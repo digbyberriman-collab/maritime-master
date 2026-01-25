@@ -213,19 +213,19 @@ const DrillScheduleTab: React.FC<DrillScheduleTabProps> = ({ onScheduleDrill }) 
               <div 
                 key={item.drillType.id} 
                 className={`p-3 rounded-lg border ${
-                  item.status === 'overdue' ? 'bg-red-50 border-red-200' :
-                  item.status === 'due_soon' ? 'bg-yellow-50 border-yellow-200' :
-                  'bg-green-50 border-green-200'
+                  item.status === 'overdue' ? 'bg-critical-muted border-critical/20' :
+                  item.status === 'due_soon' ? 'bg-warning-muted border-warning/20' :
+                  'bg-success-muted border-success/20'
                 }`}
               >
                 <div className="flex items-start justify-between mb-2">
                   <p className="font-medium text-sm">{item.drillType.drill_name}</p>
                   {item.status === 'overdue' ? (
-                    <AlertTriangle className="h-4 w-4 text-red-500" />
+                    <AlertTriangle className="h-4 w-4 text-critical" />
                   ) : item.status === 'due_soon' ? (
-                    <Clock className="h-4 w-4 text-yellow-500" />
+                    <Clock className="h-4 w-4 text-warning" />
                   ) : (
-                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <CheckCircle className="h-4 w-4 text-success" />
                   )}
                 </div>
                 <div className="text-xs text-muted-foreground space-y-1">

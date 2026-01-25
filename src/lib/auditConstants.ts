@@ -38,10 +38,10 @@ export const ISM_SECTIONS = [
 ] as const;
 
 export const AUDIT_STATUSES = [
-  { value: 'Planned', label: 'Planned', color: 'bg-blue-100 text-blue-800' },
-  { value: 'In_Progress', label: 'In Progress', color: 'bg-yellow-100 text-yellow-800' },
-  { value: 'Completed', label: 'Completed', color: 'bg-green-100 text-green-800' },
-  { value: 'Closed', label: 'Closed', color: 'bg-gray-100 text-gray-800' },
+  { value: 'Planned', label: 'Planned', color: 'bg-info-muted text-info' },
+  { value: 'In_Progress', label: 'In Progress', color: 'bg-warning-muted text-warning' },
+  { value: 'Completed', label: 'Completed', color: 'bg-success-muted text-success' },
+  { value: 'Closed', label: 'Closed', color: 'bg-muted text-muted-foreground' },
 ] as const;
 
 export const AUDIT_RESULTS = [
@@ -52,16 +52,16 @@ export const AUDIT_RESULTS = [
 ] as const;
 
 export const FINDING_TYPES = [
-  { value: 'Major_NC', label: 'Major Non-Conformity', color: 'bg-red-100 text-red-800' },
-  { value: 'Minor_NC', label: 'Minor Non-Conformity', color: 'bg-orange-100 text-orange-800' },
-  { value: 'Observation', label: 'Observation', color: 'bg-blue-100 text-blue-800' },
+  { value: 'Major_NC', label: 'Major Non-Conformity', color: 'bg-critical-muted text-critical' },
+  { value: 'Minor_NC', label: 'Minor Non-Conformity', color: 'bg-orange-muted text-orange' },
+  { value: 'Observation', label: 'Observation', color: 'bg-info-muted text-info' },
 ] as const;
 
 export const FINDING_STATUSES = [
-  { value: 'Open', label: 'Open', color: 'bg-red-100 text-red-800' },
-  { value: 'CAPA_Assigned', label: 'CAPA Assigned', color: 'bg-yellow-100 text-yellow-800' },
-  { value: 'Under_Review', label: 'Under Review', color: 'bg-blue-100 text-blue-800' },
-  { value: 'Closed', label: 'Closed', color: 'bg-green-100 text-green-800' },
+  { value: 'Open', label: 'Open', color: 'bg-critical-muted text-critical' },
+  { value: 'CAPA_Assigned', label: 'CAPA Assigned', color: 'bg-warning-muted text-warning' },
+  { value: 'Under_Review', label: 'Under Review', color: 'bg-info-muted text-info' },
+  { value: 'Closed', label: 'Closed', color: 'bg-success-muted text-success' },
 ] as const;
 
 export const REVIEW_PERIODS = [

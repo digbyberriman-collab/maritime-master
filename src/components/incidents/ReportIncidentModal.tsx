@@ -626,12 +626,12 @@ export function ReportIncidentModal({ open, onOpenChange }: ReportIncidentModalP
                           className={cn(
                             "w-8 h-8 rounded-full flex items-center justify-center font-bold text-white",
                             level.value <= 2
-                              ? "bg-green-500"
+                              ? "bg-success"
                               : level.value === 3
-                              ? "bg-yellow-500"
+                              ? "bg-warning"
                               : level.value === 4
-                              ? "bg-orange-500"
-                              : "bg-red-500"
+                              ? "bg-orange"
+                              : "bg-critical"
                           )}
                         >
                           {level.value}

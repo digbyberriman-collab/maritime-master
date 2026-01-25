@@ -40,12 +40,12 @@ export function CorrectiveActionsTab({ incidentId, incident }: CorrectiveActions
 
   const getActionTypeBadge = (type: string) => {
     const colors: Record<string, string> = {
-      Immediate: "bg-red-500",
-      Corrective: "bg-blue-500",
-      Preventive: "bg-purple-500",
+      Immediate: "bg-critical",
+      Corrective: "bg-info",
+      Preventive: "bg-purple",
     };
     return (
-      <Badge className={cn("text-white", colors[type] || "bg-gray-500")}>
+      <Badge className={cn("text-white", colors[type] || "bg-muted-foreground")}>
         {type}
       </Badge>
     );

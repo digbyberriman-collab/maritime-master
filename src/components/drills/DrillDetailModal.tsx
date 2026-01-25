@@ -88,11 +88,11 @@ const DrillDetailModal: React.FC<DrillDetailModalProps> = ({
   const getEquipmentStatusIcon = (status: string | null) => {
     switch (status) {
       case 'Satisfactory':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
+        return <CheckCircle className="h-4 w-4 text-success" />;
       case 'Defective':
-        return <XCircle className="h-4 w-4 text-red-500" />;
+        return <XCircle className="h-4 w-4 text-critical" />;
       case 'Not_Available':
-        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
+        return <AlertTriangle className="h-4 w-4 text-warning" />;
       default:
         return null;
     }
@@ -252,16 +252,16 @@ const DrillDetailModal: React.FC<DrillDetailModalProps> = ({
                                 ? 'border-green-200 bg-green-50' 
                                 : evaluation.achieved === false 
                                   ? 'border-red-200 bg-red-50'
-                                  : 'border-gray-200'
+                                  : 'border-muted'
                             }`}
                           >
                             <div className="flex items-start gap-2">
                               {evaluation.achieved ? (
-                                <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
+                                <CheckCircle className="h-5 w-5 text-success mt-0.5" />
                               ) : evaluation.achieved === false ? (
-                                <XCircle className="h-5 w-5 text-red-500 mt-0.5" />
+                                <XCircle className="h-5 w-5 text-critical mt-0.5" />
                               ) : (
-                                <div className="h-5 w-5 rounded-full border-2 border-gray-300 mt-0.5" />
+                                <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/30 mt-0.5" />
                               )}
                               <div className="flex-1">
                                 <p className="text-sm font-medium">{evaluation.objective_text}</p>
@@ -279,7 +279,7 @@ const DrillDetailModal: React.FC<DrillDetailModalProps> = ({
                       <div className="space-y-2">
                         {drill.objectives.map((obj, idx) => (
                           <div key={idx} className="flex items-center gap-2 p-2 rounded border">
-                            <div className="h-4 w-4 rounded-full border-2 border-gray-300" />
+                            <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30" />
                             <span className="text-sm">{obj}</span>
                           </div>
                         ))}
@@ -348,9 +348,9 @@ const DrillDetailModal: React.FC<DrillDetailModalProps> = ({
                               <TableCell>{participant.station_assignment || '—'}</TableCell>
                               <TableCell>
                                 {participant.attended ? (
-                                  <Badge className="bg-green-100 text-green-800">Present</Badge>
+                                  <Badge className="bg-success-muted text-success">Present</Badge>
                                 ) : participant.attended === false ? (
-                                  <Badge className="bg-red-100 text-red-800">
+                                  <Badge className="bg-critical-muted text-critical">
                                     Absent{participant.absent_reason ? `: ${participant.absent_reason}` : ''}
                                   </Badge>
                                 ) : (
@@ -410,10 +410,10 @@ const DrillDetailModal: React.FC<DrillDetailModalProps> = ({
                               <Badge 
                                 className={
                                   item.equipment_status === 'Satisfactory' 
-                                    ? 'bg-green-100 text-green-800' 
+                                    ? 'bg-success-muted text-success' 
                                     : item.equipment_status === 'Defective'
-                                      ? 'bg-red-100 text-red-800'
-                                      : 'bg-yellow-100 text-yellow-800'
+                                      ? 'bg-critical-muted text-critical'
+                                      : 'bg-warning-muted text-warning'
                                 }
                               >
                                 {item.equipment_status?.replace('_', ' ') || 'Unknown'}
@@ -483,7 +483,7 @@ const DrillDetailModal: React.FC<DrillDetailModalProps> = ({
                       </div>
                     ) : (
                       <div className="text-center py-8">
-                        <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-2" />
+                        <CheckCircle className="h-12 w-12 text-success mx-auto mb-2" />
                         <p className="text-sm text-muted-foreground">No deficiencies found</p>
                       </div>
                     )}

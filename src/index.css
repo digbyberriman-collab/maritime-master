@@ -41,6 +41,57 @@
     /* Success color for online status */
     --success: 142 76% 36%;
     --success-foreground: 0 0% 100%;
+    --success-muted: 142 76% 94%;
+
+    /* Warning color */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 0%;
+    --warning-muted: 38 92% 94%;
+
+    /* Info color */
+    --info: 217 91% 60%;
+    --info-foreground: 0 0% 100%;
+    --info-muted: 217 91% 94%;
+
+    /* Emergency/Critical colors */
+    --critical: 0 72% 51%;
+    --critical-foreground: 0 0% 100%;
+    --critical-muted: 0 72% 94%;
+
+    /* Orange accent */
+    --orange: 25 95% 53%;
+    --orange-foreground: 0 0% 100%;
+    --orange-muted: 25 95% 94%;
+
+    /* Purple accent */
+    --purple: 271 91% 65%;
+    --purple-foreground: 0 0% 100%;
+    --purple-muted: 271 91% 94%;
+
+    /* Cyan accent */
+    --cyan: 189 94% 43%;
+    --cyan-foreground: 0 0% 100%;
+    --cyan-muted: 189 94% 94%;
+
+    /* Amber accent */
+    --amber: 38 92% 50%;
+    --amber-foreground: 0 0% 0%;
+    --amber-muted: 38 92% 94%;
+
+    /* Pink accent */
+    --pink: 330 81% 60%;
+    --pink-foreground: 0 0% 100%;
+    --pink-muted: 330 81% 94%;
+
+    /* Indigo accent */
+    --indigo: 239 84% 67%;
+    --indigo-foreground: 0 0% 100%;
+    --indigo-muted: 239 84% 94%;
+
+    /* Teal accent */
+    --teal: 168 76% 42%;
+    --teal-foreground: 0 0% 100%;
+    --teal-muted: 168 76% 94%;
 
     /* Sidebar */
     --sidebar-background: 224 71% 33%;

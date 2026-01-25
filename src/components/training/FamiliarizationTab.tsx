@@ -155,8 +155,8 @@ const FamiliarizationTab: React.FC = () => {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Clock className="h-6 w-6 text-blue-600" />
+              <div className="p-3 bg-info-muted rounded-lg">
+                <Clock className="h-6 w-6 text-info" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{activeRecords.length}</p>
@@ -168,8 +168,8 @@ const FamiliarizationTab: React.FC = () => {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-green-100 rounded-lg">
-                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              <div className="p-3 bg-success-muted rounded-lg">
+                <CheckCircle2 className="h-6 w-6 text-success" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{completedRecords.length}</p>
@@ -181,8 +181,8 @@ const FamiliarizationTab: React.FC = () => {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-red-100 rounded-lg">
-                <AlertTriangle className="h-6 w-6 text-red-600" />
+              <div className="p-3 bg-critical-muted rounded-lg">
+                <AlertTriangle className="h-6 w-6 text-critical" />
               </div>
               <div>
                 <p className="text-2xl font-bold">{overdueRecords.length}</p>

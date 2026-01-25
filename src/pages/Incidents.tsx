@@ -110,12 +110,12 @@ export default function Incidents() {
               "h-3 w-3",
               star <= severity
                 ? severity <= 2
-                  ? "fill-green-500 text-green-500"
+                  ? "fill-success text-success"
                   : severity === 3
-                  ? "fill-yellow-500 text-yellow-500"
+                  ? "fill-warning text-warning"
                   : severity === 4
-                  ? "fill-orange-500 text-orange-500"
-                  : "fill-red-500 text-red-500"
+                  ? "fill-orange text-orange"
+                  : "fill-critical text-critical"
                 : "text-muted-foreground/30"
             )}
           />

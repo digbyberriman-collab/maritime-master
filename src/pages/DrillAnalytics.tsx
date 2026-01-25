@@ -381,9 +381,9 @@ const DrillAnalytics: React.FC = () => {
                     <Progress 
                       value={Math.min(check.rate, 100)} 
                       className={`h-2 ${
-                        check.rate >= 100 ? '[&>div]:bg-green-500' : 
-                        check.rate >= 70 ? '[&>div]:bg-yellow-500' : 
-                        '[&>div]:bg-red-500'
+                        check.rate >= 100 ? '[&>div]:bg-success' : 
+                        check.rate >= 70 ? '[&>div]:bg-warning' : 
+                        '[&>div]:bg-critical'
                       }`}
                     />
                   </div>
