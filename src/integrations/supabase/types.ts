@@ -747,6 +747,416 @@ export type Database = {
           },
         ]
       }
+      drill_deficiencies: {
+        Row: {
+          corrective_action_id: string | null
+          created_at: string
+          deficiency_description: string
+          drill_id: string
+          id: string
+          photo_urls: string[] | null
+          severity: string
+        }
+        Insert: {
+          corrective_action_id?: string | null
+          created_at?: string
+          deficiency_description: string
+          drill_id: string
+          id?: string
+          photo_urls?: string[] | null
+          severity: string
+        }
+        Update: {
+          corrective_action_id?: string | null
+          created_at?: string
+          deficiency_description?: string
+          drill_id?: string
+          id?: string
+          photo_urls?: string[] | null
+          severity?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drill_deficiencies_corrective_action_id_fkey"
+            columns: ["corrective_action_id"]
+            isOneToOne: false
+            referencedRelation: "corrective_actions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drill_deficiencies_drill_id_fkey"
+            columns: ["drill_id"]
+            isOneToOne: false
+            referencedRelation: "drills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drill_equipment: {
+        Row: {
+          created_at: string
+          drill_id: string
+          equipment_name: string
+          equipment_status: string | null
+          equipment_used: boolean | null
+          id: string
+          notes: string | null
+        }
+        Insert: {
+          created_at?: string
+          drill_id: string
+          equipment_name: string
+          equipment_status?: string | null
+          equipment_used?: boolean | null
+          id?: string
+          notes?: string | null
+        }
+        Update: {
+          created_at?: string
+          drill_id?: string
+          equipment_name?: string
+          equipment_status?: string | null
+          equipment_used?: boolean | null
+          id?: string
+          notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drill_equipment_drill_id_fkey"
+            columns: ["drill_id"]
+            isOneToOne: false
+            referencedRelation: "drills"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drill_evaluations: {
+        Row: {
+          achieved: boolean | null
+          created_at: string
+          drill_id: string
+          evaluator_id: string | null
+          id: string
+          notes: string | null
+          objective_index: number
+          objective_text: string
+        }
+        Insert: {
+          achieved?: boolean | null
+          created_at?: string
+          drill_id: string
+          evaluator_id?: string | null
+          id?: string
+          notes?: string | null
+          objective_index: number
+          objective_text: string
+        }
+        Update: {
+          achieved?: boolean | null
+          created_at?: string
+          drill_id?: string
+          evaluator_id?: string | null
+          id?: string
+          notes?: string | null
+          objective_index?: number
+          objective_text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drill_evaluations_drill_id_fkey"
+            columns: ["drill_id"]
+            isOneToOne: false
+            referencedRelation: "drills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drill_evaluations_evaluator_id_fkey"
+            columns: ["evaluator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      drill_participants: {
+        Row: {
+          absent_reason: string | null
+          attended: boolean | null
+          comments: string | null
+          created_at: string
+          drill_id: string
+          expected_to_attend: boolean
+          id: string
+          late_arrival_minutes: number | null
+          performance_rating: number | null
+          station_assignment: string | null
+          user_id: string
+        }
+        Insert: {
+          absent_reason?: string | null
+          attended?: boolean | null
+          comments?: string | null
+          created_at?: string
+          drill_id: string
+          expected_to_attend?: boolean
+          id?: string
+          late_arrival_minutes?: number | null
+          performance_rating?: number | null
+          station_assignment?: string | null
+          user_id: string
+        }
+        Update: {
+          absent_reason?: string | null
+          attended?: boolean | null
+          comments?: string | null
+          created_at?: string
+          drill_id?: string
+          expected_to_attend?: boolean
+          id?: string
+          late_arrival_minutes?: number | null
+          performance_rating?: number | null
+          station_assignment?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drill_participants_drill_id_fkey"
+            columns: ["drill_id"]
+            isOneToOne: false
+            referencedRelation: "drills"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drill_participants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      drill_types: {
+        Row: {
+          category: string
+          created_at: string
+          drill_name: string
+          id: string
+          is_active: boolean
+          minimum_frequency: number
+          solas_reference: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          drill_name: string
+          id?: string
+          is_active?: boolean
+          minimum_frequency: number
+          solas_reference?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          drill_name?: string
+          id?: string
+          is_active?: boolean
+          minimum_frequency?: number
+          solas_reference?: string | null
+        }
+        Relationships: []
+      }
+      drills: {
+        Row: {
+          cancelled_reason: string | null
+          conducted_by_id: string | null
+          created_at: string
+          drill_date_actual: string | null
+          drill_date_scheduled: string
+          drill_duration_minutes: number | null
+          drill_number: string
+          drill_type_id: string
+          id: string
+          lessons_learned_improvement: string | null
+          lessons_learned_positive: string | null
+          location: string | null
+          objectives: string[] | null
+          overall_rating: number | null
+          recommendations: string | null
+          scenario_description: string
+          status: string
+          updated_at: string
+          vessel_id: string
+          weather_conditions: string | null
+        }
+        Insert: {
+          cancelled_reason?: string | null
+          conducted_by_id?: string | null
+          created_at?: string
+          drill_date_actual?: string | null
+          drill_date_scheduled: string
+          drill_duration_minutes?: number | null
+          drill_number: string
+          drill_type_id: string
+          id?: string
+          lessons_learned_improvement?: string | null
+          lessons_learned_positive?: string | null
+          location?: string | null
+          objectives?: string[] | null
+          overall_rating?: number | null
+          recommendations?: string | null
+          scenario_description: string
+          status?: string
+          updated_at?: string
+          vessel_id: string
+          weather_conditions?: string | null
+        }
+        Update: {
+          cancelled_reason?: string | null
+          conducted_by_id?: string | null
+          created_at?: string
+          drill_date_actual?: string | null
+          drill_date_scheduled?: string
+          drill_duration_minutes?: number | null
+          drill_number?: string
+          drill_type_id?: string
+          id?: string
+          lessons_learned_improvement?: string | null
+          lessons_learned_positive?: string | null
+          location?: string | null
+          objectives?: string[] | null
+          overall_rating?: number | null
+          recommendations?: string | null
+          scenario_description?: string
+          status?: string
+          updated_at?: string
+          vessel_id?: string
+          weather_conditions?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drills_conducted_by_id_fkey"
+            columns: ["conducted_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "drills_drill_type_id_fkey"
+            columns: ["drill_type_id"]
+            isOneToOne: false
+            referencedRelation: "drill_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drills_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      emergency_contacts: {
+        Row: {
+          available_24_7: boolean
+          contact_category: string
+          contact_person: string | null
+          created_at: string
+          display_order: number
+          email: string | null
+          id: string
+          notes: string | null
+          organization_name: string
+          phone_primary: string
+          phone_secondary: string | null
+          vessel_id: string
+        }
+        Insert: {
+          available_24_7?: boolean
+          contact_category: string
+          contact_person?: string | null
+          created_at?: string
+          display_order?: number
+          email?: string | null
+          id?: string
+          notes?: string | null
+          organization_name: string
+          phone_primary: string
+          phone_secondary?: string | null
+          vessel_id: string
+        }
+        Update: {
+          available_24_7?: boolean
+          contact_category?: string
+          contact_person?: string | null
+          created_at?: string
+          display_order?: number
+          email?: string | null
+          id?: string
+          notes?: string | null
+          organization_name?: string
+          phone_primary?: string
+          phone_secondary?: string | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emergency_contacts_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      emergency_procedures: {
+        Row: {
+          created_at: string
+          emergency_type: string
+          id: string
+          key_actions: string[] | null
+          muster_station: string | null
+          procedure_document_id: string | null
+          responsible_officer: string | null
+          vessel_id: string
+        }
+        Insert: {
+          created_at?: string
+          emergency_type: string
+          id?: string
+          key_actions?: string[] | null
+          muster_station?: string | null
+          procedure_document_id?: string | null
+          responsible_officer?: string | null
+          vessel_id: string
+        }
+        Update: {
+          created_at?: string
+          emergency_type?: string
+          id?: string
+          key_actions?: string[] | null
+          muster_station?: string | null
+          procedure_document_id?: string | null
+          responsible_officer?: string | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emergency_procedures_procedure_document_id_fkey"
+            columns: ["procedure_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "emergency_procedures_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       incident_investigation: {
         Row: {
           approved_by: string | null
