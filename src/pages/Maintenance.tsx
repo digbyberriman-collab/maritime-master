@@ -3,7 +3,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useMaintenance } from '@/hooks/useMaintenance';
+import { useMaintenance, Equipment } from '@/hooks/useMaintenance';
 import { 
   Wrench, 
   Plus,
@@ -12,23 +12,46 @@ import {
   Package,
   Clock,
   Settings,
-  ClipboardList
+  ClipboardList,
+  RefreshCw
 } from 'lucide-react';
 import EquipmentRegisterTab from '@/components/maintenance/EquipmentRegisterTab';
 import MaintenanceScheduleTab from '@/components/maintenance/MaintenanceScheduleTab';
 import DefectsTab from '@/components/maintenance/DefectsTab';
 import RunningHoursTab from '@/components/maintenance/RunningHoursTab';
 import SparePartsTab from '@/components/maintenance/SparePartsTab';
+import TaskTemplatesTab from '@/components/maintenance/TaskTemplatesTab';
 import AddEquipmentModal from '@/components/maintenance/AddEquipmentModal';
 import CreateTaskModal from '@/components/maintenance/CreateTaskModal';
 import LogDefectModal from '@/components/maintenance/LogDefectModal';
+import EquipmentDetailModal from '@/components/maintenance/EquipmentDetailModal';
 
 const Maintenance: React.FC = () => {
-  const { stats, isLoading } = useMaintenance();
+  const { stats, tasks, defects, isLoading } = useMaintenance();
   const [activeTab, setActiveTab] = useState('equipment');
   const [showAddEquipment, setShowAddEquipment] = useState(false);
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showLogDefect, setShowLogDefect] = useState(false);
+  const [selectedEquipment, setSelectedEquipment] = useState<Equipment | null>(null);
+  const [showEquipmentDetail, setShowEquipmentDetail] = useState(false);
+  const [preselectedEquipmentId, setPreselectedEquipmentId] = useState<string | null>(null);
+
+  const handleViewEquipment = (equipment: Equipment) => {
+    setSelectedEquipment(equipment);
+    setShowEquipmentDetail(true);
+  };
+
+  const handleCreateTaskForEquipment = (equipmentId: string) => {
+    setPreselectedEquipmentId(equipmentId);
+    setShowCreateTask(true);
+    setShowEquipmentDetail(false);
+  };
+
+  const handleLogDefectForEquipment = (equipmentId: string) => {
+    setPreselectedEquipmentId(equipmentId);
+    setShowLogDefect(true);
+    setShowEquipmentDetail(false);
+  };
 
   return (
     <DashboardLayout>
@@ -121,7 +144,7 @@ const Maintenance: React.FC = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="equipment" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Equipment</span>
@@ -129,6 +152,10 @@ const Maintenance: React.FC = () => {
             <TabsTrigger value="schedule" className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               <span className="hidden sm:inline">Schedule</span>
+            </TabsTrigger>
+            <TabsTrigger value="templates" className="flex items-center gap-2">
+              <RefreshCw className="h-4 w-4" />
+              <span className="hidden sm:inline">Templates</span>
             </TabsTrigger>
             <TabsTrigger value="defects" className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
@@ -145,11 +172,18 @@ const Maintenance: React.FC = () => {
           </TabsList>
 
           <TabsContent value="equipment">
-            <EquipmentRegisterTab onAddEquipment={() => setShowAddEquipment(true)} />
+            <EquipmentRegisterTab 
+              onAddEquipment={() => setShowAddEquipment(true)} 
+              onViewEquipment={handleViewEquipment}
+            />
           </TabsContent>
 
           <TabsContent value="schedule">
             <MaintenanceScheduleTab onCreateTask={() => setShowCreateTask(true)} />
+          </TabsContent>
+
+          <TabsContent value="templates">
+            <TaskTemplatesTab />
           </TabsContent>
 
           <TabsContent value="defects">
@@ -172,11 +206,26 @@ const Maintenance: React.FC = () => {
         />
         <CreateTaskModal 
           open={showCreateTask} 
-          onOpenChange={setShowCreateTask} 
+          onOpenChange={(open) => {
+            setShowCreateTask(open);
+            if (!open) setPreselectedEquipmentId(null);
+          }}
         />
         <LogDefectModal 
           open={showLogDefect} 
-          onOpenChange={setShowLogDefect} 
+          onOpenChange={(open) => {
+            setShowLogDefect(open);
+            if (!open) setPreselectedEquipmentId(null);
+          }}
+        />
+        <EquipmentDetailModal
+          open={showEquipmentDetail}
+          onOpenChange={setShowEquipmentDetail}
+          equipment={selectedEquipment}
+          tasks={tasks}
+          defects={defects}
+          onCreateTask={handleCreateTaskForEquipment}
+          onLogDefect={handleLogDefectForEquipment}
         />
       </div>
     </DashboardLayout>

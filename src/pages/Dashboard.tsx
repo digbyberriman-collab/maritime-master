@@ -6,13 +6,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Ship, Users, Activity, Plus, Anchor, Clock, ArrowRightLeft, FileCheck, AlertCircle, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Ship, Users, Activity, Plus, Anchor, Clock, ArrowRightLeft, FileCheck, AlertCircle, AlertTriangle, TrendingUp, Wrench } from 'lucide-react';
 import { useVesselCount } from '@/hooks/useVessels';
 import { useCrewCount, useRecentCrewChanges } from '@/hooks/useCrew';
 import { useMandatoryDocumentsPending, useAcknowledgmentStats } from '@/hooks/useAcknowledgments';
 import { useOverdueCAPAs, useRecentIncidents } from '@/hooks/useCAPAAnalytics';
+import { useMaintenance } from '@/hooks/useMaintenance';
 import { format } from 'date-fns';
 import { getIncidentTypeColor } from '@/lib/incidentConstants';
+import MaintenanceWidgets from '@/components/dashboard/MaintenanceWidgets';
 
 const Dashboard: React.FC = () => {
   const { profile } = useAuth();
@@ -320,6 +322,9 @@ const Dashboard: React.FC = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Maintenance Widgets */}
+        <MaintenanceWidgets />
 
         {/* Recent Activity */}
         <Card className="shadow-card">
