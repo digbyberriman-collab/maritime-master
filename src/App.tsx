@@ -13,6 +13,7 @@ import Vessels from "./pages/Vessels";
 import CrewRoster from "./pages/CrewRoster";
 import Documents from "./pages/Documents";
 import ReviewQueue from "./pages/ReviewQueue";
+import AcknowledgmentTracking from "./pages/AcknowledgmentTracking";
 import BrandingSettings from "./pages/BrandingSettings";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
@@ -59,6 +60,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <ReviewQueue />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/acknowledgments"
+                element={
+                  <ProtectedRoute>
+                    <AcknowledgmentTracking />
                   </ProtectedRoute>
                 }
               />

@@ -5,9 +5,11 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Ship, Users, Activity, Plus, Anchor, Clock, ArrowRightLeft } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Ship, Users, Activity, Plus, Anchor, Clock, ArrowRightLeft, FileCheck, AlertCircle } from 'lucide-react';
 import { useVesselCount } from '@/hooks/useVessels';
 import { useCrewCount, useRecentCrewChanges } from '@/hooks/useCrew';
+import { useMandatoryDocumentsPending, useAcknowledgmentStats } from '@/hooks/useAcknowledgments';
 import { format } from 'date-fns';
 
 const Dashboard: React.FC = () => {
@@ -16,6 +18,8 @@ const Dashboard: React.FC = () => {
   const { data: vesselCount, isLoading: isVesselCountLoading } = useVesselCount();
   const { data: crewCount, isLoading: isCrewCountLoading } = useCrewCount();
   const { data: recentChanges, isLoading: isChangesLoading } = useRecentCrewChanges(5);
+  const { data: pendingDocs } = useMandatoryDocumentsPending();
+  const { data: ackStats } = useAcknowledgmentStats();
 
   const roleLabels: Record<string, string> = {
     master: 'Master',
@@ -112,6 +116,87 @@ const Dashboard: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Pending Acknowledgments Alert */}
+        {pendingDocs && pendingDocs.length > 0 && (
+          <Card className="shadow-card border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-lg bg-yellow-100 dark:bg-yellow-900/50 flex items-center justify-center">
+                  <AlertCircle className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-yellow-800 dark:text-yellow-200">
+                    Documents Requiring Your Acknowledgment
+                  </h3>
+                  <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                    You have {pendingDocs.length} mandatory document{pendingDocs.length > 1 ? 's' : ''} pending acknowledgment.
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {pendingDocs.slice(0, 3).map((doc) => (
+                      <Badge key={doc.id} variant="outline" className="border-yellow-400 text-yellow-800 dark:text-yellow-200">
+                        {doc.title}
+                      </Badge>
+                    ))}
+                    {pendingDocs.length > 3 && (
+                      <Badge variant="outline" className="border-yellow-400 text-yellow-800 dark:text-yellow-200">
+                        +{pendingDocs.length - 3} more
+                      </Badge>
+                    )}
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-4 border-yellow-400 text-yellow-800 hover:bg-yellow-100 dark:text-yellow-200 dark:hover:bg-yellow-900/50"
+                    onClick={() => navigate('/documents')}
+                  >
+                    View Documents
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Acknowledgment Statistics */}
+        {ackStats && ackStats.length > 0 && (
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileCheck className="w-5 h-5" />
+                Document Acknowledgment Status
+              </CardTitle>
+              <CardDescription>Mandatory documents acknowledgment progress across crew</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {ackStats.slice(0, 4).map((stat) => (
+                  <div key={stat.documentId} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{stat.documentTitle}</p>
+                        <p className="text-xs text-muted-foreground">{stat.documentNumber}</p>
+                      </div>
+                      <span className="text-sm text-muted-foreground ml-2">
+                        {stat.acknowledged}/{stat.totalCrew}
+                      </span>
+                    </div>
+                    <Progress value={stat.percentComplete} className="h-2" />
+                  </div>
+                ))}
+                {ackStats.length > 4 && (
+                  <Button 
+                    variant="link" 
+                    className="p-0 h-auto"
+                    onClick={() => navigate('/acknowledgments')}
+                  >
+                    View all {ackStats.length} documents →
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Recent Crew Changes */}
         <Card className="shadow-card">
