@@ -101,6 +101,244 @@ export type Database = {
           },
         ]
       }
+      document_acknowledgments: {
+        Row: {
+          acknowledged_at: string
+          document_id: string
+          id: string
+          ip_address: string | null
+          user_id: string
+        }
+        Insert: {
+          acknowledged_at?: string
+          document_id: string
+          id?: string
+          ip_address?: string | null
+          user_id: string
+        }
+        Update: {
+          acknowledged_at?: string
+          document_id?: string
+          id?: string
+          ip_address?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_acknowledgments_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_acknowledgments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      document_categories: {
+        Row: {
+          color: string
+          created_at: string
+          display_order: number
+          icon: string
+          id: string
+          name: string
+        }
+        Insert: {
+          color: string
+          created_at?: string
+          display_order?: number
+          icon: string
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          display_order?: number
+          icon?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      document_versions: {
+        Row: {
+          change_summary: string | null
+          created_at: string
+          created_by: string
+          document_id: string
+          file_url: string
+          id: string
+          revision: string
+        }
+        Insert: {
+          change_summary?: string | null
+          created_at?: string
+          created_by: string
+          document_id: string
+          file_url: string
+          id?: string
+          revision: string
+        }
+        Update: {
+          change_summary?: string | null
+          created_at?: string
+          created_by?: string
+          document_id?: string
+          file_url?: string
+          id?: string
+          revision?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "document_versions_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          approved_date: string | null
+          approver_id: string | null
+          author_id: string
+          category_id: string
+          company_id: string
+          created_at: string
+          description: string | null
+          document_number: string
+          file_name: string
+          file_size: number
+          file_type: string
+          file_url: string
+          id: string
+          is_mandatory_read: boolean
+          ism_sections: number[] | null
+          issue_date: string | null
+          language: string
+          next_review_date: string | null
+          reviewer_id: string | null
+          revision: string
+          status: string
+          tags: string[] | null
+          title: string
+          updated_at: string
+          vessel_id: string | null
+        }
+        Insert: {
+          approved_date?: string | null
+          approver_id?: string | null
+          author_id: string
+          category_id: string
+          company_id: string
+          created_at?: string
+          description?: string | null
+          document_number: string
+          file_name: string
+          file_size: number
+          file_type: string
+          file_url: string
+          id?: string
+          is_mandatory_read?: boolean
+          ism_sections?: number[] | null
+          issue_date?: string | null
+          language?: string
+          next_review_date?: string | null
+          reviewer_id?: string | null
+          revision?: string
+          status?: string
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          approved_date?: string | null
+          approver_id?: string | null
+          author_id?: string
+          category_id?: string
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          document_number?: string
+          file_name?: string
+          file_size?: number
+          file_type?: string
+          file_url?: string
+          id?: string
+          is_mandatory_read?: boolean
+          ism_sections?: number[] | null
+          issue_date?: string | null
+          language?: string
+          next_review_date?: string | null
+          reviewer_id?: string | null
+          revision?: string
+          status?: string
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_approver_id_fkey"
+            columns: ["approver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "documents_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "documents_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "document_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "documents_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           company_id: string | null

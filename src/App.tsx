@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Vessels from "./pages/Vessels";
 import CrewRoster from "./pages/CrewRoster";
+import Documents from "./pages/Documents";
 import BrandingSettings from "./pages/BrandingSettings";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
@@ -48,7 +49,7 @@ const App = () => (
                 path="/documents"
                 element={
                   <ProtectedRoute>
-                    <Placeholder title="Documents" description="Manage vessel documents and certifications" />
+                    <Documents />
                   </ProtectedRoute>
                 }
               />
