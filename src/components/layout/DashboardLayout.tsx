@@ -22,6 +22,7 @@ import {
   Palette,
   Siren,
   GraduationCap,
+  Wrench,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -48,6 +49,7 @@ const navigation = [
   { name: 'Audits', href: '/audits', icon: ClipboardList },
   { name: 'Drills', href: '/drills', icon: Siren },
   { name: 'Training', href: '/training', icon: GraduationCap },
+  { name: 'Maintenance', href: '/maintenance', icon: Wrench },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
