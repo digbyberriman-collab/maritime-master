@@ -19,7 +19,8 @@ const Index: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="flex flex-col items-center gap-3">
+      <div className="flex flex-col items-center gap-4">
+        <span className="text-3xl font-black tracking-tight text-primary">STORM</span>
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
         <p className="text-muted-foreground">Loading...</p>
       </div>

@@ -2,7 +2,6 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import {
-  Anchor,
   LayoutDashboard,
   FolderOpen,
   Shield,
@@ -85,10 +84,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center gap-2 px-6 h-16 border-b border-sidebar-border">
-            <div className="w-8 h-8 rounded-lg bg-sidebar-primary flex items-center justify-center">
-              <Anchor className="w-5 h-5 text-sidebar-primary-foreground" />
-            </div>
-            <span className="text-lg font-bold text-sidebar-foreground">ISM Manager</span>
+            <span className="text-xl font-black tracking-tight text-sidebar-primary">STORM</span>
             <button
               onClick={() => setSidebarOpen(false)}
               className="ml-auto lg:hidden text-sidebar-foreground"

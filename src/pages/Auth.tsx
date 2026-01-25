@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Anchor, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
 
@@ -130,7 +130,7 @@ const Auth: React.FC = () => {
         } else {
           toast({
             title: 'Account created!',
-            description: 'Welcome to ISM Manager.',
+            description: 'Welcome to STORM.',
           });
           navigate('/dashboard');
         }
@@ -161,11 +161,11 @@ const Auth: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-md animate-fade-in">
         {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-10 h-10 rounded-lg gradient-primary flex items-center justify-center">
-            <Anchor className="w-6 h-6 text-primary-foreground" />
-          </div>
-          <span className="text-2xl font-bold text-foreground">ISM Manager</span>
+        <div className="flex flex-col items-center justify-center mb-8">
+          <span className="text-4xl font-black tracking-tight text-primary">STORM</span>
+          <span className="text-xs text-muted-foreground tracking-widest uppercase mt-1">
+            Superyacht Technical Operations, Research & Management
+          </span>
         </div>
 
         <Card className="shadow-card">
@@ -176,7 +176,7 @@ const Auth: React.FC = () => {
               {mode === 'forgot-password' && 'Reset password'}
             </CardTitle>
             <CardDescription>
-              {mode === 'login' && 'Sign in to your ISM Manager account'}
+              {mode === 'login' && 'Sign in to your STORM account'}
               {mode === 'register' && 'Get started with yacht management'}
               {mode === 'forgot-password' && "Enter your email and we'll send you a reset link"}
             </CardDescription>
