@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useBrandingContext } from '@/contexts/BrandingContext';
 import { canManageBranding } from '@/hooks/useBranding';
 import InkfishFooter from '@/components/layout/InkfishFooter';
+import NotificationBell from '@/components/layout/NotificationBell';
 import {
   LayoutDashboard,
   FolderOpen,
@@ -215,6 +216,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
           {/* Spacer */}
           <div className="flex-1" />
+
+          {/* Notification Bell */}
+          <NotificationBell />
 
           {/* Client logo (desktop only) */}
           {clientLogoUrl && (

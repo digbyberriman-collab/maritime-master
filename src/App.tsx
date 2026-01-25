@@ -12,6 +12,7 @@ import Dashboard from "./pages/Dashboard";
 import Vessels from "./pages/Vessels";
 import CrewRoster from "./pages/CrewRoster";
 import Documents from "./pages/Documents";
+import ReviewQueue from "./pages/ReviewQueue";
 import BrandingSettings from "./pages/BrandingSettings";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
@@ -50,6 +51,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Documents />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/review-queue"
+                element={
+                  <ProtectedRoute>
+                    <ReviewQueue />
                   </ProtectedRoute>
                 }
               />
