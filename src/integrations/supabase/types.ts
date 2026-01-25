@@ -509,6 +509,108 @@ export type Database = {
           },
         ]
       }
+      defects: {
+        Row: {
+          actual_completion_date: string | null
+          attachments: string[] | null
+          closed_by_id: string | null
+          created_at: string
+          defect_description: string
+          defect_number: string
+          equipment_id: string | null
+          id: string
+          linked_maintenance_task_id: string | null
+          operational_impact: string
+          permanent_repair_plan: string | null
+          priority: string
+          reported_by_id: string
+          reported_date: string
+          status: string
+          target_completion_date: string | null
+          temporary_repair: string | null
+          updated_at: string
+          vessel_id: string
+        }
+        Insert: {
+          actual_completion_date?: string | null
+          attachments?: string[] | null
+          closed_by_id?: string | null
+          created_at?: string
+          defect_description: string
+          defect_number: string
+          equipment_id?: string | null
+          id?: string
+          linked_maintenance_task_id?: string | null
+          operational_impact?: string
+          permanent_repair_plan?: string | null
+          priority?: string
+          reported_by_id: string
+          reported_date?: string
+          status?: string
+          target_completion_date?: string | null
+          temporary_repair?: string | null
+          updated_at?: string
+          vessel_id: string
+        }
+        Update: {
+          actual_completion_date?: string | null
+          attachments?: string[] | null
+          closed_by_id?: string | null
+          created_at?: string
+          defect_description?: string
+          defect_number?: string
+          equipment_id?: string | null
+          id?: string
+          linked_maintenance_task_id?: string | null
+          operational_impact?: string
+          permanent_repair_plan?: string | null
+          priority?: string
+          reported_by_id?: string
+          reported_date?: string
+          status?: string
+          target_completion_date?: string | null
+          temporary_repair?: string | null
+          updated_at?: string
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "defects_closed_by_id_fkey"
+            columns: ["closed_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "defects_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "defects_linked_maintenance_task_id_fkey"
+            columns: ["linked_maintenance_task_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_tasks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "defects_reported_by_id_fkey"
+            columns: ["reported_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "defects_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_acknowledgments: {
         Row: {
           acknowledged_at: string
@@ -1157,6 +1259,128 @@ export type Database = {
           },
         ]
       }
+      equipment: {
+        Row: {
+          category_id: string
+          created_at: string
+          criticality: string
+          equipment_code: string
+          equipment_name: string
+          id: string
+          installation_date: string | null
+          location: string | null
+          manual_url: string | null
+          manufacturer: string | null
+          model: string | null
+          photo_url: string | null
+          running_hours_last_updated: string | null
+          running_hours_total: number
+          serial_number: string | null
+          specifications: Json | null
+          status: string
+          updated_at: string
+          vessel_id: string
+          warranty_expiry: string | null
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          criticality?: string
+          equipment_code: string
+          equipment_name: string
+          id?: string
+          installation_date?: string | null
+          location?: string | null
+          manual_url?: string | null
+          manufacturer?: string | null
+          model?: string | null
+          photo_url?: string | null
+          running_hours_last_updated?: string | null
+          running_hours_total?: number
+          serial_number?: string | null
+          specifications?: Json | null
+          status?: string
+          updated_at?: string
+          vessel_id: string
+          warranty_expiry?: string | null
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          criticality?: string
+          equipment_code?: string
+          equipment_name?: string
+          id?: string
+          installation_date?: string | null
+          location?: string | null
+          manual_url?: string | null
+          manufacturer?: string | null
+          model?: string | null
+          photo_url?: string | null
+          running_hours_last_updated?: string | null
+          running_hours_total?: number
+          serial_number?: string | null
+          specifications?: Json | null
+          status?: string
+          updated_at?: string
+          vessel_id?: string
+          warranty_expiry?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipment_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "equipment_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipment_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      equipment_categories: {
+        Row: {
+          category_name: string
+          color: string
+          created_at: string
+          display_order: number
+          icon: string
+          id: string
+          parent_category_id: string | null
+        }
+        Insert: {
+          category_name: string
+          color?: string
+          created_at?: string
+          display_order?: number
+          icon?: string
+          id?: string
+          parent_category_id?: string | null
+        }
+        Update: {
+          category_name?: string
+          color?: string
+          created_at?: string
+          display_order?: number
+          icon?: string
+          id?: string
+          parent_category_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipment_categories_parent_category_id_fkey"
+            columns: ["parent_category_id"]
+            isOneToOne: false
+            referencedRelation: "equipment_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       familiarization_checklist_items: {
         Row: {
           completed: boolean
@@ -1515,6 +1739,205 @@ export type Database = {
           },
         ]
       }
+      maintenance_task_templates: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          equipment_id: string | null
+          estimated_duration_minutes: number | null
+          id: string
+          interval_type: string
+          interval_value: number
+          is_active: boolean
+          procedure_document_id: string | null
+          required_spares: string[] | null
+          required_tools: string[] | null
+          responsible_role: string | null
+          safety_precautions: string | null
+          task_description: string | null
+          task_name: string
+          task_type: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          equipment_id?: string | null
+          estimated_duration_minutes?: number | null
+          id?: string
+          interval_type: string
+          interval_value: number
+          is_active?: boolean
+          procedure_document_id?: string | null
+          required_spares?: string[] | null
+          required_tools?: string[] | null
+          responsible_role?: string | null
+          safety_precautions?: string | null
+          task_description?: string | null
+          task_name: string
+          task_type: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          equipment_id?: string | null
+          estimated_duration_minutes?: number | null
+          id?: string
+          interval_type?: string
+          interval_value?: number
+          is_active?: boolean
+          procedure_document_id?: string | null
+          required_spares?: string[] | null
+          required_tools?: string[] | null
+          responsible_role?: string | null
+          safety_precautions?: string | null
+          task_description?: string | null
+          task_name?: string
+          task_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_task_templates_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "equipment_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_task_templates_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_task_templates_procedure_document_id_fkey"
+            columns: ["procedure_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance_tasks: {
+        Row: {
+          actual_completion_date: string | null
+          actual_start_date: string | null
+          assigned_to_id: string | null
+          attachments: string[] | null
+          completed_by_id: string | null
+          created_at: string
+          due_date: string
+          due_running_hours: number | null
+          equipment_id: string
+          findings: string | null
+          hours_spent: number | null
+          id: string
+          next_due_date: string | null
+          priority: string
+          scheduled_date: string | null
+          spares_used: Json | null
+          status: string
+          task_name: string
+          task_number: string
+          task_type: string
+          template_id: string | null
+          updated_at: string
+          verified_by_id: string | null
+          work_description: string | null
+          work_performed: string | null
+        }
+        Insert: {
+          actual_completion_date?: string | null
+          actual_start_date?: string | null
+          assigned_to_id?: string | null
+          attachments?: string[] | null
+          completed_by_id?: string | null
+          created_at?: string
+          due_date: string
+          due_running_hours?: number | null
+          equipment_id: string
+          findings?: string | null
+          hours_spent?: number | null
+          id?: string
+          next_due_date?: string | null
+          priority?: string
+          scheduled_date?: string | null
+          spares_used?: Json | null
+          status?: string
+          task_name: string
+          task_number: string
+          task_type: string
+          template_id?: string | null
+          updated_at?: string
+          verified_by_id?: string | null
+          work_description?: string | null
+          work_performed?: string | null
+        }
+        Update: {
+          actual_completion_date?: string | null
+          actual_start_date?: string | null
+          assigned_to_id?: string | null
+          attachments?: string[] | null
+          completed_by_id?: string | null
+          created_at?: string
+          due_date?: string
+          due_running_hours?: number | null
+          equipment_id?: string
+          findings?: string | null
+          hours_spent?: number | null
+          id?: string
+          next_due_date?: string | null
+          priority?: string
+          scheduled_date?: string | null
+          spares_used?: Json | null
+          status?: string
+          task_name?: string
+          task_number?: string
+          task_type?: string
+          template_id?: string | null
+          updated_at?: string
+          verified_by_id?: string | null
+          work_description?: string | null
+          work_performed?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_tasks_assigned_to_id_fkey"
+            columns: ["assigned_to_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "maintenance_tasks_completed_by_id_fkey"
+            columns: ["completed_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "maintenance_tasks_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_tasks_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "maintenance_task_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_tasks_verified_by_id_fkey"
+            columns: ["verified_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       management_reviews: {
         Row: {
           action_items: Json | null
@@ -1635,6 +2058,113 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      running_hours_log: {
+        Row: {
+          created_at: string
+          equipment_id: string
+          id: string
+          notes: string | null
+          recorded_by_id: string
+          recorded_date: string
+          running_hours: number
+        }
+        Insert: {
+          created_at?: string
+          equipment_id: string
+          id?: string
+          notes?: string | null
+          recorded_by_id: string
+          recorded_date?: string
+          running_hours: number
+        }
+        Update: {
+          created_at?: string
+          equipment_id?: string
+          id?: string
+          notes?: string | null
+          recorded_by_id?: string
+          recorded_date?: string
+          running_hours?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "running_hours_log_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "running_hours_log_recorded_by_id_fkey"
+            columns: ["recorded_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      spare_parts: {
+        Row: {
+          created_at: string
+          equipment_ids: string[] | null
+          id: string
+          last_ordered_date: string | null
+          location_onboard: string | null
+          manufacturer: string | null
+          minimum_stock: number
+          notes: string | null
+          part_name: string
+          part_number: string
+          quantity_onboard: number
+          supplier: string | null
+          unit_cost: number | null
+          updated_at: string
+          vessel_id: string
+        }
+        Insert: {
+          created_at?: string
+          equipment_ids?: string[] | null
+          id?: string
+          last_ordered_date?: string | null
+          location_onboard?: string | null
+          manufacturer?: string | null
+          minimum_stock?: number
+          notes?: string | null
+          part_name: string
+          part_number: string
+          quantity_onboard?: number
+          supplier?: string | null
+          unit_cost?: number | null
+          updated_at?: string
+          vessel_id: string
+        }
+        Update: {
+          created_at?: string
+          equipment_ids?: string[] | null
+          id?: string
+          last_ordered_date?: string | null
+          location_onboard?: string | null
+          manufacturer?: string | null
+          minimum_stock?: number
+          notes?: string | null
+          part_name?: string
+          part_number?: string
+          quantity_onboard?: number
+          supplier?: string | null
+          unit_cost?: number | null
+          updated_at?: string
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spare_parts_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
             referencedColumns: ["id"]
           },
         ]
