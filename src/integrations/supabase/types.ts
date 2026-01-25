@@ -16,24 +16,81 @@ export type Database = {
     Tables: {
       companies: {
         Row: {
+          address: string | null
           created_at: string
           id: string
+          imo_company_number: string | null
           name: string
           updated_at: string
         }
         Insert: {
+          address?: string | null
           created_at?: string
           id?: string
+          imo_company_number?: string | null
           name: string
           updated_at?: string
         }
         Update: {
+          address?: string | null
           created_at?: string
           id?: string
+          imo_company_number?: string | null
           name?: string
           updated_at?: string
         }
         Relationships: []
+      }
+      crew_assignments: {
+        Row: {
+          created_at: string
+          id: string
+          is_current: boolean | null
+          join_date: string
+          leave_date: string | null
+          position: string
+          updated_at: string
+          user_id: string
+          vessel_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_current?: boolean | null
+          join_date: string
+          leave_date?: string | null
+          position: string
+          updated_at?: string
+          user_id: string
+          vessel_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_current?: boolean | null
+          join_date?: string
+          leave_date?: string | null
+          position?: string
+          updated_at?: string
+          user_id?: string
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_assignments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_assignments_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -43,7 +100,11 @@ export type Database = {
           first_name: string
           id: string
           last_name: string
+          nationality: string | null
+          phone: string | null
+          rank: string | null
           role: Database["public"]["Enums"]["user_role"]
+          status: string | null
           updated_at: string
           user_id: string
         }
@@ -54,7 +115,11 @@ export type Database = {
           first_name: string
           id?: string
           last_name: string
+          nationality?: string | null
+          phone?: string | null
+          rank?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          status?: string | null
           updated_at?: string
           user_id: string
         }
@@ -65,7 +130,11 @@ export type Database = {
           first_name?: string
           id?: string
           last_name?: string
+          nationality?: string | null
+          phone?: string | null
+          rank?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          status?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -81,32 +150,44 @@ export type Database = {
       }
       vessels: {
         Row: {
+          build_year: number | null
+          classification_society: string | null
           company_id: string
           created_at: string
-          flag: string | null
+          flag_state: string | null
+          gross_tonnage: number | null
           id: string
           imo_number: string | null
           name: string
+          status: string | null
           updated_at: string
           vessel_type: string | null
         }
         Insert: {
+          build_year?: number | null
+          classification_society?: string | null
           company_id: string
           created_at?: string
-          flag?: string | null
+          flag_state?: string | null
+          gross_tonnage?: number | null
           id?: string
           imo_number?: string | null
           name: string
+          status?: string | null
           updated_at?: string
           vessel_type?: string | null
         }
         Update: {
+          build_year?: number | null
+          classification_society?: string | null
           company_id?: string
           created_at?: string
-          flag?: string | null
+          flag_state?: string | null
+          gross_tonnage?: number | null
           id?: string
           imo_number?: string | null
           name?: string
+          status?: string | null
           updated_at?: string
           vessel_type?: string | null
         }
@@ -125,7 +206,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_company_id: { Args: { _user_id: string }; Returns: string }
+      user_belongs_to_company: {
+        Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       user_role:

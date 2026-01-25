@@ -1,12 +1,16 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Ship, Users, Activity, Plus, Anchor, Clock } from 'lucide-react';
+import { useVesselCount } from '@/hooks/useVessels';
 
 const Dashboard: React.FC = () => {
   const { profile } = useAuth();
+  const navigate = useNavigate();
+  const { data: vesselCount, isLoading: isVesselCountLoading } = useVesselCount();
 
   const roleLabels: Record<string, string> = {
     master: 'Master',
@@ -20,7 +24,7 @@ const Dashboard: React.FC = () => {
   const stats = [
     {
       title: 'Total Vessels',
-      value: '0',
+      value: isVesselCountLoading ? '...' : String(vesselCount ?? 0),
       icon: Ship,
       description: 'In your fleet',
     },
@@ -92,7 +96,7 @@ const Dashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-3">
-              <Button className="gap-2">
+              <Button className="gap-2" onClick={() => navigate('/vessels')}>
                 <Plus className="w-4 h-4" />
                 Add Vessel
               </Button>
