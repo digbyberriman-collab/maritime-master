@@ -22,7 +22,7 @@ interface CreateWorkPermitModalProps {
 
 const CreateWorkPermitModal = ({ open, onOpenChange }: CreateWorkPermitModalProps) => {
   const { profile } = useAuth();
-  const { data: vessels } = useVessels();
+  const { vessels } = useVessels();
   const createMutation = useCreateWorkPermit();
 
   const [formData, setFormData] = useState({
