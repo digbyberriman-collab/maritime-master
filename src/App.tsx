@@ -23,6 +23,8 @@ import NotFound from "./pages/NotFound";
 import Incidents from "./pages/Incidents";
 import IncidentAnalytics from "./pages/IncidentAnalytics";
 import CAPATracker from "./pages/CAPATracker";
+import Certificates from "./pages/Certificates";
+import CertificateAlerts from "./pages/CertificateAlerts";
 
 const queryClient = new QueryClient();
 
@@ -106,6 +108,22 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Incidents />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/certificates"
+                element={
+                  <ProtectedRoute>
+                    <Certificates />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/certificates/alerts"
+                element={
+                  <ProtectedRoute>
+                    <CertificateAlerts />
                   </ProtectedRoute>
                 }
               />
