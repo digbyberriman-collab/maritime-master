@@ -570,9 +570,9 @@ export function ReportIncidentModal({ open, onOpenChange }: ReportIncidentModalP
                     >
                       <div className="flex items-center gap-3">
                         {file.type.startsWith("image/") ? (
-                          <FileImage className="h-5 w-5 text-blue-500" />
+                          <FileImage className="h-5 w-5 text-info" />
                         ) : (
-                          <FileText className="h-5 w-5 text-orange-500" />
+                          <FileText className="h-5 w-5 text-orange" />
                         )}
                         <div>
                           <p className="text-sm font-medium">{file.name}</p>
@@ -685,12 +685,12 @@ export function ReportIncidentModal({ open, onOpenChange }: ReportIncidentModalP
                           className={cn(
                             "w-8 h-8 rounded-full flex items-center justify-center font-bold text-white",
                             level.value <= 2
-                              ? "bg-green-500"
+                              ? "bg-success"
                               : level.value === 3
-                              ? "bg-yellow-500"
+                              ? "bg-warning"
                               : level.value === 4
-                              ? "bg-orange-500"
-                              : "bg-red-500"
+                              ? "bg-orange"
+                              : "bg-critical"
                           )}
                         >
                           {level.value}
@@ -714,14 +714,14 @@ export function ReportIncidentModal({ open, onOpenChange }: ReportIncidentModalP
             </div>
 
             {(formData.severity_actual >= 3 || formData.severity_potential >= 4) && (
-              <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <div className="p-4 bg-warning-muted border border-warning/30 rounded-lg">
                 <div className="flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+                  <AlertCircle className="h-5 w-5 text-warning mt-0.5" />
                   <div>
-                    <p className="font-medium text-yellow-800 dark:text-yellow-200">
+                    <p className="font-medium text-warning-foreground">
                       Investigation Required
                     </p>
-                    <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                    <p className="text-sm text-warning-foreground/80">
                       Based on the severity assessment, this incident will require a
                       formal investigation.
                     </p>
@@ -756,8 +756,8 @@ export function ReportIncidentModal({ open, onOpenChange }: ReportIncidentModalP
               </div>
 
               {formData.dpa_notified && (
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                <div className="p-4 bg-info-muted border border-info/30 rounded-lg">
+                  <p className="text-sm text-info-foreground">
                     The DPA will be notified via email once this incident is
                     submitted.
                   </p>
@@ -874,7 +874,7 @@ export function ReportIncidentModal({ open, onOpenChange }: ReportIncidentModalP
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-red-500" />
+            <AlertCircle className="h-5 w-5 text-critical" />
             Report Incident
           </DialogTitle>
         </DialogHeader>
@@ -938,7 +938,7 @@ export function ReportIncidentModal({ open, onOpenChange }: ReportIncidentModalP
               <Button
                 onClick={handleSubmit}
                 disabled={!confirmed || createIncident.isPending}
-                className="bg-red-600 hover:bg-red-700"
+                className="bg-critical hover:bg-critical/90"
               >
                 {createIncident.isPending ? "Submitting..." : "Submit Incident Report"}
               </Button>

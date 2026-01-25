@@ -73,7 +73,7 @@ const DrillDetailModal: React.FC<DrillDetailModalProps> = ({
         {[1, 2, 3, 4, 5].map(star => (
           <Star 
             key={star}
-            className={`h-4 w-4 ${star <= rating ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`}
+            className={`h-4 w-4 ${star <= rating ? 'text-warning fill-warning' : 'text-muted-foreground/30'}`}
           />
         ))}
       </div>
@@ -249,9 +249,9 @@ const DrillDetailModal: React.FC<DrillDetailModalProps> = ({
                             key={evaluation.id}
                             className={`p-3 rounded-lg border ${
                               evaluation.achieved 
-                                ? 'border-green-200 bg-green-50' 
+                                ? 'border-success/30 bg-success-muted' 
                                 : evaluation.achieved === false 
-                                  ? 'border-red-200 bg-red-50'
+                                  ? 'border-critical/30 bg-critical-muted'
                                   : 'border-muted'
                             }`}
                           >
@@ -388,10 +388,10 @@ const DrillDetailModal: React.FC<DrillDetailModalProps> = ({
                             key={item.id}
                             className={`flex items-center justify-between p-3 rounded-lg border ${
                               item.equipment_status === 'Satisfactory' 
-                                ? 'border-green-200 bg-green-50'
+                                ? 'border-success/30 bg-success-muted'
                                 : item.equipment_status === 'Defective'
-                                  ? 'border-red-200 bg-red-50'
-                                  : 'border-gray-200'
+                                  ? 'border-critical/30 bg-critical-muted'
+                                  : 'border-muted'
                             }`}
                           >
                             <div className="flex items-center gap-3">
@@ -495,7 +495,7 @@ const DrillDetailModal: React.FC<DrillDetailModalProps> = ({
               <TabsContent value="lessons" className="space-y-4">
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base text-green-600">What Went Well</CardTitle>
+                    <CardTitle className="text-base text-success">What Went Well</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm">
@@ -506,7 +506,7 @@ const DrillDetailModal: React.FC<DrillDetailModalProps> = ({
 
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base text-amber-600">Areas for Improvement</CardTitle>
+                    <CardTitle className="text-base text-warning">Areas for Improvement</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm">
@@ -517,7 +517,7 @@ const DrillDetailModal: React.FC<DrillDetailModalProps> = ({
 
                 <Card>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-base text-blue-600">Recommendations</CardTitle>
+                    <CardTitle className="text-base text-info">Recommendations</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <p className="text-sm">
