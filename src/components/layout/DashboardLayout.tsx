@@ -20,6 +20,7 @@ import {
   X,
   Ship,
   Palette,
+  Siren,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -44,6 +45,7 @@ const navigation = [
   { name: 'Certificates', href: '/certificates', icon: Shield },
   { name: 'Compliance', href: '/compliance', icon: ClipboardList },
   { name: 'Audits', href: '/audits', icon: ClipboardList },
+  { name: 'Drills', href: '/drills', icon: Siren },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
