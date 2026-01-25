@@ -50,6 +50,108 @@ export type Database = {
         }
         Relationships: []
       }
+      corrective_actions: {
+        Row: {
+          action_number: string
+          action_type: string
+          assigned_by: string
+          assigned_to: string
+          company_id: string
+          completion_date: string | null
+          completion_notes: string | null
+          created_at: string
+          description: string
+          due_date: string
+          evidence_urls: string[] | null
+          finding_id: string | null
+          id: string
+          incident_id: string | null
+          status: string | null
+          updated_at: string
+          verification_notes: string | null
+          verified_by: string | null
+          verified_date: string | null
+        }
+        Insert: {
+          action_number: string
+          action_type: string
+          assigned_by: string
+          assigned_to: string
+          company_id: string
+          completion_date?: string | null
+          completion_notes?: string | null
+          created_at?: string
+          description: string
+          due_date: string
+          evidence_urls?: string[] | null
+          finding_id?: string | null
+          id?: string
+          incident_id?: string | null
+          status?: string | null
+          updated_at?: string
+          verification_notes?: string | null
+          verified_by?: string | null
+          verified_date?: string | null
+        }
+        Update: {
+          action_number?: string
+          action_type?: string
+          assigned_by?: string
+          assigned_to?: string
+          company_id?: string
+          completion_date?: string | null
+          completion_notes?: string | null
+          created_at?: string
+          description?: string
+          due_date?: string
+          evidence_urls?: string[] | null
+          finding_id?: string | null
+          id?: string
+          incident_id?: string | null
+          status?: string | null
+          updated_at?: string
+          verification_notes?: string | null
+          verified_by?: string | null
+          verified_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "corrective_actions_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "corrective_actions_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "corrective_actions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "corrective_actions_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "corrective_actions_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       crew_assignments: {
         Row: {
           created_at: string
@@ -332,6 +434,185 @@ export type Database = {
           },
           {
             foreignKeyName: "documents_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incident_investigation: {
+        Row: {
+          approved_by: string | null
+          approved_date: string | null
+          completed_date: string | null
+          contributing_factors: string[] | null
+          created_at: string
+          findings: string | null
+          id: string
+          incident_id: string
+          investigation_method: string | null
+          investigation_team: Json | null
+          lead_investigator: string
+          recommendations: string[] | null
+          root_cause: string | null
+          timeline: Json | null
+        }
+        Insert: {
+          approved_by?: string | null
+          approved_date?: string | null
+          completed_date?: string | null
+          contributing_factors?: string[] | null
+          created_at?: string
+          findings?: string | null
+          id?: string
+          incident_id: string
+          investigation_method?: string | null
+          investigation_team?: Json | null
+          lead_investigator: string
+          recommendations?: string[] | null
+          root_cause?: string | null
+          timeline?: Json | null
+        }
+        Update: {
+          approved_by?: string | null
+          approved_date?: string | null
+          completed_date?: string | null
+          contributing_factors?: string[] | null
+          created_at?: string
+          findings?: string | null
+          id?: string
+          incident_id?: string
+          investigation_method?: string | null
+          investigation_team?: Json | null
+          lead_investigator?: string
+          recommendations?: string[] | null
+          root_cause?: string | null
+          timeline?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_investigation_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "incident_investigation_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incident_investigation_lead_investigator_fkey"
+            columns: ["lead_investigator"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      incidents: {
+        Row: {
+          attachments: Json | null
+          company_id: string
+          contributing_factors: string[] | null
+          created_at: string
+          description: string
+          dpa_notified: boolean | null
+          dpa_notified_date: string | null
+          id: string
+          immediate_action: string | null
+          incident_date: string
+          incident_number: string
+          incident_type: string
+          investigation_required: boolean | null
+          investigation_status: string | null
+          location: string
+          persons_involved: Json | null
+          reported_by: string
+          reported_date: string
+          root_cause: string | null
+          severity_actual: number
+          severity_potential: number
+          status: string | null
+          updated_at: string
+          vessel_id: string
+          witnesses: Json | null
+        }
+        Insert: {
+          attachments?: Json | null
+          company_id: string
+          contributing_factors?: string[] | null
+          created_at?: string
+          description: string
+          dpa_notified?: boolean | null
+          dpa_notified_date?: string | null
+          id?: string
+          immediate_action?: string | null
+          incident_date: string
+          incident_number: string
+          incident_type: string
+          investigation_required?: boolean | null
+          investigation_status?: string | null
+          location: string
+          persons_involved?: Json | null
+          reported_by: string
+          reported_date?: string
+          root_cause?: string | null
+          severity_actual: number
+          severity_potential: number
+          status?: string | null
+          updated_at?: string
+          vessel_id: string
+          witnesses?: Json | null
+        }
+        Update: {
+          attachments?: Json | null
+          company_id?: string
+          contributing_factors?: string[] | null
+          created_at?: string
+          description?: string
+          dpa_notified?: boolean | null
+          dpa_notified_date?: string | null
+          id?: string
+          immediate_action?: string | null
+          incident_date?: string
+          incident_number?: string
+          incident_type?: string
+          investigation_required?: boolean | null
+          investigation_status?: string | null
+          location?: string
+          persons_involved?: Json | null
+          reported_by?: string
+          reported_date?: string
+          root_cause?: string | null
+          severity_actual?: number
+          severity_potential?: number
+          status?: string | null
+          updated_at?: string
+          vessel_id?: string
+          witnesses?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incidents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incidents_reported_by_fkey"
+            columns: ["reported_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "incidents_vessel_id_fkey"
             columns: ["vessel_id"]
             isOneToOne: false
             referencedRelation: "vessels"

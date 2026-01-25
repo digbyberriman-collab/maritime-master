@@ -20,6 +20,7 @@ import ReviewDashboard from "./pages/ReviewDashboard";
 import BrandingSettings from "./pages/BrandingSettings";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
+import Incidents from "./pages/Incidents";
 
 const queryClient = new QueryClient();
 
@@ -102,7 +103,7 @@ const App = () => (
                 path="/compliance"
                 element={
                   <ProtectedRoute>
-                    <Placeholder title="Compliance" description="Track compliance and audits" />
+                    <Incidents />
                   </ProtectedRoute>
                 }
               />
