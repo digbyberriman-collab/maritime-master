@@ -2006,6 +2006,58 @@ export type Database = {
           },
         ]
       }
+      permit_extensions: {
+        Row: {
+          approved_by_id: string | null
+          created_at: string
+          extended_by_id: string
+          extension_reason: string
+          id: string
+          new_end_datetime: string
+          permit_id: string
+        }
+        Insert: {
+          approved_by_id?: string | null
+          created_at?: string
+          extended_by_id: string
+          extension_reason: string
+          id?: string
+          new_end_datetime: string
+          permit_id: string
+        }
+        Update: {
+          approved_by_id?: string | null
+          created_at?: string
+          extended_by_id?: string
+          extension_reason?: string
+          id?: string
+          new_end_datetime?: string
+          permit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permit_extensions_approved_by_id_fkey"
+            columns: ["approved_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "permit_extensions_extended_by_id_fkey"
+            columns: ["extended_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "permit_extensions_permit_id_fkey"
+            columns: ["permit_id"]
+            isOneToOne: false
+            referencedRelation: "work_permits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           company_id: string | null
@@ -2058,6 +2110,212 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      risk_assessment_hazards: {
+        Row: {
+          consequences: string
+          controls: string[]
+          created_at: string
+          hazard_description: string
+          id: string
+          likelihood_after: number | null
+          likelihood_before: number
+          responsible_person: string | null
+          risk_assessment_id: string
+          risk_score_after: number | null
+          risk_score_before: number
+          sequence_order: number
+          severity_after: number | null
+          severity_before: number
+        }
+        Insert: {
+          consequences: string
+          controls?: string[]
+          created_at?: string
+          hazard_description: string
+          id?: string
+          likelihood_after?: number | null
+          likelihood_before: number
+          responsible_person?: string | null
+          risk_assessment_id: string
+          risk_score_after?: number | null
+          risk_score_before: number
+          sequence_order?: number
+          severity_after?: number | null
+          severity_before: number
+        }
+        Update: {
+          consequences?: string
+          controls?: string[]
+          created_at?: string
+          hazard_description?: string
+          id?: string
+          likelihood_after?: number | null
+          likelihood_before?: number
+          responsible_person?: string | null
+          risk_assessment_id?: string
+          risk_score_after?: number | null
+          risk_score_before?: number
+          sequence_order?: number
+          severity_after?: number | null
+          severity_before?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "risk_assessment_hazards_risk_assessment_id_fkey"
+            columns: ["risk_assessment_id"]
+            isOneToOne: false
+            referencedRelation: "risk_assessments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      risk_assessment_templates: {
+        Row: {
+          common_hazards: Json
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          task_category: string
+          template_name: string
+          vessel_id: string | null
+        }
+        Insert: {
+          common_hazards?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          task_category: string
+          template_name: string
+          vessel_id?: string | null
+        }
+        Update: {
+          common_hazards?: Json
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          task_category?: string
+          template_name?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "risk_assessment_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "risk_assessment_templates_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      risk_assessments: {
+        Row: {
+          approved_by_id: string | null
+          assessed_by_id: string
+          assessment_date: string
+          assessment_number: string
+          created_at: string
+          id: string
+          linked_procedure_id: string | null
+          review_date: string
+          risk_score_initial: number | null
+          risk_score_residual: number | null
+          status: string
+          task_date: string
+          task_description: string | null
+          task_location: string
+          task_name: string
+          template_id: string | null
+          updated_at: string
+          vessel_id: string
+        }
+        Insert: {
+          approved_by_id?: string | null
+          assessed_by_id: string
+          assessment_date?: string
+          assessment_number: string
+          created_at?: string
+          id?: string
+          linked_procedure_id?: string | null
+          review_date: string
+          risk_score_initial?: number | null
+          risk_score_residual?: number | null
+          status?: string
+          task_date: string
+          task_description?: string | null
+          task_location: string
+          task_name: string
+          template_id?: string | null
+          updated_at?: string
+          vessel_id: string
+        }
+        Update: {
+          approved_by_id?: string | null
+          assessed_by_id?: string
+          assessment_date?: string
+          assessment_number?: string
+          created_at?: string
+          id?: string
+          linked_procedure_id?: string | null
+          review_date?: string
+          risk_score_initial?: number | null
+          risk_score_residual?: number | null
+          status?: string
+          task_date?: string
+          task_description?: string | null
+          task_location?: string
+          task_name?: string
+          template_id?: string | null
+          updated_at?: string
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "risk_assessments_approved_by_id_fkey"
+            columns: ["approved_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "risk_assessments_assessed_by_id_fkey"
+            columns: ["assessed_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "risk_assessments_linked_procedure_id_fkey"
+            columns: ["linked_procedure_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "risk_assessments_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "risk_assessment_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "risk_assessments_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
             referencedColumns: ["id"]
           },
         ]
@@ -2361,6 +2619,132 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_permits: {
+        Row: {
+          actual_end: string | null
+          actual_start: string | null
+          approved_by_id: string | null
+          atmosphere_results: Json | null
+          atmosphere_tested: boolean
+          cancellation_reason: string | null
+          completion_notes: string | null
+          created_at: string
+          emergency_equipment: string[]
+          end_datetime: string
+          equipment_isolated: boolean
+          fire_watch_assigned_id: string | null
+          fire_watch_required: boolean
+          id: string
+          permit_number: string
+          permit_type: string
+          precautions_verified: boolean
+          requested_by_id: string
+          risk_assessment_id: string | null
+          safety_precautions_required: Json
+          start_datetime: string
+          status: string
+          updated_at: string
+          vessel_id: string
+          work_description: string
+          work_location: string
+          workers: Json
+        }
+        Insert: {
+          actual_end?: string | null
+          actual_start?: string | null
+          approved_by_id?: string | null
+          atmosphere_results?: Json | null
+          atmosphere_tested?: boolean
+          cancellation_reason?: string | null
+          completion_notes?: string | null
+          created_at?: string
+          emergency_equipment?: string[]
+          end_datetime: string
+          equipment_isolated?: boolean
+          fire_watch_assigned_id?: string | null
+          fire_watch_required?: boolean
+          id?: string
+          permit_number: string
+          permit_type: string
+          precautions_verified?: boolean
+          requested_by_id: string
+          risk_assessment_id?: string | null
+          safety_precautions_required?: Json
+          start_datetime: string
+          status?: string
+          updated_at?: string
+          vessel_id: string
+          work_description: string
+          work_location: string
+          workers?: Json
+        }
+        Update: {
+          actual_end?: string | null
+          actual_start?: string | null
+          approved_by_id?: string | null
+          atmosphere_results?: Json | null
+          atmosphere_tested?: boolean
+          cancellation_reason?: string | null
+          completion_notes?: string | null
+          created_at?: string
+          emergency_equipment?: string[]
+          end_datetime?: string
+          equipment_isolated?: boolean
+          fire_watch_assigned_id?: string | null
+          fire_watch_required?: boolean
+          id?: string
+          permit_number?: string
+          permit_type?: string
+          precautions_verified?: boolean
+          requested_by_id?: string
+          risk_assessment_id?: string | null
+          safety_precautions_required?: Json
+          start_datetime?: string
+          status?: string
+          updated_at?: string
+          vessel_id?: string
+          work_description?: string
+          work_location?: string
+          workers?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_permits_approved_by_id_fkey"
+            columns: ["approved_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_permits_fire_watch_assigned_id_fkey"
+            columns: ["fire_watch_assigned_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_permits_requested_by_id_fkey"
+            columns: ["requested_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_permits_risk_assessment_id_fkey"
+            columns: ["risk_assessment_id"]
+            isOneToOne: false
+            referencedRelation: "risk_assessments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_permits_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
             referencedColumns: ["id"]
           },
         ]
