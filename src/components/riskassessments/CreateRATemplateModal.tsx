@@ -17,7 +17,7 @@ interface CreateRATemplateModalProps {
 
 const CreateRATemplateModal = ({ open, onOpenChange }: CreateRATemplateModalProps) => {
   const { profile } = useAuth();
-  const { data: vessels } = useVessels();
+  const { vessels } = useVessels();
   const createMutation = useCreateRiskAssessmentTemplate();
 
   const [formData, setFormData] = useState({
