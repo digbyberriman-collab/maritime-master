@@ -374,8 +374,8 @@ const EmergencyProceduresTab: React.FC = () => {
 
       {/* Emergency Contacts Modal */}
       <EmergencyContactsModal 
-        isOpen={showContactsModal}
-        onClose={() => setShowContactsModal(false)}
+        open={showContactsModal}
+        onOpenChange={setShowContactsModal}
       />
 
       {/* Muster List Modal */}

@@ -78,7 +78,7 @@ const DrillAnalytics: React.FC = () => {
 
   // Monthly drill frequency data
   const monthlyData = useMemo(() => {
-    const data: Record<string, Record<string, number>> = {};
+    const data: Record<string, Record<string, string | number>> = {};
     const monthsAgo = subMonths(new Date(), parseInt(dateRange));
     
     for (let i = 0; i < parseInt(dateRange); i++) {
@@ -93,9 +93,10 @@ const DrillAnalytics: React.FC = () => {
     filteredCompleted.forEach(drill => {
       const monthKey = format(new Date(drill.drill_date_scheduled), 'MMM yyyy');
       if (data[monthKey]) {
-        data[monthKey].total++;
+        (data[monthKey].total as number)++;
         if (drill.drill_type) {
-          data[monthKey][drill.drill_type.drill_name] = (data[monthKey][drill.drill_type.drill_name] || 0) + 1;
+          const currentValue = data[monthKey][drill.drill_type.drill_name] as number || 0;
+          data[monthKey][drill.drill_type.drill_name] = currentValue + 1;
         }
       }
     });

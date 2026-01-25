@@ -178,6 +178,11 @@ export const DRILL_TYPE_COLORS: Record<string, string> = {
   'Steering Gear Failure Drill': 'bg-teal-500',
 };
 
+// Get color for a drill type
+export function getDrillTypeColor(drillTypeName: string): string {
+  return DRILL_TYPE_COLORS[drillTypeName] || 'bg-gray-500';
+}
+
 // Generate drill number
 export function generateDrillNumber(existingCount: number): string {
   const year = new Date().getFullYear();
