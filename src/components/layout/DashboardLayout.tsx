@@ -33,6 +33,7 @@ interface DashboardLayoutProps {
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Vessels', href: '/vessels', icon: Ship },
   { name: 'Documents', href: '/documents', icon: FolderOpen },
   { name: 'Compliance', href: '/compliance', icon: Shield },
   { name: 'Operations', href: '/operations', icon: ClipboardList },
