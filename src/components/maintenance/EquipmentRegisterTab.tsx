@@ -24,9 +24,10 @@ import { format } from 'date-fns';
 
 interface EquipmentRegisterTabProps {
   onAddEquipment: () => void;
+  onViewEquipment?: (equipment: Equipment) => void;
 }
 
-const EquipmentRegisterTab: React.FC<EquipmentRegisterTabProps> = ({ onAddEquipment }) => {
+const EquipmentRegisterTab: React.FC<EquipmentRegisterTabProps> = ({ onAddEquipment, onViewEquipment }) => {
   const { categories, equipment, tasks, flatCategories } = useMaintenance();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -274,7 +275,12 @@ const EquipmentRegisterTab: React.FC<EquipmentRegisterTabProps> = ({ onAddEquipm
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="sm" title="View">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            title="View"
+                            onClick={() => onViewEquipment?.(equip)}
+                          >
                             <Eye className="h-4 w-4" />
                           </Button>
                           <Button variant="ghost" size="sm" title="Edit">
