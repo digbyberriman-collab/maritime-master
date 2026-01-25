@@ -29,6 +29,7 @@ import Audits from "./pages/Audits";
 import Drills from "./pages/Drills";
 import DrillAnalytics from "./pages/DrillAnalytics";
 import Training from "./pages/Training";
+import Maintenance from "./pages/Maintenance";
 
 const queryClient = new QueryClient();
 
@@ -168,6 +169,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Training />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/maintenance"
+                element={
+                  <ProtectedRoute>
+                    <Maintenance />
                   </ProtectedRoute>
                 }
               />
