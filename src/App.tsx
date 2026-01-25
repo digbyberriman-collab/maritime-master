@@ -27,6 +27,8 @@ import Certificates from "./pages/Certificates";
 import CertificateAlerts from "./pages/CertificateAlerts";
 import Audits from "./pages/Audits";
 import Drills from "./pages/Drills";
+import DrillAnalytics from "./pages/DrillAnalytics";
+import Training from "./pages/Training";
 
 const queryClient = new QueryClient();
 
@@ -150,6 +152,22 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Drills />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/reports/drill-analytics"
+                element={
+                  <ProtectedRoute>
+                    <DrillAnalytics />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/training"
+                element={
+                  <ProtectedRoute>
+                    <Training />
                   </ProtectedRoute>
                 }
               />
