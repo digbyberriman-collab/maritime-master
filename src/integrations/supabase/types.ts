@@ -17,6 +17,9 @@ export type Database = {
       companies: {
         Row: {
           address: string | null
+          brand_color: string | null
+          client_display_name: string | null
+          client_logo_url: string | null
           created_at: string
           id: string
           imo_company_number: string | null
@@ -25,6 +28,9 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          brand_color?: string | null
+          client_display_name?: string | null
+          client_logo_url?: string | null
           created_at?: string
           id?: string
           imo_company_number?: string | null
@@ -33,6 +39,9 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          brand_color?: string | null
+          client_display_name?: string | null
+          client_logo_url?: string | null
           created_at?: string
           id?: string
           imo_company_number?: string | null

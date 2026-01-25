@@ -1,6 +1,8 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBrandingContext } from '@/contexts/BrandingContext';
+import { canManageBranding } from '@/hooks/useBranding';
 import {
   LayoutDashboard,
   FolderOpen,
@@ -14,6 +16,7 @@ import {
   Menu,
   X,
   Ship,
+  Palette,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -42,6 +45,7 @@ const navigation = [
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const { profile, signOut } = useAuth();
+  const { clientDisplayName, brandColor, clientLogoUrl } = useBrandingContext();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
@@ -64,6 +68,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
     shore_management: 'Shore Management',
   };
 
+  const canAccessBranding = canManageBranding(profile?.role);
+
   return (
     <div className="min-h-screen bg-background flex">
       {/* Mobile sidebar overlay */}
@@ -82,21 +88,34 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         )}
       >
         <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="flex items-center gap-2 px-6 h-16 border-b border-sidebar-border">
-            <span className="text-xl font-black tracking-tight text-sidebar-primary">STORM</span>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="ml-auto lg:hidden text-sidebar-foreground"
-            >
-              <X className="w-5 h-5" />
-            </button>
+          {/* Logo with client branding */}
+          <div className="flex flex-col px-6 py-4 border-b border-sidebar-border">
+            <div className="flex items-center justify-between">
+              <span 
+                className="text-xl font-black tracking-tight"
+                style={{ color: brandColor }}
+              >
+                STORM
+              </span>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="lg:hidden text-sidebar-foreground"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {clientDisplayName && (
+              <span className="text-xs text-sidebar-foreground/70 mt-1 truncate">
+                {clientDisplayName}
+              </span>
+            )}
           </div>
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-4 space-y-1">
             {navigation.map((item) => {
-              const isActive = location.pathname === item.href;
+              const isActive = location.pathname === item.href || 
+                (item.href === '/settings' && location.pathname.startsWith('/settings'));
               return (
                 <button
                   key={item.name}
@@ -116,13 +135,35 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 </button>
               );
             })}
+            
+            {/* Branding settings - only for DPA/Shore Management */}
+            {canAccessBranding && (
+              <button
+                onClick={() => {
+                  navigate('/settings/branding');
+                  setSidebarOpen(false);
+                }}
+                className={cn(
+                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ml-4',
+                  location.pathname === '/settings/branding'
+                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                    : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                )}
+              >
+                <Palette className="w-4 h-4" />
+                Branding
+              </button>
+            )}
           </nav>
 
           {/* User info at bottom */}
           <div className="p-4 border-t border-sidebar-border">
             <div className="flex items-center gap-3 text-sidebar-foreground">
               <Avatar className="w-8 h-8">
-                <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-sm">
+                <AvatarFallback 
+                  className="text-sm"
+                  style={{ backgroundColor: brandColor, color: 'white' }}
+                >
                   {userInitials}
                 </AvatarFallback>
               </Avatar>
@@ -172,12 +213,26 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           {/* Spacer */}
           <div className="flex-1" />
 
+          {/* Client logo (desktop only) */}
+          {clientLogoUrl && (
+            <div className="hidden lg:flex items-center mr-4">
+              <img
+                src={clientLogoUrl}
+                alt="Client logo"
+                className="max-h-8 max-w-[120px] object-contain"
+              />
+            </div>
+          )}
+
           {/* User menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="gap-2">
                 <Avatar className="w-8 h-8">
-                  <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+                  <AvatarFallback 
+                    className="text-sm"
+                    style={{ backgroundColor: brandColor, color: 'white' }}
+                  >
                     {userInitials}
                   </AvatarFallback>
                 </Avatar>
@@ -196,6 +251,12 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 <Settings className="w-4 h-4 mr-2" />
                 Settings
               </DropdownMenuItem>
+              {canAccessBranding && (
+                <DropdownMenuItem onClick={() => navigate('/settings/branding')}>
+                  <Palette className="w-4 h-4 mr-2" />
+                  Branding
+                </DropdownMenuItem>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
                 <LogOut className="w-4 h-4 mr-2" />
