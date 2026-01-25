@@ -43,7 +43,7 @@ const navigation = [
   { name: 'Documents', href: '/documents', icon: FolderOpen },
   { name: 'Certificates', href: '/certificates', icon: Shield },
   { name: 'Compliance', href: '/compliance', icon: ClipboardList },
-  { name: 'Operations', href: '/operations', icon: ClipboardList },
+  { name: 'Audits', href: '/audits', icon: ClipboardList },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
