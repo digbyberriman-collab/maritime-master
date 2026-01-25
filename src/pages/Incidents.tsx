@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
 import { useVessels } from "@/hooks/useVessels";
 import { useIncidents, useIncidentStats } from "@/hooks/useIncidents";
 import { ReportIncidentModal } from "@/components/incidents/ReportIncidentModal";
-import { IncidentViewModal } from "@/components/incidents/IncidentViewModal";
+import { IncidentDetailView } from "@/components/incidents/IncidentDetailView";
 import {
   INCIDENT_TYPES,
   getIncidentTypeColor,
@@ -439,7 +439,7 @@ export default function Incidents() {
         />
 
         {viewingIncident && (
-          <IncidentViewModal
+          <IncidentDetailView
             incidentId={viewingIncident}
             open={!!viewingIncident}
             onOpenChange={(open) => !open && setViewingIncident(null)}
