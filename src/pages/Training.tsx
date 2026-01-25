@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useTraining } from '@/hooks/useTraining';
 import { useCrew } from '@/hooks/useCrew';
+import DashboardLayout from '@/components/layout/DashboardLayout';
 import { 
   GraduationCap, 
   Award, 
@@ -42,6 +43,7 @@ const Training: React.FC = () => {
     : 0;
 
   return (
+    <DashboardLayout>
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -174,6 +176,7 @@ const Training: React.FC = () => {
         onOpenChange={setShowTemplates}
       />
     </div>
+    </DashboardLayout>
   );
 };
 
