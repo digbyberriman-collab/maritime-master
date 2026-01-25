@@ -14,6 +14,9 @@ import CrewRoster from "./pages/CrewRoster";
 import Documents from "./pages/Documents";
 import ReviewQueue from "./pages/ReviewQueue";
 import AcknowledgmentTracking from "./pages/AcknowledgmentTracking";
+import MasterDocumentIndex from "./pages/MasterDocumentIndex";
+import DocumentSearch from "./pages/DocumentSearch";
+import ReviewDashboard from "./pages/ReviewDashboard";
 import BrandingSettings from "./pages/BrandingSettings";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
@@ -68,6 +71,30 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <AcknowledgmentTracking />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/documents/master-index"
+                element={
+                  <ProtectedRoute>
+                    <MasterDocumentIndex />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/documents/search"
+                element={
+                  <ProtectedRoute>
+                    <DocumentSearch />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/documents/reviews"
+                element={
+                  <ProtectedRoute>
+                    <ReviewDashboard />
                   </ProtectedRoute>
                 }
               />
