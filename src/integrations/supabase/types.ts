@@ -1157,6 +1157,185 @@ export type Database = {
           },
         ]
       }
+      familiarization_checklist_items: {
+        Row: {
+          completed: boolean
+          completed_by_id: string | null
+          completed_date: string | null
+          evidence_url: string | null
+          familiarization_id: string
+          id: string
+          item_order: number
+          item_text: string
+          notes: string | null
+          section_name: string
+        }
+        Insert: {
+          completed?: boolean
+          completed_by_id?: string | null
+          completed_date?: string | null
+          evidence_url?: string | null
+          familiarization_id: string
+          id?: string
+          item_order?: number
+          item_text: string
+          notes?: string | null
+          section_name: string
+        }
+        Update: {
+          completed?: boolean
+          completed_by_id?: string | null
+          completed_date?: string | null
+          evidence_url?: string | null
+          familiarization_id?: string
+          id?: string
+          item_order?: number
+          item_text?: string
+          notes?: string | null
+          section_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "familiarization_checklist_items_completed_by_id_fkey"
+            columns: ["completed_by_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "familiarization_checklist_items_familiarization_id_fkey"
+            columns: ["familiarization_id"]
+            isOneToOne: false
+            referencedRelation: "familiarization_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      familiarization_records: {
+        Row: {
+          actual_completion_date: string | null
+          completion_percentage: number
+          created_at: string
+          id: string
+          join_date: string
+          status: string
+          supervisor_id: string | null
+          target_completion_date: string
+          template_id: string | null
+          updated_at: string
+          user_id: string
+          vessel_id: string
+        }
+        Insert: {
+          actual_completion_date?: string | null
+          completion_percentage?: number
+          created_at?: string
+          id?: string
+          join_date: string
+          status?: string
+          supervisor_id?: string | null
+          target_completion_date: string
+          template_id?: string | null
+          updated_at?: string
+          user_id: string
+          vessel_id: string
+        }
+        Update: {
+          actual_completion_date?: string | null
+          completion_percentage?: number
+          created_at?: string
+          id?: string
+          join_date?: string
+          status?: string
+          supervisor_id?: string | null
+          target_completion_date?: string
+          template_id?: string | null
+          updated_at?: string
+          user_id?: string
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "familiarization_records_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "familiarization_records_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "familiarization_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "familiarization_records_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "familiarization_records_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      familiarization_templates: {
+        Row: {
+          applicable_ranks: string[] | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          sections: Json
+          template_name: string
+          total_duration_days: number
+          vessel_id: string
+        }
+        Insert: {
+          applicable_ranks?: string[] | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          sections?: Json
+          template_name: string
+          total_duration_days?: number
+          vessel_id: string
+        }
+        Update: {
+          applicable_ranks?: string[] | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          sections?: Json
+          template_name?: string
+          total_duration_days?: number
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "familiarization_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "familiarization_templates_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       incident_investigation: {
         Row: {
           approved_by: string | null
@@ -1457,6 +1636,149 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_courses: {
+        Row: {
+          applicable_ranks: string[] | null
+          course_category: string
+          course_code: string
+          course_duration_days: number | null
+          course_name: string
+          created_at: string
+          description: string | null
+          id: string
+          is_mandatory: boolean
+          issuing_authority: string | null
+          validity_period_months: number | null
+        }
+        Insert: {
+          applicable_ranks?: string[] | null
+          course_category: string
+          course_code: string
+          course_duration_days?: number | null
+          course_name: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_mandatory?: boolean
+          issuing_authority?: string | null
+          validity_period_months?: number | null
+        }
+        Update: {
+          applicable_ranks?: string[] | null
+          course_category?: string
+          course_code?: string
+          course_duration_days?: number | null
+          course_name?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_mandatory?: boolean
+          issuing_authority?: string | null
+          validity_period_months?: number | null
+        }
+        Relationships: []
+      }
+      training_matrix: {
+        Row: {
+          created_at: string
+          id: string
+          rank: string
+          required_courses: Json
+          vessel_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          rank: string
+          required_courses?: Json
+          vessel_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          rank?: string
+          required_courses?: Json
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_matrix_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      training_records: {
+        Row: {
+          alert_sent: boolean
+          certificate_file_url: string | null
+          certificate_number: string | null
+          completion_date: string
+          course_id: string
+          created_at: string
+          expiry_date: string | null
+          grade_result: string | null
+          id: string
+          issue_date: string
+          notes: string | null
+          status: string
+          training_provider: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          alert_sent?: boolean
+          certificate_file_url?: string | null
+          certificate_number?: string | null
+          completion_date: string
+          course_id: string
+          created_at?: string
+          expiry_date?: string | null
+          grade_result?: string | null
+          id?: string
+          issue_date: string
+          notes?: string | null
+          status?: string
+          training_provider: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          alert_sent?: boolean
+          certificate_file_url?: string | null
+          certificate_number?: string | null
+          completion_date?: string
+          course_id?: string
+          created_at?: string
+          expiry_date?: string | null
+          grade_result?: string | null
+          id?: string
+          issue_date?: string
+          notes?: string | null
+          status?: string
+          training_provider?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_records_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "training_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_records_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
