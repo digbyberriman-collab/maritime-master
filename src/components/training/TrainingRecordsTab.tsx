@@ -202,7 +202,7 @@ const TrainingRecordsTab: React.FC<TrainingRecordsTabProps> = ({ onAddTraining }
                               <Badge variant="destructive">{expiredCount} Expired</Badge>
                             )}
                             {expiringCount > 0 && (
-                              <Badge className="bg-yellow-100 text-yellow-800">{expiringCount} Expiring</Badge>
+                              <Badge className="bg-warning-muted text-warning">{expiringCount} Expiring</Badge>
                             )}
                             <Badge variant={validCount === data.records.length ? "default" : "secondary"}>
                               {validCount === data.records.length ? '✓ Compliant' : `${validCount}/${data.records.length}`}

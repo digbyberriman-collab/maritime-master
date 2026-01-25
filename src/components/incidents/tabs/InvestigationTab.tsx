@@ -41,9 +41,9 @@ interface InvestigationTabProps {
 
 const INVESTIGATION_STATUSES = [
   { value: "Not Started", label: "Not Started", color: "bg-muted text-muted-foreground" },
-  { value: "In Progress", label: "In Progress", color: "bg-blue-500 text-white" },
-  { value: "Completed", label: "Completed", color: "bg-yellow-500 text-white" },
-  { value: "Approved", label: "Approved", color: "bg-green-500 text-white" },
+  { value: "In Progress", label: "In Progress", color: "bg-info text-info-foreground" },
+  { value: "Completed", label: "Completed", color: "bg-warning text-warning-foreground" },
+  { value: "Approved", label: "Approved", color: "bg-success text-success-foreground" },
 ];
 
 export function InvestigationTab({ incident }: InvestigationTabProps) {

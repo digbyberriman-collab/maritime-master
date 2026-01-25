@@ -9,18 +9,18 @@ export const COURSE_CATEGORIES = [
 
 // Training Record Statuses
 export const TRAINING_STATUSES = [
-  { value: 'Valid', label: 'Valid', color: 'bg-green-100 text-green-800' },
-  { value: 'Expiring_Soon', label: 'Expiring Soon', color: 'bg-yellow-100 text-yellow-800' },
-  { value: 'Expired', label: 'Expired', color: 'bg-red-100 text-red-800' },
-  { value: 'Suspended', label: 'Suspended', color: 'bg-gray-100 text-gray-800' },
+  { value: 'Valid', label: 'Valid', color: 'bg-success-muted text-success' },
+  { value: 'Expiring_Soon', label: 'Expiring Soon', color: 'bg-warning-muted text-warning' },
+  { value: 'Expired', label: 'Expired', color: 'bg-critical-muted text-critical' },
+  { value: 'Suspended', label: 'Suspended', color: 'bg-muted text-muted-foreground' },
 ] as const;
 
 // Familiarization Statuses
 export const FAMILIARIZATION_STATUSES = [
-  { value: 'Not_Started', label: 'Not Started', color: 'bg-gray-100 text-gray-800' },
-  { value: 'In_Progress', label: 'In Progress', color: 'bg-blue-100 text-blue-800' },
-  { value: 'Completed', label: 'Completed', color: 'bg-green-100 text-green-800' },
-  { value: 'Overdue', label: 'Overdue', color: 'bg-red-100 text-red-800' },
+  { value: 'Not_Started', label: 'Not Started', color: 'bg-muted text-muted-foreground' },
+  { value: 'In_Progress', label: 'In Progress', color: 'bg-info-muted text-info' },
+  { value: 'Completed', label: 'Completed', color: 'bg-success-muted text-success' },
+  { value: 'Overdue', label: 'Overdue', color: 'bg-critical-muted text-critical' },
 ] as const;
 
 // Grade/Result Options
@@ -95,13 +95,13 @@ export function getFamiliarizationStatusColor(status: string): string {
 
 export function getCategoryColor(category: string): string {
   const colors: Record<string, string> = {
-    STCW: 'bg-blue-100 text-blue-800',
-    Flag_Required: 'bg-purple-100 text-purple-800',
-    Company_Required: 'bg-orange-100 text-orange-800',
-    Manufacturer: 'bg-cyan-100 text-cyan-800',
-    Other: 'bg-gray-100 text-gray-800',
+    STCW: 'bg-info-muted text-info',
+    Flag_Required: 'bg-purple-muted text-purple',
+    Company_Required: 'bg-orange-muted text-orange',
+    Manufacturer: 'bg-cyan-muted text-cyan',
+    Other: 'bg-muted text-muted-foreground',
   };
-  return colors[category] || 'bg-gray-100 text-gray-800';
+  return colors[category] || 'bg-muted text-muted-foreground';
 }
 
 // Calculate training status based on expiry

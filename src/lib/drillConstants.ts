@@ -7,11 +7,11 @@ export const DRILL_CATEGORIES = [
 
 // Drill Statuses
 export const DRILL_STATUSES = [
-  { value: 'Scheduled', label: 'Scheduled', color: 'bg-blue-100 text-blue-800' },
-  { value: 'In_Progress', label: 'In Progress', color: 'bg-yellow-100 text-yellow-800' },
-  { value: 'Completed', label: 'Completed', color: 'bg-green-100 text-green-800' },
-  { value: 'Cancelled', label: 'Cancelled', color: 'bg-red-100 text-red-800' },
-  { value: 'Postponed', label: 'Postponed', color: 'bg-orange-100 text-orange-800' },
+  { value: 'Scheduled', label: 'Scheduled', color: 'bg-info-muted text-info' },
+  { value: 'In_Progress', label: 'In Progress', color: 'bg-warning-muted text-warning' },
+  { value: 'Completed', label: 'Completed', color: 'bg-success-muted text-success' },
+  { value: 'Cancelled', label: 'Cancelled', color: 'bg-critical-muted text-critical' },
+  { value: 'Postponed', label: 'Postponed', color: 'bg-orange-muted text-orange' },
 ] as const;
 
 // Weather Conditions
@@ -25,10 +25,10 @@ export const WEATHER_CONDITIONS = [
 
 // Deficiency Severities
 export const DEFICIENCY_SEVERITIES = [
-  { value: 'Critical', label: 'Critical', color: 'bg-red-100 text-red-800' },
-  { value: 'Serious', label: 'Serious', color: 'bg-orange-100 text-orange-800' },
-  { value: 'Minor', label: 'Minor', color: 'bg-yellow-100 text-yellow-800' },
-  { value: 'Observation', label: 'Observation', color: 'bg-blue-100 text-blue-800' },
+  { value: 'Critical', label: 'Critical', color: 'bg-critical-muted text-critical' },
+  { value: 'Serious', label: 'Serious', color: 'bg-orange-muted text-orange' },
+  { value: 'Minor', label: 'Minor', color: 'bg-warning-muted text-warning' },
+  { value: 'Observation', label: 'Observation', color: 'bg-info-muted text-info' },
 ] as const;
 
 // Equipment Statuses
@@ -164,18 +164,18 @@ export const STATION_ASSIGNMENTS: Record<string, Record<string, string>> = {
 
 // Drill type colors for calendar
 export const DRILL_TYPE_COLORS: Record<string, string> = {
-  'Fire Drill': 'bg-red-500',
-  'Abandon Ship Drill': 'bg-orange-500',
-  'Man Overboard Drill': 'bg-blue-500',
-  'Collision Drill': 'bg-yellow-500',
-  'Grounding Drill': 'bg-amber-600',
-  'Flooding Drill': 'bg-cyan-500',
-  'Pollution Response Drill': 'bg-green-500',
-  'Piracy/Armed Robbery Drill': 'bg-purple-500',
-  'Medical Emergency Drill': 'bg-pink-500',
-  'Enclosed Space Entry Drill': 'bg-gray-500',
-  'Search and Rescue Drill': 'bg-indigo-500',
-  'Steering Gear Failure Drill': 'bg-teal-500',
+  'Fire Drill': 'bg-critical',
+  'Abandon Ship Drill': 'bg-orange',
+  'Man Overboard Drill': 'bg-info',
+  'Collision Drill': 'bg-warning',
+  'Grounding Drill': 'bg-amber',
+  'Flooding Drill': 'bg-cyan',
+  'Pollution Response Drill': 'bg-success',
+  'Piracy/Armed Robbery Drill': 'bg-purple',
+  'Medical Emergency Drill': 'bg-pink',
+  'Enclosed Space Entry Drill': 'bg-muted-foreground',
+  'Search and Rescue Drill': 'bg-indigo',
+  'Steering Gear Failure Drill': 'bg-teal',
 };
 
 // Get color for a drill type

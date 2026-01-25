@@ -36,17 +36,17 @@ const getTimelineIcon = (type: string) => {
 const getTimelineColor = (type: string) => {
   switch (type) {
     case "incident":
-      return "bg-red-500";
+      return "bg-critical";
     case "investigation":
-      return "bg-blue-500";
+      return "bg-info";
     case "capa":
-      return "bg-purple-500";
+      return "bg-purple";
     case "notification":
-      return "bg-yellow-500";
+      return "bg-warning";
     case "status":
-      return "bg-green-500";
+      return "bg-success";
     default:
-      return "bg-gray-500";
+      return "bg-muted-foreground";
   }
 };
 

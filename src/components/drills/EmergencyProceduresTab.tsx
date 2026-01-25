@@ -136,31 +136,31 @@ const EmergencyProceduresTab: React.FC = () => {
 
   const getEmergencyIcon = (type: string) => {
     switch (type) {
-      case 'Fire': return <Flame className="h-5 w-5 text-red-500" />;
-      case 'Flooding': return <Waves className="h-5 w-5 text-blue-500" />;
-      case 'Man_Overboard': return <User className="h-5 w-5 text-blue-600" />;
-      case 'Abandon_Ship': return <Ship className="h-5 w-5 text-orange-500" />;
-      case 'Collision': return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
-      case 'Grounding': return <Anchor className="h-5 w-5 text-amber-600" />;
-      case 'Pollution': return <CloudRain className="h-5 w-5 text-green-500" />;
-      case 'Piracy': return <Shield className="h-5 w-5 text-purple-500" />;
-      case 'Medical': return <Stethoscope className="h-5 w-5 text-pink-500" />;
-      default: return <AlertTriangle className="h-5 w-5 text-gray-500" />;
+      case 'Fire': return <Flame className="h-5 w-5 text-critical" />;
+      case 'Flooding': return <Waves className="h-5 w-5 text-info" />;
+      case 'Man_Overboard': return <User className="h-5 w-5 text-info" />;
+      case 'Abandon_Ship': return <Ship className="h-5 w-5 text-orange" />;
+      case 'Collision': return <AlertTriangle className="h-5 w-5 text-warning" />;
+      case 'Grounding': return <Anchor className="h-5 w-5 text-amber" />;
+      case 'Pollution': return <CloudRain className="h-5 w-5 text-success" />;
+      case 'Piracy': return <Shield className="h-5 w-5 text-purple" />;
+      case 'Medical': return <Stethoscope className="h-5 w-5 text-pink" />;
+      default: return <AlertTriangle className="h-5 w-5 text-muted-foreground" />;
     }
   };
 
   const getEmergencyColor = (type: string) => {
     switch (type) {
-      case 'Fire': return 'border-red-200 bg-red-50';
-      case 'Flooding': return 'border-blue-200 bg-blue-50';
-      case 'Man_Overboard': return 'border-blue-200 bg-blue-50';
-      case 'Abandon_Ship': return 'border-orange-200 bg-orange-50';
-      case 'Collision': return 'border-yellow-200 bg-yellow-50';
-      case 'Grounding': return 'border-amber-200 bg-amber-50';
-      case 'Pollution': return 'border-green-200 bg-green-50';
-      case 'Piracy': return 'border-purple-200 bg-purple-50';
-      case 'Medical': return 'border-pink-200 bg-pink-50';
-      default: return 'border-gray-200 bg-gray-50';
+      case 'Fire': return 'border-critical/20 bg-critical-muted';
+      case 'Flooding': return 'border-info/20 bg-info-muted';
+      case 'Man_Overboard': return 'border-info/20 bg-info-muted';
+      case 'Abandon_Ship': return 'border-orange/20 bg-orange-muted';
+      case 'Collision': return 'border-warning/20 bg-warning-muted';
+      case 'Grounding': return 'border-amber/20 bg-amber-muted';
+      case 'Pollution': return 'border-success/20 bg-success-muted';
+      case 'Piracy': return 'border-purple/20 bg-purple-muted';
+      case 'Medical': return 'border-pink/20 bg-pink-muted';
+      default: return 'border-border bg-muted';
     }
   };
 

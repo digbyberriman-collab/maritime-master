@@ -14,14 +14,14 @@ interface IncidentTypeChartProps {
 const getColorForType = (type: string): string => {
   const found = INCIDENT_TYPES.find((t) => t.value === type);
   if (found) {
-    // Map Tailwind classes to HSL values
+    // Map semantic tokens to HSL values
     const colorMap: Record<string, string> = {
-      "bg-blue-500": "hsl(221 83% 53%)",
-      "bg-orange-500": "hsl(25 95% 53%)",
-      "bg-red-500": "hsl(0 72% 51%)",
-      "bg-yellow-500": "hsl(38 92% 50%)",
-      "bg-purple-500": "hsl(271 91% 65%)",
-      "bg-gray-500": "hsl(215 14% 45%)",
+      "bg-info": "hsl(var(--info))",
+      "bg-orange": "hsl(var(--orange))",
+      "bg-critical": "hsl(var(--critical))",
+      "bg-warning": "hsl(var(--warning))",
+      "bg-purple": "hsl(var(--purple))",
+      "bg-muted-foreground": "hsl(var(--muted-foreground))",
     };
     return colorMap[found.color] || "hsl(var(--primary))";
   }
