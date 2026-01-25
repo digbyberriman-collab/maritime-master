@@ -22,7 +22,7 @@ const Audits: React.FC = () => {
   const [defaultAuditType, setDefaultAuditType] = useState<'Internal' | 'External'>('Internal');
   
   const { audits, openFindings, reviews, nextAudit, isLoading } = useAudits();
-  const { certificates } = useCertificates();
+  const { certificates = [] } = useCertificates();
 
   // Find DOC and SMC certificates for validity display
   const docCertificate = certificates.find(c => c.certificate_type === 'company' && c.certificate_name?.toLowerCase().includes('doc'));
