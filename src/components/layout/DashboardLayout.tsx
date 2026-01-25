@@ -44,6 +44,7 @@ const navigation = [
   { name: 'Compliance', href: '/compliance', icon: Shield },
   { name: 'Operations', href: '/operations', icon: ClipboardList },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
+  { name: 'CAPA Tracker', href: '/reports/capa-tracker', icon: ClipboardList },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

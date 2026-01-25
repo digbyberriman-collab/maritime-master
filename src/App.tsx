@@ -21,6 +21,8 @@ import BrandingSettings from "./pages/BrandingSettings";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
 import Incidents from "./pages/Incidents";
+import IncidentAnalytics from "./pages/IncidentAnalytics";
+import CAPATracker from "./pages/CAPATracker";
 
 const queryClient = new QueryClient();
 
@@ -127,7 +129,23 @@ const App = () => (
                 path="/reports"
                 element={
                   <ProtectedRoute>
-                    <Placeholder title="Reports" description="Generate and view analytics reports" />
+                    <IncidentAnalytics />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/reports/incident-analytics"
+                element={
+                  <ProtectedRoute>
+                    <IncidentAnalytics />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/reports/capa-tracker"
+                element={
+                  <ProtectedRoute>
+                    <CAPATracker />
                   </ProtectedRoute>
                 }
               />

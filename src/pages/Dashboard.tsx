@@ -6,11 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Ship, Users, Activity, Plus, Anchor, Clock, ArrowRightLeft, FileCheck, AlertCircle } from 'lucide-react';
+import { Ship, Users, Activity, Plus, Anchor, Clock, ArrowRightLeft, FileCheck, AlertCircle, AlertTriangle, TrendingUp } from 'lucide-react';
 import { useVesselCount } from '@/hooks/useVessels';
 import { useCrewCount, useRecentCrewChanges } from '@/hooks/useCrew';
 import { useMandatoryDocumentsPending, useAcknowledgmentStats } from '@/hooks/useAcknowledgments';
+import { useOverdueCAPAs, useRecentIncidents } from '@/hooks/useCAPAAnalytics';
 import { format } from 'date-fns';
+import { getIncidentTypeColor } from '@/lib/incidentConstants';
 
 const Dashboard: React.FC = () => {
   const { profile } = useAuth();
@@ -20,6 +22,8 @@ const Dashboard: React.FC = () => {
   const { data: recentChanges, isLoading: isChangesLoading } = useRecentCrewChanges(5);
   const { data: pendingDocs } = useMandatoryDocumentsPending();
   const { data: ackStats } = useAcknowledgmentStats();
+  const { data: overdueCapas } = useOverdueCAPAs();
+  const { data: recentIncidents } = useRecentIncidents(5);
 
   const roleLabels: Record<string, string> = {
     master: 'Master',
@@ -117,6 +121,79 @@ const Dashboard: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* Overdue CAPAs Alert */}
+        {overdueCapas && overdueCapas.length > 0 && (
+          <Card className="shadow-card border-destructive/50 bg-destructive/5">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-lg bg-destructive/20 flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-destructive" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-semibold text-destructive">
+                    Overdue Corrective Actions
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {overdueCapas.length} CAPA{overdueCapas.length > 1 ? 's' : ''} past due date
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-4 border-destructive text-destructive hover:bg-destructive/10"
+                    onClick={() => navigate('/reports/capa-tracker')}
+                  >
+                    View CAPAs
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Recent Incidents */}
+        {recentIncidents && recentIncidents.length > 0 && (
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="w-5 h-5" />
+                Recent Incidents
+              </CardTitle>
+              <CardDescription>Latest reported incidents</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {recentIncidents.map((incident) => (
+                  <div
+                    key={incident.id}
+                    className="flex items-center justify-between py-2 border-b border-border last:border-0"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Badge className={getIncidentTypeColor(incident.incident_type)}>
+                        {incident.incident_type}
+                      </Badge>
+                      <div>
+                        <p className="text-sm font-medium">{incident.incident_number}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {(incident.vessel as { name: string })?.name || 'Unknown vessel'}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {format(new Date(incident.incident_date), 'dd MMM yyyy')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <Button 
+                variant="link" 
+                className="p-0 h-auto mt-3"
+                onClick={() => navigate('/compliance')}
+              >
+                View all incidents →
+              </Button>
+            </CardContent>
+          </Card>
+        )}
         {/* Pending Acknowledgments Alert */}
         {pendingDocs && pendingDocs.length > 0 && (
           <Card className="shadow-card border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20">
