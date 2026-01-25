@@ -219,16 +219,16 @@ export default function Incidents() {
               </div>
 
               <Select
-                value={filters.vesselId}
+                value={filters.vesselId || "all"}
                 onValueChange={(value) =>
-                  setFilters((prev) => ({ ...prev, vesselId: value }))
+                  setFilters((prev) => ({ ...prev, vesselId: value === "all" ? "" : value }))
                 }
               >
                 <SelectTrigger className="w-[180px]">
                   <SelectValue placeholder="All Vessels" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Vessels</SelectItem>
+                  <SelectItem value="all">All Vessels</SelectItem>
                   {vessels?.map((vessel) => (
                     <SelectItem key={vessel.id} value={vessel.id}>
                       {vessel.name}
@@ -268,16 +268,16 @@ export default function Incidents() {
               </Popover>
 
               <Select
-                value={filters.status}
+                value={filters.status || "all"}
                 onValueChange={(value) =>
-                  setFilters((prev) => ({ ...prev, status: value }))
+                  setFilters((prev) => ({ ...prev, status: value === "all" ? "" : value }))
                 }
               >
                 <SelectTrigger className="w-[150px]">
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Status</SelectItem>
+                  <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="Open">Open</SelectItem>
                   <SelectItem value="Under Investigation">Under Investigation</SelectItem>
                   <SelectItem value="Closed">Closed</SelectItem>
