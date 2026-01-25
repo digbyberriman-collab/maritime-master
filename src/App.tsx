@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Vessels from "./pages/Vessels";
+import CrewRoster from "./pages/CrewRoster";
 import BrandingSettings from "./pages/BrandingSettings";
 import Placeholder from "./pages/Placeholder";
 import NotFound from "./pages/NotFound";
@@ -64,6 +65,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Placeholder title="Operations" description="Manage daily vessel operations" />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/operations/crew"
+                element={
+                  <ProtectedRoute>
+                    <CrewRoster />
                   </ProtectedRoute>
                 }
               />
