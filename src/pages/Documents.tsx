@@ -5,7 +5,7 @@ import DocumentCard from '@/components/documents/DocumentCard';
 import DocumentTable from '@/components/documents/DocumentTable';
 import UploadDocumentModal from '@/components/documents/UploadDocumentModal';
 import DeleteDocumentDialog from '@/components/documents/DeleteDocumentDialog';
-import DocumentViewModal from '@/components/documents/DocumentViewModal';
+import DocumentViewerModal from '@/components/documents/DocumentViewerModal';
 import { useDocuments, Document, DocumentFilters as Filters } from '@/hooks/useDocuments';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -220,12 +220,10 @@ const Documents: React.FC = () => {
         onOpenChange={setUploadModalOpen}
       />
 
-      <DocumentViewModal
+      <DocumentViewerModal
         document={selectedDocument}
         open={viewModalOpen}
         onOpenChange={setViewModalOpen}
-        onEdit={handleEdit}
-        onDownload={handleDownload}
       />
 
       <DeleteDocumentDialog
