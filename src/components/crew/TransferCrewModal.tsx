@@ -138,7 +138,7 @@ const TransferCrewModal: React.FC<TransferCrewModalProps> = ({
                     </FormControl>
                     <SelectContent className="bg-popover">
                       {availableVessels.length === 0 ? (
-                        <SelectItem value="" disabled>
+                        <SelectItem value="none" disabled>
                           No other vessels available
                         </SelectItem>
                       ) : (
