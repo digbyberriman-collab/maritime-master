@@ -26,6 +26,7 @@ import CAPATracker from "./pages/CAPATracker";
 import Certificates from "./pages/Certificates";
 import CertificateAlerts from "./pages/CertificateAlerts";
 import Audits from "./pages/Audits";
+import Drills from "./pages/Drills";
 
 const queryClient = new QueryClient();
 
@@ -141,6 +142,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Audits />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/drills"
+                element={
+                  <ProtectedRoute>
+                    <Drills />
                   </ProtectedRoute>
                 }
               />
