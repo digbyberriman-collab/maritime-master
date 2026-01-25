@@ -4,13 +4,18 @@ import { useAuth } from '@/contexts/AuthContext';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Ship, Users, Activity, Plus, Anchor, Clock } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Ship, Users, Activity, Plus, Anchor, Clock, ArrowRightLeft } from 'lucide-react';
 import { useVesselCount } from '@/hooks/useVessels';
+import { useCrewCount, useRecentCrewChanges } from '@/hooks/useCrew';
+import { format } from 'date-fns';
 
 const Dashboard: React.FC = () => {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const { data: vesselCount, isLoading: isVesselCountLoading } = useVesselCount();
+  const { data: crewCount, isLoading: isCrewCountLoading } = useCrewCount();
+  const { data: recentChanges, isLoading: isChangesLoading } = useRecentCrewChanges(5);
 
   const roleLabels: Record<string, string> = {
     master: 'Master',
@@ -30,7 +35,7 @@ const Dashboard: React.FC = () => {
     },
     {
       title: 'Active Crew',
-      value: '0',
+      value: isCrewCountLoading ? '...' : String(crewCount ?? 0),
       icon: Users,
       description: 'Team members',
     },
@@ -100,15 +105,61 @@ const Dashboard: React.FC = () => {
                 <Plus className="w-4 h-4" />
                 Add Vessel
               </Button>
-              <Button variant="outline" className="gap-2">
+              <Button variant="outline" className="gap-2" onClick={() => navigate('/operations/crew')}>
                 <Users className="w-4 h-4" />
-                Add Crew Member
+                Manage Crew
               </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* Recent activity placeholder */}
+        {/* Recent Crew Changes */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ArrowRightLeft className="w-5 h-5" />
+              Recent Crew Changes
+            </CardTitle>
+            <CardDescription>Latest crew movements and assignments</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isChangesLoading ? (
+              <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            ) : recentChanges && recentChanges.length > 0 ? (
+              <div className="space-y-3">
+                {recentChanges.map((change) => (
+                  <div
+                    key={change.id}
+                    className="flex items-center justify-between py-2 border-b border-border last:border-0"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Badge variant={change.type === 'join' ? 'default' : 'secondary'}>
+                        {change.type === 'join' ? 'Joined' : 'Signed Off'}
+                      </Badge>
+                      <div>
+                        <p className="text-sm font-medium">{change.crewName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {change.position} • {change.vesselName}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {format(new Date(change.createdAt), 'dd MMM yyyy')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                <ArrowRightLeft className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No recent crew changes</p>
+                <p className="text-sm">Crew movements will appear here</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Activity */}
         <Card className="shadow-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

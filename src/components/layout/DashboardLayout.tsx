@@ -13,6 +13,7 @@ import {
   Settings,
   LogOut,
   User,
+  Users,
   ChevronDown,
   Menu,
   X,
@@ -37,6 +38,7 @@ interface DashboardLayoutProps {
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Vessels', href: '/vessels', icon: Ship },
+  { name: 'Crew Roster', href: '/operations/crew', icon: Users },
   { name: 'Documents', href: '/documents', icon: FolderOpen },
   { name: 'Compliance', href: '/compliance', icon: Shield },
   { name: 'Operations', href: '/operations', icon: ClipboardList },

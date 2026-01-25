@@ -1,0 +1,63 @@
+export const RANKS = [
+  'Master',
+  'Chief Engineer',
+  'Chief Officer',
+  '2nd Engineer',
+  '3rd Engineer',
+  '2nd Officer',
+  '3rd Officer',
+  'ETO',
+  'Bosun',
+  'Deckhand',
+  'AB Seaman',
+  'OS Seaman',
+  'Motorman',
+  'Oiler',
+  'Chief Stewardess',
+  'Stewardess',
+  'Chef',
+  'Cook',
+  'Purser',
+  'Other',
+] as const;
+
+export const NATIONALITIES = [
+  'American',
+  'Australian',
+  'British',
+  'Canadian',
+  'Croatian',
+  'Dutch',
+  'Filipino',
+  'French',
+  'German',
+  'Greek',
+  'Indian',
+  'Indonesian',
+  'Irish',
+  'Italian',
+  'Latvian',
+  'Malaysian',
+  'Montenegrin',
+  'New Zealand',
+  'Norwegian',
+  'Polish',
+  'Portuguese',
+  'Romanian',
+  'Russian',
+  'South African',
+  'Spanish',
+  'Swedish',
+  'Ukrainian',
+  'Other',
+] as const;
+
+export const CREW_ROLES = [
+  { value: 'master', label: 'Master' },
+  { value: 'chief_engineer', label: 'Chief Engineer' },
+  { value: 'chief_officer', label: 'Chief Officer' },
+  { value: 'crew', label: 'Crew' },
+] as const;
+
+export type Rank = typeof RANKS[number];
+export type Nationality = typeof NATIONALITIES[number];
