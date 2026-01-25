@@ -25,6 +25,7 @@ import IncidentAnalytics from "./pages/IncidentAnalytics";
 import CAPATracker from "./pages/CAPATracker";
 import Certificates from "./pages/Certificates";
 import CertificateAlerts from "./pages/CertificateAlerts";
+import Audits from "./pages/Audits";
 
 const queryClient = new QueryClient();
 
@@ -131,7 +132,15 @@ const App = () => (
                 path="/operations"
                 element={
                   <ProtectedRoute>
-                    <Placeholder title="Operations" description="Manage daily vessel operations" />
+                    <Audits />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/audits"
+                element={
+                  <ProtectedRoute>
+                    <Audits />
                   </ProtectedRoute>
                 }
               />

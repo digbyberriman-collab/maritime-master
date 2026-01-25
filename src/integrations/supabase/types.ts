@@ -14,6 +14,166 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_findings: {
+        Row: {
+          audit_id: string
+          closed_date: string | null
+          closeout_evidence_urls: string[] | null
+          created_at: string
+          finding_description: string
+          finding_number: string
+          finding_type: string
+          id: string
+          ism_section: number
+          objective_evidence: string
+          requirement_text: string
+          status: string
+          updated_at: string
+          verified_by: string | null
+          vessel_response: string | null
+        }
+        Insert: {
+          audit_id: string
+          closed_date?: string | null
+          closeout_evidence_urls?: string[] | null
+          created_at?: string
+          finding_description: string
+          finding_number: string
+          finding_type: string
+          id?: string
+          ism_section: number
+          objective_evidence: string
+          requirement_text: string
+          status?: string
+          updated_at?: string
+          verified_by?: string | null
+          vessel_response?: string | null
+        }
+        Update: {
+          audit_id?: string
+          closed_date?: string | null
+          closeout_evidence_urls?: string[] | null
+          created_at?: string
+          finding_description?: string
+          finding_number?: string
+          finding_type?: string
+          id?: string
+          ism_section?: number
+          objective_evidence?: string
+          requirement_text?: string
+          status?: string
+          updated_at?: string
+          verified_by?: string | null
+          vessel_response?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_findings_audit_id_fkey"
+            columns: ["audit_id"]
+            isOneToOne: false
+            referencedRelation: "audits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_findings_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      audits: {
+        Row: {
+          actual_end_date: string | null
+          actual_start_date: string | null
+          audit_number: string
+          audit_report_url: string | null
+          audit_scope: string
+          audit_team: string[] | null
+          audit_type: string
+          company_id: string
+          created_at: string
+          external_auditor_name: string | null
+          external_auditor_org: string | null
+          id: string
+          ism_sections_covered: number[] | null
+          lead_auditor_id: string | null
+          notes: string | null
+          overall_result: string | null
+          scheduled_date: string
+          status: string
+          updated_at: string
+          vessel_id: string | null
+        }
+        Insert: {
+          actual_end_date?: string | null
+          actual_start_date?: string | null
+          audit_number: string
+          audit_report_url?: string | null
+          audit_scope: string
+          audit_team?: string[] | null
+          audit_type: string
+          company_id: string
+          created_at?: string
+          external_auditor_name?: string | null
+          external_auditor_org?: string | null
+          id?: string
+          ism_sections_covered?: number[] | null
+          lead_auditor_id?: string | null
+          notes?: string | null
+          overall_result?: string | null
+          scheduled_date: string
+          status?: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          actual_end_date?: string | null
+          actual_start_date?: string | null
+          audit_number?: string
+          audit_report_url?: string | null
+          audit_scope?: string
+          audit_team?: string[] | null
+          audit_type?: string
+          company_id?: string
+          created_at?: string
+          external_auditor_name?: string | null
+          external_auditor_org?: string | null
+          id?: string
+          ism_sections_covered?: number[] | null
+          lead_auditor_id?: string | null
+          notes?: string | null
+          overall_result?: string | null
+          scheduled_date?: string
+          status?: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audits_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audits_lead_auditor_id_fkey"
+            columns: ["lead_auditor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "audits_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       certificate_alerts: {
         Row: {
           acknowledged_at: string | null
@@ -762,6 +922,74 @@ export type Database = {
             columns: ["vessel_id"]
             isOneToOne: false
             referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      management_reviews: {
+        Row: {
+          action_items: Json | null
+          agenda_items: Json | null
+          attendees: Json | null
+          audit_summary: Json | null
+          capa_summary: Json | null
+          company_id: string
+          created_at: string
+          id: string
+          incident_summary: Json | null
+          minutes_url: string | null
+          next_review_date: string | null
+          period_covered: string
+          resource_decisions: string[] | null
+          review_date: string
+          sms_changes_needed: string[] | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          action_items?: Json | null
+          agenda_items?: Json | null
+          attendees?: Json | null
+          audit_summary?: Json | null
+          capa_summary?: Json | null
+          company_id: string
+          created_at?: string
+          id?: string
+          incident_summary?: Json | null
+          minutes_url?: string | null
+          next_review_date?: string | null
+          period_covered: string
+          resource_decisions?: string[] | null
+          review_date: string
+          sms_changes_needed?: string[] | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          action_items?: Json | null
+          agenda_items?: Json | null
+          attendees?: Json | null
+          audit_summary?: Json | null
+          capa_summary?: Json | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          incident_summary?: Json | null
+          minutes_url?: string | null
+          next_review_date?: string | null
+          period_covered?: string
+          resource_decisions?: string[] | null
+          review_date?: string
+          sms_changes_needed?: string[] | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "management_reviews_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
