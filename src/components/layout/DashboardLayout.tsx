@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrandingContext } from '@/contexts/BrandingContext';
 import { canManageBranding } from '@/hooks/useBranding';
+import InkfishFooter from '@/components/layout/InkfishFooter';
 import {
   LayoutDashboard,
   FolderOpen,
@@ -270,6 +271,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         <main className="flex-1 p-4 lg:p-6 overflow-auto">
           {children}
         </main>
+
+        {/* Inkfish ownership watermark - persistent, unaffected by client branding */}
+        <InkfishFooter />
       </div>
     </div>
   );
