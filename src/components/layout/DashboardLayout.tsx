@@ -41,10 +41,10 @@ const navigation = [
   { name: 'Vessels', href: '/vessels', icon: Ship },
   { name: 'Crew Roster', href: '/operations/crew', icon: Users },
   { name: 'Documents', href: '/documents', icon: FolderOpen },
-  { name: 'Compliance', href: '/compliance', icon: Shield },
+  { name: 'Certificates', href: '/certificates', icon: Shield },
+  { name: 'Compliance', href: '/compliance', icon: ClipboardList },
   { name: 'Operations', href: '/operations', icon: ClipboardList },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
-  { name: 'CAPA Tracker', href: '/reports/capa-tracker', icon: ClipboardList },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

@@ -14,6 +14,152 @@ export type Database = {
   }
   public: {
     Tables: {
+      certificate_alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          alert_date: string
+          alert_type: string
+          certificate_id: string
+          created_at: string
+          id: string
+          sent_at: string | null
+          sent_to: string[] | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_date: string
+          alert_type: string
+          certificate_id: string
+          created_at?: string
+          id?: string
+          sent_at?: string | null
+          sent_to?: string[] | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_date?: string
+          alert_type?: string
+          certificate_id?: string
+          created_at?: string
+          id?: string
+          sent_at?: string | null
+          sent_to?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "certificate_alerts_acknowledged_by_fkey"
+            columns: ["acknowledged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "certificate_alerts_certificate_id_fkey"
+            columns: ["certificate_id"]
+            isOneToOne: false
+            referencedRelation: "certificates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      certificates: {
+        Row: {
+          alert_days: number | null
+          certificate_category: string | null
+          certificate_name: string
+          certificate_number: string
+          certificate_type: string
+          company_id: string
+          created_at: string
+          expiry_date: string
+          file_url: string | null
+          id: string
+          issue_date: string
+          issuing_authority: string
+          next_survey_date: string | null
+          notes: string | null
+          status: string
+          superseded_by: string | null
+          updated_at: string
+          user_id: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          alert_days?: number | null
+          certificate_category?: string | null
+          certificate_name: string
+          certificate_number: string
+          certificate_type: string
+          company_id: string
+          created_at?: string
+          expiry_date: string
+          file_url?: string | null
+          id?: string
+          issue_date: string
+          issuing_authority: string
+          next_survey_date?: string | null
+          notes?: string | null
+          status?: string
+          superseded_by?: string | null
+          updated_at?: string
+          user_id?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          alert_days?: number | null
+          certificate_category?: string | null
+          certificate_name?: string
+          certificate_number?: string
+          certificate_type?: string
+          company_id?: string
+          created_at?: string
+          expiry_date?: string
+          file_url?: string | null
+          id?: string
+          issue_date?: string
+          issuing_authority?: string
+          next_survey_date?: string | null
+          notes?: string | null
+          status?: string
+          superseded_by?: string | null
+          updated_at?: string
+          user_id?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "certificates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificates_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "certificates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "certificates_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "certificates_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           address: string | null
