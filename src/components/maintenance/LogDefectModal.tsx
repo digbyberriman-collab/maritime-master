@@ -136,15 +136,15 @@ const LogDefectModal: React.FC<LogDefectModalProps> = ({
             <div className="space-y-2">
               <Label htmlFor="equipment">Equipment (Optional)</Label>
               <Select
-                value={formData.equipment_id}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, equipment_id: value }))}
+                value={formData.equipment_id || "__general__"}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, equipment_id: value === "__general__" ? "" : value }))}
                 disabled={!formData.vessel_id}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select equipment" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">General / No specific equipment</SelectItem>
+                  <SelectItem value="__general__">General / No specific equipment</SelectItem>
                   {filteredEquipment.map(equip => (
                     <SelectItem key={equip.id} value={equip.id}>
                       {equip.equipment_code} - {equip.equipment_name}

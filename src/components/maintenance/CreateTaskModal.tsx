@@ -193,14 +193,14 @@ const CreateTaskModal: React.FC<CreateTaskModalProps> = ({
           <div className="space-y-2">
             <Label htmlFor="assignedTo">Assign To</Label>
             <Select
-              value={formData.assigned_to_id}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, assigned_to_id: value }))}
+              value={formData.assigned_to_id || "__unassigned__"}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, assigned_to_id: value === "__unassigned__" ? "" : value }))}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select crew member" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Unassigned</SelectItem>
+                <SelectItem value="__unassigned__">Unassigned</SelectItem>
                 {crew.map(member => (
                   <SelectItem key={member.user_id} value={member.user_id}>
                     {member.first_name} {member.last_name} - {member.rank || 'Crew'}
