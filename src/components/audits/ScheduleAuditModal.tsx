@@ -132,12 +132,12 @@ const ScheduleAuditModal: React.FC<ScheduleAuditModalProps> = ({
 
             <div className="space-y-2">
               <Label>Vessel (optional for DOC audits)</Label>
-              <Select value={vesselId} onValueChange={setVesselId}>
+              <Select value={vesselId || "__company__"} onValueChange={(v) => setVesselId(v === "__company__" ? "" : v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Company-wide" />
                 </SelectTrigger>
                 <SelectContent className="bg-popover">
-                  <SelectItem value="">Company-wide</SelectItem>
+                  <SelectItem value="__company__">Company-wide</SelectItem>
                   {vessels.map(vessel => (
                     <SelectItem key={vessel.id} value={vessel.id}>{vessel.name}</SelectItem>
                   ))}

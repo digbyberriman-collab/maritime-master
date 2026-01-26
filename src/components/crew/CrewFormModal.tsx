@@ -276,7 +276,7 @@ const CrewFormModal: React.FC<CrewFormModalProps> = ({
                       </FormControl>
                       <SelectContent className="bg-popover">
                         {activeVessels.length === 0 ? (
-                          <SelectItem value="" disabled>
+                          <SelectItem value="__none__" disabled>
                             No active vessels
                           </SelectItem>
                         ) : (
