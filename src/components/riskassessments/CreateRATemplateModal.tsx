@@ -62,10 +62,10 @@ const CreateRATemplateModal = ({ open, onOpenChange }: CreateRATemplateModalProp
           </div>
           <div className="space-y-2">
             <Label>Vessel (optional - leave empty for company-wide)</Label>
-            <Select value={formData.vessel_id} onValueChange={(v) => setFormData(prev => ({ ...prev, vessel_id: v }))}>
+            <Select value={formData.vessel_id || "__all__"} onValueChange={(v) => setFormData(prev => ({ ...prev, vessel_id: v === "__all__" ? "" : v }))}>
               <SelectTrigger><SelectValue placeholder="All vessels" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All vessels</SelectItem>
+                <SelectItem value="__all__">All vessels</SelectItem>
                 {vessels?.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
               </SelectContent>
             </Select>
