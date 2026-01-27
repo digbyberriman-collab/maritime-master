@@ -16,12 +16,14 @@ import { format } from 'date-fns';
 import { getIncidentTypeColor } from '@/lib/incidentConstants';
 import MaintenanceWidgets from '@/components/dashboard/MaintenanceWidgets';
 import CrewFormModal from '@/components/crew/CrewFormModal';
+import DPADashboard from './DPADashboard';
 
 const Dashboard: React.FC = () => {
   const { profile } = useAuth();
   const navigate = useNavigate();
   const [isAddCrewModalOpen, setIsAddCrewModalOpen] = useState(false);
   
+  // All hooks must be called before any conditional returns
   const { data: vesselCount, isLoading: isVesselCountLoading } = useVesselCount();
   const { data: crewCount, isLoading: isCrewCountLoading, refetch: refetchCrewCount } = useCrewCount();
   const { data: recentChanges, isLoading: isChangesLoading, refetch: refetchRecentChanges } = useRecentCrewChanges(5);
@@ -30,6 +32,11 @@ const Dashboard: React.FC = () => {
   const { data: ackStats } = useAcknowledgmentStats();
   const { data: overdueCapas } = useOverdueCAPAs();
   const { data: recentIncidents } = useRecentIncidents(5);
+
+  // Show DPA Dashboard for DPA and Shore Management users
+  if (profile?.role === 'dpa' || profile?.role === 'shore_management') {
+    return <DPADashboard />;
+  }
 
   const roleLabels: Record<string, string> = {
     master: 'Master',
