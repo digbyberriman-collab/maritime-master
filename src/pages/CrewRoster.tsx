@@ -56,6 +56,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useCrew, type CrewMember } from '@/hooks/useCrew';
 import { useVessels } from '@/hooks/useVessels';
+import { useVesselFilter } from '@/hooks/useVesselFilter';
 import CrewFormModal from '@/components/crew/CrewFormModal';
 import CrewProfileModal from '@/components/crew/CrewProfileModal';
 import TransferCrewModal from '@/components/crew/TransferCrewModal';
@@ -63,16 +64,22 @@ import FullCrewEditModal from '@/components/crew/FullCrewEditModal';
 import SignOffDialog from '@/components/crew/SignOffDialog';
 import ImportCrewCSVModal from '@/components/crew/ImportCrewCSVModal';
 
-const VESSEL_FILTER_KEY = 'storm_crew_vessel_filter';
-
 const CrewRoster: React.FC = () => {
   const { profile } = useAuth();
   
-  // Initialize from sessionStorage
-  const [vesselFilter, setVesselFilter] = useState<string>(() => {
-    const saved = sessionStorage.getItem(VESSEL_FILTER_KEY);
-    return saved || 'all';
-  });
+  // Use global vessel filter from master selector
+  const { vesselFilter: masterVesselFilter, isAllVessels, selectedVessel } = useVesselFilter();
+  
+  // Local override for vessel selection within roster page (optional)
+  const [localVesselFilter, setLocalVesselFilter] = useState<string>('inherit');
+  
+  // Determine effective vessel filter: use local override if set, otherwise use master filter
+  const effectiveVesselFilter = useMemo(() => {
+    if (localVesselFilter === 'inherit') {
+      return isAllVessels ? undefined : masterVesselFilter || undefined;
+    }
+    return localVesselFilter === 'all' ? undefined : localVesselFilter;
+  }, [localVesselFilter, masterVesselFilter, isAllVessels]);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
@@ -94,15 +101,10 @@ const CrewRoster: React.FC = () => {
     transferCrew,
     signOffCrew,
     deactivateCrew,
-  } = useCrew(vesselFilter === 'all' ? undefined : vesselFilter);
+  } = useCrew(effectiveVesselFilter);
 
   const canManageCrew = ['dpa', 'shore_management'].includes(profile?.role || '');
   const isMaster = profile?.role === 'master';
-
-  // Save filter to sessionStorage
-  useEffect(() => {
-    sessionStorage.setItem(VESSEL_FILTER_KEY, vesselFilter);
-  }, [vesselFilter]);
 
   // Filter crew based on search
   const filteredCrew = useMemo(() => {
@@ -201,9 +203,14 @@ const CrewRoster: React.FC = () => {
   const activeVessels = vessels.filter((v) => v.status === 'Active');
   
   // Get selected vessel name for display
-  const selectedVesselName = vesselFilter === 'all' 
-    ? 'all vessels' 
-    : activeVessels.find(v => v.id === vesselFilter)?.name || 'selected vessel';
+  const selectedVesselName = useMemo(() => {
+    if (localVesselFilter === 'inherit') {
+      if (isAllVessels) return 'all vessels';
+      return selectedVessel?.name || 'selected vessel';
+    }
+    if (localVesselFilter === 'all') return 'all vessels';
+    return activeVessels.find(v => v.id === localVesselFilter)?.name || 'selected vessel';
+  }, [localVesselFilter, isAllVessels, selectedVessel, activeVessels]);
 
   return (
     <DashboardLayout>
@@ -248,7 +255,7 @@ const CrewRoster: React.FC = () => {
                   className="pl-10"
                 />
               </div>
-              <Select value={vesselFilter} onValueChange={setVesselFilter}>
+              <Select value={localVesselFilter} onValueChange={setLocalVesselFilter}>
                 <SelectTrigger className="w-full sm:w-64">
                   {vesselsLoading ? (
                     <div className="flex items-center gap-2">
@@ -258,11 +265,17 @@ const CrewRoster: React.FC = () => {
                   ) : (
                     <>
                       <Ship className="w-4 h-4 mr-2" />
-                      <SelectValue placeholder="All Vessels" />
+                      <SelectValue placeholder="Use Master Filter" />
                     </>
                   )}
                 </SelectTrigger>
                 <SelectContent className="bg-popover">
+                  <SelectItem value="inherit">
+                    {isAllVessels 
+                      ? '🔗 Master Filter (All Vessels)' 
+                      : `🔗 Master Filter (${selectedVessel?.name || 'Selected'})`
+                    }
+                  </SelectItem>
                   <SelectItem value="all">All Vessels</SelectItem>
                   {activeVessels.map((vessel) => (
                     <SelectItem key={vessel.id} value={vessel.id}>
@@ -290,7 +303,7 @@ const CrewRoster: React.FC = () => {
                 ) : (
                   <>
                     Showing {filteredCrew.length} crew member{filteredCrew.length !== 1 ? 's' : ''}{' '}
-                    {vesselFilter === 'all' ? 'across all vessels' : `on ${selectedVesselName}`}
+                    {effectiveVesselFilter ? `on ${selectedVesselName}` : 'across all vessels'}
                   </>
                 )}
               </span>
@@ -309,7 +322,7 @@ const CrewRoster: React.FC = () => {
                 {crew.length === 0 ? (
                   <>
                     <p className="text-lg font-medium">
-                      {vesselFilter === 'all' 
+                      {!effectiveVesselFilter 
                         ? 'No crew members yet' 
                         : `No crew currently assigned to ${selectedVesselName}`}
                     </p>
