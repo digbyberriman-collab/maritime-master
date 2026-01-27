@@ -64,62 +64,48 @@ const Training: React.FC = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Crew Qualified</CardTitle>
-            <GraduationCap className="h-4 w-4 text-muted-foreground" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Card className="p-0">
+          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+            <CardTitle className="text-xs font-medium">Crew Qualified</CardTitle>
+            <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{complianceStats.validRecords}</div>
-            <p className="text-xs text-muted-foreground">
-              Valid training certificates
-            </p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-xl font-bold">{complianceStats.validRecords}</div>
+            <p className="text-[10px] text-muted-foreground">Valid certificates</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Expiring Soon</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+        <Card className="p-0">
+          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+            <CardTitle className="text-xs font-medium">Expiring Soon</CardTitle>
+            <AlertTriangle className="h-3.5 w-3.5 text-warning" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">
-              {complianceStats.expiringSoon}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Within 90 days
-            </p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-xl font-bold text-warning">{complianceStats.expiringSoon}</div>
+            <p className="text-[10px] text-muted-foreground">Within 90 days</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Familiarization</CardTitle>
-            <ClipboardCheck className="h-4 w-4 text-blue-500" />
+        <Card className="p-0">
+          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+            <CardTitle className="text-xs font-medium">Familiarization</CardTitle>
+            <ClipboardCheck className="h-3.5 w-3.5 text-info" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">
-              {complianceStats.activeFamiliarizations}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              In progress
-            </p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-xl font-bold text-info">{complianceStats.activeFamiliarizations}</div>
+            <p className="text-[10px] text-muted-foreground">In progress</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Overdue Training</CardTitle>
-            <Award className="h-4 w-4 text-red-500" />
+        <Card className="p-0">
+          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
+            <CardTitle className="text-xs font-medium">Overdue Training</CardTitle>
+            <Award className="h-3.5 w-3.5 text-destructive" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-600">
-              {complianceStats.expired}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Requires immediate action
-            </p>
+          <CardContent className="p-3 pt-0">
+            <div className="text-xl font-bold text-destructive">{complianceStats.expired}</div>
+            <p className="text-[10px] text-muted-foreground">Requires action</p>
           </CardContent>
         </Card>
       </div>
