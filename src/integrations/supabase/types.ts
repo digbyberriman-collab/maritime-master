@@ -14,6 +14,59 @@ export type Database = {
   }
   public: {
     Tables: {
+      ais_snapshots: {
+        Row: {
+          cog: number | null
+          created_at: string | null
+          heading: number | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          nav_status: string | null
+          raw_data: Json | null
+          sog: number | null
+          source_provider: string | null
+          timestamp_utc: string
+          vessel_id: string
+        }
+        Insert: {
+          cog?: number | null
+          created_at?: string | null
+          heading?: number | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          nav_status?: string | null
+          raw_data?: Json | null
+          sog?: number | null
+          source_provider?: string | null
+          timestamp_utc: string
+          vessel_id: string
+        }
+        Update: {
+          cog?: number | null
+          created_at?: string | null
+          heading?: number | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          nav_status?: string | null
+          raw_data?: Json | null
+          sog?: number | null
+          source_provider?: string | null
+          timestamp_utc?: string
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ais_snapshots_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       alerts: {
         Row: {
           acknowledged_at: string | null
@@ -510,10 +563,20 @@ export type Database = {
           brand_color: string | null
           client_display_name: string | null
           client_logo_url: string | null
+          company_type: string | null
           created_at: string
+          crewing_manager_name: string | null
+          crewing_manager_phone: string | null
+          dpa_email: string | null
+          dpa_name: string | null
+          dpa_phone_24_7: string | null
+          email: string | null
           id: string
           imo_company_number: string | null
           name: string
+          phone: string | null
+          technical_manager_name: string | null
+          technical_manager_phone: string | null
           updated_at: string
         }
         Insert: {
@@ -521,10 +584,20 @@ export type Database = {
           brand_color?: string | null
           client_display_name?: string | null
           client_logo_url?: string | null
+          company_type?: string | null
           created_at?: string
+          crewing_manager_name?: string | null
+          crewing_manager_phone?: string | null
+          dpa_email?: string | null
+          dpa_name?: string | null
+          dpa_phone_24_7?: string | null
+          email?: string | null
           id?: string
           imo_company_number?: string | null
           name: string
+          phone?: string | null
+          technical_manager_name?: string | null
+          technical_manager_phone?: string | null
           updated_at?: string
         }
         Update: {
@@ -532,10 +605,20 @@ export type Database = {
           brand_color?: string | null
           client_display_name?: string | null
           client_logo_url?: string | null
+          company_type?: string | null
           created_at?: string
+          crewing_manager_name?: string | null
+          crewing_manager_phone?: string | null
+          dpa_email?: string | null
+          dpa_name?: string | null
+          dpa_phone_24_7?: string | null
+          email?: string | null
           id?: string
           imo_company_number?: string | null
           name?: string
+          phone?: string | null
+          technical_manager_name?: string | null
+          technical_manager_phone?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -644,39 +727,61 @@ export type Database = {
       }
       crew_assignments: {
         Row: {
+          assignment_type: string | null
           created_at: string
+          created_by: string | null
+          department: string | null
+          end_date: string | null
           id: string
           is_current: boolean | null
           join_date: string
           leave_date: string | null
           position: string
+          start_date: string | null
           updated_at: string
           user_id: string
           vessel_id: string
         }
         Insert: {
+          assignment_type?: string | null
           created_at?: string
+          created_by?: string | null
+          department?: string | null
+          end_date?: string | null
           id?: string
           is_current?: boolean | null
           join_date: string
           leave_date?: string | null
           position: string
+          start_date?: string | null
           updated_at?: string
           user_id: string
           vessel_id: string
         }
         Update: {
+          assignment_type?: string | null
           created_at?: string
+          created_by?: string | null
+          department?: string | null
+          end_date?: string | null
           id?: string
           is_current?: boolean | null
           join_date?: string
           leave_date?: string | null
           position?: string
+          start_date?: string | null
           updated_at?: string
           user_id?: string
           vessel_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "crew_assignments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
           {
             foreignKeyName: "crew_assignments_user_id_fkey"
             columns: ["user_id"]
@@ -829,6 +934,73 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      daily_crew_snapshots: {
+        Row: {
+          captain_name: string | null
+          captain_user_id: string | null
+          computed_at: string | null
+          crew_onboard_count: number
+          id: string
+          is_acting_captain: boolean | null
+          overridden_at: string | null
+          overridden_by: string | null
+          override_reason: string | null
+          snapshot_date: string
+          source: string | null
+          vessel_id: string
+        }
+        Insert: {
+          captain_name?: string | null
+          captain_user_id?: string | null
+          computed_at?: string | null
+          crew_onboard_count: number
+          id?: string
+          is_acting_captain?: boolean | null
+          overridden_at?: string | null
+          overridden_by?: string | null
+          override_reason?: string | null
+          snapshot_date: string
+          source?: string | null
+          vessel_id: string
+        }
+        Update: {
+          captain_name?: string | null
+          captain_user_id?: string | null
+          computed_at?: string | null
+          crew_onboard_count?: number
+          id?: string
+          is_acting_captain?: boolean | null
+          overridden_at?: string | null
+          overridden_by?: string | null
+          override_reason?: string | null
+          snapshot_date?: string
+          source?: string | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_crew_snapshots_captain_user_id_fkey"
+            columns: ["captain_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "daily_crew_snapshots_overridden_by_fkey"
+            columns: ["overridden_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "daily_crew_snapshots_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -1883,6 +2055,310 @@ export type Database = {
           },
         ]
       }
+      fleet_groups: {
+        Row: {
+          color_hex: string | null
+          company_id: string
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          color_hex?: string | null
+          company_id: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          color_hex?: string | null
+          company_id?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_groups_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flight_bookings: {
+        Row: {
+          airline: string | null
+          arrive_airport: string | null
+          arrive_datetime_utc: string | null
+          booked_at: string | null
+          booked_by: string | null
+          booking_reference: string | null
+          confirmed_at: string | null
+          cost_amount: number | null
+          created_at: string | null
+          currency: string | null
+          depart_airport: string | null
+          depart_datetime_utc: string | null
+          flight_number: string | null
+          flight_request_id: string
+          id: string
+          itinerary_file_url: string | null
+          seat_number: string | null
+          ticket_number: string | null
+          travel_letter_file_url: string | null
+        }
+        Insert: {
+          airline?: string | null
+          arrive_airport?: string | null
+          arrive_datetime_utc?: string | null
+          booked_at?: string | null
+          booked_by?: string | null
+          booking_reference?: string | null
+          confirmed_at?: string | null
+          cost_amount?: number | null
+          created_at?: string | null
+          currency?: string | null
+          depart_airport?: string | null
+          depart_datetime_utc?: string | null
+          flight_number?: string | null
+          flight_request_id: string
+          id?: string
+          itinerary_file_url?: string | null
+          seat_number?: string | null
+          ticket_number?: string | null
+          travel_letter_file_url?: string | null
+        }
+        Update: {
+          airline?: string | null
+          arrive_airport?: string | null
+          arrive_datetime_utc?: string | null
+          booked_at?: string | null
+          booked_by?: string | null
+          booking_reference?: string | null
+          confirmed_at?: string | null
+          cost_amount?: number | null
+          created_at?: string | null
+          currency?: string | null
+          depart_airport?: string | null
+          depart_datetime_utc?: string | null
+          flight_number?: string | null
+          flight_request_id?: string
+          id?: string
+          itinerary_file_url?: string | null
+          seat_number?: string | null
+          ticket_number?: string | null
+          travel_letter_file_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flight_bookings_booked_by_fkey"
+            columns: ["booked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "flight_bookings_flight_request_id_fkey"
+            columns: ["flight_request_id"]
+            isOneToOne: false
+            referencedRelation: "flight_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flight_requests: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          arrive_to: string
+          assigned_agent_id: string | null
+          baggage_notes: string | null
+          company_id: string
+          created_at: string | null
+          created_by: string | null
+          crew_id: string
+          depart_from: string
+          earliest_departure_date: string
+          id: string
+          latest_departure_date: string | null
+          notes: string | null
+          passport_nationality: string | null
+          preferred_airline: string | null
+          request_number: string
+          request_type: string
+          status: string | null
+          updated_at: string | null
+          vessel_id: string | null
+          visa_requirements: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          arrive_to: string
+          assigned_agent_id?: string | null
+          baggage_notes?: string | null
+          company_id: string
+          created_at?: string | null
+          created_by?: string | null
+          crew_id: string
+          depart_from: string
+          earliest_departure_date: string
+          id?: string
+          latest_departure_date?: string | null
+          notes?: string | null
+          passport_nationality?: string | null
+          preferred_airline?: string | null
+          request_number: string
+          request_type: string
+          status?: string | null
+          updated_at?: string | null
+          vessel_id?: string | null
+          visa_requirements?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          arrive_to?: string
+          assigned_agent_id?: string | null
+          baggage_notes?: string | null
+          company_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          crew_id?: string
+          depart_from?: string
+          earliest_departure_date?: string
+          id?: string
+          latest_departure_date?: string | null
+          notes?: string | null
+          passport_nationality?: string | null
+          preferred_airline?: string | null
+          request_number?: string
+          request_type?: string
+          status?: string | null
+          updated_at?: string | null
+          vessel_id?: string | null
+          visa_requirements?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flight_requests_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "flight_requests_assigned_agent_id_fkey"
+            columns: ["assigned_agent_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "flight_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flight_requests_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "flight_requests_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "flight_requests_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hours_of_rest_records: {
+        Row: {
+          crew_id: string
+          id: string
+          is_compliant: boolean | null
+          notes: string | null
+          record_date: string
+          rest_periods: Json
+          signed_at: string | null
+          signed_by_crew: boolean | null
+          total_rest_hours: number | null
+          total_work_hours: number | null
+          verified_by: string | null
+          vessel_id: string
+          violations: Json | null
+        }
+        Insert: {
+          crew_id: string
+          id?: string
+          is_compliant?: boolean | null
+          notes?: string | null
+          record_date: string
+          rest_periods: Json
+          signed_at?: string | null
+          signed_by_crew?: boolean | null
+          total_rest_hours?: number | null
+          total_work_hours?: number | null
+          verified_by?: string | null
+          vessel_id: string
+          violations?: Json | null
+        }
+        Update: {
+          crew_id?: string
+          id?: string
+          is_compliant?: boolean | null
+          notes?: string | null
+          record_date?: string
+          rest_periods?: Json
+          signed_at?: string | null
+          signed_by_crew?: boolean | null
+          total_rest_hours?: number | null
+          total_work_hours?: number | null
+          verified_by?: string | null
+          vessel_id?: string
+          violations?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hours_of_rest_records_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "hours_of_rest_records_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "hours_of_rest_records_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       incident_investigation: {
         Row: {
           approved_by: string | null
@@ -1959,83 +2435,116 @@ export type Database = {
       incidents: {
         Row: {
           attachments: Json | null
+          cause_categories: string[] | null
           company_id: string
           contributing_factors: string[] | null
           created_at: string
           description: string
           dpa_notified: boolean | null
+          dpa_notified_at: string | null
           dpa_notified_date: string | null
           id: string
           immediate_action: string | null
+          immediate_cause: string | null
           incident_date: string
           incident_number: string
           incident_type: string
+          injuries_reported: boolean | null
           investigation_required: boolean | null
           investigation_status: string | null
+          involved_crew_ids: string[] | null
           location: string
+          no_investigation_approved_at: string | null
+          no_investigation_approved_by: string | null
+          no_investigation_reason: string | null
           persons_involved: Json | null
           reported_by: string
           reported_date: string
           root_cause: string | null
           severity_actual: number
           severity_potential: number
+          shipping_master_message: string | null
+          shipping_master_notified: boolean | null
           status: string | null
           updated_at: string
           vessel_id: string
+          witness_crew_ids: string[] | null
           witnesses: Json | null
         }
         Insert: {
           attachments?: Json | null
+          cause_categories?: string[] | null
           company_id: string
           contributing_factors?: string[] | null
           created_at?: string
           description: string
           dpa_notified?: boolean | null
+          dpa_notified_at?: string | null
           dpa_notified_date?: string | null
           id?: string
           immediate_action?: string | null
+          immediate_cause?: string | null
           incident_date: string
           incident_number: string
           incident_type: string
+          injuries_reported?: boolean | null
           investigation_required?: boolean | null
           investigation_status?: string | null
+          involved_crew_ids?: string[] | null
           location: string
+          no_investigation_approved_at?: string | null
+          no_investigation_approved_by?: string | null
+          no_investigation_reason?: string | null
           persons_involved?: Json | null
           reported_by: string
           reported_date?: string
           root_cause?: string | null
           severity_actual: number
           severity_potential: number
+          shipping_master_message?: string | null
+          shipping_master_notified?: boolean | null
           status?: string | null
           updated_at?: string
           vessel_id: string
+          witness_crew_ids?: string[] | null
           witnesses?: Json | null
         }
         Update: {
           attachments?: Json | null
+          cause_categories?: string[] | null
           company_id?: string
           contributing_factors?: string[] | null
           created_at?: string
           description?: string
           dpa_notified?: boolean | null
+          dpa_notified_at?: string | null
           dpa_notified_date?: string | null
           id?: string
           immediate_action?: string | null
+          immediate_cause?: string | null
           incident_date?: string
           incident_number?: string
           incident_type?: string
+          injuries_reported?: boolean | null
           investigation_required?: boolean | null
           investigation_status?: string | null
+          involved_crew_ids?: string[] | null
           location?: string
+          no_investigation_approved_at?: string | null
+          no_investigation_approved_by?: string | null
+          no_investigation_reason?: string | null
           persons_involved?: Json | null
           reported_by?: string
           reported_date?: string
           root_cause?: string | null
           severity_actual?: number
           severity_potential?: number
+          shipping_master_message?: string | null
+          shipping_master_notified?: boolean | null
           status?: string | null
           updated_at?: string
           vessel_id?: string
+          witness_crew_ids?: string[] | null
           witnesses?: Json | null
         }
         Relationships: [
@@ -2047,6 +2556,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "incidents_no_investigation_approved_by_fkey"
+            columns: ["no_investigation_approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "incidents_reported_by_fkey"
             columns: ["reported_by"]
             isOneToOne: false
@@ -2055,6 +2571,79 @@ export type Database = {
           },
           {
             foreignKeyName: "incidents_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leave_requests: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string | null
+          crew_id: string
+          end_date: string
+          id: string
+          leave_type: string
+          reason: string | null
+          rejection_reason: string | null
+          start_date: string
+          status: string | null
+          travel_days_after: number | null
+          travel_days_before: number | null
+          vessel_id: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          crew_id: string
+          end_date: string
+          id?: string
+          leave_type: string
+          reason?: string | null
+          rejection_reason?: string | null
+          start_date: string
+          status?: string | null
+          travel_days_after?: number | null
+          travel_days_before?: number | null
+          vessel_id?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string | null
+          crew_id?: string
+          end_date?: string
+          id?: string
+          leave_type?: string
+          reason?: string | null
+          rejection_reason?: string | null
+          start_date?: string
+          status?: string | null
+          travel_days_after?: number | null
+          travel_days_before?: number | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_requests_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "leave_requests_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "leave_requests_vessel_id_fkey"
             columns: ["vessel_id"]
             isOneToOne: false
             referencedRelation: "vessels"
@@ -2329,6 +2918,154 @@ export type Database = {
           },
         ]
       }
+      medical_reports: {
+        Row: {
+          body_part_affected: string | null
+          created_at: string | null
+          created_by: string | null
+          crew_id: string | null
+          id: string
+          incident_id: string | null
+          injury_type: string | null
+          is_anonymized_for_fleet: boolean | null
+          medical_attention_required: boolean | null
+          report_number: string
+          time_off_work_days: number | null
+          treatment_given: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          body_part_affected?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          crew_id?: string | null
+          id?: string
+          incident_id?: string | null
+          injury_type?: string | null
+          is_anonymized_for_fleet?: boolean | null
+          medical_attention_required?: boolean | null
+          report_number: string
+          time_off_work_days?: number | null
+          treatment_given?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          body_part_affected?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          crew_id?: string | null
+          id?: string
+          incident_id?: string | null
+          injury_type?: string | null
+          is_anonymized_for_fleet?: boolean | null
+          medical_attention_required?: boolean | null
+          report_number?: string
+          time_off_work_days?: number | null
+          treatment_given?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medical_reports_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "medical_reports_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "medical_reports_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "medical_reports_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_logs: {
+        Row: {
+          body_preview: string | null
+          created_at: string | null
+          delivered_at: string | null
+          failed_at: string | null
+          failure_reason: string | null
+          id: string
+          idempotency_key: string | null
+          notification_type: string
+          provider: string | null
+          provider_message_id: string | null
+          recipient_email: string | null
+          recipient_user_id: string | null
+          related_entity_id: string | null
+          related_entity_type: string | null
+          sent_at: string | null
+          status: string | null
+          subject: string | null
+          template_name: string | null
+        }
+        Insert: {
+          body_preview?: string | null
+          created_at?: string | null
+          delivered_at?: string | null
+          failed_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          idempotency_key?: string | null
+          notification_type: string
+          provider?: string | null
+          provider_message_id?: string | null
+          recipient_email?: string | null
+          recipient_user_id?: string | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          sent_at?: string | null
+          status?: string | null
+          subject?: string | null
+          template_name?: string | null
+        }
+        Update: {
+          body_preview?: string | null
+          created_at?: string | null
+          delivered_at?: string | null
+          failed_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          idempotency_key?: string | null
+          notification_type?: string
+          provider?: string | null
+          provider_message_id?: string | null
+          recipient_email?: string | null
+          recipient_user_id?: string | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          sent_at?: string | null
+          status?: string | null
+          subject?: string | null
+          template_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_logs_recipient_user_id_fkey"
+            columns: ["recipient_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       permit_extensions: {
         Row: {
           approved_by_id: string | null
@@ -2381,8 +3118,56 @@ export type Database = {
           },
         ]
       }
+      planner_periods: {
+        Row: {
+          created_at: string | null
+          end_date: string
+          id: string
+          location: string | null
+          notes: string | null
+          period_type: string
+          start_date: string
+          status: string | null
+          title: string | null
+          vessel_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          end_date: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          period_type: string
+          start_date: string
+          status?: string | null
+          title?: string | null
+          vessel_id: string
+        }
+        Update: {
+          created_at?: string | null
+          end_date?: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          period_type?: string
+          start_date?: string
+          status?: string | null
+          title?: string | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "planner_periods_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
+          avatar_url: string | null
           cabin: string | null
           company_id: string | null
           contract_end_date: string | null
@@ -2396,6 +3181,11 @@ export type Database = {
           first_name: string
           gender: string | null
           id: string
+          invitation_count: number | null
+          invitation_token: string | null
+          invitation_token_expires: string | null
+          invited_at: string | null
+          last_invited_at: string | null
           last_name: string
           medical_expiry: string | null
           nationality: string | null
@@ -2403,6 +3193,7 @@ export type Database = {
           passport_expiry: string | null
           passport_number: string | null
           phone: string | null
+          position: string | null
           preferred_name: string | null
           rank: string | null
           role: Database["public"]["Enums"]["user_role"]
@@ -2415,6 +3206,7 @@ export type Database = {
           visa_status: string | null
         }
         Insert: {
+          avatar_url?: string | null
           cabin?: string | null
           company_id?: string | null
           contract_end_date?: string | null
@@ -2428,6 +3220,11 @@ export type Database = {
           first_name: string
           gender?: string | null
           id?: string
+          invitation_count?: number | null
+          invitation_token?: string | null
+          invitation_token_expires?: string | null
+          invited_at?: string | null
+          last_invited_at?: string | null
           last_name: string
           medical_expiry?: string | null
           nationality?: string | null
@@ -2435,6 +3232,7 @@ export type Database = {
           passport_expiry?: string | null
           passport_number?: string | null
           phone?: string | null
+          position?: string | null
           preferred_name?: string | null
           rank?: string | null
           role?: Database["public"]["Enums"]["user_role"]
@@ -2447,6 +3245,7 @@ export type Database = {
           visa_status?: string | null
         }
         Update: {
+          avatar_url?: string | null
           cabin?: string | null
           company_id?: string | null
           contract_end_date?: string | null
@@ -2460,6 +3259,11 @@ export type Database = {
           first_name?: string
           gender?: string | null
           id?: string
+          invitation_count?: number | null
+          invitation_token?: string | null
+          invitation_token_expires?: string | null
+          invited_at?: string | null
+          last_invited_at?: string | null
           last_name?: string
           medical_expiry?: string | null
           nationality?: string | null
@@ -2467,6 +3271,7 @@ export type Database = {
           passport_expiry?: string | null
           passport_number?: string | null
           phone?: string | null
+          position?: string | null
           preferred_name?: string | null
           rank?: string | null
           role?: Database["public"]["Enums"]["user_role"]
@@ -3411,45 +4216,114 @@ export type Database = {
       }
       vessels: {
         Row: {
+          beam: number | null
           build_year: number | null
+          builder: string | null
+          call_sign: string | null
+          class_emergency_contact: string | null
           classification_society: string | null
           company_id: string
           created_at: string
+          draft: number | null
+          emergency_primary_contact_name: string | null
+          emergency_primary_email: string | null
+          emergency_primary_phone: string | null
+          emergency_secondary_contact_name: string | null
+          emergency_secondary_email: string | null
+          emergency_secondary_phone: string | null
           flag_state: string | null
+          flag_state_emergency_contact: string | null
+          fleet_group_id: string | null
           gross_tonnage: number | null
+          home_port: string | null
           id: string
           imo_number: string | null
+          length_overall: number | null
+          medical_support_contact: string | null
+          minimum_safe_manning: Json | null
+          mmsi: string | null
+          mrcc_contact_info: string | null
           name: string
+          nearest_port_agent_contact: string | null
+          operational_status: string | null
+          security_support_contact: string | null
           status: string | null
           updated_at: string
+          updated_by: string | null
           vessel_type: string | null
         }
         Insert: {
+          beam?: number | null
           build_year?: number | null
+          builder?: string | null
+          call_sign?: string | null
+          class_emergency_contact?: string | null
           classification_society?: string | null
           company_id: string
           created_at?: string
+          draft?: number | null
+          emergency_primary_contact_name?: string | null
+          emergency_primary_email?: string | null
+          emergency_primary_phone?: string | null
+          emergency_secondary_contact_name?: string | null
+          emergency_secondary_email?: string | null
+          emergency_secondary_phone?: string | null
           flag_state?: string | null
+          flag_state_emergency_contact?: string | null
+          fleet_group_id?: string | null
           gross_tonnage?: number | null
+          home_port?: string | null
           id?: string
           imo_number?: string | null
+          length_overall?: number | null
+          medical_support_contact?: string | null
+          minimum_safe_manning?: Json | null
+          mmsi?: string | null
+          mrcc_contact_info?: string | null
           name: string
+          nearest_port_agent_contact?: string | null
+          operational_status?: string | null
+          security_support_contact?: string | null
           status?: string | null
           updated_at?: string
+          updated_by?: string | null
           vessel_type?: string | null
         }
         Update: {
+          beam?: number | null
           build_year?: number | null
+          builder?: string | null
+          call_sign?: string | null
+          class_emergency_contact?: string | null
           classification_society?: string | null
           company_id?: string
           created_at?: string
+          draft?: number | null
+          emergency_primary_contact_name?: string | null
+          emergency_primary_email?: string | null
+          emergency_primary_phone?: string | null
+          emergency_secondary_contact_name?: string | null
+          emergency_secondary_email?: string | null
+          emergency_secondary_phone?: string | null
           flag_state?: string | null
+          flag_state_emergency_contact?: string | null
+          fleet_group_id?: string | null
           gross_tonnage?: number | null
+          home_port?: string | null
           id?: string
           imo_number?: string | null
+          length_overall?: number | null
+          medical_support_contact?: string | null
+          minimum_safe_manning?: Json | null
+          mmsi?: string | null
+          mrcc_contact_info?: string | null
           name?: string
+          nearest_port_agent_contact?: string | null
+          operational_status?: string | null
+          security_support_contact?: string | null
           status?: string | null
           updated_at?: string
+          updated_by?: string | null
           vessel_type?: string | null
         }
         Relationships: [
@@ -3459,6 +4333,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessels_fleet_group_id_fkey"
+            columns: ["fleet_group_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessels_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
