@@ -2443,6 +2443,865 @@ export type Database = {
           },
         ]
       }
+      form_ai_extraction_jobs: {
+        Row: {
+          company_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          error_message: string | null
+          extracted_schema: Json | null
+          extraction_confidence: number | null
+          extraction_notes: string | null
+          id: string
+          source_file_url: string
+          started_at: string | null
+          status: string | null
+          template_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          error_message?: string | null
+          extracted_schema?: Json | null
+          extraction_confidence?: number | null
+          extraction_notes?: string | null
+          id?: string
+          source_file_url: string
+          started_at?: string | null
+          status?: string | null
+          template_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          error_message?: string | null
+          extracted_schema?: Json | null
+          extraction_confidence?: number | null
+          extraction_notes?: string | null
+          id?: string
+          source_file_url?: string
+          started_at?: string | null
+          status?: string | null
+          template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_ai_extraction_jobs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_ai_extraction_jobs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "form_ai_extraction_jobs_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "form_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_amendments: {
+        Row: {
+          amendment_number: number
+          amendment_reason: string
+          approval_status: string | null
+          approved_at: string | null
+          approved_by: string | null
+          changed_fields: string[] | null
+          id: string
+          new_data: Json
+          previous_data: Json
+          re_signed_at: string | null
+          requested_at: string | null
+          requested_by: string
+          requires_re_signature: boolean | null
+          submission_id: string
+        }
+        Insert: {
+          amendment_number: number
+          amendment_reason: string
+          approval_status?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          changed_fields?: string[] | null
+          id?: string
+          new_data: Json
+          previous_data: Json
+          re_signed_at?: string | null
+          requested_at?: string | null
+          requested_by: string
+          requires_re_signature?: boolean | null
+          submission_id: string
+        }
+        Update: {
+          amendment_number?: number
+          amendment_reason?: string
+          approval_status?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          changed_fields?: string[] | null
+          id?: string
+          new_data?: Json
+          previous_data?: Json
+          re_signed_at?: string | null
+          requested_at?: string | null
+          requested_by?: string
+          requires_re_signature?: boolean | null
+          submission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_amendments_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "form_amendments_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "form_amendments_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "form_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_attachments: {
+        Row: {
+          field_id: string | null
+          file_name: string
+          file_size: number | null
+          file_url: string
+          id: string
+          mime_type: string | null
+          submission_id: string | null
+          uploaded_at: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          field_id?: string | null
+          file_name: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+          mime_type?: string | null
+          submission_id?: string | null
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          field_id?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          mime_type?: string | null
+          submission_id?: string | null
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_attachments_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "form_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      form_categories: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          parent_category_id: string | null
+          sort_order: number | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          parent_category_id?: string | null
+          sort_order?: number | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          parent_category_id?: string | null
+          sort_order?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_categories_parent_category_id_fkey"
+            columns: ["parent_category_id"]
+            isOneToOne: false
+            referencedRelation: "form_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_offline_queue: {
+        Row: {
+          action_type: string
+          created_at: string | null
+          device_id: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          payload: Json
+          sync_error: string | null
+          sync_status: string | null
+          synced_at: string | null
+          user_id: string
+        }
+        Insert: {
+          action_type: string
+          created_at?: string | null
+          device_id: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          payload: Json
+          sync_error?: string | null
+          sync_status?: string | null
+          synced_at?: string | null
+          user_id: string
+        }
+        Update: {
+          action_type?: string
+          created_at?: string | null
+          device_id?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          payload?: Json
+          sync_error?: string | null
+          sync_status?: string | null
+          synced_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_offline_queue_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      form_schedules: {
+        Row: {
+          assigned_role: string | null
+          assigned_user_id: string | null
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          end_date: string | null
+          id: string
+          is_active: boolean | null
+          last_generated_at: string | null
+          next_due_date: string | null
+          recurrence_config: Json
+          recurrence_type: string
+          schedule_name: string | null
+          start_date: string
+          template_id: string
+          vessel_id: string | null
+        }
+        Insert: {
+          assigned_role?: string | null
+          assigned_user_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_generated_at?: string | null
+          next_due_date?: string | null
+          recurrence_config: Json
+          recurrence_type: string
+          schedule_name?: string | null
+          start_date: string
+          template_id: string
+          vessel_id?: string | null
+        }
+        Update: {
+          assigned_role?: string | null
+          assigned_user_id?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_generated_at?: string | null
+          next_due_date?: string | null
+          recurrence_config?: Json
+          recurrence_type?: string
+          schedule_name?: string | null
+          start_date?: string
+          template_id?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_schedules_assigned_user_id_fkey"
+            columns: ["assigned_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "form_schedules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_schedules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "form_schedules_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "form_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_schedules_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_signatures: {
+        Row: {
+          created_at: string | null
+          delegated_to: string | null
+          device_info: string | null
+          id: string
+          ip_address: string | null
+          rejection_reason: string | null
+          signature_data: string | null
+          signature_order: number
+          signature_type: string | null
+          signed_at: string | null
+          signer_name: string
+          signer_rank: string | null
+          signer_role: string
+          signer_user_id: string
+          status: string | null
+          submission_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          delegated_to?: string | null
+          device_info?: string | null
+          id?: string
+          ip_address?: string | null
+          rejection_reason?: string | null
+          signature_data?: string | null
+          signature_order: number
+          signature_type?: string | null
+          signed_at?: string | null
+          signer_name: string
+          signer_rank?: string | null
+          signer_role: string
+          signer_user_id: string
+          status?: string | null
+          submission_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          delegated_to?: string | null
+          device_info?: string | null
+          id?: string
+          ip_address?: string | null
+          rejection_reason?: string | null
+          signature_data?: string | null
+          signature_order?: number
+          signature_type?: string | null
+          signed_at?: string | null
+          signer_name?: string
+          signer_rank?: string | null
+          signer_role?: string
+          signer_user_id?: string
+          status?: string | null
+          submission_id?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_signatures_delegated_to_fkey"
+            columns: ["delegated_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "form_signatures_signer_user_id_fkey"
+            columns: ["signer_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "form_signatures_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "form_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_submissions: {
+        Row: {
+          amendment_of_id: string | null
+          amendment_reason: string | null
+          company_id: string | null
+          content_hash: string | null
+          created_at: string | null
+          created_by: string | null
+          created_date: string
+          created_offline: boolean | null
+          created_time_utc: string
+          due_date: string | null
+          form_data: Json
+          id: string
+          is_locked: boolean | null
+          line_items: Json | null
+          linked_audit_id: string | null
+          linked_capa_id: string | null
+          linked_incident_id: string | null
+          linked_nc_id: string | null
+          locked_at: string | null
+          offline_device_id: string | null
+          requires_amendment: boolean | null
+          schedule_id: string | null
+          status: string | null
+          submission_number: string
+          submitted_at: string | null
+          submitted_by: string | null
+          synced_at: string | null
+          template_id: string
+          template_version: number
+          vessel_id: string | null
+          vessel_local_offset_minutes: number | null
+        }
+        Insert: {
+          amendment_of_id?: string | null
+          amendment_reason?: string | null
+          company_id?: string | null
+          content_hash?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          created_date: string
+          created_offline?: boolean | null
+          created_time_utc: string
+          due_date?: string | null
+          form_data?: Json
+          id?: string
+          is_locked?: boolean | null
+          line_items?: Json | null
+          linked_audit_id?: string | null
+          linked_capa_id?: string | null
+          linked_incident_id?: string | null
+          linked_nc_id?: string | null
+          locked_at?: string | null
+          offline_device_id?: string | null
+          requires_amendment?: boolean | null
+          schedule_id?: string | null
+          status?: string | null
+          submission_number: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          synced_at?: string | null
+          template_id: string
+          template_version: number
+          vessel_id?: string | null
+          vessel_local_offset_minutes?: number | null
+        }
+        Update: {
+          amendment_of_id?: string | null
+          amendment_reason?: string | null
+          company_id?: string | null
+          content_hash?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          created_date?: string
+          created_offline?: boolean | null
+          created_time_utc?: string
+          due_date?: string | null
+          form_data?: Json
+          id?: string
+          is_locked?: boolean | null
+          line_items?: Json | null
+          linked_audit_id?: string | null
+          linked_capa_id?: string | null
+          linked_incident_id?: string | null
+          linked_nc_id?: string | null
+          locked_at?: string | null
+          offline_device_id?: string | null
+          requires_amendment?: boolean | null
+          schedule_id?: string | null
+          status?: string | null
+          submission_number?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          synced_at?: string | null
+          template_id?: string
+          template_version?: number
+          vessel_id?: string | null
+          vessel_local_offset_minutes?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_submissions_amendment_of_id_fkey"
+            columns: ["amendment_of_id"]
+            isOneToOne: false
+            referencedRelation: "form_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submissions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submissions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "form_submissions_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "form_schedules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submissions_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "form_submissions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "form_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submissions_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_template_acknowledgements: {
+        Row: {
+          acknowledged_at: string | null
+          id: string
+          template_id: string | null
+          template_version: number
+          user_id: string | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          id?: string
+          template_id?: string | null
+          template_version: number
+          user_id?: string | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          id?: string
+          template_id?: string | null
+          template_version?: number
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_template_acknowledgements_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "form_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_template_acknowledgements_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      form_template_versions: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          form_schema: Json
+          id: string
+          template_id: string | null
+          version: number
+          version_notes: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          form_schema: Json
+          id?: string
+          template_id?: string | null
+          version: number
+          version_notes?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          form_schema?: Json
+          id?: string
+          template_id?: string | null
+          version?: number
+          version_notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_template_versions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "form_template_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "form_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_templates: {
+        Row: {
+          allow_line_items: boolean | null
+          allow_parallel_signing: boolean | null
+          auto_attach_to_audit: boolean | null
+          can_trigger_capa: boolean | null
+          can_trigger_incident: boolean | null
+          can_trigger_nc: boolean | null
+          category_id: string | null
+          company_id: string
+          created_at: string | null
+          created_by: string | null
+          department_scope: string | null
+          description: string | null
+          effective_date: string | null
+          expiry_action: string | null
+          expiry_hours: number | null
+          form_schema: Json
+          form_type: string
+          has_expiry: boolean | null
+          id: string
+          initiation_mode: string | null
+          last_reviewed_at: string | null
+          next_review_date: string | null
+          published_at: string | null
+          published_by: string | null
+          required_signers: Json | null
+          review_cycle_days: number | null
+          source_file_name: string | null
+          source_file_type: string | null
+          source_file_url: string | null
+          status: string | null
+          supersedes_template_id: string | null
+          template_code: string
+          template_name: string
+          updated_at: string | null
+          version: number | null
+          version_notes: string | null
+          vessel_ids: string[] | null
+          vessel_scope: string | null
+        }
+        Insert: {
+          allow_line_items?: boolean | null
+          allow_parallel_signing?: boolean | null
+          auto_attach_to_audit?: boolean | null
+          can_trigger_capa?: boolean | null
+          can_trigger_incident?: boolean | null
+          can_trigger_nc?: boolean | null
+          category_id?: string | null
+          company_id: string
+          created_at?: string | null
+          created_by?: string | null
+          department_scope?: string | null
+          description?: string | null
+          effective_date?: string | null
+          expiry_action?: string | null
+          expiry_hours?: number | null
+          form_schema?: Json
+          form_type: string
+          has_expiry?: boolean | null
+          id?: string
+          initiation_mode?: string | null
+          last_reviewed_at?: string | null
+          next_review_date?: string | null
+          published_at?: string | null
+          published_by?: string | null
+          required_signers?: Json | null
+          review_cycle_days?: number | null
+          source_file_name?: string | null
+          source_file_type?: string | null
+          source_file_url?: string | null
+          status?: string | null
+          supersedes_template_id?: string | null
+          template_code: string
+          template_name: string
+          updated_at?: string | null
+          version?: number | null
+          version_notes?: string | null
+          vessel_ids?: string[] | null
+          vessel_scope?: string | null
+        }
+        Update: {
+          allow_line_items?: boolean | null
+          allow_parallel_signing?: boolean | null
+          auto_attach_to_audit?: boolean | null
+          can_trigger_capa?: boolean | null
+          can_trigger_incident?: boolean | null
+          can_trigger_nc?: boolean | null
+          category_id?: string | null
+          company_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          department_scope?: string | null
+          description?: string | null
+          effective_date?: string | null
+          expiry_action?: string | null
+          expiry_hours?: number | null
+          form_schema?: Json
+          form_type?: string
+          has_expiry?: boolean | null
+          id?: string
+          initiation_mode?: string | null
+          last_reviewed_at?: string | null
+          next_review_date?: string | null
+          published_at?: string | null
+          published_by?: string | null
+          required_signers?: Json | null
+          review_cycle_days?: number | null
+          source_file_name?: string | null
+          source_file_type?: string | null
+          source_file_url?: string | null
+          status?: string | null
+          supersedes_template_id?: string | null
+          template_code?: string
+          template_name?: string
+          updated_at?: string | null
+          version?: number | null
+          version_notes?: string | null
+          vessel_ids?: string[] | null
+          vessel_scope?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_templates_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "form_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "form_templates_published_by_fkey"
+            columns: ["published_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "form_templates_supersedes_template_id_fkey"
+            columns: ["supersedes_template_id"]
+            isOneToOne: false
+            referencedRelation: "form_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hours_of_rest_records: {
         Row: {
           crew_id: string
