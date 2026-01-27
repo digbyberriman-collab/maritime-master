@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { z } from 'zod';
+import InkfishWatermark from '@/components/InkfishWatermark';
 
 type AuthMode = 'login' | 'register' | 'forgot-password';
 
@@ -158,8 +159,11 @@ const Auth: React.FC = () => {
   const passwordStrength = getPasswordStrength(password);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md animate-fade-in">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative">
+      {/* Inkfish watermark - renders behind all content */}
+      <InkfishWatermark />
+      
+      <div className="w-full max-w-md animate-fade-in relative z-10">
         {/* Logo */}
         <div className="flex flex-col items-center justify-center mb-8">
           <span className="text-4xl font-black tracking-tight text-primary">STORM</span>

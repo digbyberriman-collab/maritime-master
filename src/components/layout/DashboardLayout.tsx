@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useBrandingContext } from '@/contexts/BrandingContext';
 import { canManageBranding } from '@/hooks/useBranding';
 import InkfishFooter from '@/components/layout/InkfishFooter';
+import InkfishWatermark from '@/components/InkfishWatermark';
 import NotificationBell from '@/components/layout/NotificationBell';
 import {
   LayoutDashboard,
@@ -82,7 +83,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const canAccessBranding = canManageBranding(profile?.role);
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex relative">
+      {/* Inkfish watermark - renders behind all content */}
+      <InkfishWatermark />
+      
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
@@ -91,7 +95,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar - z-10 to be above watermark */}
       <aside
         className={cn(
           'fixed lg:static inset-y-0 left-0 z-50 w-64 bg-sidebar transform transition-transform duration-200 ease-in-out lg:translate-x-0',
@@ -191,10 +195,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         </div>
       </aside>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Main content - z-10 to be above watermark */}
+      <div className="flex-1 flex flex-col min-w-0 relative z-10">
         {/* Top navbar */}
-        <header className="h-16 bg-card border-b border-border flex items-center justify-between px-4 lg:px-6 shadow-navbar">
+        <header className="h-16 bg-card border-b border-border flex items-center justify-between px-4 lg:px-6 shadow-navbar relative z-20">
           {/* Mobile menu button */}
           <button
             onClick={() => setSidebarOpen(true)}
