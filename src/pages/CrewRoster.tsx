@@ -59,7 +59,7 @@ import { useVessels } from '@/hooks/useVessels';
 import CrewFormModal from '@/components/crew/CrewFormModal';
 import CrewProfileModal from '@/components/crew/CrewProfileModal';
 import TransferCrewModal from '@/components/crew/TransferCrewModal';
-import EditCrewModal from '@/components/crew/EditCrewModal';
+import FullCrewEditModal from '@/components/crew/FullCrewEditModal';
 import SignOffDialog from '@/components/crew/SignOffDialog';
 import ImportCrewCSVModal from '@/components/crew/ImportCrewCSVModal';
 
@@ -460,7 +460,7 @@ const CrewRoster: React.FC = () => {
         canManage={canManageCrew}
       />
 
-      <EditCrewModal
+      <FullCrewEditModal
         isOpen={isEditModalOpen}
         onClose={() => {
           setIsEditModalOpen(false);

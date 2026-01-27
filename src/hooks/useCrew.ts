@@ -15,6 +15,23 @@ export interface CrewMember {
   status: string | null;
   role: string;
   created_at: string;
+  // Extended profile fields
+  preferred_name?: string | null;
+  date_of_birth?: string | null;
+  gender?: string | null;
+  emergency_contact_name?: string | null;
+  emergency_contact_phone?: string | null;
+  department?: string | null;
+  contract_start_date?: string | null;
+  contract_end_date?: string | null;
+  rotation?: string | null;
+  cabin?: string | null;
+  notes?: string | null;
+  medical_expiry?: string | null;
+  passport_number?: string | null;
+  passport_expiry?: string | null;
+  visa_status?: string | null;
+  // Assignment
   current_assignment?: {
     id: string;
     vessel_id: string;
@@ -59,12 +76,32 @@ export interface AddCrewMemberData {
 
 export interface UpdateCrewMemberData {
   userId: string;
+  // Personal Information
   firstName?: string;
   lastName?: string;
-  phone?: string;
+  preferredName?: string;
+  dateOfBirth?: string;
+  gender?: string;
   nationality?: string;
+  // Contact Information
+  phone?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  // Employment Information
   rank?: string;
+  department?: string;
   status?: string;
+  contractStartDate?: string;
+  contractEndDate?: string;
+  rotation?: string;
+  cabin?: string;
+  // Documents & Compliance
+  medicalExpiry?: string;
+  passportNumber?: string;
+  passportExpiry?: string;
+  visaStatus?: string;
+  // Notes
+  notes?: string;
 }
 
 export interface TransferCrewData {
@@ -126,6 +163,22 @@ export const useCrew = (vesselFilter?: string) => {
           status: p.status,
           role: p.role,
           created_at: p.created_at,
+          // Extended profile fields
+          preferred_name: p.preferred_name,
+          date_of_birth: p.date_of_birth,
+          gender: p.gender,
+          emergency_contact_name: p.emergency_contact_name,
+          emergency_contact_phone: p.emergency_contact_phone,
+          department: p.department,
+          contract_start_date: p.contract_start_date,
+          contract_end_date: p.contract_end_date,
+          rotation: p.rotation,
+          cabin: p.cabin,
+          notes: p.notes,
+          medical_expiry: p.medical_expiry,
+          passport_number: p.passport_number,
+          passport_expiry: p.passport_expiry,
+          visa_status: p.visa_status,
           current_assignment: assignment
             ? {
                 id: assignment.id,
@@ -198,12 +251,40 @@ export const useCrew = (vesselFilter?: string) => {
   const updateCrewMember = useMutation({
     mutationFn: async (data: UpdateCrewMemberData) => {
       const updateData: Record<string, any> = {};
+      
+      // Personal Information
       if (data.firstName) updateData.first_name = data.firstName;
       if (data.lastName) updateData.last_name = data.lastName;
-      if (data.phone !== undefined) updateData.phone = data.phone;
-      if (data.nationality !== undefined) updateData.nationality = data.nationality;
-      if (data.rank !== undefined) updateData.rank = data.rank;
+      if (data.preferredName !== undefined) updateData.preferred_name = data.preferredName || null;
+      if (data.dateOfBirth !== undefined) updateData.date_of_birth = data.dateOfBirth || null;
+      if (data.gender !== undefined) updateData.gender = data.gender === '__none__' ? null : data.gender || null;
+      if (data.nationality !== undefined) updateData.nationality = data.nationality === '__none__' ? null : data.nationality || null;
+      
+      // Contact Information
+      if (data.phone !== undefined) updateData.phone = data.phone || null;
+      if (data.emergencyContactName !== undefined) updateData.emergency_contact_name = data.emergencyContactName || null;
+      if (data.emergencyContactPhone !== undefined) updateData.emergency_contact_phone = data.emergencyContactPhone || null;
+      
+      // Employment Information
+      if (data.rank !== undefined) updateData.rank = data.rank === '__none__' ? null : data.rank || null;
+      if (data.department !== undefined) updateData.department = data.department === '__none__' ? null : data.department || null;
       if (data.status !== undefined) updateData.status = data.status;
+      if (data.contractStartDate !== undefined) updateData.contract_start_date = data.contractStartDate || null;
+      if (data.contractEndDate !== undefined) updateData.contract_end_date = data.contractEndDate || null;
+      if (data.rotation !== undefined) updateData.rotation = data.rotation || null;
+      if (data.cabin !== undefined) updateData.cabin = data.cabin || null;
+      
+      // Documents & Compliance
+      if (data.medicalExpiry !== undefined) updateData.medical_expiry = data.medicalExpiry || null;
+      if (data.passportNumber !== undefined) updateData.passport_number = data.passportNumber || null;
+      if (data.passportExpiry !== undefined) updateData.passport_expiry = data.passportExpiry || null;
+      if (data.visaStatus !== undefined) updateData.visa_status = data.visaStatus || null;
+      
+      // Notes
+      if (data.notes !== undefined) updateData.notes = data.notes || null;
+      
+      // Metadata
+      updateData.updated_at = new Date().toISOString();
 
       const { error } = await supabase
         .from('profiles')

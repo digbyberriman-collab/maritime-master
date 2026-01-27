@@ -83,6 +83,54 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          actor_email: string | null
+          actor_role: string | null
+          actor_user_id: string | null
+          changed_fields: Json | null
+          entity_id: string
+          entity_type: string
+          id: string
+          ip_address: string | null
+          new_values: Json | null
+          old_values: Json | null
+          timestamp: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          actor_email?: string | null
+          actor_role?: string | null
+          actor_user_id?: string | null
+          changed_fields?: Json | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          ip_address?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          timestamp?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          actor_email?: string | null
+          actor_role?: string | null
+          actor_user_id?: string | null
+          changed_fields?: Json | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          ip_address?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          timestamp?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       audits: {
         Row: {
           actual_end_date: string | null
@@ -2060,49 +2108,100 @@ export type Database = {
       }
       profiles: {
         Row: {
+          cabin: string | null
           company_id: string | null
+          contract_end_date: string | null
+          contract_start_date: string | null
           created_at: string
+          date_of_birth: string | null
+          department: string | null
           email: string
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
           first_name: string
+          gender: string | null
           id: string
           last_name: string
+          medical_expiry: string | null
           nationality: string | null
+          notes: string | null
+          passport_expiry: string | null
+          passport_number: string | null
           phone: string | null
+          preferred_name: string | null
           rank: string | null
           role: Database["public"]["Enums"]["user_role"]
+          rotation: string | null
           status: string | null
           updated_at: string
+          updated_by: string | null
           user_id: string
+          version: number | null
+          visa_status: string | null
         }
         Insert: {
+          cabin?: string | null
           company_id?: string | null
+          contract_end_date?: string | null
+          contract_start_date?: string | null
           created_at?: string
+          date_of_birth?: string | null
+          department?: string | null
           email: string
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
           first_name: string
+          gender?: string | null
           id?: string
           last_name: string
+          medical_expiry?: string | null
           nationality?: string | null
+          notes?: string | null
+          passport_expiry?: string | null
+          passport_number?: string | null
           phone?: string | null
+          preferred_name?: string | null
           rank?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          rotation?: string | null
           status?: string | null
           updated_at?: string
+          updated_by?: string | null
           user_id: string
+          version?: number | null
+          visa_status?: string | null
         }
         Update: {
+          cabin?: string | null
           company_id?: string | null
+          contract_end_date?: string | null
+          contract_start_date?: string | null
           created_at?: string
+          date_of_birth?: string | null
+          department?: string | null
           email?: string
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
           first_name?: string
+          gender?: string | null
           id?: string
           last_name?: string
+          medical_expiry?: string | null
           nationality?: string | null
+          notes?: string | null
+          passport_expiry?: string | null
+          passport_number?: string | null
           phone?: string | null
+          preferred_name?: string | null
           rank?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          rotation?: string | null
           status?: string | null
           updated_at?: string
+          updated_by?: string | null
           user_id?: string
+          version?: number | null
+          visa_status?: string | null
         }
         Relationships: [
           {
