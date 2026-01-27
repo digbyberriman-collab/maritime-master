@@ -108,7 +108,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             <div className="flex items-center justify-between">
               <Link 
                 to="/dashboard"
-                className="text-xl sm:text-2xl font-black tracking-tight text-sidebar-foreground hover:text-sidebar-foreground/80 transition-colors focus:outline-none focus:ring-2 focus:ring-sidebar-ring focus:ring-offset-2 focus:ring-offset-sidebar py-1"
+                className="text-xl sm:text-2xl font-black tracking-tight text-sidebar-foreground hover:text-sidebar-accent-foreground hover:opacity-80 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-sidebar-ring py-1"
                 aria-label="STORM Home - Return to Dashboard"
                 title="Return to Dashboard"
               >
