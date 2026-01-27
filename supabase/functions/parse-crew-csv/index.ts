@@ -36,6 +36,13 @@ interface ParseResult {
   warningRows: number;
 }
 
+interface ImportResult {
+  success: boolean;
+  created: number;
+  skipped: number;
+  errors: { row: number; error: string }[];
+}
+
 const ALLOWED_STATUSES = ['Active', 'Pending', 'On Leave', 'Invited', 'Inactive'];
 
 // Parse CSV content
@@ -117,7 +124,7 @@ function validateRow(row: Record<string, string>, rowNumber: number): Validation
     }
   }
 
-  const vesselAssignment = row.vessel_assignment?.trim() || '';
+  const vesselAssignment = row.vessel_assignment?.trim() || row.vessel?.trim() || row.vessel_name?.trim() || '';
   if (!vesselAssignment) {
     errors.push('Vessel assignment is required');
   }
@@ -129,7 +136,7 @@ function validateRow(row: Record<string, string>, rowNumber: number): Validation
   }
 
   // Optional field validation
-  const phoneNumber = row.phone_number?.trim() || '';
+  const phoneNumber = row.phone_number?.trim() || row.phone?.trim() || '';
   if (phoneNumber) {
     const phoneRegex = /^[\d\s\+\-\(\)]+$/;
     if (!phoneRegex.test(phoneNumber)) {
@@ -208,15 +215,16 @@ serve(async (req: Request) => {
       throw new Error('Insufficient permissions');
     }
 
-    // Get CSV content from request body
+    // Get request body
     const body = await req.json();
     const csvContent = body.csvContent;
+    const action = body.action || 'validate'; // 'validate' or 'import'
 
     if (!csvContent) {
       throw new Error('CSV content is required');
     }
 
-    console.log('Parsing CSV content...');
+    console.log(`Processing CSV: action=${action}`);
 
     // Parse CSV
     const rows = parseCSV(csvContent);
@@ -235,21 +243,23 @@ serve(async (req: Request) => {
       .filter(r => r.data.email)
       .map(r => r.data.email);
 
-    if (emails.length > 0) {
-      const { data: existingProfiles } = await supabaseAdmin
-        .from('profiles')
-        .select('email')
-        .eq('company_id', profile.company_id)
-        .in('email', emails);
+    const { data: existingProfiles } = await supabaseAdmin
+      .from('profiles')
+      .select('email')
+      .eq('company_id', profile.company_id)
+      .in('email', emails);
 
-      const existingEmails = new Set(existingProfiles?.map(p => p.email) || []);
+    const existingEmails = new Set(existingProfiles?.map(p => p.email) || []);
 
-      validationResults.forEach(r => {
-        if (existingEmails.has(r.data.email)) {
-          r.warnings.push('Email already exists in system');
+    validationResults.forEach(r => {
+      if (existingEmails.has(r.data.email)) {
+        r.warnings.push('Email already exists in system');
+        if (action === 'import') {
+          r.errors.push('Duplicate email - will be skipped');
+          r.valid = false;
         }
-      });
-    }
+      }
+    });
 
     // Check vessel mappings
     const vesselNames = [...new Set(validationResults.map(r => r.data.vessel_assignment))];
@@ -276,28 +286,161 @@ serve(async (req: Request) => {
       }
     });
 
-    const validRows = validationResults.filter(r => r.valid).length;
-    const errorRows = validationResults.filter(r => !r.valid).length;
-    const warningRows = validationResults.filter(r => r.warnings.length > 0).length;
+    // If validate only, return results
+    if (action === 'validate') {
+      const validRows = validationResults.filter(r => r.valid).length;
+      const errorRows = validationResults.filter(r => !r.valid).length;
+      const warningRows = validationResults.filter(r => r.warnings.length > 0).length;
 
-    const result: ParseResult = {
-      results: validationResults,
-      totalRows: validationResults.length,
-      validRows,
-      errorRows,
-      warningRows,
+      const result: ParseResult = {
+        results: validationResults,
+        totalRows: validationResults.length,
+        validRows,
+        errorRows,
+        warningRows,
+      };
+
+      console.log(`CSV validated: ${validRows} valid, ${errorRows} errors, ${warningRows} warnings`);
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          ...result,
+          vesselMapping,
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Import action - create crew members
+    const importResult: ImportResult = {
+      success: true,
+      created: 0,
+      skipped: 0,
+      errors: [],
     };
 
-    console.log(`CSV parsed: ${validRows} valid, ${errorRows} errors, ${warningRows} warnings`);
+    for (const validation of validationResults) {
+      if (!validation.valid) {
+        importResult.skipped++;
+        validation.errors.forEach(err => {
+          importResult.errors.push({ row: validation.rowNumber, error: err });
+        });
+        continue;
+      }
+
+      const data = validation.data;
+      const vesselId = vesselMapping[data.vessel_assignment.toLowerCase()];
+
+      if (!vesselId) {
+        importResult.skipped++;
+        importResult.errors.push({ 
+          row: validation.rowNumber, 
+          error: `Vessel not found: ${data.vessel_assignment}` 
+        });
+        continue;
+      }
+
+      try {
+        // Generate a temporary password
+        const tempPassword = crypto.randomUUID().substring(0, 12);
+
+        // Create auth user
+        const { data: authUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+          email: data.email,
+          password: tempPassword,
+          email_confirm: true,
+          user_metadata: {
+            first_name: data.first_name,
+            last_name: data.last_name,
+          },
+        });
+
+        if (createError) {
+          throw new Error(createError.message);
+        }
+
+        if (!authUser.user) {
+          throw new Error('Failed to create user');
+        }
+
+        // Create profile
+        const { error: profileInsertError } = await supabaseAdmin
+          .from('profiles')
+          .insert({
+            user_id: authUser.user.id,
+            email: data.email,
+            first_name: data.first_name,
+            last_name: data.last_name,
+            rank: data.rank || null,
+            nationality: data.nationality || null,
+            phone: data.phone_number || null,
+            company_id: profile.company_id,
+            role: 'crew',
+            status: data.status || 'Invited',
+          });
+
+        if (profileInsertError) {
+          console.error('Profile insert error:', profileInsertError);
+          // Try to clean up auth user
+          await supabaseAdmin.auth.admin.deleteUser(authUser.user.id);
+          throw new Error(profileInsertError.message);
+        }
+
+        // Create crew assignment
+        const { error: assignmentError } = await supabaseAdmin
+          .from('crew_assignments')
+          .insert({
+            user_id: authUser.user.id,
+            vessel_id: vesselId,
+            position: data.position || data.rank || 'Crew',
+            join_date: data.join_date || new Date().toISOString().split('T')[0],
+            is_current: true,
+            created_by: userData.user.id,
+          });
+
+        if (assignmentError) {
+          console.error('Assignment error:', assignmentError);
+          // Don't fail the whole import, just log it
+        }
+
+        // Log the import in audit_logs
+        await supabaseAdmin
+          .from('audit_logs')
+          .insert({
+            actor_user_id: userData.user.id,
+            action: 'CREATE',
+            entity_type: 'crew_member',
+            entity_id: authUser.user.id,
+            new_values: {
+              email: data.email,
+              first_name: data.first_name,
+              last_name: data.last_name,
+              vessel_id: vesselId,
+              import_source: 'csv_bulk_import',
+            },
+          });
+
+        importResult.created++;
+        existingEmails.add(data.email); // Prevent duplicates within same import
+
+      } catch (error) {
+        console.error(`Error creating crew member row ${validation.rowNumber}:`, error);
+        importResult.errors.push({ 
+          row: validation.rowNumber, 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        });
+        importResult.skipped++;
+      }
+    }
+
+    console.log(`Import complete: ${importResult.created} created, ${importResult.skipped} skipped`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        ...result,
-        vesselMapping,
-      }),
+      JSON.stringify(importResult),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in parse-crew-csv:', errorMessage);
