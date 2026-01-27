@@ -51,6 +51,7 @@ import {
   ArrowRightLeft,
   UserX,
   Loader2,
+  Upload,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCrew, type CrewMember } from '@/hooks/useCrew';
@@ -60,6 +61,7 @@ import CrewProfileModal from '@/components/crew/CrewProfileModal';
 import TransferCrewModal from '@/components/crew/TransferCrewModal';
 import EditCrewModal from '@/components/crew/EditCrewModal';
 import SignOffDialog from '@/components/crew/SignOffDialog';
+import ImportCrewCSVModal from '@/components/crew/ImportCrewCSVModal';
 
 const VESSEL_FILTER_KEY = 'storm_crew_vessel_filter';
 
@@ -79,12 +81,14 @@ const CrewRoster: React.FC = () => {
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [isSignOffDialogOpen, setIsSignOffDialogOpen] = useState(false);
   const [isDeactivateDialogOpen, setIsDeactivateDialogOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedCrew, setSelectedCrew] = useState<CrewMember | null>(null);
 
   const { vessels, isLoading: vesselsLoading } = useVessels();
   const {
     crew,
     isLoading,
+    refetch: refetchCrew,
     addCrewMember,
     updateCrewMember,
     transferCrew,
@@ -211,13 +215,23 @@ const CrewRoster: React.FC = () => {
             <p className="text-muted-foreground">Manage crew assignments and profiles</p>
           </div>
           {canManageCrew && (
-            <button 
-              onClick={() => setIsFormModalOpen(true)} 
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-            >
-              <UserPlus className="w-4 h-4" />
-              + Add Crew Member
-            </button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => setIsImportModalOpen(true)}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <Upload className="w-4 h-4" />
+                Import CSV
+              </Button>
+              <Button 
+                onClick={() => setIsFormModalOpen(true)} 
+                className="flex items-center gap-2"
+              >
+                <UserPlus className="w-4 h-4" />
+                Add Crew Member
+              </Button>
+            </div>
           )}
         </div>
 
@@ -501,6 +515,15 @@ const CrewRoster: React.FC = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Import CSV Modal */}
+      <ImportCrewCSVModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={() => {
+          refetchCrew();
+        }}
+      />
     </DashboardLayout>
   );
 };
