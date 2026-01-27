@@ -2055,6 +2055,44 @@ export type Database = {
           },
         ]
       }
+      field_redactions: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          field_name: string
+          id: string
+          module: string
+          restricted_role_ids: string[] | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          field_name: string
+          id?: string
+          module: string
+          restricted_role_ids?: string[] | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          field_name?: string
+          id?: string
+          module?: string
+          restricted_role_ids?: string[] | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_redactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       fleet_groups: {
         Row: {
           color_hex: string | null
@@ -3096,6 +3134,30 @@ export type Database = {
           },
         ]
       }
+      permissions: {
+        Row: {
+          action: string
+          created_at: string | null
+          description: string | null
+          id: string
+          module: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          module: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          module?: string
+        }
+        Relationships: []
+      }
       permit_extensions: {
         Row: {
           approved_by_id: string | null
@@ -3525,6 +3587,98 @@ export type Database = {
             columns: ["vessel_id"]
             isOneToOne: false
             referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      role_permissions: {
+        Row: {
+          created_at: string | null
+          department_scope: boolean | null
+          id: string
+          permission_id: string
+          role_id: string
+          self_only: boolean | null
+          vessel_scope: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          department_scope?: boolean | null
+          id?: string
+          permission_id: string
+          role_id: string
+          self_only?: boolean | null
+          vessel_scope?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          department_scope?: boolean | null
+          id?: string
+          permission_id?: string
+          role_id?: string
+          self_only?: boolean | null
+          vessel_scope?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_permission_id_fkey"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "role_permissions_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roles: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          is_custom: boolean | null
+          is_system_role: boolean | null
+          role_code: string
+          role_name: string
+          scope_type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_custom?: boolean | null
+          is_system_role?: boolean | null
+          role_code: string
+          role_name: string
+          scope_type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_custom?: boolean | null
+          is_system_role?: boolean | null
+          role_code?: string
+          role_name?: string
+          scope_type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]

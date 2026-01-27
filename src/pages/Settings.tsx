@@ -19,6 +19,7 @@ import {
   ComplianceSection,
   SystemLogsSection,
   VesselAccessSection,
+  PermissionsSection,
 } from '@/components/settings/sections';
 
 const Settings: React.FC = () => {
@@ -71,13 +72,7 @@ const Settings: React.FC = () => {
       case 'vessel-access':
         return <VesselAccessSection />;
       case 'permissions':
-        return (
-          <PlaceholderSection 
-            title="Permissions" 
-            description="Configure role-based access control settings"
-            icon={Lock}
-          />
-        );
+        return <PermissionsSection />;
       case 'audit-mode':
         return (
           <PlaceholderSection 
