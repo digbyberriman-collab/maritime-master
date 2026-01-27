@@ -20,6 +20,7 @@ import DocumentSearch from "./pages/DocumentSearch";
 import ReviewDashboard from "./pages/ReviewDashboard";
 import BrandingSettings from "./pages/BrandingSettings";
 import Placeholder from "./pages/Placeholder";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 import Incidents from "./pages/Incidents";
 import IncidentAnalytics from "./pages/IncidentAnalytics";
@@ -245,7 +246,7 @@ const App = () => (
                 path="/settings"
                 element={
                   <ProtectedRoute>
-                    <Placeholder title="Settings" description="Configure your account and preferences" />
+                    <Settings />
                   </ProtectedRoute>
                 }
               />
