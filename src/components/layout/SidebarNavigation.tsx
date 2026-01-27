@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NAVIGATION_ITEMS, type NavItem, type NavChild } from '@/config/navigation';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SidebarNavigationProps {
   onNavigate?: () => void;
@@ -12,11 +13,17 @@ interface SidebarNavigationProps {
 const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { canAccessModule } = useAuth();
+  
+  // Filter navigation items based on user permissions
+  const visibleNavItems = useMemo(() => {
+    return NAVIGATION_ITEMS.filter(item => canAccessModule(item.id));
+  }, [canAccessModule]);
   
   // Track which groups are open
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
-    NAVIGATION_ITEMS.forEach((item) => {
+    visibleNavItems.forEach((item) => {
       if (item.children) {
         // Auto-open if current path matches any child or if defaultOpen is true
         const hasActiveChild = item.children.some(child => 
@@ -126,7 +133,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
 
   return (
     <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-      {NAVIGATION_ITEMS.map((item) => renderNavItem(item))}
+      {visibleNavItems.map((item) => renderNavItem(item))}
     </nav>
   );
 };
