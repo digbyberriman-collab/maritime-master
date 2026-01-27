@@ -20,3 +20,21 @@ verify_jwt = false
 
 [functions.generate-travel-letter]
 verify_jwt = false
+
+[functions.submit-form]
+verify_jwt = false
+
+[functions.sign-submission]
+verify_jwt = false
+
+[functions.complete-drill]
+verify_jwt = false
+
+[functions.update-familiarization]
+verify_jwt = false
+
+[functions.review-certificate]
+verify_jwt = false
+
+[functions.external-api]
+verify_jwt = false
