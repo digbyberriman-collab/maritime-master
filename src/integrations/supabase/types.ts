@@ -3346,6 +3346,69 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          department: string | null
+          expires_at: string | null
+          granted_at: string | null
+          granted_by: string | null
+          id: string
+          is_active: boolean | null
+          metadata: Json | null
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string | null
+          user_id: string
+          vessel_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          department?: string | null
+          expires_at?: string | null
+          granted_at?: string | null
+          granted_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string | null
+          user_id: string
+          vessel_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          department?: string | null
+          expires_at?: string | null
+          granted_at?: string | null
+          granted_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          metadata?: Json | null
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string | null
+          user_id?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_roles_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vessels: {
         Row: {
           build_year: number | null
@@ -3531,6 +3594,46 @@ export type Database = {
     }
     Functions: {
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
+      get_user_roles: {
+        Args: { _user_id: string }
+        Returns: {
+          company_id: string
+          department: string
+          role: Database["public"]["Enums"]["app_role"]
+          vessel_id: string
+        }[]
+      }
+      has_any_role: {
+        Args: {
+          _roles: Database["public"]["Enums"]["app_role"][]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_fleet_access: { Args: { _user_id: string }; Returns: boolean }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_role_in_company: {
+        Args: {
+          _company_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      has_role_on_vessel: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+          _vessel_id: string
+        }
+        Returns: boolean
+      }
       user_belongs_to_company: {
         Args: { _company_id: string; _user_id: string }
         Returns: boolean
@@ -3545,6 +3648,21 @@ export type Database = {
         | "RESOLVED"
         | "ESCALATED"
         | "AUTO_DISMISSED"
+      app_role:
+        | "superadmin"
+        | "dpa"
+        | "fleet_master"
+        | "captain"
+        | "purser"
+        | "chief_officer"
+        | "chief_engineer"
+        | "hod"
+        | "officer"
+        | "crew"
+        | "auditor_flag"
+        | "auditor_class"
+        | "travel_agent"
+        | "employer_api"
       user_role:
         | "master"
         | "chief_engineer"
@@ -3687,6 +3805,22 @@ export const Constants = {
         "RESOLVED",
         "ESCALATED",
         "AUTO_DISMISSED",
+      ],
+      app_role: [
+        "superadmin",
+        "dpa",
+        "fleet_master",
+        "captain",
+        "purser",
+        "chief_officer",
+        "chief_engineer",
+        "hod",
+        "officer",
+        "crew",
+        "auditor_flag",
+        "auditor_class",
+        "travel_agent",
+        "employer_api",
       ],
       user_role: [
         "master",
