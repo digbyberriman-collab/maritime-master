@@ -47,3 +47,9 @@ verify_jwt = false
 
 [functions.send-email]
 verify_jwt = false
+
+[functions.parse-crew-csv]
+verify_jwt = false
+
+[functions.update-crew-assignment]
+verify_jwt = false

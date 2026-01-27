@@ -102,6 +102,10 @@ export interface UpdateCrewMemberData {
   visaStatus?: string;
   // Notes
   notes?: string;
+  // Assignment fields
+  assignmentId?: string;
+  joinDate?: string;
+  position?: string;
 }
 
 export interface TransferCrewData {
@@ -286,12 +290,31 @@ export const useCrew = (vesselFilter?: string) => {
       // Metadata
       updateData.updated_at = new Date().toISOString();
 
+      // Update profile
       const { error } = await supabase
         .from('profiles')
         .update(updateData)
         .eq('user_id', data.userId);
 
       if (error) throw error;
+
+      // Update assignment if join date or position changed
+      if (data.assignmentId && (data.joinDate !== undefined || data.position !== undefined)) {
+        const assignmentUpdate: Record<string, any> = {};
+        if (data.joinDate !== undefined) assignmentUpdate.join_date = data.joinDate;
+        if (data.position !== undefined) assignmentUpdate.position = data.position;
+        assignmentUpdate.updated_at = new Date().toISOString();
+
+        const { error: assignmentError } = await supabase
+          .from('crew_assignments')
+          .update(assignmentUpdate)
+          .eq('id', data.assignmentId);
+
+        if (assignmentError) {
+          console.error('Failed to update assignment:', assignmentError);
+          // Don't throw - profile update succeeded
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crew'] });
