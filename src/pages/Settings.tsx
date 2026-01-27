@@ -14,6 +14,10 @@ import {
   DataExportsSection,
   SupportSection,
   PlaceholderSection,
+  IntegrationsSection,
+  EmailTemplatesSection,
+  ComplianceSection,
+  SystemLogsSection,
 } from '@/components/settings/sections';
 
 const Settings: React.FC = () => {
@@ -88,29 +92,11 @@ const Settings: React.FC = () => {
           />
         );
       case 'integrations':
-        return (
-          <PlaceholderSection 
-            title="Integrations" 
-            description="Manage third-party integrations and API connections"
-            icon={Plug}
-          />
-        );
+        return <IntegrationsSection />;
       case 'templates':
-        return (
-          <PlaceholderSection 
-            title="Email Templates" 
-            description="Customize email templates for notifications"
-            icon={Mail}
-          />
-        );
+        return <EmailTemplatesSection />;
       case 'compliance':
-        return (
-          <PlaceholderSection 
-            title="Compliance" 
-            description="Manage compliance settings and regulatory requirements"
-            icon={FileCheck}
-          />
-        );
+        return <ComplianceSection />;
       case 'billing':
         return (
           <PlaceholderSection 
@@ -120,13 +106,7 @@ const Settings: React.FC = () => {
           />
         );
       case 'logs':
-        return (
-          <PlaceholderSection 
-            title="System Logs" 
-            description="View system activity and audit logs"
-            icon={ScrollText}
-          />
-        );
+        return <SystemLogsSection />;
       default:
         return <ProfileSection />;
     }

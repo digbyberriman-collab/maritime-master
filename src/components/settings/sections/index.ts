@@ -5,3 +5,7 @@ export { default as AppearanceSection } from './AppearanceSection';
 export { default as DataExportsSection } from './DataExportsSection';
 export { default as SupportSection } from './SupportSection';
 export { default as PlaceholderSection } from './PlaceholderSection';
+export { default as IntegrationsSection } from './IntegrationsSection';
+export { default as EmailTemplatesSection } from './EmailTemplatesSection';
+export { default as ComplianceSection } from './ComplianceSection';
+export { default as SystemLogsSection } from './SystemLogsSection';
