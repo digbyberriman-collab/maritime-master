@@ -53,3 +53,6 @@ verify_jwt = false
 
 [functions.update-crew-assignment]
 verify_jwt = false
+
+[functions.extract-form-fields]
+verify_jwt = false
