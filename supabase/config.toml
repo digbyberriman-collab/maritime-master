@@ -38,3 +38,12 @@ verify_jwt = false
 
 [functions.external-api]
 verify_jwt = false
+
+[functions.ais-refresh]
+verify_jwt = false
+
+[functions.idea-sync]
+verify_jwt = false
+
+[functions.send-email]
+verify_jwt = false
