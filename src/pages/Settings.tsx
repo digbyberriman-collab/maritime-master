@@ -20,6 +20,7 @@ import {
   SystemLogsSection,
   VesselAccessSection,
   PermissionsSection,
+  AuditModeSection,
 } from '@/components/settings/sections';
 
 const Settings: React.FC = () => {
@@ -74,13 +75,7 @@ const Settings: React.FC = () => {
       case 'permissions':
         return <PermissionsSection />;
       case 'audit-mode':
-        return (
-          <PlaceholderSection 
-            title="Audit Visibility" 
-            description="Configure audit mode visibility rules"
-            icon={Eye}
-          />
-        );
+        return <AuditModeSection />;
       case 'integrations':
         return <IntegrationsSection />;
       case 'templates':

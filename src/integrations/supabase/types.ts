@@ -320,6 +320,122 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_mode_access_log: {
+        Row: {
+          accessed_entity_id: string | null
+          accessed_entity_type: string | null
+          accessed_module: string | null
+          action: string | null
+          audit_session_id: string
+          created_at: string | null
+          id: string
+          ip_address: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          accessed_entity_id?: string | null
+          accessed_entity_type?: string | null
+          accessed_module?: string | null
+          action?: string | null
+          audit_session_id: string
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          accessed_entity_id?: string | null
+          accessed_entity_type?: string | null
+          accessed_module?: string | null
+          action?: string | null
+          audit_session_id?: string
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_mode_access_log_audit_session_id_fkey"
+            columns: ["audit_session_id"]
+            isOneToOne: false
+            referencedRelation: "audit_mode_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_mode_sessions: {
+        Row: {
+          access_token: string | null
+          access_token_expires_at: string | null
+          audit_party: string
+          audit_party_name: string | null
+          auditor_email: string | null
+          company_id: string
+          created_at: string | null
+          created_by: string | null
+          end_datetime: string
+          id: string
+          is_active: boolean | null
+          redaction_rules: Json
+          start_datetime: string
+          updated_at: string | null
+          vessel_id: string | null
+          visible_modules: Json
+        }
+        Insert: {
+          access_token?: string | null
+          access_token_expires_at?: string | null
+          audit_party: string
+          audit_party_name?: string | null
+          auditor_email?: string | null
+          company_id: string
+          created_at?: string | null
+          created_by?: string | null
+          end_datetime: string
+          id?: string
+          is_active?: boolean | null
+          redaction_rules?: Json
+          start_datetime: string
+          updated_at?: string | null
+          vessel_id?: string | null
+          visible_modules?: Json
+        }
+        Update: {
+          access_token?: string | null
+          access_token_expires_at?: string | null
+          audit_party?: string
+          audit_party_name?: string | null
+          auditor_email?: string | null
+          company_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          end_datetime?: string
+          id?: string
+          is_active?: boolean | null
+          redaction_rules?: Json
+          start_datetime?: string
+          updated_at?: string | null
+          vessel_id?: string | null
+          visible_modules?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_mode_sessions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_mode_sessions_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audits: {
         Row: {
           actual_end_date: string | null
