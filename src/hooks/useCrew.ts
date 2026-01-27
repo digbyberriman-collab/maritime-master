@@ -347,6 +347,7 @@ export const useCrew = (vesselFilter?: string) => {
     crew: crewQuery.data ?? [],
     isLoading: crewQuery.isLoading,
     error: crewQuery.error,
+    refetch: crewQuery.refetch,
     addCrewMember,
     updateCrewMember,
     transferCrew,
