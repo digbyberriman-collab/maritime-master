@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { format } from 'date-fns';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +25,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -38,7 +39,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  Plus,
+  UserPlus,
   Search,
   Users,
   MoreHorizontal,
@@ -47,6 +48,9 @@ import {
   LogOut,
   Download,
   Ship,
+  ArrowRightLeft,
+  UserX,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCrew, type CrewMember } from '@/hooks/useCrew';
@@ -54,19 +58,30 @@ import { useVessels } from '@/hooks/useVessels';
 import CrewFormModal from '@/components/crew/CrewFormModal';
 import CrewProfileModal from '@/components/crew/CrewProfileModal';
 import TransferCrewModal from '@/components/crew/TransferCrewModal';
+import EditCrewModal from '@/components/crew/EditCrewModal';
+import SignOffDialog from '@/components/crew/SignOffDialog';
+
+const VESSEL_FILTER_KEY = 'storm_crew_vessel_filter';
 
 const CrewRoster: React.FC = () => {
   const { profile } = useAuth();
-  const [vesselFilter, setVesselFilter] = useState<string>('all');
+  
+  // Initialize from sessionStorage
+  const [vesselFilter, setVesselFilter] = useState<string>(() => {
+    const saved = sessionStorage.getItem(VESSEL_FILTER_KEY);
+    return saved || 'all';
+  });
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [isSignOffDialogOpen, setIsSignOffDialogOpen] = useState(false);
   const [isDeactivateDialogOpen, setIsDeactivateDialogOpen] = useState(false);
   const [selectedCrew, setSelectedCrew] = useState<CrewMember | null>(null);
 
-  const { vessels } = useVessels();
+  const { vessels, isLoading: vesselsLoading } = useVessels();
   const {
     crew,
     isLoading,
@@ -79,6 +94,11 @@ const CrewRoster: React.FC = () => {
 
   const canManageCrew = ['dpa', 'shore_management'].includes(profile?.role || '');
   const isMaster = profile?.role === 'master';
+
+  // Save filter to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem(VESSEL_FILTER_KEY, vesselFilter);
+  }, [vesselFilter]);
 
   // Filter crew based on search
   const filteredCrew = useMemo(() => {
@@ -102,8 +122,8 @@ const CrewRoster: React.FC = () => {
 
   const handleEditProfile = (member: CrewMember) => {
     setSelectedCrew(member);
-    // For now, close profile modal - in a full implementation, would open edit modal
     setIsProfileModalOpen(false);
+    setIsEditModalOpen(true);
   };
 
   const handleTransfer = (member: CrewMember) => {
@@ -124,13 +144,8 @@ const CrewRoster: React.FC = () => {
     setIsDeactivateDialogOpen(true);
   };
 
-  const confirmSignOff = async () => {
-    if (selectedCrew?.current_assignment) {
-      await signOffCrew.mutateAsync({
-        assignmentId: selectedCrew.current_assignment.id,
-        leaveDate: format(new Date(), 'yyyy-MM-dd'),
-      });
-    }
+  const confirmSignOff = async (data: { assignmentId: string; leaveDate: string }) => {
+    await signOffCrew.mutateAsync(data);
     setIsSignOffDialogOpen(false);
     setSelectedCrew(null);
   };
@@ -144,18 +159,19 @@ const CrewRoster: React.FC = () => {
   };
 
   const handleExportCSV = () => {
-    const headers = ['Name', 'Rank', 'Vessel', 'Position', 'Nationality', 'Join Date', 'Status'];
+    const headers = ['Name', 'Rank/Position', 'Vessel Assignment', 'Nationality', 'Email', 'Phone', 'Join Date', 'Status'];
     const rows = filteredCrew.map((member) => [
       `${member.first_name} ${member.last_name}`,
       member.rank || '',
       member.current_assignment?.vessel_name || 'Unassigned',
-      member.current_assignment?.position || '',
       member.nationality || '',
+      member.email,
+      member.phone || '',
       member.current_assignment?.join_date || '',
       member.status || '',
     ]);
 
-    const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const csv = [headers.join(','), ...rows.map((r) => r.map(cell => `"${cell}"`).join(','))].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -179,6 +195,11 @@ const CrewRoster: React.FC = () => {
   };
 
   const activeVessels = vessels.filter((v) => v.status === 'Active');
+  
+  // Get selected vessel name for display
+  const selectedVesselName = vesselFilter === 'all' 
+    ? 'all vessels' 
+    : activeVessels.find(v => v.id === vesselFilter)?.name || 'selected vessel';
 
   return (
     <DashboardLayout>
@@ -191,7 +212,7 @@ const CrewRoster: React.FC = () => {
           </div>
           {canManageCrew && (
             <Button onClick={() => setIsFormModalOpen(true)} className="gap-2">
-              <Plus className="w-4 h-4" />
+              <UserPlus className="w-4 h-4" />
               Add Crew Member
             </Button>
           )}
@@ -204,22 +225,31 @@ const CrewRoster: React.FC = () => {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by name, rank, or nationality..."
+                  placeholder="Search by name, rank, nationality, or email..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
                 />
               </div>
               <Select value={vesselFilter} onValueChange={setVesselFilter}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <Ship className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="All Vessels" />
+                <SelectTrigger className="w-full sm:w-64">
+                  {vesselsLoading ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Loading vessels...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Ship className="w-4 h-4 mr-2" />
+                      <SelectValue placeholder="All Vessels" />
+                    </>
+                  )}
                 </SelectTrigger>
                 <SelectContent className="bg-popover">
                   <SelectItem value="all">All Vessels</SelectItem>
                   {activeVessels.map((vessel) => (
                     <SelectItem key={vessel.id} value={vessel.id}>
-                      {vessel.name}
+                      {vessel.name} {vessel.imo_number && `(IMO: ${vessel.imo_number})`}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -237,12 +267,16 @@ const CrewRoster: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="w-5 h-5" />
-              Crew Members
-              {!isLoading && (
-                <Badge variant="secondary" className="ml-2">
-                  {filteredCrew.length}
-                </Badge>
-              )}
+              <span>
+                {isLoading ? (
+                  'Loading crew members...'
+                ) : (
+                  <>
+                    Showing {filteredCrew.length} crew member{filteredCrew.length !== 1 ? 's' : ''}{' '}
+                    {vesselFilter === 'all' ? 'across all vessels' : `on ${selectedVesselName}`}
+                  </>
+                )}
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -257,8 +291,22 @@ const CrewRoster: React.FC = () => {
                 <Users className="w-16 h-16 mx-auto mb-4 opacity-50" />
                 {crew.length === 0 ? (
                   <>
-                    <p className="text-lg font-medium">No crew members yet</p>
-                    <p className="text-sm">Click "Add Crew Member" to get started.</p>
+                    <p className="text-lg font-medium">
+                      {vesselFilter === 'all' 
+                        ? 'No crew members yet' 
+                        : `No crew currently assigned to ${selectedVesselName}`}
+                    </p>
+                    <p className="text-sm mb-4">
+                      {canManageCrew 
+                        ? 'Click "Add Crew Member" to get started.' 
+                        : 'Contact your administrator to add crew members.'}
+                    </p>
+                    {canManageCrew && (
+                      <Button onClick={() => setIsFormModalOpen(true)} className="gap-2">
+                        <UserPlus className="w-4 h-4" />
+                        Add Crew Member
+                      </Button>
+                    )}
                   </>
                 ) : (
                   <>
@@ -276,6 +324,8 @@ const CrewRoster: React.FC = () => {
                       <TableHead>Rank/Position</TableHead>
                       <TableHead>Vessel Assignment</TableHead>
                       <TableHead>Nationality</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Phone</TableHead>
                       <TableHead>Join Date</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
@@ -301,6 +351,10 @@ const CrewRoster: React.FC = () => {
                           )}
                         </TableCell>
                         <TableCell>{member.nationality || '-'}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">
+                          {member.email}
+                        </TableCell>
+                        <TableCell>{member.phone || '-'}</TableCell>
                         <TableCell>
                           {member.current_assignment?.join_date
                             ? format(new Date(member.current_assignment.join_date), 'dd MMM yyyy')
@@ -330,10 +384,29 @@ const CrewRoster: React.FC = () => {
                                 </DropdownMenuItem>
                               )}
                               {canManageCrew && member.current_assignment && (
-                                <DropdownMenuItem onClick={() => handleSignOff(member)}>
-                                  <LogOut className="w-4 h-4 mr-2" />
-                                  Sign Off
-                                </DropdownMenuItem>
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => handleTransfer(member)}>
+                                    <ArrowRightLeft className="w-4 h-4 mr-2" />
+                                    Transfer
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleSignOff(member)}>
+                                    <LogOut className="w-4 h-4 mr-2" />
+                                    Sign Off
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              {canManageCrew && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    onClick={() => handleDeactivate(member)}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <UserX className="w-4 h-4 mr-2" />
+                                    Deactivate
+                                  </DropdownMenuItem>
+                                </>
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -370,6 +443,17 @@ const CrewRoster: React.FC = () => {
         canManage={canManageCrew}
       />
 
+      <EditCrewModal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          setIsEditModalOpen(false);
+          setSelectedCrew(null);
+        }}
+        crewMember={selectedCrew}
+        onSubmit={updateCrewMember.mutateAsync}
+        isLoading={updateCrewMember.isPending}
+      />
+
       <TransferCrewModal
         isOpen={isTransferModalOpen}
         onClose={() => {
@@ -381,23 +465,16 @@ const CrewRoster: React.FC = () => {
         isLoading={transferCrew.isPending}
       />
 
-      {/* Sign Off Confirmation */}
-      <AlertDialog open={isSignOffDialogOpen} onOpenChange={setIsSignOffDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Sign Off Crew Member</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to sign off {selectedCrew?.first_name} {selectedCrew?.last_name}{' '}
-              from {selectedCrew?.current_assignment?.vessel_name}? This will end their current
-              assignment.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSignOff}>Sign Off</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <SignOffDialog
+        isOpen={isSignOffDialogOpen}
+        onClose={() => {
+          setIsSignOffDialogOpen(false);
+          setSelectedCrew(null);
+        }}
+        crewMember={selectedCrew}
+        onConfirm={confirmSignOff}
+        isLoading={signOffCrew.isPending}
+      />
 
       {/* Deactivate Confirmation */}
       <AlertDialog open={isDeactivateDialogOpen} onOpenChange={setIsDeactivateDialogOpen}>

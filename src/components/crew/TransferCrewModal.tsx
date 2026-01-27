@@ -138,13 +138,13 @@ const TransferCrewModal: React.FC<TransferCrewModalProps> = ({
                     </FormControl>
                     <SelectContent className="bg-popover">
                       {availableVessels.length === 0 ? (
-                        <SelectItem value="none" disabled>
+                        <SelectItem value="__none__" disabled>
                           No other vessels available
                         </SelectItem>
                       ) : (
                         availableVessels.map((vessel) => (
                           <SelectItem key={vessel.id} value={vessel.id}>
-                            {vessel.name}
+                            {vessel.name} {vessel.imo_number && `(IMO: ${vessel.imo_number})`}
                           </SelectItem>
                         ))
                       )}
