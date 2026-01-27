@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
-import { CalendarIcon, Loader2, Copy, Check } from 'lucide-react';
+import { CalendarIcon, Loader2, Copy, Check, AlertCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -32,9 +32,11 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { RANKS, NATIONALITIES, CREW_ROLES } from '@/lib/crewConstants';
 import { useVessels } from '@/hooks/useVessels';
+import { supabase } from '@/integrations/supabase/client';
 import type { AddCrewMemberData } from '@/hooks/useCrew';
 
 const formSchema = z.object({
@@ -79,6 +81,8 @@ const CrewFormModal: React.FC<CrewFormModalProps> = ({
   const { vessels } = useVessels();
   const [generatedPassword, setGeneratedPassword] = useState('');
   const [copied, setCopied] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -100,6 +104,7 @@ const CrewFormModal: React.FC<CrewFormModalProps> = ({
     if (isOpen) {
       setGeneratedPassword(generatePassword());
       setCopied(false);
+      setEmailError(null);
       form.reset();
     }
   }, [isOpen, form]);
@@ -110,21 +115,54 @@ const CrewFormModal: React.FC<CrewFormModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Check if email already exists in profiles table
+  const checkEmailExists = async (email: string): Promise<boolean> => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('email', email.toLowerCase().trim())
+      .maybeSingle();
+    
+    return !!data && !error;
+  };
+
   const handleSubmit = async (values: FormValues) => {
-    await onSubmit({
-      email: values.email,
-      password: generatedPassword,
-      firstName: values.firstName,
-      lastName: values.lastName,
-      phone: values.phone,
-      nationality: values.nationality,
-      rank: values.rank,
-      role: values.role,
-      vesselId: values.vesselId || undefined,
-      position: values.position || undefined,
-      joinDate: values.joinDate ? format(values.joinDate, 'yyyy-MM-dd') : undefined,
-    });
-    onClose();
+    setEmailError(null);
+    setIsSubmitting(true);
+    
+    try {
+      // Check if email already exists
+      const emailExists = await checkEmailExists(values.email);
+      if (emailExists) {
+        setEmailError(`The email "${values.email}" is already registered. Please use a different email address.`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      await onSubmit({
+        email: values.email,
+        password: generatedPassword,
+        firstName: values.firstName,
+        lastName: values.lastName,
+        phone: values.phone,
+        nationality: values.nationality,
+        rank: values.rank,
+        role: values.role,
+        vesselId: values.vesselId || undefined,
+        position: values.position || undefined,
+        joinDate: values.joinDate ? format(values.joinDate, 'yyyy-MM-dd') : undefined,
+      });
+      onClose();
+    } catch (error: any) {
+      // Handle edge function errors
+      if (error.message?.includes('already been registered')) {
+        setEmailError(`The email "${values.email}" is already registered. Please use a different email address.`);
+      } else {
+        setEmailError(error.message || 'An error occurred while creating the crew member.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const activeVessels = vessels.filter((v) => v.status === 'Active');
@@ -141,6 +179,14 @@ const CrewFormModal: React.FC<CrewFormModalProps> = ({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+            {/* Email Error Alert */}
+            {emailError && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{emailError}</AlertDescription>
+              </Alert>
+            )}
+
             {/* Personal Information */}
             <div className="space-y-4">
               <h3 className="font-medium text-sm text-muted-foreground uppercase tracking-wider">
@@ -442,8 +488,8 @@ const CrewFormModal: React.FC<CrewFormModalProps> = ({
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              <Button type="submit" disabled={isLoading || isSubmitting}>
+                {(isLoading || isSubmitting) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Add Crew Member
               </Button>
             </div>
