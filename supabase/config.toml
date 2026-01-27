@@ -1,1 +1,22 @@
 project_id = "pfvtrtkqkvjbnbaabgpv"
+
+[functions.create-crew-member]
+verify_jwt = false
+
+[functions.accept-invitation]
+verify_jwt = false
+
+[functions.send-invitation]
+verify_jwt = false
+
+[functions.bulk-invite]
+verify_jwt = false
+
+[functions.notify-shipping-master]
+verify_jwt = false
+
+[functions.send-to-agent]
+verify_jwt = false
+
+[functions.generate-travel-letter]
+verify_jwt = false
