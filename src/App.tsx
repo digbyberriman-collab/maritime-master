@@ -31,6 +31,9 @@ import Drills from "./pages/Drills";
 import DrillAnalytics from "./pages/DrillAnalytics";
 import Training from "./pages/Training";
 import Maintenance from "./pages/Maintenance";
+import FleetMap from "./pages/FleetMap";
+import RiskAssessments from "./pages/RiskAssessments";
+import DPADashboard from "./pages/DPADashboard";
 
 const queryClient = new QueryClient();
 
@@ -51,6 +54,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/fleet-map"
+                element={
+                  <ProtectedRoute>
+                    <FleetMap />
                   </ProtectedRoute>
                 }
               />

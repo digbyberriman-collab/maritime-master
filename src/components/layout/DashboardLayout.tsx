@@ -25,6 +25,7 @@ import {
   Siren,
   GraduationCap,
   Wrench,
+  Map as MapIcon,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -43,11 +44,12 @@ interface DashboardLayoutProps {
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Fleet Map', href: '/fleet-map', icon: MapIcon },
   { name: 'Vessels', href: '/vessels', icon: Ship },
-  { name: 'Crew Roster', href: '/operations/crew', icon: Users },
+  { name: 'Crew', href: '/operations/crew', icon: Users },
   { name: 'Documents', href: '/documents', icon: FolderOpen },
   { name: 'Certificates', href: '/certificates', icon: Shield },
-  { name: 'Compliance', href: '/compliance', icon: ClipboardList },
+  { name: 'ISM', href: '/compliance', icon: ClipboardList },
   { name: 'Audits', href: '/audits', icon: ClipboardList },
   { name: 'Drills', href: '/drills', icon: Siren },
   { name: 'Training', href: '/training', icon: GraduationCap },
