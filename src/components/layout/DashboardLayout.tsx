@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrandingContext } from '@/contexts/BrandingContext';
 import { canManageBranding } from '@/hooks/useBranding';
@@ -106,12 +106,14 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           {/* Logo with client branding */}
           <div className="flex flex-col px-6 py-4 border-b border-sidebar-border">
             <div className="flex items-center justify-between">
-              <span 
-                className="text-xl font-black tracking-tight"
-                style={{ color: brandColor }}
+              <Link 
+                to="/dashboard"
+                className="text-xl sm:text-2xl font-black tracking-tight text-sidebar-foreground hover:text-sidebar-foreground/80 transition-colors focus:outline-none focus:ring-2 focus:ring-sidebar-ring focus:ring-offset-2 focus:ring-offset-sidebar py-1"
+                aria-label="STORM Home - Return to Dashboard"
+                title="Return to Dashboard"
               >
                 STORM
-              </span>
+              </Link>
               <button
                 onClick={() => setSidebarOpen(false)}
                 className="lg:hidden text-sidebar-foreground"
