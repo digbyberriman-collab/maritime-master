@@ -557,6 +557,63 @@ export type Database = {
           },
         ]
       }
+      crew_attachments: {
+        Row: {
+          attachment_type: string
+          created_at: string
+          description: string | null
+          file_name: string
+          file_size: number
+          file_url: string
+          id: string
+          mime_type: string | null
+          updated_at: string
+          uploaded_by: string | null
+          user_id: string
+        }
+        Insert: {
+          attachment_type: string
+          created_at?: string
+          description?: string | null
+          file_name: string
+          file_size?: number
+          file_url: string
+          id?: string
+          mime_type?: string | null
+          updated_at?: string
+          uploaded_by?: string | null
+          user_id: string
+        }
+        Update: {
+          attachment_type?: string
+          created_at?: string
+          description?: string | null
+          file_name?: string
+          file_size?: number
+          file_url?: string
+          id?: string
+          mime_type?: string | null
+          updated_at?: string
+          uploaded_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_attachments_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       crew_certificates: {
         Row: {
           certificate_name: string

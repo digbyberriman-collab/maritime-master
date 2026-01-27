@@ -10,15 +10,15 @@ export interface CrewAttachment {
   file_name: string;
   file_url: string;
   file_size: number;
-  mime_type: string;
+  mime_type: string | null;
   description: string | null;
-  uploaded_by: string;
+  uploaded_by: string | null;
   created_at: string;
   updated_at: string;
   uploader?: {
     first_name: string;
     last_name: string;
-  };
+  } | null;
 }
 
 export interface AttachmentFormData {
@@ -55,18 +55,29 @@ export const useCrewAttachments = (userId: string) => {
     queryFn: async () => {
       if (!userId) return [];
 
+      // Use explicit foreign key hint for the uploader relationship
       const { data, error } = await supabase
         .from('crew_attachments')
         .select(`
-          *,
-          uploader:uploaded_by(first_name, last_name)
+          id,
+          user_id,
+          attachment_type,
+          file_name,
+          file_url,
+          file_size,
+          mime_type,
+          description,
+          uploaded_by,
+          created_at,
+          updated_at,
+          uploader:profiles!crew_attachments_uploaded_by_fkey(first_name, last_name)
         `)
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      return (data || []) as CrewAttachment[];
+      return (data || []) as unknown as CrewAttachment[];
     },
     enabled: !!userId,
   });
