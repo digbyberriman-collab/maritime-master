@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import DashboardLayout from '@/components/layout/DashboardLayout';
@@ -6,22 +6,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Ship, Users, Activity, Plus, Anchor, Clock, ArrowRightLeft, FileCheck, AlertCircle, AlertTriangle, TrendingUp, Wrench } from 'lucide-react';
+import { Ship, Users, Activity, Plus, Anchor, Clock, ArrowRightLeft, FileCheck, AlertCircle, AlertTriangle, TrendingUp, Wrench, UserPlus } from 'lucide-react';
 import { useVesselCount } from '@/hooks/useVessels';
-import { useCrewCount, useRecentCrewChanges } from '@/hooks/useCrew';
+import { useCrewCount, useRecentCrewChanges, useCrew } from '@/hooks/useCrew';
 import { useMandatoryDocumentsPending, useAcknowledgmentStats } from '@/hooks/useAcknowledgments';
 import { useOverdueCAPAs, useRecentIncidents } from '@/hooks/useCAPAAnalytics';
 import { useMaintenance } from '@/hooks/useMaintenance';
 import { format } from 'date-fns';
 import { getIncidentTypeColor } from '@/lib/incidentConstants';
 import MaintenanceWidgets from '@/components/dashboard/MaintenanceWidgets';
+import CrewFormModal from '@/components/crew/CrewFormModal';
 
 const Dashboard: React.FC = () => {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const [isAddCrewModalOpen, setIsAddCrewModalOpen] = useState(false);
+  
   const { data: vesselCount, isLoading: isVesselCountLoading } = useVesselCount();
-  const { data: crewCount, isLoading: isCrewCountLoading } = useCrewCount();
-  const { data: recentChanges, isLoading: isChangesLoading } = useRecentCrewChanges(5);
+  const { data: crewCount, isLoading: isCrewCountLoading, refetch: refetchCrewCount } = useCrewCount();
+  const { data: recentChanges, isLoading: isChangesLoading, refetch: refetchRecentChanges } = useRecentCrewChanges(5);
+  const { addCrewMember } = useCrew();
   const { data: pendingDocs } = useMandatoryDocumentsPending();
   const { data: ackStats } = useAcknowledgmentStats();
   const { data: overdueCapas } = useOverdueCAPAs();
@@ -111,6 +115,13 @@ const Dashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-3">
+              <Button 
+                className="gap-2 bg-primary hover:bg-primary/90" 
+                onClick={() => setIsAddCrewModalOpen(true)}
+              >
+                <UserPlus className="w-4 h-4" />
+                Add Crew Member
+              </Button>
               <Button className="gap-2" onClick={() => navigate('/vessels')}>
                 <Plus className="w-4 h-4" />
                 Add Vessel
@@ -343,6 +354,18 @@ const Dashboard: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Add Crew Member Modal */}
+        <CrewFormModal
+          isOpen={isAddCrewModalOpen}
+          onClose={() => setIsAddCrewModalOpen(false)}
+          onSubmit={async (data) => {
+            await addCrewMember.mutateAsync(data);
+            refetchCrewCount();
+            refetchRecentChanges();
+          }}
+          isLoading={addCrewMember.isPending}
+        />
       </div>
     </DashboardLayout>
   );
