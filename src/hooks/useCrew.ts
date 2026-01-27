@@ -96,7 +96,7 @@ export const useCrew = (vesselFilter?: string) => {
       if (profilesError) throw profilesError;
       if (!profiles || profiles.length === 0) return [];
 
-      // Get current assignments
+      // Get current assignments with vessel details
       const { data: assignments, error: assignmentsError } = await supabase
         .from('crew_assignments')
         .select(`
@@ -105,7 +105,7 @@ export const useCrew = (vesselFilter?: string) => {
           user_id,
           position,
           join_date,
-          vessels (id, name)
+          vessels:vessel_id (id, name)
         `)
         .eq('is_current', true);
 
