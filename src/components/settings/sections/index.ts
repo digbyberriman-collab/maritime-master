@@ -11,3 +11,4 @@ export { default as ComplianceSection } from './ComplianceSection';
 export { default as SystemLogsSection } from './SystemLogsSection';
 export { default as VesselAccessSection } from './VesselAccessSection';
 export { default as PermissionsSection } from './PermissionsSection';
+export { default as AuditModeSection } from './AuditModeSection';
