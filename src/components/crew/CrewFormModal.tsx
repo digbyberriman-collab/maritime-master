@@ -268,21 +268,25 @@ const CrewFormModal: React.FC<CrewFormModalProps> = ({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Vessel</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select 
+                      onValueChange={(v) => field.onChange(v === "__unassigned__" ? "" : v)} 
+                      value={field.value || "__unassigned__"}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select vessel (optional)" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent className="bg-popover">
+                        <SelectItem value="__unassigned__">No assignment (optional)</SelectItem>
                         {activeVessels.length === 0 ? (
                           <SelectItem value="__none__" disabled>
-                            No active vessels
+                            No active vessels available
                           </SelectItem>
                         ) : (
                           activeVessels.map((vessel) => (
                             <SelectItem key={vessel.id} value={vessel.id}>
-                              {vessel.name}
+                              {vessel.name} {vessel.imo_number && `(IMO: ${vessel.imo_number})`}
                             </SelectItem>
                           ))
                         )}
