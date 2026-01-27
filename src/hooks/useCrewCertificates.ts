@@ -2,25 +2,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import type { Database } from '@/integrations/supabase/types';
 
-export interface CrewCertificate {
-  id: string;
-  user_id: string;
-  certificate_type: string;
-  certificate_name: string;
-  issuing_authority: string | null;
-  certificate_number: string | null;
-  issue_date: string | null;
-  expiry_date: string | null;
-  file_url: string | null;
-  file_name: string | null;
-  file_size: number | null;
-  status: string;
-  notes: string | null;
-  created_at: string;
-  created_by: string | null;
-  updated_at: string;
-  updated_by: string | null;
+type CrewCertificateRow = Database['public']['Tables']['crew_certificates']['Row'];
+type CrewCertificateInsert = Database['public']['Tables']['crew_certificates']['Insert'];
+type CrewCertificateUpdate = Database['public']['Tables']['crew_certificates']['Update'];
+
+export interface CrewCertificate extends CrewCertificateRow {
+  // Computed status field
+  computedStatus?: string;
 }
 
 export interface CrewCertificateFormData {
@@ -146,7 +136,7 @@ export const useCrewCertificates = (userId: string) => {
       // Add computed status
       return (data || []).map(cert => ({
         ...cert,
-        status: calculateCertificateStatus(cert.expiry_date),
+        computedStatus: calculateCertificateStatus(cert.expiry_date),
       })) as CrewCertificate[];
     },
     enabled: !!userId,
@@ -157,14 +147,25 @@ export const useCrewCertificates = (userId: string) => {
     mutationFn: async (formData: CrewCertificateFormData) => {
       if (!profile?.user_id) throw new Error('Not authenticated');
 
+      const insertData: CrewCertificateInsert = {
+        user_id: userId,
+        certificate_type: formData.certificate_type,
+        certificate_name: formData.certificate_name,
+        issuing_authority: formData.issuing_authority || null,
+        certificate_number: formData.certificate_number || null,
+        issue_date: formData.issue_date || null,
+        expiry_date: formData.expiry_date || null,
+        file_url: formData.file_url || null,
+        file_name: formData.file_name || null,
+        file_size: formData.file_size || null,
+        notes: formData.notes || null,
+        status: calculateCertificateStatus(formData.expiry_date || null),
+        created_by: profile.user_id,
+      };
+
       const { data, error } = await supabase
         .from('crew_certificates')
-        .insert({
-          user_id: userId,
-          ...formData,
-          status: calculateCertificateStatus(formData.expiry_date || null),
-          created_by: profile.user_id,
-        })
+        .insert(insertData)
         .select()
         .single();
 
@@ -213,8 +214,17 @@ export const useCrewCertificates = (userId: string) => {
     }) => {
       if (!profile?.user_id) throw new Error('Not authenticated');
 
-      const updateData = {
-        ...formData,
+      const updateData: CrewCertificateUpdate = {
+        certificate_type: formData.certificate_type,
+        certificate_name: formData.certificate_name,
+        issuing_authority: formData.issuing_authority,
+        certificate_number: formData.certificate_number,
+        issue_date: formData.issue_date,
+        expiry_date: formData.expiry_date,
+        file_url: formData.file_url,
+        file_name: formData.file_name,
+        file_size: formData.file_size,
+        notes: formData.notes,
         status: formData.expiry_date 
           ? calculateCertificateStatus(formData.expiry_date) 
           : undefined,
@@ -323,9 +333,9 @@ export const useCrewCertificates = (userId: string) => {
   // Calculate summary stats
   const stats = {
     total: certificates?.length || 0,
-    valid: certificates?.filter(c => c.status === 'Valid' || c.status === 'No Expiry').length || 0,
-    expiring: certificates?.filter(c => c.status === 'Expiring' || c.status === 'Expiring Soon').length || 0,
-    expired: certificates?.filter(c => c.status === 'Expired').length || 0,
+    valid: certificates?.filter(c => c.computedStatus === 'Valid' || c.computedStatus === 'No Expiry').length || 0,
+    expiring: certificates?.filter(c => c.computedStatus === 'Expiring' || c.computedStatus === 'Expiring Soon').length || 0,
+    expired: certificates?.filter(c => c.computedStatus === 'Expired').length || 0,
   };
 
   return {
