@@ -14,6 +14,142 @@ export type Database = {
   }
   public: {
     Tables: {
+      alerts: {
+        Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          alert_type: string
+          assigned_to_user_id: string | null
+          company_id: string
+          created_at: string | null
+          description: string | null
+          due_at: string | null
+          escalated_at: string | null
+          escalated_to_user_ids: string[] | null
+          escalation_level: number | null
+          id: string
+          last_snooze_reason: string | null
+          metadata: Json | null
+          owner_role: string | null
+          owner_user_id: string | null
+          related_entity_id: string | null
+          related_entity_type: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity_color: Database["public"]["Enums"]["alert_severity"]
+          snooze_count: number | null
+          snoozed_until: string | null
+          source_module: string | null
+          status: Database["public"]["Enums"]["alert_status"] | null
+          title: string
+          updated_at: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type: string
+          assigned_to_user_id?: string | null
+          company_id: string
+          created_at?: string | null
+          description?: string | null
+          due_at?: string | null
+          escalated_at?: string | null
+          escalated_to_user_ids?: string[] | null
+          escalation_level?: number | null
+          id?: string
+          last_snooze_reason?: string | null
+          metadata?: Json | null
+          owner_role?: string | null
+          owner_user_id?: string | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity_color: Database["public"]["Enums"]["alert_severity"]
+          snooze_count?: number | null
+          snoozed_until?: string | null
+          source_module?: string | null
+          status?: Database["public"]["Enums"]["alert_status"] | null
+          title: string
+          updated_at?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          alert_type?: string
+          assigned_to_user_id?: string | null
+          company_id?: string
+          created_at?: string | null
+          description?: string | null
+          due_at?: string | null
+          escalated_at?: string | null
+          escalated_to_user_ids?: string[] | null
+          escalation_level?: number | null
+          id?: string
+          last_snooze_reason?: string | null
+          metadata?: Json | null
+          owner_role?: string | null
+          owner_user_id?: string | null
+          related_entity_id?: string | null
+          related_entity_type?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity_color?: Database["public"]["Enums"]["alert_severity"]
+          snooze_count?: number | null
+          snoozed_until?: string | null
+          source_module?: string | null
+          status?: Database["public"]["Enums"]["alert_status"] | null
+          title?: string
+          updated_at?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerts_acknowledged_by_fkey"
+            columns: ["acknowledged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "alerts_assigned_to_user_id_fkey"
+            columns: ["assigned_to_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "alerts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alerts_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "alerts_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "alerts_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_findings: {
         Row: {
           audit_id: string
@@ -2999,6 +3135,14 @@ export type Database = {
       }
     }
     Enums: {
+      alert_severity: "RED" | "ORANGE" | "YELLOW" | "GREEN"
+      alert_status:
+        | "OPEN"
+        | "ACKNOWLEDGED"
+        | "SNOOZED"
+        | "RESOLVED"
+        | "ESCALATED"
+        | "AUTO_DISMISSED"
       user_role:
         | "master"
         | "chief_engineer"
@@ -3133,6 +3277,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      alert_severity: ["RED", "ORANGE", "YELLOW", "GREEN"],
+      alert_status: [
+        "OPEN",
+        "ACKNOWLEDGED",
+        "SNOOZED",
+        "RESOLVED",
+        "ESCALATED",
+        "AUTO_DISMISSED",
+      ],
       user_role: [
         "master",
         "chief_engineer",
