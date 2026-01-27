@@ -18,6 +18,7 @@ import {
   EmailTemplatesSection,
   ComplianceSection,
   SystemLogsSection,
+  VesselAccessSection,
 } from '@/components/settings/sections';
 
 const Settings: React.FC = () => {
@@ -68,13 +69,7 @@ const Settings: React.FC = () => {
       case 'support':
         return <SupportSection />;
       case 'vessel-access':
-        return (
-          <PlaceholderSection 
-            title="Vessel Access" 
-            description="Manage vessel access permissions and configurations"
-            icon={Ship}
-          />
-        );
+        return <VesselAccessSection />;
       case 'permissions':
         return (
           <PlaceholderSection 
