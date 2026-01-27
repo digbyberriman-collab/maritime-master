@@ -6,6 +6,7 @@ import { canManageBranding } from '@/hooks/useBranding';
 import InkfishFooter from '@/components/layout/InkfishFooter';
 import InkfishWatermark from '@/components/InkfishWatermark';
 import NotificationBell from '@/components/layout/NotificationBell';
+import VesselSelector from '@/components/VesselSelector';
 import {
   LayoutDashboard,
   FolderOpen,
@@ -211,20 +212,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
           {/* Vessel selector */}
           <div className="hidden lg:block">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="gap-2">
-                  <Ship className="w-4 h-4" />
-                  <span>Select Vessel</span>
-                  <ChevronDown className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-48 bg-popover">
-                <DropdownMenuItem className="text-muted-foreground">
-                  No vessels added yet
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <VesselSelector />
           </div>
 
           {/* Spacer */}
