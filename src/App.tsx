@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { BrandingProvider } from "@/contexts/BrandingContext";
+import { VesselProvider } from "@/contexts/VesselContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
@@ -41,7 +42,8 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <BrandingProvider>
-            <Routes>
+            <VesselProvider>
+              <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
               <Route
@@ -229,7 +231,8 @@ const App = () => (
                 }
               />
               <Route path="*" element={<NotFound />} />
-            </Routes>
+              </Routes>
+            </VesselProvider>
           </BrandingProvider>
         </AuthProvider>
       </BrowserRouter>
