@@ -171,6 +171,34 @@ export const AppRoutes: React.FC = () => {
           </React.Suspense>
         </ProtectedRoute>
       } />
+      <Route path="/ism/forms/templates/:templateId" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<div>Loading...</div>}>
+            {React.createElement(React.lazy(() => import('@/pages/ism/forms/TemplateDetail')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/ism/forms/templates/:templateId/edit" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<div>Loading...</div>}>
+            {React.createElement(React.lazy(() => import('@/pages/ism/forms/CreateTemplate')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/ism/forms/new" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<div>Loading...</div>}>
+            {React.createElement(React.lazy(() => import('@/pages/ism/forms/FormSubmission')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/ism/forms/submission/:submissionId" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<div>Loading...</div>}>
+            {React.createElement(React.lazy(() => import('@/pages/ism/forms/FormSubmission')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
       <Route path="/ism/forms/drafts" element={
         <ProtectedRoute>
           <PlaceholderWrapper 
@@ -218,6 +246,16 @@ export const AppRoutes: React.FC = () => {
             description="Recurring form schedules"
             icon={<Calendar className="w-8 h-8 text-primary" />}
             features={['Create schedules', 'Assign to vessels', 'Set recurrence']} 
+          />
+        </ProtectedRoute>
+      } />
+      <Route path="/ism/forms/exports" element={
+        <ProtectedRoute>
+          <PlaceholderWrapper 
+            title="Form Exports" 
+            description="Export forms to PDF or Excel"
+            icon={<FileText className="w-8 h-8 text-primary" />}
+            features={['Bulk export', 'Custom date ranges', 'Format selection']} 
           />
         </ProtectedRoute>
       } />
