@@ -4181,6 +4181,68 @@ export type Database = {
           },
         ]
       }
+      user_preferences: {
+        Row: {
+          alert_severities: Json | null
+          created_at: string
+          daily_digest_time: string | null
+          dashboard_widgets: string[] | null
+          default_snooze_minutes: number | null
+          default_vessel_id: string | null
+          id: string
+          module_subscriptions: Json | null
+          notification_channels: Json | null
+          sidebar_collapsed: boolean | null
+          theme: string | null
+          updated_at: string
+          user_id: string
+          weekly_digest_day: string | null
+          weekly_digest_time: string | null
+        }
+        Insert: {
+          alert_severities?: Json | null
+          created_at?: string
+          daily_digest_time?: string | null
+          dashboard_widgets?: string[] | null
+          default_snooze_minutes?: number | null
+          default_vessel_id?: string | null
+          id?: string
+          module_subscriptions?: Json | null
+          notification_channels?: Json | null
+          sidebar_collapsed?: boolean | null
+          theme?: string | null
+          updated_at?: string
+          user_id: string
+          weekly_digest_day?: string | null
+          weekly_digest_time?: string | null
+        }
+        Update: {
+          alert_severities?: Json | null
+          created_at?: string
+          daily_digest_time?: string | null
+          dashboard_widgets?: string[] | null
+          default_snooze_minutes?: number | null
+          default_vessel_id?: string | null
+          id?: string
+          module_subscriptions?: Json | null
+          notification_channels?: Json | null
+          sidebar_collapsed?: boolean | null
+          theme?: string | null
+          updated_at?: string
+          user_id?: string
+          weekly_digest_day?: string | null
+          weekly_digest_time?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_preferences_default_vessel_id_fkey"
+            columns: ["default_vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           company_id: string | null
