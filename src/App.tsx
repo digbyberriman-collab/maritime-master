@@ -194,10 +194,26 @@ const App = () => (
                 }
               />
               <Route
+                path="/crew"
+                element={
+                  <ProtectedRoute>
+                    <CrewRoster />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/operations/crew"
                 element={
                   <ProtectedRoute>
                     <CrewRoster />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/incidents"
+                element={
+                  <ProtectedRoute>
+                    <Incidents />
                   </ProtectedRoute>
                 }
               />

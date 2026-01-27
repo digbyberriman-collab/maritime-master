@@ -7,25 +7,15 @@ import InkfishFooter from '@/components/layout/InkfishFooter';
 import InkfishWatermark from '@/components/InkfishWatermark';
 import NotificationBell from '@/components/layout/NotificationBell';
 import VesselSelector from '@/components/VesselSelector';
+import SidebarNavigation from '@/components/layout/SidebarNavigation';
 import {
-  LayoutDashboard,
-  FolderOpen,
-  Shield,
-  ClipboardList,
-  BarChart3,
-  Settings,
   LogOut,
   User,
-  Users,
   ChevronDown,
   Menu,
   X,
-  Ship,
   Palette,
-  Siren,
-  GraduationCap,
-  Wrench,
-  Map as MapIcon,
+  Settings,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -41,22 +31,6 @@ import { cn } from '@/lib/utils';
 interface DashboardLayoutProps {
   children: React.ReactNode;
 }
-
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Fleet Map', href: '/fleet-map', icon: MapIcon },
-  { name: 'Vessels', href: '/vessels', icon: Ship },
-  { name: 'Crew', href: '/operations/crew', icon: Users },
-  { name: 'Documents', href: '/documents', icon: FolderOpen },
-  { name: 'Certificates', href: '/certificates', icon: Shield },
-  { name: 'ISM', href: '/compliance', icon: ClipboardList },
-  { name: 'Audits', href: '/audits', icon: ClipboardList },
-  { name: 'Drills', href: '/drills', icon: Siren },
-  { name: 'Training', href: '/training', icon: GraduationCap },
-  { name: 'Maintenance', href: '/maintenance', icon: Wrench },
-  { name: 'Reports', href: '/reports', icon: BarChart3 },
-  { name: 'Settings', href: '/settings', icon: Settings },
-];
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const { profile, signOut } = useAuth();
@@ -132,49 +106,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           </div>
 
           {/* Navigation */}
-          <nav className="flex-1 px-4 py-4 space-y-1">
-            {navigation.map((item) => {
-              const isActive = location.pathname === item.href || 
-                (item.href === '/settings' && location.pathname.startsWith('/settings'));
-              return (
-                <button
-                  key={item.name}
-                  onClick={() => {
-                    navigate(item.href);
-                    setSidebarOpen(false);
-                  }}
-                  className={cn(
-                    'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                      : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                  )}
-                >
-                  <item.icon className="w-5 h-5" />
-                  {item.name}
-                </button>
-              );
-            })}
-            
-            {/* Branding settings - only for DPA/Shore Management */}
-            {canAccessBranding && (
-              <button
-                onClick={() => {
-                  navigate('/settings/branding');
-                  setSidebarOpen(false);
-                }}
-                className={cn(
-                  'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ml-4',
-                  location.pathname === '/settings/branding'
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                    : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-                )}
-              >
-                <Palette className="w-4 h-4" />
-                Branding
-              </button>
-            )}
-          </nav>
+          <SidebarNavigation onNavigate={() => setSidebarOpen(false)} />
 
           {/* User info at bottom */}
           <div className="p-4 border-t border-sidebar-border">
