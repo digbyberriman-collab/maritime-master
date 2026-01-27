@@ -7,7 +7,7 @@ import {
   Ship, Users, Award, Plane, Clock, CalendarDays, CheckSquare, Siren, 
   GraduationCap, MessageSquare, AlertCircle, Search, Clipboard, AlertTriangle,
   Eye, ClipboardList, BookOpen, Shield, FileCheck, Layers, LayoutGrid,
-  Package, Bell, Settings as SettingsIcon, Building2, Phone, Wrench
+  Package, Bell, Settings as SettingsIcon, Building2, Phone, Wrench, FileText, Calendar
 } from 'lucide-react';
 
 // Main Pages
@@ -155,7 +155,74 @@ export const AppRoutes: React.FC = () => {
         </ProtectedRoute>
       } />
 
-      {/* ISM */}
+      {/* ISM - Forms */}
+      <Route path="/ism/forms" element={<Navigate to="/ism/forms/templates" replace />} />
+      <Route path="/ism/forms/templates" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<div>Loading...</div>}>
+            {React.createElement(React.lazy(() => import('@/pages/ism/forms/FormTemplates')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/ism/forms/templates/create" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<div>Loading...</div>}>
+            {React.createElement(React.lazy(() => import('@/pages/ism/forms/CreateTemplate')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/ism/forms/drafts" element={
+        <ProtectedRoute>
+          <PlaceholderWrapper 
+            title="Draft Templates" 
+            description="Templates in draft state awaiting review"
+            icon={<FileText className="w-8 h-8 text-primary" />}
+            features={['Draft template list', 'Edit & preview', 'Submit for review']} 
+          />
+        </ProtectedRoute>
+      } />
+      <Route path="/ism/forms/my-drafts" element={
+        <ProtectedRoute>
+          <PlaceholderWrapper 
+            title="My Draft Submissions" 
+            description="Your in-progress form submissions"
+            icon={<CheckSquare className="w-8 h-8 text-primary" />}
+            features={['Resume incomplete forms', 'Auto-save drafts', 'Submit when ready']} 
+          />
+        </ProtectedRoute>
+      } />
+      <Route path="/ism/forms/pending" element={
+        <ProtectedRoute>
+          <PlaceholderWrapper 
+            title="Pending Signatures" 
+            description="Forms awaiting your signature"
+            icon={<CheckSquare className="w-8 h-8 text-primary" />}
+            features={['Review submissions', 'Sign or reject', 'Add comments']} 
+          />
+        </ProtectedRoute>
+      } />
+      <Route path="/ism/forms/archive" element={
+        <ProtectedRoute>
+          <PlaceholderWrapper 
+            title="Submitted / Archive" 
+            description="Completed and archived form submissions"
+            icon={<FileText className="w-8 h-8 text-primary" />}
+            features={['Search archive', 'Export to PDF', 'View audit trail']} 
+          />
+        </ProtectedRoute>
+      } />
+      <Route path="/ism/forms/schedules" element={
+        <ProtectedRoute>
+          <PlaceholderWrapper 
+            title="Form Schedules" 
+            description="Recurring form schedules"
+            icon={<Calendar className="w-8 h-8 text-primary" />}
+            features={['Create schedules', 'Assign to vessels', 'Set recurrence']} 
+          />
+        </ProtectedRoute>
+      } />
+      
+      {/* ISM - Other */}
       <Route path="/ism/checklists" element={
         <ProtectedRoute>
           <PlaceholderWrapper 
