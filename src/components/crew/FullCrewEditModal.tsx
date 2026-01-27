@@ -66,6 +66,10 @@ const formSchema = z.object({
   rotation: z.string().max(100).optional(),
   cabin: z.string().max(50).optional(),
   
+  // Assignment Information
+  joinDate: z.string().optional(),
+  position: z.string().optional(),
+  
   // Documents & Compliance
   medicalExpiry: z.string().optional(),
   passportNumber: z.string().max(100).optional(),
@@ -146,6 +150,8 @@ const FullCrewEditModal: React.FC<FullCrewEditModalProps> = ({
       contractEndDate: '',
       rotation: '',
       cabin: '',
+      joinDate: '',
+      position: '',
       medicalExpiry: '',
       passportNumber: '',
       passportExpiry: '',
@@ -181,6 +187,8 @@ const FullCrewEditModal: React.FC<FullCrewEditModalProps> = ({
         contractEndDate: crewMember.contract_end_date || '',
         rotation: crewMember.rotation || '',
         cabin: crewMember.cabin || '',
+        joinDate: crewMember.current_assignment?.join_date || '',
+        position: crewMember.current_assignment?.position || '',
         medicalExpiry: crewMember.medical_expiry || '',
         passportNumber: crewMember.passport_number || '',
         passportExpiry: crewMember.passport_expiry || '',
@@ -218,6 +226,8 @@ const FullCrewEditModal: React.FC<FullCrewEditModalProps> = ({
       contractEndDate: 'contract_end_date',
       rotation: 'rotation',
       cabin: 'cabin',
+      joinDate: 'join_date',
+      position: 'position',
       medicalExpiry: 'medical_expiry',
       passportNumber: 'passport_number',
       passportExpiry: 'passport_expiry',
@@ -232,6 +242,11 @@ const FullCrewEditModal: React.FC<FullCrewEditModalProps> = ({
         updateData[formField] = value;
       }
     });
+
+    // Add assignment ID for join date/position updates
+    if (crewMember.current_assignment && (values.joinDate || values.position)) {
+      updateData.assignmentId = crewMember.current_assignment.id;
+    }
 
     await onSubmit(updateData);
     setHasUnsavedChanges(false);
@@ -502,6 +517,53 @@ const FullCrewEditModal: React.FC<FullCrewEditModalProps> = ({
 
               {/* Employment Tab */}
               <TabsContent value="employment" className="space-y-4 mt-4">
+                {/* Current Assignment Section */}
+                {crewMember?.current_assignment && (
+                  <div className="border rounded-lg p-4 bg-muted/30 mb-4">
+                    <h3 className="text-sm font-medium mb-3">Current Vessel Assignment</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="text-xs text-muted-foreground">Vessel</label>
+                        <p className="text-sm font-medium">{crewMember.current_assignment.vessel_name}</p>
+                      </div>
+                      <FormField
+                        control={form.control}
+                        name="position"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Position</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="e.g., Chief Engineer" 
+                                {...field} 
+                                disabled={isFieldDisabled('position')}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="joinDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Join Date</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="date" 
+                                {...field} 
+                                disabled={isFieldDisabled('join_date')}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <FormField
                     control={form.control}

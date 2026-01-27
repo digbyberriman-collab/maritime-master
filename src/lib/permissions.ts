@@ -136,6 +136,10 @@ const ALL_FIELDS = [
   'passport_number',
   'passport_expiry',
   'visa_status',
+  // Assignment fields
+  'join_date',
+  'position',
+  'vessel_id',
 ] as const;
 
 // Basic fields for HODs
