@@ -25,7 +25,8 @@ export const InkfishWatermark: React.FC = () => {
   return (
     <div
       data-watermark="inkfish"
-      className="fixed inset-0 z-0 flex items-center justify-center pointer-events-none select-none"
+      className="fixed inset-0 z-[1] flex items-center justify-center pointer-events-none select-none"
+      style={{ pointerEvents: 'none' }}
       aria-hidden="true"
     >
       <div className="relative w-[70%] sm:w-[60%] lg:w-[50%] max-w-[600px] aspect-square flex items-center justify-center translate-y-[5%]">
