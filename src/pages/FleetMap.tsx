@@ -1,116 +1,166 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Map, 
   Ship, 
-  Navigation, 
-  Anchor, 
-  Wind, 
-  Gauge,
-  MapPin,
-  RefreshCw,
   Maximize2,
+  Minimize2,
+  RefreshCw,
   Layers,
-  Info
+  X
 } from 'lucide-react';
-import { useVessels } from '@/hooks/useVessels';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useVesselFilter } from '@/hooks/useVesselFilter';
 
-interface VesselPosition {
+interface MockVessel {
   id: string;
   name: string;
+  mmsi: string;
   lat: number;
   lng: number;
+  sog: number;
+  cog: number;
   heading: number;
-  speed: number;
-  status: 'underway' | 'at_anchor' | 'moored' | 'not_under_command';
+  status: 'UNDER_WAY' | 'MOORED' | 'AT_ANCHOR';
   lastUpdate: string;
-  destination?: string;
-  eta?: string;
+  crewOnboard: number;
+  captain: string;
 }
 
-// Mock vessel positions - in production this would come from AIS API
-const mockPositions: VesselPosition[] = [
-  {
-    id: '1',
-    name: 'M/Y Draak',
-    lat: 43.7384,
+// Mock vessel data (replace with real AIS data later)
+const MOCK_VESSELS: MockVessel[] = [
+  { 
+    id: 'v1', 
+    name: 'M/Y DRAAK', 
+    mmsi: '123456789',
+    lat: 43.7384, 
     lng: 7.4246,
-    heading: 45,
-    speed: 12.5,
-    status: 'underway',
+    sog: 12.5, 
+    cog: 45, 
+    heading: 48,
+    status: 'UNDER_WAY',
     lastUpdate: new Date().toISOString(),
-    destination: 'Monaco',
-    eta: '2 hours'
+    crewOnboard: 12,
+    captain: 'John Smith'
   },
-  {
-    id: '2',
-    name: 'M/Y Leviathan',
-    lat: 36.1408,
-    lng: -5.3536,
-    heading: 270,
-    speed: 0,
-    status: 'at_anchor',
-    lastUpdate: new Date().toISOString(),
-    destination: 'Gibraltar',
-  },
-  {
-    id: '3',
-    name: 'M/Y Titan',
-    lat: 25.7617,
-    lng: -80.1918,
+  { 
+    id: 'v2', 
+    name: 'M/Y LEVIATHAN', 
+    mmsi: '987654321',
+    lat: 41.9028, 
+    lng: 12.4964,
+    sog: 0, 
+    cog: 0, 
     heading: 180,
-    speed: 8.2,
-    status: 'underway',
+    status: 'MOORED',
     lastUpdate: new Date().toISOString(),
-    destination: 'Miami',
-    eta: '30 mins'
+    crewOnboard: 8,
+    captain: 'Sarah Jones'
   },
+  { 
+    id: 'v3', 
+    name: 'M/Y TITAN', 
+    mmsi: '111222333',
+    lat: 36.1408, 
+    lng: -5.3536,
+    sog: 8.2, 
+    cog: 270, 
+    heading: 265,
+    status: 'UNDER_WAY',
+    lastUpdate: new Date().toISOString(),
+    crewOnboard: 15,
+    captain: 'Mike Brown'
+  }
 ];
 
+// Top-down vessel SVG icon
+const VesselIcon: React.FC<{ heading: number; status: string; color: string }> = ({ heading, status, color }) => (
+  <svg 
+    width="32" 
+    height="32" 
+    viewBox="0 0 32 32" 
+    style={{ transform: `rotate(${heading}deg)` }}
+  >
+    {/* Top-down ship shape */}
+    <path 
+      d="M16 2 L24 28 L16 24 L8 28 Z" 
+      fill={color} 
+      stroke="white" 
+      strokeWidth="1.5"
+    />
+    {/* Bridge/superstructure */}
+    <rect x="13" y="12" width="6" height="8" fill="white" opacity="0.7" rx="1" />
+    {/* Bow indicator */}
+    <circle cx="16" cy="6" r="2" fill="white" />
+    {/* Heading line */}
+    {status === 'UNDER_WAY' && (
+      <line x1="16" y1="2" x2="16" y2="-8" stroke={color} strokeWidth="2" strokeDasharray="2,2" />
+    )}
+  </svg>
+);
+
 const FleetMap: React.FC = () => {
-  const { vessels, isLoading } = useVessels();
-  const [selectedVessel, setSelectedVessel] = useState<VesselPosition | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const { vesselFilter } = useVesselFilter();
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showLayers, setShowLayers] = useState(false);
+  const [selectedVessel, setSelectedVessel] = useState<MockVessel | null>(null);
+  const [layers, setLayers] = useState({
+    vessels: true,
+    tracks: false,
+    weather: false,
+    ports: true
+  });
+  const mapRef = useRef<HTMLDivElement>(null);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'underway':
-        return 'bg-success text-success-foreground';
-      case 'at_anchor':
-        return 'bg-warning text-warning-foreground';
-      case 'moored':
-        return 'bg-primary text-primary-foreground';
-      case 'not_under_command':
-        return 'bg-destructive text-destructive-foreground';
-      default:
-        return 'bg-muted text-muted-foreground';
+  // Filter vessels based on master filter
+  const displayVessels = vesselFilter 
+    ? MOCK_VESSELS.filter(v => v.id === vesselFilter)
+    : MOCK_VESSELS;
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await new Promise(r => setTimeout(r, 1500));
+    setIsRefreshing(false);
+  };
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      mapRef.current?.requestFullscreen();
+      setIsFullscreen(true);
+    } else {
+      document.exitFullscreen();
+      setIsFullscreen(false);
     }
   };
 
-  const getStatusLabel = (status: string) => {
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  const getVesselColor = (status: string) => {
     switch (status) {
-      case 'underway':
-        return 'Underway';
-      case 'at_anchor':
-        return 'At Anchor';
-      case 'moored':
-        return 'Moored';
-      case 'not_under_command':
-        return 'NUC';
-      default:
-        return 'Unknown';
+      case 'UNDER_WAY': return '#22c55e';
+      case 'MOORED': return '#3b82f6';
+      case 'AT_ANCHOR': return '#f59e0b';
+      default: return '#6b7280';
     }
   };
 
-  const handleVesselClick = (vessel: VesselPosition) => {
-    setSelectedVessel(vessel);
-    setIsDrawerOpen(true);
+  const getStatusBadgeVariant = (status: string) => {
+    switch (status) {
+      case 'UNDER_WAY': return 'default';
+      case 'MOORED': return 'secondary';
+      case 'AT_ANCHOR': return 'outline';
+      default: return 'secondary';
+    }
   };
 
   return (
@@ -123,108 +173,208 @@ const FleetMap: React.FC = () => {
             <p className="text-muted-foreground">Real-time vessel tracking and AIS data</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm">
-              <Layers className="w-4 h-4 mr-2" />
-              Layers
-            </Button>
-            <Button variant="outline" size="sm">
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
-            <Button variant="outline" size="sm">
-              <Maximize2 className="w-4 h-4 mr-2" />
-              Fullscreen
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+              <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
           </div>
         </div>
 
         {/* Map Container */}
         <Card className="shadow-card overflow-hidden">
-          <CardContent className="p-0 relative">
-            {/* Placeholder for map - will integrate with Mapbox/Leaflet */}
-            <div className="h-[600px] bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 relative flex items-center justify-center">
-              {/* World map SVG placeholder */}
-              <div className="absolute inset-0 opacity-20">
-                <svg viewBox="0 0 1000 500" className="w-full h-full" preserveAspectRatio="xMidYMid slice">
-                  <path
-                    d="M100,200 Q200,100 300,200 T500,200 T700,200 T900,200"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1"
-                    className="text-primary"
-                  />
-                  {/* Simplified continents */}
-                  <ellipse cx="200" cy="200" rx="80" ry="60" fill="currentColor" className="text-muted" opacity="0.3" />
-                  <ellipse cx="500" cy="180" rx="100" ry="80" fill="currentColor" className="text-muted" opacity="0.3" />
-                  <ellipse cx="800" cy="220" rx="60" ry="50" fill="currentColor" className="text-muted" opacity="0.3" />
-                </svg>
+          <CardContent className="p-0">
+            <div 
+              ref={mapRef}
+              className="relative h-[600px] bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5"
+            >
+              {/* World Map Background SVG */}
+              <svg 
+                className="absolute inset-0 w-full h-full opacity-30"
+                viewBox="0 0 1000 500"
+                preserveAspectRatio="xMidYMid slice"
+              >
+                {/* Simplified world map paths */}
+                <path d="M150,150 Q200,100 250,150 T350,150 T450,150" fill="none" stroke="currentColor" strokeWidth="0.5" className="text-muted-foreground" />
+                <ellipse cx="200" cy="200" rx="80" ry="60" fill="currentColor" className="text-muted/30" />
+                <ellipse cx="500" cy="180" rx="100" ry="80" fill="currentColor" className="text-muted/30" />
+                <ellipse cx="800" cy="220" rx="60" ry="50" fill="currentColor" className="text-muted/30" />
+                {/* Grid lines */}
+                {[0, 100, 200, 300, 400, 500].map(y => (
+                  <line key={`h-${y}`} x1="0" y1={y} x2="1000" y2={y} stroke="currentColor" strokeWidth="0.2" className="text-muted-foreground" />
+                ))}
+                {[0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000].map(x => (
+                  <line key={`v-${x}`} x1={x} y1="0" x2={x} y2="500" stroke="currentColor" strokeWidth="0.2" className="text-muted-foreground" />
+                ))}
+              </svg>
+
+              {/* Map Controls */}
+              <div className="absolute top-4 right-4 flex flex-col gap-2 z-20">
+                {/* Refresh Button */}
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={handleRefresh}
+                  disabled={isRefreshing}
+                  className="bg-background"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                </Button>
+
+                {/* Layers Control */}
+                <div className="relative">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowLayers(!showLayers)}
+                    className="bg-background"
+                  >
+                    <Layers className="w-4 h-4" />
+                  </Button>
+
+                  {showLayers && (
+                    <div className="absolute right-0 mt-2 w-48 bg-background rounded-lg shadow-lg p-3 border">
+                      <p className="text-sm font-medium mb-2">Layers</p>
+                      {Object.entries(layers).map(([key, value]) => (
+                        <label key={key} className="flex items-center gap-2 text-sm py-1 cursor-pointer capitalize">
+                          <Checkbox
+                            checked={value}
+                            onCheckedChange={() => setLayers({ ...layers, [key]: !value })}
+                          />
+                          {key}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Fullscreen Button */}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={toggleFullscreen}
+                  className="bg-background"
+                >
+                  {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+                </Button>
               </div>
 
-              {/* Vessel markers */}
-              {mockPositions.map((vessel, index) => (
-                <Tooltip key={vessel.id}>
-                  <TooltipTrigger asChild>
-                    <button
-                      onClick={() => handleVesselClick(vessel)}
-                      className="absolute transform -translate-x-1/2 -translate-y-1/2 z-10 group"
-                      style={{
-                        left: `${20 + index * 30}%`,
-                        top: `${30 + index * 15}%`,
-                      }}
-                    >
-                      <div className={`
-                        w-10 h-10 rounded-full flex items-center justify-center
-                        ${vessel.status === 'underway' ? 'bg-success' : 'bg-warning'}
-                        text-white shadow-lg transition-transform group-hover:scale-110
-                        animate-pulse-soft
-                      `}>
-                        <Ship className="w-5 h-5" style={{ transform: `rotate(${vessel.heading}deg)` }} />
-                      </div>
-                      <span className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs font-medium bg-background/90 px-2 py-0.5 rounded shadow">
+              {/* Vessel Markers */}
+              {layers.vessels && displayVessels.map((vessel) => {
+                // Simplified positioning - in real implementation use proper map projection
+                const left = ((vessel.lng + 180) / 360) * 100;
+                const top = ((90 - vessel.lat) / 180) * 100;
+                
+                return (
+                  <div
+                    key={vessel.id}
+                    className="absolute cursor-pointer transform -translate-x-1/2 -translate-y-1/2 z-10 transition-transform hover:scale-110"
+                    style={{ left: `${left}%`, top: `${top}%` }}
+                    onClick={() => setSelectedVessel(vessel)}
+                  >
+                    <VesselIcon 
+                      heading={vessel.heading} 
+                      status={vessel.status} 
+                      color={getVesselColor(vessel.status)} 
+                    />
+                    {/* Vessel Label */}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 whitespace-nowrap">
+                      <span className="text-xs font-medium bg-background/90 px-2 py-0.5 rounded shadow">
                         {vessel.name}
                       </span>
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-xs">
-                    <div className="space-y-1">
-                      <p className="font-semibold">{vessel.name}</p>
-                      <p className="text-xs">Speed: {vessel.speed} kts</p>
-                      <p className="text-xs">Heading: {vessel.heading}°</p>
-                      {vessel.destination && <p className="text-xs">Dest: {vessel.destination}</p>}
                     </div>
-                  </TooltipContent>
-                </Tooltip>
-              ))}
+                  </div>
+                );
+              })}
 
-              {/* Map info overlay */}
-              <div className="absolute bottom-4 left-4 bg-card/95 backdrop-blur-sm rounded-lg p-4 shadow-lg">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Info className="w-4 h-4" />
-                  <span>AIS integration coming soon</span>
+              {/* Vessel Detail Panel */}
+              {selectedVessel && (
+                <div className="absolute top-4 left-4 w-80 bg-background rounded-lg shadow-lg border z-30">
+                  <div className="p-4 border-b">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Ship className="w-5 h-5 text-primary" />
+                        <h3 className="font-semibold">{selectedVessel.name}</h3>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => setSelectedVessel(null)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">MMSI: {selectedVessel.mmsi}</p>
+                  </div>
+
+                  <div className="p-4 space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground">Status</p>
+                        <Badge variant={getStatusBadgeVariant(selectedVessel.status)} className="mt-1">
+                          {selectedVessel.status.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Speed</p>
+                        <p className="text-sm font-medium">{selectedVessel.sog} kts</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Course</p>
+                        <p className="text-sm font-medium">{selectedVessel.cog}°</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Heading</p>
+                        <p className="text-sm font-medium">{selectedVessel.heading}°</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Crew Onboard</p>
+                        <p className="text-sm font-medium">{selectedVessel.crewOnboard}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Captain</p>
+                        <p className="text-sm font-medium">{selectedVessel.captain}</p>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground">
+                      Last update: {new Date(selectedVessel.lastUpdate).toLocaleString()}
+                    </p>
+
+                    <Button 
+                      className="w-full" 
+                      size="sm"
+                      onClick={() => window.location.href = `/vessels?vessel=${selectedVessel.id}`}
+                    >
+                      View Vessel Dashboard
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Legend */}
+              <div className="absolute bottom-4 left-4 bg-background/95 rounded-lg shadow-lg p-3 border z-20">
+                <p className="text-sm font-medium mb-2">Status</p>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="w-3 h-3 rounded-full bg-green-500" />
+                    Under Way
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="w-3 h-3 rounded-full bg-blue-500" />
+                    Moored
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="w-3 h-3 rounded-full bg-amber-500" />
+                    At Anchor
+                  </div>
                 </div>
               </div>
 
-              {/* Legend */}
-              <div className="absolute top-4 right-4 bg-card/95 backdrop-blur-sm rounded-lg p-4 shadow-lg">
-                <h4 className="text-sm font-medium mb-2">Vessel Status</h4>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="w-3 h-3 rounded-full bg-success" />
-                    <span>Underway</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="w-3 h-3 rounded-full bg-warning" />
-                    <span>At Anchor</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="w-3 h-3 rounded-full bg-primary" />
-                    <span>Moored</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="w-3 h-3 rounded-full bg-destructive" />
-                    <span>Not Under Command</span>
-                  </div>
-                </div>
+              {/* Map placeholder message */}
+              <div className="absolute bottom-4 right-4 bg-background/95 rounded-lg shadow p-2 border text-xs text-muted-foreground z-20">
+                <Map className="w-4 h-4 inline mr-1" />
+                Interactive map integration coming soon
               </div>
             </div>
           </CardContent>
@@ -232,144 +382,40 @@ const FleetMap: React.FC = () => {
 
         {/* Fleet Overview Grid */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {mockPositions.map((vessel) => (
+          {displayVessels.map((vessel) => (
             <Card 
               key={vessel.id} 
               className="shadow-card hover:shadow-card-hover transition-all cursor-pointer"
-              onClick={() => handleVesselClick(vessel)}
+              onClick={() => setSelectedVessel(vessel)}
             >
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base font-medium">{vessel.name}</CardTitle>
-                  <Badge className={getStatusColor(vessel.status)}>
-                    {getStatusLabel(vessel.status)}
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Ship className="w-5 h-5 text-primary" />
+                    <h3 className="font-medium">{vessel.name}</h3>
+                  </div>
+                  <Badge variant={getStatusBadgeVariant(vessel.status)}>
+                    {vessel.status.replace('_', ' ')}
                   </Badge>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div className="flex items-center gap-2">
-                    <Gauge className="w-4 h-4 text-muted-foreground" />
-                    <span>{vessel.speed} kts</span>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Speed:</span> {vessel.sog} kts
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Navigation className="w-4 h-4 text-muted-foreground" />
-                    <span>{vessel.heading}°</span>
+                  <div>
+                    <span className="text-muted-foreground">Heading:</span> {vessel.heading}°
                   </div>
-                  <div className="flex items-center gap-2 col-span-2">
-                    <MapPin className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">
-                      {vessel.lat.toFixed(4)}°N, {vessel.lng.toFixed(4)}°E
-                    </span>
+                  <div>
+                    <span className="text-muted-foreground">Crew:</span> {vessel.crewOnboard}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Captain:</span> {vessel.captain}
                   </div>
                 </div>
-                {vessel.destination && (
-                  <div className="mt-3 pt-3 border-t border-border">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Destination:</span>
-                      <span className="font-medium">{vessel.destination}</span>
-                    </div>
-                    {vessel.eta && (
-                      <div className="flex items-center justify-between text-sm mt-1">
-                        <span className="text-muted-foreground">ETA:</span>
-                        <span className="font-medium">{vessel.eta}</span>
-                      </div>
-                    )}
-                  </div>
-                )}
               </CardContent>
             </Card>
           ))}
         </div>
-
-        {/* Vessel Detail Drawer */}
-        <Sheet open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-          <SheetContent className="w-[400px] sm:w-[540px]">
-            <SheetHeader>
-              <SheetTitle className="flex items-center gap-3">
-                <Ship className="w-6 h-6" />
-                {selectedVessel?.name}
-              </SheetTitle>
-              <SheetDescription>
-                Vessel details and current status
-              </SheetDescription>
-            </SheetHeader>
-
-            {selectedVessel && (
-              <div className="mt-6 space-y-6">
-                {/* Status Badge */}
-                <Badge className={`${getStatusColor(selectedVessel.status)} text-sm px-3 py-1`}>
-                  {getStatusLabel(selectedVessel.status)}
-                </Badge>
-
-                <Separator />
-
-                {/* Navigation Data */}
-                <div className="space-y-4">
-                  <h4 className="font-semibold flex items-center gap-2">
-                    <Navigation className="w-4 h-4" />
-                    Navigation
-                  </h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-muted/50 rounded-lg p-3">
-                      <p className="text-xs text-muted-foreground">Speed</p>
-                      <p className="text-lg font-semibold">{selectedVessel.speed} kts</p>
-                    </div>
-                    <div className="bg-muted/50 rounded-lg p-3">
-                      <p className="text-xs text-muted-foreground">Heading</p>
-                      <p className="text-lg font-semibold">{selectedVessel.heading}°</p>
-                    </div>
-                    <div className="bg-muted/50 rounded-lg p-3 col-span-2">
-                      <p className="text-xs text-muted-foreground">Position</p>
-                      <p className="text-lg font-semibold">
-                        {selectedVessel.lat.toFixed(4)}°N, {selectedVessel.lng.toFixed(4)}°E
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Voyage Info */}
-                {selectedVessel.destination && (
-                  <div className="space-y-4">
-                    <h4 className="font-semibold flex items-center gap-2">
-                      <Anchor className="w-4 h-4" />
-                      Voyage
-                    </h4>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="text-muted-foreground">Destination</span>
-                        <span className="font-medium">{selectedVessel.destination}</span>
-                      </div>
-                      {selectedVessel.eta && (
-                        <div className="flex items-center justify-between">
-                          <span className="text-muted-foreground">ETA</span>
-                          <span className="font-medium">{selectedVessel.eta}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                <Separator />
-
-                {/* Quick Actions */}
-                <div className="space-y-2">
-                  <Button className="w-full" onClick={() => setIsDrawerOpen(false)}>
-                    View Full Profile
-                  </Button>
-                  <Button variant="outline" className="w-full">
-                    View Crew
-                  </Button>
-                  <Button variant="outline" className="w-full">
-                    View Certificates
-                  </Button>
-                </div>
-              </div>
-            )}
-          </SheetContent>
-        </Sheet>
       </div>
     </DashboardLayout>
   );
