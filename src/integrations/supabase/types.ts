@@ -2739,6 +2739,408 @@ export type Database = {
           },
         ]
       }
+      sms_amendments: {
+        Row: {
+          amended_at: string | null
+          amended_by: string
+          amendment_number: number
+          amendment_reason: string
+          changed_fields: string[] | null
+          id: string
+          new_data: Json
+          previous_data: Json
+          re_signed_at: string | null
+          requires_re_signature: boolean | null
+          submission_id: string
+        }
+        Insert: {
+          amended_at?: string | null
+          amended_by: string
+          amendment_number: number
+          amendment_reason: string
+          changed_fields?: string[] | null
+          id?: string
+          new_data: Json
+          previous_data: Json
+          re_signed_at?: string | null
+          requires_re_signature?: boolean | null
+          submission_id: string
+        }
+        Update: {
+          amended_at?: string | null
+          amended_by?: string
+          amendment_number?: number
+          amendment_reason?: string
+          changed_fields?: string[] | null
+          id?: string
+          new_data?: Json
+          previous_data?: Json
+          re_signed_at?: string | null
+          requires_re_signature?: boolean | null
+          submission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_amendments_amended_by_fkey"
+            columns: ["amended_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "sms_amendments_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "sms_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_attachments: {
+        Row: {
+          description: string | null
+          file_name: string
+          file_size: number | null
+          file_url: string
+          id: string
+          mime_type: string | null
+          submission_id: string
+          uploaded_at: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          description?: string | null
+          file_name: string
+          file_size?: number | null
+          file_url: string
+          id?: string
+          mime_type?: string | null
+          submission_id: string
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          description?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_url?: string
+          id?: string
+          mime_type?: string | null
+          submission_id?: string
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_attachments_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "sms_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_attachments_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      sms_signatures: {
+        Row: {
+          action: string | null
+          created_at: string | null
+          delegated_to: string | null
+          device_info: string | null
+          id: string
+          ip_address: string | null
+          rejection_reason: string | null
+          signature_data: string | null
+          signature_method: string | null
+          signature_order: number
+          signed_at: string
+          signer_name: string
+          signer_rank: string | null
+          signer_role: string
+          signer_user_id: string
+          submission_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          action?: string | null
+          created_at?: string | null
+          delegated_to?: string | null
+          device_info?: string | null
+          id?: string
+          ip_address?: string | null
+          rejection_reason?: string | null
+          signature_data?: string | null
+          signature_method?: string | null
+          signature_order: number
+          signed_at?: string
+          signer_name: string
+          signer_rank?: string | null
+          signer_role: string
+          signer_user_id: string
+          submission_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string | null
+          created_at?: string | null
+          delegated_to?: string | null
+          device_info?: string | null
+          id?: string
+          ip_address?: string | null
+          rejection_reason?: string | null
+          signature_data?: string | null
+          signature_method?: string | null
+          signature_order?: number
+          signed_at?: string
+          signer_name?: string
+          signer_rank?: string | null
+          signer_role?: string
+          signer_user_id?: string
+          submission_id?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_signatures_delegated_to_fkey"
+            columns: ["delegated_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "sms_signatures_signer_user_id_fkey"
+            columns: ["signer_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "sms_signatures_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "sms_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_submissions: {
+        Row: {
+          company_id: string
+          content_hash: string | null
+          created_at: string | null
+          created_by: string | null
+          form_data: Json
+          id: string
+          is_locked: boolean | null
+          locked_at: string | null
+          status: string | null
+          submission_date: string
+          submission_number: string
+          submission_time_utc: string
+          submitted_at: string | null
+          submitted_by: string | null
+          template_id: string
+          template_version: number
+          updated_at: string | null
+          vessel_id: string | null
+          vessel_local_offset_minutes: number | null
+        }
+        Insert: {
+          company_id: string
+          content_hash?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          form_data?: Json
+          id?: string
+          is_locked?: boolean | null
+          locked_at?: string | null
+          status?: string | null
+          submission_date: string
+          submission_number: string
+          submission_time_utc?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          template_id: string
+          template_version: number
+          updated_at?: string | null
+          vessel_id?: string | null
+          vessel_local_offset_minutes?: number | null
+        }
+        Update: {
+          company_id?: string
+          content_hash?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          form_data?: Json
+          id?: string
+          is_locked?: boolean | null
+          locked_at?: string | null
+          status?: string | null
+          submission_date?: string
+          submission_number?: string
+          submission_time_utc?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          template_id?: string
+          template_version?: number
+          updated_at?: string | null
+          vessel_id?: string | null
+          vessel_local_offset_minutes?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_submissions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_submissions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "sms_submissions_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "sms_submissions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "sms_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_submissions_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_templates: {
+        Row: {
+          allows_attachments: boolean | null
+          category: string | null
+          company_id: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          effective_date: string
+          form_schema: Json
+          id: string
+          instructions: string | null
+          max_attachments: number | null
+          owner_role: string | null
+          published_at: string | null
+          published_by: string | null
+          recurrence_config: Json | null
+          recurrence_type: string | null
+          required_signers: Json
+          status: string | null
+          supersedes_template_id: string | null
+          template_code: string
+          template_name: string
+          template_type: string
+          updated_at: string | null
+          version: number | null
+        }
+        Insert: {
+          allows_attachments?: boolean | null
+          category?: string | null
+          company_id: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          effective_date: string
+          form_schema?: Json
+          id?: string
+          instructions?: string | null
+          max_attachments?: number | null
+          owner_role?: string | null
+          published_at?: string | null
+          published_by?: string | null
+          recurrence_config?: Json | null
+          recurrence_type?: string | null
+          required_signers?: Json
+          status?: string | null
+          supersedes_template_id?: string | null
+          template_code: string
+          template_name: string
+          template_type: string
+          updated_at?: string | null
+          version?: number | null
+        }
+        Update: {
+          allows_attachments?: boolean | null
+          category?: string | null
+          company_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          effective_date?: string
+          form_schema?: Json
+          id?: string
+          instructions?: string | null
+          max_attachments?: number | null
+          owner_role?: string | null
+          published_at?: string | null
+          published_by?: string | null
+          recurrence_config?: Json | null
+          recurrence_type?: string | null
+          required_signers?: Json
+          status?: string | null
+          supersedes_template_id?: string | null
+          template_code?: string
+          template_name?: string
+          template_type?: string
+          updated_at?: string | null
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sms_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "sms_templates_published_by_fkey"
+            columns: ["published_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "sms_templates_supersedes_template_id_fkey"
+            columns: ["supersedes_template_id"]
+            isOneToOne: false
+            referencedRelation: "sms_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spare_parts: {
         Row: {
           created_at: string
