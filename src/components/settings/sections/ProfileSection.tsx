@@ -1,33 +1,36 @@
 import React from 'react';
 import { User, Camera, Save } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
+import { SectionHeader, SettingsCard, FormField, useSettingsToast } from '@/components/settings/common';
 
 const ProfileSection: React.FC = () => {
   const { profile } = useAuth();
+  const { success } = useSettingsToast();
 
   const initials = profile 
     ? `${profile.first_name?.[0] || ''}${profile.last_name?.[0] || ''}`.toUpperCase()
     : 'U';
 
+  const handleSave = () => {
+    success('Profile Updated', 'Your changes have been saved successfully.');
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-foreground">My Profile</h2>
-        <p className="text-muted-foreground mt-1">Manage your personal information and preferences</p>
-      </div>
+      <SectionHeader 
+        title="My Profile"
+        description="Manage your personal information and preferences"
+        icon={User}
+      />
 
       {/* Profile Photo */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Profile Photo</CardTitle>
-          <CardDescription>Your photo will be visible to other users in the system</CardDescription>
-        </CardHeader>
-        <CardContent className="flex items-center gap-6">
+      <SettingsCard
+        title="Profile Photo"
+        description="Your photo will be visible to other users in the system"
+      >
+        <div className="flex items-center gap-6">
           <Avatar className="h-20 w-20">
             <AvatarImage src="" alt={profile?.first_name} />
             <AvatarFallback className="text-xl bg-primary/10 text-primary">
@@ -41,66 +44,55 @@ const ProfileSection: React.FC = () => {
             </Button>
             <p className="text-xs text-muted-foreground">JPG, PNG or GIF. Max 2MB</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </SettingsCard>
 
       {/* Personal Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Personal Information</CardTitle>
-          <CardDescription>Update your personal details here</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <SettingsCard
+        title="Personal Information"
+        description="Update your personal details here"
+      >
+        <div className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">First Name</Label>
-              <Input 
-                id="firstName" 
-                defaultValue={profile?.first_name || ''} 
-                placeholder="Enter first name"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Last Name</Label>
-              <Input 
-                id="lastName" 
-                defaultValue={profile?.last_name || ''} 
-                placeholder="Enter last name"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="email">Email Address</Label>
-            <Input 
-              id="email" 
-              type="email"
-              defaultValue={profile?.email || ''} 
-              placeholder="Enter email"
-              disabled
-              className="bg-muted"
+            <FormField
+              id="firstName"
+              label="First Name"
+              defaultValue={profile?.first_name || ''}
+              placeholder="Enter first name"
             />
-            <p className="text-xs text-muted-foreground">Email cannot be changed. Contact support if needed.</p>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="role">Role</Label>
-            <Input 
-              id="role" 
-              defaultValue={profile?.role?.replace('_', ' ').toUpperCase() || ''} 
-              disabled
-              className="bg-muted"
+            <FormField
+              id="lastName"
+              label="Last Name"
+              defaultValue={profile?.last_name || ''}
+              placeholder="Enter last name"
             />
           </div>
+
+          <FormField
+            id="email"
+            label="Email Address"
+            type="email"
+            defaultValue={profile?.email || ''}
+            placeholder="Enter email"
+            disabled
+            hint="Email cannot be changed. Contact support if needed."
+          />
+
+          <FormField
+            id="role"
+            label="Role"
+            defaultValue={profile?.role?.replace('_', ' ').toUpperCase() || ''}
+            disabled
+          />
 
           <div className="flex justify-end pt-4">
-            <Button>
+            <Button onClick={handleSave}>
               <Save className="h-4 w-4 mr-2" />
               Save Changes
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </SettingsCard>
     </div>
   );
 };
