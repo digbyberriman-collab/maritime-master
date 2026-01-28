@@ -72,67 +72,12 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         />
       )}
 
-      {/* Sidebar - Desktop: always visible, Mobile: slide in/out */}
-      {/* Desktop sidebar - always visible on lg+ screens */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:shrink-0 bg-sidebar z-10">
-        <div className="flex flex-col h-full">
-          {/* Logo with client branding */}
-          <div className="flex flex-col px-6 py-4 border-b border-sidebar-border">
-            <div className="flex items-center justify-between">
-              <Link 
-                to="/dashboard"
-                className="text-xl sm:text-2xl font-black tracking-tight text-sidebar-foreground hover:text-sidebar-accent-foreground hover:opacity-80 transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-sidebar-ring py-1"
-                aria-label="STORM Home - Return to Dashboard"
-                title="Return to Dashboard"
-              >
-                STORM
-              </Link>
-            </div>
-            {clientDisplayName && (
-              <span className="text-xs text-sidebar-foreground/70 mt-1 truncate">
-                {clientDisplayName}
-              </span>
-            )}
-          </div>
-
-          {/* Navigation */}
-          <SidebarNavigation onNavigate={() => {}} />
-
-          {/* User info at bottom */}
-          <div className="p-4 border-t border-sidebar-border">
-            <div className="flex items-center gap-3 text-sidebar-foreground">
-              <Avatar className="w-8 h-8">
-                <AvatarFallback 
-                  className="text-sm"
-                  style={{ backgroundColor: brandColor, color: 'white' }}
-                >
-                  {userInitials}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">
-                  {profile?.first_name} {profile?.last_name}
-                </p>
-                <p className="text-xs text-sidebar-foreground/70 truncate">
-                  {profile?.role ? roleLabels[profile.role] : ''}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </aside>
-
-      {/* Mobile sidebar - slide-in drawer */}
+      {/* Sidebar - z-10 to be above watermark */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-sidebar lg:hidden',
-          'transform transition-transform duration-200 ease-in-out will-change-transform',
+          'fixed lg:static inset-y-0 left-0 z-50 w-64 bg-sidebar transform transition-transform duration-200 ease-in-out lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
-        style={{ 
-          WebkitTransform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
-          transform: sidebarOpen ? 'translateX(0)' : 'translateX(-100%)'
-        }}
       >
         <div className="flex flex-col h-full">
           {/* Logo with client branding */}
