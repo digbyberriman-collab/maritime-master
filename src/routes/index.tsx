@@ -65,6 +65,7 @@ import CertificateAlerts from '@/pages/CertificateAlerts';
 // Settings Sub-pages
 import BrandingSettings from '@/pages/BrandingSettings';
 import DPADashboard from '@/pages/DPADashboard';
+import RolesPermissionsPage from '@/pages/settings/RolesPermissionsPage';
 
 // Placeholder wrapper with layout
 const PlaceholderWrapper: React.FC<{ 
@@ -422,6 +423,13 @@ export const AppRoutes: React.FC = () => {
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/settings/*" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/settings/branding" element={<ProtectedRoute><BrandingSettings /></ProtectedRoute>} />
+      <Route path="/settings/permissions" element={
+        <ProtectedRoute>
+          <DashboardLayout>
+            <RolesPermissionsPage />
+          </DashboardLayout>
+        </ProtectedRoute>
+      } />
 
       {/* Admin Routes */}
       <Route path="/admin" element={<Navigate to="/admin/users" replace />} />
@@ -437,12 +445,9 @@ export const AppRoutes: React.FC = () => {
       } />
       <Route path="/admin/roles" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Roles & Permissions" 
-            description="Configure roles and permission matrix"
-            icon={<Shield className="w-8 h-8 text-primary" />}
-            features={['Role definitions', 'Permission matrix', 'Custom roles', 'Field-level redactions']} 
-          />
+          <DashboardLayout>
+            <RolesPermissionsPage />
+          </DashboardLayout>
         </ProtectedRoute>
       } />
       <Route path="/admin/fleet-groups" element={

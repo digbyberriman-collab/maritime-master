@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { usePermissionsStore } from '@/store/permissionsStore';
 
 interface Profile {
   id: string;
@@ -14,7 +15,7 @@ interface Profile {
   updated_at: string;
 }
 
-// Permission types for granular access control
+// Permission types for granular access control (legacy - to be migrated to RBAC)
 type Permission = 
   | 'all'
   | 'vessel_read' | 'vessel_write'
@@ -27,7 +28,7 @@ type Permission =
   | 'admin_read' | 'admin_write'
   | 'self_read' | 'self_write';
 
-// Role-based permission mapping
+// Role-based permission mapping (legacy fallback)
 const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   dpa: ['all'],
   shore_management: ['all'],
@@ -60,7 +61,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   ],
 };
 
-// Module access by role
+// Module access by role (legacy fallback - RBAC will take precedence when available)
 const MODULE_ACCESS: Record<string, string[]> = {
   'dashboard': ['dpa', 'shore_management', 'master', 'chief_engineer', 'chief_officer', 'crew'],
   'fleet-map': ['dpa', 'shore_management', 'master'],
@@ -114,6 +115,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // RBAC store integration
+  const { loadPermissions, reset: resetPermissions, isInitialized: rbacInitialized, canView } = usePermissionsStore();
 
   const userRole = profile?.role ?? null;
 
@@ -143,8 +147,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return rolePermissions.includes(permission);
   }, [userRole]);
 
-  // Check if user can access a specific module
+  // Check if user can access a specific module - uses RBAC when available, falls back to legacy
   const canAccessModule = useCallback((moduleId: string): boolean => {
+    // Try RBAC first if initialized
+    if (rbacInitialized) {
+      // Map navigation module IDs to RBAC module keys
+      const moduleKeyMap: Record<string, string> = {
+        'dashboard': 'dashboard',
+        'fleet-map': 'fleet',
+        'vessels': 'vessels',
+        'crew': 'crew_roster',
+        'ism': 'ism',
+        'certificates': 'vessel_certificates',
+        'documents': 'documents',
+        'maintenance': 'maintenance',
+        'alerts': 'dashboard', // Alerts are part of dashboard permissions
+        'settings': 'settings',
+        'admin': 'settings',
+        'insurance': 'insurance',
+        'hr': 'hr',
+        'reports': 'reports',
+      };
+      
+      const rbacKey = moduleKeyMap[moduleId] || moduleId;
+      const hasRBACAccess = canView(rbacKey);
+      if (hasRBACAccess) return true;
+    }
+    
+    // Fallback to legacy system
     if (!userRole) return false;
     
     const allowedRoles = MODULE_ACCESS[moduleId];
@@ -153,7 +183,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!allowedRoles) return true;
     
     return allowedRoles.includes(userRole);
-  }, [userRole]);
+  }, [userRole, rbacInitialized, canView]);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -166,9 +196,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (session?.user) {
           setTimeout(() => {
             fetchProfile(session.user.id).then(setProfile);
+            // Load RBAC permissions when user logs in
+            loadPermissions();
           }, 0);
         } else {
           setProfile(null);
+          // Reset RBAC permissions when user logs out
+          resetPermissions();
         }
       }
     );
@@ -183,13 +217,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setProfile(p);
           setLoading(false);
         });
+        // Load RBAC permissions for existing session
+        loadPermissions();
       } else {
         setLoading(false);
       }
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [loadPermissions, resetPermissions]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
