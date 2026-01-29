@@ -185,26 +185,175 @@ const FleetMap: React.FC = () => {
           <CardContent className="p-0">
             <div 
               ref={mapRef}
-              className="relative h-[600px] bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5"
+              className="relative h-[600px] bg-[#0c1929] overflow-hidden"
             >
-              {/* World Map Background SVG */}
+              {/* World Map Background */}
               <svg 
-                className="absolute inset-0 w-full h-full opacity-30"
-                viewBox="0 0 1000 500"
+                className="absolute inset-0 w-full h-full"
+                viewBox="0 0 2000 1000"
                 preserveAspectRatio="xMidYMid slice"
               >
-                {/* Simplified world map paths */}
-                <path d="M150,150 Q200,100 250,150 T350,150 T450,150" fill="none" stroke="currentColor" strokeWidth="0.5" className="text-muted-foreground" />
-                <ellipse cx="200" cy="200" rx="80" ry="60" fill="currentColor" className="text-muted/30" />
-                <ellipse cx="500" cy="180" rx="100" ry="80" fill="currentColor" className="text-muted/30" />
-                <ellipse cx="800" cy="220" rx="60" ry="50" fill="currentColor" className="text-muted/30" />
-                {/* Grid lines */}
-                {[0, 100, 200, 300, 400, 500].map(y => (
-                  <line key={`h-${y}`} x1="0" y1={y} x2="1000" y2={y} stroke="currentColor" strokeWidth="0.2" className="text-muted-foreground" />
-                ))}
-                {[0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000].map(x => (
-                  <line key={`v-${x}`} x1={x} y1="0" x2={x} y2="500" stroke="currentColor" strokeWidth="0.2" className="text-muted-foreground" />
-                ))}
+                {/* Ocean Background */}
+                <rect width="2000" height="1000" fill="#0c1929" />
+                
+                {/* Grid Lines - Latitude */}
+                {[-60, -40, -20, 0, 20, 40, 60].map((lat, i) => {
+                  const y = 500 - (lat / 90) * 500;
+                  return (
+                    <g key={`lat-${lat}`}>
+                      <line x1="0" y1={y} x2="2000" y2={y} stroke="#1e3a5f" strokeWidth="0.5" opacity="0.5" />
+                      <text x="10" y={y - 5} fill="#3b5998" fontSize="10" opacity="0.6">{lat}°</text>
+                    </g>
+                  );
+                })}
+                
+                {/* Grid Lines - Longitude */}
+                {[-150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180].map((lng) => {
+                  const x = 1000 + (lng / 180) * 1000;
+                  return (
+                    <g key={`lng-${lng}`}>
+                      <line x1={x} y1="0" x2={x} y2="1000" stroke="#1e3a5f" strokeWidth="0.5" opacity="0.5" />
+                      <text x={x + 5} y="20" fill="#3b5998" fontSize="10" opacity="0.6">{lng}°</text>
+                    </g>
+                  );
+                })}
+                
+                {/* North America */}
+                <path 
+                  d="M280,180 L320,140 L380,120 L450,100 L520,90 L580,95 L620,120 L640,160 L620,200 L580,240 L520,280 L480,320 L440,360 L400,380 L360,400 L320,380 L280,340 L240,300 L220,260 L240,220 L280,180 Z" 
+                  fill="#1a3a2f" 
+                  stroke="#2d5a4a" 
+                  strokeWidth="1"
+                />
+                {/* Alaska */}
+                <path 
+                  d="M180,120 L220,100 L260,110 L280,140 L260,160 L220,160 L180,140 L180,120 Z" 
+                  fill="#1a3a2f" 
+                  stroke="#2d5a4a" 
+                  strokeWidth="1"
+                />
+                {/* Greenland */}
+                <path 
+                  d="M580,80 L640,60 L700,70 L740,100 L720,140 L680,160 L620,150 L580,120 L580,80 Z" 
+                  fill="#1a3a2f" 
+                  stroke="#2d5a4a" 
+                  strokeWidth="1"
+                />
+                
+                {/* South America */}
+                <path 
+                  d="M420,420 L480,400 L520,420 L540,480 L520,560 L480,640 L440,720 L400,760 L380,720 L360,640 L380,560 L400,480 L420,420 Z" 
+                  fill="#1a3a2f" 
+                  stroke="#2d5a4a" 
+                  strokeWidth="1"
+                />
+                
+                {/* Europe */}
+                <path 
+                  d="M900,160 L960,140 L1020,150 L1060,180 L1080,220 L1060,260 L1020,280 L960,280 L920,260 L880,240 L860,200 L880,160 L900,160 Z" 
+                  fill="#1a3a2f" 
+                  stroke="#2d5a4a" 
+                  strokeWidth="1"
+                />
+                {/* UK & Ireland */}
+                <path 
+                  d="M860,180 L880,170 L890,190 L880,210 L860,200 L860,180 Z M840,190 L855,185 L855,205 L840,200 L840,190 Z" 
+                  fill="#1a3a2f" 
+                  stroke="#2d5a4a" 
+                  strokeWidth="1"
+                />
+                {/* Scandinavia */}
+                <path 
+                  d="M960,100 L1000,80 L1040,90 L1060,120 L1040,160 L1000,150 L960,130 L960,100 Z" 
+                  fill="#1a3a2f" 
+                  stroke="#2d5a4a" 
+                  strokeWidth="1"
+                />
+                
+                {/* Africa */}
+                <path 
+                  d="M900,320 L960,300 L1040,320 L1100,360 L1120,440 L1100,540 L1040,620 L980,660 L920,640 L880,580 L860,500 L860,420 L880,360 L900,320 Z" 
+                  fill="#1a3a2f" 
+                  stroke="#2d5a4a" 
+                  strokeWidth="1"
+                />
+                {/* Madagascar */}
+                <path 
+                  d="M1140,540 L1160,520 L1180,540 L1180,600 L1160,620 L1140,600 L1140,540 Z" 
+                  fill="#1a3a2f" 
+                  stroke="#2d5a4a" 
+                  strokeWidth="1"
+                />
+                
+                {/* Asia */}
+                <path 
+                  d="M1100,140 L1200,100 L1340,80 L1480,100 L1580,140 L1620,200 L1600,280 L1540,340 L1460,360 L1380,340 L1300,320 L1220,280 L1160,240 L1120,200 L1100,140 Z" 
+                  fill="#1a3a2f" 
+                  stroke="#2d5a4a" 
+                  strokeWidth="1"
+                />
+                {/* India */}
+                <path 
+                  d="M1260,340 L1300,320 L1340,340 L1360,400 L1340,460 L1300,500 L1260,480 L1240,420 L1260,340 Z" 
+                  fill="#1a3a2f" 
+                  stroke="#2d5a4a" 
+                  strokeWidth="1"
+                />
+                {/* Southeast Asia */}
+                <path 
+                  d="M1420,380 L1480,360 L1540,380 L1560,440 L1520,500 L1460,520 L1400,500 L1380,440 L1420,380 Z" 
+                  fill="#1a3a2f" 
+                  stroke="#2d5a4a" 
+                  strokeWidth="1"
+                />
+                {/* Japan */}
+                <path 
+                  d="M1620,200 L1660,180 L1680,220 L1660,280 L1620,300 L1600,260 L1620,200 Z" 
+                  fill="#1a3a2f" 
+                  stroke="#2d5a4a" 
+                  strokeWidth="1"
+                />
+                
+                {/* Australia */}
+                <path 
+                  d="M1480,580 L1580,540 L1680,560 L1720,620 L1700,700 L1620,740 L1540,720 L1480,680 L1460,620 L1480,580 Z" 
+                  fill="#1a3a2f" 
+                  stroke="#2d5a4a" 
+                  strokeWidth="1"
+                />
+                {/* New Zealand */}
+                <path 
+                  d="M1780,700 L1800,680 L1820,700 L1820,760 L1800,780 L1780,760 L1780,700 Z" 
+                  fill="#1a3a2f" 
+                  stroke="#2d5a4a" 
+                  strokeWidth="1"
+                />
+                
+                {/* Indonesia */}
+                <path 
+                  d="M1440,540 L1480,530 L1520,540 L1540,560 L1520,580 L1480,580 L1440,570 L1440,540 Z" 
+                  fill="#1a3a2f" 
+                  stroke="#2d5a4a" 
+                  strokeWidth="1"
+                />
+                
+                {/* Mediterranean Sea highlight */}
+                <path 
+                  d="M860,280 Q920,260 980,280 Q1040,300 1100,280" 
+                  fill="none" 
+                  stroke="#1e4a6f" 
+                  strokeWidth="8"
+                  opacity="0.4"
+                />
+                
+                {/* Major ports/locations dots */}
+                <circle cx="920" cy="270" r="3" fill="#3b82f6" opacity="0.6" /> {/* Mediterranean */}
+                <circle cx="1000" cy="260" r="3" fill="#3b82f6" opacity="0.6" /> {/* Greece */}
+                <circle cx="840" cy="340" r="3" fill="#3b82f6" opacity="0.6" /> {/* Gibraltar */}
+                <circle cx="1300" cy="400" r="3" fill="#3b82f6" opacity="0.6" /> {/* Dubai */}
+                <circle cx="1520" cy="400" r="3" fill="#3b82f6" opacity="0.6" /> {/* Singapore */}
+                <circle cx="400" cy="340" r="3" fill="#3b82f6" opacity="0.6" /> {/* Miami */}
+                <circle cx="480" cy="480" r="3" fill="#3b82f6" opacity="0.6" /> {/* Caribbean */}
               </svg>
 
               {/* Map Controls */}
