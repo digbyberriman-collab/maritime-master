@@ -137,12 +137,9 @@ export const AppRoutes: React.FC = () => {
       <Route path="/crew/roster" element={<ProtectedRoute><CrewRoster /></ProtectedRoute>} />
       <Route path="/crew/certificates" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Crew Certificates" 
-            description="Crew certification and compliance tracking"
-            icon={<Award className="w-8 h-8 text-primary" />}
-            features={['Certificate tracking by crew', 'Expiry alerts dashboard', 'Document upload & verification', 'Validation workflow']} 
-          />
+          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+            {React.createElement(React.lazy(() => import('@/pages/crew/CrewDocuments')))}
+          </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/crew/flights" element={
@@ -157,12 +154,23 @@ export const AppRoutes: React.FC = () => {
       } />
       <Route path="/crew/hours-of-rest" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Hours of Rest" 
-            description="STCW/MLC rest hour compliance tracking"
-            icon={<Clock className="w-8 h-8 text-primary" />}
-            features={['Rest period logging', 'Compliance status tracking', 'Non-conformity alerts', 'MLC/STCW compliance reports']} 
-          />
+          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+            {React.createElement(React.lazy(() => import('@/pages/crew/HoursOfRest')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/calendar" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+            {React.createElement(React.lazy(() => import('@/pages/crew/VesselCalendar')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/my-dashboard" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+            {React.createElement(React.lazy(() => import('@/pages/crew/CrewDashboard')))}
+          </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/crew/leave" element={
