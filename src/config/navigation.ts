@@ -31,6 +31,8 @@ import {
   Package,
   HardHat,
   XCircle,
+  Umbrella,
+  Briefcase,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -143,6 +145,20 @@ export const NAVIGATION_ITEMS: NavItem[] = [
       { id: 'policies', label: 'Policies', path: '/documents/policies', icon: FileCheck },
       { id: 'drawings', label: 'Drawings', path: '/documents/drawings', icon: Layers },
     ],
+  },
+  {
+    id: 'hr',
+    label: 'HR',
+    icon: Briefcase,
+    path: '/hr',
+    permissions: ['DPA', 'Management'],
+  },
+  {
+    id: 'insurance',
+    label: 'Insurance',
+    icon: Umbrella,
+    path: '/insurance',
+    permissions: ['DPA', 'Management', 'Captain'],
   },
   {
     id: 'maintenance',

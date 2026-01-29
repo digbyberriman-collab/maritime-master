@@ -27,6 +27,8 @@ import RiskAssessments from '@/pages/RiskAssessments';
 import Alerts from '@/pages/Alerts';
 import Settings from '@/pages/Settings';
 import NotFound from '@/pages/NotFound';
+import InsurancePage from '@/pages/InsurancePage';
+import HRPage from '@/pages/HRPage';
 
 // ISM Pages - Flat navigation with internal tabs
 import {
@@ -372,6 +374,12 @@ export const AppRoutes: React.FC = () => {
       <Route path="/documents/reviews" element={<ProtectedRoute><ReviewDashboard /></ProtectedRoute>} />
       <Route path="/review-queue" element={<ProtectedRoute><ReviewQueue /></ProtectedRoute>} />
       <Route path="/acknowledgments" element={<ProtectedRoute><AcknowledgmentTracking /></ProtectedRoute>} />
+
+      {/* HR */}
+      <Route path="/hr" element={<ProtectedRoute><HRPage /></ProtectedRoute>} />
+
+      {/* Insurance */}
+      <Route path="/insurance" element={<ProtectedRoute><InsurancePage /></ProtectedRoute>} />
 
       {/* Maintenance */}
       <Route path="/maintenance" element={<ProtectedRoute><Maintenance /></ProtectedRoute>} />
