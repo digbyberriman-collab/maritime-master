@@ -1,36 +1,20 @@
-// ISM Pages Index
-export { default as ISMPlaceholder } from './ISMPlaceholder';
+// ISM Pages Index - Flat navigation with internal tabs
 
-// ERM Pages
+// Tabbed Modules (4)
 export { default as ERMPage } from './ERMPage';
-export { default as ERMEmergencyChecklistsPage } from './ERMEmergencyChecklistsPage';
-export { default as ERMOtherEmergenciesPage } from './ERMOtherEmergenciesPage';
-export { default as ERMPeopleWelfarePage } from './ERMPeopleWelfarePage';
+export { default as ChecklistsPage } from './ChecklistsPage';
+export { default as RiskAssessmentsPage } from './RiskAssessmentsPage';
+export { default as SOPsPage } from './SOPsPage';
 
-// Checklist Pages
-export { default as ISMChecklistsPage } from './ISMChecklistsPage';
-export { default as BridgeChecklistsPage } from './BridgeChecklistsPage';
-export { default as EngineRoomChecklistsPage } from './EngineRoomChecklistsPage';
-export { default as InteriorChecklistsPage } from './InteriorChecklistsPage';
-
-// Permits
+// Simple Placeholder Pages (11)
+export { default as AuditsSurveysPage } from './AuditsSurveysPage';
+export { default as CorrectiveActionsPage } from './CorrectiveActionsPage';
+export { default as DrillsPage } from './DrillsPage';
+export { default as IncidentsPage } from './IncidentsPage';
+export { default as InvestigationsPage } from './InvestigationsPage';
+export { default as MeetingsPage } from './MeetingsPage';
+export { default as MiscellaneousPage } from './MiscellaneousPage';
+export { default as NonConformitiesPage } from './NonConformitiesPage';
+export { default as ObservationsPage } from './ObservationsPage';
 export { default as PermitsToWorkPage } from './PermitsToWorkPage';
-
-// Risk Assessments
-export { default as RiskAssessmentsLandingPage } from './RiskAssessmentsLandingPage';
-export { default as RiskAssessmentsBridgePage } from './RiskAssessmentsBridgePage';
-export { default as RiskAssessmentsDeckPage } from './RiskAssessmentsDeckPage';
-export { default as RiskAssessmentsEngineeringPage } from './RiskAssessmentsEngineeringPage';
-export { default as RiskAssessmentsInteriorPage } from './RiskAssessmentsInteriorPage';
-export { default as RiskAssessmentsGalleyPage } from './RiskAssessmentsGalleyPage';
-
-// SOPs
-export { default as SOPsLandingPage } from './SOPsLandingPage';
-export { default as SOPsBridgePage } from './SOPsBridgePage';
-export { default as SOPsDeckPage } from './SOPsDeckPage';
-export { default as SOPsEngineeringPage } from './SOPsEngineeringPage';
-export { default as SOPsInteriorPage } from './SOPsInteriorPage';
-export { default as SOPsGalleyPage } from './SOPsGalleyPage';
-
-// Miscellaneous
-export { default as MiscellaneousFormsPage } from './MiscellaneousFormsPage';
+export { default as TrainingPage } from './TrainingPage';

@@ -29,32 +29,17 @@ import {
   FileCheck,
   Layers,
   Package,
-  Anchor,
-  Navigation,
-  Utensils,
-  Home,
   HardHat,
-  FileWarning,
-  Cog,
-  ListChecks,
-  HeartHandshake,
+  XCircle,
   type LucideIcon,
 } from 'lucide-react';
 
-// Nested child for 3rd level navigation
-export interface NavGrandChild {
-  id: string;
-  label: string;
-  path: string;
-  icon: LucideIcon;
-}
-
+// Child for 2nd level navigation
 export interface NavChild {
   id: string;
   label: string;
   path: string;
   icon: LucideIcon;
-  children?: NavGrandChild[];
 }
 
 export interface NavItem {
@@ -116,65 +101,22 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     path: '/ism',
     permissions: ['all'],
     children: [
-      // ERM with nested children
-      {
-        id: 'erm',
-        label: 'ERM',
-        path: '/ism/erm',
-        icon: AlertCircle,
-        children: [
-          { id: 'emergency-checklists', label: 'Emergency Checklists', path: '/ism/erm/emergency-checklists', icon: ListChecks },
-          { id: 'other-emergencies', label: 'Other Emergencies', path: '/ism/erm/other-emergencies', icon: FileWarning },
-          { id: 'people-welfare', label: 'People & Welfare', path: '/ism/erm/people-welfare', icon: HeartHandshake },
-        ],
-      },
-      // Top-level checklists
-      { id: 'ism-checklists', label: 'ISM Checklists', path: '/ism/checklists', icon: CheckSquare },
-      { id: 'bridge-checklists', label: 'Bridge Checklists', path: '/ism/checklists/bridge', icon: Navigation },
-      { id: 'engine-room-checklists', label: 'Engine Room Checklists', path: '/ism/checklists/engine-room', icon: Cog },
-      { id: 'interior-checklists', label: 'Interior Checklists', path: '/ism/checklists/interior', icon: Home },
-      // Permits
-      { id: 'permits-to-work', label: 'Permits to Work', path: '/ism/permits-to-work', icon: HardHat },
-      // Risk Assessments with nested children
-      {
-        id: 'risk-assessments-nav',
-        label: 'Risk Assessments',
-        path: '/ism/risk-assessments',
-        icon: AlertTriangle,
-        children: [
-          { id: 'ra-bridge', label: 'Bridge', path: '/ism/risk-assessments/bridge', icon: Navigation },
-          { id: 'ra-deck', label: 'Deck', path: '/ism/risk-assessments/deck', icon: Anchor },
-          { id: 'ra-engineering', label: 'Engineering', path: '/ism/risk-assessments/engineering', icon: Cog },
-          { id: 'ra-interior', label: 'Interior', path: '/ism/risk-assessments/interior', icon: Home },
-          { id: 'ra-galley', label: 'Galley', path: '/ism/risk-assessments/galley', icon: Utensils },
-        ],
-      },
-      // SOPs with nested children
-      {
-        id: 'sops-nav',
-        label: 'SOPs',
-        path: '/ism/sops',
-        icon: ClipboardList,
-        children: [
-          { id: 'sops-bridge', label: 'Bridge SOPs', path: '/ism/sops/bridge', icon: Navigation },
-          { id: 'sops-deck', label: 'Deck SOPs', path: '/ism/sops/deck', icon: Anchor },
-          { id: 'sops-engineering', label: 'Engineering SOPs', path: '/ism/sops/engineering', icon: Cog },
-          { id: 'sops-interior', label: 'Interior SOPs', path: '/ism/sops/interior', icon: Home },
-          { id: 'sops-galley', label: 'Galley SOPs', path: '/ism/sops/galley', icon: Utensils },
-        ],
-      },
-      // Miscellaneous
-      { id: 'miscellaneous-forms', label: 'Miscellaneous Forms', path: '/ism/miscellaneous', icon: FileText },
-      // Existing ISM items
+      // Alphabetical order - 15 items, flat (no nested children)
+      { id: 'audits-surveys', label: 'Audits & Surveys', path: '/ism/audits-surveys', icon: ClipboardList },
+      { id: 'checklists', label: 'Checklists', path: '/ism/checklists', icon: CheckSquare },
+      { id: 'corrective-actions', label: 'Corrective Actions (CAPA)', path: '/ism/corrective-actions', icon: Clipboard },
       { id: 'drills', label: 'Drills', path: '/ism/drills', icon: Siren },
-      { id: 'training', label: 'Training', path: '/ism/training', icon: GraduationCap },
-      { id: 'meetings', label: 'Meetings', path: '/ism/meetings', icon: MessageSquare },
-      { id: 'incidents', label: 'Incidents', path: '/ism/incidents', icon: AlertCircle },
+      { id: 'erm', label: 'Emergency Response Manual (ERM)', path: '/ism/erm', icon: AlertCircle },
+      { id: 'incidents', label: 'Incidents', path: '/ism/incidents', icon: AlertTriangle },
       { id: 'investigations', label: 'Investigations', path: '/ism/investigations', icon: Search },
-      { id: 'capa', label: 'CAPA', path: '/ism/capa', icon: Clipboard },
-      { id: 'non-conformities', label: 'Non-Conformities', path: '/ism/non-conformities', icon: AlertTriangle },
+      { id: 'meetings', label: 'Meetings', path: '/ism/meetings', icon: MessageSquare },
+      { id: 'miscellaneous', label: 'Miscellaneous ISM Forms', path: '/ism/miscellaneous', icon: FileText },
+      { id: 'non-conformities', label: 'Non-Conformities', path: '/ism/non-conformities', icon: XCircle },
       { id: 'observations', label: 'Observations', path: '/ism/observations', icon: Eye },
-      { id: 'audits', label: 'Audits & Surveys', path: '/ism/audits', icon: ClipboardList },
+      { id: 'permits-to-work', label: 'Permits to Work', path: '/ism/permits-to-work', icon: HardHat },
+      { id: 'risk-assessments', label: 'Risk Assessments', path: '/ism/risk-assessments', icon: Shield },
+      { id: 'sops', label: 'Standard Operating Procedures (SOPs)', path: '/ism/sops', icon: BookOpen },
+      { id: 'training', label: 'Training', path: '/ism/training', icon: GraduationCap },
     ],
   },
   {

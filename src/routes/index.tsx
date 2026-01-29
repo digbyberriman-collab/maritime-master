@@ -4,9 +4,8 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { PlaceholderPage } from '@/components/common/PlaceholderPage';
 import { 
-  Ship, Users, Award, Plane, Clock, CalendarDays, CheckSquare, Siren, 
-  GraduationCap, MessageSquare, AlertCircle, Search, Clipboard, AlertTriangle,
-  Eye, ClipboardList, BookOpen, Shield, FileCheck, Layers, LayoutGrid,
+  Ship, Users, Award, Plane, Clock, CalendarDays,
+  AlertTriangle, ClipboardList, BookOpen, Shield, FileCheck, Layers, LayoutGrid,
   Package, Bell, Settings as SettingsIcon, Building2, Phone, Wrench, FileText, Calendar
 } from 'lucide-react';
 
@@ -29,30 +28,23 @@ import Alerts from '@/pages/Alerts';
 import Settings from '@/pages/Settings';
 import NotFound from '@/pages/NotFound';
 
-// ISM Pages
+// ISM Pages - Flat navigation with internal tabs
 import {
   ERMPage,
-  ERMEmergencyChecklistsPage,
-  ERMOtherEmergenciesPage,
-  ERMPeopleWelfarePage,
-  ISMChecklistsPage,
-  BridgeChecklistsPage,
-  EngineRoomChecklistsPage,
-  InteriorChecklistsPage,
+  ChecklistsPage,
+  RiskAssessmentsPage,
+  SOPsPage,
+  AuditsSurveysPage,
+  CorrectiveActionsPage,
+  DrillsPage as ISMDrillsPage,
+  IncidentsPage as ISMIncidentsPage,
+  InvestigationsPage,
+  MeetingsPage,
+  MiscellaneousPage,
+  NonConformitiesPage,
+  ObservationsPage,
   PermitsToWorkPage,
-  RiskAssessmentsLandingPage,
-  RiskAssessmentsBridgePage,
-  RiskAssessmentsDeckPage,
-  RiskAssessmentsEngineeringPage,
-  RiskAssessmentsInteriorPage,
-  RiskAssessmentsGalleyPage,
-  SOPsLandingPage,
-  SOPsBridgePage,
-  SOPsDeckPage,
-  SOPsEngineeringPage,
-  SOPsInteriorPage,
-  SOPsGalleyPage,
-  MiscellaneousFormsPage,
+  TrainingPage as ISMTrainingPage,
 } from '@/pages/ism';
 
 // Document Sub-pages
@@ -287,86 +279,26 @@ export const AppRoutes: React.FC = () => {
         </ProtectedRoute>
       } />
       
-      {/* ISM - ERM Routes */}
+      {/* ISM - 15 Flat Routes (Alphabetical) */}
+      <Route path="/ism/audits-surveys" element={<ProtectedRoute><AuditsSurveysPage /></ProtectedRoute>} />
+      <Route path="/ism/checklists" element={<ProtectedRoute><ChecklistsPage /></ProtectedRoute>} />
+      <Route path="/ism/corrective-actions" element={<ProtectedRoute><CorrectiveActionsPage /></ProtectedRoute>} />
+      <Route path="/ism/drills" element={<ProtectedRoute><ISMDrillsPage /></ProtectedRoute>} />
       <Route path="/ism/erm" element={<ProtectedRoute><ERMPage /></ProtectedRoute>} />
-      <Route path="/ism/erm/emergency-checklists" element={<ProtectedRoute><ERMEmergencyChecklistsPage /></ProtectedRoute>} />
-      <Route path="/ism/erm/other-emergencies" element={<ProtectedRoute><ERMOtherEmergenciesPage /></ProtectedRoute>} />
-      <Route path="/ism/erm/people-welfare" element={<ProtectedRoute><ERMPeopleWelfarePage /></ProtectedRoute>} />
-
-      {/* ISM - Checklist Routes */}
-      <Route path="/ism/checklists" element={<ProtectedRoute><ISMChecklistsPage /></ProtectedRoute>} />
-      <Route path="/ism/checklists/bridge" element={<ProtectedRoute><BridgeChecklistsPage /></ProtectedRoute>} />
-      <Route path="/ism/checklists/engine-room" element={<ProtectedRoute><EngineRoomChecklistsPage /></ProtectedRoute>} />
-      <Route path="/ism/checklists/interior" element={<ProtectedRoute><InteriorChecklistsPage /></ProtectedRoute>} />
-
-      {/* ISM - Permits to Work */}
+      <Route path="/ism/incidents" element={<ProtectedRoute><ISMIncidentsPage /></ProtectedRoute>} />
+      <Route path="/ism/investigations" element={<ProtectedRoute><InvestigationsPage /></ProtectedRoute>} />
+      <Route path="/ism/meetings" element={<ProtectedRoute><MeetingsPage /></ProtectedRoute>} />
+      <Route path="/ism/miscellaneous" element={<ProtectedRoute><MiscellaneousPage /></ProtectedRoute>} />
+      <Route path="/ism/non-conformities" element={<ProtectedRoute><NonConformitiesPage /></ProtectedRoute>} />
+      <Route path="/ism/observations" element={<ProtectedRoute><ObservationsPage /></ProtectedRoute>} />
       <Route path="/ism/permits-to-work" element={<ProtectedRoute><PermitsToWorkPage /></ProtectedRoute>} />
+      <Route path="/ism/risk-assessments" element={<ProtectedRoute><RiskAssessmentsPage /></ProtectedRoute>} />
+      <Route path="/ism/sops" element={<ProtectedRoute><SOPsPage /></ProtectedRoute>} />
+      <Route path="/ism/training" element={<ProtectedRoute><ISMTrainingPage /></ProtectedRoute>} />
 
-      {/* ISM - Risk Assessments */}
-      <Route path="/ism/risk-assessments" element={<ProtectedRoute><RiskAssessmentsLandingPage /></ProtectedRoute>} />
-      <Route path="/ism/risk-assessments/bridge" element={<ProtectedRoute><RiskAssessmentsBridgePage /></ProtectedRoute>} />
-      <Route path="/ism/risk-assessments/deck" element={<ProtectedRoute><RiskAssessmentsDeckPage /></ProtectedRoute>} />
-      <Route path="/ism/risk-assessments/engineering" element={<ProtectedRoute><RiskAssessmentsEngineeringPage /></ProtectedRoute>} />
-      <Route path="/ism/risk-assessments/interior" element={<ProtectedRoute><RiskAssessmentsInteriorPage /></ProtectedRoute>} />
-      <Route path="/ism/risk-assessments/galley" element={<ProtectedRoute><RiskAssessmentsGalleyPage /></ProtectedRoute>} />
-
-      {/* ISM - SOPs */}
-      <Route path="/ism/sops" element={<ProtectedRoute><SOPsLandingPage /></ProtectedRoute>} />
-      <Route path="/ism/sops/bridge" element={<ProtectedRoute><SOPsBridgePage /></ProtectedRoute>} />
-      <Route path="/ism/sops/deck" element={<ProtectedRoute><SOPsDeckPage /></ProtectedRoute>} />
-      <Route path="/ism/sops/engineering" element={<ProtectedRoute><SOPsEngineeringPage /></ProtectedRoute>} />
-      <Route path="/ism/sops/interior" element={<ProtectedRoute><SOPsInteriorPage /></ProtectedRoute>} />
-      <Route path="/ism/sops/galley" element={<ProtectedRoute><SOPsGalleyPage /></ProtectedRoute>} />
-
-      {/* ISM - Miscellaneous */}
-      <Route path="/ism/miscellaneous" element={<ProtectedRoute><MiscellaneousFormsPage /></ProtectedRoute>} />
-
-      {/* ISM - Other Existing */}
-      <Route path="/ism/drills" element={<ProtectedRoute><Drills /></ProtectedRoute>} />
-      <Route path="/ism/training" element={<ProtectedRoute><Training /></ProtectedRoute>} />
-      <Route path="/ism/meetings" element={
-        <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Meetings" 
-            description="Safety meetings and committee records"
-            icon={<MessageSquare className="w-8 h-8 text-primary" />}
-            features={['Safety meeting scheduling', 'HES report logging', 'Meeting minutes', 'Action item tracking']} 
-          />
-        </ProtectedRoute>
-      } />
-      <Route path="/ism/incidents" element={<ProtectedRoute><Incidents /></ProtectedRoute>} />
-      <Route path="/ism/investigations" element={
-        <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Investigations" 
-            description="Incident investigation and root cause analysis"
-            icon={<Search className="w-8 h-8 text-primary" />}
-            features={['Root cause analysis tools', 'Investigation workflow', 'Finding documentation', 'DPA approval process']} 
-          />
-        </ProtectedRoute>
-      } />
-      <Route path="/ism/capa" element={<ProtectedRoute><CAPATracker /></ProtectedRoute>} />
-      <Route path="/ism/non-conformities" element={
-        <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Non-Conformities" 
-            description="Non-conformity reports and closeout tracking"
-            icon={<AlertTriangle className="w-8 h-8 text-primary" />}
-            features={['NC logging & classification', 'Severity categorization', 'Closure tracking', 'Audit integration']} 
-          />
-        </ProtectedRoute>
-      } />
-      <Route path="/ism/observations" element={
-        <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Observations" 
-            description="Safety observations and near-miss reporting"
-            icon={<Eye className="w-8 h-8 text-primary" />}
-            features={['Observation logging', 'Positive observations', 'Improvement suggestions', 'Trend analysis']} 
-          />
-        </ProtectedRoute>
-      } />
-      <Route path="/ism/audits" element={<ProtectedRoute><Audits /></ProtectedRoute>} />
+      {/* ISM - Legacy redirect */}
+      <Route path="/ism/capa" element={<Navigate to="/ism/corrective-actions" replace />} />
+      <Route path="/ism/audits" element={<Navigate to="/ism/audits-surveys" replace />} />
 
       {/* Certificates */}
       <Route path="/certificates" element={<ProtectedRoute><Certificates /></ProtectedRoute>} />
