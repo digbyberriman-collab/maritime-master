@@ -1,36 +1,29 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVessel } from '@/contexts/VesselContext';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { 
-  ArrowLeft, Save, Send, CheckCircle, Clock, 
-  FileText, Loader2, AlertTriangle
+  ArrowLeft, ArrowRight, Save, Send, CheckCircle, Clock, 
+  FileText, Loader2, AlertTriangle, Users
 } from 'lucide-react';
 import { useFormTemplate } from '@/hooks/useFormTemplates';
+import FieldRenderer from '@/components/forms/FieldRenderer';
+import SignaturePad, { type SignatureData } from '@/components/forms/SignaturePad';
+import FormProgressBar from '@/components/forms/FormProgressBar';
 import { 
   getFormTypeInfo, 
   getSubmissionStatusConfig,
   generateContentHash,
   type FormField,
-  type FormSchema 
+  type FormSchema,
+  type RequiredSigner
 } from '@/lib/formConstants';
 import type { Json } from '@/integrations/supabase/types';
 
@@ -46,6 +39,15 @@ interface FormSubmission {
   is_locked: boolean;
   created_by: string | null;
   created_at: string;
+  template?: {
+    id: string;
+    template_name: string;
+    form_schema: Json;
+    required_signers: Json;
+    form_type: string;
+    description?: string;
+    allow_parallel_signing?: boolean;
+  };
 }
 
 const FormSubmissionPage: React.FC = () => {
@@ -59,9 +61,11 @@ const FormSubmissionPage: React.FC = () => {
 
   const [submission, setSubmission] = useState<FormSubmission | null>(null);
   const [formData, setFormData] = useState<Record<string, unknown>>({});
+  const [signatures, setSignatures] = useState<Record<string, SignatureData | null>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Load template for new submissions
   const { data: template, isLoading: templateLoading } = useFormTemplate(
@@ -73,7 +77,6 @@ const FormSubmissionPage: React.FC = () => {
     if (submissionId) {
       loadSubmission();
     } else if (templateIdFromQuery && template) {
-      // New submission - initialize empty form data
       initializeFormData();
       setLoading(false);
     }
@@ -87,7 +90,10 @@ const FormSubmissionPage: React.FC = () => {
         .from('form_submissions')
         .select(`
           *,
-          template:form_templates(*)
+          template:form_templates(
+            id, template_name, form_schema, required_signers, 
+            form_type, description, allow_parallel_signing
+          )
         `)
         .eq('id', submissionId)
         .single();
@@ -114,7 +120,7 @@ const FormSubmissionPage: React.FC = () => {
     const schema = template.form_schema as unknown as FormSchema;
     const initialData: Record<string, unknown> = {};
 
-    schema.fields.forEach((field) => {
+    schema.fields?.forEach((field) => {
       if (field.type === 'checkbox') {
         initialData[field.id] = false;
       } else if (field.type === 'table') {
@@ -127,12 +133,74 @@ const FormSubmissionPage: React.FC = () => {
     setFormData(initialData);
   };
 
-  const handleFieldChange = (fieldId: string, value: unknown) => {
+  // Get the active template
+  const activeTemplate = submission?.template || template;
+
+  const schema: FormSchema | null = useMemo(() => {
+    if (!activeTemplate?.form_schema) return null;
+    return activeTemplate.form_schema as unknown as FormSchema;
+  }, [activeTemplate]);
+
+  const requiredSigners: RequiredSigner[] = useMemo(() => {
+    if (!activeTemplate) return [];
+    return (activeTemplate.required_signers as unknown as RequiredSigner[]) || [];
+  }, [activeTemplate]);
+
+  // Calculate pages
+  const pages = useMemo(() => {
+    if (!schema?.fields) return [];
+    
+    // Group fields by pageNumber, default to page 1
+    const pageMap = new Map<number, FormField[]>();
+    schema.fields.forEach(field => {
+      const pageNum = field.pageNumber || 1;
+      if (!pageMap.has(pageNum)) {
+        pageMap.set(pageNum, []);
+      }
+      pageMap.get(pageNum)!.push(field);
+    });
+
+    // Convert to sorted array
+    return Array.from(pageMap.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([num, fields]) => ({ number: num, fields }));
+  }, [schema]);
+
+  const totalPages = pages.length || 1;
+  const currentPageFields = pages[currentPage - 1]?.fields || schema?.fields || [];
+
+  // Calculate completion
+  const { completedFields, totalFields } = useMemo(() => {
+    if (!schema?.fields) return { completedFields: 0, totalFields: 0 };
+
+    const requiredFields = schema.fields.filter(f => f.required);
+    const completed = requiredFields.filter(f => {
+      const value = formData[f.id];
+      if (value === null || value === undefined) return false;
+      if (typeof value === 'string' && value.trim() === '') return false;
+      if (Array.isArray(value) && value.length === 0) return false;
+      return true;
+    });
+
+    return {
+      completedFields: completed.length,
+      totalFields: requiredFields.length,
+    };
+  }, [schema, formData]);
+
+  const handleFieldChange = useCallback((fieldId: string, value: unknown) => {
     setFormData(prev => ({
       ...prev,
       [fieldId]: value
     }));
-  };
+  }, []);
+
+  const handleSignatureChange = useCallback((signerId: string, signature: SignatureData | null) => {
+    setSignatures(prev => ({
+      ...prev,
+      [signerId]: signature
+    }));
+  }, []);
 
   const saveSubmission = async () => {
     if (!profile?.company_id || !user?.id) {
@@ -148,7 +216,6 @@ const FormSubmissionPage: React.FC = () => {
 
     try {
       if (submission) {
-        // Update existing submission
         if (submission.is_locked) {
           throw new Error('Form is locked and cannot be modified');
         }
@@ -168,7 +235,6 @@ const FormSubmissionPage: React.FC = () => {
           description: 'Form saved successfully',
         });
       } else {
-        // Create new submission
         const templateToUse = template;
         if (!templateToUse) throw new Error('No template selected');
 
@@ -198,7 +264,6 @@ const FormSubmissionPage: React.FC = () => {
           description: `Form ${newSubmission.submission_number} created`,
         });
 
-        // Update URL to include submission ID
         navigate(`/ism/forms/submission/${newSubmission.id}`, { replace: true });
       }
     } catch (error) {
@@ -214,6 +279,16 @@ const FormSubmissionPage: React.FC = () => {
   };
 
   const submitForSignature = async () => {
+    // Validate required fields
+    if (completedFields < totalFields) {
+      toast({
+        title: 'Incomplete Form',
+        description: `Please complete all required fields (${completedFields}/${totalFields})`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!submission) {
       await saveSubmission();
       return;
@@ -228,12 +303,12 @@ const FormSubmissionPage: React.FC = () => {
         .from('form_submissions')
         .update({
           form_data: formData as unknown as Json,
-          status: 'PENDING_SIGNATURE',
+          status: requiredSigners.length > 0 ? 'PENDING_SIGNATURE' : 'SIGNED',
           submitted_at: new Date().toISOString(),
           submitted_by: user?.id,
           content_hash: contentHash,
-          is_locked: true,
-          locked_at: new Date().toISOString(),
+          is_locked: requiredSigners.length === 0,
+          locked_at: requiredSigners.length === 0 ? new Date().toISOString() : null,
         })
         .eq('id', submission.id);
 
@@ -241,10 +316,12 @@ const FormSubmissionPage: React.FC = () => {
 
       toast({
         title: 'Submitted',
-        description: 'Form submitted for signature',
+        description: requiredSigners.length > 0 
+          ? 'Form submitted for signature' 
+          : 'Form completed successfully',
       });
 
-      navigate('/ism/forms/pending');
+      navigate(requiredSigners.length > 0 ? '/ism/forms/pending' : '/ism/forms/submissions');
     } catch (error) {
       console.error('Failed to submit:', error);
       toast({
@@ -257,277 +334,21 @@ const FormSubmissionPage: React.FC = () => {
     }
   };
 
-  // Get the active template (from submission or query)
-  const activeTemplate = submission 
-    ? (submission as any).template 
-    : template;
-
-  const schema: FormSchema | null = activeTemplate?.form_schema 
-    ? activeTemplate.form_schema as unknown as FormSchema
-    : null;
-
   const isLocked = submission?.is_locked || false;
   const canEdit = !isLocked && ['DRAFT', 'IN_PROGRESS'].includes(submission?.status || 'DRAFT');
 
-  // Render individual field based on type
-  const renderField = (field: FormField) => {
-    const value = formData[field.id];
-    const disabled = !canEdit;
+  // Navigation handlers
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
-    switch (field.type) {
-      case 'section':
-        return (
-          <div key={field.id} className="col-span-2 border-b pb-2 mb-4">
-            <h3 className="text-lg font-semibold text-foreground">{field.label}</h3>
-          </div>
-        );
-
-      case 'text':
-        return (
-          <div key={field.id} className="space-y-2">
-            <Label htmlFor={field.id}>
-              {field.label}
-              {field.required && <span className="text-destructive ml-1">*</span>}
-            </Label>
-            <Input
-              id={field.id}
-              value={(value as string) || ''}
-              onChange={(e) => handleFieldChange(field.id, e.target.value)}
-              placeholder={field.placeholder}
-              disabled={disabled}
-              required={field.required}
-            />
-          </div>
-        );
-
-      case 'textarea':
-        return (
-          <div key={field.id} className="space-y-2 col-span-2">
-            <Label htmlFor={field.id}>
-              {field.label}
-              {field.required && <span className="text-destructive ml-1">*</span>}
-            </Label>
-            <Textarea
-              id={field.id}
-              value={(value as string) || ''}
-              onChange={(e) => handleFieldChange(field.id, e.target.value)}
-              placeholder={field.placeholder}
-              disabled={disabled}
-              required={field.required}
-              rows={3}
-            />
-          </div>
-        );
-
-      case 'number':
-        return (
-          <div key={field.id} className="space-y-2">
-            <Label htmlFor={field.id}>
-              {field.label}
-              {field.required && <span className="text-destructive ml-1">*</span>}
-            </Label>
-            <Input
-              id={field.id}
-              type="number"
-              value={(value as number) || ''}
-              onChange={(e) => handleFieldChange(field.id, e.target.valueAsNumber || '')}
-              placeholder={field.placeholder}
-              disabled={disabled}
-              required={field.required}
-              min={field.validation?.min}
-              max={field.validation?.max}
-            />
-          </div>
-        );
-
-      case 'date':
-        return (
-          <div key={field.id} className="space-y-2">
-            <Label htmlFor={field.id}>
-              {field.label}
-              {field.required && <span className="text-destructive ml-1">*</span>}
-            </Label>
-            <Input
-              id={field.id}
-              type="date"
-              value={(value as string) || ''}
-              onChange={(e) => handleFieldChange(field.id, e.target.value)}
-              disabled={disabled}
-              required={field.required}
-            />
-          </div>
-        );
-
-      case 'datetime':
-        return (
-          <div key={field.id} className="space-y-2">
-            <Label htmlFor={field.id}>
-              {field.label}
-              {field.required && <span className="text-destructive ml-1">*</span>}
-            </Label>
-            <Input
-              id={field.id}
-              type="datetime-local"
-              value={(value as string) || ''}
-              onChange={(e) => handleFieldChange(field.id, e.target.value)}
-              disabled={disabled}
-              required={field.required}
-            />
-          </div>
-        );
-
-      case 'time':
-        return (
-          <div key={field.id} className="space-y-2">
-            <Label htmlFor={field.id}>
-              {field.label}
-              {field.required && <span className="text-destructive ml-1">*</span>}
-            </Label>
-            <Input
-              id={field.id}
-              type="time"
-              value={(value as string) || ''}
-              onChange={(e) => handleFieldChange(field.id, e.target.value)}
-              disabled={disabled}
-              required={field.required}
-            />
-          </div>
-        );
-
-      case 'checkbox':
-        return (
-          <div key={field.id} className="flex items-center gap-2">
-            <Checkbox
-              id={field.id}
-              checked={(value as boolean) || false}
-              onCheckedChange={(checked) => handleFieldChange(field.id, checked)}
-              disabled={disabled}
-            />
-            <Label htmlFor={field.id} className="cursor-pointer">
-              {field.label}
-              {field.required && <span className="text-destructive ml-1">*</span>}
-            </Label>
-          </div>
-        );
-
-      case 'yes_no':
-        return (
-          <div key={field.id} className="space-y-2">
-            <Label>
-              {field.label}
-              {field.required && <span className="text-destructive ml-1">*</span>}
-            </Label>
-            <RadioGroup
-              value={(value as string) || ''}
-              onValueChange={(v) => handleFieldChange(field.id, v)}
-              disabled={disabled}
-              className="flex gap-4"
-            >
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="yes" id={`${field.id}-yes`} />
-                <Label htmlFor={`${field.id}-yes`}>Yes</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="no" id={`${field.id}-no`} />
-                <Label htmlFor={`${field.id}-no`}>No</Label>
-              </div>
-            </RadioGroup>
-          </div>
-        );
-
-      case 'yes_no_na':
-        return (
-          <div key={field.id} className="space-y-2">
-            <Label>
-              {field.label}
-              {field.required && <span className="text-destructive ml-1">*</span>}
-            </Label>
-            <RadioGroup
-              value={(value as string) || ''}
-              onValueChange={(v) => handleFieldChange(field.id, v)}
-              disabled={disabled}
-              className="flex gap-4"
-            >
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="yes" id={`${field.id}-yes`} />
-                <Label htmlFor={`${field.id}-yes`}>Yes</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="no" id={`${field.id}-no`} />
-                <Label htmlFor={`${field.id}-no`}>No</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <RadioGroupItem value="na" id={`${field.id}-na`} />
-                <Label htmlFor={`${field.id}-na`}>N/A</Label>
-              </div>
-            </RadioGroup>
-          </div>
-        );
-
-      case 'dropdown':
-        return (
-          <div key={field.id} className="space-y-2">
-            <Label htmlFor={field.id}>
-              {field.label}
-              {field.required && <span className="text-destructive ml-1">*</span>}
-            </Label>
-            <Select
-              value={(value as string) || ''}
-              onValueChange={(v) => handleFieldChange(field.id, v)}
-              disabled={disabled}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select..." />
-              </SelectTrigger>
-              <SelectContent>
-                {field.options?.map((option) => (
-                  <SelectItem key={option} value={option}>
-                    {option}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        );
-
-      case 'signature':
-        return (
-          <div key={field.id} className="space-y-2 col-span-2">
-            <Label htmlFor={field.id}>
-              {field.label}
-              {field.required && <span className="text-destructive ml-1">*</span>}
-            </Label>
-            <Card className="border-2 border-dashed">
-              <CardContent className="py-8 text-center text-muted-foreground">
-                {isLocked ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span>Signature captured</span>
-                  </div>
-                ) : (
-                  <span>Signature will be captured during submission</span>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        );
-
-      default:
-        return (
-          <div key={field.id} className="space-y-2">
-            <Label htmlFor={field.id}>
-              {field.label}
-              {field.required && <span className="text-destructive ml-1">*</span>}
-            </Label>
-            <Input
-              id={field.id}
-              value={(value as string) || ''}
-              onChange={(e) => handleFieldChange(field.id, e.target.value)}
-              placeholder={field.placeholder}
-              disabled={disabled}
-            />
-          </div>
-        );
+  const goToPrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -546,7 +367,7 @@ const FormSubmissionPage: React.FC = () => {
       <DashboardLayout>
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <AlertTriangle className="h-12 w-12 text-amber-500 mb-4" />
+            <AlertTriangle className="h-12 w-12 text-warning mb-4" />
             <h3 className="text-lg font-medium">Template Not Found</h3>
             <p className="text-muted-foreground text-sm mt-1">
               The form template could not be loaded
@@ -610,17 +431,25 @@ const FormSubmissionPage: React.FC = () => {
                 </Button>
                 <Button onClick={submitForSignature} disabled={submitting}>
                   {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-                  Submit for Signature
+                  {requiredSigners.length > 0 ? 'Submit for Signature' : 'Complete Form'}
                 </Button>
               </>
             )}
           </div>
         </div>
 
+        {/* Progress bar */}
+        <FormProgressBar
+          currentPage={currentPage}
+          totalPages={totalPages}
+          completedFields={completedFields}
+          totalFields={totalFields}
+        />
+
         {/* Locked banner */}
         {isLocked && (
-          <Card className="border-amber-200 bg-amber-50">
-            <CardContent className="py-3 flex items-center gap-2 text-amber-800">
+          <Card className="border-warning/50 bg-warning/10">
+            <CardContent className="py-3 flex items-center gap-2 text-warning">
               <Clock className="h-5 w-5" />
               <span>This form is locked and cannot be modified.</span>
             </CardContent>
@@ -630,17 +459,90 @@ const FormSubmissionPage: React.FC = () => {
         {/* Form Fields */}
         <Card>
           <CardHeader>
-            <CardTitle>Form Details</CardTitle>
+            <CardTitle>
+              {totalPages > 1 ? `Section ${currentPage}` : 'Form Details'}
+            </CardTitle>
             {activeTemplate.description && (
               <CardDescription>{activeTemplate.description}</CardDescription>
             )}
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {schema.fields.map(renderField)}
+              {currentPageFields.map((field) => (
+                <FieldRenderer
+                  key={field.id}
+                  field={field}
+                  value={formData[field.id]}
+                  onChange={handleFieldChange}
+                  disabled={!canEdit}
+                  allValues={formData}
+                />
+              ))}
             </div>
           </CardContent>
         </Card>
+
+        {/* Page navigation */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              onClick={goToPrevPage}
+              disabled={currentPage === 1}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {currentPage} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              onClick={goToNextPage}
+              disabled={currentPage === totalPages}
+            >
+              Next
+              <ArrowRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
+        )}
+
+        {/* Signatures Section - Show on last page or if no pages */}
+        {requiredSigners.length > 0 && currentPage === totalPages && (
+          <>
+            <Separator />
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Required Signatures
+                </CardTitle>
+                <CardDescription>
+                  {activeTemplate.allow_parallel_signing
+                    ? 'Signatures can be collected in any order'
+                    : 'Signatures must be collected in sequence'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {requiredSigners.map((signer, index) => (
+                  <SignaturePad
+                    key={signer.role}
+                    label={`Signature ${index + 1}`}
+                    signerRole={signer.role}
+                    required={signer.is_mandatory}
+                    value={signatures[signer.role] || null}
+                    onChange={(sig) => handleSignatureChange(signer.role, sig)}
+                    disabled={!canEdit || (
+                      !activeTemplate.allow_parallel_signing && 
+                      index > 0 && 
+                      !signatures[requiredSigners[index - 1].role]
+                    )}
+                  />
+                ))}
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
     </DashboardLayout>
   );
