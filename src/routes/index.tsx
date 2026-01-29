@@ -176,6 +176,100 @@ export const AppRoutes: React.FC = () => {
         </ProtectedRoute>
       } />
 
+      {/* Crew Admin */}
+      <Route path="/crew/admin" element={
+        <ProtectedRoute>
+          <DashboardLayout>
+            <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+              {React.createElement(React.lazy(() => import('@/pages/crew/admin/CrewAdminDashboard')))}
+            </React.Suspense>
+          </DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/admin/travel" element={
+        <ProtectedRoute>
+          <DashboardLayout>
+            <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+              {React.createElement(React.lazy(() => import('@/pages/crew/admin/TravelRecordsPage')))}
+            </React.Suspense>
+          </DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/admin/travel/new" element={
+        <ProtectedRoute>
+          <DashboardLayout>
+            <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+              {React.createElement(React.lazy(() => import('@/pages/crew/admin/CreateTravelRecordPage')))}
+            </React.Suspense>
+          </DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/admin/travel/:id" element={
+        <ProtectedRoute>
+          <PlaceholderWrapper 
+            title="Travel Record Detail" 
+            description="View and manage travel record details"
+            icon={<Plane className="w-8 h-8 text-primary" />}
+            features={['Flight segments', 'Document attachments', 'Pre-departure status', 'Cost tracking']} 
+          />
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/admin/pre-departure" element={
+        <ProtectedRoute>
+          <DashboardLayout>
+            <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+              {React.createElement(React.lazy(() => import('@/pages/crew/admin/PreDepartureListPage')))}
+            </React.Suspense>
+          </DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/admin/pre-departure/:id" element={
+        <ProtectedRoute>
+          <DashboardLayout>
+            <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+              {React.createElement(React.lazy(() => import('@/pages/crew/admin/PreDepartureDetailPage')))}
+            </React.Suspense>
+          </DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/admin/documents" element={
+        <ProtectedRoute>
+          <DashboardLayout>
+            <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+              {React.createElement(React.lazy(() => import('@/pages/crew/admin/TravelDocumentsPage')))}
+            </React.Suspense>
+          </DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/admin/documents/upload" element={
+        <ProtectedRoute>
+          <DashboardLayout>
+            <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+              {React.createElement(React.lazy(() => import('@/pages/crew/admin/DocumentUploadPage')))}
+            </React.Suspense>
+          </DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/admin/quarantine" element={
+        <ProtectedRoute>
+          <DashboardLayout>
+            <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+              {React.createElement(React.lazy(() => import('@/pages/crew/admin/QuarantineHousesPage')))}
+            </React.Suspense>
+          </DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/admin/quarantine/bookings" element={
+        <ProtectedRoute>
+          <PlaceholderWrapper 
+            title="Quarantine Bookings" 
+            description="Manage crew quarantine accommodation bookings"
+            icon={<CalendarDays className="w-8 h-8 text-primary" />}
+            features={['Active bookings', 'Check-in/out tracking', 'Cost management', 'Provisioning requests']} 
+          />
+        </ProtectedRoute>
+      } />
+
       {/* ISM - Forms */}
       <Route path="/ism/forms" element={<Navigate to="/ism/forms/templates" replace />} />
       <Route path="/ism/forms/templates" element={

@@ -1,5 +1,8 @@
 project_id = "pfvtrtkqkvjbnbaabgpv"
 
+[functions.extract-flight-data]
+verify_jwt = false
+
 [functions.create-crew-member]
 verify_jwt = false
 
