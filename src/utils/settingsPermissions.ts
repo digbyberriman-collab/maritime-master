@@ -1,6 +1,6 @@
 // Settings page permission utilities for STORM platform
 
-import { LucideIcon, User, Shield, Bell, Palette, Ship, Lock, Eye, Plug, Mail, Download, FileCheck, CreditCard, ScrollText, HelpCircle } from 'lucide-react';
+import { LucideIcon, User, Shield, Bell, Palette, Ship, Lock, Eye, Plug, Mail, Download, FileCheck, CreditCard, ScrollText, HelpCircle, Database, FileWarning, UserX } from 'lucide-react';
 
 export interface SettingsNavItem {
   id: string;
@@ -18,6 +18,10 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { id: 'vessel-access', label: 'Vessel Access', icon: Ship, scope: 'admin', permission: 'vessel_settings' },
   { id: 'permissions', label: 'Permissions', icon: Lock, scope: 'admin', permission: 'rbac' },
   { id: 'audit-mode', label: 'Audit Visibility', icon: Eye, scope: 'admin', permission: 'audit_mode' },
+  { id: 'data-retention', label: 'Data Retention & GDPR', icon: Database, scope: 'admin', permission: 'compliance' },
+  { id: 'gdpr-requests', label: 'GDPR Requests', icon: UserX, scope: 'admin', permission: 'compliance' },
+  { id: 'insurance-audit', label: 'Insurance Audit Mode', icon: FileWarning, scope: 'admin', permission: 'compliance' },
+  { id: 'hr-audit-access', label: 'HR Audit Access', icon: Lock, scope: 'admin', permission: 'compliance' },
   { id: 'integrations', label: 'Integrations', icon: Plug, scope: 'admin', permission: 'integrations' },
   { id: 'templates', label: 'Email Templates', icon: Mail, scope: 'admin', permission: 'templates' },
   { id: 'data-exports', label: 'Data & Exports', icon: Download, scope: 'self' },
