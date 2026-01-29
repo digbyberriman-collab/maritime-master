@@ -1,77 +1,143 @@
 import React from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { Users, Plus, Info, FileText, Calendar, Shield, Upload, Lock } from 'lucide-react';
+import { Users, Plus, Info, FileText, Calendar, Shield, Upload, Lock, Download, UserX } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { GDPRCompliancePanel, RetentionStatusBadge, RedactedField } from '@/components/compliance';
+import type { GDPRMapping } from '@/components/compliance';
 
-// HR tab data - alphabetically ordered
-const hrTabs = [
+// HR tab data with GDPR compliance mapping - alphabetically ordered
+const hrTabs: Array<{
+  id: string;
+  label: string;
+  description: string;
+  fields: string[];
+  sensitiveFields: string[];
+  gdpr: GDPRMapping;
+}> = [
   {
     id: 'annual-evaluations',
     label: 'Annual Evaluations',
     description: 'Formal performance evaluations conducted annually',
     fields: ['Crew Member', 'Evaluation Period', 'Evaluator', 'Overall Rating', 'Date Completed', 'Next Due'],
-    retention: '3-5 years',
-    gdprBasis: 'Legitimate interest',
+    sensitiveFields: ['Overall Rating', 'Evaluator Comments', 'Development Areas'],
+    gdpr: {
+      purpose: 'Performance management and career development tracking',
+      lawfulBasis: 'legitimate_interest',
+      retentionPeriod: '3-5 years',
+      retentionTrigger: 'evaluation date',
+      dataOwner: 'Company / Management',
+      sensitiveFields: ['Overall Rating', 'Evaluator Comments'],
+      redactedForAuditors: true,
+    },
   },
   {
     id: 'annual-reviews',
     label: 'Annual Reviews',
     description: 'Annual performance reviews and career development discussions',
     fields: ['Crew Member', 'Review Period', 'Reviewer', 'Development Goals', 'Training Needs', 'Date'],
-    retention: '3-5 years',
-    gdprBasis: 'Legitimate interest',
+    sensitiveFields: ['Development Goals', 'Training Needs', 'Career Aspirations'],
+    gdpr: {
+      purpose: 'Performance management and professional development',
+      lawfulBasis: 'legitimate_interest',
+      retentionPeriod: '3-5 years',
+      retentionTrigger: 'review date',
+      dataOwner: 'Company / Management',
+      sensitiveFields: ['Performance Scores', 'Development Goals'],
+      redactedForAuditors: true,
+    },
   },
   {
     id: 'contracts-employment',
     label: 'Contracts & Employment',
     description: 'Employment contracts, SEAs, and terms of service',
     fields: ['Crew Member', 'Contract Type', 'Start Date', 'End Date', 'Vessel Assignment', 'Status'],
-    retention: '7 years post-termination',
-    gdprBasis: 'Contractual obligation',
+    sensitiveFields: ['Contract Terms', 'Special Clauses', 'Termination Conditions'],
+    gdpr: {
+      purpose: 'Legal compliance and employment record keeping',
+      lawfulBasis: 'legal_obligation',
+      retentionPeriod: '7 years',
+      retentionTrigger: 'termination date',
+      dataOwner: 'Company / Management',
+      sensitiveFields: ['Contract Terms', 'Salary Details'],
+      redactedForAuditors: false, // Contract existence can be confirmed
+    },
   },
   {
     id: 'disciplinary-matters',
     label: 'Disciplinary Matters',
     description: 'Disciplinary records, warnings, and investigations',
     fields: ['Crew Member', 'Incident Date', 'Category', 'Severity', 'Outcome', 'Expiry Date'],
-    retention: '2-7 years (severity dependent)',
-    gdprBasis: 'Legal obligation',
+    sensitiveFields: ['Incident Details', 'Investigation Notes', 'Witness Statements', 'Outcome Details'],
+    gdpr: {
+      purpose: 'Workplace conduct management and safety compliance',
+      lawfulBasis: 'legal_obligation',
+      retentionPeriod: '2-7 years (severity dependent)',
+      retentionTrigger: 'incident date',
+      dataOwner: 'Company / Management',
+      sensitiveFields: ['All Fields'],
+      redactedForAuditors: true,
+    },
   },
   {
     id: 'end-of-rotation',
     label: 'End-of-Rotation Catch-Ups',
     description: 'Informal check-ins at the end of rotation periods',
     fields: ['Crew Member', 'Rotation Period', 'Supervisor', 'Feedback Summary', 'Follow-up Actions', 'Date'],
-    retention: '2 years',
-    gdprBasis: 'Legitimate interest',
+    sensitiveFields: ['Feedback Summary', 'Welfare Concerns', 'Personal Notes'],
+    gdpr: {
+      purpose: 'Crew welfare support and management',
+      lawfulBasis: 'legitimate_interest',
+      retentionPeriod: '2 years',
+      retentionTrigger: 'rotation end date',
+      dataOwner: 'Company / Management',
+      sensitiveFields: ['Welfare Notes', 'Personal Concerns'],
+      redactedForAuditors: true,
+    },
   },
   {
     id: 'pay-reviews',
     label: 'Pay Reviews',
     description: 'Salary review records and compensation adjustments',
     fields: ['Crew Member', 'Review Date', 'Previous Rate', 'New Rate', 'Effective Date', 'Approved By'],
-    retention: '5 years',
-    gdprBasis: 'Contractual obligation',
+    sensitiveFields: ['Previous Rate', 'New Rate', 'Justification', 'Comparator Data'],
+    gdpr: {
+      purpose: 'Compensation management and audit trail',
+      lawfulBasis: 'contractual',
+      retentionPeriod: '5 years',
+      retentionTrigger: 'review date',
+      dataOwner: 'Company / Management',
+      sensitiveFields: ['Salary Amounts', 'Justification'],
+      redactedForAuditors: true,
+    },
   },
   {
     id: 'salaries-compensation',
     label: 'Salaries & Compensation',
     description: 'Current salary structures, allowances, and benefits',
     fields: ['Crew Member', 'Base Salary', 'Currency', 'Allowances', 'Payment Frequency', 'Bank Details'],
-    retention: '7 years after final payment',
-    gdprBasis: 'Contractual obligation',
+    sensitiveFields: ['Base Salary', 'Allowances', 'Bank Details', 'Tax Information'],
+    gdpr: {
+      purpose: 'Payroll processing and tax compliance',
+      lawfulBasis: 'contractual',
+      retentionPeriod: '7 years',
+      retentionTrigger: 'last payment date',
+      dataOwner: 'Company / Management',
+      sensitiveFields: ['All Financial Fields', 'Bank Details'],
+      redactedForAuditors: true,
+    },
   },
 ];
 
 interface HRTabContentProps {
   tab: typeof hrTabs[0];
+  isAuditMode?: boolean;
 }
 
-const HRTabContent: React.FC<HRTabContentProps> = ({ tab }) => {
+const HRTabContent: React.FC<HRTabContentProps> = ({ tab, isAuditMode = false }) => {
   return (
     <div className="space-y-6">
       {/* Tab Header */}
@@ -80,42 +146,23 @@ const HRTabContent: React.FC<HRTabContentProps> = ({ tab }) => {
           <h3 className="text-lg font-medium text-foreground">{tab.label}</h3>
           <p className="text-sm text-muted-foreground">{tab.description}</p>
         </div>
-        <Button variant="outline" size="sm" disabled>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Record (Coming Soon)
-        </Button>
+        <div className="flex items-center gap-2">
+          <RetentionStatusBadge 
+            status="active" 
+            retentionPeriod={tab.gdpr.retentionPeriod}
+          />
+          <Button variant="outline" size="sm" disabled>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Record
+          </Button>
+        </div>
       </div>
 
-      {/* GDPR & Retention Info */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="bg-muted/30">
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">Retention Period</span>
-            </div>
-            <p className="text-sm font-medium text-foreground">{tab.retention}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-muted/30">
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Shield className="w-4 h-4 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">GDPR Lawful Basis</span>
-            </div>
-            <p className="text-sm font-medium text-foreground">{tab.gdprBasis}</p>
-          </CardContent>
-        </Card>
-        <Card className="bg-muted/30">
-          <CardContent className="pt-4">
-            <div className="flex items-center gap-2 mb-1">
-              <Lock className="w-4 h-4 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">Data Owner</span>
-            </div>
-            <p className="text-sm font-medium text-foreground">Company / Management</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* GDPR Compliance Panel */}
+      <GDPRCompliancePanel 
+        mapping={tab.gdpr} 
+        recordType={tab.label}
+      />
 
       {/* Records Placeholder Card */}
       <Card>
@@ -134,18 +181,30 @@ const HRTabContent: React.FC<HRTabContentProps> = ({ tab }) => {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Record Fields Placeholder */}
+          {/* Record Fields - Show redacted if audit mode and sensitive */}
           <div>
             <h4 className="text-sm font-medium text-foreground mb-3">Record Fields</h4>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {tab.fields.map((field) => (
-                <div key={field} className="space-y-1">
-                  <label className="text-xs text-muted-foreground">{field}</label>
-                  <div className="h-9 bg-muted rounded-md flex items-center px-3">
-                    <span className="text-sm text-muted-foreground">—</span>
+              {tab.fields.map((field) => {
+                const isSensitive = tab.sensitiveFields.includes(field);
+                const shouldRedact = isAuditMode && isSensitive;
+                
+                return (
+                  <div key={field} className="space-y-1">
+                    <label className="text-xs text-muted-foreground flex items-center gap-1">
+                      {field}
+                      {isSensitive && <Lock className="w-3 h-3 text-amber-500" />}
+                    </label>
+                    {shouldRedact ? (
+                      <RedactedField label={field} reason="Auditor restricted" />
+                    ) : (
+                      <div className="h-9 bg-muted rounded-md flex items-center px-3">
+                        <span className="text-sm text-muted-foreground">—</span>
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -179,33 +238,32 @@ const HRTabContent: React.FC<HRTabContentProps> = ({ tab }) => {
           {/* Notes Placeholder */}
           <div>
             <h4 className="text-sm font-medium text-foreground mb-3">Notes</h4>
-            <div className="h-24 bg-muted rounded-md flex items-center justify-center">
-              <span className="text-sm text-muted-foreground">No notes added</span>
-            </div>
+            {isAuditMode && tab.gdpr.redactedForAuditors ? (
+              <RedactedField label="Notes" reason="Content hidden from auditors" className="h-24" />
+            ) : (
+              <div className="h-24 bg-muted rounded-md flex items-center justify-center">
+                <span className="text-sm text-muted-foreground">No notes added</span>
+              </div>
+            )}
           </div>
 
           {/* Audit Trail Notice */}
           <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
             <p className="text-xs text-blue-800 dark:text-blue-200">
-              <strong>Audit Trail:</strong> All changes to HR records are logged with timestamp, user, and previous values for compliance purposes.
+              <strong>Audit Trail:</strong> All changes to HR records are logged with timestamp, user, and previous values. 
+              Versioning is enabled for compliance.
             </p>
           </div>
         </CardContent>
       </Card>
-
-      {/* Access Control Notice */}
-      <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
-        <p className="text-xs text-red-800 dark:text-red-200">
-          <strong>Sensitive Data:</strong> This section contains highly sensitive HR data. 
-          Access is restricted to DPA and authorized personnel. 
-          Auditors have no access by default.
-        </p>
-      </div>
     </div>
   );
 };
 
 const HRPage: React.FC = () => {
+  // In production, this would come from context/hook
+  const isAuditMode = false;
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -215,11 +273,22 @@ const HRPage: React.FC = () => {
             <div className="p-2 bg-primary/10 rounded-lg">
               <Users className="w-6 h-6 text-primary" />
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="text-2xl font-semibold text-foreground">Human Resources</h1>
               <p className="text-muted-foreground">
                 Crew HR records, contracts, evaluations, and compensation
               </p>
+            </div>
+            {/* DPA Actions */}
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" disabled>
+                <Download className="w-4 h-4 mr-2" />
+                Export Data (GDPR)
+              </Button>
+              <Button variant="outline" size="sm" disabled>
+                <UserX className="w-4 h-4 mr-2" />
+                Anonymise Expired
+              </Button>
             </div>
           </div>
         </div>
@@ -229,15 +298,24 @@ const HRPage: React.FC = () => {
           <Lock className="h-4 w-4" />
           <AlertDescription className="text-red-800 dark:text-red-200">
             <strong>Restricted Access:</strong> DPA has full access. Captains have restricted view/contribution. 
-            Crew members have no access. Auditors have no access by default.
+            Crew members have no access. <strong>Auditors have NO HR access by default.</strong>
           </AlertDescription>
         </Alert>
 
-        {/* GDPR Compliance Notice */}
+        {/* GDPR & Retention Overview */}
         <Alert>
-          <Info className="h-4 w-4" />
+          <Shield className="h-4 w-4" />
           <AlertDescription>
-            HR data is processed under GDPR. Records include retention periods, lawful basis, and are subject to data subject access requests.
+            <div className="flex items-center justify-between">
+              <span>
+                HR data is processed under GDPR with defined retention periods. Records are archived (not deleted) after expiry.
+                Only DPA can approve data deletion.
+              </span>
+              <Badge variant="outline" className="ml-4">
+                <Calendar className="w-3 h-3 mr-1" />
+                Retention Tracking Active
+              </Badge>
+            </div>
           </AlertDescription>
         </Alert>
 
@@ -253,10 +331,36 @@ const HRPage: React.FC = () => {
           
           {hrTabs.map((tab) => (
             <TabsContent key={tab.id} value={tab.id} className="mt-6">
-              <HRTabContent tab={tab} />
+              <HRTabContent tab={tab} isAuditMode={isAuditMode} />
             </TabsContent>
           ))}
         </Tabs>
+
+        {/* Data Retention Footer */}
+        <div className="p-4 bg-muted/30 border border-border rounded-lg">
+          <h4 className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
+            <Calendar className="w-4 h-4" />
+            Data Retention Summary
+          </h4>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+            <div>
+              <p className="text-muted-foreground">Contracts & Employment</p>
+              <p className="font-medium">7 years post-termination</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Salaries & Compensation</p>
+              <p className="font-medium">7 years after final payment</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Reviews & Evaluations</p>
+              <p className="font-medium">3-5 years</p>
+            </div>
+            <div>
+              <p className="text-muted-foreground">Disciplinary (Serious)</p>
+              <p className="font-medium">6-7 years</p>
+            </div>
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   );
