@@ -199,6 +199,13 @@ export const AppRoutes: React.FC = () => {
           </React.Suspense>
         </ProtectedRoute>
       } />
+      <Route path="/ism/forms/submissions" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<div>Loading...</div>}>
+            {React.createElement(React.lazy(() => import('@/pages/ism/forms/SubmissionsList')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
       <Route path="/ism/forms/drafts" element={
         <ProtectedRoute>
           <PlaceholderWrapper 
@@ -211,22 +218,16 @@ export const AppRoutes: React.FC = () => {
       } />
       <Route path="/ism/forms/my-drafts" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="My Draft Submissions" 
-            description="Your in-progress form submissions"
-            icon={<CheckSquare className="w-8 h-8 text-primary" />}
-            features={['Resume incomplete forms', 'Auto-save drafts', 'Submit when ready']} 
-          />
+          <React.Suspense fallback={<div>Loading...</div>}>
+            {React.createElement(React.lazy(() => import('@/pages/ism/forms/MyDrafts')))}
+          </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/ism/forms/pending" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Pending Signatures" 
-            description="Forms awaiting your signature"
-            icon={<CheckSquare className="w-8 h-8 text-primary" />}
-            features={['Review submissions', 'Sign or reject', 'Add comments']} 
-          />
+          <React.Suspense fallback={<div>Loading...</div>}>
+            {React.createElement(React.lazy(() => import('@/pages/ism/forms/PendingSignatures')))}
+          </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/ism/forms/archive" element={
