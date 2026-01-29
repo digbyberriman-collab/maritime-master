@@ -6806,6 +6806,18 @@ export type Database = {
     }
     Functions: {
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
+      get_user_permissions_full: {
+        Args: { p_user_id: string }
+        Returns: {
+          can_admin: boolean
+          can_edit: boolean
+          can_view: boolean
+          module_key: string
+          module_name: string
+          restrictions: Json
+          scope: Database["public"]["Enums"]["role_scope_type"]
+        }[]
+      }
       get_user_rbac_permissions: {
         Args: { p_user_id: string }
         Returns: {
@@ -6823,6 +6835,18 @@ export type Database = {
           department: string
           role: Database["public"]["Enums"]["app_role"]
           vessel_id: string
+        }[]
+      }
+      get_user_roles_full: {
+        Args: { p_user_id: string }
+        Returns: {
+          department: string
+          is_fleet_wide: boolean
+          role_display_name: string
+          role_id: string
+          role_name: string
+          vessel_id: string
+          vessel_name: string
         }[]
       }
       has_any_role: {
@@ -6882,6 +6906,15 @@ export type Database = {
           p_module_key: string
           p_required_permission?: Database["public"]["Enums"]["permission_level"]
           p_user_id: string
+        }
+        Returns: boolean
+      }
+      user_has_permission: {
+        Args: {
+          p_module_key: string
+          p_permission?: Database["public"]["Enums"]["permission_level"]
+          p_user_id: string
+          p_vessel_id?: string
         }
         Returns: boolean
       }
