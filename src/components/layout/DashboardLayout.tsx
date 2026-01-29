@@ -5,7 +5,7 @@ import { useBrandingContext } from '@/contexts/BrandingContext';
 import { canManageBranding } from '@/hooks/useBranding';
 import InkfishFooter from '@/components/layout/InkfishFooter';
 import InkfishWatermark from '@/components/InkfishWatermark';
-import NotificationBell from '@/components/layout/NotificationBell';
+import GlobalHeaderControls from '@/components/layout/GlobalHeaderControls';
 import VesselSelector from '@/components/VesselSelector';
 import SidebarNavigation from '@/components/layout/SidebarNavigation';
 import {
@@ -144,20 +144,17 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             <Menu className="w-5 h-5" />
           </button>
 
-          {/* Vessel selector */}
-          <div className="hidden lg:block">
+          {/* Mobile vessel selector */}
+          <div className="hidden sm:block lg:hidden">
             <VesselSelector />
           </div>
 
           {/* Spacer */}
           <div className="flex-1" />
 
-          {/* Notification Bell */}
-          <NotificationBell />
-
           {/* Client logo (desktop only) */}
           {clientLogoUrl && (
-            <div className="hidden lg:flex items-center mr-4">
+            <div className="hidden lg:flex items-center mr-2">
               <img
                 src={clientLogoUrl}
                 alt="Client logo"
@@ -165,6 +162,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               />
             </div>
           )}
+
+          {/* Global Header Controls: Fleet Filter + Alerts Bell */}
+          <GlobalHeaderControls className="mr-2" />
 
           {/* User menu */}
           <DropdownMenu>
