@@ -56,7 +56,7 @@ serve(async (req: Request) => {
 
     const userId = userData.user.id;
 
-    // Check if user has DPA/superadmin role
+    // Check if user has DPA/superadmin role in user_roles table
     const { data: roles } = await supabaseAdmin
       .from('user_roles')
       .select('role')
@@ -64,7 +64,19 @@ serve(async (req: Request) => {
       .eq('is_active', true)
       .in('role', ['dpa', 'superadmin']);
 
-    if (!roles || roles.length === 0) {
+    // Also check legacy profile.role for backwards compatibility
+    const { data: profile } = await supabaseAdmin
+      .from('profiles')
+      .select('role')
+      .eq('user_id', userId)
+      .single();
+
+    const legacyRole = profile?.role?.toLowerCase();
+    const hasLegacyAdminRole = legacyRole === 'dpa' || legacyRole === 'shore_management' || legacyRole === 'superadmin';
+    const hasNewRoleAccess = roles && roles.length > 0;
+
+    if (!hasNewRoleAccess && !hasLegacyAdminRole) {
+      console.log('Permission denied for user:', userId, 'Legacy role:', legacyRole, 'New roles:', roles);
       return new Response(JSON.stringify({ error: 'Insufficient permissions' }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
