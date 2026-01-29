@@ -29,6 +29,32 @@ import Alerts from '@/pages/Alerts';
 import Settings from '@/pages/Settings';
 import NotFound from '@/pages/NotFound';
 
+// ISM Pages
+import {
+  ERMPage,
+  ERMEmergencyChecklistsPage,
+  ERMOtherEmergenciesPage,
+  ERMPeopleWelfarePage,
+  ISMChecklistsPage,
+  BridgeChecklistsPage,
+  EngineRoomChecklistsPage,
+  InteriorChecklistsPage,
+  PermitsToWorkPage,
+  RiskAssessmentsLandingPage,
+  RiskAssessmentsBridgePage,
+  RiskAssessmentsDeckPage,
+  RiskAssessmentsEngineeringPage,
+  RiskAssessmentsInteriorPage,
+  RiskAssessmentsGalleyPage,
+  SOPsLandingPage,
+  SOPsBridgePage,
+  SOPsDeckPage,
+  SOPsEngineeringPage,
+  SOPsInteriorPage,
+  SOPsGalleyPage,
+  MiscellaneousFormsPage,
+} from '@/pages/ism';
+
 // Document Sub-pages
 import ReviewQueue from '@/pages/ReviewQueue';
 import AcknowledgmentTracking from '@/pages/AcknowledgmentTracking';
@@ -261,17 +287,41 @@ export const AppRoutes: React.FC = () => {
         </ProtectedRoute>
       } />
       
-      {/* ISM - Other */}
-      <Route path="/ism/checklists" element={
-        <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Checklists & Forms" 
-            description="ISM checklists and digital forms for vessel operations"
-            icon={<CheckSquare className="w-8 h-8 text-primary" />}
-            features={['Electronic forms', 'E-signatures', 'Pre-departure checklists', 'Watchkeeper handovers']} 
-          />
-        </ProtectedRoute>
-      } />
+      {/* ISM - ERM Routes */}
+      <Route path="/ism/erm" element={<ProtectedRoute><ERMPage /></ProtectedRoute>} />
+      <Route path="/ism/erm/emergency-checklists" element={<ProtectedRoute><ERMEmergencyChecklistsPage /></ProtectedRoute>} />
+      <Route path="/ism/erm/other-emergencies" element={<ProtectedRoute><ERMOtherEmergenciesPage /></ProtectedRoute>} />
+      <Route path="/ism/erm/people-welfare" element={<ProtectedRoute><ERMPeopleWelfarePage /></ProtectedRoute>} />
+
+      {/* ISM - Checklist Routes */}
+      <Route path="/ism/checklists" element={<ProtectedRoute><ISMChecklistsPage /></ProtectedRoute>} />
+      <Route path="/ism/checklists/bridge" element={<ProtectedRoute><BridgeChecklistsPage /></ProtectedRoute>} />
+      <Route path="/ism/checklists/engine-room" element={<ProtectedRoute><EngineRoomChecklistsPage /></ProtectedRoute>} />
+      <Route path="/ism/checklists/interior" element={<ProtectedRoute><InteriorChecklistsPage /></ProtectedRoute>} />
+
+      {/* ISM - Permits to Work */}
+      <Route path="/ism/permits-to-work" element={<ProtectedRoute><PermitsToWorkPage /></ProtectedRoute>} />
+
+      {/* ISM - Risk Assessments */}
+      <Route path="/ism/risk-assessments" element={<ProtectedRoute><RiskAssessmentsLandingPage /></ProtectedRoute>} />
+      <Route path="/ism/risk-assessments/bridge" element={<ProtectedRoute><RiskAssessmentsBridgePage /></ProtectedRoute>} />
+      <Route path="/ism/risk-assessments/deck" element={<ProtectedRoute><RiskAssessmentsDeckPage /></ProtectedRoute>} />
+      <Route path="/ism/risk-assessments/engineering" element={<ProtectedRoute><RiskAssessmentsEngineeringPage /></ProtectedRoute>} />
+      <Route path="/ism/risk-assessments/interior" element={<ProtectedRoute><RiskAssessmentsInteriorPage /></ProtectedRoute>} />
+      <Route path="/ism/risk-assessments/galley" element={<ProtectedRoute><RiskAssessmentsGalleyPage /></ProtectedRoute>} />
+
+      {/* ISM - SOPs */}
+      <Route path="/ism/sops" element={<ProtectedRoute><SOPsLandingPage /></ProtectedRoute>} />
+      <Route path="/ism/sops/bridge" element={<ProtectedRoute><SOPsBridgePage /></ProtectedRoute>} />
+      <Route path="/ism/sops/deck" element={<ProtectedRoute><SOPsDeckPage /></ProtectedRoute>} />
+      <Route path="/ism/sops/engineering" element={<ProtectedRoute><SOPsEngineeringPage /></ProtectedRoute>} />
+      <Route path="/ism/sops/interior" element={<ProtectedRoute><SOPsInteriorPage /></ProtectedRoute>} />
+      <Route path="/ism/sops/galley" element={<ProtectedRoute><SOPsGalleyPage /></ProtectedRoute>} />
+
+      {/* ISM - Miscellaneous */}
+      <Route path="/ism/miscellaneous" element={<ProtectedRoute><MiscellaneousFormsPage /></ProtectedRoute>} />
+
+      {/* ISM - Other Existing */}
       <Route path="/ism/drills" element={<ProtectedRoute><Drills /></ProtectedRoute>} />
       <Route path="/ism/training" element={<ProtectedRoute><Training /></ProtectedRoute>} />
       <Route path="/ism/meetings" element={
@@ -316,7 +366,6 @@ export const AppRoutes: React.FC = () => {
           />
         </ProtectedRoute>
       } />
-      <Route path="/ism/risk-assessments" element={<ProtectedRoute><RiskAssessments /></ProtectedRoute>} />
       <Route path="/ism/audits" element={<ProtectedRoute><Audits /></ProtectedRoute>} />
 
       {/* Certificates */}
