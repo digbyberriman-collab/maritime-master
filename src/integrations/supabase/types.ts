@@ -4767,6 +4767,59 @@ export type Database = {
           },
         ]
       }
+      modules: {
+        Row: {
+          api_accessible: boolean | null
+          created_at: string | null
+          description: string | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          key: string
+          name: string
+          parent_key: string | null
+          route: string | null
+          sort_order: number | null
+          supports_scoping: boolean | null
+        }
+        Insert: {
+          api_accessible?: boolean | null
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          key: string
+          name: string
+          parent_key?: string | null
+          route?: string | null
+          sort_order?: number | null
+          supports_scoping?: boolean | null
+        }
+        Update: {
+          api_accessible?: boolean | null
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          key?: string
+          name?: string
+          parent_key?: string | null
+          route?: string | null
+          sort_order?: number | null
+          supports_scoping?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "modules_parent_key_fkey"
+            columns: ["parent_key"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
       notification_logs: {
         Row: {
           body_preview: string | null
@@ -4835,6 +4888,85 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      permission_audit_log: {
+        Row: {
+          action_type: Database["public"]["Enums"]["audit_action_type"]
+          actor_role: string
+          actor_user_id: string
+          after_state: Json | null
+          before_state: Json | null
+          id: string
+          ip_address: unknown
+          is_high_impact: boolean | null
+          reason_text: string | null
+          session_id: string | null
+          target_module_key: string | null
+          target_role_id: string | null
+          target_user_id: string | null
+          timestamp_utc: string | null
+          user_agent: string | null
+          vessel_scope: string | null
+        }
+        Insert: {
+          action_type: Database["public"]["Enums"]["audit_action_type"]
+          actor_role: string
+          actor_user_id: string
+          after_state?: Json | null
+          before_state?: Json | null
+          id?: string
+          ip_address?: unknown
+          is_high_impact?: boolean | null
+          reason_text?: string | null
+          session_id?: string | null
+          target_module_key?: string | null
+          target_role_id?: string | null
+          target_user_id?: string | null
+          timestamp_utc?: string | null
+          user_agent?: string | null
+          vessel_scope?: string | null
+        }
+        Update: {
+          action_type?: Database["public"]["Enums"]["audit_action_type"]
+          actor_role?: string
+          actor_user_id?: string
+          after_state?: Json | null
+          before_state?: Json | null
+          id?: string
+          ip_address?: unknown
+          is_high_impact?: boolean | null
+          reason_text?: string | null
+          session_id?: string | null
+          target_module_key?: string | null
+          target_role_id?: string | null
+          target_user_id?: string | null
+          timestamp_utc?: string | null
+          user_agent?: string | null
+          vessel_scope?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permission_audit_log_target_module_key_fkey"
+            columns: ["target_module_key"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "permission_audit_log_target_role_id_fkey"
+            columns: ["target_role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permission_audit_log_vessel_scope_fkey"
+            columns: ["vessel_scope"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -5095,6 +5227,60 @@ export type Database = {
           },
         ]
       }
+      rbac_user_roles: {
+        Row: {
+          assigned_at: string | null
+          assigned_by: string | null
+          department: string | null
+          id: string
+          is_active: boolean | null
+          role_id: string
+          user_id: string
+          valid_from: string | null
+          valid_until: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          department?: string | null
+          id?: string
+          is_active?: boolean | null
+          role_id: string
+          user_id: string
+          valid_from?: string | null
+          valid_until?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          assigned_at?: string | null
+          assigned_by?: string | null
+          department?: string | null
+          id?: string
+          is_active?: boolean | null
+          role_id?: string
+          user_id?: string
+          valid_from?: string | null
+          valid_until?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rbac_user_roles_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rbac_user_roles_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       risk_assessment_hazards: {
         Row: {
           consequences: string
@@ -5304,6 +5490,54 @@ export type Database = {
       role_permissions: {
         Row: {
           created_at: string | null
+          id: string
+          module_key: string
+          permission: Database["public"]["Enums"]["permission_level"]
+          restrictions: Json | null
+          role_id: string
+          scope: Database["public"]["Enums"]["role_scope_type"]
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          module_key: string
+          permission: Database["public"]["Enums"]["permission_level"]
+          restrictions?: Json | null
+          role_id: string
+          scope?: Database["public"]["Enums"]["role_scope_type"]
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          module_key?: string
+          permission?: Database["public"]["Enums"]["permission_level"]
+          restrictions?: Json | null
+          role_id?: string
+          scope?: Database["public"]["Enums"]["role_scope_type"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "role_permissions_module_key_fkey"
+            columns: ["module_key"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "role_permissions_role_id_fkey1"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      role_permissions_legacy_v1: {
+        Row: {
+          created_at: string | null
           department_scope: boolean | null
           id: string
           permission_id: string
@@ -5341,12 +5575,54 @@ export type Database = {
             foreignKeyName: "role_permissions_role_id_fkey"
             columns: ["role_id"]
             isOneToOne: false
-            referencedRelation: "roles"
+            referencedRelation: "roles_legacy_v1"
             referencedColumns: ["id"]
           },
         ]
       }
       roles: {
+        Row: {
+          created_at: string | null
+          default_scope: Database["public"]["Enums"]["role_scope_type"] | null
+          description: string | null
+          display_name: string
+          id: string
+          is_api_only: boolean | null
+          is_system_role: boolean | null
+          is_time_limited: boolean | null
+          max_session_hours: number | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          default_scope?: Database["public"]["Enums"]["role_scope_type"] | null
+          description?: string | null
+          display_name: string
+          id?: string
+          is_api_only?: boolean | null
+          is_system_role?: boolean | null
+          is_time_limited?: boolean | null
+          max_session_hours?: number | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          default_scope?: Database["public"]["Enums"]["role_scope_type"] | null
+          description?: string | null
+          display_name?: string
+          id?: string
+          is_api_only?: boolean | null
+          is_system_role?: boolean | null
+          is_time_limited?: boolean | null
+          max_session_hours?: number | null
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      roles_legacy_v1: {
         Row: {
           company_id: string | null
           created_at: string | null
@@ -6045,6 +6321,56 @@ export type Database = {
           },
         ]
       }
+      user_permission_overrides: {
+        Row: {
+          created_at: string | null
+          created_by: string
+          id: string
+          is_granted: boolean
+          module_key: string
+          permission: Database["public"]["Enums"]["permission_level"]
+          reason: string
+          restrictions: Json | null
+          scope: Database["public"]["Enums"]["role_scope_type"] | null
+          user_id: string
+          valid_until: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by: string
+          id?: string
+          is_granted: boolean
+          module_key: string
+          permission: Database["public"]["Enums"]["permission_level"]
+          reason: string
+          restrictions?: Json | null
+          scope?: Database["public"]["Enums"]["role_scope_type"] | null
+          user_id: string
+          valid_until?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string
+          id?: string
+          is_granted?: boolean
+          module_key?: string
+          permission?: Database["public"]["Enums"]["permission_level"]
+          reason?: string
+          restrictions?: Json | null
+          scope?: Database["public"]["Enums"]["role_scope_type"] | null
+          user_id?: string
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permission_overrides_module_key_fkey"
+            columns: ["module_key"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
       user_preferences: {
         Row: {
           alert_severities: Json | null
@@ -6480,6 +6806,16 @@ export type Database = {
     }
     Functions: {
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
+      get_user_rbac_permissions: {
+        Args: { p_user_id: string }
+        Returns: {
+          module_key: string
+          permission: Database["public"]["Enums"]["permission_level"]
+          restrictions: Json
+          scope: Database["public"]["Enums"]["role_scope_type"]
+          source: string
+        }[]
+      }
       get_user_roles: {
         Args: { _user_id: string }
         Returns: {
@@ -6520,8 +6856,33 @@ export type Database = {
         }
         Returns: boolean
       }
+      log_permission_change: {
+        Args: {
+          p_action_type: Database["public"]["Enums"]["audit_action_type"]
+          p_actor_role: string
+          p_actor_user_id: string
+          p_after_state?: Json
+          p_before_state?: Json
+          p_ip_address?: unknown
+          p_reason_text?: string
+          p_target_module_key?: string
+          p_target_role_id?: string
+          p_target_user_id?: string
+          p_user_agent?: string
+          p_vessel_scope?: string
+        }
+        Returns: string
+      }
       user_belongs_to_company: {
         Args: { _company_id: string; _user_id: string }
+        Returns: boolean
+      }
+      user_has_module_access: {
+        Args: {
+          p_module_key: string
+          p_required_permission?: Database["public"]["Enums"]["permission_level"]
+          p_user_id: string
+        }
         Returns: boolean
       }
     }
@@ -6549,6 +6910,22 @@ export type Database = {
         | "auditor_class"
         | "travel_agent"
         | "employer_api"
+      audit_action_type:
+        | "role_assigned"
+        | "role_removed"
+        | "permission_granted"
+        | "permission_revoked"
+        | "permission_updated"
+        | "scope_changed"
+        | "override_added"
+        | "override_removed"
+        | "role_created"
+        | "role_updated"
+        | "role_deleted"
+        | "api_access_granted"
+        | "api_access_revoked"
+        | "audit_mode_enabled"
+        | "audit_mode_disabled"
       gdpr_lawful_basis:
         | "consent"
         | "contractual"
@@ -6569,12 +6946,14 @@ export type Database = {
         | "training_record"
         | "leave_record"
         | "medical_record"
+      permission_level: "view" | "edit" | "admin"
       record_lifecycle_status:
         | "active"
         | "pending_archive"
         | "archived"
         | "pending_deletion"
         | "anonymized"
+      role_scope_type: "fleet" | "vessel" | "department" | "self"
       user_role:
         | "master"
         | "chief_engineer"
@@ -6734,6 +7113,23 @@ export const Constants = {
         "travel_agent",
         "employer_api",
       ],
+      audit_action_type: [
+        "role_assigned",
+        "role_removed",
+        "permission_granted",
+        "permission_revoked",
+        "permission_updated",
+        "scope_changed",
+        "override_added",
+        "override_removed",
+        "role_created",
+        "role_updated",
+        "role_deleted",
+        "api_access_granted",
+        "api_access_revoked",
+        "audit_mode_enabled",
+        "audit_mode_disabled",
+      ],
       gdpr_lawful_basis: [
         "consent",
         "contractual",
@@ -6756,6 +7152,7 @@ export const Constants = {
         "leave_record",
         "medical_record",
       ],
+      permission_level: ["view", "edit", "admin"],
       record_lifecycle_status: [
         "active",
         "pending_archive",
@@ -6763,6 +7160,7 @@ export const Constants = {
         "pending_deletion",
         "anonymized",
       ],
+      role_scope_type: ["fleet", "vessel", "department", "self"],
       user_role: [
         "master",
         "chief_engineer",
