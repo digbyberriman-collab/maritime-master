@@ -183,6 +183,20 @@ export const AppRoutes: React.FC = () => {
           />
         </ProtectedRoute>
       } />
+      <Route path="/crew/tasks" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+            {React.createElement(React.lazy(() => import('@/pages/crew/CrewTasksPage')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/acknowledgements" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+            {React.createElement(React.lazy(() => import('@/pages/crew/DocumentAcknowledgementsPage')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
 
       {/* Crew Admin */}
       <Route path="/crew/admin" element={

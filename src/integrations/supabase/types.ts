@@ -1208,6 +1208,128 @@ export type Database = {
           },
         ]
       }
+      crew_tasks: {
+        Row: {
+          assigned_by: string
+          assigned_to: string
+          company_id: string
+          completed_at: string | null
+          completion_notes: string | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          priority: string
+          related_document_id: string | null
+          related_form_id: string | null
+          started_at: string | null
+          status: string
+          task_type: string
+          title: string
+          updated_at: string
+          verification_required: boolean | null
+          verified_at: string | null
+          verified_by: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          assigned_by: string
+          assigned_to: string
+          company_id: string
+          completed_at?: string | null
+          completion_notes?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string
+          related_document_id?: string | null
+          related_form_id?: string | null
+          started_at?: string | null
+          status?: string
+          task_type: string
+          title: string
+          updated_at?: string
+          verification_required?: boolean | null
+          verified_at?: string | null
+          verified_by?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          assigned_by?: string
+          assigned_to?: string
+          company_id?: string
+          completed_at?: string | null
+          completion_notes?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          priority?: string
+          related_document_id?: string | null
+          related_form_id?: string | null
+          started_at?: string | null
+          status?: string
+          task_type?: string
+          title?: string
+          updated_at?: string
+          verification_required?: boolean | null
+          verified_at?: string | null
+          verified_by?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_tasks_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_tasks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_tasks_related_document_id_fkey"
+            columns: ["related_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_tasks_related_form_id_fkey"
+            columns: ["related_form_id"]
+            isOneToOne: false
+            referencedRelation: "form_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_tasks_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_tasks_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crew_travel_documents: {
         Row: {
           company_id: string

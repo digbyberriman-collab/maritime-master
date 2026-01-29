@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   ClipboardCheck, FileText, Calendar, AlertTriangle, CheckCircle,
-  Clock, ChevronRight, Loader2, Award, Bell, User, Ship
+  Clock, ChevronRight, Loader2, Award, Bell, User, Ship, FileCheck
 } from 'lucide-react';
+import { useCrewTasks } from '@/hooks/useCrewTasks';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVessel } from '@/contexts/VesselContext';
@@ -41,6 +42,12 @@ export default function CrewDashboard() {
   const [certificates, setCertificates] = useState<CertificateStatus[]>([]);
   const [pendingForms, setPendingForms] = useState(0);
   const [pendingAcks, setPendingAcks] = useState(0);
+  
+  // Load assigned crew tasks
+  const { tasks: assignedTasks, loading: tasksLoading } = useCrewTasks({ 
+    assignedToMe: true, 
+    status: ['pending', 'in_progress'] 
+  });
 
   useEffect(() => {
     if (user?.id) {
@@ -228,7 +235,7 @@ export default function CrewDashboard() {
                   My Tasks & Actions
                 </CardTitle>
                 <Button variant="ghost" size="sm" asChild>
-                  <Link to="/ism/forms/my-drafts">
+                  <Link to="/crew/tasks">
                     View All <ChevronRight className="h-4 w-4 ml-1" />
                   </Link>
                 </Button>
