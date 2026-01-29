@@ -121,38 +121,10 @@ const DPADashboard: React.FC = () => {
 
   return (
     <DashboardLayout>
-      <div className="flex gap-6 animate-fade-in">
-        {/* Left Sidebar - Vessel Filter */}
-        <aside className="w-64 shrink-0 hidden lg:block">
-          <Card className="shadow-card sticky top-6">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-semibold">Fleet Filter</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <VesselFilter
-                vessels={vesselList}
-                selectedVesselIds={selectedVesselIds}
-                onVesselToggle={handleVesselToggle}
-                onSelectAll={() => setSelectedVesselIds(vesselList.map(v => v.id))}
-                onClearAll={() => setSelectedVesselIds([])}
-                searchQuery={searchQuery}
-                onSearchChange={setSearchQuery}
-                alertFilters={alertFilters}
-                onAlertFilterChange={(filter, value) => 
-                  setAlertFilters(prev => ({ ...prev, [filter]: value }))
-                }
-                fleetGroups={[
-                  { id: 'private', name: 'Private', vesselIds: [] },
-                  { id: 'charter', name: 'Charter', vesselIds: [] },
-                  { id: 'yard', name: 'Yard', vesselIds: [] },
-                ]}
-              />
-            </CardContent>
-          </Card>
-        </aside>
+      <div className="animate-fade-in">
 
         {/* Main Content */}
-        <div className="flex-1 space-y-6 min-w-0">
+        <div className="space-y-6">
           {/* Welcome Header */}
           <Card className="gradient-primary text-primary-foreground border-0">
             <CardContent className="pt-6">
