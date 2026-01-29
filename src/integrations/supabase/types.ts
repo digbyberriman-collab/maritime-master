@@ -1208,6 +1208,240 @@ export type Database = {
           },
         ]
       }
+      crew_travel_documents: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          crew_member_id: string
+          destination_location: string | null
+          document_type: string
+          extracted_data: Json | null
+          extraction_error: string | null
+          extraction_status: string | null
+          file_size_bytes: number | null
+          id: string
+          mime_type: string | null
+          origin_location: string | null
+          original_file_path: string
+          original_filename: string
+          standardised_file_path: string | null
+          standardised_filename: string | null
+          travel_date: string | null
+          travel_record_id: string | null
+          updated_at: string | null
+          uploaded_by: string | null
+          valid_from: string | null
+          valid_until: string | null
+          verified: boolean | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          crew_member_id: string
+          destination_location?: string | null
+          document_type: string
+          extracted_data?: Json | null
+          extraction_error?: string | null
+          extraction_status?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          mime_type?: string | null
+          origin_location?: string | null
+          original_file_path: string
+          original_filename: string
+          standardised_file_path?: string | null
+          standardised_filename?: string | null
+          travel_date?: string | null
+          travel_record_id?: string | null
+          updated_at?: string | null
+          uploaded_by?: string | null
+          valid_from?: string | null
+          valid_until?: string | null
+          verified?: boolean | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          crew_member_id?: string
+          destination_location?: string | null
+          document_type?: string
+          extracted_data?: Json | null
+          extraction_error?: string | null
+          extraction_status?: string | null
+          file_size_bytes?: number | null
+          id?: string
+          mime_type?: string | null
+          origin_location?: string | null
+          original_file_path?: string
+          original_filename?: string
+          standardised_file_path?: string | null
+          standardised_filename?: string | null
+          travel_date?: string | null
+          travel_record_id?: string | null
+          updated_at?: string | null
+          uploaded_by?: string | null
+          valid_from?: string | null
+          valid_until?: string | null
+          verified?: boolean | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_travel_documents_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_travel_documents_crew_member_id_fkey"
+            columns: ["crew_member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_travel_documents_travel_record_id_fkey"
+            columns: ["travel_record_id"]
+            isOneToOne: false
+            referencedRelation: "crew_travel_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crew_travel_records: {
+        Row: {
+          accommodation_id: string | null
+          accommodation_required: boolean | null
+          arrival_date: string | null
+          booking_reference: string | null
+          company_id: string
+          cost_currency: string | null
+          created_at: string | null
+          created_by: string | null
+          crew_member_id: string
+          departure_date: string
+          destination_airport_code: string | null
+          destination_city: string | null
+          destination_country: string | null
+          handover_notes: string | null
+          id: string
+          joining_vessel: boolean | null
+          leaving_vessel: boolean | null
+          notes: string | null
+          origin_airport_code: string | null
+          origin_city: string | null
+          origin_country: string | null
+          pickup_location: string | null
+          pickup_required: boolean | null
+          pickup_time: string | null
+          status: string
+          total_cost: number | null
+          travel_agent: string | null
+          travel_type: string
+          updated_at: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          accommodation_id?: string | null
+          accommodation_required?: boolean | null
+          arrival_date?: string | null
+          booking_reference?: string | null
+          company_id: string
+          cost_currency?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          crew_member_id: string
+          departure_date: string
+          destination_airport_code?: string | null
+          destination_city?: string | null
+          destination_country?: string | null
+          handover_notes?: string | null
+          id?: string
+          joining_vessel?: boolean | null
+          leaving_vessel?: boolean | null
+          notes?: string | null
+          origin_airport_code?: string | null
+          origin_city?: string | null
+          origin_country?: string | null
+          pickup_location?: string | null
+          pickup_required?: boolean | null
+          pickup_time?: string | null
+          status?: string
+          total_cost?: number | null
+          travel_agent?: string | null
+          travel_type: string
+          updated_at?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          accommodation_id?: string | null
+          accommodation_required?: boolean | null
+          arrival_date?: string | null
+          booking_reference?: string | null
+          company_id?: string
+          cost_currency?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          crew_member_id?: string
+          departure_date?: string
+          destination_airport_code?: string | null
+          destination_city?: string | null
+          destination_country?: string | null
+          handover_notes?: string | null
+          id?: string
+          joining_vessel?: boolean | null
+          leaving_vessel?: boolean | null
+          notes?: string | null
+          origin_airport_code?: string | null
+          origin_city?: string | null
+          origin_country?: string | null
+          pickup_location?: string | null
+          pickup_required?: boolean | null
+          pickup_time?: string | null
+          status?: string
+          total_cost?: number | null
+          travel_agent?: string | null
+          travel_type?: string
+          updated_at?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_travel_records_accommodation_id_fkey"
+            columns: ["accommodation_id"]
+            isOneToOne: false
+            referencedRelation: "quarantine_houses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_travel_records_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_travel_records_crew_member_id_fkey"
+            columns: ["crew_member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_travel_records_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_crew_snapshots: {
         Row: {
           captain_name: string | null
@@ -1495,6 +1729,47 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      document_naming_rules: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          document_type: string
+          folder_structure: string
+          id: string
+          is_active: boolean | null
+          naming_pattern: string
+          updated_at: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          document_type: string
+          folder_structure: string
+          id?: string
+          is_active?: boolean | null
+          naming_pattern: string
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          document_type?: string
+          folder_structure?: string
+          id?: string
+          is_active?: boolean | null
+          naming_pattern?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_naming_rules_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       document_versions: {
         Row: {
@@ -2647,6 +2922,123 @@ export type Database = {
             columns: ["vessel_id"]
             isOneToOne: false
             referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      flight_segments: {
+        Row: {
+          airline_code: string | null
+          airline_name: string | null
+          arrival_airport_code: string
+          arrival_airport_name: string | null
+          arrival_city: string | null
+          arrival_country: string | null
+          arrival_datetime: string
+          arrival_terminal: string | null
+          booking_class: string | null
+          created_at: string | null
+          departure_airport_code: string
+          departure_airport_name: string | null
+          departure_city: string | null
+          departure_country: string | null
+          departure_datetime: string
+          departure_terminal: string | null
+          e_ticket_number: string | null
+          extracted_from_document: string | null
+          extraction_confidence: number | null
+          flight_number: string | null
+          id: string
+          manually_verified: boolean | null
+          pnr_locator: string | null
+          seat_number: string | null
+          segment_order: number
+          status: string | null
+          ticket_number: string | null
+          travel_record_id: string
+          updated_at: string | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          airline_code?: string | null
+          airline_name?: string | null
+          arrival_airport_code: string
+          arrival_airport_name?: string | null
+          arrival_city?: string | null
+          arrival_country?: string | null
+          arrival_datetime: string
+          arrival_terminal?: string | null
+          booking_class?: string | null
+          created_at?: string | null
+          departure_airport_code: string
+          departure_airport_name?: string | null
+          departure_city?: string | null
+          departure_country?: string | null
+          departure_datetime: string
+          departure_terminal?: string | null
+          e_ticket_number?: string | null
+          extracted_from_document?: string | null
+          extraction_confidence?: number | null
+          flight_number?: string | null
+          id?: string
+          manually_verified?: boolean | null
+          pnr_locator?: string | null
+          seat_number?: string | null
+          segment_order?: number
+          status?: string | null
+          ticket_number?: string | null
+          travel_record_id: string
+          updated_at?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          airline_code?: string | null
+          airline_name?: string | null
+          arrival_airport_code?: string
+          arrival_airport_name?: string | null
+          arrival_city?: string | null
+          arrival_country?: string | null
+          arrival_datetime?: string
+          arrival_terminal?: string | null
+          booking_class?: string | null
+          created_at?: string | null
+          departure_airport_code?: string
+          departure_airport_name?: string | null
+          departure_city?: string | null
+          departure_country?: string | null
+          departure_datetime?: string
+          departure_terminal?: string | null
+          e_ticket_number?: string | null
+          extracted_from_document?: string | null
+          extraction_confidence?: number | null
+          flight_number?: string | null
+          id?: string
+          manually_verified?: boolean | null
+          pnr_locator?: string | null
+          seat_number?: string | null
+          segment_order?: number
+          status?: string | null
+          ticket_number?: string | null
+          travel_record_id?: string
+          updated_at?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "flight_segments_extracted_from_document_fkey"
+            columns: ["extracted_from_document"]
+            isOneToOne: false
+            referencedRelation: "crew_travel_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "flight_segments_travel_record_id_fkey"
+            columns: ["travel_record_id"]
+            isOneToOne: false
+            referencedRelation: "crew_travel_records"
             referencedColumns: ["id"]
           },
         ]
@@ -5093,6 +5485,177 @@ export type Database = {
           },
         ]
       }
+      pre_departure_checklists: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          certificates_valid: boolean | null
+          checklist_status: string | null
+          company_id: string
+          covid_test_date: string | null
+          covid_test_document_id: string | null
+          covid_test_required: boolean | null
+          covid_test_result: string | null
+          covid_test_type: string | null
+          created_at: string | null
+          crew_member_id: string
+          emergency_contacts_confirmed: boolean | null
+          flight_ticket_received: boolean | null
+          id: string
+          itinerary_sent: boolean | null
+          joining_instructions_acknowledged: boolean | null
+          joining_instructions_sent: boolean | null
+          medical_certificate_id: string | null
+          medical_fit_to_travel: boolean | null
+          notes: string | null
+          passport_expiry_ok: boolean | null
+          passport_valid: boolean | null
+          quarantine_days: number | null
+          quarantine_location_id: string | null
+          quarantine_required: boolean | null
+          seamans_book_valid: boolean | null
+          travel_insurance_valid: boolean | null
+          travel_record_id: string
+          updated_at: string | null
+          vaccination_document_id: string | null
+          vaccination_status: string | null
+          visa_document_id: string | null
+          visa_obtained: boolean | null
+          visa_required: boolean | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          certificates_valid?: boolean | null
+          checklist_status?: string | null
+          company_id: string
+          covid_test_date?: string | null
+          covid_test_document_id?: string | null
+          covid_test_required?: boolean | null
+          covid_test_result?: string | null
+          covid_test_type?: string | null
+          created_at?: string | null
+          crew_member_id: string
+          emergency_contacts_confirmed?: boolean | null
+          flight_ticket_received?: boolean | null
+          id?: string
+          itinerary_sent?: boolean | null
+          joining_instructions_acknowledged?: boolean | null
+          joining_instructions_sent?: boolean | null
+          medical_certificate_id?: string | null
+          medical_fit_to_travel?: boolean | null
+          notes?: string | null
+          passport_expiry_ok?: boolean | null
+          passport_valid?: boolean | null
+          quarantine_days?: number | null
+          quarantine_location_id?: string | null
+          quarantine_required?: boolean | null
+          seamans_book_valid?: boolean | null
+          travel_insurance_valid?: boolean | null
+          travel_record_id: string
+          updated_at?: string | null
+          vaccination_document_id?: string | null
+          vaccination_status?: string | null
+          visa_document_id?: string | null
+          visa_obtained?: boolean | null
+          visa_required?: boolean | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          certificates_valid?: boolean | null
+          checklist_status?: string | null
+          company_id?: string
+          covid_test_date?: string | null
+          covid_test_document_id?: string | null
+          covid_test_required?: boolean | null
+          covid_test_result?: string | null
+          covid_test_type?: string | null
+          created_at?: string | null
+          crew_member_id?: string
+          emergency_contacts_confirmed?: boolean | null
+          flight_ticket_received?: boolean | null
+          id?: string
+          itinerary_sent?: boolean | null
+          joining_instructions_acknowledged?: boolean | null
+          joining_instructions_sent?: boolean | null
+          medical_certificate_id?: string | null
+          medical_fit_to_travel?: boolean | null
+          notes?: string | null
+          passport_expiry_ok?: boolean | null
+          passport_valid?: boolean | null
+          quarantine_days?: number | null
+          quarantine_location_id?: string | null
+          quarantine_required?: boolean | null
+          seamans_book_valid?: boolean | null
+          travel_insurance_valid?: boolean | null
+          travel_record_id?: string
+          updated_at?: string | null
+          vaccination_document_id?: string | null
+          vaccination_status?: string | null
+          visa_document_id?: string | null
+          visa_obtained?: boolean | null
+          visa_required?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pre_departure_checklists_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_departure_checklists_covid_test_document_id_fkey"
+            columns: ["covid_test_document_id"]
+            isOneToOne: false
+            referencedRelation: "crew_travel_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_departure_checklists_crew_member_id_fkey"
+            columns: ["crew_member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "pre_departure_checklists_medical_certificate_id_fkey"
+            columns: ["medical_certificate_id"]
+            isOneToOne: false
+            referencedRelation: "crew_travel_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_departure_checklists_quarantine_location_id_fkey"
+            columns: ["quarantine_location_id"]
+            isOneToOne: false
+            referencedRelation: "quarantine_houses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_departure_checklists_travel_record_id_fkey"
+            columns: ["travel_record_id"]
+            isOneToOne: false
+            referencedRelation: "crew_travel_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_departure_checklists_vaccination_document_id_fkey"
+            columns: ["vaccination_document_id"]
+            isOneToOne: false
+            referencedRelation: "crew_travel_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pre_departure_checklists_visa_document_id_fkey"
+            columns: ["visa_document_id"]
+            isOneToOne: false
+            referencedRelation: "crew_travel_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           account_status: string | null
@@ -5220,6 +5783,220 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quarantine_bookings: {
+        Row: {
+          actual_check_in: string | null
+          actual_check_out: string | null
+          check_in_date: string
+          check_out_date: string
+          company_id: string
+          cost_currency: string | null
+          created_at: string | null
+          created_by: string | null
+          crew_member_id: string
+          dietary_requirements: string | null
+          id: string
+          notes: string | null
+          paid: boolean | null
+          quarantine_house_id: string
+          room_number: string | null
+          special_requests: string | null
+          status: string | null
+          total_cost: number | null
+          total_nights: number | null
+          travel_record_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          actual_check_in?: string | null
+          actual_check_out?: string | null
+          check_in_date: string
+          check_out_date: string
+          company_id: string
+          cost_currency?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          crew_member_id: string
+          dietary_requirements?: string | null
+          id?: string
+          notes?: string | null
+          paid?: boolean | null
+          quarantine_house_id: string
+          room_number?: string | null
+          special_requests?: string | null
+          status?: string | null
+          total_cost?: number | null
+          total_nights?: number | null
+          travel_record_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          actual_check_in?: string | null
+          actual_check_out?: string | null
+          check_in_date?: string
+          check_out_date?: string
+          company_id?: string
+          cost_currency?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          crew_member_id?: string
+          dietary_requirements?: string | null
+          id?: string
+          notes?: string | null
+          paid?: boolean | null
+          quarantine_house_id?: string
+          room_number?: string | null
+          special_requests?: string | null
+          status?: string | null
+          total_cost?: number | null
+          total_nights?: number | null
+          travel_record_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quarantine_bookings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quarantine_bookings_crew_member_id_fkey"
+            columns: ["crew_member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "quarantine_bookings_quarantine_house_id_fkey"
+            columns: ["quarantine_house_id"]
+            isOneToOne: false
+            referencedRelation: "quarantine_houses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quarantine_bookings_travel_record_id_fkey"
+            columns: ["travel_record_id"]
+            isOneToOne: false
+            referencedRelation: "crew_travel_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quarantine_houses: {
+        Row: {
+          address_line1: string
+          address_line2: string | null
+          airport_transfer_available: boolean | null
+          check_in_instructions: string | null
+          city: string
+          company_id: string
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          country: string
+          created_at: string | null
+          created_by: string | null
+          daily_rate: number | null
+          house_rules: string | null
+          id: string
+          includes_meals: boolean | null
+          is_active: boolean | null
+          kitchen_available: boolean | null
+          latitude: number | null
+          laundry_available: boolean | null
+          longitude: number | null
+          name: string
+          notes: string | null
+          parking_available: boolean | null
+          photos: Json | null
+          postal_code: string | null
+          rate_currency: string | null
+          state_province: string | null
+          total_beds: number
+          total_rooms: number
+          updated_at: string | null
+          wifi_available: boolean | null
+        }
+        Insert: {
+          address_line1: string
+          address_line2?: string | null
+          airport_transfer_available?: boolean | null
+          check_in_instructions?: string | null
+          city: string
+          company_id: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          country: string
+          created_at?: string | null
+          created_by?: string | null
+          daily_rate?: number | null
+          house_rules?: string | null
+          id?: string
+          includes_meals?: boolean | null
+          is_active?: boolean | null
+          kitchen_available?: boolean | null
+          latitude?: number | null
+          laundry_available?: boolean | null
+          longitude?: number | null
+          name: string
+          notes?: string | null
+          parking_available?: boolean | null
+          photos?: Json | null
+          postal_code?: string | null
+          rate_currency?: string | null
+          state_province?: string | null
+          total_beds?: number
+          total_rooms?: number
+          updated_at?: string | null
+          wifi_available?: boolean | null
+        }
+        Update: {
+          address_line1?: string
+          address_line2?: string | null
+          airport_transfer_available?: boolean | null
+          check_in_instructions?: string | null
+          city?: string
+          company_id?: string
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          country?: string
+          created_at?: string | null
+          created_by?: string | null
+          daily_rate?: number | null
+          house_rules?: string | null
+          id?: string
+          includes_meals?: boolean | null
+          is_active?: boolean | null
+          kitchen_available?: boolean | null
+          latitude?: number | null
+          laundry_available?: boolean | null
+          longitude?: number | null
+          name?: string
+          notes?: string | null
+          parking_available?: boolean | null
+          photos?: Json | null
+          postal_code?: string | null
+          rate_currency?: string | null
+          state_province?: string | null
+          total_beds?: number
+          total_rooms?: number
+          updated_at?: string | null
+          wifi_available?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quarantine_houses_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
