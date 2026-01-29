@@ -1,8 +1,84 @@
 import React from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Plus, Info } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import TabPlaceholder from '@/components/ism/TabPlaceholder';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import ChecklistCard from '@/components/ism/ChecklistCard';
+
+// Checklist data - alphabetically ordered
+const emergencyChecklists = [
+  'Abandon Ship',
+  'Blackout',
+  'Collision',
+  'Fire at Sea',
+  'Fire in Port',
+  'Flooding / Damage Control',
+  'Grounding',
+  'Lithium Ion Battery Fire at Sea',
+  'Man Overboard',
+  'Pollution',
+  'Post Incident (MAJOR EMERGENCY)',
+  'Propulsion Failure',
+  'Steering Failure',
+];
+
+const otherEmergencies = [
+  'Bomb Threat / Suspicious Package',
+  'Bridge Equipment Failure: GPS / GMDSS / Radar',
+  'Crane/Davit Failure During Launch or Recovery',
+  'Cyber Attack',
+  'Dive Emergency',
+  'Enclosed Space Rescue',
+  'Helicopter Evacuation',
+  'Kidnap / Hostage Incident Ashore',
+  'Medical Emergency',
+  'Piracy / Suspicious Craft',
+  'Receiving Distress Signals and Search & Rescue',
+  'Rescue of Persons from Cold Water',
+  'Rescue of Refugees and Migrants',
+  'Salvage of Own Vessel',
+  'Stowaway',
+  'Tender Incident',
+];
+
+const peopleWelfareIssues = [
+  'Aggressive / Intoxicated Person',
+  'Contagious Disease Outbreak',
+  'Death Onboard',
+  'Drugs Onboard',
+  'Food Poisoning Outbreak',
+  'Mental Health Crisis',
+  'Missing Person Ashore',
+];
+
+interface ChecklistGridProps {
+  items: string[];
+}
+
+const ChecklistGrid: React.FC<ChecklistGridProps> = ({ items }) => {
+  return (
+    <div className="space-y-4">
+      {/* Header with count and action */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-muted-foreground">
+          {items.length} checklists
+        </p>
+        <Button variant="outline" size="sm" disabled>
+          <Plus className="w-4 h-4 mr-2" />
+          Add Checklist (Coming Soon)
+        </Button>
+      </div>
+      
+      {/* Checklist cards grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {items.map((title) => (
+          <ChecklistCard key={title} title={title} />
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const ERMPage: React.FC = () => {
   return (
@@ -14,42 +90,49 @@ const ERMPage: React.FC = () => {
             <div className="p-2 bg-primary/10 rounded-lg">
               <AlertCircle className="w-6 h-6 text-primary" />
             </div>
-            <h1 className="text-2xl font-semibold text-foreground">
-              Emergency Response Manual (ERM)
-            </h1>
+            <div>
+              <h1 className="text-2xl font-semibold text-foreground">
+                Emergency Response Manual (ERM)
+              </h1>
+              <p className="text-muted-foreground">
+                Emergency procedures, checklists, and response guidance
+              </p>
+            </div>
           </div>
-          <p className="text-muted-foreground">
-            Emergency procedures and response checklists
-          </p>
         </div>
+
+        {/* Info Banner */}
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            These checklists are placeholders. Document upload and electronic form functionality coming soon.
+          </AlertDescription>
+        </Alert>
 
         {/* Tabbed Content */}
         <Tabs defaultValue="emergency-checklists" className="w-full">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="emergency-checklists">Emergency Checklists</TabsTrigger>
-            <TabsTrigger value="other-emergencies">Other Emergencies & Detailed Guidance</TabsTrigger>
-            <TabsTrigger value="people-welfare">People & Welfare Issues</TabsTrigger>
+            <TabsTrigger value="emergency-checklists">
+              Emergency Checklists ({emergencyChecklists.length})
+            </TabsTrigger>
+            <TabsTrigger value="other-emergencies">
+              Other Emergencies ({otherEmergencies.length})
+            </TabsTrigger>
+            <TabsTrigger value="people-welfare">
+              People & Welfare ({peopleWelfareIssues.length})
+            </TabsTrigger>
           </TabsList>
           
           <TabsContent value="emergency-checklists" className="mt-6">
-            <TabPlaceholder
-              title="Emergency Checklists"
-              description="Quick-reference checklists for emergency situations including fire, flooding, and abandon ship procedures."
-            />
+            <ChecklistGrid items={emergencyChecklists} />
           </TabsContent>
           
           <TabsContent value="other-emergencies" className="mt-6">
-            <TabPlaceholder
-              title="Other Emergencies & Detailed Guidance"
-              description="Comprehensive guidance for various emergency scenarios not covered by standard checklists."
-            />
+            <ChecklistGrid items={otherEmergencies} />
           </TabsContent>
           
           <TabsContent value="people-welfare" className="mt-6">
-            <TabPlaceholder
-              title="People & Welfare Issues"
-              description="Procedures for crew welfare, medical emergencies, and personnel-related incidents."
-            />
+            <ChecklistGrid items={peopleWelfareIssues} />
           </TabsContent>
         </Tabs>
       </div>
