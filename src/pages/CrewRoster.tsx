@@ -27,6 +27,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
@@ -52,17 +53,25 @@ import {
   UserX,
   Loader2,
   Upload,
+  KeyRound,
+  UserCheck,
+  ShieldAlert,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCrew, type CrewMember } from '@/hooks/useCrew';
 import { useVessels } from '@/hooks/useVessels';
 import { useVesselFilter } from '@/hooks/useVesselFilter';
+import { useAdminActions } from '@/hooks/useAdminActions';
 import CrewFormModal from '@/components/crew/CrewFormModal';
 import CrewProfileModal from '@/components/crew/CrewProfileModal';
 import TransferCrewModal from '@/components/crew/TransferCrewModal';
 import FullCrewEditModal from '@/components/crew/FullCrewEditModal';
 import SignOffDialog from '@/components/crew/SignOffDialog';
 import ImportCrewCSVModal from '@/components/crew/ImportCrewCSVModal';
+import AdminPinModal from '@/components/crew/AdminPinModal';
+import ResetAccountModal from '@/components/crew/ResetAccountModal';
+import ToggleAccessModal from '@/components/crew/ToggleAccessModal';
+import ReallocateVesselModal from '@/components/crew/ReallocateVesselModal';
 
 const CrewRoster: React.FC = () => {
   const { profile } = useAuth();
@@ -90,7 +99,16 @@ const CrewRoster: React.FC = () => {
   const [isDeactivateDialogOpen, setIsDeactivateDialogOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [selectedCrew, setSelectedCrew] = useState<CrewMember | null>(null);
-
+  
+  // Admin action states
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+  const [isToggleAccessModalOpen, setIsToggleAccessModalOpen] = useState(false);
+  const [isReallocateModalOpen, setIsReallocateModalOpen] = useState(false);
+  const [pendingAdminAction, setPendingAdminAction] = useState<'reset' | 'toggle' | 'reallocate' | null>(null);
+  
+  const { isConfirmed } = useAdminActions();
+  
   const { vessels, isLoading: vesselsLoading } = useVessels();
   const {
     crew,
@@ -104,6 +122,7 @@ const CrewRoster: React.FC = () => {
   } = useCrew(effectiveVesselFilter);
 
   const canManageCrew = ['dpa', 'shore_management'].includes(profile?.role || '');
+  const isDPAAdmin = ['dpa', 'superadmin'].includes(profile?.role || '');
   const isMaster = profile?.role === 'master';
 
   // Filter crew based on search
@@ -197,6 +216,56 @@ const CrewRoster: React.FC = () => {
         return 'destructive';
       default:
         return 'outline';
+    }
+  };
+
+  const getAccountStatusBadge = (member: CrewMember) => {
+    const status = member.account_status || 'active';
+    switch (status) {
+      case 'active':
+        return <Badge variant="default" className="bg-primary/80">Active</Badge>;
+      case 'disabled':
+        return <Badge variant="destructive">Disabled</Badge>;
+      case 'invited':
+        return <Badge variant="secondary">Invited</Badge>;
+      case 'not_invited':
+        return <Badge variant="outline">Not Invited</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  // Admin action handlers
+  const handleAdminAction = (member: CrewMember, action: 'reset' | 'toggle' | 'reallocate') => {
+    setSelectedCrew(member);
+    setPendingAdminAction(action);
+    
+    // Check if already confirmed within window
+    if (isConfirmed()) {
+      executeAdminAction(action);
+    } else {
+      setIsPinModalOpen(true);
+    }
+  };
+
+  const executeAdminAction = (action: 'reset' | 'toggle' | 'reallocate') => {
+    setPendingAdminAction(null);
+    switch (action) {
+      case 'reset':
+        setIsResetModalOpen(true);
+        break;
+      case 'toggle':
+        setIsToggleAccessModalOpen(true);
+        break;
+      case 'reallocate':
+        setIsReallocateModalOpen(true);
+        break;
+    }
+  };
+
+  const handlePinConfirmed = () => {
+    if (pendingAdminAction) {
+      executeAdminAction(pendingAdminAction);
     }
   };
 
@@ -353,11 +422,9 @@ const CrewRoster: React.FC = () => {
                       <TableHead>Name</TableHead>
                       <TableHead>Rank/Position</TableHead>
                       <TableHead>Vessel Assignment</TableHead>
-                      <TableHead>Nationality</TableHead>
-                      <TableHead>Email</TableHead>
-                      <TableHead>Phone</TableHead>
-                      <TableHead>Join Date</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead>Account Status</TableHead>
+                      <TableHead>Last Login</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -380,20 +447,18 @@ const CrewRoster: React.FC = () => {
                             <span className="text-muted-foreground">Unassigned</span>
                           )}
                         </TableCell>
-                        <TableCell>{member.nationality || '-'}</TableCell>
-                        <TableCell className="max-w-[200px] truncate">
-                          {member.email}
-                        </TableCell>
-                        <TableCell>{member.phone || '-'}</TableCell>
-                        <TableCell>
-                          {member.current_assignment?.join_date
-                            ? format(new Date(member.current_assignment.join_date), 'dd MMM yyyy')
-                            : '-'}
-                        </TableCell>
                         <TableCell>
                           <Badge variant={getStatusBadgeVariant(member.status)}>
                             {member.status || 'Unknown'}
                           </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {getAccountStatusBadge(member)}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {member.last_login_at
+                            ? format(new Date(member.last_login_at), 'dd MMM yyyy HH:mm')
+                            : 'Never'}
                         </TableCell>
                         <TableCell className="text-right">
                           <DropdownMenu>
@@ -435,6 +500,30 @@ const CrewRoster: React.FC = () => {
                                   >
                                     <UserX className="w-4 h-4 mr-2" />
                                     Deactivate
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                              {isDPAAdmin && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuLabel className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <ShieldAlert className="w-3 h-3" />
+                                    Admin Actions
+                                  </DropdownMenuLabel>
+                                  <DropdownMenuItem onClick={() => handleAdminAction(member, 'reset')}>
+                                    <KeyRound className="w-4 h-4 mr-2" />
+                                    Reset Account
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleAdminAction(member, 'toggle')}>
+                                    {member.account_status === 'disabled' ? (
+                                      <><UserCheck className="w-4 h-4 mr-2" />Enable Access</>
+                                    ) : (
+                                      <><UserX className="w-4 h-4 mr-2" />Disable Access</>
+                                    )}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleAdminAction(member, 'reallocate')}>
+                                    <Ship className="w-4 h-4 mr-2" />
+                                    Reallocate Vessel
                                   </DropdownMenuItem>
                                 </>
                               )}
@@ -536,6 +625,33 @@ const CrewRoster: React.FC = () => {
         onSuccess={() => {
           refetchCrew();
         }}
+      />
+
+      {/* Admin Action Modals */}
+      <AdminPinModal
+        open={isPinModalOpen}
+        onOpenChange={setIsPinModalOpen}
+        onConfirmed={handlePinConfirmed}
+        title="Confirm Admin Action"
+        description="Enter your 6-digit admin PIN to proceed with this sensitive action."
+      />
+
+      <ResetAccountModal
+        open={isResetModalOpen}
+        onOpenChange={setIsResetModalOpen}
+        crewMember={selectedCrew}
+      />
+
+      <ToggleAccessModal
+        open={isToggleAccessModalOpen}
+        onOpenChange={setIsToggleAccessModalOpen}
+        crewMember={selectedCrew}
+      />
+
+      <ReallocateVesselModal
+        open={isReallocateModalOpen}
+        onOpenChange={setIsReallocateModalOpen}
+        crewMember={selectedCrew}
       />
     </DashboardLayout>
   );

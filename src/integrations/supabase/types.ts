@@ -14,6 +14,89 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_action_log: {
+        Row: {
+          action_type: string
+          actor_user_id: string
+          after_json: Json | null
+          before_json: Json | null
+          created_at: string
+          id: string
+          ip_address: string | null
+          reason: string | null
+          target_crew_id: string | null
+          target_user_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action_type: string
+          actor_user_id: string
+          after_json?: Json | null
+          before_json?: Json | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          reason?: string | null
+          target_crew_id?: string | null
+          target_user_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action_type?: string
+          actor_user_id?: string
+          after_json?: Json | null
+          before_json?: Json | null
+          created_at?: string
+          id?: string
+          ip_address?: string | null
+          reason?: string | null
+          target_crew_id?: string | null
+          target_user_id?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_action_log_target_crew_id_fkey"
+            columns: ["target_crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_pins: {
+        Row: {
+          created_at: string
+          failed_attempts: number | null
+          id: string
+          last_confirmed_at: string | null
+          locked_until: string | null
+          pin_hash: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          failed_attempts?: number | null
+          id?: string
+          last_confirmed_at?: string | null
+          locked_until?: string | null
+          pin_hash: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          failed_attempts?: number | null
+          id?: string
+          last_confirmed_at?: string | null
+          locked_until?: string | null
+          pin_hash?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       ais_snapshots: {
         Row: {
           cog: number | null
@@ -4880,6 +4963,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          account_status: string | null
           avatar_url: string | null
           cabin: string | null
           company_id: string | null
@@ -4899,6 +4983,7 @@ export type Database = {
           invitation_token_expires: string | null
           invited_at: string | null
           last_invited_at: string | null
+          last_login_at: string | null
           last_name: string
           medical_expiry: string | null
           nationality: string | null
@@ -4919,6 +5004,7 @@ export type Database = {
           visa_status: string | null
         }
         Insert: {
+          account_status?: string | null
           avatar_url?: string | null
           cabin?: string | null
           company_id?: string | null
@@ -4938,6 +5024,7 @@ export type Database = {
           invitation_token_expires?: string | null
           invited_at?: string | null
           last_invited_at?: string | null
+          last_login_at?: string | null
           last_name: string
           medical_expiry?: string | null
           nationality?: string | null
@@ -4958,6 +5045,7 @@ export type Database = {
           visa_status?: string | null
         }
         Update: {
+          account_status?: string | null
           avatar_url?: string | null
           cabin?: string | null
           company_id?: string | null
@@ -4977,6 +5065,7 @@ export type Database = {
           invitation_token_expires?: string | null
           invited_at?: string | null
           last_invited_at?: string | null
+          last_login_at?: string | null
           last_name?: string
           medical_expiry?: string | null
           nationality?: string | null

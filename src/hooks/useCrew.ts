@@ -31,6 +31,10 @@ export interface CrewMember {
   passport_number?: string | null;
   passport_expiry?: string | null;
   visa_status?: string | null;
+  // Account status fields
+  account_status?: string | null;
+  last_login_at?: string | null;
+  invited_at?: string | null;
   // Assignment
   current_assignment?: {
     id: string;
@@ -183,6 +187,9 @@ export const useCrew = (vesselFilter?: string) => {
           passport_number: p.passport_number,
           passport_expiry: p.passport_expiry,
           visa_status: p.visa_status,
+          account_status: p.account_status,
+          last_login_at: p.last_login_at,
+          invited_at: p.invited_at,
           current_assignment: assignment
             ? {
                 id: assignment.id,
