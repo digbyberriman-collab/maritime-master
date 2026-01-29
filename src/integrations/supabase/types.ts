@@ -739,6 +739,78 @@ export type Database = {
         }
         Relationships: []
       }
+      compliance_access_log: {
+        Row: {
+          access_granted: boolean | null
+          accessed_fields: string[] | null
+          action: string
+          audit_session_id: string | null
+          company_id: string
+          created_at: string | null
+          denial_reason: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          ip_address: string | null
+          is_audit_mode: boolean | null
+          module: string
+          user_agent: string | null
+          user_id: string
+          user_role: string
+        }
+        Insert: {
+          access_granted?: boolean | null
+          accessed_fields?: string[] | null
+          action: string
+          audit_session_id?: string | null
+          company_id: string
+          created_at?: string | null
+          denial_reason?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          ip_address?: string | null
+          is_audit_mode?: boolean | null
+          module: string
+          user_agent?: string | null
+          user_id: string
+          user_role: string
+        }
+        Update: {
+          access_granted?: boolean | null
+          accessed_fields?: string[] | null
+          action?: string
+          audit_session_id?: string | null
+          company_id?: string
+          created_at?: string | null
+          denial_reason?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          ip_address?: string | null
+          is_audit_mode?: boolean | null
+          module?: string
+          user_agent?: string | null
+          user_id?: string
+          user_role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_access_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compliance_access_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       corrective_actions: {
         Row: {
           action_number: string
@@ -1116,6 +1188,59 @@ export type Database = {
             columns: ["vessel_id"]
             isOneToOne: false
             referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      data_retention_policies: {
+        Row: {
+          auto_archive: boolean | null
+          company_id: string
+          created_at: string | null
+          data_owner: string
+          gdpr_lawful_basis: Database["public"]["Enums"]["gdpr_lawful_basis"]
+          gdpr_purpose: string
+          id: string
+          record_type: Database["public"]["Enums"]["hr_record_type"]
+          require_dpa_approval_for_deletion: boolean | null
+          retention_trigger: string
+          retention_years: number
+          updated_at: string | null
+        }
+        Insert: {
+          auto_archive?: boolean | null
+          company_id: string
+          created_at?: string | null
+          data_owner?: string
+          gdpr_lawful_basis: Database["public"]["Enums"]["gdpr_lawful_basis"]
+          gdpr_purpose: string
+          id?: string
+          record_type: Database["public"]["Enums"]["hr_record_type"]
+          require_dpa_approval_for_deletion?: boolean | null
+          retention_trigger?: string
+          retention_years: number
+          updated_at?: string | null
+        }
+        Update: {
+          auto_archive?: boolean | null
+          company_id?: string
+          created_at?: string | null
+          data_owner?: string
+          gdpr_lawful_basis?: Database["public"]["Enums"]["gdpr_lawful_basis"]
+          gdpr_purpose?: string
+          id?: string
+          record_type?: Database["public"]["Enums"]["hr_record_type"]
+          require_dpa_approval_for_deletion?: boolean | null
+          retention_trigger?: string
+          retention_years?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_retention_policies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -3302,6 +3427,86 @@ export type Database = {
           },
         ]
       }
+      gdpr_requests: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          deadline_date: string
+          export_file_url: string | null
+          id: string
+          processed_at: string | null
+          processed_by: string | null
+          request_type: string
+          requested_at: string | null
+          requested_by: string
+          response_notes: string | null
+          status: string
+          subject_user_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          deadline_date: string
+          export_file_url?: string | null
+          id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          request_type: string
+          requested_at?: string | null
+          requested_by: string
+          response_notes?: string | null
+          status?: string
+          subject_user_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          deadline_date?: string
+          export_file_url?: string | null
+          id?: string
+          processed_at?: string | null
+          processed_by?: string | null
+          request_type?: string
+          requested_at?: string | null
+          requested_by?: string
+          response_notes?: string | null
+          status?: string
+          subject_user_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gdpr_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gdpr_requests_processed_by_fkey"
+            columns: ["processed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "gdpr_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "gdpr_requests_subject_user_id_fkey"
+            columns: ["subject_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       hours_of_rest_records: {
         Row: {
           crew_id: string
@@ -3369,6 +3574,185 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vessels"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_audit_access_grants: {
+        Row: {
+          allowed_fields: string[] | null
+          audit_session_id: string
+          company_id: string
+          denied_fields: string[] | null
+          expires_at: string
+          granted_access_level: string
+          granted_at: string | null
+          granted_by: string
+          id: string
+          notes: string | null
+          revoked_at: string | null
+          revoked_by: string | null
+        }
+        Insert: {
+          allowed_fields?: string[] | null
+          audit_session_id: string
+          company_id: string
+          denied_fields?: string[] | null
+          expires_at: string
+          granted_access_level?: string
+          granted_at?: string | null
+          granted_by: string
+          id?: string
+          notes?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+        }
+        Update: {
+          allowed_fields?: string[] | null
+          audit_session_id?: string
+          company_id?: string
+          denied_fields?: string[] | null
+          expires_at?: string
+          granted_access_level?: string
+          granted_at?: string | null
+          granted_by?: string
+          id?: string
+          notes?: string | null
+          revoked_at?: string | null
+          revoked_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_audit_access_grants_audit_session_id_fkey"
+            columns: ["audit_session_id"]
+            isOneToOne: false
+            referencedRelation: "audit_mode_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_audit_access_grants_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_audit_access_grants_granted_by_fkey"
+            columns: ["granted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "hr_audit_access_grants_revoked_by_fkey"
+            columns: ["revoked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      hr_record_metadata: {
+        Row: {
+          anonymized_at: string | null
+          anonymized_by: string | null
+          archived_at: string | null
+          archived_by: string | null
+          company_id: string
+          created_at: string | null
+          id: string
+          last_accessed_at: string | null
+          last_accessed_by: string | null
+          lifecycle_status:
+            | Database["public"]["Enums"]["record_lifecycle_status"]
+            | null
+          record_id: string
+          record_type: Database["public"]["Enums"]["hr_record_type"]
+          retention_end_date: string
+          retention_start_date: string
+          source_table: string
+          updated_at: string | null
+          user_id: string
+          version: number | null
+        }
+        Insert: {
+          anonymized_at?: string | null
+          anonymized_by?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          company_id: string
+          created_at?: string | null
+          id?: string
+          last_accessed_at?: string | null
+          last_accessed_by?: string | null
+          lifecycle_status?:
+            | Database["public"]["Enums"]["record_lifecycle_status"]
+            | null
+          record_id: string
+          record_type: Database["public"]["Enums"]["hr_record_type"]
+          retention_end_date: string
+          retention_start_date: string
+          source_table: string
+          updated_at?: string | null
+          user_id: string
+          version?: number | null
+        }
+        Update: {
+          anonymized_at?: string | null
+          anonymized_by?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
+          company_id?: string
+          created_at?: string | null
+          id?: string
+          last_accessed_at?: string | null
+          last_accessed_by?: string | null
+          lifecycle_status?:
+            | Database["public"]["Enums"]["record_lifecycle_status"]
+            | null
+          record_id?: string
+          record_type?: Database["public"]["Enums"]["hr_record_type"]
+          retention_end_date?: string
+          retention_start_date?: string
+          source_table?: string
+          updated_at?: string | null
+          user_id?: string
+          version?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_record_metadata_anonymized_by_fkey"
+            columns: ["anonymized_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "hr_record_metadata_archived_by_fkey"
+            columns: ["archived_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "hr_record_metadata_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_record_metadata_last_accessed_by_fkey"
+            columns: ["last_accessed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "hr_record_metadata_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -3584,6 +3968,268 @@ export type Database = {
           },
           {
             foreignKeyName: "incidents_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insurance_audit_sessions: {
+        Row: {
+          access_token: string | null
+          access_token_expires_at: string | null
+          audit_party: string
+          auditor_email: string | null
+          auditor_name: string | null
+          company_id: string
+          created_at: string | null
+          created_by: string
+          end_datetime: string
+          id: string
+          is_active: boolean | null
+          start_datetime: string
+          updated_at: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          access_token_expires_at?: string | null
+          audit_party: string
+          auditor_email?: string | null
+          auditor_name?: string | null
+          company_id: string
+          created_at?: string | null
+          created_by: string
+          end_datetime: string
+          id?: string
+          is_active?: boolean | null
+          start_datetime: string
+          updated_at?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          access_token_expires_at?: string | null
+          audit_party?: string
+          auditor_email?: string | null
+          auditor_name?: string | null
+          company_id?: string
+          created_at?: string | null
+          created_by?: string
+          end_datetime?: string
+          id?: string
+          is_active?: boolean | null
+          start_datetime?: string
+          updated_at?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insurance_audit_sessions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insurance_audit_sessions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "insurance_audit_sessions_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insurance_claims: {
+        Row: {
+          attachments: string[] | null
+          claim_amount: number | null
+          claim_date: string
+          claim_number: string
+          company_id: string
+          correspondence_notes: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          incident_description: string
+          lifecycle_status:
+            | Database["public"]["Enums"]["record_lifecycle_status"]
+            | null
+          policy_id: string
+          settlement_amount: number | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          attachments?: string[] | null
+          claim_amount?: number | null
+          claim_date: string
+          claim_number: string
+          company_id: string
+          correspondence_notes?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          incident_description: string
+          lifecycle_status?:
+            | Database["public"]["Enums"]["record_lifecycle_status"]
+            | null
+          policy_id: string
+          settlement_amount?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          attachments?: string[] | null
+          claim_amount?: number | null
+          claim_date?: string
+          claim_number?: string
+          company_id?: string
+          correspondence_notes?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          incident_description?: string
+          lifecycle_status?:
+            | Database["public"]["Enums"]["record_lifecycle_status"]
+            | null
+          policy_id?: string
+          settlement_amount?: number | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insurance_claims_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insurance_claims_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "insurance_claims_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_policies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insurance_policies: {
+        Row: {
+          certificate_url: string | null
+          company_id: string
+          coverage_amount: number | null
+          coverage_end_date: string
+          coverage_start_date: string
+          created_at: string | null
+          created_by: string | null
+          deductible_amount: number | null
+          id: string
+          insurer_contact: string | null
+          insurer_name: string
+          lifecycle_status:
+            | Database["public"]["Enums"]["record_lifecycle_status"]
+            | null
+          notes: string | null
+          policy_document_url: string | null
+          policy_number: string
+          policy_type: string
+          premium_amount: number | null
+          status: string | null
+          updated_at: string | null
+          updated_by: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          certificate_url?: string | null
+          company_id: string
+          coverage_amount?: number | null
+          coverage_end_date: string
+          coverage_start_date: string
+          created_at?: string | null
+          created_by?: string | null
+          deductible_amount?: number | null
+          id?: string
+          insurer_contact?: string | null
+          insurer_name: string
+          lifecycle_status?:
+            | Database["public"]["Enums"]["record_lifecycle_status"]
+            | null
+          notes?: string | null
+          policy_document_url?: string | null
+          policy_number: string
+          policy_type: string
+          premium_amount?: number | null
+          status?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          certificate_url?: string | null
+          company_id?: string
+          coverage_amount?: number | null
+          coverage_end_date?: string
+          coverage_start_date?: string
+          created_at?: string | null
+          created_by?: string | null
+          deductible_amount?: number | null
+          id?: string
+          insurer_contact?: string | null
+          insurer_name?: string
+          lifecycle_status?:
+            | Database["public"]["Enums"]["record_lifecycle_status"]
+            | null
+          notes?: string | null
+          policy_document_url?: string | null
+          policy_number?: string
+          policy_type?: string
+          premium_amount?: number | null
+          status?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insurance_policies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insurance_policies_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "insurance_policies_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "insurance_policies_vessel_id_fkey"
             columns: ["vessel_id"]
             isOneToOne: false
             referencedRelation: "vessels"
@@ -5814,6 +6460,32 @@ export type Database = {
         | "auditor_class"
         | "travel_agent"
         | "employer_api"
+      gdpr_lawful_basis:
+        | "consent"
+        | "contractual"
+        | "legal_obligation"
+        | "vital_interests"
+        | "public_task"
+        | "legitimate_interest"
+      hr_record_type:
+        | "employment_contract"
+        | "salary_compensation"
+        | "pay_review"
+        | "annual_review"
+        | "performance_evaluation"
+        | "rotation_catchup"
+        | "disciplinary_minor"
+        | "disciplinary_serious"
+        | "welfare_note"
+        | "training_record"
+        | "leave_record"
+        | "medical_record"
+      record_lifecycle_status:
+        | "active"
+        | "pending_archive"
+        | "archived"
+        | "pending_deletion"
+        | "anonymized"
       user_role:
         | "master"
         | "chief_engineer"
@@ -5972,6 +6644,35 @@ export const Constants = {
         "auditor_class",
         "travel_agent",
         "employer_api",
+      ],
+      gdpr_lawful_basis: [
+        "consent",
+        "contractual",
+        "legal_obligation",
+        "vital_interests",
+        "public_task",
+        "legitimate_interest",
+      ],
+      hr_record_type: [
+        "employment_contract",
+        "salary_compensation",
+        "pay_review",
+        "annual_review",
+        "performance_evaluation",
+        "rotation_catchup",
+        "disciplinary_minor",
+        "disciplinary_serious",
+        "welfare_note",
+        "training_record",
+        "leave_record",
+        "medical_record",
+      ],
+      record_lifecycle_status: [
+        "active",
+        "pending_archive",
+        "archived",
+        "pending_deletion",
+        "anonymized",
       ],
       user_role: [
         "master",

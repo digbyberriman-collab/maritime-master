@@ -25,6 +25,8 @@ export const AUDIT_MODE_RULES: Record<string, AuditModeConfig> = {
       'incidents', // severity, date, status - no names
       'corrective_actions',
       'audit_history',
+      // Insurance - limited view
+      'insurance_policies_summary',
     ],
 
     redacted_fields: [
@@ -37,6 +39,24 @@ export const AUDIT_MODE_RULES: Record<string, AuditModeConfig> = {
       'maintenance.*', // all maintenance hidden
       'defects.cost',
       'commercial.*',
+      // HR - ALL HIDDEN by default
+      'hr.*',
+      'profiles.salary',
+      'profiles.compensation',
+      'profiles.bank_details',
+      'profiles.tax_info',
+      'profiles.welfare_notes',
+      'profiles.disciplinary',
+      'profiles.pay_reviews',
+      'profiles.annual_reviews',
+      'profiles.performance_evaluations',
+      'profiles.medical_records',
+      // Insurance - sensitive fields
+      'insurance_policies.premium_amount',
+      'insurance_policies.deductible_amount',
+      'insurance_policies.coverage_amount',
+      'insurance_policies.notes',
+      'insurance_claims.*', // all claims hidden
     ],
 
     allowed_actions: ['view', 'export_pdf'],
@@ -55,13 +75,22 @@ export const AUDIT_MODE_RULES: Record<string, AuditModeConfig> = {
       'defects', // class-related only
       'ism_critical_equipment',
       'corrective_actions', // class-related only
+      // Insurance - certificate view only
+      'insurance_certificates',
     ],
 
     redacted_fields: [
       'crew.*', // all crew data hidden
+      'hr.*', // all HR data hidden
       'incidents.*',
       'commercial.*',
       'maintenance.cost',
+      // Insurance - all financial data
+      'insurance_policies.premium_amount',
+      'insurance_policies.deductible_amount',
+      'insurance_policies.coverage_amount',
+      'insurance_policies.notes',
+      'insurance_claims.*',
     ],
 
     allowed_actions: ['view', 'export_pdf'],
@@ -83,6 +112,8 @@ export const AUDIT_MODE_RULES: Record<string, AuditModeConfig> = {
       'crew.emergency_contact',
       'crew.passport_number',
       'crew.visa_details',
+      'hr.*', // all HR hidden
+      'insurance.*', // all insurance hidden
     ],
 
     allowed_actions: ['view'],
@@ -99,9 +130,11 @@ export const AUDIT_MODE_RULES: Record<string, AuditModeConfig> = {
 
     redacted_fields: [
       'crew.*', // only see flight-relevant crew data
+      'hr.*', // all HR hidden
       'incidents.*',
       'maintenance.*',
       'documents.*',
+      'insurance.*', // all insurance hidden
     ],
 
     allowed_actions: ['view', 'update_booking', 'upload_documents'],
@@ -121,6 +154,29 @@ export const EMPLOYER_API_ALLOWED_FIELDS = [
   'crew.leave_balance',
   'crew.status',
 ];
+
+// HR fields that are ABSOLUTELY NEVER shown to auditors
+export const HR_ABSOLUTELY_RESTRICTED_FIELDS = [
+  'salary',
+  'compensation',
+  'bank_details',
+  'tax_info',
+  'disciplinary_records',
+  'welfare_notes',
+  'medical_records',
+  'pay_reviews',
+  'annual_reviews',
+  'performance_evaluations',
+] as const;
+
+// Insurance fields that are NEVER shown to auditors
+export const INSURANCE_ABSOLUTELY_RESTRICTED_FIELDS = [
+  'premium_amount',
+  'deductible_amount',
+  'claim_amount',
+  'settlement_amount',
+  'correspondence_notes',
+] as const;
 
 // Check if a field should be redacted for a role
 export function isFieldRedacted(role: string, fieldPath: string): boolean {
@@ -180,4 +236,111 @@ export function redactData<T extends Record<string, unknown>>(
   }
 
   return result;
+}
+
+// Mask a field value (show partial for reference)
+export function maskFieldValue(value: string, showChars = 3): string {
+  if (!value || value.length <= showChars) return '***';
+  return value.substring(0, showChars) + '***';
+}
+
+// Check if HR access is allowed for audit session
+export function isHRAuditAccessAllowed(
+  accessLevel: 'none' | 'employment_only' | 'limited' | 'full'
+): boolean {
+  return accessLevel !== 'none';
+}
+
+// Get allowed HR fields based on access level
+export function getAllowedHRFieldsForAudit(
+  accessLevel: 'none' | 'employment_only' | 'limited' | 'full'
+): string[] {
+  if (accessLevel === 'none') return [];
+  
+  const employmentOnlyFields = [
+    'employment_exists',
+    'contract_valid',
+    'position',
+    'department',
+    'vessel_assignment',
+  ];
+  
+  const limitedFields = [
+    ...employmentOnlyFields,
+    'start_date',
+    'end_date',
+    'contract_type',
+    'nationality',
+    'certification_status',
+  ];
+  
+  if (accessLevel === 'employment_only') return employmentOnlyFields;
+  if (accessLevel === 'limited') return limitedFields;
+  
+  // Full access - everything except absolutely restricted
+  return limitedFields; // Even "full" doesn't include salary, disciplinary, etc.
+}
+
+// Transform data for audit-safe view
+export function transformForAuditView<T extends Record<string, unknown>>(
+  data: T,
+  module: 'hr' | 'insurance',
+  accessLevel?: 'none' | 'employment_only' | 'limited' | 'full'
+): Partial<T> | { access_denied: true } {
+  if (module === 'hr') {
+    if (!accessLevel || accessLevel === 'none') {
+      return { access_denied: true };
+    }
+    
+    const allowedFields = getAllowedHRFieldsForAudit(accessLevel);
+    const result: Partial<T> = {};
+    
+    for (const field of allowedFields) {
+      if (field in data) {
+        result[field as keyof T] = data[field as keyof T];
+      }
+    }
+    
+    // Mark restricted fields
+    for (const field of HR_ABSOLUTELY_RESTRICTED_FIELDS) {
+      if (field in data) {
+        (result as any)[field] = '[REDACTED]';
+      }
+    }
+    
+    return result;
+  }
+  
+  if (module === 'insurance') {
+    const auditSafeFields = [
+      'id',
+      'policy_type',
+      'policy_number',
+      'insurer_name',
+      'coverage_start_date',
+      'coverage_end_date',
+      'certificate_url',
+      'status',
+      'vessel_id',
+    ];
+    
+    const result: Partial<T> = {};
+    
+    for (const field of auditSafeFields) {
+      if (field in data) {
+        result[field as keyof T] = data[field as keyof T];
+      }
+    }
+    
+    // Mark restricted fields
+    for (const field of INSURANCE_ABSOLUTELY_RESTRICTED_FIELDS) {
+      if (field in data) {
+        (result as any)[field] = '[REDACTED]';
+      }
+    }
+    
+    return result;
+  }
+  
+  return data;
 }

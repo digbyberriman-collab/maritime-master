@@ -12,3 +12,7 @@ export { default as SystemLogsSection } from './SystemLogsSection';
 export { default as VesselAccessSection } from './VesselAccessSection';
 export { default as PermissionsSection } from './PermissionsSection';
 export { default as AuditModeSection } from './AuditModeSection';
+export { default as DataRetentionSection } from './DataRetentionSection';
+export { default as InsuranceAuditModeSection } from './InsuranceAuditModeSection';
+export { default as HRAuditAccessSection } from './HRAuditAccessSection';
+export { default as GDPRRequestsSection } from './GDPRRequestsSection';

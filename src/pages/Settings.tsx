@@ -21,6 +21,10 @@ import {
   VesselAccessSection,
   PermissionsSection,
   AuditModeSection,
+  DataRetentionSection,
+  InsuranceAuditModeSection,
+  HRAuditAccessSection,
+  GDPRRequestsSection,
 } from '@/components/settings/sections';
 
 const Settings: React.FC = () => {
@@ -76,6 +80,14 @@ const Settings: React.FC = () => {
         return <PermissionsSection />;
       case 'audit-mode':
         return <AuditModeSection />;
+      case 'data-retention':
+        return <DataRetentionSection />;
+      case 'gdpr-requests':
+        return <GDPRRequestsSection />;
+      case 'insurance-audit':
+        return <InsuranceAuditModeSection />;
+      case 'hr-audit-access':
+        return <HRAuditAccessSection />;
       case 'integrations':
         return <IntegrationsSection />;
       case 'templates':
