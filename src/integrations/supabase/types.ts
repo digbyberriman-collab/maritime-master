@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      activity_log: {
+        Row: {
+          activity_type: string
+          company_id: string
+          created_at: string | null
+          description: string | null
+          id: string
+          module: string | null
+          performed_by: string | null
+          performed_by_name: string | null
+          record_id: string | null
+          record_type: string | null
+          title: string
+          vessel_id: string | null
+        }
+        Insert: {
+          activity_type: string
+          company_id: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          module?: string | null
+          performed_by?: string | null
+          performed_by_name?: string | null
+          record_id?: string | null
+          record_type?: string | null
+          title: string
+          vessel_id?: string | null
+        }
+        Update: {
+          activity_type?: string
+          company_id?: string
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          module?: string | null
+          performed_by?: string | null
+          performed_by_name?: string | null
+          record_id?: string | null
+          record_type?: string | null
+          title?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activity_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activity_log_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       admin_action_log: {
         Row: {
           action_type: string
@@ -7704,6 +7764,83 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_dashboard_alerts: {
+        Args: {
+          p_all_vessels?: boolean
+          p_company_id: string
+          p_limit?: number
+          p_vessel_id?: string
+        }
+        Returns: {
+          created_at: string
+          due_at: string
+          id: string
+          is_overdue: boolean
+          severity: string
+          source_module: string
+          title: string
+          vessel_id: string
+          vessel_name: string
+        }[]
+      }
+      get_expiring_certificates: {
+        Args: {
+          p_all_vessels?: boolean
+          p_company_id: string
+          p_days?: number
+          p_vessel_id?: string
+        }
+        Returns: {
+          certificate_name: string
+          certificate_type: string
+          crew_member_name: string
+          days_until_expiry: number
+          expiry_date: string
+          id: string
+          is_crew_cert: boolean
+          vessel_id: string
+          vessel_name: string
+        }[]
+      }
+      get_recent_activity: {
+        Args: {
+          p_all_vessels?: boolean
+          p_company_id: string
+          p_limit?: number
+          p_vessel_id?: string
+        }
+        Returns: {
+          activity_type: string
+          created_at: string
+          description: string
+          id: string
+          module: string
+          performed_by_name: string
+          record_id: string
+          title: string
+          vessel_id: string
+          vessel_name: string
+        }[]
+      }
+      get_upcoming_audits: {
+        Args: {
+          p_all_vessels?: boolean
+          p_company_id: string
+          p_days?: number
+          p_vessel_id?: string
+        }
+        Returns: {
+          audit_number: string
+          audit_scope: string
+          audit_type: string
+          days_until_due: number
+          id: string
+          scheduled_date: string
+          status: string
+          vessel_id: string
+          vessel_name: string
+        }[]
+      }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_permissions_full: {
         Args: { p_user_id: string }
