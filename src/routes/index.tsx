@@ -81,6 +81,7 @@ import Policies from '@/pages/documents/Policies';
 
 // Maintenance Pages
 import MaintenanceDefects from '@/pages/maintenance/MaintenanceDefects';
+import CriticalEquipment from '@/pages/maintenance/CriticalEquipment';
 
 // Vessel Pages
 import CompanyDetails from '@/pages/vessels/CompanyDetails';
@@ -494,16 +495,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/maintenance" element={<ProtectedRoute><Maintenance /></ProtectedRoute>} />
       <Route path="/maintenance/dashboard" element={<ProtectedRoute><Maintenance /></ProtectedRoute>} />
       <Route path="/maintenance/defects" element={<ProtectedRoute><MaintenanceDefects /></ProtectedRoute>} />
-      <Route path="/maintenance/critical" element={
-        <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Critical Equipment" 
-            description="Critical equipment status monitoring"
-            icon={<Shield className="w-8 h-8 text-primary" />}
-            features={['ISM critical equipment list', 'Maintenance status', 'Spare parts tracking', 'Test records']} 
-          />
-        </ProtectedRoute>
-      } />
+      <Route path="/maintenance/critical" element={<ProtectedRoute><CriticalEquipment /></ProtectedRoute>} />
       <Route path="/maintenance/spares" element={
         <ProtectedRoute>
           <PlaceholderWrapper 
