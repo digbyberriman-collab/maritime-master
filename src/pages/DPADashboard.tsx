@@ -5,8 +5,6 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { 
   Anchor, 
   Bell,
@@ -19,14 +17,13 @@ import {
   ArrowRightLeft,
   Activity
 } from 'lucide-react';
-import { useVesselCount, useVessels } from '@/hooks/useVessels';
+import { useVesselCount } from '@/hooks/useVessels';
 import { useCrewCount, useRecentCrewChanges, useCrew } from '@/hooks/useCrew';
 import { useOverdueCAPAs, useRecentIncidents } from '@/hooks/useCAPAAnalytics';
 import { format } from 'date-fns';
 import AlertKPITiles from '@/components/dashboard/AlertKPITiles';
-import RedRoomAlerts, { RedAlert } from '@/components/dashboard/RedRoomAlerts';
+import RedRoomPanel from '@/components/dashboard/RedRoomPanel';
 import AlertSections from '@/components/dashboard/AlertSections';
-import VesselFilter from '@/components/dashboard/VesselFilter';
 import CrewFormModal from '@/components/crew/CrewFormModal';
 
 const DPADashboard: React.FC = () => {
@@ -34,18 +31,7 @@ const DPADashboard: React.FC = () => {
   const navigate = useNavigate();
   const [isAddCrewModalOpen, setIsAddCrewModalOpen] = useState(false);
   
-  // Vessel filter state
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedVesselIds, setSelectedVesselIds] = useState<string[]>([]);
-  const [alertFilters, setAlertFilters] = useState({
-    red: true,
-    orange: true,
-    yellow: true,
-    green: false,
-  });
-  
   const { data: vesselCount } = useVesselCount();
-  const { vessels } = useVessels();
   const { data: crewCount, refetch: refetchCrewCount } = useCrewCount();
   const { data: recentChanges, refetch: refetchRecentChanges } = useRecentCrewChanges(5);
   const { addCrewMember } = useCrew();
@@ -61,63 +47,9 @@ const DPADashboard: React.FC = () => {
     shore_management: 'Shore Management',
   };
 
-  // Mock alert data - in production these would come from hooks
-  const redAlerts: RedAlert[] = recentIncidents
-    ?.filter(i => (i.severity_actual ?? 0) >= 4)
-    .slice(0, 3)
-    .map(incident => ({
-      id: incident.id,
-      type: 'incident' as const,
-      vesselName: (incident.vessel as { name: string })?.name || 'Unknown',
-      title: incident.incident_number,
-      description: incident.description || 'High-severity incident reported',
-      timestamp: incident.incident_date,
-      severity: 'high' as const,
-      status: 'pending' as const,
-    })) || [];
-
-  // Add overdue CAPAs to red alerts
-  if (overdueCapas?.length) {
-    overdueCapas.slice(0, 2).forEach(capa => {
-      redAlerts.push({
-        id: capa.id,
-        type: 'capa',
-        vesselName: 'Fleet',
-        title: capa.action_number,
-        description: `Critical CAPA overdue: ${capa.description}`,
-        timestamp: capa.due_date,
-        severity: 'high',
-        status: 'pending',
-      });
-    });
-  }
-
-  const handleViewAlert = (alert: RedAlert) => {
-    if (alert.type === 'incident') {
-      navigate(`/compliance?incident=${alert.id}`);
-    } else if (alert.type === 'capa') {
-      navigate('/reports/capa-tracker');
-    }
-  };
-
-  const handleAcknowledgeAlert = (alert: RedAlert) => {
-    console.log('Acknowledging alert:', alert.id);
-    // In production, this would call an API to acknowledge
-  };
-
-  const handleVesselToggle = (vesselId: string) => {
-    setSelectedVesselIds(prev => 
-      prev.includes(vesselId) 
-        ? prev.filter(id => id !== vesselId)
-        : [...prev, vesselId]
-    );
-  };
-
-  const vesselList = vessels?.map(v => ({
-    id: v.id,
-    name: v.name,
-    status: v.status,
-  })) || [];
+  // Count red alerts from recent incidents
+  const redAlertsCount = (recentIncidents?.filter(i => (i.severity_actual ?? 0) >= 4).length || 0) + 
+    (overdueCapas?.slice(0, 2).length || 0);
 
   return (
     <DashboardLayout>
@@ -159,7 +91,7 @@ const DPADashboard: React.FC = () => {
 
           {/* KPI Tiles */}
           <AlertKPITiles
-            redAlerts={redAlerts.length}
+            redAlerts={redAlertsCount}
             orangeAlerts={overdueCapas?.length || 0}
             yellowAlerts={5} // Mock - would come from cert expiry hook
             greenItems={45}
@@ -168,7 +100,7 @@ const DPADashboard: React.FC = () => {
             onTileClick={(type) => {
               switch (type) {
                 case 'red':
-                  // Scroll to red room
+                  navigate('/alerts?severity=red');
                   break;
                 case 'orange':
                   navigate('/reports/capa-tracker');
@@ -186,14 +118,8 @@ const DPADashboard: React.FC = () => {
             }}
           />
 
-          {/* Red Room */}
-          <RedRoomAlerts
-            alerts={redAlerts}
-            onView={handleViewAlert}
-            onAcknowledge={handleAcknowledgeAlert}
-            onAssign={(alert) => console.log('Assign:', alert.id)}
-            onViewAll={() => navigate('/compliance')}
-          />
+          {/* Red Room - Using new RedRoomPanel with full functionality */}
+          <RedRoomPanel />
 
           {/* Orange and Yellow Sections */}
           <AlertSections
