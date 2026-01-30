@@ -39,30 +39,36 @@ const SOPsPage: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   
-  const { documents = [], isLoading } = useDocuments();
+  // useDocuments requires filters parameter
+  const { data: documents = [], isLoading } = useDocuments({
+    search: '',
+    categories: [],
+    statuses: [],
+    ismSections: [],
+    vesselId: null,
+  });
 
   // Filter documents that are SOPs/procedures
   const sopDocuments = documents.filter(
-    d => d.category?.toLowerCase().includes('sop') || 
-         d.category?.toLowerCase().includes('procedure') ||
-         d.document_type?.toLowerCase().includes('procedure') ||
-         d.name?.toLowerCase().includes('sop') ||
-         d.name?.toLowerCase().includes('procedure')
+    d => d.category?.name?.toLowerCase().includes('sop') || 
+         d.category?.name?.toLowerCase().includes('procedure') ||
+         d.title?.toLowerCase().includes('sop') ||
+         d.title?.toLowerCase().includes('procedure')
   );
 
   const filteredDocuments = sopDocuments.filter((doc) => {
     const matchesSearch = searchQuery === '' || 
-      doc.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      doc.title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       doc.description?.toLowerCase().includes(searchQuery.toLowerCase());
     
-    const matchesCategory = categoryFilter === 'all' || doc.category === categoryFilter;
+    const matchesCategory = categoryFilter === 'all' || doc.category?.id === categoryFilter;
     const matchesStatus = statusFilter === 'all' || doc.status === statusFilter;
     
     return matchesSearch && matchesCategory && matchesStatus;
   });
 
   // Get unique categories
-  const categories = [...new Set(sopDocuments.map(d => d.category).filter(Boolean))];
+  const categories = [...new Set(sopDocuments.map(d => d.category?.name).filter(Boolean))];
 
   // Stats
   const activeSOPs = sopDocuments.filter(d => d.status === 'active' || d.status === 'approved').length;
@@ -168,8 +174,8 @@ const SOPsPage: React.FC = () => {
                 <SelectContent>
                   <SelectItem value="all">All Categories</SelectItem>
                   {categories.map((cat) => (
-                    <SelectItem key={cat} value={cat || ''}>
-                      {cat}
+                    <SelectItem key={cat as string} value={cat as string}>
+                      {cat as string}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -228,11 +234,11 @@ const SOPsPage: React.FC = () => {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{doc.name}</span>
+                          <span className="font-medium">{doc.title}</span>
                         </div>
                       </TableCell>
-                      <TableCell>{doc.category || '-'}</TableCell>
-                      <TableCell>v{doc.version || '1.0'}</TableCell>
+                      <TableCell>{doc.category?.name || '-'}</TableCell>
+                      <TableCell>v{doc.revision || '1.0'}</TableCell>
                       <TableCell>
                         {doc.updated_at && format(new Date(doc.updated_at), 'MMM d, yyyy')}
                       </TableCell>

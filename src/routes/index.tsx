@@ -12,6 +12,7 @@ import {
 // Main Pages
 import Index from '@/pages/Index';
 import Auth from '@/pages/Auth';
+import ResetPassword from '@/pages/ResetPassword';
 import Dashboard from '@/pages/Dashboard';
 import Vessels from '@/pages/Vessels';
 import VesselDashboard from '@/pages/VesselDashboard';
@@ -92,6 +93,7 @@ export const AppRoutes: React.FC = () => {
       {/* Public Routes */}
       <Route path="/" element={<Index />} />
       <Route path="/auth" element={<Auth />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Dashboard */}
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

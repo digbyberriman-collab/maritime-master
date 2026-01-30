@@ -28,13 +28,14 @@ const ERMPage: React.FC = () => {
   const { data: riskAssessments = [] } = useRiskAssessments();
   const { data: incidents = [] } = useIncidents({});
   const { data: actions = [] } = useCorrectiveActions();
-  const { audits = [], openFindings = 0 } = useAudits();
+  const { audits = [], openFindings = [] } = useAudits();
 
-  // Calculate risk metrics
-  const highRiskCount = riskAssessments.filter(r => r.risk_level === 'High' || r.risk_level === 'Critical').length;
-  const mediumRiskCount = riskAssessments.filter(r => r.risk_level === 'Medium').length;
-  const lowRiskCount = riskAssessments.filter(r => r.risk_level === 'Low').length;
+  // Calculate risk metrics based on risk_score_initial
+  const highRiskCount = riskAssessments.filter(r => (r.risk_score_initial ?? 0) >= 15).length;
+  const mediumRiskCount = riskAssessments.filter(r => (r.risk_score_initial ?? 0) >= 8 && (r.risk_score_initial ?? 0) < 15).length;
+  const lowRiskCount = riskAssessments.filter(r => (r.risk_score_initial ?? 0) < 8).length;
   const totalRisks = riskAssessments.length;
+  const openFindingsCount = openFindings.length;
 
   // Calculate incident metrics
   const openIncidents = incidents.filter(i => i.status === 'Open' || i.status === 'Under Investigation').length;
@@ -182,8 +183,8 @@ const ERMPage: React.FC = () => {
               <Target className="h-4 w-4 text-purple-500" />
             </CardHeader>
             <CardContent>
-              <div className={cn("text-2xl font-bold", openFindings > 0 && "text-purple-600")}>
-                {openFindings}
+              <div className={cn("text-2xl font-bold", openFindingsCount > 0 && "text-purple-600")}>
+                {openFindingsCount}
               </div>
               <p className="text-xs text-muted-foreground">
                 Open findings
