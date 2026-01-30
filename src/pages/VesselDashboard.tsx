@@ -1,25 +1,34 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
   Ship,
-  Plus,
   UserPlus,
   FileText,
   AlertTriangle,
   CalendarDays,
   ChevronRight,
   ClipboardList,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVessel } from '@/contexts/VesselContext';
 import { useVesselDashboard } from '@/hooks/useVesselDashboard';
 import { useRBACPermissions } from '@/hooks/useRBACPermissions';
+import { useDashboardStore } from '@/store/dashboardStore';
 import VesselHeader from '@/components/dashboard/VesselHeader';
+import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
+import { FleetFilter } from '@/components/dashboard/FleetFilter';
+import { KPITiles } from '@/components/dashboard/KPITiles';
+import { AlertsTriagePanel } from '@/components/dashboard/AlertsTriagePanel';
+import { ComplianceSnapshot } from '@/components/dashboard/ComplianceSnapshot';
+import { OperationsSnapshot } from '@/components/dashboard/OperationsSnapshot';
+import { RecentActivityFeed } from '@/components/dashboard/RecentActivityFeed';
+import { QuickActionsMenu } from '@/components/dashboard/QuickActionsMenu';
 import {
   AlertsWidget,
   CrewWidget,
@@ -33,14 +42,38 @@ import {
 import { useRecentIncidents } from '@/hooks/useCAPAAnalytics';
 import { format } from 'date-fns';
 import { getIncidentTypeColor } from '@/lib/incidentConstants';
+import { getWidgetsForRole, type WidgetKey } from '@/types/dashboard';
+import { cn } from '@/lib/utils';
 
 const VesselDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const { isAllVessels, selectedVessel, canAccessAllVessels } = useVessel();
+  const { isAllVessels, selectedVessel, selectedVesselId, canAccessAllVessels } = useVessel();
   const { dashboardData, isLoading, refetch } = useVesselDashboard();
   const { canView, isInitialized } = useRBACPermissions();
   const { data: recentIncidents } = useRecentIncidents(5);
+
+  // Initialize the dashboard store
+  const {
+    summary: storeSummary,
+    isLoading: storeLoading,
+    isRefreshing,
+    error: storeError,
+    lastRefreshed,
+    initialize,
+    refresh,
+  } = useDashboardStore();
+
+  const companyId = profile?.company_id;
+  const userRole = profile?.role || 'crew';
+  const visibleWidgets = getWidgetsForRole(userRole);
+
+  // Initialize the store when component mounts
+  useEffect(() => {
+    if (companyId) {
+      initialize(companyId, userRole, selectedVesselId, canAccessAllVessels);
+    }
+  }, [companyId, userRole, selectedVesselId, canAccessAllVessels, initialize]);
 
   // Role-based widget visibility
   const canViewAlerts = isInitialized ? canView('alerts') : true;
@@ -53,48 +86,107 @@ const VesselDashboard: React.FC = () => {
   const canViewForms = isInitialized ? canView('forms') : true;
   const canViewIncidents = isInitialized ? canView('incidents') : true;
 
+  const canShowWidget = (widget: WidgetKey) => visibleWidgets.includes(widget);
+
+  const handleRefresh = () => {
+    refetch();
+    refresh();
+  };
+
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
-        {/* Vessel/Fleet Header */}
-        <VesselHeader
-          data={dashboardData}
-          isLoading={isLoading}
-          isAllVessels={isAllVessels}
-          onRefresh={() => refetch()}
-          userName={profile?.first_name}
-        />
-
-        {/* KPI Widget Grid */}
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-          {canViewAlerts && (
-            <AlertsWidget data={dashboardData} isLoading={isLoading} />
-          )}
-          {canViewCrew && (
-            <CrewWidget data={dashboardData} isLoading={isLoading} />
-          )}
-          {canViewCertificates && (
-            <CertificatesWidget data={dashboardData} isLoading={isLoading} />
-          )}
-          {canViewMaintenance && (
-            <MaintenanceWidget data={dashboardData} isLoading={isLoading} />
-          )}
+        {/* Enhanced Header with Fleet Filter */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <VesselHeader
+            data={dashboardData}
+            isLoading={isLoading}
+            isAllVessels={isAllVessels}
+            onRefresh={handleRefresh}
+            userName={profile?.first_name}
+          />
+          
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Fleet Filter (DPA/Fleet roles only) */}
+            {canAccessAllVessels && <FleetFilter />}
+            
+            {/* Refresh Button */}
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={cn('w-4 h-4 mr-2', isRefreshing && 'animate-spin')} />
+              Refresh
+            </Button>
+            
+            {/* Quick Actions Menu */}
+            <QuickActionsMenu />
+          </div>
         </div>
 
-        {/* Secondary Widgets Row */}
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-          {canViewDrills && (
-            <DrillsWidget data={dashboardData} isLoading={isLoading} />
-          )}
-          {canViewTraining && (
-            <TrainingWidget data={dashboardData} isLoading={isLoading} />
-          )}
-          {canViewCompliance && (
-            <ComplianceWidget data={dashboardData} isLoading={isLoading} />
-          )}
-          {canViewForms && (
-            <SignaturesWidget data={dashboardData} isLoading={isLoading} />
-          )}
+        {/* Last Updated */}
+        {lastRefreshed && (
+          <p className="text-xs text-muted-foreground -mt-4">
+            Last updated: {lastRefreshed.toLocaleString()}
+          </p>
+        )}
+
+        {/* KPI Widget Grid - Enhanced */}
+        {storeSummary && (
+          <KPITiles summary={storeSummary} visibleWidgets={visibleWidgets} />
+        )}
+
+        {/* Fallback KPI Widgets using existing hook */}
+        {!storeSummary && (
+          <>
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+              {canViewAlerts && (
+                <AlertsWidget data={dashboardData} isLoading={isLoading} />
+              )}
+              {canViewCrew && (
+                <CrewWidget data={dashboardData} isLoading={isLoading} />
+              )}
+              {canViewCertificates && (
+                <CertificatesWidget data={dashboardData} isLoading={isLoading} />
+              )}
+              {canViewMaintenance && (
+                <MaintenanceWidget data={dashboardData} isLoading={isLoading} />
+              )}
+            </div>
+
+            {/* Secondary Widgets Row */}
+            <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+              {canViewDrills && (
+                <DrillsWidget data={dashboardData} isLoading={isLoading} />
+              )}
+              {canViewTraining && (
+                <TrainingWidget data={dashboardData} isLoading={isLoading} />
+              )}
+              {canViewCompliance && (
+                <ComplianceWidget data={dashboardData} isLoading={isLoading} />
+              )}
+              {canViewForms && (
+                <SignaturesWidget data={dashboardData} isLoading={isLoading} />
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Main Widgets Grid - New Enhanced Panels */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column: Alerts & Compliance */}
+          <div className="space-y-6">
+            {canShowWidget('alerts') && <AlertsTriagePanel />}
+            {canShowWidget('compliance') && <ComplianceSnapshot />}
+          </div>
+          
+          {/* Right Column: Operations & Activity */}
+          <div className="space-y-6">
+            {canShowWidget('operations') && <OperationsSnapshot />}
+            {canShowWidget('activity') && <RecentActivityFeed />}
+          </div>
         </div>
 
         {/* Quick Actions */}
