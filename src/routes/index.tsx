@@ -73,6 +73,7 @@ import RolesPermissionsPage from '@/pages/settings/RolesPermissionsPage';
 import UserManagement from '@/pages/admin/UserManagement';
 import FleetGroups from '@/pages/admin/FleetGroups';
 import AlertConfiguration from '@/pages/admin/AlertConfiguration';
+import APIIntegrations from '@/pages/admin/APIIntegrations';
 
 // Document Pages
 import Manuals from '@/pages/documents/Manuals';
@@ -80,6 +81,9 @@ import Policies from '@/pages/documents/Policies';
 
 // Maintenance Pages
 import MaintenanceDefects from '@/pages/maintenance/MaintenanceDefects';
+
+// Vessel Pages
+import CompanyDetails from '@/pages/vessels/CompanyDetails';
 
 // Placeholder wrapper with layout
 const PlaceholderWrapper: React.FC<{ 
@@ -122,16 +126,7 @@ export const AppRoutes: React.FC = () => {
           <VesselDashboard />
         </ProtectedRoute>
       } />
-      <Route path="/vessels/company-details" element={
-        <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Company Details" 
-            description="Company information and management contacts"
-            icon={<Building2 className="w-8 h-8 text-primary" />}
-            features={['Company information', 'DPA contacts', 'Management contacts', 'Technical manager details']} 
-          />
-        </ProtectedRoute>
-      } />
+      <Route path="/vessels/company-details" element={<ProtectedRoute><CompanyDetails /></ProtectedRoute>} />
       <Route path="/vessels/emergency-details" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
@@ -547,16 +542,7 @@ export const AppRoutes: React.FC = () => {
       } />
       <Route path="/admin/fleet-groups" element={<ProtectedRoute><FleetGroups /></ProtectedRoute>} />
       <Route path="/admin/alerts" element={<ProtectedRoute><AlertConfiguration /></ProtectedRoute>} />
-      <Route path="/admin/integrations" element={
-        <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="API Integrations" 
-            description="Third-party API and system integrations"
-            icon={<Wrench className="w-8 h-8 text-primary" />}
-            features={['AIS provider config', 'IDEA connection', 'Email service', 'External API keys']} 
-          />
-        </ProtectedRoute>
-      } />
+      <Route path="/admin/integrations" element={<ProtectedRoute><APIIntegrations /></ProtectedRoute>} />
 
       {/* Legacy/Report Routes */}
       <Route path="/drills" element={<ProtectedRoute><Drills /></ProtectedRoute>} />
