@@ -214,8 +214,14 @@ export type Database = {
         Row: {
           acknowledged_at: string | null
           acknowledged_by: string | null
+          acknowledged_notes: string | null
           alert_type: string
+          assigned_at: string | null
+          assigned_by: string | null
+          assigned_to_role: string | null
           assigned_to_user_id: string | null
+          assignment_notes: string | null
+          assignment_priority: string | null
           company_id: string
           created_at: string | null
           description: string | null
@@ -224,6 +230,8 @@ export type Database = {
           escalated_to_user_ids: string[] | null
           escalation_level: number | null
           id: string
+          incident_id: string | null
+          is_direct_assignment: boolean | null
           last_snooze_reason: string | null
           metadata: Json | null
           owner_role: string | null
@@ -234,6 +242,8 @@ export type Database = {
           resolved_by: string | null
           severity_color: Database["public"]["Enums"]["alert_severity"]
           snooze_count: number | null
+          snoozed_at: string | null
+          snoozed_by: string | null
           snoozed_until: string | null
           source_module: string | null
           status: Database["public"]["Enums"]["alert_status"] | null
@@ -244,8 +254,14 @@ export type Database = {
         Insert: {
           acknowledged_at?: string | null
           acknowledged_by?: string | null
+          acknowledged_notes?: string | null
           alert_type: string
+          assigned_at?: string | null
+          assigned_by?: string | null
+          assigned_to_role?: string | null
           assigned_to_user_id?: string | null
+          assignment_notes?: string | null
+          assignment_priority?: string | null
           company_id: string
           created_at?: string | null
           description?: string | null
@@ -254,6 +270,8 @@ export type Database = {
           escalated_to_user_ids?: string[] | null
           escalation_level?: number | null
           id?: string
+          incident_id?: string | null
+          is_direct_assignment?: boolean | null
           last_snooze_reason?: string | null
           metadata?: Json | null
           owner_role?: string | null
@@ -264,6 +282,8 @@ export type Database = {
           resolved_by?: string | null
           severity_color: Database["public"]["Enums"]["alert_severity"]
           snooze_count?: number | null
+          snoozed_at?: string | null
+          snoozed_by?: string | null
           snoozed_until?: string | null
           source_module?: string | null
           status?: Database["public"]["Enums"]["alert_status"] | null
@@ -274,8 +294,14 @@ export type Database = {
         Update: {
           acknowledged_at?: string | null
           acknowledged_by?: string | null
+          acknowledged_notes?: string | null
           alert_type?: string
+          assigned_at?: string | null
+          assigned_by?: string | null
+          assigned_to_role?: string | null
           assigned_to_user_id?: string | null
+          assignment_notes?: string | null
+          assignment_priority?: string | null
           company_id?: string
           created_at?: string | null
           description?: string | null
@@ -284,6 +310,8 @@ export type Database = {
           escalated_to_user_ids?: string[] | null
           escalation_level?: number | null
           id?: string
+          incident_id?: string | null
+          is_direct_assignment?: boolean | null
           last_snooze_reason?: string | null
           metadata?: Json | null
           owner_role?: string | null
@@ -294,6 +322,8 @@ export type Database = {
           resolved_by?: string | null
           severity_color?: Database["public"]["Enums"]["alert_severity"]
           snooze_count?: number | null
+          snoozed_at?: string | null
+          snoozed_by?: string | null
           snoozed_until?: string | null
           source_module?: string | null
           status?: Database["public"]["Enums"]["alert_status"] | null
@@ -8021,6 +8051,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      acknowledge_alert_action: {
+        Args: { p_alert_id: string; p_notes?: string }
+        Returns: Json
+      }
+      assign_alert_task: {
+        Args: {
+          p_alert_id: string
+          p_assign_to_role?: string
+          p_assign_to_user_id?: string
+          p_notes?: string
+          p_priority?: string
+        }
+        Returns: Json
+      }
+      can_user_assign_tasks: { Args: never; Returns: boolean }
       get_dashboard_alerts: {
         Args: {
           p_all_vessels?: boolean
@@ -8074,6 +8119,34 @@ export type Database = {
           module: string
           performed_by_name: string
           record_id: string
+          title: string
+          vessel_id: string
+          vessel_name: string
+        }[]
+      }
+      get_red_room_items: {
+        Args: { p_company_id: string; p_vessel_id?: string }
+        Returns: {
+          assigned_at: string
+          assigned_by_name: string
+          assignment_notes: string
+          assignment_priority: string
+          created_at: string
+          description: string
+          due_at: string
+          id: string
+          incident_id: string
+          is_direct_assignment: boolean
+          is_overdue: boolean
+          is_snoozed: boolean
+          related_entity_id: string
+          related_entity_type: string
+          severity: string
+          snooze_count: number
+          snoozed_until: string
+          source_module: string
+          source_type: string
+          status: string
           title: string
           vessel_id: string
           vessel_name: string
@@ -8240,6 +8313,10 @@ export type Database = {
           p_vessel_scope?: string
         }
         Returns: string
+      }
+      snooze_alert: {
+        Args: { p_alert_id: string; p_reason?: string; p_snooze_hours?: number }
+        Returns: Json
       }
       update_emergency_contacts: {
         Args: {
