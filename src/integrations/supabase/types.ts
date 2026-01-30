@@ -2487,6 +2487,50 @@ export type Database = {
           },
         ]
       }
+      emergency_contacts_history: {
+        Row: {
+          change_summary: string | null
+          created_at: string | null
+          created_by: string | null
+          created_by_name: string | null
+          data_snapshot: Json
+          emergency_contact_id: string
+          id: string
+          revision_date: string
+          revision_number: number
+        }
+        Insert: {
+          change_summary?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          created_by_name?: string | null
+          data_snapshot: Json
+          emergency_contact_id: string
+          id?: string
+          revision_date: string
+          revision_number: number
+        }
+        Update: {
+          change_summary?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          created_by_name?: string | null
+          data_snapshot?: Json
+          emergency_contact_id?: string
+          id?: string
+          revision_date?: string
+          revision_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emergency_contacts_history_emergency_contact_id_fkey"
+            columns: ["emergency_contact_id"]
+            isOneToOne: false
+            referencedRelation: "vessel_emergency_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       emergency_procedures: {
         Row: {
           created_at: string
@@ -2531,6 +2575,53 @@ export type Database = {
             columns: ["vessel_id"]
             isOneToOne: false
             referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      emergency_team_members: {
+        Row: {
+          created_at: string | null
+          display_order: number
+          email: string
+          emergency_contact_id: string
+          id: string
+          is_active: boolean | null
+          name: string
+          phone: string
+          position: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number
+          email: string
+          emergency_contact_id: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          phone: string
+          position: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number
+          email?: string
+          emergency_contact_id?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          phone?: string
+          position?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "emergency_team_members_emergency_contact_id_fkey"
+            columns: ["emergency_contact_id"]
+            isOneToOne: false
+            referencedRelation: "vessel_emergency_contacts"
             referencedColumns: ["id"]
           },
         ]
@@ -2870,6 +2961,97 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_emergency_defaults: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          emergency_heading: string
+          id: string
+          logo_url: string | null
+          primary_email: string
+          primary_instruction: string
+          primary_phone: string
+          secondary_instruction: string | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          emergency_heading?: string
+          id?: string
+          logo_url?: string | null
+          primary_email: string
+          primary_instruction?: string
+          primary_phone: string
+          secondary_instruction?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          emergency_heading?: string
+          id?: string
+          logo_url?: string | null
+          primary_email?: string
+          primary_instruction?: string
+          primary_phone?: string
+          secondary_instruction?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_emergency_defaults_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_emergency_team_defaults: {
+        Row: {
+          created_at: string | null
+          display_order: number
+          email: string
+          fleet_default_id: string
+          id: string
+          name: string
+          phone: string
+          position: string
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number
+          email: string
+          fleet_default_id: string
+          id?: string
+          name: string
+          phone: string
+          position: string
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number
+          email?: string
+          fleet_default_id?: string
+          id?: string
+          name?: string
+          phone?: string
+          position?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_emergency_team_defaults_fleet_default_id_fkey"
+            columns: ["fleet_default_id"]
+            isOneToOne: false
+            referencedRelation: "fleet_emergency_defaults"
             referencedColumns: ["id"]
           },
         ]
@@ -7497,6 +7679,81 @@ export type Database = {
         }
         Relationships: []
       }
+      vessel_emergency_contacts: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          created_by: string | null
+          emergency_heading: string
+          id: string
+          is_active: boolean | null
+          logo_url: string | null
+          notes: string | null
+          primary_email: string
+          primary_instruction: string
+          primary_phone: string
+          revision_date: string
+          revision_number: number
+          secondary_instruction: string | null
+          updated_at: string | null
+          updated_by: string | null
+          vessel_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          created_by?: string | null
+          emergency_heading?: string
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          notes?: string | null
+          primary_email: string
+          primary_instruction?: string
+          primary_phone: string
+          revision_date?: string
+          revision_number?: number
+          secondary_instruction?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          vessel_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          emergency_heading?: string
+          id?: string
+          is_active?: boolean | null
+          logo_url?: string | null
+          notes?: string | null
+          primary_email?: string
+          primary_instruction?: string
+          primary_phone?: string
+          revision_date?: string
+          revision_number?: number
+          secondary_instruction?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vessel_emergency_contacts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessel_emergency_contacts_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vessels: {
         Row: {
           beam: number | null
@@ -7914,6 +8171,24 @@ export type Database = {
           vessel_name: string
         }[]
       }
+      get_vessel_emergency_contacts: {
+        Args: { p_vessel_id: string }
+        Returns: {
+          emergency_heading: string
+          id: string
+          logo_url: string
+          primary_email: string
+          primary_instruction: string
+          primary_phone: string
+          revision_date: string
+          revision_number: number
+          secondary_instruction: string
+          team_members: Json
+          updated_at: string
+          updated_by_name: string
+          vessel_id: string
+        }[]
+      }
       has_any_role: {
         Args: {
           _roles: Database["public"]["Enums"]["app_role"][]
@@ -7945,6 +8220,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      initialize_vessel_emergency_from_defaults: {
+        Args: { p_company_id: string; p_vessel_id: string }
+        Returns: string
+      }
       log_permission_change: {
         Args: {
           p_action_type: Database["public"]["Enums"]["audit_action_type"]
@@ -7959,6 +8238,21 @@ export type Database = {
           p_target_user_id?: string
           p_user_agent?: string
           p_vessel_scope?: string
+        }
+        Returns: string
+      }
+      update_emergency_contacts: {
+        Args: {
+          p_change_summary?: string
+          p_company_id: string
+          p_emergency_heading: string
+          p_logo_url: string
+          p_primary_email: string
+          p_primary_instruction: string
+          p_primary_phone: string
+          p_secondary_instruction: string
+          p_team_members: Json
+          p_vessel_id: string
         }
         Returns: string
       }

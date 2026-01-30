@@ -120,12 +120,16 @@ export const AppRoutes: React.FC = () => {
       } />
       <Route path="/vessels/emergency-details" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Emergency Details" 
-            description="Emergency contacts and response procedures"
-            icon={<Phone className="w-8 h-8 text-primary" />}
-            features={['Emergency contacts list', 'MRCC information', 'Flag state contacts', 'Medical support contacts']} 
-          />
+          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+            {React.createElement(React.lazy(() => import('@/pages/vessels/VesselEmergencyDetailsPage')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/vessels/:vesselId/emergency" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+            {React.createElement(React.lazy(() => import('@/pages/vessels/VesselEmergencyDetailsPage')))}
+          </React.Suspense>
         </ProtectedRoute>
       } />
 

@@ -29,6 +29,7 @@ import { ComplianceSnapshot } from '@/components/dashboard/ComplianceSnapshot';
 import { OperationsSnapshot } from '@/components/dashboard/OperationsSnapshot';
 import { RecentActivityFeed } from '@/components/dashboard/RecentActivityFeed';
 import { QuickActionsMenu } from '@/components/dashboard/QuickActionsMenu';
+import { EmergencyContactsWidget } from '@/components/emergency/EmergencyContactsWidget';
 import {
   AlertsWidget,
   CrewWidget,
@@ -172,6 +173,11 @@ const VesselDashboard: React.FC = () => {
               )}
             </div>
           </>
+        )}
+
+        {/* Emergency Contacts Widget - Always visible, top position */}
+        {selectedVesselId && !isAllVessels && (
+          <EmergencyContactsWidget vesselId={selectedVesselId} />
         )}
 
         {/* Main Widgets Grid - New Enhanced Panels */}
