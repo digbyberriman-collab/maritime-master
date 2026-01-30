@@ -34,42 +34,47 @@ const MeetingsPage: React.FC = () => {
   // Using management reviews from audits hook
   const { reviews = [], isLoading } = useAudits();
 
-  // Filter reviews based on tab
+  // Filter reviews based on tab - use review_date instead of scheduled_date
   const upcomingReviews = reviews.filter(r => 
-    r.status === 'Scheduled' && isFuture(new Date(r.scheduled_date))
+    r.status === 'Scheduled' && isFuture(new Date(r.review_date))
   );
   const pastReviews = reviews.filter(r => 
-    r.status === 'Completed' || isPast(new Date(r.scheduled_date))
+    r.status === 'Completed' || isPast(new Date(r.review_date))
   );
 
   const filteredReviews = (activeTab === 'upcoming' ? upcomingReviews : pastReviews)
     .filter(review => 
       searchQuery === '' || 
-      review.review_type?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      review.agenda?.toLowerCase().includes(searchQuery.toLowerCase())
+      review.period_covered?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
   // Stats
   const scheduledThisMonth = reviews.filter(r => {
-    if (!r.scheduled_date) return false;
-    const date = new Date(r.scheduled_date);
+    if (!r.review_date) return false;
+    const date = new Date(r.review_date);
     const now = new Date();
     return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
   }).length;
 
   const completedThisYear = reviews.filter(r => {
-    if (r.status !== 'Completed' || !r.completed_date) return false;
-    return new Date(r.completed_date).getFullYear() === new Date().getFullYear();
+    if (r.status !== 'Completed') return false;
+    return new Date(r.review_date).getFullYear() === new Date().getFullYear();
   }).length;
 
-  const getStatusBadge = (status: string, date: string) => {
+  const getStatusBadge = (status: string, date?: string) => {
     if (status === 'Completed') {
       return <Badge className="bg-green-500 text-white">Completed</Badge>;
     }
-    if (isPast(new Date(date))) {
+    if (date && isPast(new Date(date))) {
       return <Badge className="bg-red-500 text-white">Overdue</Badge>;
     }
     return <Badge className="bg-blue-500 text-white">Scheduled</Badge>;
+  };
+  
+  // Helper to get attendees count from JSON
+  const getAttendeesCount = (attendees: unknown): number => {
+    if (Array.isArray(attendees)) return attendees.length;
+    return 0;
   };
 
   return (
@@ -194,19 +199,19 @@ const MeetingsPage: React.FC = () => {
                       {filteredReviews.map((review) => (
                         <TableRow key={review.id}>
                           <TableCell className="font-medium">
-                            {review.review_type || 'Management Review'}
+                            {review.period_covered || 'Management Review'}
                           </TableCell>
                           <TableCell>
-                            {review.scheduled_date && format(new Date(review.scheduled_date), 'MMM d, yyyy')}
+                            {review.review_date && format(new Date(review.review_date), 'MMM d, yyyy')}
                           </TableCell>
                           <TableCell>
-                            {review.attendees?.length || 0} attendees
+                            {getAttendeesCount(review.attendees)} attendees
                           </TableCell>
                           <TableCell className="max-w-[200px] truncate">
-                            {review.agenda || '-'}
+                            {review.period_covered || '-'}
                           </TableCell>
                           <TableCell>
-                            {getStatusBadge(review.status, review.scheduled_date)}
+                            {getStatusBadge(review.status, review.review_date)}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="sm">
@@ -249,23 +254,23 @@ const MeetingsPage: React.FC = () => {
                       {filteredReviews.map((review) => (
                         <TableRow key={review.id}>
                           <TableCell className="font-medium">
-                            {review.review_type || 'Management Review'}
+                            {review.period_covered || 'Management Review'}
                           </TableCell>
                           <TableCell>
-                            {review.scheduled_date && format(new Date(review.scheduled_date), 'MMM d, yyyy')}
+                            {review.review_date && format(new Date(review.review_date), 'MMM d, yyyy')}
                           </TableCell>
                           <TableCell>
-                            {review.attendees?.length || 0} attendees
+                            {getAttendeesCount(review.attendees)} attendees
                           </TableCell>
                           <TableCell>
-                            {review.minutes ? (
+                            {review.minutes_url ? (
                               <Badge variant="outline">Available</Badge>
                             ) : (
                               <span className="text-muted-foreground">-</span>
                             )}
                           </TableCell>
                           <TableCell>
-                            {getStatusBadge(review.status, review.scheduled_date)}
+                            {getStatusBadge(review.status, review.review_date)}
                           </TableCell>
                           <TableCell className="text-right">
                             <Button variant="ghost" size="sm">

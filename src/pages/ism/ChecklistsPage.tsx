@@ -23,18 +23,18 @@ const ChecklistsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('templates');
   
-  const { templates = [], isLoading } = useFormTemplates();
+  const { data: templates = [], isLoading } = useFormTemplates();
 
   // Filter templates that are checklists (by category or naming)
   const checklistTemplates = templates.filter(
-    t => t.category?.toLowerCase().includes('checklist') || 
-         t.name?.toLowerCase().includes('checklist') ||
+    t => t.category?.name?.toLowerCase().includes('checklist') || 
+         t.template_name?.toLowerCase().includes('checklist') ||
          t.form_type === 'checklist'
   );
 
   const filteredTemplates = checklistTemplates.filter(
     t => searchQuery === '' || 
-         t.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+         t.template_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
          t.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -158,7 +158,7 @@ const ChecklistsPage: React.FC = () => {
                       <div className="flex items-start justify-between">
                         <div className="flex items-center gap-2">
                           <ClipboardList className="h-5 w-5 text-primary" />
-                          <CardTitle className="text-base">{template.name}</CardTitle>
+                          <CardTitle className="text-base">{template.template_name}</CardTitle>
                         </div>
                         <Badge variant={template.status === 'active' ? 'default' : 'secondary'}>
                           {template.status}
