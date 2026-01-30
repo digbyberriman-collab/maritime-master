@@ -69,6 +69,18 @@ import BrandingSettings from '@/pages/BrandingSettings';
 import DPADashboard from '@/pages/DPADashboard';
 import RolesPermissionsPage from '@/pages/settings/RolesPermissionsPage';
 
+// Admin Pages
+import UserManagement from '@/pages/admin/UserManagement';
+import FleetGroups from '@/pages/admin/FleetGroups';
+import AlertConfiguration from '@/pages/admin/AlertConfiguration';
+
+// Document Pages
+import Manuals from '@/pages/documents/Manuals';
+import Policies from '@/pages/documents/Policies';
+
+// Maintenance Pages
+import MaintenanceDefects from '@/pages/maintenance/MaintenanceDefects';
+
 // Placeholder wrapper with layout
 const PlaceholderWrapper: React.FC<{ 
   title: string; 
@@ -439,16 +451,7 @@ export const AppRoutes: React.FC = () => {
 
       {/* Documents */}
       <Route path="/documents" element={<ProtectedRoute><Documents /></ProtectedRoute>} />
-      <Route path="/documents/manuals" element={
-        <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Manuals" 
-            description="Operational and safety manuals"
-            icon={<BookOpen className="w-8 h-8 text-primary" />}
-            features={['Safety Management Manual', 'Operations manuals', 'Version control', 'Distribution tracking']} 
-          />
-        </ProtectedRoute>
-      } />
+      <Route path="/documents/manuals" element={<ProtectedRoute><Manuals /></ProtectedRoute>} />
       <Route path="/documents/procedures" element={
         <ProtectedRoute>
           <PlaceholderWrapper 
@@ -469,16 +472,7 @@ export const AppRoutes: React.FC = () => {
           />
         </ProtectedRoute>
       } />
-      <Route path="/documents/policies" element={
-        <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Policies" 
-            description="Company policies and guidelines"
-            icon={<FileCheck className="w-8 h-8 text-primary" />}
-            features={['Company policies', 'Vessel policies', 'Shore-side policies', 'Acknowledgment tracking']} 
-          />
-        </ProtectedRoute>
-      } />
+      <Route path="/documents/policies" element={<ProtectedRoute><Policies /></ProtectedRoute>} />
       <Route path="/documents/drawings" element={
         <ProtectedRoute>
           <PlaceholderWrapper 
@@ -504,16 +498,7 @@ export const AppRoutes: React.FC = () => {
       {/* Maintenance */}
       <Route path="/maintenance" element={<ProtectedRoute><Maintenance /></ProtectedRoute>} />
       <Route path="/maintenance/dashboard" element={<ProtectedRoute><Maintenance /></ProtectedRoute>} />
-      <Route path="/maintenance/defects" element={
-        <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Open Defects" 
-            description="Track and manage open defects"
-            icon={<AlertTriangle className="w-8 h-8 text-primary" />}
-            features={['Defect list from IDEA', 'Priority tracking', 'ISM critical flags', 'Resolution workflow']} 
-          />
-        </ProtectedRoute>
-      } />
+      <Route path="/maintenance/defects" element={<ProtectedRoute><MaintenanceDefects /></ProtectedRoute>} />
       <Route path="/maintenance/critical" element={
         <ProtectedRoute>
           <PlaceholderWrapper 
@@ -552,16 +537,7 @@ export const AppRoutes: React.FC = () => {
 
       {/* Admin Routes */}
       <Route path="/admin" element={<Navigate to="/admin/users" replace />} />
-      <Route path="/admin/users" element={
-        <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="User Management" 
-            description="Manage users and access permissions"
-            icon={<Users className="w-8 h-8 text-primary" />}
-            features={['User list & search', 'Role assignment', 'Vessel access control', 'Account status management']} 
-          />
-        </ProtectedRoute>
-      } />
+      <Route path="/admin/users" element={<ProtectedRoute><UserManagement /></ProtectedRoute>} />
       <Route path="/admin/roles" element={
         <ProtectedRoute>
           <DashboardLayout>
@@ -569,26 +545,8 @@ export const AppRoutes: React.FC = () => {
           </DashboardLayout>
         </ProtectedRoute>
       } />
-      <Route path="/admin/fleet-groups" element={
-        <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Fleet Groups" 
-            description="Manage fleet groupings and hierarchies"
-            icon={<Ship className="w-8 h-8 text-primary" />}
-            features={['Group management', 'Vessel assignment', 'Color coding', 'Reporting groups']} 
-          />
-        </ProtectedRoute>
-      } />
-      <Route path="/admin/alerts" element={
-        <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Alert Configuration" 
-            description="Configure alert rules and escalation"
-            icon={<Bell className="w-8 h-8 text-primary" />}
-            features={['Alert rules', 'Escalation settings', 'Notification channels', 'Severity thresholds']} 
-          />
-        </ProtectedRoute>
-      } />
+      <Route path="/admin/fleet-groups" element={<ProtectedRoute><FleetGroups /></ProtectedRoute>} />
+      <Route path="/admin/alerts" element={<ProtectedRoute><AlertConfiguration /></ProtectedRoute>} />
       <Route path="/admin/integrations" element={
         <ProtectedRoute>
           <PlaceholderWrapper 
