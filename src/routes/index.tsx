@@ -101,7 +101,8 @@ export const AppRoutes: React.FC = () => {
       <Route path="/fleet-map" element={<ProtectedRoute><FleetMap /></ProtectedRoute>} />
 
       {/* Vessels */}
-      <Route path="/vessels" element={<ProtectedRoute><Vessels /></ProtectedRoute>} />
+      <Route path="/vessels" element={<Navigate to="/vessels/dashboard" replace />} />
+      <Route path="/vessels/list" element={<ProtectedRoute><Vessels /></ProtectedRoute>} />
       <Route path="/vessels/dashboard" element={
         <ProtectedRoute>
           <VesselDashboard />
