@@ -7748,6 +7748,35 @@ export type Database = {
           vessel_name: string
         }[]
       }
+      get_vessel_dashboard_summary: {
+        Args: {
+          p_aggregate_all?: boolean
+          p_company_id: string
+          p_vessel_ids?: string[]
+        }
+        Returns: {
+          audits_due_90d: number
+          certs_expiring_90d: number
+          classification_society: string
+          crew_certs_expiring_90d: number
+          crew_onboard_count: number
+          critical_defects_count: number
+          current_captain: string
+          data_refreshed_at: string
+          flag_state: string
+          imo_number: string
+          open_alerts_count: number
+          open_capas_count: number
+          open_ncs_count: number
+          overdue_drills_count: number
+          overdue_maintenance_count: number
+          pending_signatures_count: number
+          red_alerts_count: number
+          training_gaps_count: number
+          vessel_id: string
+          vessel_name: string
+        }[]
+      }
       has_any_role: {
         Args: {
           _roles: Database["public"]["Enums"]["app_role"][]

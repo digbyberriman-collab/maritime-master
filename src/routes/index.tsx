@@ -14,6 +14,7 @@ import Index from '@/pages/Index';
 import Auth from '@/pages/Auth';
 import Dashboard from '@/pages/Dashboard';
 import Vessels from '@/pages/Vessels';
+import VesselDashboard from '@/pages/VesselDashboard';
 import CrewRoster from '@/pages/CrewRoster';
 import Documents from '@/pages/Documents';
 import Certificates from '@/pages/Certificates';
@@ -103,12 +104,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/vessels" element={<ProtectedRoute><Vessels /></ProtectedRoute>} />
       <Route path="/vessels/dashboard" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Vessel Dashboard" 
-            description="Comprehensive vessel overview and status monitoring"
-            icon={<LayoutGrid className="w-8 h-8 text-primary" />}
-            features={['Vessel overview tiles', 'Key performance metrics', 'Quick actions menu', 'Recent activity feed']} 
-          />
+          <VesselDashboard />
         </ProtectedRoute>
       } />
       <Route path="/vessels/company-details" element={
