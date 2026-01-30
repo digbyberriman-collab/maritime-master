@@ -2,6 +2,7 @@ import React from 'react';
 import { useVessel } from '@/contexts/VesselContext';
 import NotificationBell from './NotificationBell';
 import VesselSelector from '@/components/VesselSelector';
+import HeaderQuickActions from './HeaderQuickActions';
 import { cn } from '@/lib/utils';
 
 interface GlobalHeaderControlsProps {
@@ -10,7 +11,7 @@ interface GlobalHeaderControlsProps {
 }
 
 /**
- * GlobalHeaderControls renders the Fleet Filter and Alerts Bell
+ * GlobalHeaderControls renders the Quick Actions, Fleet Filter and Alerts Bell
  * in a consistent layout for the header. The Fleet Filter is only
  * visible to users with multi-vessel access (DPA, Shore Management).
  */
@@ -25,6 +26,9 @@ const GlobalHeaderControls: React.FC<GlobalHeaderControlsProps> = ({
 
   return (
     <div className={cn('flex items-center gap-2', className)}>
+      {/* Quick Actions - visible everywhere except settings */}
+      <HeaderQuickActions />
+
       {/* Fleet Filter - Only for multi-vessel users */}
       {shouldShowVesselSelector && (
         <div className="hidden md:block">
