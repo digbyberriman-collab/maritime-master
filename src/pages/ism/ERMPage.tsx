@@ -1,10 +1,12 @@
 import React from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { AlertCircle, Plus, Info } from 'lucide-react';
+import { AlertCircle, Plus, Info, Phone } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import ChecklistCard from '@/components/ism/ChecklistCard';
+import { ERMEmergencyContactsSection } from '@/components/emergency/ERMEmergencyContactsSection';
+import { useVessel } from '@/contexts/VesselContext';
 
 // Checklist data - alphabetically ordered
 const emergencyChecklists = [
@@ -81,6 +83,9 @@ const ChecklistGrid: React.FC<ChecklistGridProps> = ({ items }) => {
 };
 
 const ERMPage: React.FC = () => {
+  const { selectedVessel } = useVessel();
+  const vesselId = selectedVessel?.id;
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -110,8 +115,12 @@ const ERMPage: React.FC = () => {
         </Alert>
 
         {/* Tabbed Content */}
-        <Tabs defaultValue="emergency-checklists" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+        <Tabs defaultValue="emergency-contacts" className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="emergency-contacts" className="flex items-center gap-2">
+              <Phone className="w-4 h-4" />
+              Emergency Contacts
+            </TabsTrigger>
             <TabsTrigger value="emergency-checklists">
               Emergency Checklists ({emergencyChecklists.length})
             </TabsTrigger>
@@ -122,6 +131,16 @@ const ERMPage: React.FC = () => {
               People & Welfare ({peopleWelfareIssues.length})
             </TabsTrigger>
           </TabsList>
+          
+          <TabsContent value="emergency-contacts" className="mt-6">
+            {vesselId ? (
+              <ERMEmergencyContactsSection vesselId={vesselId} />
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Please select a vessel to view emergency contacts.
+              </div>
+            )}
+          </TabsContent>
           
           <TabsContent value="emergency-checklists" className="mt-6">
             <ChecklistGrid items={emergencyChecklists} />
