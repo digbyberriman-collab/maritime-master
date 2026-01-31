@@ -18,4 +18,30 @@ export default defineConfig(({ mode }) => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Heavy libraries get their own chunks
+          'excel': ['exceljs'],
+          'pdf-gen': ['jspdf', 'html2canvas'],
+          'pdf-view': ['pdfjs-dist', 'react-pdf'],
+          'charts': ['recharts'],
+          'supabase': ['@supabase/supabase-js'],
+          // Vendor chunk for React ecosystem
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          // UI components
+          'vendor-radix': [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-popover',
+            '@radix-ui/react-select',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-toast',
+            '@radix-ui/react-tooltip',
+          ],
+        },
+      },
+    },
+  },
 }));

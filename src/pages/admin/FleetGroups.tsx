@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,8 +31,12 @@ import {
   Palette,
   MapPin,
   Building,
-  Globe
+  Globe,
+  RefreshCw
 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import AddFleetGroupModal from '@/components/modals/AddFleetGroupModal';
+import DeleteConfirmModal from '@/components/modals/DeleteConfirmModal';
 
 interface FleetGroup {
   id: string;
@@ -46,8 +50,8 @@ interface FleetGroup {
   created_at: string;
 }
 
-// Mock data for demo purposes
-const mockFleetGroups: FleetGroup[] = [
+// Initial mock data
+const initialMockFleetGroups: FleetGroup[] = [
   {
     id: '1',
     name: 'Atlantic Fleet',
@@ -106,8 +110,37 @@ const mockFleetGroups: FleetGroup[] = [
 ];
 
 const FleetGroups: React.FC = () => {
+  const { toast } = useToast();
+  const [groups, setGroups] = useState<FleetGroup[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<FleetGroup | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState<FleetGroup | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Load groups from localStorage on component mount
+  useEffect(() => {
+    const savedGroups = localStorage.getItem('maritime-fleet-groups');
+    if (savedGroups) {
+      try {
+        setGroups(JSON.parse(savedGroups));
+      } catch (error) {
+        console.error('Failed to parse saved fleet groups:', error);
+        setGroups(initialMockFleetGroups);
+      }
+    } else {
+      setGroups(initialMockFleetGroups);
+    }
+  }, []);
+
+  // Save groups to localStorage whenever groups change
+  useEffect(() => {
+    if (groups.length > 0) {
+      localStorage.setItem('maritime-fleet-groups', JSON.stringify(groups));
+    }
+  }, [groups]);
 
   const typeLabels: Record<string, string> = {
     operational: 'Operational',
@@ -142,8 +175,103 @@ const FleetGroups: React.FC = () => {
     return <MapPin className="w-4 h-4 text-muted-foreground" />;
   };
 
+  const handleAddGroup = () => {
+    setEditingGroup(null);
+    setIsAddModalOpen(true);
+  };
+
+  const handleEditGroup = (group: FleetGroup) => {
+    setEditingGroup(group);
+    setIsAddModalOpen(true);
+  };
+
+  const handleDeleteGroup = (group: FleetGroup) => {
+    setDeletingGroup(group);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleGroupAdded = (group: FleetGroup) => {
+    if (editingGroup) {
+      // Update existing group
+      setGroups(prev => prev.map(g => g.id === group.id ? group : g));
+      toast({
+        title: 'Group Updated',
+        description: `Fleet group "${group.name}" has been updated successfully.`,
+      });
+    } else {
+      // Add new group
+      setGroups(prev => [...prev, group]);
+      toast({
+        title: 'Group Created',
+        description: `Fleet group "${group.name}" has been created successfully.`,
+      });
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingGroup) return;
+
+    setLoading(true);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setGroups(prev => prev.filter(g => g.id !== deletingGroup.id));
+      
+      toast({
+        title: 'Group Deleted',
+        description: `Fleet group "${deletingGroup.name}" has been deleted.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete fleet group. Please try again.',
+        variant: 'destructive',
+      });
+    }
+    
+    setLoading(false);
+    setDeletingGroup(null);
+  };
+
+  const handleChangeGroupColor = async (group: FleetGroup, newColor: string) => {
+    setLoading(true);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      setGroups(prev => prev.map(g => 
+        g.id === group.id 
+          ? { ...g, color: newColor }
+          : g
+      ));
+      
+      toast({
+        title: 'Color Updated',
+        description: `Color for "${group.name}" has been updated.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update group color. Please try again.',
+        variant: 'destructive',
+      });
+    }
+    
+    setLoading(false);
+  };
+
+  const handleResetData = () => {
+    setGroups(initialMockFleetGroups);
+    localStorage.setItem('maritime-fleet-groups', JSON.stringify(initialMockFleetGroups));
+    toast({
+      title: 'Data Reset',
+      description: 'Fleet group data has been reset to default values.',
+    });
+  };
+
   const filteredGroups = useMemo(() => {
-    let filtered = mockFleetGroups;
+    let filtered = groups;
 
     // Filter by search query
     if (searchQuery.trim()) {
@@ -163,24 +291,24 @@ const FleetGroups: React.FC = () => {
     }
 
     return filtered;
-  }, [mockFleetGroups, searchQuery, selectedType]);
+  }, [groups, searchQuery, selectedType]);
 
   const stats = [
     {
       title: 'Total Groups',
-      value: mockFleetGroups.length,
+      value: groups.length,
       description: 'Fleet groups configured',
       icon: Building,
     },
     {
       title: 'Total Vessels',
-      value: mockFleetGroups.reduce((acc, group) => acc + group.vessels.length, 0),
+      value: groups.reduce((acc, group) => acc + group.vessels.length, 0),
       description: 'Vessels assigned to groups',
       icon: Ship,
     },
     {
       title: 'Managers',
-      value: new Set(mockFleetGroups.map(g => g.manager).filter(Boolean)).size,
+      value: new Set(groups.map(g => g.manager).filter(Boolean)).size,
       description: 'Unique fleet managers',
       icon: Users,
     },
@@ -197,10 +325,16 @@ const FleetGroups: React.FC = () => {
               Organize vessels into manageable groups for operations and reporting
             </p>
           </div>
-          <Button className="gap-2">
-            <Plus className="w-4 h-4" />
-            Create Group
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleResetData} className="gap-2">
+              <RefreshCw className="w-4 h-4" />
+              Reset Data
+            </Button>
+            <Button onClick={handleAddGroup} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Create Group
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -290,10 +424,20 @@ const FleetGroups: React.FC = () => {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <div
-                          className="w-4 h-4 rounded-full border-2"
+                          className="w-4 h-4 rounded-full border-2 cursor-pointer hover:scale-110 transition-transform"
                           style={{
                             backgroundColor: group.color,
                             borderColor: group.color,
+                          }}
+                          onClick={() => {
+                            const input = document.createElement('input');
+                            input.type = 'color';
+                            input.value = group.color;
+                            input.onchange = (e) => {
+                              const target = e.target as HTMLInputElement;
+                              handleChangeGroupColor(group, target.value);
+                            };
+                            input.click();
                           }}
                         />
                         <div>
@@ -341,26 +485,44 @@ const FleetGroups: React.FC = () => {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
+                          <Button variant="ghost" className="h-8 w-8 p-0" disabled={loading}>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem className="gap-2">
+                          <DropdownMenuItem 
+                            className="gap-2"
+                            onClick={() => handleEditGroup(group)}
+                          >
                             <Edit className="h-4 w-4" />
                             Edit Group
                           </DropdownMenuItem>
                           <DropdownMenuItem className="gap-2">
                             <Ship className="h-4 w-4" />
-                            Manage Vessels
+                            View Vessels
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2">
+                          <DropdownMenuItem 
+                            className="gap-2"
+                            onClick={() => {
+                              const input = document.createElement('input');
+                              input.type = 'color';
+                              input.value = group.color;
+                              input.onchange = (e) => {
+                                const target = e.target as HTMLInputElement;
+                                handleChangeGroupColor(group, target.value);
+                              };
+                              input.click();
+                            }}
+                          >
                             <Palette className="h-4 w-4" />
                             Change Color
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="gap-2 text-destructive">
+                          <DropdownMenuItem 
+                            className="gap-2 text-destructive"
+                            onClick={() => handleDeleteGroup(group)}
+                          >
                             <Trash2 className="h-4 w-4" />
                             Delete Group
                           </DropdownMenuItem>
@@ -390,18 +552,28 @@ const FleetGroups: React.FC = () => {
               Color Legend
             </CardTitle>
             <CardDescription>
-              Visual identification for fleet groups
+              Visual identification for fleet groups (click colors to change)
             </CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-              {mockFleetGroups.map((group) => (
+              {groups.map((group) => (
                 <div key={group.id} className="flex items-center gap-2">
                   <div
-                    className="w-6 h-6 rounded-full border-2"
+                    className="w-6 h-6 rounded-full border-2 cursor-pointer hover:scale-110 transition-transform"
                     style={{
                       backgroundColor: group.color,
                       borderColor: group.color,
+                    }}
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'color';
+                      input.value = group.color;
+                      input.onchange = (e) => {
+                        const target = e.target as HTMLInputElement;
+                        handleChangeGroupColor(group, target.value);
+                      };
+                      input.click();
                     }}
                   />
                   <span className="text-sm font-medium">{group.name}</span>
@@ -410,6 +582,24 @@ const FleetGroups: React.FC = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Add/Edit Group Modal */}
+        <AddFleetGroupModal
+          open={isAddModalOpen}
+          onOpenChange={setIsAddModalOpen}
+          onGroupAdded={handleGroupAdded}
+          editGroup={editingGroup}
+        />
+
+        {/* Delete Confirmation Modal */}
+        <DeleteConfirmModal
+          open={isDeleteModalOpen}
+          onOpenChange={setIsDeleteModalOpen}
+          onConfirm={handleConfirmDelete}
+          title="Delete Fleet Group"
+          description={`Are you sure you want to delete the fleet group "${deletingGroup?.name}"? This action cannot be undone.`}
+          confirmText="Delete Group"
+        />
       </div>
     </DashboardLayout>
   );

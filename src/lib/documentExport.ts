@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { Document } from '@/hooks/useDocuments';
 import { format } from 'date-fns';
 
@@ -149,38 +149,60 @@ export const exportMDIToPDF = (
   doc.save(`Master_Document_Index_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
 };
 
-export const exportMDIToExcel = (
+export const exportMDIToExcel = async (
   documents: ExportDocument[],
   companyName: string
 ) => {
-  const worksheetData = documents.map(doc => ({
-    'Document Number': doc.document_number,
-    'Title': doc.title,
-    'Category': doc.category?.name || '',
-    'Revision': doc.revision,
-    'Issue Date': doc.issue_date ? format(new Date(doc.issue_date), 'dd/MM/yyyy') : '',
-    'Next Review Date': doc.next_review_date ? format(new Date(doc.next_review_date), 'dd/MM/yyyy') : '',
-    'Status': doc.status.replace('_', ' '),
-    'Responsible Person': doc.author ? `${doc.author.first_name} ${doc.author.last_name}` : '',
-    'Vessel': doc.vessel?.name || 'All Vessels',
-  }));
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = companyName;
+  workbook.created = new Date();
+  
+  const worksheet = workbook.addWorksheet('Master Document Index');
 
-  const worksheet = XLSX.utils.json_to_sheet(worksheetData);
-  const workbook = XLSX.utils.book_new();
-
-  // Set column widths
-  worksheet['!cols'] = [
-    { wch: 20 },
-    { wch: 50 },
-    { wch: 15 },
-    { wch: 10 },
-    { wch: 12 },
-    { wch: 15 },
-    { wch: 12 },
-    { wch: 25 },
-    { wch: 20 },
+  // Set column headers and widths
+  worksheet.columns = [
+    { header: 'Document Number', key: 'docNumber', width: 20 },
+    { header: 'Title', key: 'title', width: 50 },
+    { header: 'Category', key: 'category', width: 15 },
+    { header: 'Revision', key: 'revision', width: 10 },
+    { header: 'Issue Date', key: 'issueDate', width: 12 },
+    { header: 'Next Review Date', key: 'nextReviewDate', width: 15 },
+    { header: 'Status', key: 'status', width: 12 },
+    { header: 'Responsible Person', key: 'responsiblePerson', width: 25 },
+    { header: 'Vessel', key: 'vessel', width: 20 },
   ];
 
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Master Document Index');
-  XLSX.writeFile(workbook, `Master_Document_Index_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+  // Style header row
+  worksheet.getRow(1).font = { bold: true };
+  worksheet.getRow(1).fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: '3B82F6' }
+  };
+  worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFF' } };
+
+  // Add data rows
+  documents.forEach(doc => {
+    worksheet.addRow({
+      docNumber: doc.document_number,
+      title: doc.title,
+      category: doc.category?.name || '',
+      revision: doc.revision,
+      issueDate: doc.issue_date ? format(new Date(doc.issue_date), 'dd/MM/yyyy') : '',
+      nextReviewDate: doc.next_review_date ? format(new Date(doc.next_review_date), 'dd/MM/yyyy') : '',
+      status: doc.status.replace('_', ' '),
+      responsiblePerson: doc.author ? `${doc.author.first_name} ${doc.author.last_name}` : '',
+      vessel: doc.vessel?.name || 'All Vessels',
+    });
+  });
+
+  // Generate and download file
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `Master_Document_Index_${format(new Date(), 'yyyy-MM-dd')}.xlsx`;
+  a.click();
+  window.URL.revokeObjectURL(url);
 };

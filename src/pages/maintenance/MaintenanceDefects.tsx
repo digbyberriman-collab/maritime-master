@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,8 +35,12 @@ import {
   User,
   Flag,
   Eye,
-  FileText
+  FileText,
+  RefreshCw
 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import AddDefectModal from '@/components/modals/AddDefectModal';
+import DeleteConfirmModal from '@/components/modals/DeleteConfirmModal';
 
 interface MaintenanceDefect {
   id: string;
@@ -60,8 +64,8 @@ interface MaintenanceDefect {
   updated_at: string;
 }
 
-// Mock data for demo purposes
-const mockDefects: MaintenanceDefect[] = [
+// Initial mock data
+const initialMockDefects: MaintenanceDefect[] = [
   {
     id: '1',
     defect_number: 'DEF-2024-0001',
@@ -179,9 +183,38 @@ const mockDefects: MaintenanceDefect[] = [
 ];
 
 const MaintenanceDefects: React.FC = () => {
+  const { toast } = useToast();
+  const [defects, setDefects] = useState<MaintenanceDefect[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPriority, setSelectedPriority] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [editingDefect, setEditingDefect] = useState<MaintenanceDefect | null>(null);
+  const [deletingDefect, setDeletingDefect] = useState<MaintenanceDefect | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Load defects from localStorage on component mount
+  useEffect(() => {
+    const savedDefects = localStorage.getItem('maritime-defects');
+    if (savedDefects) {
+      try {
+        setDefects(JSON.parse(savedDefects));
+      } catch (error) {
+        console.error('Failed to parse saved defects:', error);
+        setDefects(initialMockDefects);
+      }
+    } else {
+      setDefects(initialMockDefects);
+    }
+  }, []);
+
+  // Save defects to localStorage whenever defects change
+  useEffect(() => {
+    if (defects.length > 0) {
+      localStorage.setItem('maritime-defects', JSON.stringify(defects));
+    }
+  }, [defects]);
 
   const priorityLabels: Record<string, string> = {
     low: 'Low',
@@ -257,8 +290,108 @@ const MaintenanceDefects: React.FC = () => {
     return new Date(targetDate) < new Date();
   };
 
+  const handleAddDefect = () => {
+    setEditingDefect(null);
+    setIsAddModalOpen(true);
+  };
+
+  const handleEditDefect = (defect: MaintenanceDefect) => {
+    setEditingDefect(defect);
+    setIsAddModalOpen(true);
+  };
+
+  const handleDeleteDefect = (defect: MaintenanceDefect) => {
+    setDeletingDefect(defect);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleDefectAdded = (defect: MaintenanceDefect) => {
+    if (editingDefect) {
+      // Update existing defect
+      setDefects(prev => prev.map(d => d.id === defect.id ? defect : d));
+      toast({
+        title: 'Defect Updated',
+        description: `Defect ${defect.defect_number} has been updated successfully.`,
+      });
+    } else {
+      // Add new defect
+      setDefects(prev => [...prev, defect]);
+      toast({
+        title: 'Defect Reported',
+        description: `Defect ${defect.defect_number} has been reported successfully.`,
+      });
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingDefect) return;
+
+    setLoading(true);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setDefects(prev => prev.filter(d => d.id !== deletingDefect.id));
+      
+      toast({
+        title: 'Defect Deleted',
+        description: `Defect ${deletingDefect.defect_number} has been deleted.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete defect. Please try again.',
+        variant: 'destructive',
+      });
+    }
+    
+    setLoading(false);
+    setDeletingDefect(null);
+  };
+
+  const handleCompleteDefect = async (defect: MaintenanceDefect) => {
+    setLoading(true);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setDefects(prev => prev.map(d => 
+        d.id === defect.id 
+          ? { 
+              ...d, 
+              status: 'completed', 
+              completion_date: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            }
+          : d
+      ));
+      
+      toast({
+        title: 'Defect Completed',
+        description: `Defect ${defect.defect_number} has been marked as completed.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to complete defect. Please try again.',
+        variant: 'destructive',
+      });
+    }
+    
+    setLoading(false);
+  };
+
+  const handleResetData = () => {
+    setDefects(initialMockDefects);
+    localStorage.setItem('maritime-defects', JSON.stringify(initialMockDefects));
+    toast({
+      title: 'Data Reset',
+      description: 'Defect data has been reset to default values.',
+    });
+  };
+
   const filteredDefects = useMemo(() => {
-    let filtered = mockDefects;
+    let filtered = defects;
 
     // Filter by search query
     if (searchQuery.trim()) {
@@ -284,24 +417,24 @@ const MaintenanceDefects: React.FC = () => {
     }
 
     return filtered;
-  }, [mockDefects, searchQuery, selectedPriority, selectedStatus]);
+  }, [defects, searchQuery, selectedPriority, selectedStatus]);
 
   const stats = [
     {
       title: 'Open Defects',
-      value: mockDefects.filter(d => d.status !== 'completed' && d.status !== 'cancelled').length,
+      value: defects.filter(d => d.status !== 'completed' && d.status !== 'cancelled').length,
       description: 'Require attention',
       icon: AlertTriangle,
     },
     {
       title: 'ISM Critical',
-      value: mockDefects.filter(d => d.ism_critical && d.status !== 'completed').length,
+      value: defects.filter(d => d.ism_critical && d.status !== 'completed').length,
       description: 'High priority items',
       icon: Flag,
     },
     {
       title: 'Overdue',
-      value: mockDefects.filter(d => isOverdue(d.target_completion, d.status)).length,
+      value: defects.filter(d => isOverdue(d.target_completion, d.status)).length,
       description: 'Past target date',
       icon: XCircle,
     },
@@ -318,10 +451,16 @@ const MaintenanceDefects: React.FC = () => {
               Track and manage open defects across your fleet
             </p>
           </div>
-          <Button className="gap-2">
-            <Plus className="w-4 h-4" />
-            Report Defect
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleResetData} className="gap-2">
+              <RefreshCw className="w-4 h-4" />
+              Reset Data
+            </Button>
+            <Button onClick={handleAddDefect} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Report Defect
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -492,32 +631,47 @@ const MaintenanceDefects: React.FC = () => {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
+                          <Button variant="ghost" className="h-8 w-8 p-0" disabled={loading}>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem 
+                            className="gap-2"
+                            onClick={() => handleEditDefect(defect)}
+                          >
+                            <Edit className="h-4 w-4" />
+                            Edit Defect
+                          </DropdownMenuItem>
                           <DropdownMenuItem className="gap-2">
                             <Eye className="h-4 w-4" />
                             View Details
                           </DropdownMenuItem>
                           <DropdownMenuItem className="gap-2">
-                            <Edit className="h-4 w-4" />
-                            Update Defect
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2">
                             <User className="h-4 w-4" />
-                            Assign Engineer
+                            Reassign
                           </DropdownMenuItem>
                           <DropdownMenuItem className="gap-2">
                             <FileText className="h-4 w-4" />
                             Work Order
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="gap-2">
-                            <CheckCircle className="h-4 w-4" />
-                            Mark Complete
+                          {defect.status !== 'completed' && (
+                            <DropdownMenuItem 
+                              className="gap-2"
+                              onClick={() => handleCompleteDefect(defect)}
+                            >
+                              <CheckCircle className="h-4 w-4" />
+                              Mark Complete
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem 
+                            className="gap-2 text-destructive"
+                            onClick={() => handleDeleteDefect(defect)}
+                          >
+                            <XCircle className="h-4 w-4" />
+                            Cancel Defect
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -536,6 +690,24 @@ const MaintenanceDefects: React.FC = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Add/Edit Defect Modal */}
+        <AddDefectModal
+          open={isAddModalOpen}
+          onOpenChange={setIsAddModalOpen}
+          onDefectAdded={handleDefectAdded}
+          editDefect={editingDefect}
+        />
+
+        {/* Delete Confirmation Modal */}
+        <DeleteConfirmModal
+          open={isDeleteModalOpen}
+          onOpenChange={setIsDeleteModalOpen}
+          onConfirm={handleConfirmDelete}
+          title="Cancel Defect"
+          description={`Are you sure you want to cancel defect ${deletingDefect?.defect_number}? This action cannot be undone.`}
+          confirmText="Cancel Defect"
+        />
       </div>
     </DashboardLayout>
   );

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -32,8 +32,12 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import AddUserModal from '@/components/modals/AddUserModal';
+import DeleteConfirmModal from '@/components/modals/DeleteConfirmModal';
 
 interface User {
   id: string;
@@ -47,8 +51,8 @@ interface User {
   created_at: string;
 }
 
-// Mock data for demo purposes
-const mockUsers: User[] = [
+// Initial mock data
+const initialMockUsers: User[] = [
   {
     id: '1',
     email: 'john.doe@maritime.com',
@@ -106,8 +110,37 @@ const mockUsers: User[] = [
 ];
 
 const UserManagement: React.FC = () => {
+  const { toast } = useToast();
+  const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRole, setSelectedRole] = useState<string>('all');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [deletingUser, setDeletingUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Load users from localStorage on component mount
+  useEffect(() => {
+    const savedUsers = localStorage.getItem('maritime-users');
+    if (savedUsers) {
+      try {
+        setUsers(JSON.parse(savedUsers));
+      } catch (error) {
+        console.error('Failed to parse saved users:', error);
+        setUsers(initialMockUsers);
+      }
+    } else {
+      setUsers(initialMockUsers);
+    }
+  }, []);
+
+  // Save users to localStorage whenever users change
+  useEffect(() => {
+    if (users.length > 0) {
+      localStorage.setItem('maritime-users', JSON.stringify(users));
+    }
+  }, [users]);
 
   const roleLabels: Record<string, string> = {
     master: 'Master',
@@ -161,8 +194,105 @@ const UserManagement: React.FC = () => {
     );
   };
 
+  const handleAddUser = () => {
+    setEditingUser(null);
+    setIsAddModalOpen(true);
+  };
+
+  const handleEditUser = (user: User) => {
+    setEditingUser(user);
+    setIsAddModalOpen(true);
+  };
+
+  const handleDeleteUser = (user: User) => {
+    setDeletingUser(user);
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleUserAdded = (user: User) => {
+    if (editingUser) {
+      // Update existing user
+      setUsers(prev => prev.map(u => u.id === user.id ? user : u));
+      toast({
+        title: 'User Updated',
+        description: `${user.first_name} ${user.last_name} has been updated successfully.`,
+      });
+    } else {
+      // Add new user
+      setUsers(prev => [...prev, user]);
+      toast({
+        title: 'User Added',
+        description: `${user.first_name} ${user.last_name} has been added successfully.`,
+      });
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingUser) return;
+
+    setLoading(true);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setUsers(prev => prev.filter(u => u.id !== deletingUser.id));
+      
+      toast({
+        title: 'User Deleted',
+        description: `${deletingUser.first_name} ${deletingUser.last_name} has been deleted.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete user. Please try again.',
+        variant: 'destructive',
+      });
+    }
+    
+    setLoading(false);
+    setDeletingUser(null);
+  };
+
+  const handleToggleUserStatus = async (user: User) => {
+    const newStatus = user.status === 'active' ? 'inactive' : 'active';
+    
+    setLoading(true);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setUsers(prev => prev.map(u => 
+        u.id === user.id 
+          ? { ...u, status: newStatus }
+          : u
+      ));
+      
+      toast({
+        title: 'Status Updated',
+        description: `${user.first_name} ${user.last_name} is now ${newStatus}.`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update user status. Please try again.',
+        variant: 'destructive',
+      });
+    }
+    
+    setLoading(false);
+  };
+
+  const handleResetData = () => {
+    setUsers(initialMockUsers);
+    localStorage.setItem('maritime-users', JSON.stringify(initialMockUsers));
+    toast({
+      title: 'Data Reset',
+      description: 'User data has been reset to default values.',
+    });
+  };
+
   const filteredUsers = useMemo(() => {
-    let filtered = mockUsers;
+    let filtered = users;
 
     // Filter by search query
     if (searchQuery.trim()) {
@@ -182,7 +312,7 @@ const UserManagement: React.FC = () => {
     }
 
     return filtered;
-  }, [mockUsers, searchQuery, selectedRole]);
+  }, [users, searchQuery, selectedRole]);
 
   const formatLastLogin = (lastLogin?: string) => {
     if (!lastLogin) return 'Never';
@@ -193,19 +323,19 @@ const UserManagement: React.FC = () => {
   const stats = [
     {
       title: 'Total Users',
-      value: mockUsers.length,
+      value: users.length,
       description: 'Registered users',
       icon: Users,
     },
     {
       title: 'Active Users',
-      value: mockUsers.filter(u => u.status === 'active').length,
+      value: users.filter(u => u.status === 'active').length,
       description: 'Currently active',
       icon: CheckCircle,
     },
     {
       title: 'Pending Approval',
-      value: mockUsers.filter(u => u.status === 'pending').length,
+      value: users.filter(u => u.status === 'pending').length,
       description: 'Awaiting activation',
       icon: Clock,
     },
@@ -222,10 +352,16 @@ const UserManagement: React.FC = () => {
               Manage user accounts, roles, and access permissions
             </p>
           </div>
-          <Button className="gap-2">
-            <UserPlus className="w-4 h-4" />
-            Add User
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={handleResetData} className="gap-2">
+              <RefreshCw className="w-4 h-4" />
+              Reset Data
+            </Button>
+            <Button onClick={handleAddUser} className="gap-2">
+              <UserPlus className="w-4 h-4" />
+              Add User
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -345,22 +481,31 @@ const UserManagement: React.FC = () => {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
+                          <Button variant="ghost" className="h-8 w-8 p-0" disabled={loading}>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem className="gap-2">
+                          <DropdownMenuItem 
+                            className="gap-2"
+                            onClick={() => handleEditUser(user)}
+                          >
                             <Edit className="h-4 w-4" />
                             Edit User
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2">
+                          <DropdownMenuItem 
+                            className="gap-2"
+                            onClick={() => handleToggleUserStatus(user)}
+                          >
                             <Shield className="h-4 w-4" />
-                            Manage Access
+                            {user.status === 'active' ? 'Deactivate' : 'Activate'}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="gap-2 text-destructive">
+                          <DropdownMenuItem 
+                            className="gap-2 text-destructive"
+                            onClick={() => handleDeleteUser(user)}
+                          >
                             <Trash2 className="h-4 w-4" />
                             Delete User
                           </DropdownMenuItem>
@@ -381,6 +526,24 @@ const UserManagement: React.FC = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Add/Edit User Modal */}
+        <AddUserModal
+          open={isAddModalOpen}
+          onOpenChange={setIsAddModalOpen}
+          onUserAdded={handleUserAdded}
+          editUser={editingUser}
+        />
+
+        {/* Delete Confirmation Modal */}
+        <DeleteConfirmModal
+          open={isDeleteModalOpen}
+          onOpenChange={setIsDeleteModalOpen}
+          onConfirm={handleConfirmDelete}
+          title="Delete User"
+          description={`Are you sure you want to delete ${deletingUser?.first_name} ${deletingUser?.last_name}? This action cannot be undone.`}
+          confirmText="Delete User"
+        />
       </div>
     </DashboardLayout>
   );
