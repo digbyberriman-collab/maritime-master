@@ -101,7 +101,7 @@ const getDeepLink = (alert: AlertItem): string => {
     drill: '/drills',
     audit: '/audits',
     maintenance: '/maintenance',
-    capa: '/capa-tracker',
+    capa: '/reports/capa-tracker',
     document: '/documents',
     crew: '/crew',
     training: '/training',
