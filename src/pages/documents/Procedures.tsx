@@ -59,27 +59,28 @@ export default function Procedures() {
   async function loadProcedures() {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      const response = await supabase
         .from('documents')
-        .select('id, title, document_number, status, revision, effective_date, next_review_date, created_at')
-        .eq('document_type', 'procedure')
+        .select('id, title, document_number, status, revision, issue_date, next_review_date, created_at')
         .order('title', { ascending: true });
 
-      if (error) throw error;
+      if (response.error) throw response.error;
       
-      // Map to interface
-      const mapped: Procedure[] = (data || []).map((d: any) => ({
-        id: d.id,
-        title: d.title,
-        document_number: d.document_number,
-        category: null,
-        status: d.status || 'active',
-        version: d.revision,
-        effective_date: d.effective_date,
-        review_date: d.next_review_date,
-        department: null,
-        created_at: d.created_at
-      }));
+      // Map to interface - filter for procedure docs
+      const mapped: Procedure[] = (response.data || [])
+        .filter((d) => d.document_number?.startsWith('PROC') || d.document_number?.startsWith('SOP'))
+        .map((d) => ({
+          id: d.id,
+          title: d.title || '',
+          document_number: d.document_number || '',
+          category: null,
+          status: d.status || 'active',
+          version: d.revision || '',
+          effective_date: d.issue_date,
+          review_date: d.next_review_date,
+          department: null,
+          created_at: d.created_at || ''
+        }));
       
       // Apply filters
       let filtered = mapped;

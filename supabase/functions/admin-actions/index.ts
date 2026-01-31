@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,6 +19,9 @@ interface AdminActionRequest {
   pin?: string;
   position?: string;
 }
+
+// Generate salt for bcrypt
+const generateSalt = async () => await bcrypt.genSalt(12);
 
 serve(async (req: Request) => {
   // Handle CORS preflight
@@ -93,7 +97,7 @@ serve(async (req: Request) => {
       .eq('user_id', userId)
       .single();
 
-    let result: any = {};
+    let result: Record<string, unknown> = {};
 
     switch (action) {
       case 'set_pin': {
@@ -104,12 +108,9 @@ serve(async (req: Request) => {
           });
         }
 
-        // Hash the PIN using bcrypt-like approach (using crypto)
-        const encoder = new TextEncoder();
-        const data = encoder.encode(pin + userId);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const pinHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        // Hash the PIN using bcrypt (secure key derivation function)
+        const salt = await generateSalt();
+        const pinHash = await bcrypt.hash(pin, salt);
 
         // Upsert PIN
         const { error: pinError } = await supabaseAdmin
@@ -124,7 +125,7 @@ serve(async (req: Request) => {
 
         if (pinError) throw pinError;
 
-        // Log action
+        // Log action (don't log the PIN itself)
         await supabaseAdmin.from('admin_action_log').insert({
           actor_user_id: userId,
           action_type: 'SET_PIN',
@@ -170,16 +171,12 @@ serve(async (req: Request) => {
           });
         }
 
-        // Verify PIN
-        const encoder = new TextEncoder();
-        const data = encoder.encode(pin + userId);
-        const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const pinHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        // Verify PIN using bcrypt (constant-time comparison)
+        const isValid = await bcrypt.compare(pin, pinRecord.pin_hash);
 
-        if (pinHash !== pinRecord.pin_hash) {
+        if (!isValid) {
           const failedAttempts = (pinRecord.failed_attempts || 0) + 1;
-          const updateData: any = { failed_attempts: failedAttempts };
+          const updateData: Record<string, unknown> = { failed_attempts: failedAttempts };
           
           if (failedAttempts >= 5) {
             updateData.locked_until = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 min lockout
@@ -243,7 +240,7 @@ serve(async (req: Request) => {
           });
         }
 
-        const beforeState = { email: targetProfile.email, account_status: targetProfile.account_status };
+        const beforeState = { account_status: targetProfile.account_status };
 
         switch (resetType) {
           case 'password_reset':
@@ -281,7 +278,7 @@ serve(async (req: Request) => {
             break;
         }
 
-        // Log action
+        // Log action (redact email in logs)
         await supabaseAdmin.from('admin_action_log').insert({
           actor_user_id: userId,
           action_type: 'RESET_ACCOUNT',
@@ -397,7 +394,7 @@ serve(async (req: Request) => {
         const transferDate = effectiveDate || new Date().toISOString().split('T')[0];
         const beforeState = currentAssignment ? {
           vessel_id: currentAssignment.vessel_id,
-          vessel_name: (currentAssignment.vessels as any)?.name,
+          vessel_name: (currentAssignment.vessels as Record<string, unknown>)?.name,
           position: currentAssignment.position
         } : null;
 
@@ -472,9 +469,9 @@ serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Admin action error:', error);
-    return new Response(JSON.stringify({ error: error.message || 'Internal error' }), {
+    return new Response(JSON.stringify({ error: 'Internal error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });

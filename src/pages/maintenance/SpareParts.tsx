@@ -77,9 +77,21 @@ export default function SpareParts() {
       if (vesselsRes.error) throw vesselsRes.error;
 
       setVessels(vesselsRes.data || []);
-      setParts((partsRes.data || []).map(p => ({
-        ...p,
-        vessel_name: (p as any).vessel?.name || null,
+      setParts((partsRes.data || []).map((p: any) => ({
+        id: p.id,
+        name: p.part_name,
+        part_number: p.part_number,
+        category: p.category || 'other',
+        location: p.location_onboard || null,
+        vessel_id: p.vessel_id || null,
+        vessel_name: p.vessel?.name || null,
+        quantity_on_hand: p.quantity || 0,
+        minimum_quantity: p.minimum_stock || 0,
+        unit: p.unit || 'pcs',
+        unit_cost: p.unit_cost || null,
+        supplier: p.supplier || null,
+        is_critical: p.is_critical || false,
+        last_ordered: p.last_ordered_date || null,
       })));
     } catch (error) {
       console.error('Failed to load data:', error);

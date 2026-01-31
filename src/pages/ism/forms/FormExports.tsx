@@ -51,9 +51,9 @@ export default function FormExports() {
       const [templatesRes, vesselsRes] = await Promise.all([
         supabase
           .from('form_templates')
-          .select('id, name, category')
+          .select('id, template_name, category')
           .eq('status', 'active')
-          .order('name'),
+          .order('template_name'),
         supabase
           .from('vessels')
           .select('id, name')
@@ -64,7 +64,7 @@ export default function FormExports() {
       if (templatesRes.error) throw templatesRes.error;
       if (vesselsRes.error) throw vesselsRes.error;
 
-      setTemplates((templatesRes.data || []).map(t => ({ ...t, submission_count: 0 })));
+      setTemplates((templatesRes.data || []).map((t: any) => ({ id: t.id, name: t.template_name, category: t.category, submission_count: 0 })));
       setVessels(vesselsRes.data || []);
     } catch (error) {
       console.error('Failed to load data:', error);

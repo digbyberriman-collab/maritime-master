@@ -54,32 +54,32 @@ export default function FlightsTravel() {
   async function loadBookings() {
     setIsLoading(true);
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('flight_bookings')
-        .select('*')
+        .select('id, airline, flight_number, depart_airport, arrive_airport, depart_datetime_utc, arrive_datetime_utc, booking_reference, confirmed_at')
         .order('depart_datetime_utc', { ascending: true });
 
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
       
       // Map database fields to interface
-      const mappedBookings: FlightBooking[] = (data || []).map((b: any) => ({
+      const mappedBookings: FlightBooking[] = (data || []).map((b) => ({
         id: b.id,
-        airline: b.airline,
-        flight_number: b.flight_number,
-        departure_airport: b.depart_airport,
-        arrival_airport: b.arrive_airport,
-        departure_time: b.depart_datetime_utc,
-        arrival_time: b.arrive_datetime_utc,
-        booking_reference: b.booking_reference,
-        status: b.status || 'pending',
+        airline: b.airline || '',
+        flight_number: b.flight_number || '',
+        departure_airport: b.depart_airport || '',
+        arrival_airport: b.arrive_airport || '',
+        departure_time: b.depart_datetime_utc || '',
+        arrival_time: b.arrive_datetime_utc || '',
+        booking_reference: b.booking_reference || '',
+        status: b.confirmed_at ? 'confirmed' : 'pending',
         travel_record: null
       }));
-      setBookings(mappedBookings);
+      
+      // Apply status filter
+      const filtered = statusFilter !== 'all' 
+        ? mappedBookings.filter(b => b.status === statusFilter)
+        : mappedBookings;
+      setBookings(filtered);
     } catch (error) {
       console.error('Failed to load bookings:', error);
       setBookings([]);

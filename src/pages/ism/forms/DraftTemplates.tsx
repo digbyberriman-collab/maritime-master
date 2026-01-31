@@ -39,24 +39,21 @@ export default function DraftTemplates() {
     try {
       const { data, error } = await supabase
         .from('form_templates')
-        .select(`
-          id,
-          name,
-          description,
-          category,
-          status,
-          created_at,
-          updated_at,
-          created_by_name,
-          fields
-        `)
+        .select('id, template_name, description, category, status, created_at, updated_at, created_by_name, fields')
         .eq('status', 'draft')
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
       
-      setTemplates((data || []).map(t => ({
-        ...t,
+      setTemplates((data || []).map((t: any) => ({
+        id: t.id,
+        name: t.template_name,
+        description: t.description,
+        category: t.category,
+        status: t.status,
+        created_at: t.created_at,
+        updated_at: t.updated_at,
+        created_by_name: t.created_by_name,
         field_count: Array.isArray(t.fields) ? t.fields.length : 0,
       })));
     } catch (error) {

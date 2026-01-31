@@ -116,23 +116,23 @@ export default function TravelRecordDetail() {
     try {
       const { data, error } = await supabase
         .from('flight_bookings')
-        .select('*')
-        .eq('travel_record_id', id)
+        .select('id, airline, flight_number, depart_airport, arrive_airport, depart_datetime_utc, arrive_datetime_utc, booking_reference, confirmed_at')
+        .eq('flight_request_id', id)
         .order('depart_datetime_utc', { ascending: true });
 
       if (error) throw error;
       
       // Map to interface
-      const mapped: FlightSegment[] = (data || []).map((f: any) => ({
+      const mapped: FlightSegment[] = (data || []).map((f) => ({
         id: f.id,
-        airline: f.airline,
-        flight_number: f.flight_number,
-        departure_airport: f.depart_airport,
-        arrival_airport: f.arrive_airport,
-        departure_time: f.depart_datetime_utc,
-        arrival_time: f.arrive_datetime_utc,
-        booking_reference: f.booking_reference,
-        status: f.status || 'pending'
+        airline: f.airline || '',
+        flight_number: f.flight_number || '',
+        departure_airport: f.depart_airport || '',
+        arrival_airport: f.arrive_airport || '',
+        departure_time: f.depart_datetime_utc || '',
+        arrival_time: f.arrive_datetime_utc || '',
+        booking_reference: f.booking_reference || '',
+        status: f.confirmed_at ? 'confirmed' : 'pending'
       }));
       setFlights(mapped);
     } catch (error) {
