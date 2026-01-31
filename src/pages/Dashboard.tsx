@@ -133,7 +133,7 @@ const Dashboard: React.FC = () => {
                 <Plus className="w-4 h-4" />
                 Add Vessel
               </Button>
-              <Button variant="outline" className="gap-2" onClick={() => navigate('/operations/crew')}>
+              <Button variant="outline" className="gap-2" onClick={() => navigate('/crew')}>
                 <Users className="w-4 h-4" />
                 Manage Crew
               </Button>
@@ -207,7 +207,7 @@ const Dashboard: React.FC = () => {
               <Button 
                 variant="link" 
                 className="p-0 h-auto mt-3"
-                onClick={() => navigate('/compliance')}
+                onClick={() => navigate('/incidents')}
               >
                 View all incidents →
               </Button>
