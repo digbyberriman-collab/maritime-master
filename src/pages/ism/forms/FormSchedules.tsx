@@ -65,21 +65,27 @@ export default function FormSchedules() {
     try {
       const { data, error } = await supabase
         .from('form_schedules')
-        .select(`
-          *,
-          form_templates(name)
-        `)
+        .select('id, schedule_name, template_id, recurrence_type, is_active, next_due_date, last_generated_at, created_at, vessel_id')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       
-      setSchedules((data || []).map(s => ({
-        ...s,
-        template_name: (s as any).form_templates?.name || 'Unknown Template',
+      setSchedules((data || []).map((s) => ({
+        id: s.id,
+        name: s.schedule_name || s.id,
+        template_id: s.template_id || '',
+        template_name: null, // Will be resolved separately
+        frequency: (s.recurrence_type || 'monthly') as any,
+        day_of_week: null,
+        day_of_month: null,
+        is_active: s.is_active ?? true,
+        vessel_ids: s.vessel_id ? [s.vessel_id] : [],
+        last_run: s.last_generated_at,
+        next_run: s.next_due_date,
+        created_at: s.created_at || '',
       })));
     } catch (error) {
       console.error('Failed to load schedules:', error);
-      // Use mock data if table doesn't exist
       setSchedules([]);
     } finally {
       setIsLoading(false);
@@ -90,12 +96,12 @@ export default function FormSchedules() {
     try {
       const { data, error } = await supabase
         .from('form_templates')
-        .select('id, name')
+        .select('id, template_name')
         .eq('status', 'active')
-        .order('name');
+        .order('template_name');
 
       if (error) throw error;
-      setTemplates(data || []);
+      setTemplates((data || []).map((t: any) => ({ id: t.id, name: t.template_name })));
     } catch (error) {
       console.error('Failed to load templates:', error);
     }
@@ -157,13 +163,13 @@ export default function FormSchedules() {
     }
 
     try {
-      const { error } = await supabase
-        .from('form_schedules')
+      // Use any to bypass strict type checking on table that may have outdated types
+      const { error } = await (supabase
+        .from('form_schedules') as any)
         .insert({
-          name: newSchedule.name,
+          schedule_name: newSchedule.name,
           template_id: newSchedule.template_id,
-          frequency: newSchedule.frequency,
-          vessel_ids: newSchedule.vessel_ids,
+          recurrence_type: newSchedule.frequency,
           is_active: true,
         });
 

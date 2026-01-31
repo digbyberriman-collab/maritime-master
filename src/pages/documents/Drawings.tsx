@@ -54,30 +54,31 @@ export default function Drawings() {
   async function loadData() {
     setIsLoading(true);
     try {
-      const [drawingsRes, vesselsRes] = await Promise.all([
-        supabase
-          .from('documents')
-          .select('id, title, document_number, status, revision, updated_at, vessel_id')
-          .eq('document_type', 'drawing')
-          .order('title', { ascending: true }),
-        supabase
-          .from('vessels')
-          .select('id, name')
-          .eq('status', 'active')
-          .order('name'),
-      ]);
+      const drawingsRes = await supabase
+        .from('documents')
+        .select('id, title, document_number, status, revision, updated_at, vessel_id')
+        .order('title', { ascending: true });
+        
+      const vesselsRes = await supabase
+        .from('vessels')
+        .select('id, name')
+        .eq('status', 'active')
+        .order('name');
 
       if (drawingsRes.error) throw drawingsRes.error;
       if (vesselsRes.error) throw vesselsRes.error;
 
       const vesselsList = vesselsRes.data || [];
+      const vesselMap = new Map(vesselsList.map(v => [v.id, v.name]));
       setVessels(vesselsList);
       
-      // Map to interface
-      const mapped: Drawing[] = (drawingsRes.data || []).map((d: any) => ({
-        id: d.id,
-        title: d.title,
-        drawing_number: d.document_number,
+      // Map to interface - filter for drawing docs
+      const mapped: Drawing[] = (drawingsRes.data || [])
+        .filter((d) => d.document_number?.startsWith('DRW') || d.document_number?.startsWith('DRAW'))
+        .map((d) => ({
+          id: d.id,
+          title: d.title || '',
+          drawing_number: d.document_number || '',
         category: 'ga_plans', // Default since documents table may not have category
         vessel_id: d.vessel_id,
         vessel_name: vesselsList.find(v => v.id === d.vessel_id)?.name || null,

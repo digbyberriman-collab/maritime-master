@@ -52,19 +52,33 @@ serve(async (req: Request) => {
       throw new Error('Unauthorized');
     }
 
-    // Get the caller's profile to check permissions
+    const userId = userData.user.id;
+
+    // Check if user has DPA/superadmin role in user_roles table (RBAC system)
+    const { data: roles } = await supabaseAdmin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('is_active', true)
+      .in('role', ['dpa', 'superadmin', 'shore_management']);
+
+    // Also check legacy profile.role for backwards compatibility
     const { data: callerProfile, error: callerError } = await supabaseAdmin
       .from('profiles')
       .select('role, company_id')
-      .eq('user_id', userData.user.id)
+      .eq('user_id', userId)
       .single();
 
     if (callerError || !callerProfile) {
       throw new Error('Could not verify permissions');
     }
 
-    // Only DPA and Shore Management can create crew members
-    if (!['dpa', 'shore_management'].includes(callerProfile.role)) {
+    const legacyRole = callerProfile.role?.toLowerCase();
+    const hasLegacyAdminRole = legacyRole === 'dpa' || legacyRole === 'shore_management' || legacyRole === 'superadmin';
+    const hasNewRoleAccess = roles && roles.length > 0;
+
+    // Only DPA, Shore Management, or superadmin can create crew members
+    if (!hasNewRoleAccess && !hasLegacyAdminRole) {
       throw new Error('Insufficient permissions to create crew members');
     }
 
@@ -155,10 +169,11 @@ serve(async (req: Request) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
-  } catch (error: any) {
-    console.error('Error in create-crew-member:', error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error in create-crew-member:', errorMessage);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

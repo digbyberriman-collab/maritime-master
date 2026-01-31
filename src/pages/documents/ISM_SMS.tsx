@@ -53,25 +53,26 @@ export default function ISM_SMS() {
   async function loadDocuments() {
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      const response = await supabase
         .from('documents')
-        .select('id, title, document_number, status, revision, effective_date, approved_date')
-        .in('document_type', ['ism', 'sms'])
+        .select('id, title, document_number, status, revision, issue_date, approved_date')
         .order('document_number', { ascending: true });
 
-      if (error) throw error;
+      if (response.error) throw response.error;
       
-      // Map to interface
-      const mapped: SMSDocument[] = (data || []).map((d: any) => ({
-        id: d.id,
-        title: d.title,
-        document_number: d.document_number,
-        section: d.document_number?.split('-')[1]?.charAt(0) || '1', // Extract section from doc number like SMS-2.1
-        status: d.status || 'active',
-        version: d.revision,
-        effective_date: d.effective_date,
-        last_reviewed: d.approved_date
-      }));
+      // Map to interface - filter for ISM/SMS docs based on document_number prefix
+      const mapped: SMSDocument[] = (response.data || [])
+        .filter((d) => d.document_number?.startsWith('SMS') || d.document_number?.startsWith('ISM'))
+        .map((d) => ({
+          id: d.id,
+          title: d.title || '',
+          document_number: d.document_number || '',
+          section: d.document_number?.split('-')[1]?.charAt(0) || '1',
+          status: d.status || 'active',
+          version: d.revision || '',
+          effective_date: d.issue_date,
+          last_reviewed: d.approved_date
+        }));
       
       // Filter by section if needed
       const filtered = sectionFilter !== 'all' 

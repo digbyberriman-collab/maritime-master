@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.2';
+import * as bcrypt from 'https://deno.land/x/bcrypt@v0.4.1/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,15 +27,37 @@ serve(async (req: Request) => {
       throw new Error('API key required');
     }
 
-    // Validate API key and get associated entity
-    const { data: apiKeyRecord, error: keyError } = await supabaseAdmin
+    // Get all active API keys and verify using bcrypt
+    // Note: We need to check all keys since we can't look up by hash directly
+    const { data: apiKeys, error: keysError } = await supabaseAdmin
       .from('api_keys')
       .select('*, companies(*)')
-      .eq('key_hash', apiKey) // In production, hash the key
-      .eq('is_active', true)
-      .single();
+      .eq('is_active', true);
 
-    if (keyError || !apiKeyRecord) {
+    if (keysError) {
+      console.error('Error fetching API keys:', keysError);
+      return new Response(
+        JSON.stringify({ error: 'Internal server error' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Find matching key by comparing hashes
+    let apiKeyRecord = null;
+    for (const key of apiKeys || []) {
+      try {
+        const isMatch = await bcrypt.compare(apiKey, key.key_hash);
+        if (isMatch) {
+          apiKeyRecord = key;
+          break;
+        }
+      } catch {
+        // Skip keys with invalid hashes
+        continue;
+      }
+    }
+
+    if (!apiKeyRecord) {
       return new Response(
         JSON.stringify({ error: 'Invalid API key' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -49,7 +72,7 @@ serve(async (req: Request) => {
       );
     }
 
-    // Log API access
+    // Log API access (do not log the key itself)
     await supabaseAdmin
       .from('api_access_logs')
       .insert({
@@ -229,7 +252,7 @@ serve(async (req: Request) => {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in external-api:', errorMessage);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: 'Request failed' }), // Don't expose internal error details
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

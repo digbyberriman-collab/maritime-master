@@ -59,7 +59,7 @@ interface CriticalEquipment {
   next_maintenance: string;
   maintenance_interval: number; // days
   responsible_officer: string;
-  spare_parts_status: 'adequate' | 'low' | 'critical' | 'none';
+  spare_parts_status: 'adequate' | 'good' | 'low' | 'critical' | 'none';
   spare_parts_count: number;
   test_frequency: string;
   last_test: string;
@@ -249,7 +249,7 @@ const CriticalEquipment: React.FC = () => {
 
   const systemTypes = [...new Set(mockCriticalEquipment.map(eq => eq.system))];
   
-  const statusLabels: Record<string, string> = {
+  const statusLabels: Record<CriticalEquipment['maintenance_status'], string> = {
     excellent: 'Excellent',
     good: 'Good',
     fair: 'Fair',

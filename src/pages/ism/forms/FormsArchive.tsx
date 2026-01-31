@@ -43,12 +43,12 @@ export default function FormsArchive() {
     try {
       const { data, error } = await supabase
         .from('form_templates')
-        .select('id, name')
+        .select('id, template_name')
         .eq('status', 'active')
-        .order('name');
+        .order('template_name');
 
       if (error) throw error;
-      setTemplates(data || []);
+      setTemplates((data || []).map((t: any) => ({ id: t.id, name: t.template_name })));
     } catch (error) {
       console.error('Failed to load templates:', error);
     }
@@ -103,10 +103,16 @@ export default function FormsArchive() {
       const { data, error } = await query;
       if (error) throw error;
       
-      setSubmissions((data || []).map(s => ({
-        ...s,
-        template_name: (s as any).form_templates?.name || 'Unknown Template',
-        signature_count: 0, // Would need separate query
+      setSubmissions((data || []).map((s: any) => ({
+        id: s.id,
+        template_name: s.form_templates?.template_name || 'Unknown Template',
+        template_id: s.template_id,
+        status: s.status,
+        submitted_at: s.submitted_at,
+        submitted_by_name: s.submitted_by_name,
+        vessel_name: s.vessel_name,
+        signature_count: 0,
+        data: s.data || {},
       })));
     } catch (error) {
       console.error('Failed to load submissions:', error);
