@@ -59,22 +59,34 @@ export default function Procedures() {
   async function loadProcedures() {
     setIsLoading(true);
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('documents')
-        .select('*')
+        .select('id, title, document_number, status, revision, effective_date, next_review_date, created_at')
         .eq('document_type', 'procedure')
         .order('title', { ascending: true });
 
-      if (categoryFilter !== 'all') {
-        query = query.eq('category', categoryFilter);
-      }
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
-      setProcedures((data || []) as Procedure[]);
+      
+      // Map to interface
+      const mapped: Procedure[] = (data || []).map((d: any) => ({
+        id: d.id,
+        title: d.title,
+        document_number: d.document_number,
+        category: null,
+        status: d.status || 'active',
+        version: d.revision,
+        effective_date: d.effective_date,
+        review_date: d.next_review_date,
+        department: null,
+        created_at: d.created_at
+      }));
+      
+      // Apply filters
+      let filtered = mapped;
+      if (statusFilter !== 'all') {
+        filtered = filtered.filter(p => p.status === statusFilter);
+      }
+      setProcedures(filtered);
     } catch (error) {
       console.error('Failed to load procedures:', error);
       // Mock data for display
@@ -90,42 +102,6 @@ export default function Procedures() {
           review_date: '2025-01-15',
           department: 'Deck',
           created_at: '2024-01-01',
-        },
-        {
-          id: '2',
-          title: 'Cargo Loading and Discharge',
-          document_number: 'SOP-CRG-001',
-          category: 'cargo',
-          status: 'active',
-          version: '2.1',
-          effective_date: '2024-03-01',
-          review_date: '2025-03-01',
-          department: 'Deck',
-          created_at: '2024-02-15',
-        },
-        {
-          id: '3',
-          title: 'Main Engine Start-up Procedure',
-          document_number: 'SOP-ENG-001',
-          category: 'engineering',
-          status: 'under_review',
-          version: '4.0',
-          effective_date: '2023-06-01',
-          review_date: '2024-06-01',
-          department: 'Engine',
-          created_at: '2023-05-01',
-        },
-        {
-          id: '4',
-          title: 'Enclosed Space Entry',
-          document_number: 'SOP-SAF-001',
-          category: 'safety',
-          status: 'active',
-          version: '5.0',
-          effective_date: '2024-02-01',
-          review_date: '2025-02-01',
-          department: 'Safety',
-          created_at: '2024-01-20',
         },
       ]);
     } finally {

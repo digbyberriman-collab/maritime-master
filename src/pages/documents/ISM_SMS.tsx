@@ -53,34 +53,37 @@ export default function ISM_SMS() {
   async function loadDocuments() {
     setIsLoading(true);
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('documents')
-        .select('*')
+        .select('id, title, document_number, status, revision, effective_date, approved_date')
         .in('document_type', ['ism', 'sms'])
         .order('document_number', { ascending: true });
 
-      if (sectionFilter !== 'all') {
-        query = query.eq('section', sectionFilter);
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
-      setDocuments((data || []) as SMSDocument[]);
+      
+      // Map to interface
+      const mapped: SMSDocument[] = (data || []).map((d: any) => ({
+        id: d.id,
+        title: d.title,
+        document_number: d.document_number,
+        section: d.document_number?.split('-')[1]?.charAt(0) || '1', // Extract section from doc number like SMS-2.1
+        status: d.status || 'active',
+        version: d.revision,
+        effective_date: d.effective_date,
+        last_reviewed: d.approved_date
+      }));
+      
+      // Filter by section if needed
+      const filtered = sectionFilter !== 'all' 
+        ? mapped.filter(d => d.section === sectionFilter)
+        : mapped;
+      setDocuments(filtered);
     } catch (error) {
       console.error('Failed to load documents:', error);
       // Mock data
       setDocuments([
         { id: '1', title: 'Safety & Environmental Protection Policy', document_number: 'SMS-2.1', section: '2', status: 'active', version: '5.0', effective_date: '2024-01-01', last_reviewed: '2024-01-15' },
         { id: '2', title: 'Company Organization Chart', document_number: 'SMS-3.1', section: '3', status: 'active', version: '4.2', effective_date: '2023-12-01', last_reviewed: '2023-12-10' },
-        { id: '3', title: 'DPA Appointment & Responsibilities', document_number: 'SMS-4.1', section: '4', status: 'active', version: '3.0', effective_date: '2024-02-01', last_reviewed: '2024-02-05' },
-        { id: '4', title: 'Master\'s Standing Orders', document_number: 'SMS-5.1', section: '5', status: 'active', version: '6.1', effective_date: '2024-01-15', last_reviewed: '2024-01-20' },
-        { id: '5', title: 'Crew Manning & Competence', document_number: 'SMS-6.1', section: '6', status: 'active', version: '4.0', effective_date: '2023-11-01', last_reviewed: '2023-11-15' },
-        { id: '6', title: 'Navigation Procedures', document_number: 'SMS-7.1', section: '7', status: 'active', version: '5.2', effective_date: '2024-03-01', last_reviewed: '2024-03-05' },
-        { id: '7', title: 'Emergency Muster List', document_number: 'SMS-8.1', section: '8', status: 'active', version: '3.5', effective_date: '2024-02-15', last_reviewed: '2024-02-20' },
-        { id: '8', title: 'Incident Reporting Procedure', document_number: 'SMS-9.1', section: '9', status: 'active', version: '4.1', effective_date: '2024-01-01', last_reviewed: '2024-01-10' },
-        { id: '9', title: 'Planned Maintenance System', document_number: 'SMS-10.1', section: '10', status: 'active', version: '5.0', effective_date: '2023-10-01', last_reviewed: '2023-10-15' },
-        { id: '10', title: 'Document Control Procedure', document_number: 'SMS-11.1', section: '11', status: 'active', version: '3.2', effective_date: '2024-01-01', last_reviewed: '2024-01-05' },
-        { id: '11', title: 'Internal Audit Procedure', document_number: 'SMS-12.1', section: '12', status: 'active', version: '4.0', effective_date: '2024-02-01', last_reviewed: '2024-02-10' },
       ]);
     } finally {
       setIsLoading(false);

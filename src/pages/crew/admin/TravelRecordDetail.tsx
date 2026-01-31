@@ -97,7 +97,13 @@ export default function TravelRecordDetail() {
         .single();
 
       if (error) throw error;
-      setRecord(data as TravelRecord);
+      
+      // Map to interface
+      const mapped: TravelRecord = {
+        ...(data as any),
+        cost_estimate: (data as any).total_cost || null
+      };
+      setRecord(mapped);
     } catch (error) {
       console.error('Failed to load record:', error);
       toast.error('Failed to load travel record');
@@ -112,10 +118,23 @@ export default function TravelRecordDetail() {
         .from('flight_bookings')
         .select('*')
         .eq('travel_record_id', id)
-        .order('departure_time', { ascending: true });
+        .order('depart_datetime_utc', { ascending: true });
 
       if (error) throw error;
-      setFlights((data || []) as FlightSegment[]);
+      
+      // Map to interface
+      const mapped: FlightSegment[] = (data || []).map((f: any) => ({
+        id: f.id,
+        airline: f.airline,
+        flight_number: f.flight_number,
+        departure_airport: f.depart_airport,
+        arrival_airport: f.arrive_airport,
+        departure_time: f.depart_datetime_utc,
+        arrival_time: f.arrive_datetime_utc,
+        booking_reference: f.booking_reference,
+        status: f.status || 'pending'
+      }));
+      setFlights(mapped);
     } catch (error) {
       console.error('Failed to load flights:', error);
     }
@@ -127,10 +146,19 @@ export default function TravelRecordDetail() {
         .from('crew_travel_documents')
         .select('*')
         .eq('travel_record_id', id)
-        .order('uploaded_at', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setDocuments((data || []) as TravelDocument[]);
+      
+      // Map to interface
+      const mapped: TravelDocument[] = (data || []).map((d: any) => ({
+        id: d.id,
+        document_type: d.document_type,
+        file_name: d.original_filename,
+        file_url: d.original_file_path,
+        uploaded_at: d.created_at
+      }));
+      setDocuments(mapped);
     } catch (error) {
       console.error('Failed to load documents:', error);
     }

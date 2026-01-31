@@ -57,7 +57,7 @@ export default function Drawings() {
       const [drawingsRes, vesselsRes] = await Promise.all([
         supabase
           .from('documents')
-          .select('*, vessel:vessels(name)')
+          .select('id, title, document_number, status, revision, updated_at, vessel_id')
           .eq('document_type', 'drawing')
           .order('title', { ascending: true }),
         supabase
@@ -70,21 +70,29 @@ export default function Drawings() {
       if (drawingsRes.error) throw drawingsRes.error;
       if (vesselsRes.error) throw vesselsRes.error;
 
-      setVessels(vesselsRes.data || []);
-      setDrawings((drawingsRes.data || []).map(d => ({
-        ...d,
-        vessel_name: (d as any).vessel?.name || null,
-      })));
+      const vesselsList = vesselsRes.data || [];
+      setVessels(vesselsList);
+      
+      // Map to interface
+      const mapped: Drawing[] = (drawingsRes.data || []).map((d: any) => ({
+        id: d.id,
+        title: d.title,
+        drawing_number: d.document_number,
+        category: 'ga_plans', // Default since documents table may not have category
+        vessel_id: d.vessel_id,
+        vessel_name: vesselsList.find(v => v.id === d.vessel_id)?.name || null,
+        revision: d.revision,
+        file_type: 'PDF',
+        status: d.status,
+        updated_at: d.updated_at
+      }));
+      setDrawings(mapped);
     } catch (error) {
       console.error('Failed to load data:', error);
       // Mock data
       setDrawings([
         { id: '1', title: 'General Arrangement Plan', drawing_number: 'GA-001', category: 'ga_plans', vessel_id: '1', vessel_name: 'MV Ocean Star', revision: 'B', file_type: 'PDF', status: 'approved', updated_at: '2024-02-15' },
         { id: '2', title: 'Fire Control Plan', drawing_number: 'FCP-001', category: 'fire_plans', vessel_id: '1', vessel_name: 'MV Ocean Star', revision: 'C', file_type: 'PDF', status: 'approved', updated_at: '2024-03-01' },
-        { id: '3', title: 'Safety Plan - Deck A', drawing_number: 'SP-001A', category: 'safety_plans', vessel_id: '1', vessel_name: 'MV Ocean Star', revision: 'A', file_type: 'PDF', status: 'approved', updated_at: '2024-01-20' },
-        { id: '4', title: 'Main Engine Room Piping', drawing_number: 'PIP-ME-001', category: 'piping', vessel_id: '2', vessel_name: 'MV Pacific Trader', revision: 'D', file_type: 'DWG', status: 'under_review', updated_at: '2024-03-10' },
-        { id: '5', title: 'Electrical Single Line Diagram', drawing_number: 'EL-SLD-001', category: 'electrical', vessel_id: '2', vessel_name: 'MV Pacific Trader', revision: 'B', file_type: 'PDF', status: 'approved', updated_at: '2024-02-28' },
-        { id: '6', title: 'Stability Booklet - Loading Conditions', drawing_number: 'STB-001', category: 'stability', vessel_id: '1', vessel_name: 'MV Ocean Star', revision: 'E', file_type: 'PDF', status: 'approved', updated_at: '2024-01-15' },
       ]);
       setVessels([
         { id: '1', name: 'MV Ocean Star' },
