@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -75,6 +76,7 @@ import ReallocateVesselModal from '@/components/crew/ReallocateVesselModal';
 
 const CrewRoster: React.FC = () => {
   const { profile } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   
   // Use global vessel filter from master selector
   const { vesselFilter: masterVesselFilter, isAllVessels, selectedVessel } = useVesselFilter();
@@ -124,6 +126,16 @@ const CrewRoster: React.FC = () => {
   const canManageCrew = ['dpa', 'shore_management'].includes(profile?.role || '');
   const isDPAAdmin = ['dpa', 'superadmin'].includes(profile?.role || '');
   const isMaster = profile?.role === 'master';
+
+  // Handle ?new=true URL parameter to auto-open Add Crew modal
+  useEffect(() => {
+    if (searchParams.get('new') === 'true' && canManageCrew) {
+      setIsFormModalOpen(true);
+      // Remove the query param after opening
+      searchParams.delete('new');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, canManageCrew, setSearchParams]);
 
   // Filter crew based on search
   const filteredCrew = useMemo(() => {
