@@ -159,7 +159,7 @@ const DPADashboard: React.FC = () => {
                   <Ship className="w-4 h-4" />
                   Fleet Map
                 </Button>
-                <Button variant="outline" className="gap-2" onClick={() => navigate('/compliance')}>
+                <Button variant="outline" className="gap-2" onClick={() => navigate('/incidents')}>
                   Report Incident
                 </Button>
               </div>
