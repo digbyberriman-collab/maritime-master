@@ -315,6 +315,19 @@ export const AppRoutes: React.FC = () => {
           />
         </ProtectedRoute>
       } />
+      <Route path="/crew/admin/quarantine/new" element={
+        <ProtectedRoute>
+          <PlaceholderWrapper 
+            title="Add Quarantine House" 
+            description="Register a new quarantine accommodation facility"
+            icon={<Building2 className="w-8 h-8 text-primary" />}
+            features={['Location details', 'Room capacity', 'Contact information', 'Cost per night']} 
+          />
+        </ProtectedRoute>
+      } />
+
+      {/* ISM - Parent redirect */}
+      <Route path="/ism" element={<Navigate to="/ism/forms/templates" replace />} />
 
       {/* ISM - Forms */}
       <Route path="/ism/forms" element={<Navigate to="/ism/forms/templates" replace />} />
