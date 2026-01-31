@@ -211,7 +211,7 @@ export const useRedRoomStore = create<RedRoomState>((set, get) => ({
           return `/incidents?id=${item.related_entity_id}`;
         case 'form':
         case 'form_submission':
-          return `/ism/forms/submissions/${item.related_entity_id}`;
+          return `/ism/forms/submission/${item.related_entity_id}`;
         case 'certificate':
           return `/certificates?id=${item.related_entity_id}`;
         case 'maintenance':
