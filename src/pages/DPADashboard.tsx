@@ -109,7 +109,7 @@ const DPADashboard: React.FC = () => {
                   navigate('/certificates/alerts');
                   break;
                 case 'crew':
-                  navigate('/operations/crew');
+                  navigate('/crew');
                   break;
                 case 'vessels':
                   navigate('/vessels');

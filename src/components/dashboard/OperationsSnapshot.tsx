@@ -103,7 +103,7 @@ export const OperationsSnapshot: React.FC = () => {
 
         {/* Pending Signatures */}
         <Link 
-          to="/ism/forms/pending-signatures"
+          to="/ism/forms/pending"
           className="flex items-center justify-between p-3 rounded-lg bg-primary/5 hover:bg-primary/10 transition-colors"
         >
           <div className="flex items-center gap-3">

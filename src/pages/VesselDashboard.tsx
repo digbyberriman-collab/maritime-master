@@ -237,7 +237,7 @@ const VesselDashboard: React.FC = () => {
                 <Button
                   className="gap-2"
                   variant="outline"
-                  onClick={() => navigate('/operations/crew')}
+                  onClick={() => navigate('/crew')}
                 >
                   <UserPlus className="w-4 h-4" />
                   Manage Crew

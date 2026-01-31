@@ -39,7 +39,7 @@ const quickActionGroups: QuickActionGroup[] = [
   {
     label: 'Quick Access',
     actions: [
-      { label: 'Crew Roster', icon: Users, href: '/operations/crew' },
+      { label: 'Crew Roster', icon: Users, href: '/crew' },
       { label: 'Certificates', icon: Award, href: '/certificates' },
       { label: 'Maintenance', icon: Wrench, href: '/maintenance' },
       { label: 'Audits & Surveys', icon: ClipboardCheck, href: '/ism/audits' },

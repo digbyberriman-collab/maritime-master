@@ -225,7 +225,7 @@ export const useRedRoomStore = create<RedRoomState>((set, get) => ({
           return `/ism/drills?id=${item.related_entity_id}`;
         case 'crew':
         case 'profile':
-          return `/operations/crew?id=${item.related_entity_id}`;
+          return `/crew?id=${item.related_entity_id}`;
         case 'corrective_action':
         case 'capa':
           return `/reports/capa-tracker?id=${item.related_entity_id}`;
@@ -252,7 +252,7 @@ export const useRedRoomStore = create<RedRoomState>((set, get) => ({
         case 'training':
           return `/training`;
         case 'crew':
-          return `/operations/crew`;
+          return `/crew`;
         default:
           return `/alerts?id=${item.id}`;
       }

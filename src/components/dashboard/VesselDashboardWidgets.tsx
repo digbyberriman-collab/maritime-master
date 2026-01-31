@@ -69,7 +69,7 @@ export const CrewWidget: React.FC<WidgetProps> = ({ data, isLoading }) => {
   if (isLoading) return <WidgetSkeleton />;
 
   return (
-    <Card className="cursor-pointer transition-all hover:shadow-md" onClick={() => navigate('/operations/crew')}>
+    <Card className="cursor-pointer transition-all hover:shadow-md" onClick={() => navigate('/crew')}>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">Crew Onboard</CardTitle>
         <Users className="w-5 h-5 text-muted-foreground" />
@@ -271,7 +271,7 @@ export const SignaturesWidget: React.FC<WidgetProps> = ({ data, isLoading }) => 
         'cursor-pointer transition-all hover:shadow-md',
         hasPending && 'border-primary/50 bg-primary/5'
       )}
-      onClick={() => navigate('/ism/forms/pending-signatures')}
+      onClick={() => navigate('/ism/forms/pending')}
     >
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">Pending Signatures</CardTitle>
