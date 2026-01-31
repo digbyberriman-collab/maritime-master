@@ -63,7 +63,7 @@ export default function QuarantineBookingsPage() {
         .select(`
           *,
           crew_member:profiles(first_name, last_name, rank),
-          quarantine_house:quarantine_houses(name, location)
+          quarantine_house:quarantine_houses(name, city)
         `)
         .order('check_in_date', { ascending: true });
 
@@ -73,10 +73,18 @@ export default function QuarantineBookingsPage() {
 
       const { data, error } = await query;
       if (error) throw error;
-      setBookings((data || []) as QuarantineBooking[]);
+      
+      // Map to interface
+      const mapped: QuarantineBooking[] = (data || []).map((b: any) => ({
+        ...b,
+        quarantine_house: b.quarantine_house ? {
+          name: b.quarantine_house.name,
+          location: b.quarantine_house.city
+        } : null
+      }));
+      setBookings(mapped);
     } catch (error) {
       console.error('Failed to load bookings:', error);
-      // Use empty array if table doesn't exist
       setBookings([]);
     } finally {
       setIsLoading(false);

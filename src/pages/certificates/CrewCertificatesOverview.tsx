@@ -67,8 +67,7 @@ export default function CrewCertificatesOverview() {
           .from('crew_certificates')
           .select(`
             *,
-            crew_member:profiles(id, first_name, last_name, rank),
-            vessel:vessels(id, name)
+            crew_member:profiles!crew_certificates_user_id_fkey(id, first_name, last_name, rank)
           `)
           .order('expiry_date', { ascending: true }),
         supabase
@@ -81,7 +80,12 @@ export default function CrewCertificatesOverview() {
       if (certsRes.error) throw certsRes.error;
       if (vesselsRes.error) throw vesselsRes.error;
 
-      const certs = (certsRes.data || []) as CrewCertificate[];
+      // Map data to interface - vessel info would need to come from crew_assignments
+      const certs: CrewCertificate[] = (certsRes.data || []).map((cert: any) => ({
+        ...cert,
+        crew_member: cert.crew_member,
+        vessel: null // Vessel info comes from assignments, not certificates
+      }));
       setVessels(vesselsRes.data || []);
 
       // Calculate stats

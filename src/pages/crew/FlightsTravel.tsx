@@ -56,15 +56,8 @@ export default function FlightsTravel() {
     try {
       let query = supabase
         .from('flight_bookings')
-        .select(`
-          *,
-          travel_record:crew_travel_records(
-            id,
-            travel_type,
-            crew_member:profiles(first_name, last_name)
-          )
-        `)
-        .order('departure_time', { ascending: true });
+        .select('*')
+        .order('depart_datetime_utc', { ascending: true });
 
       if (statusFilter !== 'all') {
         query = query.eq('status', statusFilter);
@@ -72,9 +65,24 @@ export default function FlightsTravel() {
 
       const { data, error } = await query;
       if (error) throw error;
-      setBookings((data || []) as FlightBooking[]);
+      
+      // Map database fields to interface
+      const mappedBookings: FlightBooking[] = (data || []).map((b: any) => ({
+        id: b.id,
+        airline: b.airline,
+        flight_number: b.flight_number,
+        departure_airport: b.depart_airport,
+        arrival_airport: b.arrive_airport,
+        departure_time: b.depart_datetime_utc,
+        arrival_time: b.arrive_datetime_utc,
+        booking_reference: b.booking_reference,
+        status: b.status || 'pending',
+        travel_record: null
+      }));
+      setBookings(mappedBookings);
     } catch (error) {
       console.error('Failed to load bookings:', error);
+      setBookings([]);
     } finally {
       setIsLoading(false);
     }

@@ -95,10 +95,25 @@ export default function LeaveManagement() {
 
       const { data, error } = await query;
       if (error) throw error;
-      setRequests((data || []) as LeaveRequest[]);
+      
+      // Map to interface
+      const mapped: LeaveRequest[] = (data || []).map((r: any) => ({
+        id: r.id,
+        crew_member_id: r.crew_id,
+        leave_type: r.leave_type,
+        start_date: r.start_date,
+        end_date: r.end_date,
+        status: r.status || 'pending',
+        reason: r.reason,
+        notes: r.reason,
+        approved_by: r.approved_by,
+        created_at: r.created_at,
+        crew_member: r.crew_member,
+        vessel: r.vessel
+      }));
+      setRequests(mapped);
     } catch (error) {
       console.error('Failed to load leave requests:', error);
-      // Use mock data if table doesn't exist yet
       setRequests([]);
     } finally {
       setIsLoading(false);
@@ -113,7 +128,7 @@ export default function LeaveManagement() {
 
     try {
       const { error } = await supabase.from('leave_requests').insert({
-        crew_member_id: user?.id,
+        crew_id: user?.id,
         leave_type: newRequest.leave_type,
         start_date: newRequest.start_date,
         end_date: newRequest.end_date,
