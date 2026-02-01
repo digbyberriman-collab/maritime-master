@@ -7920,6 +7920,134 @@ export type Database = {
           },
         ]
       }
+      webhook_configurations: {
+        Row: {
+          allowed_data_types: string[]
+          allowed_ip_addresses: string[] | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          last_used_at: string | null
+          name: string
+          rate_limit_per_minute: number | null
+          updated_at: string
+          webhook_secret: string
+        }
+        Insert: {
+          allowed_data_types?: string[]
+          allowed_ip_addresses?: string[] | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          name: string
+          rate_limit_per_minute?: number | null
+          updated_at?: string
+          webhook_secret: string
+        }
+        Update: {
+          allowed_data_types?: string[]
+          allowed_ip_addresses?: string[] | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          last_used_at?: string | null
+          name?: string
+          rate_limit_per_minute?: number | null
+          updated_at?: string
+          webhook_secret?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_configurations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      webhook_events: {
+        Row: {
+          company_id: string
+          created_at: string
+          data_type: string
+          error_message: string | null
+          event_type: string
+          id: string
+          ip_address: string | null
+          payload: Json
+          processing_completed_at: string | null
+          processing_started_at: string | null
+          records_created: number | null
+          records_failed: number | null
+          records_updated: number | null
+          status: string
+          user_agent: string | null
+          webhook_config_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          data_type: string
+          error_message?: string | null
+          event_type: string
+          id?: string
+          ip_address?: string | null
+          payload: Json
+          processing_completed_at?: string | null
+          processing_started_at?: string | null
+          records_created?: number | null
+          records_failed?: number | null
+          records_updated?: number | null
+          status?: string
+          user_agent?: string | null
+          webhook_config_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          data_type?: string
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          ip_address?: string | null
+          payload?: Json
+          processing_completed_at?: string | null
+          processing_started_at?: string | null
+          records_created?: number | null
+          records_failed?: number | null
+          records_updated?: number | null
+          status?: string
+          user_agent?: string | null
+          webhook_config_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_events_webhook_config_id_fkey"
+            columns: ["webhook_config_id"]
+            isOneToOne: false
+            referencedRelation: "webhook_configurations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       work_permits: {
         Row: {
           actual_end: string | null

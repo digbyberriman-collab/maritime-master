@@ -59,3 +59,9 @@ verify_jwt = false
 
 [functions.extract-form-fields]
 verify_jwt = false
+
+[functions.inbound-webhook]
+verify_jwt = false
+
+[functions.admin-actions]
+verify_jwt = false
