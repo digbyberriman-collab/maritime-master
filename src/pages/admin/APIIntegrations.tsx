@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Tabs,
   TabsContent,
@@ -29,6 +30,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { 
   Wrench, 
   Search, 
@@ -48,8 +58,15 @@ import {
   Ship,
   AlertTriangle,
   TestTube,
-  RefreshCw
+  RefreshCw,
+  Webhook,
+  Copy,
+  Eye,
+  EyeOff
 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from '@/hooks/use-toast';
 
 interface APIIntegration {
   id: string;
@@ -70,6 +87,31 @@ interface APIIntegration {
   description: string;
   created_at: string;
   updated_at: string;
+}
+
+interface WebhookConfig {
+  id: string;
+  name: string;
+  description: string | null;
+  webhook_secret: string;
+  is_active: boolean;
+  allowed_data_types: string[];
+  allowed_ip_addresses: string[] | null;
+  rate_limit_per_minute: number;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+interface WebhookEvent {
+  id: string;
+  event_type: string;
+  data_type: string;
+  status: string;
+  records_created: number;
+  records_updated: number;
+  records_failed: number;
+  error_message: string | null;
+  created_at: string;
 }
 
 // Mock data for demo purposes
@@ -197,9 +239,121 @@ const mockIntegrations: APIIntegration[] = [
 ];
 
 const APIIntegrations: React.FC = () => {
+  const { profile } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
+  
+  // Webhook state
+  const [webhookConfigs, setWebhookConfigs] = useState<WebhookConfig[]>([]);
+  const [webhookEvents, setWebhookEvents] = useState<WebhookEvent[]>([]);
+  const [loadingWebhooks, setLoadingWebhooks] = useState(false);
+  const [showCreateWebhook, setShowCreateWebhook] = useState(false);
+  const [newWebhookName, setNewWebhookName] = useState('');
+  const [newWebhookDesc, setNewWebhookDesc] = useState('');
+  const [newWebhookDataTypes, setNewWebhookDataTypes] = useState<string[]>(['crew', 'vessel', 'document', 'incident']);
+  const [showSecret, setShowSecret] = useState<Record<string, boolean>>({});
+
+  // Load webhook configurations
+  useEffect(() => {
+    if (profile?.company_id) {
+      loadWebhookConfigs();
+      loadWebhookEvents();
+    }
+  }, [profile?.company_id]);
+
+  const loadWebhookConfigs = async () => {
+    setLoadingWebhooks(true);
+    const { data, error } = await supabase
+      .from('webhook_configurations')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (!error && data) {
+      setWebhookConfigs(data as WebhookConfig[]);
+    }
+    setLoadingWebhooks(false);
+  };
+
+  const loadWebhookEvents = async () => {
+    const { data, error } = await supabase
+      .from('webhook_events')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+    
+    if (!error && data) {
+      setWebhookEvents(data as WebhookEvent[]);
+    }
+  };
+
+  const generateWebhookSecret = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let result = 'whsec_';
+    for (let i = 0; i < 32; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
+  const createWebhookConfig = async () => {
+    if (!newWebhookName.trim() || !profile?.company_id) return;
+
+    const { data, error } = await supabase
+      .from('webhook_configurations')
+      .insert({
+        company_id: profile.company_id,
+        name: newWebhookName.trim(),
+        description: newWebhookDesc.trim() || null,
+        webhook_secret: generateWebhookSecret(),
+        allowed_data_types: newWebhookDataTypes,
+        created_by: profile.user_id,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      toast({ title: 'Error', description: 'Failed to create webhook configuration', variant: 'destructive' });
+    } else {
+      toast({ title: 'Success', description: 'Webhook configuration created' });
+      setWebhookConfigs([data as WebhookConfig, ...webhookConfigs]);
+      setShowCreateWebhook(false);
+      setNewWebhookName('');
+      setNewWebhookDesc('');
+      setNewWebhookDataTypes(['crew', 'vessel', 'document', 'incident']);
+    }
+  };
+
+  const toggleWebhookActive = async (id: string, isActive: boolean) => {
+    const { error } = await supabase
+      .from('webhook_configurations')
+      .update({ is_active: !isActive })
+      .eq('id', id);
+
+    if (!error) {
+      setWebhookConfigs(webhookConfigs.map(w => w.id === id ? { ...w, is_active: !isActive } : w));
+      toast({ title: 'Updated', description: `Webhook ${!isActive ? 'enabled' : 'disabled'}` });
+    }
+  };
+
+  const deleteWebhookConfig = async (id: string) => {
+    const { error } = await supabase
+      .from('webhook_configurations')
+      .delete()
+      .eq('id', id);
+
+    if (!error) {
+      setWebhookConfigs(webhookConfigs.filter(w => w.id !== id));
+      toast({ title: 'Deleted', description: 'Webhook configuration removed' });
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: 'Copied', description: 'Copied to clipboard' });
+  };
+
+  const webhookEndpoint = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/inbound-webhook`;
 
   const typeLabels: Record<string, string> = {
     ais: 'AIS Tracking',
@@ -238,7 +392,7 @@ const APIIntegrations: React.FC = () => {
       case 'active':
         return <CheckCircle className="w-4 h-4 text-green-500" />;
       case 'inactive':
-        return <XCircle className="w-4 h-4 text-gray-500" />;
+        return <XCircle className="w-4 h-4 text-muted-foreground" />;
       case 'error':
         return <AlertTriangle className="w-4 h-4 text-red-500" />;
       case 'testing':
@@ -355,8 +509,12 @@ const APIIntegrations: React.FC = () => {
         </div>
 
         <Tabs defaultValue="overview" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="webhooks" className="gap-2">
+              <Webhook className="w-4 h-4" />
+              Inbound Webhooks
+            </TabsTrigger>
             <TabsTrigger value="configuration">Configuration</TabsTrigger>
             <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
           </TabsList>
@@ -546,6 +704,305 @@ const APIIntegrations: React.FC = () => {
                     <p className="text-sm">Try adjusting your search criteria</p>
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Webhooks Tab */}
+          <TabsContent value="webhooks" className="space-y-4">
+            <Card className="shadow-card">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Webhook className="w-5 h-5" />
+                    Inbound Webhook Configurations
+                  </CardTitle>
+                  <CardDescription>
+                    Receive data from external platforms via webhooks
+                  </CardDescription>
+                </div>
+                <Dialog open={showCreateWebhook} onOpenChange={setShowCreateWebhook}>
+                  <DialogTrigger asChild>
+                    <Button className="gap-2">
+                      <Plus className="w-4 h-4" />
+                      Create Webhook
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create Webhook Configuration</DialogTitle>
+                      <DialogDescription>
+                        Set up a new webhook endpoint for receiving data from external systems.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="webhook_name">Name</Label>
+                        <Input
+                          id="webhook_name"
+                          placeholder="e.g., Crewing System Integration"
+                          value={newWebhookName}
+                          onChange={(e) => setNewWebhookName(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="webhook_desc">Description (optional)</Label>
+                        <Textarea
+                          id="webhook_desc"
+                          placeholder="Describe this webhook's purpose..."
+                          value={newWebhookDesc}
+                          onChange={(e) => setNewWebhookDesc(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Allowed Data Types</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {['crew', 'vessel', 'document', 'incident'].map((type) => (
+                            <div key={type} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`type_${type}`}
+                                checked={newWebhookDataTypes.includes(type)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setNewWebhookDataTypes([...newWebhookDataTypes, type]);
+                                  } else {
+                                    setNewWebhookDataTypes(newWebhookDataTypes.filter(t => t !== type));
+                                  }
+                                }}
+                              />
+                              <Label htmlFor={`type_${type}`} className="capitalize">{type}</Label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setShowCreateWebhook(false)}>Cancel</Button>
+                      <Button onClick={createWebhookConfig} disabled={!newWebhookName.trim()}>
+                        Create Webhook
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+              <CardContent>
+                {/* Endpoint Info */}
+                <div className="bg-muted rounded-lg p-4 mb-6">
+                  <Label className="text-sm font-medium">Webhook Endpoint URL</Label>
+                  <div className="flex items-center gap-2 mt-2">
+                    <code className="flex-1 bg-background p-2 rounded text-sm font-mono overflow-x-auto">
+                      {webhookEndpoint}
+                    </code>
+                    <Button variant="outline" size="sm" onClick={() => copyToClipboard(webhookEndpoint)}>
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Send POST requests to this URL with the <code>x-webhook-secret</code> header.
+                  </p>
+                </div>
+
+                {loadingWebhooks ? (
+                  <div className="text-center py-8 text-muted-foreground">Loading...</div>
+                ) : webhookConfigs.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Webhook className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>No webhook configurations yet</p>
+                    <p className="text-sm">Create one to start receiving data</p>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Secret</TableHead>
+                        <TableHead>Data Types</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Last Used</TableHead>
+                        <TableHead className="w-[50px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {webhookConfigs.map((config) => (
+                        <TableRow key={config.id}>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{config.name}</div>
+                              {config.description && (
+                                <div className="text-xs text-muted-foreground">{config.description}</div>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <code className="text-xs bg-muted px-2 py-1 rounded font-mono">
+                                {showSecret[config.id] ? config.webhook_secret : '••••••••••••••••'}
+                              </code>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setShowSecret({ ...showSecret, [config.id]: !showSecret[config.id] })}
+                              >
+                                {showSecret[config.id] ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => copyToClipboard(config.webhook_secret)}
+                              >
+                                <Copy className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {config.allowed_data_types.map((type) => (
+                                <Badge key={type} variant="outline" className="text-xs capitalize">
+                                  {type}
+                                </Badge>
+                              ))}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Switch
+                              checked={config.is_active}
+                              onCheckedChange={() => toggleWebhookActive(config.id, config.is_active)}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            {config.last_used_at ? (
+                              <span className="text-sm">{new Date(config.last_used_at).toLocaleString()}</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Never</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem className="gap-2" onClick={() => copyToClipboard(config.webhook_secret)}>
+                                  <Copy className="h-4 w-4" />
+                                  Copy Secret
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="gap-2 text-destructive"
+                                  onClick={() => deleteWebhookConfig(config.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Recent Webhook Events */}
+            <Card className="shadow-card">
+              <CardHeader>
+                <CardTitle>Recent Webhook Events</CardTitle>
+                <CardDescription>Latest incoming webhook requests</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {webhookEvents.length === 0 ? (
+                  <div className="text-center py-6 text-muted-foreground">
+                    No webhook events yet
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Time</TableHead>
+                        <TableHead>Event</TableHead>
+                        <TableHead>Data Type</TableHead>
+                        <TableHead>Results</TableHead>
+                        <TableHead>Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {webhookEvents.slice(0, 10).map((event) => (
+                        <TableRow key={event.id}>
+                          <TableCell className="text-sm">
+                            {new Date(event.created_at).toLocaleString()}
+                          </TableCell>
+                          <TableCell className="capitalize">{event.event_type}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className="capitalize">{event.data_type}</Badge>
+                          </TableCell>
+                          <TableCell className="text-sm">
+                            <span className="text-green-600">+{event.records_created}</span>
+                            {' / '}
+                            <span className="text-blue-600">~{event.records_updated}</span>
+                            {event.records_failed > 0 && (
+                              <>
+                                {' / '}
+                                <span className="text-red-600">✗{event.records_failed}</span>
+                              </>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge
+                              variant={event.status === 'completed' ? 'default' : event.status === 'failed' ? 'destructive' : 'secondary'}
+                            >
+                              {event.status}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* API Documentation */}
+            <Card className="shadow-card">
+              <CardHeader>
+                <CardTitle>Webhook API Documentation</CardTitle>
+                <CardDescription>How to send data to this webhook</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="font-medium">Request Format</Label>
+                  <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto">
+{`POST ${webhookEndpoint}
+Content-Type: application/json
+x-webhook-secret: whsec_your_secret_here
+
+{
+  "event_type": "create" | "update" | "delete" | "sync",
+  "data_type": "crew" | "vessel" | "document" | "incident",
+  "data": { ... } // or array of objects
+}`}
+                  </pre>
+                </div>
+                <div className="space-y-2">
+                  <Label className="font-medium">Example: Create Crew Member</Label>
+                  <pre className="bg-muted p-4 rounded-lg text-sm overflow-x-auto">
+{`{
+  "event_type": "create",
+  "data_type": "crew",
+  "data": {
+    "external_id": "EMP001",
+    "first_name": "John",
+    "last_name": "Smith",
+    "rank": "Chief Officer",
+    "nationality": "Philippines",
+    "email": "john.smith@example.com"
+  }
+}`}
+                  </pre>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
