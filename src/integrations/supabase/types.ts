@@ -5106,6 +5106,71 @@ export type Database = {
           },
         ]
       }
+      integration_api_keys: {
+        Row: {
+          api_key_encrypted: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          data_types: string[] | null
+          description: string | null
+          endpoint_url: string
+          id: string
+          integration_name: string
+          is_active: boolean | null
+          last_error: string | null
+          last_sync_at: string | null
+          provider: string | null
+          refresh_interval_minutes: number | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          api_key_encrypted: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          data_types?: string[] | null
+          description?: string | null
+          endpoint_url: string
+          id?: string
+          integration_name: string
+          is_active?: boolean | null
+          last_error?: string | null
+          last_sync_at?: string | null
+          provider?: string | null
+          refresh_interval_minutes?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          api_key_encrypted?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          data_types?: string[] | null
+          description?: string | null
+          endpoint_url?: string
+          id?: string
+          integration_name?: string
+          is_active?: boolean | null
+          last_error?: string | null
+          last_sync_at?: string | null
+          provider?: string | null
+          refresh_interval_minutes?: number | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integration_api_keys_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_requests: {
         Row: {
           approved_at: string | null
