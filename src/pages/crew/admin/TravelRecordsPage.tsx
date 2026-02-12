@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  Plane, Plus, Search, Filter, Calendar, 
+import {
+  Plane, Plus, Search, Filter, Calendar,
   ChevronRight, Loader2, MapPin
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -59,11 +59,7 @@ export default function TravelRecordsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
 
-  useEffect(() => {
-    loadRecords();
-  }, [statusFilter, typeFilter]);
-
-  async function loadRecords() {
+  const loadRecords = useCallback(async () => {
     setIsLoading(true);
     try {
       let query = supabase
@@ -90,7 +86,11 @@ export default function TravelRecordsPage() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [statusFilter, typeFilter]);
+
+  useEffect(() => {
+    loadRecords();
+  }, [loadRecords]);
 
   const filteredRecords = records.filter(r => {
     if (!search) return true;

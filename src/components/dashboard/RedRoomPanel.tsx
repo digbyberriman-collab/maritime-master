@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   AlertTriangle, 
@@ -49,12 +49,20 @@ export function RedRoomPanel({ vesselId }: RedRoomPanelProps) {
   const [selectedItem, setSelectedItem] = useState<RedRoomItem | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  useEffect(() => {
+  const memoizedCheckPermissions = useCallback(() => {
     checkPermissions();
+  }, [checkPermissions]);
+
+  const memoizedLoadRedRoomItems = useCallback(() => {
     if (profile?.company_id) {
       loadRedRoomItems(profile.company_id, vesselId);
     }
-  }, [vesselId, profile?.company_id]);
+  }, [loadRedRoomItems, profile?.company_id, vesselId]);
+
+  useEffect(() => {
+    memoizedCheckPermissions();
+    memoizedLoadRedRoomItems();
+  }, [memoizedCheckPermissions, memoizedLoadRedRoomItems]);
 
   // Handle View - Navigate to related record
   const handleView = (item: RedRoomItem) => {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { 
@@ -34,11 +34,6 @@ export default function FormsArchive() {
   const [templateFilter, setTemplateFilter] = useState('all');
   const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
 
-  useEffect(() => {
-    loadSubmissions();
-    loadTemplates();
-  }, [dateRange, templateFilter]);
-
   async function loadTemplates() {
     try {
       const { data, error } = await supabase
@@ -54,7 +49,7 @@ export default function FormsArchive() {
     }
   }
 
-  async function loadSubmissions() {
+  const loadSubmissions = useCallback(async () => {
     setIsLoading(true);
     try {
       let query = supabase
@@ -79,7 +74,7 @@ export default function FormsArchive() {
       if (dateRange !== 'all') {
         const now = new Date();
         let startDate: Date;
-        
+
         switch (dateRange) {
           case 'week':
             startDate = new Date(now.setDate(now.getDate() - 7));
@@ -96,13 +91,13 @@ export default function FormsArchive() {
           default:
             startDate = new Date(0);
         }
-        
+
         query = query.gte('submitted_at', startDate.toISOString());
       }
 
       const { data, error } = await query;
       if (error) throw error;
-      
+
       setSubmissions((data || []).map((s: any) => ({
         id: s.id,
         template_name: s.form_templates?.template_name || 'Unknown Template',
@@ -120,7 +115,12 @@ export default function FormsArchive() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [dateRange, templateFilter]);
+
+  useEffect(() => {
+    loadSubmissions();
+    loadTemplates();
+  }, [loadSubmissions]);
 
   async function handleExportPDF(id: string) {
     toast.info('Generating PDF...');

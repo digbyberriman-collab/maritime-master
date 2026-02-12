@@ -171,9 +171,12 @@ export function useAudits() {
   // Update audit mutation
   const updateAuditMutation = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Audit> & { id: string }) => {
+      // Remove joined relation fields that don't exist on the table
+      const { vessel, lead_auditor, ...dbUpdates } = updates as Record<string, unknown>;
+
       const { data, error } = await supabase
         .from('audits')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id)
         .select()
         .single();

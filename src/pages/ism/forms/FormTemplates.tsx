@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -64,11 +64,7 @@ const FormTemplates: React.FC = () => {
   const [filterType, setFilterType] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('PUBLISHED');
 
-  useEffect(() => {
-    loadTemplates();
-  }, [selectedVesselId, filterType, filterStatus]);
-
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     setLoading(true);
     
     try {
@@ -100,7 +96,11 @@ const FormTemplates: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedVesselId, filterType, filterStatus]);
+
+  useEffect(() => {
+    loadTemplates();
+  }, [loadTemplates]);
 
   const filteredTemplates = templates.filter(t =>
     t.template_name.toLowerCase().includes(searchTerm.toLowerCase()) ||

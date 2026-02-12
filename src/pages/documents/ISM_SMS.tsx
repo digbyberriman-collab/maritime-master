@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { 
+import {
   Shield, Search, Filter, Plus, FolderOpen, FileText,
   Eye, Download, Edit, Loader2, CheckCircle, Book, FileCheck
 } from 'lucide-react';
@@ -46,11 +46,7 @@ export default function ISM_SMS() {
   const [search, setSearch] = useState('');
   const [sectionFilter, setSectionFilter] = useState('all');
 
-  useEffect(() => {
-    loadDocuments();
-  }, [sectionFilter]);
-
-  async function loadDocuments() {
+  const loadDocuments = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await supabase
@@ -89,7 +85,11 @@ export default function ISM_SMS() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [sectionFilter]);
+
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
 
   const filteredDocuments = documents.filter(d => {
     if (!search) return true;

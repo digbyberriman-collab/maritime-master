@@ -282,9 +282,12 @@ export function useMaintenance() {
   // Update equipment mutation
   const updateEquipment = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Equipment> & { id: string }) => {
+      // Remove joined relation fields that don't exist on the table
+      const { category, vessel, ...dbUpdates } = updates as Record<string, unknown>;
+
       const { data, error } = await supabase
         .from('equipment')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id)
         .select()
         .single();
@@ -384,9 +387,12 @@ export function useMaintenance() {
   // Update defect mutation
   const updateDefect = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Defect> & { id: string }) => {
+      // Remove joined relation fields that don't exist on the table
+      const { equipment, vessel, reported_by, ...dbUpdates } = updates as Record<string, unknown>;
+
       const { data, error } = await supabase
         .from('defects')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id)
         .select()
         .single();
@@ -461,9 +467,12 @@ export function useMaintenance() {
   // Update spare part mutation
   const updateSparePart = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<SparePart> & { id: string }) => {
+      // Remove joined relation fields that don't exist on the table
+      const { vessel, ...dbUpdates } = updates as Record<string, unknown>;
+
       const { data, error } = await supabase
         .from('spare_parts')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id)
         .select()
         .single();

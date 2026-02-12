@@ -85,6 +85,7 @@ export interface IncidentFormData {
 
 async function generateIncidentNumber(companyId: string): Promise<string> {
   const year = new Date().getFullYear();
+  const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
   const { count } = await supabase
     .from("incidents")
     .select("*", { count: "exact", head: true })
@@ -92,11 +93,12 @@ async function generateIncidentNumber(companyId: string): Promise<string> {
     .gte("created_at", `${year}-01-01`);
 
   const nextNumber = (count || 0) + 1;
-  return `INC-${year}-${String(nextNumber).padStart(3, "0")}`;
+  return `INC-${year}-${String(nextNumber).padStart(3, "0")}-${timestamp}`;
 }
 
 async function generateActionNumber(companyId: string): Promise<string> {
   const year = new Date().getFullYear();
+  const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
   const { count } = await supabase
     .from("corrective_actions")
     .select("*", { count: "exact", head: true })
@@ -104,7 +106,7 @@ async function generateActionNumber(companyId: string): Promise<string> {
     .gte("created_at", `${year}-01-01`);
 
   const nextNumber = (count || 0) + 1;
-  return `CAPA-${year}-${String(nextNumber).padStart(3, "0")}`;
+  return `CAPA-${year}-${String(nextNumber).padStart(3, "0")}-${timestamp}`;
 }
 
 export function useIncidents(filters?: {
@@ -291,9 +293,12 @@ export function useUpdateIncident() {
 
   return useMutation({
     mutationFn: async ({ id, ...updateData }: Partial<Incident> & { id: string }) => {
+      // Remove joined relation fields that don't exist on the table
+      const { vessels, reporter, ...dbUpdates } = updateData as Record<string, unknown>;
+
       const { data: incident, error } = await supabase
         .from("incidents")
-        .update(updateData as Record<string, unknown>)
+        .update(dbUpdates)
         .eq("id", id)
         .select()
         .single();

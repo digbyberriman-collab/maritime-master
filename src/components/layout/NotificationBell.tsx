@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -147,7 +147,7 @@ const NotificationBell: React.FC = () => {
     setShowHelper(false);
   };
 
-  const loadAlerts = async () => {
+  const loadAlerts = useCallback(async () => {
     if (!profile?.company_id) return;
 
     try {
@@ -184,7 +184,7 @@ const NotificationBell: React.FC = () => {
       if (error) throw error;
 
       setAlerts((data as AlertItem[]) || []);
-      
+
       // Calculate unread (OPEN) count
       const openCount = (data || []).filter(a => a.status === 'OPEN').length;
       setUnreadCount(openCount);
@@ -193,7 +193,7 @@ const NotificationBell: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [profile?.company_id, selectedVesselId, isAllVessels]);
 
   // Initial load and polling
   useEffect(() => {
@@ -222,7 +222,7 @@ const NotificationBell: React.FC = () => {
       clearInterval(interval);
       subscription.unsubscribe();
     };
-  }, [profile?.company_id, selectedVesselId, isAllVessels]);
+  }, [loadAlerts]);
 
   // Categorize alerts
   const categorizedAlerts = useMemo(() => {

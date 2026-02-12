@@ -264,8 +264,8 @@ export const useCrew = (vesselFilter?: string) => {
       const updateData: Record<string, any> = {};
       
       // Personal Information
-      if (data.firstName) updateData.first_name = data.firstName;
-      if (data.lastName) updateData.last_name = data.lastName;
+      if (data.firstName !== undefined) updateData.first_name = data.firstName;
+      if (data.lastName !== undefined) updateData.last_name = data.lastName;
       if (data.preferredName !== undefined) updateData.preferred_name = data.preferredName || null;
       if (data.dateOfBirth !== undefined) updateData.date_of_birth = data.dateOfBirth || null;
       if (data.gender !== undefined) updateData.gender = data.gender === '__none__' ? null : data.gender || null;

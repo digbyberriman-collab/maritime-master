@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { 
   Plane, ArrowLeft, MapPin, Calendar, User, Ship, Clock,
@@ -75,15 +75,7 @@ export default function TravelRecordDetail() {
   const [documents, setDocuments] = useState<TravelDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (id) {
-      loadRecord();
-      loadFlights();
-      loadDocuments();
-    }
-  }, [id]);
-
-  async function loadRecord() {
+  const loadRecord = useCallback(async () => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase
@@ -97,7 +89,7 @@ export default function TravelRecordDetail() {
         .single();
 
       if (error) throw error;
-      
+
       // Map to interface
       const mapped: TravelRecord = {
         ...(data as any),
@@ -110,9 +102,9 @@ export default function TravelRecordDetail() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [id]);
 
-  async function loadFlights() {
+  const loadFlights = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('flight_bookings')
@@ -121,7 +113,7 @@ export default function TravelRecordDetail() {
         .order('depart_datetime_utc', { ascending: true });
 
       if (error) throw error;
-      
+
       // Map to interface
       const mapped: FlightSegment[] = (data || []).map((f) => ({
         id: f.id,
@@ -138,9 +130,9 @@ export default function TravelRecordDetail() {
     } catch (error) {
       console.error('Failed to load flights:', error);
     }
-  }
+  }, [id]);
 
-  async function loadDocuments() {
+  const loadDocuments = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('crew_travel_documents')
@@ -149,7 +141,7 @@ export default function TravelRecordDetail() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
+
       // Map to interface
       const mapped: TravelDocument[] = (data || []).map((d: any) => ({
         id: d.id,
@@ -162,7 +154,15 @@ export default function TravelRecordDetail() {
     } catch (error) {
       console.error('Failed to load documents:', error);
     }
-  }
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      loadRecord();
+      loadFlights();
+      loadDocuments();
+    }
+  }, [id, loadRecord, loadFlights, loadDocuments]);
 
   async function handleDelete() {
     if (!confirm('Are you sure you want to delete this travel record?')) return;

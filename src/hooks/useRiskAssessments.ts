@@ -103,17 +103,17 @@ export interface PermitExtension {
   approved_by?: { first_name: string; last_name: string };
 }
 
-// Generate unique numbers
+// Generate unique numbers using timestamp to avoid collisions
 const generateAssessmentNumber = () => {
   const year = new Date().getFullYear();
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `RA-${year}-${random}`;
+  const timestamp = Date.now().toString(36).slice(-6).toUpperCase();
+  return `RA-${year}-${timestamp}`;
 };
 
 const generatePermitNumber = () => {
   const year = new Date().getFullYear();
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `WP-${year}-${random}`;
+  const timestamp = Date.now().toString(36).slice(-6).toUpperCase();
+  return `WP-${year}-${timestamp}`;
 };
 
 // Risk Assessment Templates
@@ -277,9 +277,12 @@ export const useUpdateRiskAssessment = () => {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<RiskAssessment> & { id: string }) => {
+      // Remove joined relation fields that don't exist on the table
+      const { vessel, assessed_by, approved_by, hazards, ...dbUpdates } = updates as Record<string, unknown>;
+
       const { data, error } = await supabase
         .from('risk_assessments')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id)
         .select()
         .single();
@@ -512,9 +515,12 @@ export const useUpdateWorkPermit = () => {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: Partial<WorkPermit> & { id: string }) => {
+      // Remove joined relation fields that don't exist on the table
+      const { vessel, requested_by, approved_by, risk_assessment, ...dbUpdates } = updates as Record<string, unknown>;
+
       const { data, error } = await supabase
         .from('work_permits')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id)
         .select()
         .single();

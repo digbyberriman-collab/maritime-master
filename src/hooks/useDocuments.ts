@@ -99,9 +99,12 @@ export const useDocuments = (filters: DocumentFilters) => {
         `)
         .eq('company_id', profile.company_id);
 
-      // Apply filters
+      // Apply filters - sanitize search to prevent PostgREST filter injection
       if (filters.search) {
-        query = query.or(`title.ilike.%${filters.search}%,document_number.ilike.%${filters.search}%`);
+        const sanitized = filters.search.replace(/[%_.*,()]/g, '');
+        if (sanitized) {
+          query = query.or(`title.ilike.%${sanitized}%,document_number.ilike.%${sanitized}%`);
+        }
       }
 
       if (filters.categories.length > 0) {
@@ -162,13 +165,14 @@ export const useDocumentMutations = () => {
     if (!profile?.company_id) throw new Error('No company ID');
 
     const year = new Date().getFullYear();
+    const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
     const { count } = await supabase
       .from('documents')
       .select('*', { count: 'exact', head: true })
       .eq('company_id', profile.company_id);
 
     const nextNum = (count || 0) + 1;
-    return `STORM-DOC-${year}-${String(nextNum).padStart(4, '0')}`;
+    return `STORM-DOC-${year}-${String(nextNum).padStart(4, '0')}-${timestamp}`;
   };
 
   const uploadDocument = useMutation({
@@ -242,9 +246,12 @@ export const useDocumentMutations = () => {
 
   const updateDocument = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Document> & { id: string }) => {
+      // Remove joined relation fields that don't exist on the table
+      const { category, vessel, author, ...dbUpdates } = updates as Record<string, unknown>;
+
       const { data, error } = await supabase
         .from('documents')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id)
         .select()
         .single();
@@ -273,13 +280,14 @@ export const useDocumentMutations = () => {
       // Get document to delete file from storage
       const { data: doc } = await supabase
         .from('documents')
-        .select('file_url, company_id, document_number')
+        .select('file_url, file_name, company_id, document_number')
         .eq('id', documentId)
         .single();
 
       if (doc) {
-        // Extract file path from URL
-        const filePath = `${doc.company_id}/${doc.document_number}.${doc.file_url.split('.').pop()}`;
+        // Extract extension from the original file_name (more reliable than parsing URL)
+        const fileExt = doc.file_name?.split('.').pop() || 'pdf';
+        const filePath = `${doc.company_id}/${doc.document_number}.${fileExt}`;
         await supabase.storage.from('documents').remove([filePath]);
       }
 

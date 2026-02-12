@@ -60,8 +60,9 @@ serve(async (req: Request) => {
       throw new Error('Template not found');
     }
 
-    // Generate submission number
+    // Generate submission number with timestamp suffix to prevent race condition duplicates
     const year = new Date().getFullYear();
+    const timestamp = Date.now().toString(36).slice(-4).toUpperCase();
     const { count } = await supabaseAdmin
       .from('sms_submissions')
       .select('*', { count: 'exact', head: true })
@@ -69,7 +70,7 @@ serve(async (req: Request) => {
       .gte('created_at', `${year}-01-01`);
 
     const sequence = (count || 0) + 1;
-    const submissionNumber = `${template.template_code}-${year}-${String(sequence).padStart(5, '0')}`;
+    const submissionNumber = `${template.template_code}-${year}-${String(sequence).padStart(5, '0')}-${timestamp}`;
 
     // Generate content hash for integrity
     const content = JSON.stringify(body.formData);

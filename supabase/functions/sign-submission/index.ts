@@ -73,7 +73,7 @@ serve(async (req: Request) => {
       .eq('submission_id', body.submissionId)
       .order('sign_order');
 
-    const currentSigner = requiredSigners?.find(s => 
+    const currentSigner = requiredSigners?.find(s =>
       s.user_id === userData.user.id && !s.signed_at
     );
 
@@ -81,18 +81,40 @@ serve(async (req: Request) => {
       throw new Error('You are not authorized to sign this submission');
     }
 
+    // Ensure signers sign in order - check all mandatory signers with lower order have signed
+    const earlierUnsignedSigners = requiredSigners?.filter(s =>
+      s.is_mandatory && s.sign_order < currentSigner.sign_order && !s.signed_at
+    );
+    if (earlierUnsignedSigners && earlierUnsignedSigners.length > 0) {
+      throw new Error('Previous required signers must sign first');
+    }
+
     // Verify PIN if method is PIN
-    if (body.signatureMethod === 'PIN' && body.pin) {
+    if (body.signatureMethod === 'PIN') {
+      if (!body.pin) {
+        throw new Error('PIN is required for PIN signature method');
+      }
+
       const { data: userProfile } = await supabaseAdmin
         .from('profiles')
         .select('signature_pin_hash')
         .eq('user_id', userData.user.id)
         .single();
 
-      // In production, compare hashed PIN
-      // For now, we'll just check it exists
       if (!userProfile?.signature_pin_hash) {
-        console.log('Warning: User has no PIN set');
+        throw new Error('No PIN configured. Please set up your signature PIN in settings.');
+      }
+
+      // Compare provided PIN hash with stored hash
+      // Hash the provided PIN using the same method as the client
+      const encoder = new TextEncoder();
+      const data = encoder.encode(body.pin);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const pinHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+      if (pinHash !== userProfile.signature_pin_hash) {
+        throw new Error('Incorrect PIN');
       }
     }
 

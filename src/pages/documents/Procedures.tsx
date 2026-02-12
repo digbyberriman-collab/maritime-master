@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { 
@@ -52,11 +52,7 @@ export default function Procedures() {
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
 
-  useEffect(() => {
-    loadProcedures();
-  }, [categoryFilter, statusFilter]);
-
-  async function loadProcedures() {
+  const loadProcedures = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await supabase
@@ -108,7 +104,11 @@ export default function Procedures() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [categoryFilter, statusFilter]);
+
+  useEffect(() => {
+    loadProcedures();
+  }, [loadProcedures]);
 
   const filteredProcedures = procedures.filter(p => {
     if (!search) return true;

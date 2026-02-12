@@ -214,9 +214,12 @@ export function useDrills() {
   // Update drill mutation
   const updateDrillMutation = useMutation({
     mutationFn: async ({ id, ...updates }: Partial<Drill> & { id: string }) => {
+      // Remove joined relation fields that don't exist on the table
+      const { vessel, drill_type, conducted_by, ...dbUpdates } = updates as Record<string, unknown>;
+
       const { data, error } = await supabase
         .from('drills')
-        .update(updates)
+        .update(dbUpdates)
         .eq('id', id)
         .select()
         .single();

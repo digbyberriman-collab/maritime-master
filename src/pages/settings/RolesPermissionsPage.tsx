@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Shield, Check, X, Download, Users, History, Loader2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { usePermissionsStore } from '@/store/permissionsStore';
@@ -26,11 +26,7 @@ export default function RolesPermissionsPage() {
 
   const canEdit = canAdmin('settings');
 
-  useEffect(() => { 
-    loadData(); 
-  }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setIsLoading(true);
     try {
       const [rolesRes, modulesRes, permsRes] = await Promise.all([
@@ -57,7 +53,11 @@ export default function RolesPermissionsPage() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [toast]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   function hasPermission(roleId: string, moduleKey: string, level: PermissionLevel): boolean {
     return permissions.some(p => 
