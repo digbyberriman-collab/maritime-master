@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import {
   format,
   startOfMonth,
@@ -8,17 +8,18 @@ import {
   eachMonthOfInterval,
   eachWeekOfInterval,
   eachDayOfInterval,
-  isWithinInterval,
   parseISO,
   isSameMonth,
   isToday,
   addMonths,
   addWeeks,
   addDays,
+  getDaysInMonth,
 } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Plus } from 'lucide-react';
-import TripBlock from './TripBlock';
+import DraggableTripBlock from './DraggableTripBlock';
+import { useUpdateEntry } from '@/hooks/useItinerary';
 import type { ItineraryEntry, ViewMode, ItineraryStatus } from '@/types/itinerary';
 
 interface PlanningGridProps {
@@ -32,6 +33,8 @@ interface PlanningGridProps {
   onCreateEntry: (vesselId: string, date: string) => void;
 }
 
+const DAY_HEIGHT = 18; // px per day in month view
+
 const PlanningGrid: React.FC<PlanningGridProps> = ({
   entries,
   vessels,
@@ -42,6 +45,8 @@ const PlanningGrid: React.FC<PlanningGridProps> = ({
   onSelectEntry,
   onCreateEntry,
 }) => {
+  const updateEntry = useUpdateEntry();
+
   // Build time periods based on view mode
   const timePeriods = useMemo(() => {
     const periodsCount = viewMode === 'month' ? 12 : viewMode === 'week' ? 12 : 28;
@@ -58,6 +63,7 @@ const PlanningGrid: React.FC<PlanningGridProps> = ({
         start: startOfMonth(d),
         end: endOfMonth(d),
         isToday: isSameMonth(d, new Date()),
+        days: getDaysInMonth(d),
       }));
     }
 
@@ -72,7 +78,8 @@ const PlanningGrid: React.FC<PlanningGridProps> = ({
         shortLabel: format(d, 'MMM d'),
         start: d,
         end: endOfWeek(d, { weekStartsOn: 1 }),
-        isToday: isWithinInterval(new Date(), { start: d, end: endOfWeek(d, { weekStartsOn: 1 }) }),
+        isToday: false,
+        days: 7,
       }));
     }
 
@@ -88,6 +95,7 @@ const PlanningGrid: React.FC<PlanningGridProps> = ({
       start: d,
       end: d,
       isToday: isToday(d),
+      days: 1,
     }));
   }, [viewMode, currentDate]);
 
@@ -103,8 +111,8 @@ const PlanningGrid: React.FC<PlanningGridProps> = ({
     [entries, statusFilter]
   );
 
-  // Get entries for a vessel + time period, with proportional positioning
-  const getEntriesForCell = (vesselId: string, period: typeof timePeriods[0]) => {
+  // Get entries for a vessel + time period, with vertical positioning
+  const getEntriesForCell = useCallback((vesselId: string, period: typeof timePeriods[0]) => {
     const periodStart = period.start.getTime();
     const periodEnd = period.end.getTime();
     const periodDuration = periodEnd - periodStart || 1;
@@ -120,11 +128,15 @@ const PlanningGrid: React.FC<PlanningGridProps> = ({
       .map(entry => {
         const entryStart = Math.max(parseISO(entry.start_date).getTime(), periodStart);
         const entryEnd = Math.min(parseISO(entry.end_date).getTime(), periodEnd);
-        const leftPct = ((entryStart - periodStart) / periodDuration) * 100;
-        const widthPct = Math.max(((entryEnd - entryStart) / periodDuration) * 100, 3); // min 3%
-        return { entry, leftPct, widthPct };
+        const topPct = ((entryStart - periodStart) / periodDuration) * 100;
+        const heightPct = Math.max(((entryEnd - entryStart) / periodDuration) * 100, 3);
+        return { entry, topPct, heightPct };
       });
-  };
+  }, [filteredEntries]);
+
+  const handleDateChange = useCallback((entryId: string, newStart: string, newEnd: string) => {
+    updateEntry.mutate({ id: entryId, start_date: newStart, end_date: newEnd });
+  }, [updateEntry]);
 
   if (visibleVessels.length === 0) {
     return (
@@ -138,15 +150,15 @@ const PlanningGrid: React.FC<PlanningGridProps> = ({
     <div className="overflow-auto flex-1">
       <table className="w-full border-collapse min-w-[600px]">
         {/* Header: vessel names */}
-        <thead className="sticky top-0 z-10 bg-card">
+        <thead className="sticky top-0 z-20 bg-card">
           <tr>
-            <th className="sticky left-0 z-20 bg-card border-b border-r border-border px-3 py-2 text-left text-xs font-semibold text-muted-foreground w-[120px] min-w-[120px]">
+            <th className="sticky left-0 z-30 bg-card border-b border-r border-border px-3 py-2 text-left text-xs font-semibold text-muted-foreground w-[100px] min-w-[100px]">
               Period
             </th>
             {visibleVessels.map(vessel => (
               <th
                 key={vessel.id}
-                className="border-b border-r border-border px-2 py-2 text-center text-xs font-semibold text-foreground min-w-[150px]"
+                className="border-b border-r border-border px-2 py-2 text-center text-xs font-semibold text-foreground min-w-[160px]"
               >
                 {vessel.name.replace('M/Y ', '').replace('R/V ', '')}
               </th>
@@ -155,55 +167,89 @@ const PlanningGrid: React.FC<PlanningGridProps> = ({
         </thead>
 
         <tbody>
-          {timePeriods.map(period => (
-            <tr key={period.key} className={cn(period.isToday && 'bg-primary/5')}>
-              {/* Time label */}
-              <td className={cn(
-                'sticky left-0 z-10 bg-card border-b border-r border-border px-3 py-2 text-xs font-medium whitespace-nowrap',
-                period.isToday ? 'text-primary bg-primary/5' : 'text-muted-foreground'
-              )}>
-                {viewMode === 'month' ? period.label : period.shortLabel}
-              </td>
+          {timePeriods.map(period => {
+            // Cell height based on days in period
+            const cellHeight = Math.max(period.days * DAY_HEIGHT, 60);
 
-              {/* Vessel cells */}
-              {visibleVessels.map(vessel => {
-                const cellEntries = getEntriesForCell(vessel.id, period);
-
-                return (
-                  <td
-                    key={`${period.key}-${vessel.id}`}
-                    className={cn(
-                      'border-b border-r border-border px-1 py-1 align-top min-h-[40px] group relative',
-                      period.isToday && 'bg-primary/5'
+            return (
+              <tr key={period.key} className={cn(period.isToday && 'bg-primary/5')}>
+                {/* Time label */}
+                <td className={cn(
+                  'sticky left-0 z-10 bg-card border-b border-r border-border px-3 py-1 text-xs font-medium whitespace-nowrap align-top',
+                  period.isToday ? 'text-primary bg-primary/5' : 'text-muted-foreground'
+                )}>
+                  <div className="flex flex-col">
+                    <span className="font-semibold">{period.shortLabel}</span>
+                    {viewMode === 'month' && (
+                      <span className="text-[9px] text-muted-foreground/60">{period.days}d</span>
                     )}
-                  >
-                    <div className="relative min-h-[32px] w-full">
-                      {cellEntries.map(({ entry, leftPct, widthPct }) => (
-                        <div
-                          key={entry.id}
-                          className="absolute top-0.5 bottom-0.5"
-                          style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
+                  </div>
+                  {/* Day markers for month view */}
+                  {viewMode === 'month' && (
+                    <div className="mt-1 flex flex-col gap-0" style={{ height: cellHeight - 30 }}>
+                      {[1, 8, 15, 22].map(d => (
+                        <span
+                          key={d}
+                          className="text-[8px] text-muted-foreground/40 leading-none"
+                          style={{ marginTop: d === 1 ? 0 : 'auto' }}
                         >
-                          <TripBlock
-                            entry={entry}
-                            compact={viewMode === 'day'}
-                            onClick={onSelectEntry}
-                          />
-                        </div>
+                          {d}
+                        </span>
                       ))}
                     </div>
-                    {/* Add button on hover */}
-                    <button
-                      onClick={() => onCreateEntry(vessel.id, format(period.start, 'yyyy-MM-dd'))}
-                      className="absolute top-1 right-1 w-5 h-5 rounded flex items-center justify-center bg-muted/80 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary hover:text-primary-foreground"
+                  )}
+                </td>
+
+                {/* Vessel cells */}
+                {visibleVessels.map(vessel => {
+                  const cellEntries = getEntriesForCell(vessel.id, period);
+
+                  return (
+                    <td
+                      key={`${period.key}-${vessel.id}`}
+                      className={cn(
+                        'border-b border-r border-border px-0 py-0 align-top group/cell relative',
+                        period.isToday && 'bg-primary/5'
+                      )}
+                      style={{ height: cellHeight }}
                     >
-                      <Plus className="w-3 h-3" />
-                    </button>
-                  </td>
-                );
-              })}
-            </tr>
-          ))}
+                      <div className="relative w-full h-full">
+                        {/* Subtle day gridlines for month view */}
+                        {viewMode === 'month' && [0.25, 0.5, 0.75].map(frac => (
+                          <div
+                            key={frac}
+                            className="absolute left-0 right-0 border-t border-border/20"
+                            style={{ top: `${frac * 100}%` }}
+                          />
+                        ))}
+
+                        {cellEntries.map(({ entry, topPct, heightPct }) => (
+                          <DraggableTripBlock
+                            key={entry.id}
+                            entry={entry}
+                            topPct={topPct}
+                            heightPct={heightPct}
+                            periodStart={period.start}
+                            periodEnd={period.end}
+                            onClick={onSelectEntry}
+                            onDateChange={handleDateChange}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Add button on hover */}
+                      <button
+                        onClick={() => onCreateEntry(vessel.id, format(period.start, 'yyyy-MM-dd'))}
+                        className="absolute top-1 right-1 w-5 h-5 rounded flex items-center justify-center bg-muted/80 text-muted-foreground opacity-0 group-hover/cell:opacity-100 transition-opacity hover:bg-primary hover:text-primary-foreground z-30"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </td>
+                  );
+                })}
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
