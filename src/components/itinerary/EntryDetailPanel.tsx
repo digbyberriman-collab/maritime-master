@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { useUpdateEntry, useDeleteEntry, useTripTypes } from '@/hooks/useItinerary';
+import { useUpdateEntry, useDeleteEntry, useTripTypes, useUpdateEntryVessels, useItineraryVessels } from '@/hooks/useItinerary';
 import { useToast } from '@/hooks/use-toast';
 import type { ItineraryEntry, ItineraryStatus } from '@/types/itinerary';
 import { STATUS_CONFIG as statusConfig } from '@/types/itinerary';
@@ -21,8 +22,10 @@ interface EntryDetailPanelProps {
 const EntryDetailPanel: React.FC<EntryDetailPanelProps> = ({ entry, onClose }) => {
   const { toast } = useToast();
   const { data: tripTypes = [] } = useTripTypes();
+  const { data: allVessels = [] } = useItineraryVessels();
   const updateEntry = useUpdateEntry();
   const deleteEntry = useDeleteEntry();
+  const updateVessels = useUpdateEntryVessels();
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState({
@@ -34,6 +37,7 @@ const EntryDetailPanel: React.FC<EntryDetailPanelProps> = ({ entry, onClose }) =
     notes: entry.notes || '',
     trip_type_id: entry.trip_type_id || '',
     status: entry.status,
+    vessel_ids: (entry.vessels || []).map(v => v.vessel_id),
   });
 
   // Sync form when entry changes (e.g. after drag)
@@ -48,6 +52,7 @@ const EntryDetailPanel: React.FC<EntryDetailPanelProps> = ({ entry, onClose }) =
         notes: entry.notes || '',
         trip_type_id: entry.trip_type_id || '',
         status: entry.status,
+        vessel_ids: (entry.vessels || []).map(v => v.vessel_id),
       });
     }
   }, [entry, editing]);
@@ -57,8 +62,22 @@ const EntryDetailPanel: React.FC<EntryDetailPanelProps> = ({ entry, onClose }) =
   const sc = statusConfig[entry.status];
   const isEditable = !entry.is_locked;
 
+  const toggleVessel = (vesselId: string) => {
+    setForm(f => ({
+      ...f,
+      vessel_ids: f.vessel_ids.includes(vesselId)
+        ? f.vessel_ids.filter(v => v !== vesselId)
+        : [...f.vessel_ids, vesselId],
+    }));
+  };
+
   const handleSave = async () => {
+    if (form.vessel_ids.length === 0) {
+      toast({ title: 'Select at least one vessel', variant: 'destructive' });
+      return;
+    }
     try {
+      // Update entry fields
       await updateEntry.mutateAsync({
         id: entry.id,
         title: form.title,
@@ -70,6 +89,12 @@ const EntryDetailPanel: React.FC<EntryDetailPanelProps> = ({ entry, onClose }) =
         trip_type_id: form.trip_type_id || null,
         status: form.status,
       });
+      // Update vessel assignments
+      const currentVesselIds = (entry.vessels || []).map(v => v.vessel_id).sort().join(',');
+      const newVesselIds = [...form.vessel_ids].sort().join(',');
+      if (currentVesselIds !== newVesselIds) {
+        await updateVessels.mutateAsync({ entryId: entry.id, vesselIds: form.vessel_ids });
+      }
       toast({ title: 'Entry updated' });
       setEditing(false);
     } catch (err: any) {
@@ -87,6 +112,7 @@ const EntryDetailPanel: React.FC<EntryDetailPanelProps> = ({ entry, onClose }) =
       notes: entry.notes || '',
       trip_type_id: entry.trip_type_id || '',
       status: entry.status,
+      vessel_ids: (entry.vessels || []).map(v => v.vessel_id),
     });
     setEditing(false);
   };
@@ -247,13 +273,27 @@ const EntryDetailPanel: React.FC<EntryDetailPanelProps> = ({ entry, onClose }) =
         {/* Vessels */}
         <div className="space-y-1.5">
           <label className="text-xs font-medium text-muted-foreground">Vessels</label>
-          <div className="flex flex-wrap gap-1">
-            {entry.vessels?.map(ev => (
-              <Badge key={ev.id} variant="outline" className="text-xs">
-                {ev.vessel?.name || ev.vessel_id}
-              </Badge>
-            ))}
-          </div>
+          {editing ? (
+            <div className="grid grid-cols-1 gap-0.5 p-2 border border-border rounded-md max-h-32 overflow-y-auto bg-muted/30">
+              {allVessels.map(v => (
+                <label key={v.id} className="flex items-center gap-2 text-xs cursor-pointer py-0.5">
+                  <Checkbox
+                    checked={form.vessel_ids.includes(v.id)}
+                    onCheckedChange={() => toggleVessel(v.id)}
+                  />
+                  <span className="truncate">{v.name}</span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-wrap gap-1">
+              {entry.vessels?.map(ev => (
+                <Badge key={ev.id} variant="outline" className="text-xs">
+                  {ev.vessel?.name || ev.vessel_id}
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Notes */}

@@ -166,6 +166,42 @@ export function useUpdateEntry() {
   });
 }
 
+export function useUpdateEntryVessels() {
+  const queryClient = useQueryClient();
+  const { profile } = useAuth();
+  const companyId = profile?.company_id;
+
+  return useMutation({
+    mutationFn: async ({ entryId, vesselIds }: { entryId: string; vesselIds: string[] }) => {
+      // Delete existing vessel links
+      const { error: deleteError } = await supabase
+        .from('itinerary_entry_vessels')
+        .delete()
+        .eq('entry_id', entryId);
+      if (deleteError) throw deleteError;
+
+      // Insert new vessel links
+      if (vesselIds.length > 0) {
+        const inserts = vesselIds.map(vid => ({ entry_id: entryId, vessel_id: vid }));
+        const { error: insertError } = await supabase
+          .from('itinerary_entry_vessels')
+          .insert(inserts);
+        if (insertError) throw insertError;
+      }
+
+      // Update group_id based on vessel count
+      const { error: updateError } = await supabase
+        .from('itinerary_entries')
+        .update({ group_id: vesselIds.length > 1 ? crypto.randomUUID() : null })
+        .eq('id', entryId);
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: itineraryKeys.entries(companyId || '') });
+    },
+  });
+}
+
 export function useDeleteEntry() {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
