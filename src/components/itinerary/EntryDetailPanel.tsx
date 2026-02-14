@@ -54,7 +54,7 @@ const EntryDetailPanel: React.FC<EntryDetailPanelProps> = ({ entry, onClose }) =
   const tripType = entry.trip_type;
   const colour = tripType?.colour || '#6B7280';
   const sc = statusConfig[entry.status];
-  const isEditable = !entry.is_locked && entry.status !== 'completed' && entry.status !== 'cancelled';
+  const isEditable = !entry.is_locked;
 
   const handleSave = async () => {
     try {
