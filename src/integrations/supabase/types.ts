@@ -1298,6 +1298,47 @@ export type Database = {
           },
         ]
       }
+      crew_change_dates: {
+        Row: {
+          change_date: string
+          created_at: string
+          id: string
+          notes: string | null
+          overridden_by: string | null
+          source: Database["public"]["Enums"]["crew_change_source"]
+          updated_at: string
+          vessel_id: string
+        }
+        Insert: {
+          change_date: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          overridden_by?: string | null
+          source?: Database["public"]["Enums"]["crew_change_source"]
+          updated_at?: string
+          vessel_id: string
+        }
+        Update: {
+          change_date?: string
+          created_at?: string
+          id?: string
+          notes?: string | null
+          overridden_by?: string | null
+          source?: Database["public"]["Enums"]["crew_change_source"]
+          updated_at?: string
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_change_dates_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crew_tasks: {
         Row: {
           assigned_by: string
@@ -5171,6 +5212,190 @@ export type Database = {
           },
         ]
       }
+      itinerary_comments: {
+        Row: {
+          author_id: string
+          body: string
+          created_at: string
+          deleted_at: string | null
+          entry_id: string
+          id: string
+          mentions: string[] | null
+          parent_comment_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          created_at?: string
+          deleted_at?: string | null
+          entry_id: string
+          id?: string
+          mentions?: string[] | null
+          parent_comment_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          created_at?: string
+          deleted_at?: string | null
+          entry_id?: string
+          id?: string
+          mentions?: string[] | null
+          parent_comment_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "itinerary_comments_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "itinerary_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "itinerary_comments_parent_comment_id_fkey"
+            columns: ["parent_comment_id"]
+            isOneToOne: false
+            referencedRelation: "itinerary_comments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      itinerary_entries: {
+        Row: {
+          company_id: string
+          country: string | null
+          created_at: string
+          created_by: string
+          end_date: string
+          group_id: string | null
+          id: string
+          is_locked: boolean
+          latitude: number | null
+          location: string | null
+          locked_at: string | null
+          locked_by: string | null
+          longitude: number | null
+          notes: string | null
+          port_id: string | null
+          responsible_person_id: string | null
+          start_date: string
+          status: Database["public"]["Enums"]["itinerary_status"]
+          title: string
+          trip_type_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          country?: string | null
+          created_at?: string
+          created_by: string
+          end_date: string
+          group_id?: string | null
+          id?: string
+          is_locked?: boolean
+          latitude?: number | null
+          location?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
+          longitude?: number | null
+          notes?: string | null
+          port_id?: string | null
+          responsible_person_id?: string | null
+          start_date: string
+          status?: Database["public"]["Enums"]["itinerary_status"]
+          title: string
+          trip_type_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          country?: string | null
+          created_at?: string
+          created_by?: string
+          end_date?: string
+          group_id?: string | null
+          id?: string
+          is_locked?: boolean
+          latitude?: number | null
+          location?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
+          longitude?: number | null
+          notes?: string | null
+          port_id?: string | null
+          responsible_person_id?: string | null
+          start_date?: string
+          status?: Database["public"]["Enums"]["itinerary_status"]
+          title?: string
+          trip_type_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "itinerary_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "itinerary_entries_port_id_fkey"
+            columns: ["port_id"]
+            isOneToOne: false
+            referencedRelation: "ports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "itinerary_entries_trip_type_id_fkey"
+            columns: ["trip_type_id"]
+            isOneToOne: false
+            referencedRelation: "trip_types"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      itinerary_entry_vessels: {
+        Row: {
+          created_at: string
+          detached_from_group: boolean
+          entry_id: string
+          id: string
+          vessel_id: string
+        }
+        Insert: {
+          created_at?: string
+          detached_from_group?: boolean
+          entry_id: string
+          id?: string
+          vessel_id: string
+        }
+        Update: {
+          created_at?: string
+          detached_from_group?: boolean
+          entry_id?: string
+          id?: string
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "itinerary_entry_vessels_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "itinerary_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "itinerary_entry_vessels_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_requests: {
         Row: {
           approved_at: string | null
@@ -5943,6 +6168,60 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ports: {
+        Row: {
+          country: string | null
+          country_code: string | null
+          created_at: string
+          created_by: string | null
+          default_agent_contact: string | null
+          default_agent_name: string | null
+          id: string
+          is_custom: boolean
+          isps_compliant: boolean
+          latitude: number | null
+          longitude: number | null
+          max_loa_metres: number | null
+          name: string
+          notes: string | null
+          timezone: string | null
+        }
+        Insert: {
+          country?: string | null
+          country_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_agent_contact?: string | null
+          default_agent_name?: string | null
+          id?: string
+          is_custom?: boolean
+          isps_compliant?: boolean
+          latitude?: number | null
+          longitude?: number | null
+          max_loa_metres?: number | null
+          name: string
+          notes?: string | null
+          timezone?: string | null
+        }
+        Update: {
+          country?: string | null
+          country_code?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_agent_contact?: string | null
+          default_agent_name?: string | null
+          id?: string
+          is_custom?: boolean
+          isps_compliant?: boolean
+          latitude?: number | null
+          longitude?: number | null
+          max_loa_metres?: number | null
+          name?: string
+          notes?: string | null
+          timezone?: string | null
+        }
+        Relationships: []
       }
       pre_departure_checklists: {
         Row: {
@@ -7557,6 +7836,166 @@ export type Database = {
           },
         ]
       }
+      trip_suggestion_votes: {
+        Row: {
+          created_at: string
+          id: string
+          suggestion_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          suggestion_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          suggestion_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_suggestion_votes_suggestion_id_fkey"
+            columns: ["suggestion_id"]
+            isOneToOne: false
+            referencedRelation: "trip_suggestions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_suggestions: {
+        Row: {
+          activities: string[] | null
+          best_time_end_month: number | null
+          best_time_start_month: number | null
+          company_id: string
+          country: string | null
+          created_at: string
+          destination: string
+          diving_level: Database["public"]["Enums"]["diving_level"] | null
+          id: string
+          internal_notes: string | null
+          latitude: number | null
+          linked_entry_id: string | null
+          longitude: number | null
+          nearest_bunker: string | null
+          priority_rating: number | null
+          reason: string
+          region: string | null
+          status: Database["public"]["Enums"]["suggestion_status"]
+          submitted_by: string
+          suggested_vessels: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          activities?: string[] | null
+          best_time_end_month?: number | null
+          best_time_start_month?: number | null
+          company_id: string
+          country?: string | null
+          created_at?: string
+          destination: string
+          diving_level?: Database["public"]["Enums"]["diving_level"] | null
+          id?: string
+          internal_notes?: string | null
+          latitude?: number | null
+          linked_entry_id?: string | null
+          longitude?: number | null
+          nearest_bunker?: string | null
+          priority_rating?: number | null
+          reason: string
+          region?: string | null
+          status?: Database["public"]["Enums"]["suggestion_status"]
+          submitted_by: string
+          suggested_vessels?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          activities?: string[] | null
+          best_time_end_month?: number | null
+          best_time_start_month?: number | null
+          company_id?: string
+          country?: string | null
+          created_at?: string
+          destination?: string
+          diving_level?: Database["public"]["Enums"]["diving_level"] | null
+          id?: string
+          internal_notes?: string | null
+          latitude?: number | null
+          linked_entry_id?: string | null
+          longitude?: number | null
+          nearest_bunker?: string | null
+          priority_rating?: number | null
+          reason?: string
+          region?: string | null
+          status?: Database["public"]["Enums"]["suggestion_status"]
+          submitted_by?: string
+          suggested_vessels?: string[] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_suggestions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trip_suggestions_linked_entry_id_fkey"
+            columns: ["linked_entry_id"]
+            isOneToOne: false
+            referencedRelation: "itinerary_entries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trip_types: {
+        Row: {
+          colour: string
+          company_id: string
+          created_at: string
+          display_order: number
+          icon: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          colour: string
+          company_id: string
+          created_at?: string
+          display_order?: number
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          colour?: string
+          company_id?: string
+          created_at?: string
+          display_order?: number
+          icon?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trip_types_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_permission_overrides: {
         Row: {
           created_at: string | null
@@ -8588,6 +9027,14 @@ export type Database = {
         | "api_access_revoked"
         | "audit_mode_enabled"
         | "audit_mode_disabled"
+      crew_change_source: "auto_generated" | "manual_override"
+      diving_level:
+        | "none"
+        | "beginner"
+        | "intermediate"
+        | "advanced"
+        | "technical"
+        | "cave"
       gdpr_lawful_basis:
         | "consent"
         | "contractual"
@@ -8608,6 +9055,13 @@ export type Database = {
         | "training_record"
         | "leave_record"
         | "medical_record"
+      itinerary_status:
+        | "draft"
+        | "tentative"
+        | "confirmed"
+        | "postponed"
+        | "cancelled"
+        | "completed"
       permission_level: "view" | "edit" | "admin"
       record_lifecycle_status:
         | "active"
@@ -8616,6 +9070,7 @@ export type Database = {
         | "pending_deletion"
         | "anonymized"
       role_scope_type: "fleet" | "vessel" | "department" | "self"
+      suggestion_status: "new" | "under_consideration" | "planned" | "declined"
       user_role:
         | "master"
         | "chief_engineer"
@@ -8792,6 +9247,15 @@ export const Constants = {
         "audit_mode_enabled",
         "audit_mode_disabled",
       ],
+      crew_change_source: ["auto_generated", "manual_override"],
+      diving_level: [
+        "none",
+        "beginner",
+        "intermediate",
+        "advanced",
+        "technical",
+        "cave",
+      ],
       gdpr_lawful_basis: [
         "consent",
         "contractual",
@@ -8814,6 +9278,14 @@ export const Constants = {
         "leave_record",
         "medical_record",
       ],
+      itinerary_status: [
+        "draft",
+        "tentative",
+        "confirmed",
+        "postponed",
+        "cancelled",
+        "completed",
+      ],
       permission_level: ["view", "edit", "admin"],
       record_lifecycle_status: [
         "active",
@@ -8823,6 +9295,7 @@ export const Constants = {
         "anonymized",
       ],
       role_scope_type: ["fleet", "vessel", "department", "self"],
+      suggestion_status: ["new", "under_consideration", "planned", "declined"],
       user_role: [
         "master",
         "chief_engineer",

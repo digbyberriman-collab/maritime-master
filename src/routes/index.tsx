@@ -6,7 +6,8 @@ import { PlaceholderPage } from '@/components/common/PlaceholderPage';
 import { 
   Ship, Users, Award, Plane, Clock, CalendarDays,
   AlertTriangle, ClipboardList, BookOpen, Shield, FileCheck, Layers, LayoutGrid,
-  Package, Bell, Settings as SettingsIcon, Building2, Phone, Wrench, FileText, Calendar
+  Package, Bell, Settings as SettingsIcon, Building2, Phone, Wrench, FileText, Calendar,
+  Compass
 } from 'lucide-react';
 
 // Main Pages - Keep critical path pages sync, lazy load the rest
@@ -496,6 +497,37 @@ export const AppRoutes: React.FC = () => {
       <Route path="/documents/reviews" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><ReviewDashboard /></React.Suspense></ProtectedRoute>} />
       <Route path="/review-queue" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><ReviewQueue /></React.Suspense></ProtectedRoute>} />
       <Route path="/acknowledgments" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><AcknowledgmentTracking /></React.Suspense></ProtectedRoute>} />
+
+      {/* Itinerary */}
+      <Route path="/itinerary" element={<Navigate to="/itinerary/planning" replace />} />
+      <Route path="/itinerary/planning" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/pages/itinerary/FleetPlanningPage')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/itinerary/timeline" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/pages/itinerary/FleetTimelinePage')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/itinerary/suggestions" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/pages/itinerary/TripSuggestionsPage')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/itinerary/postponed" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/pages/itinerary/PostponedEntriesPage')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
 
       {/* HR */}
       <Route path="/hr" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><HRPage /></React.Suspense></ProtectedRoute>} />
