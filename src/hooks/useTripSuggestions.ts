@@ -46,6 +46,8 @@ export interface TripSuggestion {
   destinations?: Destination;
   vote_count?: number;
   user_voted?: boolean;
+  comment_count?: number;
+  submitter_name?: string;
 }
 
 export interface SuggestionFormData {
@@ -72,6 +74,15 @@ export interface SuggestionFormData {
   owner_visited?: string;
   owner_visited_when?: string;
   enthusiasm_rating: number;
+}
+
+export interface BrowseFilters {
+  search: string;
+  status: string;
+  category: string;
+  region: string;
+  tags: string[];
+  sortBy: 'newest' | 'most_voted' | 'enthusiasm' | 'destination';
 }
 
 export const useTripSuggestions = () => {
@@ -112,6 +123,122 @@ export const useTripSuggestions = () => {
     },
     enabled: !!profile?.company_id,
   });
+
+  // Browse suggestions with filters
+  const useBrowseSuggestions = (filters: BrowseFilters) => {
+    return useQuery({
+      queryKey: ['trip-suggestions', 'browse', profile?.company_id, filters],
+      queryFn: async () => {
+        if (!profile?.company_id || !user) return [];
+
+        // Fetch suggestions with destinations join
+        let query = supabase
+          .from('trip_suggestions')
+          .select('*, destinations(*)')
+          .eq('company_id', profile.company_id)
+          .is('deleted_at', null);
+
+        // Apply filters
+        if (filters.status && filters.status !== 'all') {
+          query = query.eq('status', filters.status as any);
+        }
+        if (filters.category && filters.category !== 'all') {
+          query = query.eq('trip_category', filters.category as any);
+        }
+        if (filters.search) {
+          query = query.or(`description.ilike.%${filters.search}%,title.ilike.%${filters.search}%`);
+        }
+        if (filters.tags.length > 0) {
+          query = query.overlaps('tags', filters.tags);
+        }
+
+        // Sort
+        switch (filters.sortBy) {
+          case 'enthusiasm':
+            query = query.order('enthusiasm_rating', { ascending: false });
+            break;
+          case 'destination':
+            query = query.order('created_at', { ascending: false });
+            break;
+          case 'newest':
+          default:
+            query = query.order('created_at', { ascending: false });
+            break;
+        }
+
+        const { data: suggestions, error } = await query;
+        if (error) throw error;
+
+        // Fetch vote counts for all suggestions
+        const suggestionIds = (suggestions || []).map(s => s.id);
+        if (suggestionIds.length === 0) return [];
+
+        const { data: votes } = await supabase
+          .from('trip_suggestion_votes')
+          .select('suggestion_id')
+          .in('suggestion_id', suggestionIds);
+
+        // Fetch user's own votes
+        const { data: userVotes } = await supabase
+          .from('trip_suggestion_votes')
+          .select('suggestion_id')
+          .eq('user_id', user.id)
+          .in('suggestion_id', suggestionIds);
+
+        // Fetch comment counts
+        const { data: comments } = await supabase
+          .from('trip_suggestion_comments')
+          .select('suggestion_id')
+          .is('deleted_at', null)
+          .in('suggestion_id', suggestionIds);
+
+        // Fetch submitter names
+        const submitterIds = [...new Set((suggestions || []).map(s => s.submitted_by))];
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, first_name, last_name')
+          .in('user_id', submitterIds);
+
+        const profileMap = new Map((profiles || []).map(p => [p.user_id, `${p.first_name || ''} ${p.last_name || ''}`.trim()]));
+
+        // Build vote count map
+        const voteCountMap = new Map<string, number>();
+        (votes || []).forEach(v => {
+          voteCountMap.set(v.suggestion_id, (voteCountMap.get(v.suggestion_id) || 0) + 1);
+        });
+
+        const userVoteSet = new Set((userVotes || []).map(v => v.suggestion_id));
+
+        // Build comment count map
+        const commentCountMap = new Map<string, number>();
+        (comments || []).forEach(c => {
+          commentCountMap.set(c.suggestion_id, (commentCountMap.get(c.suggestion_id) || 0) + 1);
+        });
+
+        const enriched = (suggestions || []).map(s => ({
+          ...s,
+          vote_count: voteCountMap.get(s.id) || 0,
+          user_voted: userVoteSet.has(s.id),
+          comment_count: commentCountMap.get(s.id) || 0,
+          submitter_name: profileMap.get(s.submitted_by) || 'Unknown',
+        })) as TripSuggestion[];
+
+        // Filter by region (post-query since it's on joined table)
+        let filtered = enriched;
+        if (filters.region && filters.region !== 'all') {
+          filtered = filtered.filter(s => s.destinations?.region === filters.region);
+        }
+
+        // Sort by votes if needed (post-query)
+        if (filters.sortBy === 'most_voted') {
+          filtered.sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0));
+        }
+
+        return filtered;
+      },
+      enabled: !!profile?.company_id && !!user,
+    });
+  };
 
   // Submit a new suggestion
   const submitSuggestion = useMutation({
@@ -180,10 +307,98 @@ export const useTripSuggestions = () => {
     },
   });
 
+  // Vote / Unvote
+  const toggleVote = useMutation({
+    mutationFn: async ({ suggestionId, hasVoted }: { suggestionId: string; hasVoted: boolean }) => {
+      if (!user) throw new Error('Not authenticated');
+
+      if (hasVoted) {
+        const { error } = await supabase
+          .from('trip_suggestion_votes')
+          .delete()
+          .eq('suggestion_id', suggestionId)
+          .eq('user_id', user.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('trip_suggestion_votes')
+          .insert({ suggestion_id: suggestionId, user_id: user.id });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trip-suggestions', 'browse'] });
+    },
+    onError: (error) => {
+      toast({ title: 'Vote failed', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Add comment
+  const addComment = useMutation({
+    mutationFn: async ({ suggestionId, body }: { suggestionId: string; body: string }) => {
+      if (!user) throw new Error('Not authenticated');
+      const { data, error } = await supabase
+        .from('trip_suggestion_comments')
+        .insert({
+          suggestion_id: suggestionId,
+          author_id: user.id,
+          body,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trip-suggestions', 'browse'] });
+      queryClient.invalidateQueries({ queryKey: ['trip-suggestion-comments'] });
+    },
+    onError: (error) => {
+      toast({ title: 'Comment failed', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Fetch comments for a suggestion
+  const useComments = (suggestionId: string | null) => {
+    return useQuery({
+      queryKey: ['trip-suggestion-comments', suggestionId],
+      queryFn: async () => {
+        if (!suggestionId) return [];
+        const { data, error } = await supabase
+          .from('trip_suggestion_comments')
+          .select('*')
+          .eq('suggestion_id', suggestionId)
+          .is('deleted_at', null)
+          .order('created_at', { ascending: true });
+        if (error) throw error;
+
+        // Fetch author names
+        const authorIds = [...new Set((data || []).map(c => c.author_id))];
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('user_id, first_name, last_name')
+          .in('user_id', authorIds);
+
+        const profileMap = new Map((profiles || []).map(p => [p.user_id, `${p.first_name || ''} ${p.last_name || ''}`.trim()]));
+
+        return (data || []).map(c => ({
+          ...c,
+          author_name: profileMap.get(c.author_id) || 'Unknown',
+        }));
+      },
+      enabled: !!suggestionId,
+    });
+  };
+
   return {
     useDestinationSearch,
+    useBrowseSuggestions,
+    useComments,
     destinations: destinationsQuery.data || [],
     destinationsLoading: destinationsQuery.isLoading,
     submitSuggestion,
+    toggleVote,
+    addComment,
   };
 };
