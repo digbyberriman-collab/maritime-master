@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useVessels } from '@/hooks/useVessels';
-import { useTripSuggestions, type SuggestionFormData } from '@/hooks/useTripSuggestions';
+import { useTripSuggestions, type SuggestionFormData, type GeocodingResult } from '@/hooks/useTripSuggestions';
 import {
   INTEREST_TAGS,
   DIVING_LEVELS,
@@ -32,7 +32,7 @@ import { useNavigate } from 'react-router-dom';
 
 const SubmitSuggestionForm: React.FC = () => {
   const navigate = useNavigate();
-  const { submitSuggestion, useDestinationSearch, destinations } = useTripSuggestions();
+  const { submitSuggestion, useGeocodingSearch, destinations } = useTripSuggestions();
   const { vessels } = useVessels();
 
   // Destination state
@@ -61,7 +61,7 @@ const SubmitSuggestionForm: React.FC = () => {
   const [ownerVisitedWhen, setOwnerVisitedWhen] = useState('');
   const [enthusiasmRating, setEnthusiasmRating] = useState(3);
 
-  const { data: searchResults = [] } = useTripSuggestions().useDestinationSearch(destSearch);
+  const { data: searchResults = [], isLoading: searchLoading } = useTripSuggestions().useGeocodingSearch(destSearch);
 
   const showDivingSection = selectedTags.includes('diving') || selectedTags.includes('marine_life');
   const showEventDates = selectedTags.includes('event');
@@ -90,10 +90,18 @@ const SubmitSuggestionForm: React.FC = () => {
     );
   };
 
-  const handleSelectDestination = (dest: any) => {
-    setSelectedDestination(dest);
-    setDestSearch(dest.name);
-    setIsNewDestination(false);
+  const handleSelectDestination = (result: GeocodingResult) => {
+    setSelectedDestination(result);
+    setDestSearch(result.name);
+    setIsNewDestination(true);
+    setNewDest({
+      name: result.name,
+      country: result.country,
+      region: result.region,
+      area: result.area,
+      latitude: result.latitude,
+      longitude: result.longitude,
+    });
     setShowDropdown(false);
   };
 
@@ -128,7 +136,7 @@ const SubmitSuggestionForm: React.FC = () => {
     e.preventDefault();
 
     const formData: SuggestionFormData = {
-      destination_id: selectedDestination?.id,
+      destination_id: undefined,
       new_destination: isNewDestination ? newDest : undefined,
       description,
       tags: selectedTags,
@@ -192,77 +200,68 @@ const SubmitSuggestionForm: React.FC = () => {
             />
             {showDropdown && destSearch.length >= 2 && (
               <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-[240px] overflow-y-auto">
-                {searchResults.map((dest) => (
+                {searchLoading && (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">Searching worldwide...</div>
+                )}
+                {!searchLoading && searchResults.length === 0 && (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">No results found. Try a different search.</div>
+                )}
+                {searchResults.map((result, idx) => (
                   <button
-                    key={dest.id}
+                    key={`${result.osm_id}-${idx}`}
                     type="button"
                     className="w-full text-left px-3 py-2 hover:bg-muted text-sm"
-                    onClick={() => handleSelectDestination(dest)}
+                    onClick={() => handleSelectDestination(result)}
                   >
-                    <span className="font-medium">{dest.name}</span>
-                    {dest.region && (
-                      <span className="text-muted-foreground"> — {dest.region}{dest.country ? `, ${dest.country}` : ''}</span>
-                    )}
+                    <span className="font-medium">{result.name}</span>
+                    <span className="text-muted-foreground text-xs block truncate">{result.display_name}</span>
                   </button>
                 ))}
-                <button
-                  type="button"
-                  className="w-full text-left px-3 py-2 hover:bg-muted text-sm text-primary font-medium border-t"
-                  onClick={handleAddNewDestination}
-                >
-                  <Plus className="inline w-3.5 h-3.5 mr-1" />
-                  Add new destination: "{destSearch}"
-                </button>
               </div>
             )}
           </div>
         </div>
 
-        {/* Selected destination info */}
-        {selectedDestination && (
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <Label className="text-xs text-muted-foreground">Country</Label>
-              <p className="text-sm">{selectedDestination.country || '—'}</p>
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Region</Label>
-              <p className="text-sm">{selectedDestination.region || '—'}</p>
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Area</Label>
-              <p className="text-sm">{selectedDestination.area || '—'}</p>
-            </div>
-          </div>
-        )}
-
-        {/* New destination fields */}
-        {isNewDestination && (
+        {/* Selected destination info (auto-filled from geocoding) */}
+        {selectedDestination && isNewDestination && (
           <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">New Destination Details</p>
-            <Input
-              placeholder="Destination name"
-              value={newDest.name}
-              onChange={(e) => setNewDest({ ...newDest, name: e.target.value })}
-            />
-            <Input
-              placeholder="Country"
-              value={newDest.country}
-              onChange={(e) => setNewDest({ ...newDest, country: e.target.value })}
-            />
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              📍 Location Details (auto-filled, editable)
+            </p>
             <div className="grid grid-cols-2 gap-3">
-              <Select value={newDest.region} onValueChange={(v) => setNewDest({ ...newDest, region: v })}>
-                <SelectTrigger><SelectValue placeholder="Region / Continent" /></SelectTrigger>
-                <SelectContent>
-                  {REGIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Select value={newDest.area} onValueChange={(v) => setNewDest({ ...newDest, area: v })}>
-                <SelectTrigger><SelectValue placeholder="Area / Ocean" /></SelectTrigger>
-                <SelectContent>
-                  {AREAS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <div>
+                <Label className="text-xs">Country</Label>
+                <Input
+                  value={newDest.country}
+                  onChange={(e) => setNewDest({ ...newDest, country: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Region</Label>
+                <Select value={newDest.region} onValueChange={(v) => setNewDest({ ...newDest, region: v })}>
+                  <SelectTrigger><SelectValue placeholder="Region" /></SelectTrigger>
+                  <SelectContent>
+                    {REGIONS.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Area / Ocean</Label>
+                <Select value={newDest.area} onValueChange={(v) => setNewDest({ ...newDest, area: v })}>
+                  <SelectTrigger><SelectValue placeholder="Area" /></SelectTrigger>
+                  <SelectContent>
+                    {AREAS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Coordinates</Label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {newDest.latitude?.toFixed(4)}, {newDest.longitude?.toFixed(4)}
+                </p>
+              </div>
             </div>
           </div>
         )}
