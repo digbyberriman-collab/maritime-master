@@ -157,6 +157,106 @@ export type Database = {
         }
         Relationships: []
       }
+      airtable_sync_log: {
+        Row: {
+          company_id: string
+          completed_at: string | null
+          direction: string
+          error_details: Json | null
+          id: string
+          records_errored: number | null
+          records_exported: number | null
+          records_imported: number | null
+          started_at: string
+          status: string
+          sync_type: string
+          triggered_by: string | null
+        }
+        Insert: {
+          company_id: string
+          completed_at?: string | null
+          direction: string
+          error_details?: Json | null
+          id?: string
+          records_errored?: number | null
+          records_exported?: number | null
+          records_imported?: number | null
+          started_at?: string
+          status?: string
+          sync_type: string
+          triggered_by?: string | null
+        }
+        Update: {
+          company_id?: string
+          completed_at?: string | null
+          direction?: string
+          error_details?: Json | null
+          id?: string
+          records_errored?: number | null
+          records_exported?: number | null
+          records_imported?: number | null
+          started_at?: string
+          status?: string
+          sync_type?: string
+          triggered_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "airtable_sync_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      airtable_sync_map: {
+        Row: {
+          airtable_record_id: string
+          company_id: string
+          created_at: string
+          error_message: string | null
+          id: string
+          last_sync_direction: string
+          last_synced_at: string
+          profile_user_id: string
+          sync_status: string
+          updated_at: string
+        }
+        Insert: {
+          airtable_record_id: string
+          company_id: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_sync_direction?: string
+          last_synced_at?: string
+          profile_user_id: string
+          sync_status?: string
+          updated_at?: string
+        }
+        Update: {
+          airtable_record_id?: string
+          company_id?: string
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_sync_direction?: string
+          last_synced_at?: string
+          profile_user_id?: string
+          sync_status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "airtable_sync_map_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ais_snapshots: {
         Row: {
           cog: number | null
