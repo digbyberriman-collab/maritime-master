@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -57,6 +59,7 @@ import {
   KeyRound,
   UserCheck,
   ShieldAlert,
+  RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCrew, type CrewMember } from '@/hooks/useCrew';
@@ -110,6 +113,7 @@ const CrewRoster: React.FC = () => {
   const [pendingAdminAction, setPendingAdminAction] = useState<'reset' | 'toggle' | 'reallocate' | null>(null);
   
   const { isConfirmed } = useAdminActions();
+  const [isSyncing, setIsSyncing] = useState(false);
   
   const { vessels, isLoading: vesselsLoading } = useVessels();
   const {
@@ -304,6 +308,33 @@ const CrewRoster: React.FC = () => {
           </div>
           {canManageCrew && (
             <div className="flex gap-2">
+              <Button
+                onClick={async () => {
+                  setIsSyncing(true);
+                  try {
+                    const { data, error } = await supabase.functions.invoke('airtable-sync', {
+                      body: { action: 'two_way' },
+                    });
+                    if (error) throw error;
+                    if (data?.error) throw new Error(data.error);
+                    toast({
+                      title: 'Airtable Sync Complete',
+                      description: `Imported: ${data.imported}, Exported: ${data.exported}${data.errored ? `, Errors: ${data.errored}` : ''}`,
+                    });
+                    refetchCrew();
+                  } catch (e: any) {
+                    toast({ title: 'Sync Failed', description: e.message, variant: 'destructive' });
+                  } finally {
+                    setIsSyncing(false);
+                  }
+                }}
+                variant="outline"
+                className="flex items-center gap-2"
+                disabled={isSyncing}
+              >
+                <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                {isSyncing ? 'Syncing...' : 'Sync Airtable'}
+              </Button>
               <Button 
                 onClick={() => setIsImportModalOpen(true)}
                 variant="outline"
