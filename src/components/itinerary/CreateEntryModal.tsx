@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import LocationSearchInput from '@/components/common/LocationSearchInput';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -129,15 +130,18 @@ const CreateEntryModal: React.FC<CreateEntryModalProps> = ({
           </div>
 
           {/* Location & Country */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Location</Label>
-              <Input value={location} onChange={e => setLocation(e.target.value)} placeholder="Port / area" className="h-9" />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Country</Label>
-              <Input value={country} onChange={e => setCountry(e.target.value)} placeholder="Country" className="h-9" />
-            </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Location</Label>
+            <LocationSearchInput
+              value={location}
+              country={country}
+              onSelect={(loc, cty) => { setLocation(loc); setCountry(cty); }}
+              placeholder="Search port / area..."
+              inputClassName="h-9"
+            />
+            {country && (
+              <p className="text-xs text-muted-foreground">Country: {country}</p>
+            )}
           </div>
 
           {/* Dates */}
