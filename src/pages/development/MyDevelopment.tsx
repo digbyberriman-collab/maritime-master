@@ -22,10 +22,12 @@ import {
 import { differenceInDays, differenceInMonths, addMonths, format } from 'date-fns';
 import ApplicationDetailModal from '@/components/development/ApplicationDetailModal';
 import ExpenseClaimModal from '@/components/development/ExpenseClaimModal';
+import NewApplicationFlow from '@/components/development/NewApplicationFlow';
 
 export default function MyDevelopment() {
   const [selectedApp, setSelectedApp] = useState<any>(null);
   const [expenseApp, setExpenseApp] = useState<any>(null);
+  const [showNewApp, setShowNewApp] = useState(false);
   const { user, profile } = useAuth();
   const { data: applications = [], isLoading: appsLoading } = useMyApplications();
   const { data: repayments = [], isLoading: repLoading } = useMyRepayments();
@@ -200,20 +202,11 @@ export default function MyDevelopment() {
                   size="sm"
                   className="w-full justify-start"
                   disabled={!eligibility.eligible}
-                  asChild={eligibility.eligible}
+                  onClick={() => eligibility.eligible && setShowNewApp(true)}
                   title={!eligibility.eligible ? eligibility.reason : 'Start a new application'}
                 >
-                  {eligibility.eligible ? (
-                    <Link to="/development/catalogue">
-                      <FileText className="h-4 w-4 mr-2" />
-                      Start New Application
-                    </Link>
-                  ) : (
-                    <>
-                      <FileText className="h-4 w-4 mr-2" />
-                      Start New Application
-                    </>
-                  )}
+                  <FileText className="h-4 w-4 mr-2" />
+                  Start New Application
                 </Button>
                 <Button variant="outline" size="sm" className="w-full justify-start" asChild>
                   <Link to="/development/applications">
@@ -276,6 +269,10 @@ export default function MyDevelopment() {
         open={!!expenseApp}
         onOpenChange={(open) => !open && setExpenseApp(null)}
         application={expenseApp}
+      />
+      <NewApplicationFlow
+        open={showNewApp}
+        onOpenChange={setShowNewApp}
       />
     </DashboardLayout>
   );
