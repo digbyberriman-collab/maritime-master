@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import { X, Lock, Unlock, MapPin, Calendar, Pencil, Save, XCircle } from 'lucide-react';
+import LocationSearchInput from '@/components/common/LocationSearchInput';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -227,20 +228,13 @@ const EntryDetailPanel: React.FC<EntryDetailPanelProps> = ({ entry, onClose }) =
             <MapPin className="w-3 h-3" /> Location
           </label>
           {editing ? (
-            <div className="space-y-1.5">
-              <Input
-                placeholder="Location"
-                value={form.location}
-                onChange={e => setForm(f => ({ ...f, location: e.target.value }))}
-                className="h-8 text-xs"
-              />
-              <Input
-                placeholder="Country"
-                value={form.country}
-                onChange={e => setForm(f => ({ ...f, country: e.target.value }))}
-                className="h-8 text-xs"
-              />
-            </div>
+            <LocationSearchInput
+              value={form.location}
+              country={form.country}
+              onSelect={(location, country) => setForm(f => ({ ...f, location, country }))}
+              placeholder="Search location..."
+              inputClassName="h-8 text-xs"
+            />
           ) : (
             entry.location ? (
               <p className="text-sm text-foreground">{entry.location}{entry.country ? `, ${entry.country}` : ''}</p>
