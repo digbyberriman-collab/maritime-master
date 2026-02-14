@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+// Fleet Map - Interactive vessel tracking with Leaflet
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,6 @@ import { useVesselFilter } from '@/hooks/useVesselFilter';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -58,9 +58,9 @@ const MAJOR_PORTS: Port[] = [
   { name: 'Piraeus', country: 'Greece', lat: 37.9475, lng: 23.6370, type: 'major', description: 'Largest port in Greece, gateway to Greek islands' },
   { name: 'Istanbul', country: 'Turkey', lat: 41.0082, lng: 28.9784, type: 'major', description: 'Bosporus strait, connecting Mediterranean and Black Sea' },
   { name: 'Dubai (Port Rashid)', country: 'UAE', lat: 25.2760, lng: 55.2780, type: 'marina', description: 'D-Marin, premium superyacht berths' },
-  { name: 'Singapore', country: 'Singapore', lat: 1.2655, lng: 103.8226, type: 'major', description: 'World\'s busiest transhipment port and bunkering hub' },
+  { name: 'Singapore', country: 'Singapore', lat: 1.2655, lng: 103.8226, type: 'major', description: "World's busiest transhipment port and bunkering hub" },
   { name: 'Fort Lauderdale', country: 'USA', lat: 26.1003, lng: -80.1439, type: 'marina', description: 'Yachting capital of the world, FLIBS host' },
-  { name: 'Antigua (Falmouth)', country: 'Antigua', lat: 17.0509, lng: -61.7818, type: 'marina', description: 'Nelson\'s Dockyard, Caribbean charter hub' },
+  { name: 'Antigua (Falmouth)', country: 'Antigua', lat: 17.0509, lng: -61.7818, type: 'marina', description: "Nelson's Dockyard, Caribbean charter hub" },
   { name: 'Rotterdam', country: 'Netherlands', lat: 51.9225, lng: 4.4792, type: 'major', description: 'Largest port in Europe by cargo tonnage' },
   { name: 'Southampton', country: 'UK', lat: 50.9097, lng: -1.4044, type: 'major', description: 'Major cruise and commercial port' },
   { name: 'Hamburg', country: 'Germany', lat: 53.5459, lng: 9.9660, type: 'shipyard', description: 'Blohm+Voss and Lürssen shipyards' },
@@ -114,15 +114,13 @@ const hashToCoord = (id: string, range: number, offset: number): number => {
   return offset + (Math.abs(hash) % (range * 100)) / 100;
 };
 
-// Component to handle map interactions
-const MapController: React.FC<{ selectedVessel: MapVessel | null }> = ({ selectedVessel }) => {
-  const map = useMap();
-  useEffect(() => {
-    if (selectedVessel) {
-      map.flyTo([selectedVessel.lat, selectedVessel.lng], 8, { duration: 1 });
-    }
-  }, [selectedVessel, map]);
-  return null;
+const getPortTypeLabel = (type: string) => {
+  switch (type) {
+    case 'major': return 'Commercial Port';
+    case 'marina': return 'Superyacht Marina';
+    case 'shipyard': return 'Shipyard / Refit';
+    default: return 'Port';
+  }
 };
 
 const FleetMap: React.FC = () => {
@@ -140,6 +138,10 @@ const FleetMap: React.FC = () => {
     ports: true
   });
   const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const vesselMarkersRef = useRef<L.LayerGroup>(L.layerGroup());
+  const portMarkersRef = useRef<L.LayerGroup>(L.layerGroup());
 
   // Fetch real vessels from database
   const { data: dbVessels = [], refetch } = useQuery({
@@ -157,7 +159,7 @@ const FleetMap: React.FC = () => {
     enabled: !!companyId,
   });
 
-  // Map DB vessels to map vessels with placeholder positions (Mediterranean spread)
+  // Map DB vessels to map vessels with placeholder positions
   const mapVessels: MapVessel[] = useMemo(() => {
     return dbVessels.map((v) => {
       const statuses: MapVessel['status'][] = ['UNDER_WAY', 'MOORED', 'AT_ANCHOR'];
@@ -166,8 +168,8 @@ const FleetMap: React.FC = () => {
         id: v.id,
         name: v.name,
         mmsi: v.mmsi || 'N/A',
-        lat: hashToCoord(v.id, 20, 30), // 30-50° lat (Mediterranean region)
-        lng: hashToCoord(v.id + 'lng', 40, -10), // -10 to 30° lng
+        lat: hashToCoord(v.id, 20, 30),
+        lng: hashToCoord(v.id + 'lng', 40, -10),
         sog: Math.round(hashToCoord(v.id + 'sog', 15, 0) * 10) / 10,
         cog: Math.round(hashToCoord(v.id + 'cog', 360, 0)),
         heading: Math.round(hashToCoord(v.id + 'hdg', 360, 0)),
@@ -182,6 +184,97 @@ const FleetMap: React.FC = () => {
   const displayVessels = vesselFilter 
     ? mapVessels.filter(v => v.id === vesselFilter)
     : mapVessels;
+
+  // Initialize Leaflet map
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    const map = L.map(mapContainerRef.current, {
+      center: [38, 15],
+      zoom: 4,
+      zoomControl: true,
+      scrollWheelZoom: true,
+    });
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
+    }).addTo(map);
+
+    vesselMarkersRef.current.addTo(map);
+    portMarkersRef.current.addTo(map);
+
+    mapRef.current = map;
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  }, []);
+
+  // Update vessel markers
+  useEffect(() => {
+    const group = vesselMarkersRef.current;
+    group.clearLayers();
+
+    if (!layers.vessels) return;
+
+    displayVessels.forEach((vessel) => {
+      const marker = L.marker([vessel.lat, vessel.lng], {
+        icon: createVesselIcon(vessel.heading, vessel.status),
+      });
+
+      marker.bindPopup(`
+        <div style="min-width:200px">
+          <p style="font-weight:600;font-size:14px;margin:0 0 4px">${vessel.name}</p>
+          <p style="font-size:12px;color:#888;margin:0 0 8px">MMSI: ${vessel.mmsi}</p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:12px">
+            <span>Status: ${vessel.status.replace('_', ' ')}</span>
+            <span>SOG: ${vessel.sog} kts</span>
+            <span>COG: ${vessel.cog}°</span>
+            <span>HDG: ${vessel.heading}°</span>
+          </div>
+        </div>
+      `);
+
+      marker.on('click', () => setSelectedVessel(vessel));
+      group.addLayer(marker);
+    });
+  }, [displayVessels, layers.vessels]);
+
+  // Update port markers
+  useEffect(() => {
+    const group = portMarkersRef.current;
+    group.clearLayers();
+
+    if (!layers.ports) return;
+
+    MAJOR_PORTS.forEach((port) => {
+      const marker = L.marker([port.lat, port.lng], {
+        icon: createPortIcon(port.type),
+      });
+
+      marker.bindPopup(`
+        <div style="min-width:220px">
+          <p style="font-weight:600;font-size:14px;margin:0 0 4px">${port.name}</p>
+          <p style="font-size:12px;color:#888;margin:0">${port.country}</p>
+          <span style="display:inline-block;font-size:10px;font-weight:500;padding:2px 6px;border-radius:4px;background:#f1f5f9;margin:4px 0">
+            ${getPortTypeLabel(port.type)}
+          </span>
+          <p style="font-size:12px;margin:8px 0 4px">${port.description}</p>
+          <p style="font-size:10px;color:#888;margin:0">${port.lat.toFixed(4)}°N, ${port.lng.toFixed(4)}°E</p>
+        </div>
+      `);
+
+      group.addLayer(marker);
+    });
+  }, [layers.ports]);
+
+  // Fly to selected vessel
+  useEffect(() => {
+    if (selectedVessel && mapRef.current) {
+      mapRef.current.flyTo([selectedVessel.lat, selectedVessel.lng], 8, { duration: 1 });
+    }
+  }, [selectedVessel]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -207,21 +300,19 @@ const FleetMap: React.FC = () => {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  // Invalidate map size on fullscreen change
+  useEffect(() => {
+    setTimeout(() => {
+      mapRef.current?.invalidateSize();
+    }, 300);
+  }, [isFullscreen]);
+
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'UNDER_WAY': return 'default';
       case 'MOORED': return 'secondary';
       case 'AT_ANCHOR': return 'outline';
       default: return 'secondary';
-    }
-  };
-
-  const getPortTypeLabel = (type: string) => {
-    switch (type) {
-      case 'major': return 'Commercial Port';
-      case 'marina': return 'Superyacht Marina';
-      case 'shipyard': return 'Shipyard / Refit';
-      default: return 'Port';
     }
   };
 
@@ -249,73 +340,11 @@ const FleetMap: React.FC = () => {
               ref={containerRef}
               className="relative h-[600px] overflow-hidden"
             >
-              <MapContainer
-                center={[38, 15]}
-                zoom={4}
+              <div
+                ref={mapContainerRef}
                 className="h-full w-full z-0"
                 style={{ background: '#0c1929' }}
-                zoomControl={true}
-                scrollWheelZoom={true}
-              >
-                {/* Dark nautical-style tile layer */}
-                <TileLayer
-                  attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-                  url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                />
-
-                <MapController selectedVessel={selectedVessel} />
-
-                {/* Vessel Markers */}
-                {layers.vessels && displayVessels.map((vessel) => (
-                  <Marker
-                    key={vessel.id}
-                    position={[vessel.lat, vessel.lng]}
-                    icon={createVesselIcon(vessel.heading, vessel.status)}
-                    eventHandlers={{
-                      click: () => setSelectedVessel(vessel),
-                    }}
-                  >
-                    <Popup className="vessel-popup">
-                      <div className="min-w-[200px]">
-                        <p className="font-semibold text-sm">{vessel.name}</p>
-                        <p className="text-xs text-muted-foreground">MMSI: {vessel.mmsi}</p>
-                        <div className="grid grid-cols-2 gap-1 mt-2 text-xs">
-                          <span>Status: {vessel.status.replace('_', ' ')}</span>
-                          <span>SOG: {vessel.sog} kts</span>
-                          <span>COG: {vessel.cog}°</span>
-                          <span>HDG: {vessel.heading}°</span>
-                        </div>
-                      </div>
-                    </Popup>
-                  </Marker>
-                ))}
-
-                {/* Port Markers */}
-                {layers.ports && MAJOR_PORTS.map((port) => (
-                  <Marker
-                    key={port.name}
-                    position={[port.lat, port.lng]}
-                    icon={createPortIcon(port.type)}
-                  >
-                    <Popup>
-                      <div className="min-w-[220px]">
-                        <div className="flex items-center gap-1.5 mb-1">
-                          <Anchor className="w-3.5 h-3.5 text-primary" />
-                          <p className="font-semibold text-sm">{port.name}</p>
-                        </div>
-                        <p className="text-xs text-muted-foreground mb-1">{port.country}</p>
-                        <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted">
-                          {getPortTypeLabel(port.type)}
-                        </span>
-                        <p className="text-xs mt-2">{port.description}</p>
-                        <p className="text-[10px] text-muted-foreground mt-1">
-                          {port.lat.toFixed(4)}°N, {port.lng.toFixed(4)}°E
-                        </p>
-                      </div>
-                    </Popup>
-                  </Marker>
-                ))}
-              </MapContainer>
+              />
 
               {/* Map Controls Overlay */}
               <div className="absolute top-4 right-4 flex flex-col gap-2 z-[1000]">
