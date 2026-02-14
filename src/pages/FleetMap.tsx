@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,8 +14,11 @@ import {
   X
 } from 'lucide-react';
 import { useVesselFilter } from '@/hooks/useVesselFilter';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
-interface MockVessel {
+interface MapVessel {
   id: string;
   name: string;
   mmsi: string;
@@ -29,52 +32,6 @@ interface MockVessel {
   crewOnboard: number;
   captain: string;
 }
-
-// Mock vessel data (replace with real AIS data later)
-const MOCK_VESSELS: MockVessel[] = [
-  { 
-    id: 'v1', 
-    name: 'M/Y DRAAK', 
-    mmsi: '123456789',
-    lat: 43.7384, 
-    lng: 7.4246,
-    sog: 12.5, 
-    cog: 45, 
-    heading: 48,
-    status: 'UNDER_WAY',
-    lastUpdate: new Date().toISOString(),
-    crewOnboard: 12,
-    captain: 'John Smith'
-  },
-  { 
-    id: 'v2', 
-    name: 'M/Y LEVIATHAN', 
-    mmsi: '987654321',
-    lat: 41.9028, 
-    lng: 12.4964,
-    sog: 0, 
-    cog: 0, 
-    heading: 180,
-    status: 'MOORED',
-    lastUpdate: new Date().toISOString(),
-    crewOnboard: 8,
-    captain: 'Sarah Jones'
-  },
-  { 
-    id: 'v3', 
-    name: 'M/Y TITAN', 
-    mmsi: '111222333',
-    lat: 36.1408, 
-    lng: -5.3536,
-    sog: 8.2, 
-    cog: 270, 
-    heading: 265,
-    status: 'UNDER_WAY',
-    lastUpdate: new Date().toISOString(),
-    crewOnboard: 15,
-    captain: 'Mike Brown'
-  }
-];
 
 // Top-down vessel SVG icon
 const VesselIcon: React.FC<{ heading: number; status: string; color: string }> = ({ heading, status, color }) => (
@@ -102,12 +59,24 @@ const VesselIcon: React.FC<{ heading: number; status: string; color: string }> =
   </svg>
 );
 
+// Generate a pseudo-random but stable position from vessel id
+const hashToCoord = (id: string, range: number, offset: number): number => {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = ((hash << 5) - hash) + id.charCodeAt(i);
+    hash |= 0;
+  }
+  return offset + (Math.abs(hash) % (range * 100)) / 100;
+};
+
 const FleetMap: React.FC = () => {
   const { vesselFilter } = useVesselFilter();
+  const { profile } = useAuth();
+  const companyId = profile?.company_id;
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showLayers, setShowLayers] = useState(false);
-  const [selectedVessel, setSelectedVessel] = useState<MockVessel | null>(null);
+  const [selectedVessel, setSelectedVessel] = useState<MapVessel | null>(null);
   const [layers, setLayers] = useState({
     vessels: true,
     tracks: false,
@@ -116,14 +85,52 @@ const FleetMap: React.FC = () => {
   });
   const mapRef = useRef<HTMLDivElement>(null);
 
+  // Fetch real vessels from database
+  const { data: dbVessels = [], refetch } = useQuery({
+    queryKey: ['vessels', companyId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('vessels')
+        .select('id, name, mmsi, status')
+        .eq('company_id', companyId!)
+        .neq('status', 'Sold')
+        .order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!companyId,
+  });
+
+  // Map DB vessels to map vessels with placeholder positions
+  const mapVessels: MapVessel[] = useMemo(() => {
+    return dbVessels.map((v) => {
+      const statuses: MapVessel['status'][] = ['UNDER_WAY', 'MOORED', 'AT_ANCHOR'];
+      const statusIndex = Math.abs(v.id.charCodeAt(0)) % 3;
+      return {
+        id: v.id,
+        name: v.name,
+        mmsi: v.mmsi || 'N/A',
+        lat: hashToCoord(v.id, 50, 10),
+        lng: hashToCoord(v.id + 'lng', 60, -10),
+        sog: Math.round(hashToCoord(v.id + 'sog', 15, 0) * 10) / 10,
+        cog: Math.round(hashToCoord(v.id + 'cog', 360, 0)),
+        heading: Math.round(hashToCoord(v.id + 'hdg', 360, 0)),
+        status: statuses[statusIndex],
+        lastUpdate: new Date().toISOString(),
+        crewOnboard: Math.round(hashToCoord(v.id + 'crew', 20, 5)),
+        captain: '—',
+      };
+    });
+  }, [dbVessels]);
+
   // Filter vessels based on master filter
   const displayVessels = vesselFilter 
-    ? MOCK_VESSELS.filter(v => v.id === vesselFilter)
-    : MOCK_VESSELS;
+    ? mapVessels.filter(v => v.id === vesselFilter)
+    : mapVessels;
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await new Promise(r => setTimeout(r, 1500));
+    await refetch();
     setIsRefreshing(false);
   };
 
