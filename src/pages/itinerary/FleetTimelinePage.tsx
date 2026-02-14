@@ -77,6 +77,7 @@ const FleetTimelinePage: React.FC = () => {
               entries={entries}
               vessels={vessels}
               currentDate={currentDate}
+              viewMode={viewMode}
               statusFilter={statusFilter}
               vesselFilter={vesselFilter}
               onSelectEntry={handleSelectEntry}
