@@ -50,6 +50,24 @@ export function useItineraryVessels() {
   });
 }
 
+/** Derive effective status: entries whose end_date is in the past become completed & locked */
+function applyAutoCompletion(entries: ItineraryEntry[]): ItineraryEntry[] {
+  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  return entries.map(entry => {
+    if (
+      entry.end_date < today &&
+      entry.status !== 'completed' &&
+      entry.status !== 'cancelled'
+    ) {
+      return { ...entry, status: 'completed' as const, is_locked: true };
+    }
+    if (entry.status === 'completed') {
+      return { ...entry, is_locked: true };
+    }
+    return entry;
+  });
+}
+
 export function useItineraryEntries() {
   const { profile } = useAuth();
   const companyId = profile?.company_id;
@@ -73,7 +91,7 @@ export function useItineraryEntries() {
         .eq('company_id', companyId!)
         .order('start_date');
       if (error) throw error;
-      return data as unknown as ItineraryEntry[];
+      return applyAutoCompletion(data as unknown as ItineraryEntry[]);
     },
     enabled: !!companyId,
   });
