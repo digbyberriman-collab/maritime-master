@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const AIRTABLE_BASE_ID = "appZzCXh4qtvqIy3x";
-const AIRTABLE_TABLE_NAME = "Crew Contacts";
+const AIRTABLE_TABLE_NAME = "Crew Data";
 const AIRTABLE_API_URL = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${encodeURIComponent(AIRTABLE_TABLE_NAME)}`;
 
 // Field mapping: Airtable field name -> profiles column
