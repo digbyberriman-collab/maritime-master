@@ -53,7 +53,7 @@ interface FormSubmission {
 const FormSubmissionPage: React.FC = () => {
   const { submissionId } = useParams<{ submissionId: string }>();
   const [searchParams] = useSearchParams();
-  const templateIdFromQuery = searchParams.get('template');
+  const templateIdFromQuery = searchParams.get('templateId') || searchParams.get('template');
   const navigate = useNavigate();
   const { user, profile } = useAuth();
   const { selectedVesselId, selectedVessel } = useVessel();
