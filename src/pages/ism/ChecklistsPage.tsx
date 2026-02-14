@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 const ChecklistsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('templates');
   
@@ -58,7 +60,7 @@ const ChecklistsPage: React.FC = () => {
               Safety and operational checklists for vessel operations
             </p>
           </div>
-          <Button>
+          <Button onClick={() => navigate('/ism/forms/create-template', { state: { preselectedType: 'CHECKLIST' } })}>
             <Plus className="w-4 h-4 mr-2" />
             Create Checklist
           </Button>
@@ -144,7 +146,7 @@ const ChecklistsPage: React.FC = () => {
                   <p className="text-muted-foreground mb-4">
                     Create your first checklist to get started
                   </p>
-                  <Button>
+                  <Button onClick={() => navigate('/ism/forms/create-template', { state: { preselectedType: 'CHECKLIST' } })}>
                     <Plus className="w-4 h-4 mr-2" />
                     Create Checklist
                   </Button>
