@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.geocode-search]
 verify_jwt = false
+
+[functions.airtable-sync]
+verify_jwt = false
