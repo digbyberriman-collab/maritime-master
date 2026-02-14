@@ -71,3 +71,6 @@ verify_jwt = false
 
 [functions.airtable-sync]
 verify_jwt = false
+
+[functions.ai-route-planner]
+verify_jwt = false
