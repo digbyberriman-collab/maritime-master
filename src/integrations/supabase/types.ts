@@ -2024,6 +2024,666 @@ export type Database = {
           },
         ]
       }
+      development_applications: {
+        Row: {
+          application_number: string
+          captain_comments: string | null
+          captain_decision: string | null
+          captain_reviewed_at: string | null
+          captain_reviewer_id: string | null
+          category: string
+          company_id: string
+          completed_at: string | null
+          completion_certificate_url: string | null
+          course_description: string | null
+          course_duration_days: number | null
+          course_end_date: string | null
+          course_id: string | null
+          course_location: string | null
+          course_name: string
+          course_provider: string | null
+          course_start_date: string | null
+          course_url: string | null
+          created_at: string | null
+          crew_member_id: string
+          discretionary_justification: string | null
+          estimated_accommodation_nightly_rate: number | null
+          estimated_accommodation_nights: number | null
+          estimated_accommodation_usd: number | null
+          estimated_food_per_diem_usd: number | null
+          estimated_total_usd: number | null
+          estimated_travel_route: string | null
+          estimated_travel_usd: number | null
+          estimated_tuition_usd: number | null
+          hod_comments: string | null
+          hod_decision: string | null
+          hod_reviewed_at: string | null
+          hod_reviewer_id: string | null
+          id: string
+          is_custom_course: boolean | null
+          is_discretionary: boolean | null
+          leave_days_accrued: number | null
+          neutral_days_accrued: number | null
+          peer_comments: string | null
+          peer_decision: string | null
+          peer_reviewed_at: string | null
+          peer_reviewer_id: string | null
+          reimbursement_total_usd: number | null
+          status: string
+          submitted_at: string | null
+          updated_at: string | null
+          upfront_payment_by_inkfish: number | null
+          vessel_id: string
+        }
+        Insert: {
+          application_number?: string
+          captain_comments?: string | null
+          captain_decision?: string | null
+          captain_reviewed_at?: string | null
+          captain_reviewer_id?: string | null
+          category: string
+          company_id: string
+          completed_at?: string | null
+          completion_certificate_url?: string | null
+          course_description?: string | null
+          course_duration_days?: number | null
+          course_end_date?: string | null
+          course_id?: string | null
+          course_location?: string | null
+          course_name: string
+          course_provider?: string | null
+          course_start_date?: string | null
+          course_url?: string | null
+          created_at?: string | null
+          crew_member_id: string
+          discretionary_justification?: string | null
+          estimated_accommodation_nightly_rate?: number | null
+          estimated_accommodation_nights?: number | null
+          estimated_accommodation_usd?: number | null
+          estimated_food_per_diem_usd?: number | null
+          estimated_total_usd?: number | null
+          estimated_travel_route?: string | null
+          estimated_travel_usd?: number | null
+          estimated_tuition_usd?: number | null
+          hod_comments?: string | null
+          hod_decision?: string | null
+          hod_reviewed_at?: string | null
+          hod_reviewer_id?: string | null
+          id?: string
+          is_custom_course?: boolean | null
+          is_discretionary?: boolean | null
+          leave_days_accrued?: number | null
+          neutral_days_accrued?: number | null
+          peer_comments?: string | null
+          peer_decision?: string | null
+          peer_reviewed_at?: string | null
+          peer_reviewer_id?: string | null
+          reimbursement_total_usd?: number | null
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string | null
+          upfront_payment_by_inkfish?: number | null
+          vessel_id: string
+        }
+        Update: {
+          application_number?: string
+          captain_comments?: string | null
+          captain_decision?: string | null
+          captain_reviewed_at?: string | null
+          captain_reviewer_id?: string | null
+          category?: string
+          company_id?: string
+          completed_at?: string | null
+          completion_certificate_url?: string | null
+          course_description?: string | null
+          course_duration_days?: number | null
+          course_end_date?: string | null
+          course_id?: string | null
+          course_location?: string | null
+          course_name?: string
+          course_provider?: string | null
+          course_start_date?: string | null
+          course_url?: string | null
+          created_at?: string | null
+          crew_member_id?: string
+          discretionary_justification?: string | null
+          estimated_accommodation_nightly_rate?: number | null
+          estimated_accommodation_nights?: number | null
+          estimated_accommodation_usd?: number | null
+          estimated_food_per_diem_usd?: number | null
+          estimated_total_usd?: number | null
+          estimated_travel_route?: string | null
+          estimated_travel_usd?: number | null
+          estimated_tuition_usd?: number | null
+          hod_comments?: string | null
+          hod_decision?: string | null
+          hod_reviewed_at?: string | null
+          hod_reviewer_id?: string | null
+          id?: string
+          is_custom_course?: boolean | null
+          is_discretionary?: boolean | null
+          leave_days_accrued?: number | null
+          neutral_days_accrued?: number | null
+          peer_comments?: string | null
+          peer_decision?: string | null
+          peer_reviewed_at?: string | null
+          peer_reviewer_id?: string | null
+          reimbursement_total_usd?: number | null
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string | null
+          upfront_payment_by_inkfish?: number | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "development_applications_captain_reviewer_id_fkey"
+            columns: ["captain_reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "development_applications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "development_applications_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "development_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "development_applications_crew_member_id_fkey"
+            columns: ["crew_member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "development_applications_hod_reviewer_id_fkey"
+            columns: ["hod_reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "development_applications_peer_reviewer_id_fkey"
+            columns: ["peer_reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "development_applications_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      development_audit_log: {
+        Row: {
+          action: string
+          actor_id: string
+          application_id: string | null
+          company_id: string
+          created_at: string | null
+          details: Json | null
+          expense_id: string | null
+          id: string
+        }
+        Insert: {
+          action: string
+          actor_id: string
+          application_id?: string | null
+          company_id: string
+          created_at?: string | null
+          details?: Json | null
+          expense_id?: string | null
+          id?: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string
+          application_id?: string | null
+          company_id?: string
+          created_at?: string | null
+          details?: Json | null
+          expense_id?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "development_audit_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "development_audit_log_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "development_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "development_audit_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "development_audit_log_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "development_expenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      development_comments: {
+        Row: {
+          application_id: string
+          author_id: string
+          content: string
+          created_at: string | null
+          id: string
+          is_system_message: boolean | null
+        }
+        Insert: {
+          application_id: string
+          author_id: string
+          content: string
+          created_at?: string | null
+          id?: string
+          is_system_message?: boolean | null
+        }
+        Update: {
+          application_id?: string
+          author_id?: string
+          content?: string
+          created_at?: string | null
+          id?: string
+          is_system_message?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "development_comments_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "development_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "development_comments_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      development_courses: {
+        Row: {
+          catalogue_number: number | null
+          category: string
+          company_id: string
+          contact_person: string | null
+          created_at: string | null
+          created_by: string | null
+          department: string
+          duration_description: string | null
+          format: string | null
+          id: string
+          name: string
+          notes: string | null
+          over_4k_rule: boolean | null
+          reimbursement_summary: string | null
+          renewal_period: string | null
+          requires_fleet_doctor_agreement: boolean | null
+          status: string
+          sub_section: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          catalogue_number?: number | null
+          category: string
+          company_id: string
+          contact_person?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          department: string
+          duration_description?: string | null
+          format?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          over_4k_rule?: boolean | null
+          reimbursement_summary?: string | null
+          renewal_period?: string | null
+          requires_fleet_doctor_agreement?: boolean | null
+          status?: string
+          sub_section?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          catalogue_number?: number | null
+          category?: string
+          company_id?: string
+          contact_person?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          department?: string
+          duration_description?: string | null
+          format?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          over_4k_rule?: boolean | null
+          reimbursement_summary?: string | null
+          renewal_period?: string | null
+          requires_fleet_doctor_agreement?: boolean | null
+          status?: string
+          sub_section?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "development_courses_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "development_courses_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      development_documents: {
+        Row: {
+          application_id: string | null
+          created_at: string | null
+          document_type: string
+          expense_id: string | null
+          file_name: string
+          file_size_bytes: number | null
+          file_url: string
+          id: string
+          mime_type: string | null
+          uploaded_by: string
+        }
+        Insert: {
+          application_id?: string | null
+          created_at?: string | null
+          document_type: string
+          expense_id?: string | null
+          file_name: string
+          file_size_bytes?: number | null
+          file_url: string
+          id?: string
+          mime_type?: string | null
+          uploaded_by: string
+        }
+        Update: {
+          application_id?: string | null
+          created_at?: string | null
+          document_type?: string
+          expense_id?: string | null
+          file_name?: string
+          file_size_bytes?: number | null
+          file_url?: string
+          id?: string
+          mime_type?: string | null
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "development_documents_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "development_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "development_documents_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "development_expenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "development_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      development_expenses: {
+        Row: {
+          actual_accommodation_nightly_rate: number | null
+          actual_accommodation_nights: number | null
+          actual_accommodation_usd: number | null
+          actual_food_per_diem_usd: number | null
+          actual_total_usd: number | null
+          actual_travel_usd: number | null
+          actual_tuition_usd: number | null
+          application_id: string
+          approved_reimbursement_usd: number | null
+          company_id: string
+          completion_amount_due: number | null
+          completion_amount_paid: number | null
+          completion_paid_at: string | null
+          created_at: string | null
+          crew_member_id: string
+          id: string
+          is_split_payment: boolean | null
+          paid_at: string | null
+          reimbursement_breakdown: Json | null
+          review_comments: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          submitted_at: string | null
+          updated_at: string | null
+          upfront_amount_paid: number | null
+          upfront_paid_at: string | null
+        }
+        Insert: {
+          actual_accommodation_nightly_rate?: number | null
+          actual_accommodation_nights?: number | null
+          actual_accommodation_usd?: number | null
+          actual_food_per_diem_usd?: number | null
+          actual_total_usd?: number | null
+          actual_travel_usd?: number | null
+          actual_tuition_usd?: number | null
+          application_id: string
+          approved_reimbursement_usd?: number | null
+          company_id: string
+          completion_amount_due?: number | null
+          completion_amount_paid?: number | null
+          completion_paid_at?: string | null
+          created_at?: string | null
+          crew_member_id: string
+          id?: string
+          is_split_payment?: boolean | null
+          paid_at?: string | null
+          reimbursement_breakdown?: Json | null
+          review_comments?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string | null
+          upfront_amount_paid?: number | null
+          upfront_paid_at?: string | null
+        }
+        Update: {
+          actual_accommodation_nightly_rate?: number | null
+          actual_accommodation_nights?: number | null
+          actual_accommodation_usd?: number | null
+          actual_food_per_diem_usd?: number | null
+          actual_total_usd?: number | null
+          actual_travel_usd?: number | null
+          actual_tuition_usd?: number | null
+          application_id?: string
+          approved_reimbursement_usd?: number | null
+          company_id?: string
+          completion_amount_due?: number | null
+          completion_amount_paid?: number | null
+          completion_paid_at?: string | null
+          created_at?: string | null
+          crew_member_id?: string
+          id?: string
+          is_split_payment?: boolean | null
+          paid_at?: string | null
+          reimbursement_breakdown?: Json | null
+          review_comments?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          submitted_at?: string | null
+          updated_at?: string | null
+          upfront_amount_paid?: number | null
+          upfront_paid_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "development_expenses_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "development_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "development_expenses_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "development_expenses_crew_member_id_fkey"
+            columns: ["crew_member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "development_expenses_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      development_repayments: {
+        Row: {
+          amortisation_end_date: string
+          application_id: string
+          clawback_amount_usd: number | null
+          clawback_reason: string | null
+          clawback_settled: boolean | null
+          clawback_settled_at: string | null
+          clawback_triggered: boolean | null
+          clawback_triggered_at: string | null
+          company_id: string
+          created_at: string | null
+          crew_member_id: string
+          expense_id: string
+          id: string
+          is_fully_amortised: boolean | null
+          reimbursement_date: string
+          remaining_obligation_usd: number
+          total_reimbursed_usd: number
+          updated_at: string | null
+        }
+        Insert: {
+          amortisation_end_date: string
+          application_id: string
+          clawback_amount_usd?: number | null
+          clawback_reason?: string | null
+          clawback_settled?: boolean | null
+          clawback_settled_at?: string | null
+          clawback_triggered?: boolean | null
+          clawback_triggered_at?: string | null
+          company_id: string
+          created_at?: string | null
+          crew_member_id: string
+          expense_id: string
+          id?: string
+          is_fully_amortised?: boolean | null
+          reimbursement_date: string
+          remaining_obligation_usd: number
+          total_reimbursed_usd: number
+          updated_at?: string | null
+        }
+        Update: {
+          amortisation_end_date?: string
+          application_id?: string
+          clawback_amount_usd?: number | null
+          clawback_reason?: string | null
+          clawback_settled?: boolean | null
+          clawback_settled_at?: string | null
+          clawback_triggered?: boolean | null
+          clawback_triggered_at?: string | null
+          company_id?: string
+          created_at?: string | null
+          crew_member_id?: string
+          expense_id?: string
+          id?: string
+          is_fully_amortised?: boolean | null
+          reimbursement_date?: string
+          remaining_obligation_usd?: number
+          total_reimbursed_usd?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "development_repayments_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "development_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "development_repayments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "development_repayments_crew_member_id_fkey"
+            columns: ["crew_member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "development_repayments_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "development_expenses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_acknowledgments: {
         Row: {
           acknowledged_at: string
@@ -3266,6 +3926,45 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      fleet_training_participants: {
+        Row: {
+          application_id: string
+          attendance_status: string | null
+          created_at: string | null
+          crew_member_id: string
+          id: string
+        }
+        Insert: {
+          application_id: string
+          attendance_status?: string | null
+          created_at?: string | null
+          crew_member_id: string
+          id?: string
+        }
+        Update: {
+          application_id?: string
+          attendance_status?: string | null
+          created_at?: string | null
+          crew_member_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fleet_training_participants_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "development_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fleet_training_participants_crew_member_id_fkey"
+            columns: ["crew_member_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
