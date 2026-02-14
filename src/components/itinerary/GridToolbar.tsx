@@ -44,15 +44,24 @@ const GridToolbar: React.FC<GridToolbarProps> = ({
   onVesselFilterChange,
 }) => {
   const navigate = (direction: 'prev' | 'next') => {
-    if (viewMode === 'quarter') {
-      onDateChange(direction === 'prev' ? subMonths(currentDate, 3) : addMonths(currentDate, 3));
-      return;
+    const d = direction === 'prev' ? -1 : 1;
+    switch (viewMode) {
+      case 'year':
+        onDateChange(d === -1 ? subMonths(currentDate, 12) : addMonths(currentDate, 12));
+        break;
+      case 'quarter':
+        onDateChange(d === -1 ? subMonths(currentDate, 3) : addMonths(currentDate, 3));
+        break;
+      case 'month':
+        onDateChange(d === -1 ? subMonths(currentDate, 1) : addMonths(currentDate, 1));
+        break;
+      case 'week':
+        onDateChange(d === -1 ? subWeeks(currentDate, 1) : addWeeks(currentDate, 1));
+        break;
+      case 'day':
+        onDateChange(d === -1 ? subDays(currentDate, 7) : addDays(currentDate, 7));
+        break;
     }
-    const fn = direction === 'prev'
-      ? viewMode === 'month' ? subMonths : viewMode === 'week' ? subWeeks : subDays
-      : viewMode === 'month' ? addMonths : viewMode === 'week' ? addWeeks : addDays;
-    const amount = viewMode === 'day' ? 7 : 1;
-    onDateChange(fn(currentDate, amount));
   };
 
   const jumpToToday = () => onDateChange(new Date());
@@ -90,6 +99,7 @@ const GridToolbar: React.FC<GridToolbarProps> = ({
 
       {/* Date label */}
       <span className="text-sm font-semibold text-foreground min-w-[140px]">
+        {viewMode === 'year' && format(currentDate, 'yyyy')}
         {viewMode === 'month' && format(currentDate, 'MMMM yyyy')}
         {viewMode === 'quarter' && `${format(currentDate, 'MMM')} – ${format(addMonths(currentDate, 2), 'MMM yyyy')}`}
         {viewMode === 'week' && `Week of ${format(currentDate, 'MMM d, yyyy')}`}
@@ -98,7 +108,7 @@ const GridToolbar: React.FC<GridToolbarProps> = ({
 
       {/* View mode toggle */}
       <div className="flex items-center bg-muted rounded-md p-0.5">
-        {(['month', 'quarter', 'week', 'day'] as ViewMode[]).map(mode => (
+        {(['year', 'quarter', 'month', 'week', 'day'] as ViewMode[]).map(mode => (
           <button
             key={mode}
             onClick={() => onViewModeChange(mode)}
@@ -108,7 +118,7 @@ const GridToolbar: React.FC<GridToolbarProps> = ({
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            {mode === 'quarter' ? 'Quarter' : mode.charAt(0).toUpperCase() + mode.slice(1)}
+            {mode.charAt(0).toUpperCase() + mode.slice(1)}
           </button>
         ))}
       </div>

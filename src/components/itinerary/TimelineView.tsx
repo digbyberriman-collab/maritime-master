@@ -40,14 +40,16 @@ const HEADER_HEIGHT = 48;
 function getViewConfig(viewMode: ViewMode) {
   switch (viewMode) {
     case 'day':
-      return { dayWidth: 48 };   // 7 days, very detailed
+      return { dayWidth: 48 };
     case 'week':
-      return { dayWidth: 24 };   // ~4 weeks
+      return { dayWidth: 24 };
     case 'quarter':
-      return { dayWidth: 12 };   // 3 months
+      return { dayWidth: 12 };
     case 'month':
+      return { dayWidth: 32 };   // single month, detailed
+    case 'year':
     default:
-      return { dayWidth: 4 };    // 12 months overview
+      return { dayWidth: 2 };    // 12 months compressed
   }
 }
 
@@ -68,10 +70,15 @@ function getTimelineRange(viewMode: ViewMode, currentDate: Date) {
       const end = endOfMonth(addMonths(start, 2));
       return { start, end };
     }
-    case 'month':
+    case 'month': {
+      const start = startOfMonth(currentDate);
+      const end = endOfMonth(start); // single month
+      return { start, end };
+    }
+    case 'year':
     default: {
       const start = startOfMonth(currentDate);
-      const end = endOfMonth(addMonths(start, 11));
+      const end = endOfMonth(addMonths(start, 11)); // 12 months
       return { start, end };
     }
   }
@@ -98,13 +105,15 @@ const TimelineView: React.FC<TimelineViewProps> = ({
 
   // Generate header segments based on view mode
   const headerSegments = useMemo(() => {
-    if (viewMode === 'day' || viewMode === 'week') {
+    if (viewMode === 'day' || viewMode === 'week' || viewMode === 'month') {
       // Individual days
       return eachDayOfInterval({ start: timelineStart, end: timelineEnd }).map(day => ({
         key: format(day, 'yyyy-MM-dd'),
         label: viewMode === 'day'
           ? format(day, 'EEE d MMM')
-          : format(day, 'EEE d'),
+          : viewMode === 'month'
+            ? format(day, 'd')
+            : format(day, 'EEE d'),
         startOffset: differenceInDays(day, timelineStart),
         days: 1,
         isCurrent: isSameDay(day, new Date()),
@@ -149,23 +158,14 @@ const TimelineView: React.FC<TimelineViewProps> = ({
 
   // Grid lines for vessel rows
   const gridLines = useMemo(() => {
-    if (viewMode === 'day') {
-      // Vertical line per day
+    if (viewMode === 'day' || viewMode === 'week' || viewMode === 'month') {
       return eachDayOfInterval({ start: timelineStart, end: timelineEnd }).map(day => ({
         key: format(day, 'yyyy-MM-dd'),
         offset: differenceInDays(day, timelineStart) * dayWidth,
         isWeekend: isWeekend(day),
       }));
     }
-    if (viewMode === 'week') {
-      // Line per day, highlight weekends
-      return eachDayOfInterval({ start: timelineStart, end: timelineEnd }).map(day => ({
-        key: format(day, 'yyyy-MM-dd'),
-        offset: differenceInDays(day, timelineStart) * dayWidth,
-        isWeekend: isWeekend(day),
-      }));
-    }
-    // Quarter & month: line per month
+    // Quarter & year: line per month
     const months = eachMonthOfInterval({ start: timelineStart, end: timelineEnd });
     return months.map(month => ({
       key: format(month, 'yyyy-MM'),
