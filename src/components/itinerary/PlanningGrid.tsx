@@ -103,18 +103,27 @@ const PlanningGrid: React.FC<PlanningGridProps> = ({
     [entries, statusFilter]
   );
 
-  // Get entries for a vessel + time period
+  // Get entries for a vessel + time period, with proportional positioning
   const getEntriesForCell = (vesselId: string, period: typeof timePeriods[0]) => {
-    return filteredEntries.filter(entry => {
-      const hasVessel = entry.vessels?.some(ev => ev.vessel_id === vesselId);
-      if (!hasVessel) return false;
+    const periodStart = period.start.getTime();
+    const periodEnd = period.end.getTime();
+    const periodDuration = periodEnd - periodStart || 1;
 
-      const entryStart = parseISO(entry.start_date);
-      const entryEnd = parseISO(entry.end_date);
-
-      // Check overlap
-      return entryStart <= period.end && entryEnd >= period.start;
-    });
+    return filteredEntries
+      .filter(entry => {
+        const hasVessel = entry.vessels?.some(ev => ev.vessel_id === vesselId);
+        if (!hasVessel) return false;
+        const entryStart = parseISO(entry.start_date);
+        const entryEnd = parseISO(entry.end_date);
+        return entryStart <= period.end && entryEnd >= period.start;
+      })
+      .map(entry => {
+        const entryStart = Math.max(parseISO(entry.start_date).getTime(), periodStart);
+        const entryEnd = Math.min(parseISO(entry.end_date).getTime(), periodEnd);
+        const leftPct = ((entryStart - periodStart) / periodDuration) * 100;
+        const widthPct = Math.max(((entryEnd - entryStart) / periodDuration) * 100, 3); // min 3%
+        return { entry, leftPct, widthPct };
+      });
   };
 
   if (visibleVessels.length === 0) {
@@ -168,14 +177,19 @@ const PlanningGrid: React.FC<PlanningGridProps> = ({
                       period.isToday && 'bg-primary/5'
                     )}
                   >
-                    <div className="space-y-0.5 min-h-[32px]">
-                      {cellEntries.map(entry => (
-                        <TripBlock
+                    <div className="relative min-h-[32px] w-full">
+                      {cellEntries.map(({ entry, leftPct, widthPct }) => (
+                        <div
                           key={entry.id}
-                          entry={entry}
-                          compact={viewMode === 'day'}
-                          onClick={onSelectEntry}
-                        />
+                          className="absolute top-0.5 bottom-0.5"
+                          style={{ left: `${leftPct}%`, width: `${widthPct}%` }}
+                        >
+                          <TripBlock
+                            entry={entry}
+                            compact={viewMode === 'day'}
+                            onClick={onSelectEntry}
+                          />
+                        </div>
                       ))}
                     </div>
                     {/* Add button on hover */}
