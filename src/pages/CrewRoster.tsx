@@ -434,6 +434,14 @@ const CrewRoster: React.FC = () => {
                       <TableHead>Name</TableHead>
                       <TableHead>Rank/Position</TableHead>
                       <TableHead>Vessel Assignment</TableHead>
+                      <TableHead>Nationality</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Phone</TableHead>
+                      <TableHead>Department</TableHead>
+                      <TableHead>Contract Start</TableHead>
+                      <TableHead>Contract End</TableHead>
+                      <TableHead>Passport Expiry</TableHead>
+                      <TableHead>Medical Expiry</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Account Status</TableHead>
                       <TableHead>Last Login</TableHead>
@@ -442,14 +450,14 @@ const CrewRoster: React.FC = () => {
                   </TableHeader>
                   <TableBody>
                     {filteredCrew.map((member) => (
-                      <TableRow key={member.id}>
-                        <TableCell className="font-medium">
+                      <TableRow key={member.id} className={member.status === 'Inactive' ? 'opacity-50' : ''}>
+                        <TableCell className="font-medium whitespace-nowrap">
                           {member.first_name} {member.last_name}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-nowrap">
                           {member.rank || member.current_assignment?.position || '-'}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-nowrap">
                           {member.current_assignment ? (
                             <div className="flex items-center gap-2">
                               <Ship className="w-4 h-4 text-muted-foreground" />
@@ -459,6 +467,38 @@ const CrewRoster: React.FC = () => {
                             <span className="text-muted-foreground">Unassigned</span>
                           )}
                         </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {member.nationality || '-'}
+                        </TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {member.email}
+                        </TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {member.phone || '-'}
+                        </TableCell>
+                        <TableCell className="whitespace-nowrap">
+                          {member.department || '-'}
+                        </TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {member.contract_start_date
+                            ? format(new Date(member.contract_start_date), 'dd MMM yyyy')
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {member.contract_end_date
+                            ? format(new Date(member.contract_end_date), 'dd MMM yyyy')
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {member.passport_expiry
+                            ? format(new Date(member.passport_expiry), 'dd MMM yyyy')
+                            : '-'}
+                        </TableCell>
+                        <TableCell className="text-sm whitespace-nowrap">
+                          {member.medical_expiry
+                            ? format(new Date(member.medical_expiry), 'dd MMM yyyy')
+                            : '-'}
+                        </TableCell>
                         <TableCell>
                           <Badge variant={getStatusBadgeVariant(member.status)}>
                             {member.status || 'Unknown'}
@@ -467,7 +507,7 @@ const CrewRoster: React.FC = () => {
                         <TableCell>
                           {getAccountStatusBadge(member)}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                           {member.last_login_at
                             ? format(new Date(member.last_login_at), 'dd MMM yyyy HH:mm')
                             : 'Never'}
