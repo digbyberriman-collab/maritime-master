@@ -116,7 +116,7 @@ Return ONLY valid JSON, no markdown formatting, no code blocks.`;
       'application/pdf',
       'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/tiff',
     ];
-    const canSendAsMultimodal = base64Data && supportedMultimodalTypes.some(t => mimeType.startsWith(t.split('/')[0]) || mimeType === t);
+    const canSendAsMultimodal = base64Data && supportedMultimodalTypes.includes(mimeType);
 
     if (base64Data && canSendAsMultimodal) {
       userContent.push({
