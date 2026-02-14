@@ -27,8 +27,11 @@ interface Props {
 export default function CreateApplicationModal({ open, onOpenChange, course }: Props) {
   const createApp = useCreateApplication();
   const submitApp = useSubmitApplication();
+  const isCustom = !course;
 
   const [form, setForm] = useState({
+    custom_course_name: '',
+    custom_category: 'professional' as DevCategory,
     course_provider: '',
     course_url: '',
     course_location: '',
@@ -61,13 +64,16 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
   const isOver4k = total > PROFESSIONAL_THRESHOLD;
   const isSplitPayment = course?.over_4k_rule && isOver4k;
 
+  const courseName = isCustom ? form.custom_course_name : course.name;
+  const courseCategory = isCustom ? form.custom_category : course.category;
+
   const handleSaveDraft = async () => {
-    if (!course) return;
+    if (!courseName.trim()) return;
     await createApp.mutateAsync({
-      course_id: course.id,
-      course_name: course.name,
-      category: course.category,
-      course_description: form.course_description || course.notes || undefined,
+      course_id: isCustom ? undefined : course?.id,
+      course_name: courseName,
+      category: courseCategory,
+      course_description: form.course_description || (course?.notes ?? undefined),
       course_provider: form.course_provider || undefined,
       course_url: form.course_url || undefined,
       course_location: form.course_location || undefined,
@@ -82,7 +88,7 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
       estimated_accommodation_nightly_rate: nightlyRate || undefined,
       estimated_food_per_diem_usd: foodPerDiem || undefined,
       estimated_total_usd: total || undefined,
-      is_custom_course: false,
+      is_custom_course: isCustom,
       leave_days_accrued: parseInt(form.leave_days_accrued) || 0,
       neutral_days_accrued: parseInt(form.neutral_days_accrued) || 0,
     });
@@ -90,10 +96,11 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
   };
 
   const handleSubmit = async () => {
+    if (!courseName.trim()) return;
     const result = await createApp.mutateAsync({
-      course_id: course?.id,
-      course_name: course?.name || 'Custom Course',
-      category: course?.category || 'professional',
+      course_id: isCustom ? undefined : course?.id,
+      course_name: courseName,
+      category: courseCategory,
       course_description: form.course_description || undefined,
       course_provider: form.course_provider || undefined,
       course_url: form.course_url || undefined,
@@ -109,7 +116,7 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
       estimated_accommodation_nightly_rate: nightlyRate || undefined,
       estimated_food_per_diem_usd: foodPerDiem || undefined,
       estimated_total_usd: total || undefined,
-      is_custom_course: !course,
+      is_custom_course: isCustom,
       leave_days_accrued: parseInt(form.leave_days_accrued) || 0,
       neutral_days_accrued: parseInt(form.neutral_days_accrued) || 0,
     });
@@ -119,26 +126,55 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
     onOpenChange(false);
   };
 
-  const catConfig = course ? CATEGORY_CONFIG[course.category] : null;
+  const catConfig = CATEGORY_CONFIG[courseCategory];
   const isPending = createApp.isPending || submitApp.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>New Development Application</DialogTitle>
+          <DialogTitle>{isCustom ? 'Custom Course Application' : 'New Development Application'}</DialogTitle>
         </DialogHeader>
 
-        {/* Course Info */}
+        {/* Custom Course Fields */}
+        {isCustom && (
+          <div className="space-y-4 rounded-lg border border-dashed p-4">
+            <div className="space-y-2">
+              <Label>Course Name *</Label>
+              <Input
+                value={form.custom_course_name}
+                onChange={(e) => update('custom_course_name', e.target.value)}
+                placeholder="e.g. Advanced Wine & Spirit Education"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Category</Label>
+              <select
+                value={form.custom_category}
+                onChange={(e) => update('custom_category', e.target.value)}
+                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                {(Object.entries(CATEGORY_CONFIG) as [DevCategory, typeof CATEGORY_CONFIG[DevCategory]][]).map(
+                  ([key, config]) => (
+                    <option key={key} value={key}>{config.label}</option>
+                  )
+                )}
+              </select>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Custom courses require Captain discretionary approval and may have different reimbursement terms.
+            </p>
+          </div>
+        )}
+
+        {/* Catalogue Course Info */}
         {course && (
           <div className="rounded-lg border p-4 space-y-2">
             <div className="flex items-center gap-2">
               <h3 className="font-medium">{course.name}</h3>
-              {catConfig && (
-                <Badge variant="outline" className={`${catConfig.bgClass} ${catConfig.textClass} border-0 text-xs`}>
-                  {catConfig.label}
-                </Badge>
-              )}
+              <Badge variant="outline" className={`${catConfig.bgClass} ${catConfig.textClass} border-0 text-xs`}>
+                {catConfig.label}
+              </Badge>
             </div>
             <div className="flex gap-3 text-sm text-muted-foreground flex-wrap">
               <span>{course.department}</span>
@@ -265,8 +301,8 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
 
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>Cancel</Button>
-          <Button variant="secondary" onClick={handleSaveDraft} disabled={isPending}>Save Draft</Button>
-          <Button onClick={handleSubmit} disabled={isPending || total === 0}>Submit for Approval</Button>
+          <Button variant="secondary" onClick={handleSaveDraft} disabled={isPending || !courseName.trim()}>Save Draft</Button>
+          <Button onClick={handleSubmit} disabled={isPending || total === 0 || !courseName.trim()}>Submit for Approval</Button>
         </div>
       </DialogContent>
     </Dialog>
