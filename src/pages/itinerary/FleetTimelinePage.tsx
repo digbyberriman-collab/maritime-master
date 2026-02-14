@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import TimelineView from '@/components/itinerary/TimelineView';
 import GridToolbar from '@/components/itinerary/GridToolbar';
@@ -20,8 +20,15 @@ const FleetTimelinePage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<ItineraryStatus[]>(ALL_STATUSES);
   const [tripTypeFilter, setTripTypeFilter] = useState<string[]>([]);
   const [vesselFilter, setVesselFilter] = useState<string[]>([]);
-  const [selectedEntry, setSelectedEntry] = useState<ItineraryEntry | null>(null);
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+
+  const selectedEntry = useMemo(
+    () => (selectedEntryId ? entries.find(e => e.id === selectedEntryId) ?? null : null),
+    [selectedEntryId, entries]
+  );
+
+  const handleSelectEntry = (entry: ItineraryEntry) => setSelectedEntryId(entry.id);
 
   React.useEffect(() => {
     if (vessels.length > 0 && vesselFilter.length === 0) {
@@ -72,14 +79,14 @@ const FleetTimelinePage: React.FC = () => {
               currentDate={currentDate}
               statusFilter={statusFilter}
               vesselFilter={vesselFilter}
-              onSelectEntry={setSelectedEntry}
+              onSelectEntry={handleSelectEntry}
             />
           )}
 
           {selectedEntry && (
             <EntryDetailPanel
               entry={selectedEntry}
-              onClose={() => setSelectedEntry(null)}
+              onClose={() => setSelectedEntryId(null)}
             />
           )}
         </div>
