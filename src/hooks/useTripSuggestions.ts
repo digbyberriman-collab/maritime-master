@@ -16,6 +16,19 @@ export interface Destination {
   merged_into_id: string | null;
 }
 
+export interface GeocodingResult {
+  display_name: string;
+  name: string;
+  country: string;
+  country_code: string;
+  region: string;
+  area: string;
+  latitude: number;
+  longitude: number;
+  type: string;
+  osm_id: number;
+}
+
 export interface TripSuggestion {
   id: string;
   company_id: string;
@@ -89,7 +102,24 @@ export const useTripSuggestions = () => {
   const { profile, user } = useAuth();
   const queryClient = useQueryClient();
 
-  // Search destinations for autocomplete
+  // Search destinations via geocoding API (OpenStreetMap Nominatim)
+  const useGeocodingSearch = (query: string) => {
+    return useQuery({
+      queryKey: ['geocode-search', query],
+      queryFn: async () => {
+        if (!query || query.length < 2) return [];
+        const { data, error } = await supabase.functions.invoke('geocode-search', {
+          body: { query },
+        });
+        if (error) throw error;
+        return (data?.results || []) as GeocodingResult[];
+      },
+      enabled: query.length >= 2,
+      staleTime: 60_000,
+    });
+  };
+
+  // Legacy local search (kept for browsing)
   const useDestinationSearch = (query: string) => {
     return useQuery({
       queryKey: ['destinations', 'search', query],
@@ -393,6 +423,7 @@ export const useTripSuggestions = () => {
 
   return {
     useDestinationSearch,
+    useGeocodingSearch,
     useBrowseSuggestions,
     useComments,
     destinations: destinationsQuery.data || [],
