@@ -10,11 +10,12 @@ import {
   eachDayOfInterval,
   parseISO,
   isSameMonth,
-  isToday,
+  isToday as isDateToday,
   addMonths,
   addWeeks,
   addDays,
   getDaysInMonth,
+  getDay,
 } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Plus } from 'lucide-react';
@@ -33,7 +34,7 @@ interface PlanningGridProps {
   onCreateEntry: (vesselId: string, date: string) => void;
 }
 
-const DAY_HEIGHT = 18; // px per day in month view
+const DAY_HEIGHT = 22; // px per day in month view
 
 const PlanningGrid: React.FC<PlanningGridProps> = ({
   entries,
@@ -94,7 +95,7 @@ const PlanningGrid: React.FC<PlanningGridProps> = ({
       shortLabel: format(d, 'EEE d'),
       start: d,
       end: d,
-      isToday: isToday(d),
+      isToday: isDateToday(d),
       days: 1,
     }));
   }, [viewMode, currentDate]);
@@ -152,7 +153,7 @@ const PlanningGrid: React.FC<PlanningGridProps> = ({
         {/* Header: vessel names */}
         <thead className="sticky top-0 z-20 bg-card">
           <tr>
-            <th className="sticky left-0 z-30 bg-card border-b border-r border-border px-3 py-2 text-left text-xs font-semibold text-muted-foreground w-[100px] min-w-[100px]">
+            <th className="sticky left-0 z-30 bg-card border-b border-r border-border px-1 py-2 text-left text-xs font-semibold text-muted-foreground w-[56px] min-w-[56px]">
               Period
             </th>
             {visibleVessels.map(vessel => (
@@ -175,29 +176,40 @@ const PlanningGrid: React.FC<PlanningGridProps> = ({
               <tr key={period.key} className={cn(period.isToday && 'bg-primary/5')}>
                 {/* Time label */}
                 <td className={cn(
-                  'sticky left-0 z-10 bg-card border-b border-r border-border px-3 py-1 text-xs font-medium whitespace-nowrap align-top',
+                  'sticky left-0 z-10 bg-card border-b border-r border-border px-0 py-0 text-xs font-medium whitespace-nowrap align-top',
                   period.isToday ? 'text-primary bg-primary/5' : 'text-muted-foreground'
-                )}>
-                  <div className="flex flex-col">
-                    <span className="font-semibold">{period.shortLabel}</span>
-                    {viewMode === 'month' && (
-                      <span className="text-[9px] text-muted-foreground/60">{period.days}d</span>
-                    )}
+                )} style={{ height: cellHeight }}>
+                  {/* Month label pinned at top */}
+                  <div className="px-1 pt-0.5 pb-0 text-[10px] font-bold text-foreground/70 leading-tight sticky top-0">
+                    {period.shortLabel}
                   </div>
-                  {/* Day markers for month view */}
-                  {viewMode === 'month' && (
-                    <div className="mt-1 flex flex-col gap-0" style={{ height: cellHeight - 30 }}>
-                      {[1, 8, 15, 22].map(d => (
-                        <span
-                          key={d}
-                          className="text-[8px] text-muted-foreground/40 leading-none"
-                          style={{ marginTop: d === 1 ? 0 : 'auto' }}
-                        >
-                          {d}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                  {/* Per-day labels */}
+                  {viewMode === 'month' && (() => {
+                    const daysInMonth = period.days;
+                    const dayDates = eachDayOfInterval({ start: period.start, end: period.end });
+                    return (
+                      <div className="flex flex-col" style={{ height: cellHeight - 16 }}>
+                        {dayDates.map((d, i) => {
+                          const isWeekend = getDay(d) === 0 || getDay(d) === 6;
+                          const isTodayDate = isDateToday(d);
+                          return (
+                            <div
+                              key={i}
+                              className={cn(
+                                'flex items-center px-1 text-[9px] leading-none border-t border-border/15',
+                                isWeekend && 'bg-muted/30 text-muted-foreground/50',
+                                isTodayDate && 'bg-primary/10 text-primary font-bold',
+                              )}
+                              style={{ height: (cellHeight - 16) / daysInMonth, minHeight: 0 }}
+                            >
+                              <span className="w-3 text-right">{i + 1}</span>
+                              {isTodayDate && <span className="ml-0.5 w-1 h-1 rounded-full bg-primary inline-block" />}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </td>
 
                 {/* Vessel cells */}
@@ -214,14 +226,20 @@ const PlanningGrid: React.FC<PlanningGridProps> = ({
                       style={{ height: cellHeight }}
                     >
                       <div className="relative w-full h-full">
-                        {/* Subtle day gridlines for month view */}
-                        {viewMode === 'month' && [0.25, 0.5, 0.75].map(frac => (
-                          <div
-                            key={frac}
-                            className="absolute left-0 right-0 border-t border-border/20"
-                            style={{ top: `${frac * 100}%` }}
-                          />
-                        ))}
+                        {/* Per-day gridlines */}
+                        {viewMode === 'month' && Array.from({ length: period.days - 1 }, (_, i) => {
+                          const frac = (i + 1) / period.days;
+                          return (
+                            <div
+                              key={i}
+                              className={cn(
+                                'absolute left-0 right-0 border-t',
+                                (i + 1) % 7 === 0 ? 'border-border/30' : 'border-border/10'
+                              )}
+                              style={{ top: `${frac * 100}%` }}
+                            />
+                          );
+                        })}
 
                         {cellEntries.map(({ entry, topPct, heightPct }) => (
                           <DraggableTripBlock
