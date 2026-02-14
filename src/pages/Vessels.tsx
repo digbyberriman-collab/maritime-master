@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,10 +21,21 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 const Vessels: React.FC = () => {
   const { vessels, isLoading, createVessel, updateVessel, deleteVessel } = useVessels();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null);
+
+  // Auto-open modal when navigated with ?new=true
+  useEffect(() => {
+    if (searchParams.get('new') === 'true') {
+      setSelectedVessel(null);
+      setIsFormModalOpen(true);
+      searchParams.delete('new');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const filteredVessels = useMemo(() => {
     if (!searchQuery.trim()) return vessels;
