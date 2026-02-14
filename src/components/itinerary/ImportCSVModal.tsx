@@ -29,6 +29,13 @@ interface ParsedRow {
 
 const VALID_STATUSES: ItineraryStatus[] = ['draft', 'tentative', 'confirmed', 'postponed', 'cancelled', 'completed'];
 
+/** Strip common vessel prefixes (M/Y, R/V, S/Y, MY, RV, SY) and compare case-insensitively */
+const normalizeVesselName = (name: string) =>
+  name.replace(/^(M\/Y|R\/V|S\/Y|MY|RV|SY)\s*/i, '').trim().toLowerCase();
+
+const fuzzyVesselMatch = (dbName: string, csvName: string) =>
+  normalizeVesselName(dbName) === normalizeVesselName(csvName);
+
 const ImportCSVModal: React.FC<ImportCSVModalProps> = ({ open, onOpenChange }) => {
   const { toast } = useToast();
   const { data: tripTypes = [] } = useTripTypes();
@@ -161,7 +168,7 @@ const ImportCSVModal: React.FC<ImportCSVModalProps> = ({ open, onOpenChange }) =
           ? rawVessels.split(/[,;]/).map(v => v.trim()).filter(Boolean)
           : [];
         const unmatchedVessels = vesselNames.filter(
-          vn => !vessels.some(v => v.name.toLowerCase() === vn.toLowerCase())
+          vn => !vessels.some(v => fuzzyVesselMatch(v.name, vn))
         );
         if (unmatchedVessels.length > 0) {
           errors.push(`Unknown vessel(s): ${unmatchedVessels.join(', ')}`);
@@ -215,7 +222,7 @@ const ImportCSVModal: React.FC<ImportCSVModalProps> = ({ open, onOpenChange }) =
           tt => tt.name.toLowerCase() === row.trip_type.toLowerCase()
         );
         const vesselIds = row.vessels
-          .map(vn => vessels.find(v => v.name.toLowerCase() === vn.toLowerCase())?.id)
+          .map(vn => vessels.find(v => fuzzyVesselMatch(v.name, vn))?.id)
           .filter(Boolean) as string[];
 
         const input: CreateEntryInput = {
