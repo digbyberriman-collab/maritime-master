@@ -74,6 +74,19 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     permissions: ['DPA', 'Management', 'Captain'],
   },
   {
+    id: 'itinerary',
+    label: 'Itinerary',
+    icon: Compass,
+    path: '/itinerary',
+    permissions: ['all'],
+    children: [
+      { id: 'fleet-planning', label: 'Fleet Planning', path: '/itinerary/planning', icon: LayoutGrid },
+      { id: 'fleet-timeline', label: 'Fleet Timeline', path: '/itinerary/timeline', icon: GanttChart },
+      { id: 'trip-suggestions', label: 'Trip Suggestions', path: '/itinerary/suggestions', icon: Lightbulb },
+      { id: 'postponed', label: 'Postponed', path: '/itinerary/postponed', icon: PauseCircle },
+    ],
+  },
+  {
     id: 'vessels',
     label: 'Vessels',
     icon: Ship,
@@ -108,7 +121,6 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     path: '/ism',
     permissions: ['all'],
     children: [
-      // Alphabetical order - 15 items, flat (no nested children)
       { id: 'audits-surveys', label: 'Audits & Surveys', path: '/ism/audits-surveys', icon: ClipboardList },
       { id: 'checklists', label: 'Checklists', path: '/ism/checklists', icon: CheckSquare },
       { id: 'corrective-actions', label: 'Corrective Actions (CAPA)', path: '/ism/corrective-actions', icon: Clipboard },
@@ -149,19 +161,6 @@ export const NAVIGATION_ITEMS: NavItem[] = [
       { id: 'ism-sms', label: 'ISM / SMS', path: '/documents/ism-sms', icon: Shield },
       { id: 'policies', label: 'Policies', path: '/documents/policies', icon: FileCheck },
       { id: 'drawings', label: 'Drawings', path: '/documents/drawings', icon: Layers },
-    ],
-  },
-  {
-    id: 'itinerary',
-    label: 'Itinerary',
-    icon: Compass,
-    path: '/itinerary',
-    permissions: ['all'],
-    children: [
-      { id: 'fleet-planning', label: 'Fleet Planning', path: '/itinerary/planning', icon: LayoutGrid },
-      { id: 'fleet-timeline', label: 'Fleet Timeline', path: '/itinerary/timeline', icon: GanttChart },
-      { id: 'trip-suggestions', label: 'Trip Suggestions', path: '/itinerary/suggestions', icon: Lightbulb },
-      { id: 'postponed', label: 'Postponed', path: '/itinerary/postponed', icon: PauseCircle },
     ],
   },
   {
