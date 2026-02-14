@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useVessel } from '@/contexts/VesselContext';
 import { toast } from '@/hooks/use-toast';
 
 export interface Vessel {
@@ -31,6 +32,7 @@ export interface VesselFormData {
 
 export const useVessels = () => {
   const { profile } = useAuth();
+  const { refreshVessels } = useVessel();
   const queryClient = useQueryClient();
 
   const vesselsQuery = useQuery({
@@ -76,6 +78,7 @@ export const useVessels = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vessels'] });
+      refreshVessels();
       toast({
         title: 'Success',
         description: 'Vessel created successfully',
@@ -113,6 +116,7 @@ export const useVessels = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vessels'] });
+      refreshVessels();
       toast({
         title: 'Success',
         description: 'Vessel updated successfully',
@@ -138,6 +142,7 @@ export const useVessels = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vessels'] });
+      refreshVessels();
       toast({
         title: 'Success',
         description: 'Vessel removed successfully',
