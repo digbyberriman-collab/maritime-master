@@ -164,6 +164,19 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     ],
   },
   {
+    id: 'development',
+    label: 'Crew Development',
+    icon: GraduationCap,
+    path: '/development',
+    permissions: ['all'],
+    children: [
+      { id: 'my-development', label: 'My Development', path: '/development/my', icon: Users },
+      { id: 'course-catalogue', label: 'Course Catalogue', path: '/development/catalogue', icon: BookOpen },
+      { id: 'dev-applications', label: 'Applications', path: '/development/applications', icon: ClipboardList },
+      { id: 'dev-admin', label: 'Admin', path: '/development/admin', icon: LayoutGrid },
+    ],
+  },
+  {
     id: 'hr',
     label: 'HR',
     icon: Briefcase,
