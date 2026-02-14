@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { format, addMonths, subMonths, addWeeks, subWeeks, addDays, subDays, startOfMonth } from 'date-fns';
-import { ChevronLeft, ChevronRight, Plus, CalendarDays, Filter } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, CalendarDays, Filter, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,7 @@ interface GridToolbarProps {
   currentDate: Date;
   onDateChange: (date: Date) => void;
   onCreateEntry: () => void;
+  onImportCSV?: () => void;
   statusFilter: ItineraryStatus[];
   onStatusFilterChange: (statuses: ItineraryStatus[]) => void;
   tripTypes: TripType[];
@@ -32,6 +33,7 @@ const GridToolbar: React.FC<GridToolbarProps> = ({
   currentDate,
   onDateChange,
   onCreateEntry,
+  onImportCSV,
   statusFilter,
   onStatusFilterChange,
   tripTypes,
@@ -155,6 +157,14 @@ const GridToolbar: React.FC<GridToolbarProps> = ({
           </div>
         </PopoverContent>
       </Popover>
+
+      {/* Import CSV */}
+      {onImportCSV && (
+        <Button variant="outline" size="sm" className="h-8 text-xs gap-1" onClick={onImportCSV}>
+          <Upload className="w-3 h-3" />
+          Import
+        </Button>
+      )}
 
       {/* Create entry */}
       <Button size="sm" className="h-8 text-xs gap-1" onClick={onCreateEntry}>
