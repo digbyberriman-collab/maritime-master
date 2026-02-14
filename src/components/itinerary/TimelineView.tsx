@@ -1,14 +1,21 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import {
   format,
   parseISO,
   differenceInDays,
   startOfMonth,
   endOfMonth,
+  startOfWeek,
+  endOfWeek,
   eachMonthOfInterval,
+  eachWeekOfInterval,
+  eachDayOfInterval,
   addMonths,
-  isToday,
+  addWeeks,
+  addDays,
   isSameMonth,
+  isSameDay,
+  isWeekend,
 } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Lock, Users as UsersIcon } from 'lucide-react';
@@ -26,8 +33,49 @@ interface TimelineViewProps {
   onSelectEntry: (entry: ItineraryEntry) => void;
 }
 
-const ROW_HEIGHT = 56; // px per vessel row
+const ROW_HEIGHT = 56;
 const HEADER_HEIGHT = 48;
+
+/** Per-mode config: how many days to show and pixel width per day */
+function getViewConfig(viewMode: ViewMode) {
+  switch (viewMode) {
+    case 'day':
+      return { dayWidth: 48 };   // 7 days, very detailed
+    case 'week':
+      return { dayWidth: 24 };   // ~4 weeks
+    case 'quarter':
+      return { dayWidth: 12 };   // 3 months
+    case 'month':
+    default:
+      return { dayWidth: 4 };    // 12 months overview
+  }
+}
+
+function getTimelineRange(viewMode: ViewMode, currentDate: Date) {
+  switch (viewMode) {
+    case 'day': {
+      const start = startOfWeek(currentDate, { weekStartsOn: 1 });
+      const end = addDays(start, 6);
+      return { start, end };
+    }
+    case 'week': {
+      const start = startOfWeek(currentDate, { weekStartsOn: 1 });
+      const end = addDays(start, 27); // 4 weeks
+      return { start, end };
+    }
+    case 'quarter': {
+      const start = startOfMonth(currentDate);
+      const end = endOfMonth(addMonths(start, 2));
+      return { start, end };
+    }
+    case 'month':
+    default: {
+      const start = startOfMonth(currentDate);
+      const end = endOfMonth(addMonths(start, 11));
+      return { start, end };
+    }
+  }
+}
 
 const TimelineView: React.FC<TimelineViewProps> = ({
   entries,
@@ -40,22 +88,91 @@ const TimelineView: React.FC<TimelineViewProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const isQuarter = viewMode === 'quarter';
-  const MONTHS_VISIBLE = isQuarter ? 3 : 12;
-  const DAY_WIDTH = isQuarter ? 12 : 4; // wider days for quarter view
-
-  const months = useMemo(() => {
-    const start = startOfMonth(currentDate);
-    return eachMonthOfInterval({
-      start,
-      end: addMonths(start, MONTHS_VISIBLE - 1),
-    });
-  }, [currentDate]);
-
-  const timelineStart = months[0];
-  const timelineEnd = endOfMonth(months[months.length - 1]);
+  const { dayWidth } = getViewConfig(viewMode);
+  const { start: timelineStart, end: timelineEnd } = useMemo(
+    () => getTimelineRange(viewMode, currentDate),
+    [viewMode, currentDate]
+  );
   const totalDays = differenceInDays(timelineEnd, timelineStart) + 1;
-  const totalWidth = totalDays * DAY_WIDTH;
+  const totalWidth = totalDays * dayWidth;
+
+  // Generate header segments based on view mode
+  const headerSegments = useMemo(() => {
+    if (viewMode === 'day' || viewMode === 'week') {
+      // Individual days
+      return eachDayOfInterval({ start: timelineStart, end: timelineEnd }).map(day => ({
+        key: format(day, 'yyyy-MM-dd'),
+        label: viewMode === 'day'
+          ? format(day, 'EEE d MMM')
+          : format(day, 'EEE d'),
+        startOffset: differenceInDays(day, timelineStart),
+        days: 1,
+        isCurrent: isSameDay(day, new Date()),
+        isWeekend: isWeekend(day),
+      }));
+    }
+    // Quarter & month: month-based headers
+    const months = eachMonthOfInterval({ start: timelineStart, end: timelineEnd });
+    return months.map(month => {
+      const monthStart = differenceInDays(month, timelineStart);
+      const monthEnd = differenceInDays(endOfMonth(month), timelineStart);
+      return {
+        key: format(month, 'yyyy-MM'),
+        label: viewMode === 'quarter' ? format(month, 'MMMM yyyy') : format(month, 'MMM yyyy'),
+        startOffset: monthStart,
+        days: monthEnd - monthStart + 1,
+        isCurrent: isSameMonth(month, new Date()),
+        isWeekend: false,
+      };
+    });
+  }, [viewMode, timelineStart, timelineEnd]);
+
+  // Week group headers for week view (shown above day headers)
+  const weekGroups = useMemo(() => {
+    if (viewMode !== 'week') return [];
+    const weeks = eachWeekOfInterval(
+      { start: timelineStart, end: timelineEnd },
+      { weekStartsOn: 1 }
+    );
+    return weeks.map(weekStart => {
+      const weekEnd = addDays(weekStart, 6);
+      const startOffset = Math.max(0, differenceInDays(weekStart, timelineStart));
+      const endOffset = Math.min(totalDays - 1, differenceInDays(weekEnd, timelineStart));
+      return {
+        key: format(weekStart, 'yyyy-ww'),
+        label: `${format(weekStart, 'd MMM')} – ${format(weekEnd, 'd MMM')}`,
+        startOffset,
+        days: endOffset - startOffset + 1,
+      };
+    });
+  }, [viewMode, timelineStart, timelineEnd, totalDays]);
+
+  // Grid lines for vessel rows
+  const gridLines = useMemo(() => {
+    if (viewMode === 'day') {
+      // Vertical line per day
+      return eachDayOfInterval({ start: timelineStart, end: timelineEnd }).map(day => ({
+        key: format(day, 'yyyy-MM-dd'),
+        offset: differenceInDays(day, timelineStart) * dayWidth,
+        isWeekend: isWeekend(day),
+      }));
+    }
+    if (viewMode === 'week') {
+      // Line per day, highlight weekends
+      return eachDayOfInterval({ start: timelineStart, end: timelineEnd }).map(day => ({
+        key: format(day, 'yyyy-MM-dd'),
+        offset: differenceInDays(day, timelineStart) * dayWidth,
+        isWeekend: isWeekend(day),
+      }));
+    }
+    // Quarter & month: line per month
+    const months = eachMonthOfInterval({ start: timelineStart, end: timelineEnd });
+    return months.map(month => ({
+      key: format(month, 'yyyy-MM'),
+      offset: differenceInDays(month, timelineStart) * dayWidth,
+      isWeekend: false,
+    }));
+  }, [viewMode, timelineStart, timelineEnd, dayWidth]);
 
   const visibleVessels = useMemo(() =>
     vessels.filter(v => vesselFilter.includes(v.id)),
@@ -69,16 +186,24 @@ const TimelineView: React.FC<TimelineViewProps> = ({
 
   // Today position
   const todayOffset = differenceInDays(new Date(), timelineStart);
-  const todayX = todayOffset * DAY_WIDTH;
+  const todayX = todayOffset * dayWidth;
   const showTodayLine = todayOffset >= 0 && todayOffset <= totalDays;
+
+  // Auto-scroll to today on mount / view change
+  useEffect(() => {
+    if (containerRef.current && showTodayLine) {
+      const scrollTarget = Math.max(0, todayX - containerRef.current.clientWidth / 3);
+      containerRef.current.scrollLeft = scrollTarget;
+    }
+  }, [viewMode, currentDate]);
 
   const getEntryPosition = (entry: ItineraryEntry) => {
     const start = parseISO(entry.start_date);
     const end = parseISO(entry.end_date);
     const startOffset = Math.max(0, differenceInDays(start, timelineStart));
     const duration = Math.max(1, differenceInDays(end, start) + 1);
-    const left = startOffset * DAY_WIDTH;
-    const width = Math.min(duration * DAY_WIDTH, totalWidth - left);
+    const left = startOffset * dayWidth;
+    const width = Math.min(duration * dayWidth, totalWidth - left);
     return { left, width };
   };
 
@@ -88,12 +213,17 @@ const TimelineView: React.FC<TimelineViewProps> = ({
     );
   };
 
+  const showDualHeaders = viewMode === 'week';
+  const topHeaderHeight = showDualHeaders ? 24 : 0;
+  const mainHeaderHeight = HEADER_HEIGHT;
+  const fullHeaderHeight = topHeaderHeight + mainHeaderHeight;
+
   return (
     <div className="flex-1 overflow-hidden flex flex-col">
       <div className="flex flex-1 overflow-hidden">
         {/* Vessel labels (fixed left) */}
         <div className="flex-shrink-0 w-[140px] border-r border-border bg-card z-10">
-          <div className="h-[48px] border-b border-border flex items-center px-3">
+          <div className="border-b border-border flex items-center px-3" style={{ height: fullHeaderHeight }}>
             <span className="text-xs font-semibold text-muted-foreground">Vessel</span>
           </div>
           {visibleVessels.map(vessel => (
@@ -110,27 +240,39 @@ const TimelineView: React.FC<TimelineViewProps> = ({
         {/* Timeline area (scrollable) */}
         <div ref={containerRef} className="flex-1 overflow-x-auto overflow-y-auto">
           <div style={{ width: totalWidth, minWidth: '100%' }} className="relative">
-            {/* Month headers */}
-            <div className="sticky top-0 z-10 flex bg-card border-b border-border" style={{ height: HEADER_HEIGHT }}>
-              {months.map(month => {
-                const monthStart = differenceInDays(month, timelineStart);
-                const monthEnd = differenceInDays(endOfMonth(month), timelineStart);
-                const monthWidth = (monthEnd - monthStart + 1) * DAY_WIDTH;
-                const isCurrent = isSameMonth(month, new Date());
-
-                return (
+            {/* Week group headers (week view only) */}
+            {showDualHeaders && (
+              <div className="sticky top-0 z-10 flex bg-card border-b border-border" style={{ height: topHeaderHeight }}>
+                {weekGroups.map(wg => (
                   <div
-                    key={format(month, 'yyyy-MM')}
-                    className={cn(
-                      'flex-shrink-0 border-r border-border flex items-center justify-center text-xs font-medium',
-                      isCurrent ? 'text-primary bg-primary/5' : 'text-muted-foreground'
-                    )}
-                    style={{ width: monthWidth }}
+                    key={wg.key}
+                    className="flex-shrink-0 border-r border-border flex items-center justify-center text-[10px] font-semibold text-muted-foreground"
+                    style={{ width: wg.days * dayWidth }}
                   >
-                    {format(month, 'MMM yyyy')}
+                    {wg.label}
                   </div>
-                );
-              })}
+                ))}
+              </div>
+            )}
+
+            {/* Main headers */}
+            <div
+              className={cn('sticky z-10 flex bg-card border-b border-border', showDualHeaders ? 'top-[24px]' : 'top-0')}
+              style={{ height: mainHeaderHeight }}
+            >
+              {headerSegments.map(seg => (
+                <div
+                  key={seg.key}
+                  className={cn(
+                    'flex-shrink-0 border-r border-border flex items-center justify-center text-xs font-medium',
+                    seg.isCurrent ? 'text-primary bg-primary/5' : 'text-muted-foreground',
+                    seg.isWeekend && 'bg-muted/30',
+                  )}
+                  style={{ width: seg.days * dayWidth }}
+                >
+                  {seg.label}
+                </div>
+              ))}
             </div>
 
             {/* Vessel rows */}
@@ -143,17 +285,17 @@ const TimelineView: React.FC<TimelineViewProps> = ({
                   className="relative border-b border-border"
                   style={{ height: ROW_HEIGHT }}
                 >
-                  {/* Month grid lines */}
-                  {months.map(month => {
-                    const offset = differenceInDays(month, timelineStart) * DAY_WIDTH;
-                    return (
-                      <div
-                        key={format(month, 'yyyy-MM')}
-                        className="absolute top-0 bottom-0 border-r border-border/30"
-                        style={{ left: offset }}
-                      />
-                    );
-                  })}
+                  {/* Grid lines */}
+                  {gridLines.map(gl => (
+                    <div
+                      key={gl.key}
+                      className={cn(
+                        'absolute top-0 bottom-0 border-r',
+                        gl.isWeekend ? 'border-border/20 bg-muted/10' : 'border-border/30'
+                      )}
+                      style={{ left: gl.offset, width: gl.isWeekend ? dayWidth : undefined }}
+                    />
+                  ))}
 
                   {/* Entry bars */}
                   {vesselEntries.map(entry => {
