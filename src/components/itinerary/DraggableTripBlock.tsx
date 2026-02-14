@@ -135,7 +135,7 @@ const DraggableTripBlock: React.FC<DraggableTripBlockProps> = ({
       style={{
         top: `${liveTop}%`,
         height: `${liveHeight}%`,
-        minHeight: '20px',
+        minHeight: '28px',
       }}
     >
       {/* Top resize handle */}
@@ -156,7 +156,7 @@ const DraggableTripBlock: React.FC<DraggableTripBlockProps> = ({
             }}
             className={cn(
               'w-full h-full text-left rounded px-1.5 py-0.5 text-xs transition-all cursor-grab active:cursor-grabbing',
-              'flex flex-col justify-start overflow-hidden',
+              'flex flex-col justify-start',
               isDragging && 'opacity-80 shadow-lg ring-2 ring-primary/40',
               entry.status === 'cancelled' && 'line-through opacity-50',
               entry.status === 'completed' && 'opacity-60',
