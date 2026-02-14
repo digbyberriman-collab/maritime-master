@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTripSuggestions, type BrowseFilters } from '@/hooks/useTripSuggestions';
+import AIRoutePlanner from './AIRoutePlanner';
 
 const DEFAULT_FILTERS: BrowseFilters = {
   search: '',
@@ -12,11 +13,24 @@ const DEFAULT_FILTERS: BrowseFilters = {
   sortBy: 'newest',
 };
 
+interface SelectedDestination {
+  id: string;
+  name: string;
+  country: string;
+  lat: number;
+  lng: number;
+}
+
 const HeatMapTab: React.FC = () => {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const destinationMarkersRef = useRef<L.Marker[]>([]);
+  const routeLineRef = useRef<L.Polyline | null>(null);
   const { useBrowseSuggestions } = useTripSuggestions();
   const { data: suggestions = [], isLoading } = useBrowseSuggestions(DEFAULT_FILTERS);
+
+  const [selectedDestinations, setSelectedDestinations] = useState<SelectedDestination[]>([]);
+  const [isPickingMode, setIsPickingMode] = useState(false);
 
   const clusters = useMemo(() => {
     const map = new Map<string, {
@@ -48,6 +62,56 @@ const HeatMapTab: React.FC = () => {
 
   const noLocationCount = suggestions.filter(s => !s.destinations?.latitude || !s.destinations?.longitude).length;
 
+  // Reverse geocode a clicked point
+  const reverseGeocode = useCallback(async (lat: number, lng: number): Promise<{ name: string; country: string }> => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&zoom=10`
+      );
+      const data = await res.json();
+      const name = data.address?.city || data.address?.town || data.address?.village ||
+        data.address?.county || data.address?.state || data.display_name?.split(',')[0] || 'Unknown';
+      const country = data.address?.country || '';
+      return { name, country };
+    } catch {
+      return { name: `${lat.toFixed(2)}, ${lng.toFixed(2)}`, country: '' };
+    }
+  }, []);
+
+  // Handle map click to add destination
+  const handleMapClick = useCallback(async (e: L.LeafletMouseEvent) => {
+    const { lat, lng } = e.latlng;
+
+    // Check if clicking near an existing suggestion cluster
+    const nearbyCluster = clusters.find(c => {
+      const d = Math.sqrt(Math.pow(c.lat - lat, 2) + Math.pow(c.lng - lng, 2));
+      return d < 2; // ~2 degrees tolerance
+    });
+
+    let dest: SelectedDestination;
+    if (nearbyCluster) {
+      dest = {
+        id: crypto.randomUUID(),
+        name: nearbyCluster.name,
+        country: nearbyCluster.country || '',
+        lat: nearbyCluster.lat,
+        lng: nearbyCluster.lng,
+      };
+    } else {
+      const geo = await reverseGeocode(lat, lng);
+      dest = {
+        id: crypto.randomUUID(),
+        name: geo.name,
+        country: geo.country,
+        lat,
+        lng,
+      };
+    }
+
+    setSelectedDestinations(prev => [...prev, dest]);
+  }, [clusters, reverseGeocode]);
+
+  // Init map
   useEffect(() => {
     if (!containerRef.current || isLoading) return;
 
@@ -60,7 +124,7 @@ const HeatMapTab: React.FC = () => {
 
     const map = mapRef.current;
 
-    // Clear existing markers
+    // Clear existing circle markers (suggestion clusters)
     map.eachLayer(layer => {
       if (layer instanceof L.CircleMarker) map.removeLayer(layer);
     });
@@ -104,6 +168,76 @@ const HeatMapTab: React.FC = () => {
     return () => {};
   }, [clusters, isLoading]);
 
+  // Map click handler toggle
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (isPickingMode) {
+      map.on('click', handleMapClick);
+      map.getContainer().style.cursor = 'crosshair';
+    } else {
+      map.off('click', handleMapClick);
+      map.getContainer().style.cursor = '';
+    }
+
+    return () => {
+      map.off('click', handleMapClick);
+      map.getContainer().style.cursor = '';
+    };
+  }, [isPickingMode, handleMapClick]);
+
+  // Draw destination markers and route line
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Clear old destination markers
+    destinationMarkersRef.current.forEach(m => map.removeLayer(m));
+    destinationMarkersRef.current = [];
+    if (routeLineRef.current) {
+      map.removeLayer(routeLineRef.current);
+      routeLineRef.current = null;
+    }
+
+    if (selectedDestinations.length === 0) return;
+
+    // Add numbered markers
+    selectedDestinations.forEach((d, i) => {
+      const icon = L.divIcon({
+        className: 'ai-route-marker',
+        html: `<div style="
+          width:24px;height:24px;border-radius:50%;
+          background:hsl(var(--primary));color:hsl(var(--primary-foreground));
+          display:flex;align-items:center;justify-content:center;
+          font-size:11px;font-weight:700;
+          border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);
+        ">${i + 1}</div>`,
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
+      });
+      const marker = L.marker([d.lat, d.lng], { icon }).addTo(map);
+      marker.bindTooltip(`${d.name}, ${d.country}`, { direction: 'top', offset: [0, -14] });
+      destinationMarkersRef.current.push(marker);
+    });
+
+    // Draw connecting line
+    if (selectedDestinations.length > 1) {
+      const latlngs = selectedDestinations.map(d => [d.lat, d.lng] as [number, number]);
+      routeLineRef.current = L.polyline(latlngs, {
+        color: 'hsl(var(--primary))',
+        weight: 2,
+        dashArray: '6 4',
+        opacity: 0.6,
+      }).addTo(map);
+    }
+  }, [selectedDestinations]);
+
+  // Auto-enable picking mode
+  useEffect(() => {
+    setIsPickingMode(true);
+  }, []);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -113,6 +247,14 @@ const HeatMapTab: React.FC = () => {
       }
     };
   }, []);
+
+  const handleRemoveDestination = (id: string) => {
+    setSelectedDestinations(prev => prev.filter(d => d.id !== id));
+  };
+
+  const handleClearDestinations = () => {
+    setSelectedDestinations([]);
+  };
 
   if (isLoading) {
     return (
@@ -147,8 +289,25 @@ const HeatMapTab: React.FC = () => {
         </div>
       </div>
 
-      <div className="border rounded-lg overflow-hidden" style={{ height: '550px' }}>
-        <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
+      <div className="flex gap-3" style={{ height: '550px' }}>
+        {/* Map */}
+        <div className="flex-1 border rounded-lg overflow-hidden relative">
+          <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
+          {/* Picking mode indicator */}
+          <div className="absolute top-3 left-14 z-[1000] bg-card/90 backdrop-blur border border-border rounded-md px-3 py-1.5 text-xs font-medium text-foreground shadow-sm">
+            Click map to add destinations
+          </div>
+        </div>
+
+        {/* AI Route Planner panel */}
+        <div className="w-80 flex-shrink-0">
+          <AIRoutePlanner
+            destinations={selectedDestinations}
+            onAddDestination={() => setIsPickingMode(true)}
+            onRemoveDestination={handleRemoveDestination}
+            onClearDestinations={handleClearDestinations}
+          />
+        </div>
       </div>
     </div>
   );
