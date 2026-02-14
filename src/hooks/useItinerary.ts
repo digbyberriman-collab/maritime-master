@@ -35,7 +35,7 @@ export function useItineraryVessels() {
   const companyId = profile?.company_id;
 
   return useQuery({
-    queryKey: itineraryKeys.vessels(companyId || ''),
+    queryKey: ['vessels', companyId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('vessels')
