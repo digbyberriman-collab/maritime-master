@@ -5,18 +5,22 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { 
-  Map, 
   Ship, 
   Maximize2,
   Minimize2,
   RefreshCw,
   Layers,
-  X
+  X,
+  Anchor,
+  Navigation
 } from 'lucide-react';
 import { useVesselFilter } from '@/hooks/useVesselFilter';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 
 interface MapVessel {
   id: string;
@@ -33,31 +37,72 @@ interface MapVessel {
   captain: string;
 }
 
-// Top-down vessel SVG icon
-const VesselIcon: React.FC<{ heading: number; status: string; color: string }> = ({ heading, status, color }) => (
-  <svg 
-    width="32" 
-    height="32" 
-    viewBox="0 0 32 32" 
-    style={{ transform: `rotate(${heading}deg)` }}
-  >
-    {/* Top-down ship shape */}
-    <path 
-      d="M16 2 L24 28 L16 24 L8 28 Z" 
-      fill={color} 
-      stroke="white" 
-      strokeWidth="1.5"
-    />
-    {/* Bridge/superstructure */}
-    <rect x="13" y="12" width="6" height="8" fill="white" opacity="0.7" rx="1" />
-    {/* Bow indicator */}
-    <circle cx="16" cy="6" r="2" fill="white" />
-    {/* Heading line */}
-    {status === 'UNDER_WAY' && (
-      <line x1="16" y1="2" x2="16" y2="-8" stroke={color} strokeWidth="2" strokeDasharray="2,2" />
-    )}
-  </svg>
-);
+interface Port {
+  name: string;
+  country: string;
+  lat: number;
+  lng: number;
+  type: 'major' | 'marina' | 'shipyard';
+  description: string;
+}
+
+const MAJOR_PORTS: Port[] = [
+  { name: 'Port of Monaco', country: 'Monaco', lat: 43.7384, lng: 7.4246, type: 'marina', description: 'Premier superyacht marina in the heart of Monte Carlo' },
+  { name: 'Antibes', country: 'France', lat: 43.5804, lng: 7.1251, type: 'marina', description: 'Largest superyacht port in Europe, Port Vauban' },
+  { name: 'Palma de Mallorca', country: 'Spain', lat: 39.5696, lng: 2.6502, type: 'marina', description: 'Major refit hub and superyacht marina' },
+  { name: 'Barcelona', country: 'Spain', lat: 41.3751, lng: 2.1768, type: 'major', description: 'OneOcean Port Vell, key Mediterranean stopover' },
+  { name: 'Gibraltar', country: 'Gibraltar', lat: 36.1408, lng: -5.3536, type: 'major', description: 'Strategic bunkering and crew change port' },
+  { name: 'Genoa', country: 'Italy', lat: 44.4056, lng: 8.9463, type: 'shipyard', description: 'Major shipbuilding and refit centre' },
+  { name: 'La Spezia', country: 'Italy', lat: 44.1024, lng: 9.8240, type: 'shipyard', description: 'Home to several superyacht builders' },
+  { name: 'Naples', country: 'Italy', lat: 40.8518, lng: 14.2681, type: 'major', description: 'Gateway to Amalfi Coast and Capri' },
+  { name: 'Piraeus', country: 'Greece', lat: 37.9475, lng: 23.6370, type: 'major', description: 'Largest port in Greece, gateway to Greek islands' },
+  { name: 'Istanbul', country: 'Turkey', lat: 41.0082, lng: 28.9784, type: 'major', description: 'Bosporus strait, connecting Mediterranean and Black Sea' },
+  { name: 'Dubai (Port Rashid)', country: 'UAE', lat: 25.2760, lng: 55.2780, type: 'marina', description: 'D-Marin, premium superyacht berths' },
+  { name: 'Singapore', country: 'Singapore', lat: 1.2655, lng: 103.8226, type: 'major', description: 'World\'s busiest transhipment port and bunkering hub' },
+  { name: 'Fort Lauderdale', country: 'USA', lat: 26.1003, lng: -80.1439, type: 'marina', description: 'Yachting capital of the world, FLIBS host' },
+  { name: 'Antigua (Falmouth)', country: 'Antigua', lat: 17.0509, lng: -61.7818, type: 'marina', description: 'Nelson\'s Dockyard, Caribbean charter hub' },
+  { name: 'Rotterdam', country: 'Netherlands', lat: 51.9225, lng: 4.4792, type: 'major', description: 'Largest port in Europe by cargo tonnage' },
+  { name: 'Southampton', country: 'UK', lat: 50.9097, lng: -1.4044, type: 'major', description: 'Major cruise and commercial port' },
+  { name: 'Hamburg', country: 'Germany', lat: 53.5459, lng: 9.9660, type: 'shipyard', description: 'Blohm+Voss and Lürssen shipyards' },
+  { name: 'Vlissingen', country: 'Netherlands', lat: 51.4427, lng: 3.5709, type: 'shipyard', description: 'Damen and Royal Huisman shipyards' },
+  { name: 'Marmaris', country: 'Turkey', lat: 36.8510, lng: 28.2741, type: 'marina', description: 'Popular yacht charter base, refit facilities' },
+  { name: 'Port Louis', country: 'Mauritius', lat: -20.1609, lng: 57.5012, type: 'major', description: 'Indian Ocean stopover and provisioning' },
+  { name: 'Cape Town', country: 'South Africa', lat: -33.9062, lng: 18.4210, type: 'major', description: 'V&A Waterfront, Atlantic crossing stopover' },
+  { name: 'Sydney', country: 'Australia', lat: -33.8568, lng: 151.2153, type: 'major', description: 'Superyacht berths at Rozelle Bay and Double Bay' },
+];
+
+// Create vessel icon as a Leaflet divIcon
+const createVesselIcon = (heading: number, status: string) => {
+  const color = status === 'UNDER_WAY' ? '#22c55e' : status === 'MOORED' ? '#3b82f6' : '#f59e0b';
+  const svg = `<svg width="32" height="32" viewBox="0 0 32 32" style="transform:rotate(${heading}deg)">
+    <path d="M16 2 L24 28 L16 24 L8 28 Z" fill="${color}" stroke="white" stroke-width="1.5"/>
+    <rect x="13" y="12" width="6" height="8" fill="white" opacity="0.7" rx="1"/>
+    <circle cx="16" cy="6" r="2" fill="white"/>
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: 'vessel-marker',
+    iconSize: [32, 32],
+    iconAnchor: [16, 16],
+    popupAnchor: [0, -16],
+  });
+};
+
+// Create port icon
+const createPortIcon = (type: string) => {
+  const colors: Record<string, string> = { major: '#3b82f6', marina: '#8b5cf6', shipyard: '#f59e0b' };
+  const color = colors[type] || '#3b82f6';
+  const svg = `<svg width="16" height="16" viewBox="0 0 16 16">
+    <circle cx="8" cy="8" r="6" fill="${color}" stroke="white" stroke-width="2" opacity="0.9"/>
+  </svg>`;
+  return L.divIcon({
+    html: svg,
+    className: 'port-marker',
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+    popupAnchor: [0, -8],
+  });
+};
 
 // Generate a pseudo-random but stable position from vessel id
 const hashToCoord = (id: string, range: number, offset: number): number => {
@@ -67,6 +112,17 @@ const hashToCoord = (id: string, range: number, offset: number): number => {
     hash |= 0;
   }
   return offset + (Math.abs(hash) % (range * 100)) / 100;
+};
+
+// Component to handle map interactions
+const MapController: React.FC<{ selectedVessel: MapVessel | null }> = ({ selectedVessel }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (selectedVessel) {
+      map.flyTo([selectedVessel.lat, selectedVessel.lng], 8, { duration: 1 });
+    }
+  }, [selectedVessel, map]);
+  return null;
 };
 
 const FleetMap: React.FC = () => {
@@ -83,7 +139,7 @@ const FleetMap: React.FC = () => {
     weather: false,
     ports: true
   });
-  const mapRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Fetch real vessels from database
   const { data: dbVessels = [], refetch } = useQuery({
@@ -101,7 +157,7 @@ const FleetMap: React.FC = () => {
     enabled: !!companyId,
   });
 
-  // Map DB vessels to map vessels with placeholder positions
+  // Map DB vessels to map vessels with placeholder positions (Mediterranean spread)
   const mapVessels: MapVessel[] = useMemo(() => {
     return dbVessels.map((v) => {
       const statuses: MapVessel['status'][] = ['UNDER_WAY', 'MOORED', 'AT_ANCHOR'];
@@ -110,8 +166,8 @@ const FleetMap: React.FC = () => {
         id: v.id,
         name: v.name,
         mmsi: v.mmsi || 'N/A',
-        lat: hashToCoord(v.id, 50, 10),
-        lng: hashToCoord(v.id + 'lng', 60, -10),
+        lat: hashToCoord(v.id, 20, 30), // 30-50° lat (Mediterranean region)
+        lng: hashToCoord(v.id + 'lng', 40, -10), // -10 to 30° lng
         sog: Math.round(hashToCoord(v.id + 'sog', 15, 0) * 10) / 10,
         cog: Math.round(hashToCoord(v.id + 'cog', 360, 0)),
         heading: Math.round(hashToCoord(v.id + 'hdg', 360, 0)),
@@ -123,7 +179,6 @@ const FleetMap: React.FC = () => {
     });
   }, [dbVessels]);
 
-  // Filter vessels based on master filter
   const displayVessels = vesselFilter 
     ? mapVessels.filter(v => v.id === vesselFilter)
     : mapVessels;
@@ -136,7 +191,7 @@ const FleetMap: React.FC = () => {
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      mapRef.current?.requestFullscreen();
+      containerRef.current?.requestFullscreen();
       setIsFullscreen(true);
     } else {
       document.exitFullscreen();
@@ -152,21 +207,21 @@ const FleetMap: React.FC = () => {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
-  const getVesselColor = (status: string) => {
-    switch (status) {
-      case 'UNDER_WAY': return '#22c55e';
-      case 'MOORED': return '#3b82f6';
-      case 'AT_ANCHOR': return '#f59e0b';
-      default: return '#6b7280';
-    }
-  };
-
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case 'UNDER_WAY': return 'default';
       case 'MOORED': return 'secondary';
       case 'AT_ANCHOR': return 'outline';
       default: return 'secondary';
+    }
+  };
+
+  const getPortTypeLabel = (type: string) => {
+    switch (type) {
+      case 'major': return 'Commercial Port';
+      case 'marina': return 'Superyacht Marina';
+      case 'shipyard': return 'Shipyard / Refit';
+      default: return 'Port';
     }
   };
 
@@ -191,204 +246,101 @@ const FleetMap: React.FC = () => {
         <Card className="shadow-card overflow-hidden">
           <CardContent className="p-0">
             <div 
-              ref={mapRef}
-              className="relative h-[600px] bg-[#0c1929] overflow-hidden"
+              ref={containerRef}
+              className="relative h-[600px] overflow-hidden"
             >
-              {/* World Map Background */}
-              <svg 
-                className="absolute inset-0 w-full h-full"
-                viewBox="0 0 2000 1000"
-                preserveAspectRatio="xMidYMid slice"
+              <MapContainer
+                center={[38, 15]}
+                zoom={4}
+                className="h-full w-full z-0"
+                style={{ background: '#0c1929' }}
+                zoomControl={true}
+                scrollWheelZoom={true}
               >
-                {/* Ocean Background */}
-                <rect width="2000" height="1000" fill="#0c1929" />
-                
-                {/* Grid Lines - Latitude */}
-                {[-60, -40, -20, 0, 20, 40, 60].map((lat, i) => {
-                  const y = 500 - (lat / 90) * 500;
-                  return (
-                    <g key={`lat-${lat}`}>
-                      <line x1="0" y1={y} x2="2000" y2={y} stroke="#1e3a5f" strokeWidth="0.5" opacity="0.5" />
-                      <text x="10" y={y - 5} fill="#3b5998" fontSize="10" opacity="0.6">{lat}°</text>
-                    </g>
-                  );
-                })}
-                
-                {/* Grid Lines - Longitude */}
-                {[-150, -120, -90, -60, -30, 0, 30, 60, 90, 120, 150, 180].map((lng) => {
-                  const x = 1000 + (lng / 180) * 1000;
-                  return (
-                    <g key={`lng-${lng}`}>
-                      <line x1={x} y1="0" x2={x} y2="1000" stroke="#1e3a5f" strokeWidth="0.5" opacity="0.5" />
-                      <text x={x + 5} y="20" fill="#3b5998" fontSize="10" opacity="0.6">{lng}°</text>
-                    </g>
-                  );
-                })}
-                
-                {/* North America */}
-                <path 
-                  d="M280,180 L320,140 L380,120 L450,100 L520,90 L580,95 L620,120 L640,160 L620,200 L580,240 L520,280 L480,320 L440,360 L400,380 L360,400 L320,380 L280,340 L240,300 L220,260 L240,220 L280,180 Z" 
-                  fill="#1a3a2f" 
-                  stroke="#2d5a4a" 
-                  strokeWidth="1"
+                {/* Dark nautical-style tile layer */}
+                <TileLayer
+                  attribution='&copy; <a href="https://carto.com/">CARTO</a>'
+                  url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
                 />
-                {/* Alaska */}
-                <path 
-                  d="M180,120 L220,100 L260,110 L280,140 L260,160 L220,160 L180,140 L180,120 Z" 
-                  fill="#1a3a2f" 
-                  stroke="#2d5a4a" 
-                  strokeWidth="1"
-                />
-                {/* Greenland */}
-                <path 
-                  d="M580,80 L640,60 L700,70 L740,100 L720,140 L680,160 L620,150 L580,120 L580,80 Z" 
-                  fill="#1a3a2f" 
-                  stroke="#2d5a4a" 
-                  strokeWidth="1"
-                />
-                
-                {/* South America */}
-                <path 
-                  d="M420,420 L480,400 L520,420 L540,480 L520,560 L480,640 L440,720 L400,760 L380,720 L360,640 L380,560 L400,480 L420,420 Z" 
-                  fill="#1a3a2f" 
-                  stroke="#2d5a4a" 
-                  strokeWidth="1"
-                />
-                
-                {/* Europe */}
-                <path 
-                  d="M900,160 L960,140 L1020,150 L1060,180 L1080,220 L1060,260 L1020,280 L960,280 L920,260 L880,240 L860,200 L880,160 L900,160 Z" 
-                  fill="#1a3a2f" 
-                  stroke="#2d5a4a" 
-                  strokeWidth="1"
-                />
-                {/* UK & Ireland */}
-                <path 
-                  d="M860,180 L880,170 L890,190 L880,210 L860,200 L860,180 Z M840,190 L855,185 L855,205 L840,200 L840,190 Z" 
-                  fill="#1a3a2f" 
-                  stroke="#2d5a4a" 
-                  strokeWidth="1"
-                />
-                {/* Scandinavia */}
-                <path 
-                  d="M960,100 L1000,80 L1040,90 L1060,120 L1040,160 L1000,150 L960,130 L960,100 Z" 
-                  fill="#1a3a2f" 
-                  stroke="#2d5a4a" 
-                  strokeWidth="1"
-                />
-                
-                {/* Africa */}
-                <path 
-                  d="M900,320 L960,300 L1040,320 L1100,360 L1120,440 L1100,540 L1040,620 L980,660 L920,640 L880,580 L860,500 L860,420 L880,360 L900,320 Z" 
-                  fill="#1a3a2f" 
-                  stroke="#2d5a4a" 
-                  strokeWidth="1"
-                />
-                {/* Madagascar */}
-                <path 
-                  d="M1140,540 L1160,520 L1180,540 L1180,600 L1160,620 L1140,600 L1140,540 Z" 
-                  fill="#1a3a2f" 
-                  stroke="#2d5a4a" 
-                  strokeWidth="1"
-                />
-                
-                {/* Asia */}
-                <path 
-                  d="M1100,140 L1200,100 L1340,80 L1480,100 L1580,140 L1620,200 L1600,280 L1540,340 L1460,360 L1380,340 L1300,320 L1220,280 L1160,240 L1120,200 L1100,140 Z" 
-                  fill="#1a3a2f" 
-                  stroke="#2d5a4a" 
-                  strokeWidth="1"
-                />
-                {/* India */}
-                <path 
-                  d="M1260,340 L1300,320 L1340,340 L1360,400 L1340,460 L1300,500 L1260,480 L1240,420 L1260,340 Z" 
-                  fill="#1a3a2f" 
-                  stroke="#2d5a4a" 
-                  strokeWidth="1"
-                />
-                {/* Southeast Asia */}
-                <path 
-                  d="M1420,380 L1480,360 L1540,380 L1560,440 L1520,500 L1460,520 L1400,500 L1380,440 L1420,380 Z" 
-                  fill="#1a3a2f" 
-                  stroke="#2d5a4a" 
-                  strokeWidth="1"
-                />
-                {/* Japan */}
-                <path 
-                  d="M1620,200 L1660,180 L1680,220 L1660,280 L1620,300 L1600,260 L1620,200 Z" 
-                  fill="#1a3a2f" 
-                  stroke="#2d5a4a" 
-                  strokeWidth="1"
-                />
-                
-                {/* Australia */}
-                <path 
-                  d="M1480,580 L1580,540 L1680,560 L1720,620 L1700,700 L1620,740 L1540,720 L1480,680 L1460,620 L1480,580 Z" 
-                  fill="#1a3a2f" 
-                  stroke="#2d5a4a" 
-                  strokeWidth="1"
-                />
-                {/* New Zealand */}
-                <path 
-                  d="M1780,700 L1800,680 L1820,700 L1820,760 L1800,780 L1780,760 L1780,700 Z" 
-                  fill="#1a3a2f" 
-                  stroke="#2d5a4a" 
-                  strokeWidth="1"
-                />
-                
-                {/* Indonesia */}
-                <path 
-                  d="M1440,540 L1480,530 L1520,540 L1540,560 L1520,580 L1480,580 L1440,570 L1440,540 Z" 
-                  fill="#1a3a2f" 
-                  stroke="#2d5a4a" 
-                  strokeWidth="1"
-                />
-                
-                {/* Mediterranean Sea highlight */}
-                <path 
-                  d="M860,280 Q920,260 980,280 Q1040,300 1100,280" 
-                  fill="none" 
-                  stroke="#1e4a6f" 
-                  strokeWidth="8"
-                  opacity="0.4"
-                />
-                
-                {/* Major ports/locations dots */}
-                <circle cx="920" cy="270" r="3" fill="#3b82f6" opacity="0.6" /> {/* Mediterranean */}
-                <circle cx="1000" cy="260" r="3" fill="#3b82f6" opacity="0.6" /> {/* Greece */}
-                <circle cx="840" cy="340" r="3" fill="#3b82f6" opacity="0.6" /> {/* Gibraltar */}
-                <circle cx="1300" cy="400" r="3" fill="#3b82f6" opacity="0.6" /> {/* Dubai */}
-                <circle cx="1520" cy="400" r="3" fill="#3b82f6" opacity="0.6" /> {/* Singapore */}
-                <circle cx="400" cy="340" r="3" fill="#3b82f6" opacity="0.6" /> {/* Miami */}
-                <circle cx="480" cy="480" r="3" fill="#3b82f6" opacity="0.6" /> {/* Caribbean */}
-              </svg>
 
-              {/* Map Controls */}
-              <div className="absolute top-4 right-4 flex flex-col gap-2 z-20">
-                {/* Refresh Button */}
+                <MapController selectedVessel={selectedVessel} />
+
+                {/* Vessel Markers */}
+                {layers.vessels && displayVessels.map((vessel) => (
+                  <Marker
+                    key={vessel.id}
+                    position={[vessel.lat, vessel.lng]}
+                    icon={createVesselIcon(vessel.heading, vessel.status)}
+                    eventHandlers={{
+                      click: () => setSelectedVessel(vessel),
+                    }}
+                  >
+                    <Popup className="vessel-popup">
+                      <div className="min-w-[200px]">
+                        <p className="font-semibold text-sm">{vessel.name}</p>
+                        <p className="text-xs text-muted-foreground">MMSI: {vessel.mmsi}</p>
+                        <div className="grid grid-cols-2 gap-1 mt-2 text-xs">
+                          <span>Status: {vessel.status.replace('_', ' ')}</span>
+                          <span>SOG: {vessel.sog} kts</span>
+                          <span>COG: {vessel.cog}°</span>
+                          <span>HDG: {vessel.heading}°</span>
+                        </div>
+                      </div>
+                    </Popup>
+                  </Marker>
+                ))}
+
+                {/* Port Markers */}
+                {layers.ports && MAJOR_PORTS.map((port) => (
+                  <Marker
+                    key={port.name}
+                    position={[port.lat, port.lng]}
+                    icon={createPortIcon(port.type)}
+                  >
+                    <Popup>
+                      <div className="min-w-[220px]">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Anchor className="w-3.5 h-3.5 text-primary" />
+                          <p className="font-semibold text-sm">{port.name}</p>
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-1">{port.country}</p>
+                        <span className="inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-muted">
+                          {getPortTypeLabel(port.type)}
+                        </span>
+                        <p className="text-xs mt-2">{port.description}</p>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          {port.lat.toFixed(4)}°N, {port.lng.toFixed(4)}°E
+                        </p>
+                      </div>
+                    </Popup>
+                  </Marker>
+                ))}
+              </MapContainer>
+
+              {/* Map Controls Overlay */}
+              <div className="absolute top-4 right-4 flex flex-col gap-2 z-[1000]">
                 <Button 
                   variant="outline" 
                   size="icon"
                   onClick={handleRefresh}
                   disabled={isRefreshing}
-                  className="bg-background"
+                  className="bg-background shadow-md"
                 >
                   <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 </Button>
 
-                {/* Layers Control */}
                 <div className="relative">
                   <Button
                     variant="outline"
                     size="icon"
                     onClick={() => setShowLayers(!showLayers)}
-                    className="bg-background"
+                    className="bg-background shadow-md"
                   >
                     <Layers className="w-4 h-4" />
                   </Button>
 
                   {showLayers && (
-                    <div className="absolute right-0 mt-2 w-48 bg-background rounded-lg shadow-lg p-3 border">
+                    <div className="absolute right-0 mt-2 w-48 bg-background rounded-lg shadow-lg p-3 border z-[1001]">
                       <p className="text-sm font-medium mb-2">Layers</p>
                       {Object.entries(layers).map(([key, value]) => (
                         <label key={key} className="flex items-center gap-2 text-sm py-1 cursor-pointer capitalize">
@@ -403,48 +355,19 @@ const FleetMap: React.FC = () => {
                   )}
                 </div>
 
-                {/* Fullscreen Button */}
                 <Button
                   variant="outline"
                   size="icon"
                   onClick={toggleFullscreen}
-                  className="bg-background"
+                  className="bg-background shadow-md"
                 >
                   {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                 </Button>
               </div>
 
-              {/* Vessel Markers */}
-              {layers.vessels && displayVessels.map((vessel) => {
-                // Simplified positioning - in real implementation use proper map projection
-                const left = ((vessel.lng + 180) / 360) * 100;
-                const top = ((90 - vessel.lat) / 180) * 100;
-                
-                return (
-                  <div
-                    key={vessel.id}
-                    className="absolute cursor-pointer transform -translate-x-1/2 -translate-y-1/2 z-10 transition-transform hover:scale-110"
-                    style={{ left: `${left}%`, top: `${top}%` }}
-                    onClick={() => setSelectedVessel(vessel)}
-                  >
-                    <VesselIcon 
-                      heading={vessel.heading} 
-                      status={vessel.status} 
-                      color={getVesselColor(vessel.status)} 
-                    />
-                    {/* Vessel Label */}
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 whitespace-nowrap">
-                      <span className="text-xs font-medium bg-background/90 px-2 py-0.5 rounded shadow">
-                        {vessel.name}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* Vessel Detail Panel */}
+              {/* Selected Vessel Detail Panel */}
               {selectedVessel && (
-                <div className="absolute top-4 left-4 w-80 bg-background rounded-lg shadow-lg border z-30">
+                <div className="absolute top-4 left-4 w-80 bg-background rounded-lg shadow-lg border z-[1000]">
                   <div className="p-4 border-b">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -493,6 +416,11 @@ const FleetMap: React.FC = () => {
                       </div>
                     </div>
 
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Navigation className="w-3 h-3" />
+                      {selectedVessel.lat.toFixed(4)}°N, {selectedVessel.lng.toFixed(4)}°E
+                    </div>
+
                     <p className="text-xs text-muted-foreground">
                       Last update: {new Date(selectedVessel.lastUpdate).toLocaleString()}
                     </p>
@@ -500,7 +428,7 @@ const FleetMap: React.FC = () => {
                     <Button 
                       className="w-full" 
                       size="sm"
-                      onClick={() => window.location.href = `/vessels?vessel=${selectedVessel.id}`}
+                      onClick={() => window.location.href = `/vessels/dashboard?vessel=${selectedVessel.id}`}
                     >
                       View Vessel Dashboard
                     </Button>
@@ -509,28 +437,35 @@ const FleetMap: React.FC = () => {
               )}
 
               {/* Legend */}
-              <div className="absolute bottom-4 left-4 bg-background/95 rounded-lg shadow-lg p-3 border z-20">
-                <p className="text-sm font-medium mb-2">Status</p>
+              <div className="absolute bottom-4 left-4 bg-background/95 rounded-lg shadow-lg p-3 border z-[1000]">
+                <p className="text-sm font-medium mb-2">Legend</p>
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center gap-2 text-xs">
-                    <span className="w-3 h-3 rounded-full bg-green-500" />
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#22c55e' }} />
                     Under Way
                   </div>
                   <div className="flex items-center gap-2 text-xs">
-                    <span className="w-3 h-3 rounded-full bg-blue-500" />
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#3b82f6' }} />
                     Moored
                   </div>
                   <div className="flex items-center gap-2 text-xs">
-                    <span className="w-3 h-3 rounded-full bg-amber-500" />
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#f59e0b' }} />
                     At Anchor
                   </div>
+                  <div className="border-t my-1" />
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#3b82f6', opacity: 0.9 }} />
+                    Commercial Port
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#8b5cf6', opacity: 0.9 }} />
+                    Marina
+                  </div>
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#f59e0b', opacity: 0.9 }} />
+                    Shipyard
+                  </div>
                 </div>
-              </div>
-
-              {/* Map placeholder message */}
-              <div className="absolute bottom-4 right-4 bg-background/95 rounded-lg shadow p-2 border text-xs text-muted-foreground z-20">
-                <Map className="w-4 h-4 inline mr-1" />
-                Interactive map integration coming soon
               </div>
             </div>
           </CardContent>
