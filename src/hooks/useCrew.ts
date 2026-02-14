@@ -135,8 +135,7 @@ export const useCrew = (vesselFilter?: string) => {
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('*')
-        .eq('company_id', profile.company_id)
-        .neq('status', 'Inactive');
+        .eq('company_id', profile.company_id);
 
       if (profilesError) throw profilesError;
       if (!profiles || profiles.length === 0) return [];
