@@ -111,7 +111,14 @@ Return ONLY valid JSON, no markdown formatting, no code blocks.`;
       }
     ];
 
-    if (base64Data) {
+    // Only send as multimodal if the MIME type is supported by Gemini (images + PDF)
+    const supportedMultimodalTypes = [
+      'application/pdf',
+      'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/tiff',
+    ];
+    const canSendAsMultimodal = base64Data && supportedMultimodalTypes.some(t => mimeType.startsWith(t.split('/')[0]) || mimeType === t);
+
+    if (base64Data && canSendAsMultimodal) {
       userContent.push({
         type: 'image_url',
         image_url: {
