@@ -186,26 +186,63 @@ const CreateTemplate: React.FC = () => {
     }
   }, []);
 
+  // Convert uploaded file to base64 for AI extraction
+  const getFileBase64 = (): Promise<{ base64: string; mimeType: string } | null> => {
+    return new Promise((resolve) => {
+      if (!uploadedFile) {
+        resolve(null);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        const commaIndex = dataUrl.indexOf(',');
+        const base64 = dataUrl.substring(commaIndex + 1);
+        const mimeType = dataUrl.substring(5, dataUrl.indexOf(';'));
+        resolve({ base64, mimeType });
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(uploadedFile);
+    });
+  };
+
   // AI Extraction handler
   const handleAIExtraction = async () => {
-    if (!templateData.source_file_url) return;
+    if (!templateData.source_file_url && !uploadedFile) return;
     
     setIsProcessing(true);
 
     try {
+      // Get file as base64 for multimodal AI analysis
+      const fileData = await getFileBase64();
+
+      const requestBody: Record<string, any> = {
+        file_url: templateData.source_file_url,
+        file_type: templateData.source_file_type,
+        template_name: templateData.template_name,
+      };
+
+      if (fileData) {
+        requestBody.file_base64 = fileData.base64;
+        requestBody.file_mime_type = fileData.mimeType;
+      }
+
       // Call AI extraction edge function
       const { data, error } = await supabase.functions.invoke('extract-form-fields', {
-        body: {
-          file_url: templateData.source_file_url,
-          file_type: templateData.source_file_type
-        }
+        body: requestBody
       });
 
       if (error) throw error;
 
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+
       if (data?.success) {
         setTemplateData(prev => ({
           ...prev,
+          template_name: data.document_title || prev.template_name,
+          description: data.document_description || prev.description,
           form_schema: {
             ...prev.form_schema,
             fields: data.extracted_fields || [],
@@ -215,25 +252,16 @@ const CreateTemplate: React.FC = () => {
         setExtractionComplete(true);
         toast({
           title: "Extraction Complete",
-          description: `Found ${data.extracted_fields?.length || 0} fields`,
+          description: `Found ${data.extracted_fields?.length || 0} fields with ${Math.round((data.extraction_confidence || 0.7) * 100)}% confidence`,
         });
+      } else {
+        throw new Error('Extraction returned no data');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('AI extraction failed:', error);
-      // Fall back to manual field creation
-      setTemplateData(prev => ({
-        ...prev,
-        form_schema: {
-          ...prev.form_schema,
-          fields: [
-            { id: 'field_1', type: 'text', label: 'Field 1', required: false }
-          ]
-        }
-      }));
-      setExtractionComplete(true);
       toast({
-        title: "Using Manual Mode",
-        description: "AI extraction unavailable. Add fields manually.",
+        title: "Extraction Failed",
+        description: error?.message || "AI extraction unavailable. You can add fields manually.",
         variant: "destructive"
       });
     } finally {
