@@ -179,7 +179,7 @@ const ChecklistsPage: React.FC = () => {
                         <Button variant="outline" size="sm" className="flex-1">
                           Preview
                         </Button>
-                        <Button size="sm" className="flex-1">
+                        <Button size="sm" className="flex-1" onClick={(e) => { e.stopPropagation(); navigate(`/ism/forms/submit/${template.id}`); }}>
                           Start
                         </Button>
                       </div>
