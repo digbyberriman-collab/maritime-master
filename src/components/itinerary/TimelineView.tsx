@@ -13,20 +13,19 @@ import {
 import { cn } from '@/lib/utils';
 import { Lock, Users as UsersIcon } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import type { ItineraryEntry, ItineraryStatus, TripType } from '@/types/itinerary';
+import type { ItineraryEntry, ItineraryStatus, TripType, ViewMode } from '@/types/itinerary';
 import { STATUS_CONFIG } from '@/types/itinerary';
 
 interface TimelineViewProps {
   entries: ItineraryEntry[];
   vessels: { id: string; name: string }[];
   currentDate: Date;
+  viewMode?: ViewMode;
   statusFilter: ItineraryStatus[];
   vesselFilter: string[];
   onSelectEntry: (entry: ItineraryEntry) => void;
 }
 
-const MONTHS_VISIBLE = 12;
-const DAY_WIDTH = 4; // px per day
 const ROW_HEIGHT = 56; // px per vessel row
 const HEADER_HEIGHT = 48;
 
@@ -34,11 +33,16 @@ const TimelineView: React.FC<TimelineViewProps> = ({
   entries,
   vessels,
   currentDate,
+  viewMode = 'month',
   statusFilter,
   vesselFilter,
   onSelectEntry,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const isQuarter = viewMode === 'quarter';
+  const MONTHS_VISIBLE = isQuarter ? 3 : 12;
+  const DAY_WIDTH = isQuarter ? 12 : 4; // wider days for quarter view
 
   const months = useMemo(() => {
     const start = startOfMonth(currentDate);
