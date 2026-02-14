@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   GraduationCap, BookOpen, ClipboardList, DollarSign,
@@ -20,8 +20,12 @@ import {
   type ApplicationStatus,
 } from '@/lib/developmentConstants';
 import { differenceInDays, differenceInMonths, addMonths, format } from 'date-fns';
+import ApplicationDetailModal from '@/components/development/ApplicationDetailModal';
+import ExpenseClaimModal from '@/components/development/ExpenseClaimModal';
 
 export default function MyDevelopment() {
+  const [selectedApp, setSelectedApp] = useState<any>(null);
+  const [expenseApp, setExpenseApp] = useState<any>(null);
   const { user, profile } = useAuth();
   const { data: applications = [], isLoading: appsLoading } = useMyApplications();
   const { data: repayments = [], isLoading: repLoading } = useMyRepayments();
@@ -196,14 +200,26 @@ export default function MyDevelopment() {
                   size="sm"
                   className="w-full justify-start"
                   disabled={!eligibility.eligible}
+                  asChild={eligibility.eligible}
                   title={!eligibility.eligible ? eligibility.reason : 'Start a new application'}
                 >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Start New Application
+                  {eligibility.eligible ? (
+                    <Link to="/development/catalogue">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Start New Application
+                    </Link>
+                  ) : (
+                    <>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Start New Application
+                    </>
+                  )}
                 </Button>
-                <Button variant="outline" size="sm" className="w-full justify-start" disabled>
-                  <DollarSign className="h-4 w-4 mr-2" />
-                  Submit Expense Claim
+                <Button variant="outline" size="sm" className="w-full justify-start" asChild>
+                  <Link to="/development/applications">
+                    <DollarSign className="h-4 w-4 mr-2" />
+                    View Applications & Expenses
+                  </Link>
                 </Button>
               </CardContent>
             </Card>
@@ -251,6 +267,16 @@ export default function MyDevelopment() {
           </div>
         </div>
       </div>
+      <ApplicationDetailModal
+        open={!!selectedApp}
+        onOpenChange={(open) => !open && setSelectedApp(null)}
+        application={selectedApp}
+      />
+      <ExpenseClaimModal
+        open={!!expenseApp}
+        onOpenChange={(open) => !open && setExpenseApp(null)}
+        application={expenseApp}
+      />
     </DashboardLayout>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, Filter, LayoutGrid, List, BookOpen, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { Search, Filter, LayoutGrid, List, BookOpen, ChevronDown, ChevronUp, ExternalLink, Plus } from 'lucide-react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useCourseCatalogue, type DevelopmentCourse } from '@/hooks/useDevelopment';
+import CreateApplicationModal from '@/components/development/CreateApplicationModal';
 import {
   CATEGORY_CONFIG,
   FORMAT_LABELS,
@@ -24,6 +25,7 @@ export default function CourseCatalogue() {
   const [selectedFormats, setSelectedFormats] = useState<DevFormat[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [expandedCourse, setExpandedCourse] = useState<string | null>(null);
+  const [applyingCourse, setApplyingCourse] = useState<DevelopmentCourse | null>(null);
 
   const { data: courses = [], isLoading } = useCourseCatalogue({
     search: search.length >= 2 ? search : undefined,
@@ -32,7 +34,6 @@ export default function CourseCatalogue() {
     formats: selectedFormats.length ? selectedFormats : undefined,
   });
 
-  // Group courses by sub_section for display
   const groupedCourses = useMemo(() => {
     const groups: Record<string, DevelopmentCourse[]> = {};
     courses.forEach((course) => {
@@ -104,7 +105,6 @@ export default function CourseCatalogue() {
           <div className="lg:w-64 shrink-0">
             <Card>
               <CardContent className="p-4 space-y-6">
-                {/* Search */}
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -123,7 +123,6 @@ export default function CourseCatalogue() {
 
                 <Separator />
 
-                {/* Category Filter */}
                 <div>
                   <h3 className="text-sm font-medium mb-3">Category</h3>
                   <div className="space-y-2">
@@ -145,7 +144,6 @@ export default function CourseCatalogue() {
 
                 <Separator />
 
-                {/* Department Filter */}
                 <div>
                   <h3 className="text-sm font-medium mb-3">Department</h3>
                   <ScrollArea className="max-h-48">
@@ -165,7 +163,6 @@ export default function CourseCatalogue() {
 
                 <Separator />
 
-                {/* Format Filter */}
                 <div>
                   <h3 className="text-sm font-medium mb-3">Format</h3>
                   <div className="space-y-2">
@@ -227,6 +224,7 @@ export default function CourseCatalogue() {
                           onToggle={() =>
                             setExpandedCourse(expandedCourse === course.id ? null : course.id)
                           }
+                          onApply={() => setApplyingCourse(course)}
                           viewMode={viewMode}
                         />
                       ))}
@@ -238,6 +236,12 @@ export default function CourseCatalogue() {
           </div>
         </div>
       </div>
+
+      <CreateApplicationModal
+        open={!!applyingCourse}
+        onOpenChange={(open) => !open && setApplyingCourse(null)}
+        course={applyingCourse}
+      />
     </DashboardLayout>
   );
 }
@@ -246,11 +250,13 @@ function CourseCard({
   course,
   expanded,
   onToggle,
+  onApply,
   viewMode,
 }: {
   course: DevelopmentCourse;
   expanded: boolean;
   onToggle: () => void;
+  onApply: () => void;
   viewMode: 'grid' | 'list';
 }) {
   const catConfig = CATEGORY_CONFIG[course.category];
@@ -295,6 +301,9 @@ function CourseCard({
                   {course.contact_person && (
                     <p><span className="font-medium">Contact:</span> {course.contact_person}</p>
                   )}
+                  <Button size="sm" onClick={onApply}>
+                    <Plus className="h-3 w-3 mr-1" /> Apply
+                  </Button>
                 </div>
               )}
             </div>
@@ -345,10 +354,17 @@ function CourseCard({
           </div>
         )}
 
-        <Button variant="ghost" size="sm" className="w-full" onClick={onToggle}>
-          {expanded ? 'Show Less' : 'View Details'}
-          {expanded ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" className="flex-1" onClick={onToggle}>
+            {expanded ? 'Show Less' : 'View Details'}
+            {expanded ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />}
+          </Button>
+          {expanded && (
+            <Button size="sm" onClick={onApply}>
+              <Plus className="h-3 w-3 mr-1" /> Apply
+            </Button>
+          )}
+        </div>
       </CardContent>
     </Card>
   );
