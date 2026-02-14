@@ -63,6 +63,8 @@ const DraggableTripBlock: React.FC<DraggableTripBlockProps> = ({
   }, [topPct, heightPct, isDragging]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent, mode: DragMode) => {
+    // Prevent dragging locked/completed entries
+    if (entry.is_locked || entry.status === 'completed') return;
     e.preventDefault();
     e.stopPropagation();
     const container = blockRef.current?.parentElement;
@@ -139,12 +141,14 @@ const DraggableTripBlock: React.FC<DraggableTripBlockProps> = ({
       }}
     >
       {/* Top resize handle */}
-      <div
-        onMouseDown={(e) => handleMouseDown(e, 'resize-top')}
-        className="absolute top-0 left-0 right-0 h-1.5 cursor-n-resize z-20 group/handle"
-      >
-        <div className="absolute inset-x-2 top-0 h-0.5 bg-foreground/0 group-hover/handle:bg-foreground/40 rounded transition-colors" />
-      </div>
+      {!entry.is_locked && entry.status !== 'completed' && (
+        <div
+          onMouseDown={(e) => handleMouseDown(e, 'resize-top')}
+          className="absolute top-0 left-0 right-0 h-1.5 cursor-n-resize z-20 group/handle"
+        >
+          <div className="absolute inset-x-2 top-0 h-0.5 bg-foreground/0 group-hover/handle:bg-foreground/40 rounded transition-colors" />
+        </div>
+      )}
 
       {/* Main block */}
       <Tooltip>
@@ -155,7 +159,8 @@ const DraggableTripBlock: React.FC<DraggableTripBlockProps> = ({
               if (!isDragging) onClick?.(entry);
             }}
             className={cn(
-              'w-full h-full text-left rounded px-1.5 py-0.5 text-xs transition-all cursor-grab active:cursor-grabbing',
+              'w-full h-full text-left rounded px-1.5 py-0.5 text-xs transition-all',
+              entry.is_locked || entry.status === 'completed' ? 'cursor-default' : 'cursor-grab active:cursor-grabbing',
               'flex flex-col justify-start',
               isDragging && 'opacity-80 shadow-lg ring-2 ring-primary/40',
               entry.status === 'cancelled' && 'line-through opacity-50',
@@ -192,12 +197,14 @@ const DraggableTripBlock: React.FC<DraggableTripBlockProps> = ({
       </Tooltip>
 
       {/* Bottom resize handle */}
-      <div
-        onMouseDown={(e) => handleMouseDown(e, 'resize-bottom')}
-        className="absolute bottom-0 left-0 right-0 h-1.5 cursor-s-resize z-20 group/handle"
-      >
-        <div className="absolute inset-x-2 bottom-0 h-0.5 bg-foreground/0 group-hover/handle:bg-foreground/40 rounded transition-colors" />
-      </div>
+      {!entry.is_locked && entry.status !== 'completed' && (
+        <div
+          onMouseDown={(e) => handleMouseDown(e, 'resize-bottom')}
+          className="absolute bottom-0 left-0 right-0 h-1.5 cursor-s-resize z-20 group/handle"
+        >
+          <div className="absolute inset-x-2 bottom-0 h-0.5 bg-foreground/0 group-hover/handle:bg-foreground/40 rounded transition-colors" />
+        </div>
+      )}
     </div>
   );
 };
