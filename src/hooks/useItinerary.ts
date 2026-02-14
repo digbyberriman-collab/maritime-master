@@ -50,7 +50,7 @@ export function useItineraryVessels() {
   });
 }
 
-/** Derive effective status: entries whose end_date is in the past become completed & locked */
+/** Derive effective status: entries whose end_date is in the past become completed but remain editable */
 function applyAutoCompletion(entries: ItineraryEntry[]): ItineraryEntry[] {
   const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
   return entries.map(entry => {
@@ -59,10 +59,7 @@ function applyAutoCompletion(entries: ItineraryEntry[]): ItineraryEntry[] {
       entry.status !== 'completed' &&
       entry.status !== 'cancelled'
     ) {
-      return { ...entry, status: 'completed' as const, is_locked: true };
-    }
-    if (entry.status === 'completed') {
-      return { ...entry, is_locked: true };
+      return { ...entry, status: 'completed' as const };
     }
     return entry;
   });
