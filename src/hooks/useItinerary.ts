@@ -50,16 +50,15 @@ export function useItineraryVessels() {
   });
 }
 
-/** Derive effective status: entries whose end_date is in the past become completed but remain editable */
+/** Past entries auto-complete and default to locked. 
+ *  The DB is_locked field is the source of truth — users can unlock via the detail panel. */
 function applyAutoCompletion(entries: ItineraryEntry[]): ItineraryEntry[] {
-  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const today = new Date().toISOString().split('T')[0];
   return entries.map(entry => {
-    if (
-      entry.end_date < today &&
-      entry.status !== 'completed' &&
-      entry.status !== 'cancelled'
-    ) {
-      return { ...entry, status: 'completed' as const };
+    const isPast = entry.end_date < today;
+    if (isPast && entry.status !== 'completed' && entry.status !== 'cancelled') {
+      // Past non-completed entry: mark completed, lock unless user has explicitly unlocked (is_locked=false in DB)
+      return { ...entry, status: 'completed' as const, is_locked: true };
     }
     return entry;
   });
