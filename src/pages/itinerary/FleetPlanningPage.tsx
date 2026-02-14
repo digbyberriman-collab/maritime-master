@@ -18,6 +18,7 @@ const FleetPlanningPage: React.FC = () => {
 
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [hasJumpedToData, setHasJumpedToData] = useState(false);
   const [statusFilter, setStatusFilter] = useState<ItineraryStatus[]>(ALL_STATUSES);
   const [tripTypeFilter, setTripTypeFilter] = useState<string[]>([]);
   const [vesselFilter, setVesselFilter] = useState<string[]>([]);
@@ -40,6 +41,20 @@ const FleetPlanningPage: React.FC = () => {
       setVesselFilter(vessels.map(v => v.id));
     }
   }, [vessels]);
+
+  // Auto-jump to the date range of the earliest entry with vessels
+  React.useEffect(() => {
+    if (!hasJumpedToData && entries.length > 0 && vessels.length > 0) {
+      const entriesWithVessels = entries.filter(e => e.vessels && e.vessels.length > 0);
+      if (entriesWithVessels.length > 0) {
+        // Find the most recent entry to start from (more useful than earliest)
+        const sorted = [...entriesWithVessels].sort((a, b) => b.start_date.localeCompare(a.start_date));
+        const mostRecent = sorted[0];
+        setCurrentDate(new Date(mostRecent.start_date));
+        setHasJumpedToData(true);
+      }
+    }
+  }, [entries, vessels, hasJumpedToData]);
 
   const handleCreateFromCell = (vesselId: string, date: string) => {
     setCreateDefaults({ vesselId, date });
