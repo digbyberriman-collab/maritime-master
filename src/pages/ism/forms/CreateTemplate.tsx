@@ -119,7 +119,7 @@ interface TemplateData {
 
 const CreateTemplate: React.FC = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const { toast } = useToast();
   
   const [currentStep, setCurrentStep] = useState(0);
@@ -390,6 +390,7 @@ const CreateTemplate: React.FC = () => {
 
     try {
       const insertData: Record<string, unknown> = {
+        company_id: profile?.company_id,
         template_code: templateData.template_code,
         template_name: templateData.template_name,
         description: templateData.description,
