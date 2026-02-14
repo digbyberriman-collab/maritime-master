@@ -15,7 +15,7 @@ const FleetTimelinePage: React.FC = () => {
   const { data: tripTypes = [] } = useTripTypes();
   const { data: vessels = [], isLoading: vesselsLoading } = useItineraryVessels();
 
-  const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [viewMode, setViewMode] = useState<ViewMode>('year');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [statusFilter, setStatusFilter] = useState<ItineraryStatus[]>(ALL_STATUSES);
   const [tripTypeFilter, setTripTypeFilter] = useState<string[]>([]);

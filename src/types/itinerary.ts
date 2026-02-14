@@ -3,7 +3,7 @@
 export type ItineraryStatus = 'draft' | 'tentative' | 'confirmed' | 'postponed' | 'cancelled' | 'completed';
 export type DivingLevel = 'none' | 'beginner' | 'intermediate' | 'advanced' | 'technical' | 'cave';
 export type SuggestionStatus = 'new' | 'under_consideration' | 'planned' | 'declined';
-export type ViewMode = 'month' | 'quarter' | 'week' | 'day';
+export type ViewMode = 'year' | 'quarter' | 'month' | 'week' | 'day';
 
 export interface TripType {
   id: string;
