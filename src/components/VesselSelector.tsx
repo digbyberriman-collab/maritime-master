@@ -241,7 +241,7 @@ export const VesselSelector: React.FC<VesselSelectorProps> = ({ className }) => 
                 </button>
               </div>
             </div>
-            <div className="space-y-1 max-h-[140px] overflow-y-auto">
+            <div className="space-y-1 max-h-[360px] overflow-y-auto">
               {filteredVessels.map((vessel) => (
                 <label
                   key={vessel.id}
