@@ -26,7 +26,7 @@ interface QuickAction {
 
 const quickActions: QuickAction[] = [
   { label: 'Add Crew Member', icon: Users, href: '/crew?new=true', variant: 'default' },
-  { label: 'Add Vessel', icon: Ship, href: '/vessels?new=true', variant: 'default' },
+  { label: 'Add Vessel', icon: Ship, href: '/vessels/list?new=true', variant: 'default' },
   { label: 'Fleet Map', icon: Map, href: '/fleet-map', variant: 'outline' },
   { label: 'Report Incident', icon: AlertTriangle, href: '/incidents?new=true', variant: 'outline' },
 ];
