@@ -3,6 +3,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import PlanningGrid from '@/components/itinerary/PlanningGrid';
 import GridToolbar from '@/components/itinerary/GridToolbar';
 import CreateEntryModal from '@/components/itinerary/CreateEntryModal';
+import ImportCSVModal from '@/components/itinerary/ImportCSVModal';
 import EntryDetailPanel from '@/components/itinerary/EntryDetailPanel';
 import { useItineraryEntries, useTripTypes, useItineraryVessels } from '@/hooks/useItinerary';
 import { Loader2 } from 'lucide-react';
@@ -22,6 +23,7 @@ const FleetPlanningPage: React.FC = () => {
   const [vesselFilter, setVesselFilter] = useState<string[]>([]);
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
   const [createDefaults, setCreateDefaults] = useState<{ vesselId?: string; date?: string }>({});
 
   // Derive selectedEntry from fresh query data
@@ -69,6 +71,7 @@ const FleetPlanningPage: React.FC = () => {
           currentDate={currentDate}
           onDateChange={setCurrentDate}
           onCreateEntry={handleCreateNew}
+          onImportCSV={() => setImportModalOpen(true)}
           statusFilter={statusFilter}
           onStatusFilterChange={setStatusFilter}
           tripTypes={tripTypes}
@@ -114,6 +117,12 @@ const FleetPlanningPage: React.FC = () => {
         onOpenChange={setCreateModalOpen}
         defaultDate={createDefaults.date}
         defaultVesselId={createDefaults.vesselId}
+      />
+
+      {/* Import CSV modal */}
+      <ImportCSVModal
+        open={importModalOpen}
+        onOpenChange={setImportModalOpen}
       />
     </DashboardLayout>
   );
