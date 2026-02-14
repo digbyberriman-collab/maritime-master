@@ -529,6 +529,37 @@ export const AppRoutes: React.FC = () => {
         </ProtectedRoute>
       } />
 
+      {/* Crew Development */}
+      <Route path="/development" element={<Navigate to="/development/my" replace />} />
+      <Route path="/development/my" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/pages/development/MyDevelopment')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/development/catalogue" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/pages/development/CourseCatalogue')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/development/applications" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/pages/development/DevelopmentApplications')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/development/admin" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/pages/development/DevelopmentAdmin')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+
       {/* HR */}
       <Route path="/hr" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><HRPage /></React.Suspense></ProtectedRoute>} />
 
