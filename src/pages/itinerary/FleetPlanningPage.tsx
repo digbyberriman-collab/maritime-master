@@ -20,9 +20,17 @@ const FleetPlanningPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<ItineraryStatus[]>(ALL_STATUSES);
   const [tripTypeFilter, setTripTypeFilter] = useState<string[]>([]);
   const [vesselFilter, setVesselFilter] = useState<string[]>([]);
-  const [selectedEntry, setSelectedEntry] = useState<ItineraryEntry | null>(null);
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createDefaults, setCreateDefaults] = useState<{ vesselId?: string; date?: string }>({});
+
+  // Derive selectedEntry from fresh query data
+  const selectedEntry = useMemo(
+    () => (selectedEntryId ? entries.find(e => e.id === selectedEntryId) ?? null : null),
+    [selectedEntryId, entries]
+  );
+
+  const handleSelectEntry = (entry: ItineraryEntry) => setSelectedEntryId(entry.id);
 
   // Initialize vessel filter with all vessels once loaded
   React.useEffect(() => {
@@ -85,7 +93,7 @@ const FleetPlanningPage: React.FC = () => {
               currentDate={currentDate}
               statusFilter={statusFilter}
               vesselFilter={vesselFilter}
-              onSelectEntry={setSelectedEntry}
+              onSelectEntry={handleSelectEntry}
               onCreateEntry={handleCreateFromCell}
             />
           )}
@@ -94,7 +102,7 @@ const FleetPlanningPage: React.FC = () => {
           {selectedEntry && (
             <EntryDetailPanel
               entry={selectedEntry}
-              onClose={() => setSelectedEntry(null)}
+              onClose={() => setSelectedEntryId(null)}
             />
           )}
         </div>
