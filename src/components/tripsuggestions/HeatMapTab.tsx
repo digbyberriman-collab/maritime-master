@@ -134,15 +134,17 @@ const HeatMapTab: React.FC = () => {
       const totalVotes = cluster.suggestions.reduce((sum, s) => sum + (s.vote_count || 0), 0);
       const count = cluster.suggestions.length;
 
-      const radius = count >= 5 ? 18 : count >= 3 ? 14 : count >= 2 ? 11 : 8;
+      // Scale dot size based on suggestion count — more suggestions = larger dot
+      const radius = Math.min(6 + count * 3, 30);
+      const opacity = Math.min(0.5 + count * 0.05, 0.9);
       const color = avgEnthusiasm >= 4 ? '#22c55e' : avgEnthusiasm >= 3 ? '#f59e0b' : '#3b82f6';
 
       const marker = L.circleMarker([cluster.lat, cluster.lng], {
         radius,
         fillColor: color,
-        fillOpacity: 0.7,
+        fillOpacity: opacity,
         color,
-        weight: 2,
+        weight: count >= 3 ? 3 : 2,
         opacity: 0.9,
       }).addTo(map);
 
