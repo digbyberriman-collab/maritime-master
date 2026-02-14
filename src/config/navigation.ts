@@ -107,7 +107,7 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     permissions: ['all'],
     children: [
       { id: 'crew-roster', label: 'Roster', path: '/crew/roster', icon: Users },
-      { id: 'crew-certificates', label: 'Certificates', path: '/crew/certificates', icon: Award },
+      
       { id: 'crew-admin', label: 'Crew Admin', path: '/crew/admin', icon: Briefcase },
       { id: 'flights-travel', label: 'Flights & Travel', path: '/crew/flights', icon: Plane },
       { id: 'hours-of-rest', label: 'Hours of Rest', path: '/crew/hours-of-rest', icon: Clock },
