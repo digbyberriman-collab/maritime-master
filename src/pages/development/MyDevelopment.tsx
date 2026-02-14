@@ -33,11 +33,17 @@ export default function MyDevelopment() {
   const { data: repayments = [], isLoading: repLoading } = useMyRepayments();
   const { data: stats, isLoading: statsLoading } = useDevelopmentStats();
 
+  // Admin roles bypass eligibility
+  const isAdmin = profile?.role === 'dpa' || (profile?.role as string) === 'fleet_master';
+
   // Calculate eligibility
   const eligibility = useMemo(() => {
     if (!profile) return { eligible: false, reason: 'Loading...', daysRemaining: 0 };
 
-    const joinDate = (profile as any).join_date || (profile as any).created_at;
+    // Admin roles are always eligible
+    if (isAdmin) return { eligible: true, reason: 'Eligible (Admin)', daysRemaining: 0 };
+
+    const joinDate = (profile as any).join_date || (profile as any).contract_start_date || (profile as any).created_at;
     if (!joinDate) return { eligible: false, reason: 'Join date not set', daysRemaining: 0 };
 
     const eligibilityDate = addMonths(new Date(joinDate), ELIGIBILITY_MONTHS);
@@ -53,7 +59,7 @@ export default function MyDevelopment() {
     }
 
     return { eligible: true, reason: 'Eligible', daysRemaining: 0 };
-  }, [profile]);
+  }, [profile, isAdmin]);
 
   const activeApps = applications.filter((a) =>
     ['submitted', 'hod_review', 'peer_review', 'captain_review', 'approved', 'enrolled'].includes(a.status)
