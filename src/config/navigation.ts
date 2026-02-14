@@ -33,6 +33,10 @@ import {
   XCircle,
   Umbrella,
   Briefcase,
+  Compass,
+  GanttChart,
+  Lightbulb,
+  PauseCircle,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -145,6 +149,19 @@ export const NAVIGATION_ITEMS: NavItem[] = [
       { id: 'ism-sms', label: 'ISM / SMS', path: '/documents/ism-sms', icon: Shield },
       { id: 'policies', label: 'Policies', path: '/documents/policies', icon: FileCheck },
       { id: 'drawings', label: 'Drawings', path: '/documents/drawings', icon: Layers },
+    ],
+  },
+  {
+    id: 'itinerary',
+    label: 'Itinerary',
+    icon: Compass,
+    path: '/itinerary',
+    permissions: ['all'],
+    children: [
+      { id: 'fleet-planning', label: 'Fleet Planning', path: '/itinerary/planning', icon: LayoutGrid },
+      { id: 'fleet-timeline', label: 'Fleet Timeline', path: '/itinerary/timeline', icon: GanttChart },
+      { id: 'trip-suggestions', label: 'Trip Suggestions', path: '/itinerary/suggestions', icon: Lightbulb },
+      { id: 'postponed', label: 'Postponed', path: '/itinerary/postponed', icon: PauseCircle },
     ],
   },
   {
