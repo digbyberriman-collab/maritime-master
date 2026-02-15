@@ -28,10 +28,19 @@ export default function LeavePlannerPage() {
   const [departmentFilter, setDepartmentFilter] = useState<LeaveDepartment>('All');
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkCode, setBulkCode] = useState('F');
-  const [bulkStart, setBulkStart] = useState<{ crewId: string; date: string } | null>(null);
   const [showLegend, setShowLegend] = useState(false);
   const [activePopover, setActivePopover] = useState<string | null>(null);
   const navigate = useNavigate();
+
+  // Drag-to-fill state
+  const dragRef = useRef<{
+    active: boolean;
+    crewId: string;
+    startDay: number;
+    currentDay: number;
+    code: string;
+  } | null>(null);
+  const [dragRange, setDragRange] = useState<{ crewId: string; minDay: number; maxDay: number; code: string } | null>(null);
 
   const { crewLeaveData, loading, isMonthLocked, setEntry, bulkFill, undo, toggleMonthLock, canUndo } = useCrewLeave(year, month);
 
@@ -74,33 +83,60 @@ export default function LeavePlannerPage() {
     setYear(newYear);
   };
 
-  const handleCellClick = useCallback((crewId: string, date: string) => {
-    if (locked) {
+  // Drag-to-fill handlers
+  const handleMouseDown = useCallback((crewId: string, day: number, existingCode: string | null) => {
+    if (locked) return;
+    
+    const code = bulkMode ? bulkCode : existingCode;
+    if (!code && !bulkMode) {
+      // No code on cell and not in bulk mode → open popover for single-cell pick
+      const dateStr = format(new Date(year, month - 1, day), 'yyyy-MM-dd');
+      setActivePopover(`${crewId}-${dateStr}`);
       return;
     }
 
-    if (bulkMode) {
-      if (!bulkStart) {
-        setBulkStart({ crewId, date });
-      } else {
-        if (bulkStart.crewId === crewId) {
-          const start = bulkStart.date <= date ? bulkStart.date : date;
-          const end = bulkStart.date <= date ? date : bulkStart.date;
-          bulkFill(crewId, start, end, bulkCode);
-        }
-        setBulkStart(null);
+    // Start drag
+    dragRef.current = { active: true, crewId, startDay: day, currentDay: day, code: code || bulkCode };
+    setDragRange({ crewId, minDay: day, maxDay: day, code: code || bulkCode });
+  }, [locked, bulkMode, bulkCode, year, month]);
+
+  const handleMouseEnter = useCallback((crewId: string, day: number) => {
+    if (!dragRef.current?.active || dragRef.current.crewId !== crewId) return;
+    dragRef.current.currentDay = day;
+    const min = Math.min(dragRef.current.startDay, day);
+    const max = Math.max(dragRef.current.startDay, day);
+    setDragRange({ crewId, minDay: min, maxDay: max, code: dragRef.current.code });
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    if (!dragRef.current?.active) return;
+    const { crewId, startDay, currentDay, code } = dragRef.current;
+    dragRef.current = null;
+    setDragRange(null);
+
+    const min = Math.min(startDay, currentDay);
+    const max = Math.max(startDay, currentDay);
+    
+    if (min === max) {
+      // Single cell click with existing code — just set it (already has the code, so this is a no-op unless bulk mode)
+      if (bulkMode) {
+        const dateStr = format(new Date(year, month - 1, min), 'yyyy-MM-dd');
+        setEntry(crewId, dateStr, code);
       }
     } else {
-      setActivePopover(`${crewId}-${date}`);
+      // Multi-cell drag
+      const startDate = format(new Date(year, month - 1, min), 'yyyy-MM-dd');
+      const endDate = format(new Date(year, month - 1, max), 'yyyy-MM-dd');
+      bulkFill(crewId, startDate, endDate, code);
     }
-  }, [locked, bulkMode, bulkStart, bulkCode, bulkFill]);
+  }, [bulkMode, year, month, setEntry, bulkFill]);
 
-  const handleCodeSelect = useCallback((crewId: string, date: string, code: string | null) => {
-    setEntry(crewId, date, code);
-    setActivePopover(null);
-  }, [setEntry]);
-
-  // Keyboard handler
+  // Global mouseup listener for drag
+  useEffect(() => {
+    const handler = () => handleMouseUp();
+    window.addEventListener('mouseup', handler);
+    return () => window.removeEventListener('mouseup', handler);
+  }, [handleMouseUp]);
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === 'z') {
@@ -187,7 +223,7 @@ export default function LeavePlannerPage() {
             variant={bulkMode ? 'default' : 'outline'}
             size="sm"
             className="h-8 text-xs"
-            onClick={() => { setBulkMode(!bulkMode); setBulkStart(null); }}
+            onClick={() => { setBulkMode(!bulkMode); dragRef.current = null; setDragRange(null); }}
           >
             <Paintbrush className="w-3 h-3 mr-1" />
             Bulk Fill
@@ -253,9 +289,9 @@ export default function LeavePlannerPage() {
         )}
 
         {/* Bulk mode indicator */}
-        {bulkMode && bulkStart && (
+        {bulkMode && (
           <div className="bg-primary/10 border border-primary/30 rounded-lg px-3 py-2 text-xs text-primary">
-            Click another cell on the same row to fill range with <strong>{bulkCode}</strong>. Click a different row to cancel.
+            Click and drag across cells to fill with <strong>{bulkCode}</strong>. Single click to set one cell.
           </div>
         )}
 
@@ -339,27 +375,31 @@ export default function LeavePlannerPage() {
                         </td>
                         {/* Day cells */}
                         {Array.from({ length: daysInMonth }, (_, i) => {
-                          const dateStr = format(new Date(year, month - 1, i + 1), 'yyyy-MM-dd');
-                          const d = new Date(year, month - 1, i + 1);
+                          const day = i + 1;
+                          const dateStr = format(new Date(year, month - 1, day), 'yyyy-MM-dd');
+                          const d = new Date(year, month - 1, day);
                           const weekend = isWeekend(d);
                           const today = isToday(d);
                           const code = crew.entries[dateStr];
                           const statusInfo = code ? STATUS_CODE_MAP[code] : null;
                           const cellKey = `${crew.userId}-${dateStr}`;
-                          const isBulkStartCell = bulkStart?.crewId === crew.userId && bulkStart?.date === dateStr;
+                          const isDragHighlighted = dragRange && dragRange.crewId === crew.userId && day >= dragRange.minDay && day <= dragRange.maxDay;
+                          const dragPreviewInfo = isDragHighlighted ? STATUS_CODE_MAP[dragRange.code] : null;
 
                           return (
                             <td
                               key={i}
                               className={cn(
                                 'text-center border-l cursor-pointer select-none p-0',
-                                weekend && !statusInfo && 'bg-muted/30',
+                                weekend && !statusInfo && !isDragHighlighted && 'bg-muted/30',
                                 today && 'border-b-2 border-b-primary',
                                 locked && 'opacity-60 cursor-not-allowed',
-                                isBulkStartCell && 'ring-2 ring-primary ring-inset'
+                                isDragHighlighted && 'ring-1 ring-inset ring-primary'
                               )}
+                              onMouseDown={(e) => { e.preventDefault(); handleMouseDown(crew.userId, day, code); }}
+                              onMouseEnter={() => handleMouseEnter(crew.userId, day)}
                             >
-                              {activePopover === cellKey && !bulkMode && !locked ? (
+                              {activePopover === cellKey && !locked ? (
                                 <Popover open onOpenChange={(open) => !open && setActivePopover(null)}>
                                   <PopoverTrigger asChild>
                                     <div
@@ -375,7 +415,7 @@ export default function LeavePlannerPage() {
                                         <button
                                           key={s.code}
                                           className="flex items-center gap-1 px-2 py-1.5 text-xs rounded hover:bg-muted text-left w-full"
-                                          onClick={() => handleCodeSelect(crew.userId, dateStr, s.code)}
+                                          onClick={() => { setEntry(crew.userId, dateStr, s.code); setActivePopover(null); }}
                                         >
                                           <span
                                             className="w-4 h-4 rounded-sm flex items-center justify-center text-[9px] font-bold shrink-0"
@@ -388,7 +428,7 @@ export default function LeavePlannerPage() {
                                       ))}
                                       <button
                                         className="flex items-center gap-1 px-2 py-1.5 text-xs rounded hover:bg-muted text-left w-full col-span-2 border-t mt-0.5 pt-1.5"
-                                        onClick={() => handleCodeSelect(crew.userId, dateStr, null)}
+                                        onClick={() => { setEntry(crew.userId, dateStr, null); setActivePopover(null); }}
                                       >
                                         <span className="w-4 h-4 rounded-sm bg-muted flex items-center justify-center text-[9px] shrink-0">✕</span>
                                         <span>Clear</span>
@@ -399,10 +439,12 @@ export default function LeavePlannerPage() {
                               ) : (
                                 <div
                                   className="w-full h-full min-h-[24px] flex items-center justify-center text-[10px] font-bold"
-                                  style={statusInfo ? { backgroundColor: statusInfo.bgColor, color: statusInfo.color } : undefined}
-                                  onClick={() => handleCellClick(crew.userId, dateStr)}
+                                  style={isDragHighlighted && dragPreviewInfo
+                                    ? { backgroundColor: dragPreviewInfo.bgColor, color: dragPreviewInfo.color }
+                                    : statusInfo ? { backgroundColor: statusInfo.bgColor, color: statusInfo.color } : undefined
+                                  }
                                 >
-                                  {code || ''}
+                                  {isDragHighlighted ? dragRange.code : (code || '')}
                                 </div>
                               )}
                             </td>
