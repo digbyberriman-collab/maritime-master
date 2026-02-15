@@ -1439,6 +1439,238 @@ export type Database = {
           },
         ]
       }
+      crew_leave_carryover: {
+        Row: {
+          carryover_days: number
+          company_id: string
+          created_at: string
+          crew_id: string
+          id: string
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          carryover_days?: number
+          company_id: string
+          created_at?: string
+          crew_id: string
+          id?: string
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          carryover_days?: number
+          company_id?: string
+          created_at?: string
+          crew_id?: string
+          id?: string
+          updated_at?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_leave_carryover_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_leave_carryover_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      crew_leave_entries: {
+        Row: {
+          company_id: string
+          created_at: string
+          crew_id: string
+          date: string
+          id: string
+          status_code: string
+          updated_at: string
+          vessel_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          crew_id: string
+          date: string
+          id?: string
+          status_code: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          crew_id?: string
+          date?: string
+          id?: string
+          status_code?: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_leave_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_leave_entries_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_leave_entries_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crew_leave_locked_months: {
+        Row: {
+          company_id: string
+          id: string
+          locked_at: string
+          locked_by: string | null
+          month: number
+          vessel_id: string | null
+          year: number
+        }
+        Insert: {
+          company_id: string
+          id?: string
+          locked_at?: string
+          locked_by?: string | null
+          month: number
+          vessel_id?: string | null
+          year: number
+        }
+        Update: {
+          company_id?: string
+          id?: string
+          locked_at?: string
+          locked_by?: string | null
+          month?: number
+          vessel_id?: string | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_leave_locked_months_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_leave_locked_months_locked_by_fkey"
+            columns: ["locked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_leave_locked_months_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crew_leave_requests: {
+        Row: {
+          company_id: string
+          created_at: string
+          crew_id: string
+          end_date: string
+          id: string
+          leave_type: string
+          notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          start_date: string
+          status: string
+          submitted_at: string
+          updated_at: string
+          vessel_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          crew_id: string
+          end_date: string
+          id?: string
+          leave_type: string
+          notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          start_date: string
+          status?: string
+          submitted_at?: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          crew_id?: string
+          end_date?: string
+          id?: string
+          leave_type?: string
+          notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          start_date?: string
+          status?: string
+          submitted_at?: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_leave_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_leave_requests_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_leave_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_leave_requests_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crew_tasks: {
         Row: {
           assigned_by: string
