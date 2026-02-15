@@ -56,7 +56,8 @@ const GridToolbar: React.FC<GridToolbarProps> = ({
         onDateChange(d === -1 ? subMonths(currentDate, 1) : addMonths(currentDate, 1));
         break;
       case 'week':
-        onDateChange(d === -1 ? subWeeks(currentDate, 1) : addWeeks(currentDate, 1));
+        // Navigate by 4 weeks at a time for the 52-week view
+        onDateChange(d === -1 ? subMonths(currentDate, 12) : addMonths(currentDate, 12));
         break;
       case 'day':
         onDateChange(d === -1 ? subDays(currentDate, 7) : addDays(currentDate, 7));
@@ -101,8 +102,8 @@ const GridToolbar: React.FC<GridToolbarProps> = ({
       <span className="text-sm font-semibold text-foreground min-w-[140px]">
         {viewMode === 'year' && format(currentDate, 'yyyy')}
         {viewMode === 'month' && format(currentDate, 'MMMM yyyy')}
-        {viewMode === 'quarter' && `${format(currentDate, 'MMM')} – ${format(addMonths(currentDate, 2), 'MMM yyyy')}`}
-        {viewMode === 'week' && `Week of ${format(currentDate, 'MMM d, yyyy')}`}
+        {viewMode === 'quarter' && `Q${Math.ceil((currentDate.getMonth() + 1) / 3)} ${format(currentDate, 'yyyy')}: ${format(startOfMonth(currentDate), 'MMM')} – ${format(addMonths(startOfMonth(currentDate), 2), 'MMM')}`}
+        {viewMode === 'week' && `${format(currentDate, 'yyyy')} — 52 Weeks`}
         {viewMode === 'day' && format(currentDate, 'MMM d, yyyy')}
       </span>
 
