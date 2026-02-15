@@ -111,7 +111,8 @@ export const NAVIGATION_ITEMS: NavItem[] = [
       { id: 'crew-admin', label: 'Crew Admin', path: '/crew/admin', icon: Briefcase },
       { id: 'flights-travel', label: 'Flights & Travel', path: '/crew/flights', icon: Plane },
       { id: 'hours-of-rest', label: 'Hours of Rest', path: '/crew/hours-of-rest', icon: Clock },
-      { id: 'leave', label: 'Leave', path: '/crew/leave', icon: CalendarDays },
+      { id: 'leave-planner', label: 'Leave Planner', path: '/crew/leave', icon: CalendarDays },
+      { id: 'leave-requests', label: 'Leave Requests', path: '/crew/leave/requests', icon: CalendarDays },
     ],
   },
   {
