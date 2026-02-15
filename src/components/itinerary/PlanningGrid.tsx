@@ -112,13 +112,13 @@ const PlanningGrid: React.FC<PlanningGridProps> = ({
     [entries, statusFilter]
   );
 
-  // Get entries for a vessel + time period, with vertical positioning
+  // Get entries for a vessel + time period, with vertical positioning and lane staggering
   const getEntriesForCell = useCallback((vesselId: string, period: typeof timePeriods[0]) => {
     const periodStart = period.start.getTime();
     const periodEnd = period.end.getTime();
     const periodDuration = periodEnd - periodStart || 1;
 
-    return filteredEntries
+    const items = filteredEntries
       .filter(entry => {
         const hasVessel = entry.vessels?.some(ev => ev.vessel_id === vesselId);
         if (!hasVessel) return false;
@@ -131,8 +131,35 @@ const PlanningGrid: React.FC<PlanningGridProps> = ({
         const entryEnd = Math.min(parseISO(entry.end_date).getTime(), periodEnd);
         const topPct = ((entryStart - periodStart) / periodDuration) * 100;
         const heightPct = Math.max(((entryEnd - entryStart) / periodDuration) * 100, 3);
-        return { entry, topPct, heightPct };
+        return { entry, topPct, heightPct, laneIndex: 0, totalLanes: 1 };
       });
+
+    // Compute overlap lanes: assign each item to the first lane where it doesn't overlap
+    if (items.length > 1) {
+      // Sort by topPct
+      items.sort((a, b) => a.topPct - b.topPct);
+      const lanes: { endPct: number }[] = [];
+      for (const item of items) {
+        const itemEnd = item.topPct + item.heightPct;
+        let placed = false;
+        for (let l = 0; l < lanes.length; l++) {
+          if (item.topPct >= lanes[l].endPct) {
+            item.laneIndex = l;
+            lanes[l].endPct = itemEnd;
+            placed = true;
+            break;
+          }
+        }
+        if (!placed) {
+          item.laneIndex = lanes.length;
+          lanes.push({ endPct: itemEnd });
+        }
+      }
+      const totalLanes = lanes.length;
+      items.forEach(it => { it.totalLanes = totalLanes; });
+    }
+
+    return items;
   }, [filteredEntries]);
 
   const handleDateChange = useCallback((entryId: string, newStart: string, newEnd: string) => {
@@ -241,12 +268,14 @@ const PlanningGrid: React.FC<PlanningGridProps> = ({
                           );
                         })}
 
-                        {cellEntries.map(({ entry, topPct, heightPct }) => (
+                        {cellEntries.map(({ entry, topPct, heightPct, laneIndex, totalLanes }) => (
                           <DraggableTripBlock
                             key={entry.id}
                             entry={entry}
                             topPct={topPct}
                             heightPct={heightPct}
+                            laneIndex={laneIndex}
+                            totalLanes={totalLanes}
                             periodStart={period.start}
                             periodEnd={period.end}
                             onClick={onSelectEntry}
