@@ -1,27 +1,35 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
-import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-};
-
-interface AdminActionRequest {
-  action: 'reset_account' | 'toggle_access' | 'reallocate_vessel' | 'verify_pin' | 'set_pin';
-  targetUserId?: string;
-  resetType?: 'password_reset' | 'invalidate_sessions' | 'resend_invitation';
-  enableAccess?: boolean;
-  vesselId?: string;
-  effectiveDate?: string;
-  endDate?: string;
-  reason?: string;
-  pin?: string;
-  position?: string;
+// Use Deno's native crypto for PIN hashing (bcrypt uses Workers which aren't available)
+async function hashPin(pin: string): Promise<string> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', encoder.encode(pin), 'PBKDF2', false, ['deriveBits']
+  );
+  const derived = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+    keyMaterial, 256
+  );
+  const saltHex = Array.from(salt).map(b => b.toString(16).padStart(2, '0')).join('');
+  const hashHex = Array.from(new Uint8Array(derived)).map(b => b.toString(16).padStart(2, '0')).join('');
+  return `${saltHex}:${hashHex}`;
 }
 
-// Generate salt for bcrypt
-const generateSalt = async () => await bcrypt.genSalt(12);
+async function verifyPin(pin: string, stored: string): Promise<boolean> {
+  const [saltHex, _hashHex] = stored.split(':');
+  const salt = new Uint8Array(saltHex.match(/.{2}/g)!.map(b => parseInt(b, 16)));
+  const encoder = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', encoder.encode(pin), 'PBKDF2', false, ['deriveBits']
+  );
+  const derived = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations: 100000, hash: 'SHA-256' },
+    keyMaterial, 256
+  );
+  const hashHex = Array.from(new Uint8Array(derived)).map(b => b.toString(16).padStart(2, '0')).join('');
+  return `${saltHex}:${hashHex}` === stored;
+}
 
 serve(async (req: Request) => {
   // Handle CORS preflight
@@ -108,9 +116,8 @@ serve(async (req: Request) => {
           });
         }
 
-        // Hash the PIN using bcrypt (secure key derivation function)
-        const salt = await generateSalt();
-        const pinHash = await bcrypt.hash(pin, salt);
+        // Hash the PIN using PBKDF2 (native crypto)
+        const pinHash = await hashPin(pin);
 
         // Upsert PIN
         const { error: pinError } = await supabaseAdmin
@@ -171,8 +178,8 @@ serve(async (req: Request) => {
           });
         }
 
-        // Verify PIN using bcrypt (constant-time comparison)
-        const isValid = await bcrypt.compare(pin, pinRecord.pin_hash);
+        // Verify PIN using PBKDF2 (constant-time comparison)
+        const isValid = await verifyPin(pin, pinRecord.pin_hash);
 
         if (!isValid) {
           const failedAttempts = (pinRecord.failed_attempts || 0) + 1;
