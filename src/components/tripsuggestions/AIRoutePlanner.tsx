@@ -167,7 +167,7 @@ const AIRoutePlanner: React.FC<AIRoutePlannerProps> = ({
   }, [routeResult, selectedLegs, selectedVessels, createEntry, toast]);
 
   return (
-    <div className="bg-card border border-border rounded-lg overflow-hidden flex flex-col" style={{ maxHeight: '550px' }}>
+    <div className="bg-card border border-border rounded-lg overflow-hidden flex flex-col h-full">
       {/* Header */}
       <div className="p-3 border-b border-border bg-muted/30">
         <div className="flex items-center gap-2 mb-1">
