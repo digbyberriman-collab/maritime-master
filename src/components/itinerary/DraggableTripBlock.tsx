@@ -147,6 +147,9 @@ const DraggableTripBlock: React.FC<DraggableTripBlockProps> = ({
     try { return format(parseISO(entry.end_date), 'd MMM'); } catch { return ''; }
   })();
 
+  // Determine if block is tall enough for multi-line content
+  const isTall = heightPct > 15 || (totalLanes === 1 && heightPct > 8);
+
   return (
     <div
       ref={blockRef}
@@ -154,12 +157,12 @@ const DraggableTripBlock: React.FC<DraggableTripBlockProps> = ({
       style={{
         top: `${liveTop}%`,
         height: `${liveHeight}%`,
-        minHeight: '24px',
+        minHeight: '22px',
         left: totalLanes > 1 ? `${laneLeftPct}%` : '2px',
         width: totalLanes > 1 ? `${laneWidthPct}%` : 'calc(100% - 4px)',
       }}
     >
-      {/* Top resize handle — large hit area */}
+      {/* Top resize handle */}
       {!isLocked && (
         <div
           onMouseDown={(e) => handleMouseDown(e, 'resize-top')}
@@ -177,14 +180,13 @@ const DraggableTripBlock: React.FC<DraggableTripBlockProps> = ({
             onMouseDown={(e) => handleMouseDown(e, 'move')}
             onClick={handleClick}
             className={cn(
-              'w-full h-full text-left rounded px-1.5 py-0.5 text-xs transition-all overflow-hidden',
+              'w-full h-full text-left rounded overflow-hidden transition-all relative',
               isLocked ? 'cursor-default' : 'cursor-grab active:cursor-grabbing',
-              'flex flex-col justify-start gap-0',
               isDragging && 'shadow-lg ring-2 ring-primary/40',
               entry.status === 'cancelled' && 'line-through',
             )}
             style={{
-              backgroundColor: `${colour}CC`, // 80% opacity background
+              backgroundColor: `${colour}CC`,
               borderLeft: `3px solid ${colour}`,
               ...(entry.status === 'draft' ? {
                 borderStyle: 'dashed',
@@ -194,29 +196,61 @@ const DraggableTripBlock: React.FC<DraggableTripBlockProps> = ({
               } : {}),
             }}
           >
-            <span className="truncate font-semibold text-foreground text-[11px] leading-tight" style={{ opacity: 0.9 }}>
-              {entry.title}
-            </span>
-            {entry.location && (
-              <span className="truncate text-[9px] text-foreground/80 leading-tight">
-                {entry.location}{entry.country ? `, ${entry.country}` : ''}
+            {/* Content area */}
+            <div className="px-1.5 py-1 flex flex-col h-full min-w-0">
+              {/* Title — always visible */}
+              <span
+                className="font-semibold leading-tight text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]"
+                style={{ fontSize: '11px' }}
+              >
+                {entry.title}
               </span>
-            )}
-            <span className="truncate text-[8px] text-foreground/70 leading-tight">
-              {startLabel} – {endLabel}
-            </span>
-            {tripType && (
-              <span className="truncate text-[8px] text-foreground/70 leading-tight">
-                {tripType.name}
-              </span>
-            )}
-            <span className="flex-shrink-0 flex items-center gap-0.5 mt-auto">
-              {entry.is_locked && <Lock className="w-2.5 h-2.5 text-foreground/60" />}
-              {isMultiVessel && <UsersIcon className="w-2.5 h-2.5 text-foreground/60" />}
-              {statusConf.label !== 'Confirmed' && (
-                <span className="text-[7px] text-foreground/60 uppercase tracking-wide">{statusConf.label}</span>
+
+              {/* Location — show if room */}
+              {entry.location && (
+                <span
+                  className="truncate leading-tight text-white/90 drop-shadow-[0_1px_1px_rgba(0,0,0,0.4)]"
+                  style={{ fontSize: '9px' }}
+                >
+                  {entry.location}{entry.country ? `, ${entry.country}` : ''}
+                </span>
               )}
-            </span>
+
+              {/* Date range */}
+              <span
+                className="truncate leading-tight text-white/80 drop-shadow-[0_1px_1px_rgba(0,0,0,0.3)]"
+                style={{ fontSize: '8px' }}
+              >
+                {startLabel} – {endLabel}
+              </span>
+
+              {/* Trip type — show when tall */}
+              {isTall && tripType && (
+                <span
+                  className="truncate leading-tight text-white/70"
+                  style={{ fontSize: '8px' }}
+                >
+                  {tripType.name}
+                </span>
+              )}
+
+              {/* Spacer to push status to bottom */}
+              <div className="flex-1" />
+            </div>
+
+            {/* Status badge — bottom-right corner */}
+            <div className="absolute bottom-0.5 right-1 flex items-center gap-0.5">
+              {entry.is_locked && <Lock className="w-2.5 h-2.5 text-white/70 drop-shadow-sm" />}
+              {isMultiVessel && <UsersIcon className="w-2.5 h-2.5 text-white/70 drop-shadow-sm" />}
+              {statusConf.label !== 'Confirmed' && (
+                <span
+                  className="text-white/80 uppercase tracking-wide font-medium drop-shadow-[0_1px_1px_rgba(0,0,0,0.4)] bg-black/20 rounded px-0.5"
+                  style={{ fontSize: '7px' }}
+                >
+                  {statusConf.label}
+                </span>
+              )}
+            </div>
           </button>
         </TooltipTrigger>
         <TooltipContent side="right" className="max-w-xs">
@@ -233,7 +267,7 @@ const DraggableTripBlock: React.FC<DraggableTripBlockProps> = ({
         </TooltipContent>
       </Tooltip>
 
-      {/* Bottom resize handle — large hit area */}
+      {/* Bottom resize handle */}
       {!isLocked && (
         <div
           onMouseDown={(e) => handleMouseDown(e, 'resize-bottom')}

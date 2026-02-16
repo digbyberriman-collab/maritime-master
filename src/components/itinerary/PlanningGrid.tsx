@@ -156,11 +156,11 @@ const PlanningGrid: React.FC<PlanningGridProps> = ({
   // Cell height per period row
   const cellHeight = useMemo(() => {
     switch (viewMode) {
-      case 'year': return 80;      // 12 compact month rows
-      case 'quarter': return 280;  // 3 detailed month rows
-      case 'month': return 36;     // per-day rows, slim
-      case 'week': return 40;      // 52 compact week rows
-      case 'day': return 120;      // 7 detailed day rows
+      case 'year': return 100;     // 12 month rows — enough to read trip blocks
+      case 'quarter': return 300;  // 3 detailed month rows
+      case 'month': return 44;     // per-day rows
+      case 'week': return 52;      // 52 week rows — readable
+      case 'day': return 140;      // 7 detailed day rows
       default: return 60;
     }
   }, [viewMode]);
