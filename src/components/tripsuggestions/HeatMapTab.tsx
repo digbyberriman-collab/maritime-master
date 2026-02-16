@@ -204,7 +204,7 @@ const HeatMapTab: React.FC = () => {
 
     if (selectedDestinations.length === 0) return;
 
-    // Add numbered markers
+    // Add numbered draggable markers
     selectedDestinations.forEach((d, i) => {
       const icon = L.divIcon({
         className: 'ai-route-marker',
@@ -214,12 +214,26 @@ const HeatMapTab: React.FC = () => {
           display:flex;align-items:center;justify-content:center;
           font-size:11px;font-weight:700;
           border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);
+          cursor:grab;
         ">${i + 1}</div>`,
         iconSize: [24, 24],
         iconAnchor: [12, 12],
       });
-      const marker = L.marker([d.lat, d.lng], { icon }).addTo(map);
+      const marker = L.marker([d.lat, d.lng], { icon, draggable: true }).addTo(map);
       marker.bindTooltip(`${d.name}, ${d.country}`, { direction: 'top', offset: [0, -14] });
+
+      marker.on('dragend', async () => {
+        const pos = marker.getLatLng();
+        const geo = await reverseGeocode(pos.lat, pos.lng);
+        setSelectedDestinations(prev =>
+          prev.map(dest =>
+            dest.id === d.id
+              ? { ...dest, lat: pos.lat, lng: pos.lng, name: geo.name, country: geo.country }
+              : dest
+          )
+        );
+      });
+
       destinationMarkersRef.current.push(marker);
     });
 
@@ -233,7 +247,7 @@ const HeatMapTab: React.FC = () => {
         opacity: 0.6,
       }).addTo(map);
     }
-  }, [selectedDestinations]);
+  }, [selectedDestinations, reverseGeocode]);
 
   // Auto-enable picking mode
   useEffect(() => {
