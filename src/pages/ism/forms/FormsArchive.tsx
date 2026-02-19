@@ -20,10 +20,24 @@ interface ArchivedSubmission {
   template_id: string | null;
   status: string;
   submitted_at: string | null;
+  created_at: string | null;
   submitted_by_name: string | null;
   vessel_name: string | null;
   signature_count: number;
   data: Record<string, unknown>;
+}
+
+function formatStatusLabel(status: string | null): string {
+  if (!status) return 'Unknown';
+  return status.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function statusBadgeClass(status: string): string {
+  const normalized = status.toLowerCase();
+  if (normalized === 'signed' || normalized === 'completed') return 'bg-green-50 text-green-700 border-green-200';
+  if (normalized === 'pending_signature') return 'bg-yellow-50 text-yellow-700 border-yellow-200';
+  if (normalized === 'draft') return 'bg-blue-50 text-blue-700 border-blue-200';
+  return 'bg-gray-50 text-gray-700 border-gray-200';
 }
 
 export default function FormsArchive() {
@@ -64,12 +78,14 @@ export default function FormsArchive() {
           template_id,
           status,
           submitted_at,
-          submitted_by_name,
-          vessel_name,
-          data,
-          form_templates(name)
+          created_at,
+          form_data,
+          template:form_templates(template_name),
+          submitter:profiles!form_submissions_submitted_by_fkey(first_name, last_name),
+          vessel:vessels(name),
+          signatures:form_signatures(id)
         `)
-        .eq('status', 'completed')
+        .in('status', ['SIGNED', 'COMPLETED', 'completed', 'signed'])
         .order('submitted_at', { ascending: false });
 
       if (templateFilter !== 'all') {
@@ -77,21 +93,23 @@ export default function FormsArchive() {
       }
 
       if (dateRange !== 'all') {
-        const now = new Date();
         let startDate: Date;
         
         switch (dateRange) {
           case 'week':
-            startDate = new Date(now.setDate(now.getDate() - 7));
+            startDate = new Date(Date.now() - (7 * 24 * 60 * 60 * 1000));
             break;
           case 'month':
-            startDate = new Date(now.setMonth(now.getMonth() - 1));
+            startDate = new Date();
+            startDate.setMonth(startDate.getMonth() - 1);
             break;
           case 'quarter':
-            startDate = new Date(now.setMonth(now.getMonth() - 3));
+            startDate = new Date();
+            startDate.setMonth(startDate.getMonth() - 3);
             break;
           case 'year':
-            startDate = new Date(now.setFullYear(now.getFullYear() - 1));
+            startDate = new Date();
+            startDate.setFullYear(startDate.getFullYear() - 1);
             break;
           default:
             startDate = new Date(0);
@@ -102,18 +120,35 @@ export default function FormsArchive() {
 
       const { data, error } = await query;
       if (error) throw error;
-      
-      setSubmissions((data || []).map((s: any) => ({
-        id: s.id,
-        template_name: s.form_templates?.template_name || 'Unknown Template',
-        template_id: s.template_id,
-        status: s.status,
-        submitted_at: s.submitted_at,
-        submitted_by_name: s.submitted_by_name,
-        vessel_name: s.vessel_name,
-        signature_count: 0,
-        data: s.data || {},
-      })));
+
+      const mapped = ((data || []) as Array<{
+        id: string;
+        template_id: string | null;
+        status: string | null;
+        submitted_at: string | null;
+        created_at: string | null;
+        form_data: Record<string, unknown> | null;
+        template: { template_name: string } | null;
+        submitter: { first_name: string | null; last_name: string | null } | null;
+        vessel: { name: string } | null;
+        signatures: Array<{ id: string }> | null;
+      }>).map((submission) => ({
+        id: submission.id,
+        template_name: submission.template?.template_name || 'Unknown Template',
+        template_id: submission.template_id,
+        status: submission.status || 'UNKNOWN',
+        submitted_at: submission.submitted_at || submission.created_at,
+        created_at: submission.created_at,
+        submitted_by_name:
+          [submission.submitter?.first_name, submission.submitter?.last_name]
+            .filter(Boolean)
+            .join(' ') || null,
+        vessel_name: submission.vessel?.name || null,
+        signature_count: submission.signatures?.length || 0,
+        data: submission.form_data || {},
+      }));
+
+      setSubmissions(mapped);
     } catch (error) {
       console.error('Failed to load submissions:', error);
       setSubmissions([]);
@@ -294,8 +329,8 @@ export default function FormsArchive() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <p className="font-medium">{submission.template_name}</p>
-                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                          Completed
+                        <Badge variant="outline" className={statusBadgeClass(submission.status)}>
+                          {formatStatusLabel(submission.status)}
                         </Badge>
                       </div>
                       
@@ -317,6 +352,9 @@ export default function FormsArchive() {
                             <Calendar className="w-3 h-3" />
                             {format(new Date(submission.submitted_at), 'MMM d, yyyy')}
                           </span>
+                        )}
+                        {submission.signature_count > 0 && (
+                          <span>{submission.signature_count} signature{submission.signature_count === 1 ? '' : 's'}</span>
                         )}
                       </div>
                     </div>

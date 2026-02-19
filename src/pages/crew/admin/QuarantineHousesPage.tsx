@@ -192,12 +192,12 @@ export default function QuarantineHousesPage() {
                 {/* Actions */}
                 <div className="flex gap-2 pt-2">
                   <Button variant="outline" size="sm" className="flex-1" asChild>
-                    <Link to={`/crew/admin/quarantine/${house.id}`}>
-                      View Details
+                    <Link to={`/crew/admin/quarantine/bookings?house=${house.id}`}>
+                      View Bookings
                     </Link>
                   </Button>
                   <Button size="sm" className="flex-1" asChild>
-                    <Link to={`/crew/admin/quarantine/bookings?house=${house.id}`}>
+                    <Link to={`/crew/admin/quarantine/bookings?house=${house.id}&new=true`}>
                       Book Room
                     </Link>
                   </Button>
