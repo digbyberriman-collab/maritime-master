@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   Plane, ArrowLeft, Save, Loader2, User, 
-  Ship, Calendar, MapPin, Home, DollarSign
+  MapPin, Home, DollarSign
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCrewOptions, useVesselOptions, useQuarantineHouseOptions } from '@/hooks/useReferenceOptions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,10 +21,10 @@ export default function CreateTravelRecordPage() {
   const { profile } = useAuth();
   const { toast } = useToast();
   
-  const [isLoading, setIsLoading] = useState(false);
-  const [crewMembers, setCrewMembers] = useState<any[]>([]);
-  const [vessels, setVessels] = useState<any[]>([]);
-  const [quarantineHouses, setQuarantineHouses] = useState<any[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { data: crewMembers = [], isLoading: isCrewLoading } = useCrewOptions();
+  const { data: vessels = [], isLoading: isVesselLoading } = useVesselOptions();
+  const { data: quarantineHouses = [], isLoading: isHousesLoading } = useQuarantineHouseOptions();
 
   const [formData, setFormData] = useState({
     crew_member_id: '',
@@ -52,26 +53,6 @@ export default function CreateTravelRecordPage() {
     notes: '',
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
-    try {
-      const [crewRes, vesselsRes, housesRes] = await Promise.all([
-        supabase.from('profiles').select('user_id, first_name, last_name').order('last_name'),
-        supabase.from('vessels').select('id, name').order('name'),
-        supabase.from('quarantine_houses').select('id, name, city, country').eq('is_active', true),
-      ]);
-
-      setCrewMembers(crewRes.data || []);
-      setVessels(vesselsRes.data || []);
-      setQuarantineHouses(housesRes.data || []);
-    } catch (error) {
-      console.error('Failed to load data:', error);
-    }
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     
@@ -84,7 +65,7 @@ export default function CreateTravelRecordPage() {
       return;
     }
 
-    setIsLoading(true);
+    setIsSubmitting(true);
     try {
       const { data, error } = await supabase
         .from('crew_travel_records')
@@ -123,8 +104,16 @@ export default function CreateTravelRecordPage() {
         variant: 'destructive',
       });
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
+  }
+
+  if (isCrewLoading || isVesselLoading || isHousesLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[320px]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
@@ -164,8 +153,9 @@ export default function CreateTravelRecordPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {crewMembers.map((cm) => (
-                    <SelectItem key={cm.user_id} value={cm.user_id}>
-                      {cm.last_name}, {cm.first_name}
+                    <SelectItem key={cm.id} value={cm.id}>
+                      {cm.label}
+                      {cm.rank ? ` (${cm.rank})` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -184,7 +174,7 @@ export default function CreateTravelRecordPage() {
                 <SelectContent>
                   {vessels.map((v) => (
                     <SelectItem key={v.id} value={v.id}>
-                      {v.name}
+                      {v.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -403,7 +393,8 @@ export default function CreateTravelRecordPage() {
                     <SelectContent>
                       {quarantineHouses.map((h) => (
                         <SelectItem key={h.id} value={h.id}>
-                          {h.name} - {h.city}, {h.country}
+                          {h.label}
+                          {h.city ? ` - ${h.city}` : ''}, {h.country}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -489,8 +480,8 @@ export default function CreateTravelRecordPage() {
           <Button type="button" variant="outline" onClick={() => navigate(-1)}>
             Cancel
           </Button>
-          <Button type="submit" disabled={isLoading}>
-            {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             <Save className="w-4 h-4 mr-2" />
             Create Travel Record
           </Button>

@@ -6,6 +6,7 @@ import {
   FileText, Loader2, User, Ship, CheckCircle
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +42,7 @@ function statusBadgeClass(status: string): string {
 }
 
 export default function FormsArchive() {
+  const { profile } = useAuth();
   const [submissions, setSubmissions] = useState<ArchivedSubmission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -49,26 +51,44 @@ export default function FormsArchive() {
   const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
+    if (!profile?.company_id) {
+      setSubmissions([]);
+      setTemplates([]);
+      setIsLoading(false);
+      return;
+    }
     loadSubmissions();
     loadTemplates();
-  }, [dateRange, templateFilter]);
+  }, [dateRange, templateFilter, profile?.company_id]);
 
   async function loadTemplates() {
+    if (!profile?.company_id) {
+      setTemplates([]);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('form_templates')
         .select('id, template_name')
-        .eq('status', 'active')
+        .eq('company_id', profile.company_id)
+        .eq('status', 'PUBLISHED')
         .order('template_name');
 
       if (error) throw error;
-      setTemplates((data || []).map((t: any) => ({ id: t.id, name: t.template_name })));
+      setTemplates((data || []).map((t) => ({ id: t.id, name: t.template_name })));
     } catch (error) {
       console.error('Failed to load templates:', error);
     }
   }
 
   async function loadSubmissions() {
+    if (!profile?.company_id) {
+      setSubmissions([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       let query = supabase
@@ -85,6 +105,7 @@ export default function FormsArchive() {
           vessel:vessels(name),
           signatures:form_signatures(id)
         `)
+        .eq('company_id', profile.company_id)
         .in('status', ['SIGNED', 'COMPLETED', 'completed', 'signed'])
         .order('submitted_at', { ascending: false });
 

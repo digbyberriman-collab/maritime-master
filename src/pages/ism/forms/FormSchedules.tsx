@@ -88,12 +88,19 @@ export default function FormSchedules() {
   );
 
   useEffect(() => {
+    if (!profile?.company_id) return;
     loadSchedules();
     loadTemplates();
     loadVessels();
-  }, []);
+  }, [profile?.company_id]);
 
   async function loadSchedules() {
+    if (!profile?.company_id) {
+      setSchedules([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const { data, error } = await supabase
@@ -110,6 +117,7 @@ export default function FormSchedules() {
           vessel_id,
           template:form_templates(template_name)
         `)
+        .eq('company_id', profile.company_id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -150,11 +158,17 @@ export default function FormSchedules() {
   }
 
   async function loadTemplates() {
+    if (!profile?.company_id) {
+      setTemplates([]);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('form_templates')
         .select('id, template_name')
-        .eq('status', 'active')
+        .eq('company_id', profile.company_id)
+        .eq('status', 'PUBLISHED')
         .order('template_name');
 
       if (error) throw error;
@@ -165,11 +179,17 @@ export default function FormSchedules() {
   }
 
   async function loadVessels() {
+    if (!profile?.company_id) {
+      setVessels([]);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('vessels')
         .select('id, name')
-        .eq('status', 'active')
+        .eq('company_id', profile.company_id)
+        .or('status.is.null,status.neq.Sold')
         .order('name');
 
       if (error) throw error;

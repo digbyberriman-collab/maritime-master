@@ -5,6 +5,7 @@ import {
   Eye, Download, Check, AlertCircle, Calendar
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,16 +56,24 @@ const extractionStatusColors: Record<string, string> = {
 };
 
 export default function TravelDocumentsPage() {
+  const { profile } = useAuth();
   const [documents, setDocuments] = useState<TravelDocument[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
 
   useEffect(() => {
+    if (!profile?.company_id) {
+      setDocuments([]);
+      setIsLoading(false);
+      return;
+    }
     loadDocuments();
-  }, [typeFilter]);
+  }, [typeFilter, profile?.company_id]);
 
   async function loadDocuments() {
+    if (!profile?.company_id) return;
+
     setIsLoading(true);
     try {
       let query = supabase
@@ -73,6 +82,7 @@ export default function TravelDocumentsPage() {
           *,
           crew_member:profiles(first_name, last_name)
         `)
+        .eq('company_id', profile.company_id)
         .order('created_at', { ascending: false });
 
       if (typeFilter !== 'all') {
