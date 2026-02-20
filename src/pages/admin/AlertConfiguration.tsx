@@ -105,7 +105,7 @@ const mockAlertRules: AlertRule[] = [
   {
     id: '4',
     name: 'Crew Hours of Rest Violation',
-    category: 'Crew',
+    category: 'Crew Management',
     condition: 'Hours of rest < minimum required',
     severity: 'high',
     enabled: true,

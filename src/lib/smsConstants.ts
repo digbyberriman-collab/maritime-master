@@ -205,7 +205,7 @@ export const FORM_CATEGORIES = [
   'Engineering',
   'Environmental',
   'Security',
-  'Crew',
+  'Crew Management',
   'Audit',
   'General',
 ] as const;
