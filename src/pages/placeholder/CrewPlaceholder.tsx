@@ -16,7 +16,7 @@ const CREW_PAGES: Record<string, { title: string; description: string; icon: Rea
 const CrewPlaceholder: React.FC = () => {
   const location = useLocation();
   const pageConfig = CREW_PAGES[location.pathname] || { 
-    title: 'Crew Module', 
+    title: 'Crew Management',
     description: 'Crew management', 
     icon: Users 
   };

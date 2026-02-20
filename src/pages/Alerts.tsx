@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 const SAMPLE_ALERTS = [
   { id: '1', type: 'critical', title: 'SMC Certificate Expired', vessel: 'M/Y Aurora', module: 'Certificates', time: '2 hours ago', status: 'open' },
   { id: '2', type: 'warning', title: 'Drill Overdue: Fire Drill', vessel: 'M/Y Horizon', module: 'Drills', time: '1 day ago', status: 'open' },
-  { id: '3', type: 'warning', title: 'Crew Certificate Expiring', vessel: 'M/Y Aurora', module: 'Crew', time: '2 days ago', status: 'acknowledged' },
+  { id: '3', type: 'warning', title: 'Crew Certificate Expiring', vessel: 'M/Y Aurora', module: 'Crew Management', time: '2 days ago', status: 'acknowledged' },
   { id: '4', type: 'info', title: 'Document Review Due', vessel: 'M/Y Horizon', module: 'Documents', time: '3 days ago', status: 'open' },
   { id: '5', type: 'critical', title: 'CAPA Overdue', vessel: 'M/Y Aurora', module: 'CAPA', time: '5 days ago', status: 'escalated' },
 ];

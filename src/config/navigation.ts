@@ -101,7 +101,7 @@ export const NAVIGATION_ITEMS: NavItem[] = [
   },
   {
     id: 'crew',
-    label: 'Crew',
+    label: 'Crew Management',
     icon: Users,
     path: '/crew',
     permissions: ['all'],

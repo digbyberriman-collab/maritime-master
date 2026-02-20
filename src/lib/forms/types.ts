@@ -119,7 +119,7 @@ export const FORM_CATEGORY_CONFIG: Record<FormCategory, { label: string; icon: s
   safety: { label: 'Safety', icon: '🛡️', color: 'bg-red-100 text-red-800' },
   operations: { label: 'Operations', icon: '⚙️', color: 'bg-blue-100 text-blue-800' },
   maintenance: { label: 'Maintenance', icon: '🔧', color: 'bg-amber-100 text-amber-800' },
-  crew: { label: 'Crew', icon: '👥', color: 'bg-purple-100 text-purple-800' },
+  crew: { label: 'Crew Management', icon: '👥', color: 'bg-purple-100 text-purple-800' },
   environmental: { label: 'Environmental', icon: '🌊', color: 'bg-green-100 text-green-800' },
   security: { label: 'Security', icon: '🔒', color: 'bg-slate-100 text-slate-800' },
   navigation: { label: 'Navigation', icon: '🧭', color: 'bg-indigo-100 text-indigo-800' },
