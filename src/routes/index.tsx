@@ -314,22 +314,20 @@ export const AppRoutes: React.FC = () => {
       } />
       <Route path="/crew/admin/quarantine/bookings" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Quarantine Bookings" 
-            description="Manage crew quarantine accommodation bookings"
-            icon={<CalendarDays className="w-8 h-8 text-primary" />}
-            features={['Active bookings', 'Check-in/out tracking', 'Cost management', 'Provisioning requests']} 
-          />
+          <DashboardLayout>
+            <React.Suspense fallback={<LazyLoader />}>
+              {React.createElement(React.lazy(() => import('@/pages/crew/admin/QuarantineBookingsPage')))}
+            </React.Suspense>
+          </DashboardLayout>
         </ProtectedRoute>
       } />
       <Route path="/crew/admin/quarantine/new" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Add Quarantine House" 
-            description="Register a new quarantine accommodation facility"
-            icon={<Building2 className="w-8 h-8 text-primary" />}
-            features={['Location details', 'Room capacity', 'Contact information', 'Cost per night']} 
-          />
+          <DashboardLayout>
+            <React.Suspense fallback={<LazyLoader />}>
+              {React.createElement(React.lazy(() => import('@/pages/crew/admin/AddQuarantineHousePage')))}
+            </React.Suspense>
+          </DashboardLayout>
         </ProtectedRoute>
       } />
 
@@ -408,32 +406,17 @@ export const AppRoutes: React.FC = () => {
       } />
       <Route path="/ism/forms/archive" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Submitted / Archive" 
-            description="Completed and archived form submissions"
-            icon={<FileText className="w-8 h-8 text-primary" />}
-            features={['Search archive', 'Export to PDF', 'View audit trail']} 
-          />
+          <React.Suspense fallback={<LazyLoader />}><FormsArchive /></React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/ism/forms/schedules" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Form Schedules" 
-            description="Recurring form schedules"
-            icon={<Calendar className="w-8 h-8 text-primary" />}
-            features={['Create schedules', 'Assign to vessels', 'Set recurrence']} 
-          />
+          <React.Suspense fallback={<LazyLoader />}><FormSchedules /></React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/ism/forms/exports" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Form Exports" 
-            description="Export forms to PDF or Excel"
-            icon={<FileText className="w-8 h-8 text-primary" />}
-            features={['Bulk export', 'Custom date ranges', 'Format selection']} 
-          />
+          <React.Suspense fallback={<LazyLoader />}><FormExports /></React.Suspense>
         </ProtectedRoute>
       } />
       
@@ -479,12 +462,9 @@ export const AppRoutes: React.FC = () => {
       <Route path="/documents/manuals" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Manuals /></React.Suspense></ProtectedRoute>} />
       <Route path="/documents/procedures" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Procedures & SOPs" 
-            description="Standard operating procedures"
-            icon={<ClipboardList className="w-8 h-8 text-primary" />}
-            features={['Standard procedures', 'Work instructions', 'Linked checklists', 'Amendment tracking']} 
-          />
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/pages/documents/Procedures')))}
+          </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/documents/ism-sms" element={
@@ -579,12 +559,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/maintenance/critical" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CriticalEquipment /></React.Suspense></ProtectedRoute>} />
       <Route path="/maintenance/spares" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Spare Parts" 
-            description="Spare parts inventory management"
-            icon={<Package className="w-8 h-8 text-primary" />}
-            features={['Inventory levels', 'Reorder alerts', 'Critical spares list', 'Location tracking']} 
-          />
+          <React.Suspense fallback={<LazyLoader />}><SpareParts /></React.Suspense>
         </ProtectedRoute>
       } />
 
