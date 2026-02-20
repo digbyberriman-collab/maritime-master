@@ -2,13 +2,6 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
-import { PlaceholderPage } from '@/components/common/PlaceholderPage';
-import { 
-  Ship, Users, Award, Plane, Clock, CalendarDays,
-  AlertTriangle, ClipboardList, BookOpen, Shield, FileCheck, Layers, LayoutGrid,
-  Package, Bell, Settings as SettingsIcon, Building2, Phone, Wrench, FileText, Calendar,
-  Compass
-} from 'lucide-react';
 
 // Main Pages - Keep critical path pages sync, lazy load the rest
 import Index from '@/pages/Index';
@@ -89,6 +82,7 @@ const LeavePlannerPage = React.lazy(() => import('@/pages/crew/LeavePlannerPage'
 const LeaveRequestsPage = React.lazy(() => import('@/pages/crew/LeaveRequestsPage'));
 const TravelRecordDetail = React.lazy(() => import('@/pages/crew/admin/TravelRecordDetail'));
 const QuarantineBookingsPage = React.lazy(() => import('@/pages/crew/admin/QuarantineBookingsPage'));
+const CreateQuarantineHousePage = React.lazy(() => import('@/pages/crew/admin/CreateQuarantineHousePage'));
 
 // Certificate Pages - lazy loaded
 const CrewCertificatesOverview = React.lazy(() => import('@/pages/certificates/CrewCertificatesOverview'));
@@ -114,24 +108,6 @@ const LazyLoader = () => (
   <div className="flex items-center justify-center min-h-[400px]">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
   </div>
-);
-
-// Placeholder wrapper with layout
-const PlaceholderWrapper: React.FC<{ 
-  title: string; 
-  description?: string;
-  features?: string[];
-  icon?: React.ReactNode;
-}> = ({ title, description, features, icon }) => (
-  <DashboardLayout>
-    <PlaceholderPage 
-      title={title} 
-      description={description}
-      features={features} 
-      icon={icon}
-      expectedRelease="Phase 2" 
-    />
-  </DashboardLayout>
 );
 
 export const AppRoutes: React.FC = () => {
@@ -314,22 +290,16 @@ export const AppRoutes: React.FC = () => {
       } />
       <Route path="/crew/admin/quarantine/bookings" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Quarantine Bookings" 
-            description="Manage crew quarantine accommodation bookings"
-            icon={<CalendarDays className="w-8 h-8 text-primary" />}
-            features={['Active bookings', 'Check-in/out tracking', 'Cost management', 'Provisioning requests']} 
-          />
+          <DashboardLayout>
+            <React.Suspense fallback={<LazyLoader />}><QuarantineBookingsPage /></React.Suspense>
+          </DashboardLayout>
         </ProtectedRoute>
       } />
       <Route path="/crew/admin/quarantine/new" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Add Quarantine House" 
-            description="Register a new quarantine accommodation facility"
-            icon={<Building2 className="w-8 h-8 text-primary" />}
-            features={['Location details', 'Room capacity', 'Contact information', 'Cost per night']} 
-          />
+          <DashboardLayout>
+            <React.Suspense fallback={<LazyLoader />}><CreateQuarantineHousePage /></React.Suspense>
+          </DashboardLayout>
         </ProtectedRoute>
       } />
 
@@ -408,32 +378,17 @@ export const AppRoutes: React.FC = () => {
       } />
       <Route path="/ism/forms/archive" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Submitted / Archive" 
-            description="Completed and archived form submissions"
-            icon={<FileText className="w-8 h-8 text-primary" />}
-            features={['Search archive', 'Export to PDF', 'View audit trail']} 
-          />
+          <React.Suspense fallback={<LazyLoader />}><FormsArchive /></React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/ism/forms/schedules" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Form Schedules" 
-            description="Recurring form schedules"
-            icon={<Calendar className="w-8 h-8 text-primary" />}
-            features={['Create schedules', 'Assign to vessels', 'Set recurrence']} 
-          />
+          <React.Suspense fallback={<LazyLoader />}><FormSchedules /></React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/ism/forms/exports" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Form Exports" 
-            description="Export forms to PDF or Excel"
-            icon={<FileText className="w-8 h-8 text-primary" />}
-            features={['Bulk export', 'Custom date ranges', 'Format selection']} 
-          />
+          <React.Suspense fallback={<LazyLoader />}><FormExports /></React.Suspense>
         </ProtectedRoute>
       } />
       
@@ -479,12 +434,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/documents/manuals" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Manuals /></React.Suspense></ProtectedRoute>} />
       <Route path="/documents/procedures" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Procedures & SOPs" 
-            description="Standard operating procedures"
-            icon={<ClipboardList className="w-8 h-8 text-primary" />}
-            features={['Standard procedures', 'Work instructions', 'Linked checklists', 'Amendment tracking']} 
-          />
+          <React.Suspense fallback={<LazyLoader />}><Procedures /></React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/documents/ism-sms" element={
@@ -579,12 +529,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/maintenance/critical" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CriticalEquipment /></React.Suspense></ProtectedRoute>} />
       <Route path="/maintenance/spares" element={
         <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Spare Parts" 
-            description="Spare parts inventory management"
-            icon={<Package className="w-8 h-8 text-primary" />}
-            features={['Inventory levels', 'Reorder alerts', 'Critical spares list', 'Location tracking']} 
-          />
+          <React.Suspense fallback={<LazyLoader />}><SpareParts /></React.Suspense>
         </ProtectedRoute>
       } />
 
@@ -652,8 +597,8 @@ export const AppRoutes: React.FC = () => {
         </ProtectedRoute>
       } />
 
-      {/* Catch-all - redirect to dashboard instead of 404 */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* Catch-all */}
+      <Route path="*" element={<React.Suspense fallback={<LazyLoader />}><NotFound /></React.Suspense>} />
     </Routes>
   );
 };

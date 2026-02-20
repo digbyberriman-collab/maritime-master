@@ -51,6 +51,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { extractDocumentMetadata } from '@/lib/aiDocumentExtraction';
 
 interface UploadDocumentModalProps {
   open: boolean;
@@ -88,6 +89,8 @@ const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   // Step 1: File
   const [file, setFile] = useState<File | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [isAutofilling, setIsAutofilling] = useState(false);
+  const [autofillSummary, setAutofillSummary] = useState<string | null>(null);
 
   // Step 2: Document details
   const [documentNumber, setDocumentNumber] = useState('');
@@ -158,6 +161,8 @@ const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   const resetForm = () => {
     setStep(1);
     setFile(null);
+    setIsAutofilling(false);
+    setAutofillSummary(null);
     setDocumentNumber('');
     setDocumentNumberError('');
     setTitle('');
@@ -194,21 +199,6 @@ const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
     }
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const droppedFile = e.dataTransfer.files[0];
-      if (validateFile(droppedFile)) {
-        setFile(droppedFile);
-        if (!title) {
-          setTitle(droppedFile.name.replace(/\.[^/.]+$/, ''));
-        }
-      }
-    }
-  }, [title]);
-
   const validateFile = (file: File): boolean => {
     const allowedTypes = [
       'application/pdf',
@@ -228,6 +218,86 @@ const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
     return true;
   };
 
+  const runAIAutofill = useCallback(async (selectedFile: File) => {
+    setIsAutofilling(true);
+    setAutofillSummary(null);
+
+    try {
+      const metadata = await extractDocumentMetadata({
+        file: selectedFile,
+        hintTitle: selectedFile.name.replace(/\.[^/.]+$/, ''),
+      });
+
+      if (!metadata) {
+        setAutofillSummary('AI could not detect fields from this file.');
+        return;
+      }
+
+      let updatedCount = 0;
+
+      if (metadata.title && !title) {
+        setTitle(metadata.title);
+        updatedCount += 1;
+      }
+
+      if (metadata.description && !description) {
+        setDescription(metadata.description);
+        updatedCount += 1;
+      }
+
+      if (metadata.document_number && !documentNumber) {
+        setDocumentNumber(metadata.document_number);
+        updatedCount += 1;
+      }
+
+      if (metadata.tags?.length && tags.length === 0) {
+        setTags(metadata.tags.slice(0, 8));
+        updatedCount += 1;
+      }
+
+      const vesselName = metadata.entities?.vessel_name?.toLowerCase();
+      if (vesselName && !vesselId) {
+        const matchedVessel = vessels.find((v) => v.name.toLowerCase() === vesselName);
+        if (matchedVessel) {
+          setScope('vessel');
+          setVesselId(matchedVessel.id);
+          updatedCount += 1;
+        }
+      }
+
+      if (updatedCount > 0) {
+        setAutofillSummary(
+          `AI auto-filled ${updatedCount} field${updatedCount > 1 ? 's' : ''} (${Math.round(
+            (metadata.confidence || 0.7) * 100,
+          )}% confidence).`,
+        );
+      } else {
+        setAutofillSummary('AI extraction completed. Existing values were kept.');
+      }
+    } catch (error) {
+      console.error('Document autofill failed:', error);
+      setAutofillSummary('AI extraction failed. You can continue with manual entry.');
+    } finally {
+      setIsAutofilling(false);
+    }
+  }, [description, documentNumber, tags.length, title, vesselId, vessels]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+      const droppedFile = e.dataTransfer.files[0];
+      if (validateFile(droppedFile)) {
+        setFile(droppedFile);
+        if (!title) {
+          setTitle(droppedFile.name.replace(/\.[^/.]+$/, ''));
+        }
+        void runAIAutofill(droppedFile);
+      }
+    }
+  }, [title, runAIAutofill]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
@@ -236,6 +306,7 @@ const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
         if (!title) {
           setTitle(selectedFile.name.replace(/\.[^/.]+$/, ''));
         }
+        void runAIAutofill(selectedFile);
       }
     }
   };
@@ -284,6 +355,7 @@ const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
 
       const result = await uploadDocument.mutateAsync({
         file,
+        document_number: documentNumber,
         title,
         description: description || undefined,
         category_id: categoryId,
@@ -411,7 +483,10 @@ const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={() => setFile(null)}
+                        onClick={() => {
+                          setFile(null);
+                          setAutofillSummary(null);
+                        }}
                         className="mt-4 text-destructive hover:text-destructive"
                       >
                         <X className="w-4 h-4 mr-2" />
@@ -444,6 +519,21 @@ const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
                     </>
                   )}
                 </div>
+
+                {(isAutofilling || autofillSummary) && (
+                  <Alert>
+                    {isAutofilling ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Wand2 className="h-4 w-4" />
+                    )}
+                    <AlertDescription>
+                      {isAutofilling
+                        ? 'AI is reading the document and filling available fields...'
+                        : autofillSummary}
+                    </AlertDescription>
+                  </Alert>
+                )}
               </div>
             )}
 

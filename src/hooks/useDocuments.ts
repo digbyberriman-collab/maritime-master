@@ -53,6 +53,7 @@ export interface DocumentFilters {
 
 export interface UploadDocumentData {
   file: File;
+  document_number?: string;
   title: string;
   description?: string;
   category_id: string;
@@ -177,8 +178,8 @@ export const useDocumentMutations = () => {
         throw new Error('User not authenticated');
       }
 
-      // Generate document number
-      const documentNumber = await generateDocumentNumber();
+      // Use AI/manual number when provided; otherwise generate one
+      const documentNumber = data.document_number?.trim() || (await generateDocumentNumber());
 
       // Upload file to storage
       const fileExt = data.file.name.split('.').pop();

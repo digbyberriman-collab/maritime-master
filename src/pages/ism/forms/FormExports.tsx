@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { 
-  Download, FileText, Calendar, Ship, Filter, Search,
-  Loader2, CheckCircle, FileSpreadsheet, File, Archive
+  Download, FileText, Calendar, Loader2, FileSpreadsheet, File, Archive
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
@@ -28,6 +26,7 @@ interface Vessel {
 }
 
 export default function FormExports() {
+  const { profile } = useAuth();
   const [templates, setTemplates] = useState<FormTemplate[]>([]);
   const [vessels, setVessels] = useState<Vessel[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -42,29 +41,48 @@ export default function FormExports() {
   const [includeAttachments, setIncludeAttachments] = useState(false);
 
   useEffect(() => {
+    if (!profile?.company_id) {
+      setTemplates([]);
+      setVessels([]);
+      setIsLoading(false);
+      return;
+    }
     loadData();
-  }, []);
+  }, [profile?.company_id]);
 
   async function loadData() {
+    if (!profile?.company_id) return;
+
     setIsLoading(true);
     try {
       const [templatesRes, vesselsRes] = await Promise.all([
         supabase
           .from('form_templates')
-          .select('id, template_name, category')
-          .eq('status', 'active')
+          .select('id, template_name, category:form_categories(name)')
+          .eq('company_id', profile.company_id)
+          .eq('status', 'PUBLISHED')
           .order('template_name'),
         supabase
           .from('vessels')
           .select('id, name')
-          .eq('status', 'active')
+          .eq('company_id', profile.company_id)
+          .or('status.is.null,status.neq.Sold')
           .order('name'),
       ]);
 
       if (templatesRes.error) throw templatesRes.error;
       if (vesselsRes.error) throw vesselsRes.error;
 
-      setTemplates((templatesRes.data || []).map((t: any) => ({ id: t.id, name: t.template_name, category: t.category, submission_count: 0 })));
+      setTemplates(
+        (templatesRes.data || []).map(
+          (t: { id: string; template_name: string; category: { name: string } | { name: string }[] | null }) => ({
+            id: t.id,
+            name: t.template_name,
+            category: Array.isArray(t.category) ? t.category[0]?.name || null : t.category?.name || null,
+            submission_count: 0,
+          }),
+        ),
+      );
       setVessels(vesselsRes.data || []);
     } catch (error) {
       console.error('Failed to load data:', error);

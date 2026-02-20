@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { 
   Calendar, Plus, Search, Clock, Play, Pause, Trash2,
-  FileText, Loader2, Ship, Edit, RefreshCw, AlertCircle
+  FileText, Loader2, Ship, Edit, RefreshCw
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import type { Database, Json } from '@/integrations/supabase/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,12 +18,14 @@ import { Switch } from '@/components/ui/switch';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
+type ScheduleFrequency = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annually';
+
 interface FormSchedule {
   id: string;
   name: string;
   template_id: string;
   template_name: string | null;
-  frequency: 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'annually';
+  frequency: ScheduleFrequency;
   day_of_week: number | null;
   day_of_month: number | null;
   is_active: boolean;
@@ -40,7 +43,32 @@ const frequencyLabels: Record<string, string> = {
   annually: 'Annually',
 };
 
+function normalizeFrequency(value: string | null): ScheduleFrequency {
+  if (value === 'daily' || value === 'weekly' || value === 'monthly' || value === 'quarterly' || value === 'annually') {
+    return value;
+  }
+  return 'monthly';
+}
+
+function buildRecurrenceConfig(frequency: ScheduleFrequency): Json {
+  switch (frequency) {
+    case 'daily':
+      return { interval_days: 1 };
+    case 'weekly':
+      return { interval_weeks: 1, weekday: 1 };
+    case 'monthly':
+      return { interval_months: 1, day_of_month: 1 };
+    case 'quarterly':
+      return { interval_months: 3, day_of_month: 1 };
+    case 'annually':
+      return { interval_years: 1, day: 1, month: 1 };
+    default:
+      return { interval_months: 1, day_of_month: 1 };
+  }
+}
+
 export default function FormSchedules() {
+  const { profile, user } = useAuth();
   const [schedules, setSchedules] = useState<FormSchedule[]>([]);
   const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
   const [vessels, setVessels] = useState<{ id: string; name: string }[]>([]);
@@ -50,40 +78,77 @@ export default function FormSchedules() {
   const [newSchedule, setNewSchedule] = useState({
     name: '',
     template_id: '',
-    frequency: 'monthly',
-    vessel_ids: [] as string[],
+    frequency: 'monthly' as ScheduleFrequency,
+    vessel_id: '',
   });
 
+  const templateNameById = useMemo(
+    () => new Map(templates.map((template) => [template.id, template.name])),
+    [templates],
+  );
+
   useEffect(() => {
+    if (!profile?.company_id) return;
     loadSchedules();
     loadTemplates();
     loadVessels();
-  }, []);
+  }, [profile?.company_id]);
 
   async function loadSchedules() {
+    if (!profile?.company_id) {
+      setSchedules([]);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('form_schedules')
-        .select('id, schedule_name, template_id, recurrence_type, is_active, next_due_date, last_generated_at, created_at, vessel_id')
+        .select(`
+          id,
+          schedule_name,
+          template_id,
+          recurrence_type,
+          is_active,
+          next_due_date,
+          last_generated_at,
+          created_at,
+          vessel_id,
+          template:form_templates(template_name)
+        `)
+        .eq('company_id', profile.company_id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      
-      setSchedules((data || []).map((s) => ({
-        id: s.id,
-        name: s.schedule_name || s.id,
-        template_id: s.template_id || '',
-        template_name: null, // Will be resolved separately
-        frequency: (s.recurrence_type || 'monthly') as any,
+
+      const mapped = ((data || []) as Array<{
+        id: string;
+        schedule_name: string | null;
+        template_id: string;
+        recurrence_type: string;
+        is_active: boolean | null;
+        next_due_date: string | null;
+        last_generated_at: string | null;
+        created_at: string | null;
+        vessel_id: string | null;
+        template: { template_name: string } | null;
+      }>).map((schedule) => ({
+        id: schedule.id,
+        name: schedule.schedule_name || schedule.id,
+        template_id: schedule.template_id || '',
+        template_name: schedule.template?.template_name || null,
+        frequency: normalizeFrequency(schedule.recurrence_type),
         day_of_week: null,
         day_of_month: null,
-        is_active: s.is_active ?? true,
-        vessel_ids: s.vessel_id ? [s.vessel_id] : [],
-        last_run: s.last_generated_at,
-        next_run: s.next_due_date,
-        created_at: s.created_at || '',
-      })));
+        is_active: schedule.is_active ?? true,
+        vessel_ids: schedule.vessel_id ? [schedule.vessel_id] : [],
+        last_run: schedule.last_generated_at,
+        next_run: schedule.next_due_date,
+        created_at: schedule.created_at || '',
+      }));
+
+      setSchedules(mapped);
     } catch (error) {
       console.error('Failed to load schedules:', error);
       setSchedules([]);
@@ -93,26 +158,38 @@ export default function FormSchedules() {
   }
 
   async function loadTemplates() {
+    if (!profile?.company_id) {
+      setTemplates([]);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('form_templates')
         .select('id, template_name')
-        .eq('status', 'active')
+        .eq('company_id', profile.company_id)
+        .eq('status', 'PUBLISHED')
         .order('template_name');
 
       if (error) throw error;
-      setTemplates((data || []).map((t: any) => ({ id: t.id, name: t.template_name })));
+      setTemplates((data || []).map((template) => ({ id: template.id, name: template.template_name })));
     } catch (error) {
       console.error('Failed to load templates:', error);
     }
   }
 
   async function loadVessels() {
+    if (!profile?.company_id) {
+      setVessels([]);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('vessels')
         .select('id, name')
-        .eq('status', 'active')
+        .eq('company_id', profile.company_id)
+        .or('status.is.null,status.neq.Sold')
         .order('name');
 
       if (error) throw error;
@@ -162,22 +239,35 @@ export default function FormSchedules() {
       return;
     }
 
+    if (!profile?.company_id || !user?.id) {
+      toast.error('You must be logged in with a valid company context');
+      return;
+    }
+
     try {
-      // Use any to bypass strict type checking on table that may have outdated types
-      const { error } = await (supabase
-        .from('form_schedules') as any)
-        .insert({
-          schedule_name: newSchedule.name,
-          template_id: newSchedule.template_id,
-          recurrence_type: newSchedule.frequency,
-          is_active: true,
-        });
+      const startDate = new Date().toISOString().split('T')[0];
+      const payload: Database['public']['Tables']['form_schedules']['Insert'] = {
+        company_id: profile.company_id,
+        created_by: user.id,
+        schedule_name: newSchedule.name.trim(),
+        template_id: newSchedule.template_id,
+        recurrence_type: newSchedule.frequency,
+        recurrence_config: buildRecurrenceConfig(newSchedule.frequency),
+        start_date: startDate,
+        next_due_date: startDate,
+        is_active: true,
+        vessel_id: newSchedule.vessel_id || null,
+      };
+
+      const { error } = await supabase
+        .from('form_schedules')
+        .insert(payload);
 
       if (error) throw error;
 
       toast.success('Schedule created');
       setIsDialogOpen(false);
-      setNewSchedule({ name: '', template_id: '', frequency: 'monthly', vessel_ids: [] });
+      setNewSchedule({ name: '', template_id: '', frequency: 'monthly', vessel_id: '' });
       loadSchedules();
     } catch (error) {
       console.error('Failed to create schedule:', error);
@@ -186,11 +276,12 @@ export default function FormSchedules() {
   }
 
   const filteredSchedules = schedules.filter(s => {
+    const templateName = s.template_name || templateNameById.get(s.template_id) || '';
     if (!search) return true;
     const searchLower = search.toLowerCase();
     return (
       s.name?.toLowerCase().includes(searchLower) ||
-      s.template_name?.toLowerCase().includes(searchLower)
+      templateName.toLowerCase().includes(searchLower)
     );
   });
 
@@ -248,7 +339,7 @@ export default function FormSchedules() {
                   <Label>Frequency</Label>
                   <Select 
                     value={newSchedule.frequency}
-                    onValueChange={(v) => setNewSchedule({ ...newSchedule, frequency: v })}
+                    onValueChange={(value) => setNewSchedule({ ...newSchedule, frequency: normalizeFrequency(value) })}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -264,12 +355,15 @@ export default function FormSchedules() {
                 </div>
                 <div className="space-y-2">
                   <Label>Assign to Vessels</Label>
-                  <Select>
+                  <Select
+                    value={newSchedule.vessel_id || '__all__'}
+                    onValueChange={(value) => setNewSchedule({ ...newSchedule, vessel_id: value === '__all__' ? '' : value })}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="All vessels" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Vessels</SelectItem>
+                      <SelectItem value="__all__">All Vessels</SelectItem>
                       {vessels.map(v => (
                         <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                       ))}
@@ -411,7 +505,7 @@ export default function FormSchedules() {
                       <div className="flex items-center gap-4 text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <FileText className="w-3 h-3" />
-                          {schedule.template_name}
+                          {schedule.template_name || templateNameById.get(schedule.template_id) || 'Unknown template'}
                         </span>
                         {schedule.vessel_ids?.length > 0 && (
                           <span className="flex items-center gap-1">

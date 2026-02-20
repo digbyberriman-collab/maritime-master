@@ -30,6 +30,7 @@ import { useCertificates, uploadCertificateFile, CertificateFormData } from '@/h
 import { useVessels } from '@/hooks/useVessels';
 import { useCrew } from '@/hooks/useCrew';
 import { useAuth } from '@/contexts/AuthContext';
+import { extractDocumentMetadata } from '@/lib/aiDocumentExtraction';
 import {
   CERTIFICATE_TYPES,
   getCategoryOptions,
@@ -57,6 +58,8 @@ const AddCertificateModal: React.FC<AddCertificateModalProps> = ({
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionSummary, setExtractionSummary] = useState<string | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -95,6 +98,8 @@ const AddCertificateModal: React.FC<AddCertificateModalProps> = ({
         alertOptions: [90, 60, 30, 7, 0],
       });
       setUploadedFile(null);
+      setIsExtracting(false);
+      setExtractionSummary(null);
     }
   }, [isOpen, defaultType]);
 
@@ -109,7 +114,7 @@ const AddCertificateModal: React.FC<AddCertificateModalProps> = ({
     }
   }, [formData.certificate_category, formData.certificate_type]);
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
@@ -117,6 +122,77 @@ const AddCertificateModal: React.FC<AddCertificateModalProps> = ({
         return;
       }
       setUploadedFile(file);
+      setIsExtracting(true);
+      setExtractionSummary(null);
+
+      try {
+        const metadata = await extractDocumentMetadata({
+          file,
+          hintTitle: file.name.replace(/\.[^/.]+$/, ''),
+        });
+
+        if (!metadata) {
+          setExtractionSummary('AI could not extract certificate details from this file.');
+          return;
+        }
+
+        let updateCount = 0;
+        const nextData = { ...formData };
+
+        if (!nextData.certificate_name && metadata.title) {
+          nextData.certificate_name = metadata.title;
+          updateCount += 1;
+        }
+
+        if (!nextData.certificate_number && metadata.document_number) {
+          nextData.certificate_number = metadata.document_number;
+          updateCount += 1;
+        }
+
+        if (!nextData.notes && metadata.description) {
+          nextData.notes = metadata.description;
+          updateCount += 1;
+        }
+
+        const issueDate = metadata.dates?.issue_date || metadata.dates?.valid_from;
+        if (!nextData.issue_date && issueDate) {
+          const parsed = new Date(issueDate);
+          if (!Number.isNaN(parsed.getTime())) {
+            nextData.issue_date = parsed;
+            updateCount += 1;
+          }
+        }
+
+        const expiryDate = metadata.dates?.valid_until;
+        if (!nextData.expiry_date && expiryDate) {
+          const parsed = new Date(expiryDate);
+          if (!Number.isNaN(parsed.getTime())) {
+            nextData.expiry_date = parsed;
+            updateCount += 1;
+          }
+        }
+
+        const vesselName = metadata.entities?.vessel_name?.toLowerCase();
+        if (vesselName && !nextData.vessel_id) {
+          const match = vessels.find((vessel) => vessel.name.toLowerCase() === vesselName);
+          if (match) {
+            nextData.vessel_id = match.id;
+            updateCount += 1;
+          }
+        }
+
+        setFormData(nextData);
+        setExtractionSummary(
+          updateCount > 0
+            ? `AI auto-filled ${updateCount} field${updateCount > 1 ? 's' : ''}.`
+            : 'AI extraction completed; existing values were kept.',
+        );
+      } catch (error) {
+        console.error('Certificate extraction failed:', error);
+        setExtractionSummary('AI extraction failed. Continue with manual entry.');
+      } finally {
+        setIsExtracting(false);
+      }
     }
   };
 
@@ -457,6 +533,11 @@ const AddCertificateModal: React.FC<AddCertificateModalProps> = ({
                   </label>
                 )}
               </div>
+              {(isExtracting || extractionSummary) && (
+                <p className="text-xs text-muted-foreground">
+                  {isExtracting ? 'AI is extracting certificate details...' : extractionSummary}
+                </p>
+              )}
             </div>
 
             {/* Alert Settings */}

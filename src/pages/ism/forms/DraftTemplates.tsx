@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { 
-  FileText, Search, Filter, Edit, Trash2, Clock,
-  Eye, Send, Loader2, AlertCircle
+  FileText, Search, Edit, Trash2, Clock,
+  Eye, Send, Loader2
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,7 +18,7 @@ interface DraftTemplate {
   id: string;
   name: string;
   description: string | null;
-  category: string | null;
+  form_type: string | null;
   status: string;
   created_at: string;
   updated_at: string;
@@ -26,36 +27,67 @@ interface DraftTemplate {
 }
 
 export default function DraftTemplates() {
+  const { profile } = useAuth();
   const [templates, setTemplates] = useState<DraftTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
+    if (!profile?.company_id) {
+      setTemplates([]);
+      setIsLoading(false);
+      return;
+    }
     loadDrafts();
-  }, []);
+  }, [profile?.company_id]);
 
   async function loadDrafts() {
+    if (!profile?.company_id) return;
+
     setIsLoading(true);
     try {
       const { data, error } = await supabase
         .from('form_templates')
-        .select('id, template_name, description, category, status, created_at, updated_at, created_by_name, fields')
-        .eq('status', 'draft')
+        .select(`
+          id,
+          template_name,
+          description,
+          form_type,
+          status,
+          created_at,
+          updated_at,
+          form_schema,
+          creator:profiles!form_templates_created_by_fkey(first_name, last_name)
+        `)
+        .eq('company_id', profile.company_id)
+        .eq('status', 'DRAFT')
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
       
-      setTemplates((data || []).map((t: any) => ({
-        id: t.id,
-        name: t.template_name,
-        description: t.description,
-        category: t.category,
-        status: t.status,
-        created_at: t.created_at,
-        updated_at: t.updated_at,
-        created_by_name: t.created_by_name,
-        field_count: Array.isArray(t.fields) ? t.fields.length : 0,
-      })));
+      setTemplates(
+        (data || []).map((t: {
+          id: string;
+          template_name: string;
+          description: string | null;
+          form_type: string | null;
+          status: string;
+          created_at: string;
+          updated_at: string;
+          form_schema: { fields?: unknown[] } | null;
+          creator: { first_name: string | null; last_name: string | null } | null;
+        }) => ({
+          id: t.id,
+          name: t.template_name,
+          description: t.description,
+          form_type: t.form_type,
+          status: t.status,
+          created_at: t.created_at,
+          updated_at: t.updated_at,
+          created_by_name: [t.creator?.first_name, t.creator?.last_name].filter(Boolean).join(' ') || null,
+          field_count: Array.isArray(t.form_schema?.fields) ? t.form_schema.fields.length : 0,
+        })),
+      );
     } catch (error) {
       console.error('Failed to load drafts:', error);
       setTemplates([]);
@@ -65,10 +97,16 @@ export default function DraftTemplates() {
   }
 
   async function handlePublish(id: string) {
+    if (!profile?.user_id) return;
+
     try {
       const { error } = await supabase
         .from('form_templates')
-        .update({ status: 'active' })
+        .update({
+          status: 'PUBLISHED',
+          published_at: new Date().toISOString(),
+          published_by: profile.user_id,
+        })
         .eq('id', id);
 
       if (error) throw error;
@@ -104,7 +142,7 @@ export default function DraftTemplates() {
     return (
       t.name?.toLowerCase().includes(searchLower) ||
       t.description?.toLowerCase().includes(searchLower) ||
-      t.category?.toLowerCase().includes(searchLower)
+      t.form_type?.toLowerCase().includes(searchLower)
     );
   });
 
@@ -224,9 +262,9 @@ export default function DraftTemplates() {
                         <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
                           Draft
                         </Badge>
-                        {template.category && (
+                        {template.form_type && (
                           <Badge variant="secondary" className="text-xs">
-                            {template.category}
+                            {template.form_type}
                           </Badge>
                         )}
                       </div>

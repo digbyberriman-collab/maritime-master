@@ -1,12 +1,21 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDropzone } from 'react-dropzone';
 import { 
-  Upload, FileText, Check, AlertCircle, Loader2, 
-  Plane, ArrowLeft, Trash2, Eye
+  Upload, Check, AlertCircle, Loader2, 
+  Plane, ArrowLeft, Trash2
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCrewOptions } from '@/hooks/useReferenceOptions';
+import {
+  extractDocumentMetadata,
+  extractFlightData,
+  matchCrewIdFromName,
+  pickBestDate,
+  type DocumentMetadataExtraction,
+  type FlightExtractionResult,
+} from '@/lib/aiDocumentExtraction';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,12 +27,15 @@ import { useToast } from '@/hooks/use-toast';
 interface UploadedFile {
   id: string;
   file: File;
+  documentType: string;
   status: 'uploading' | 'processing' | 'extracted' | 'error';
   progress: number;
-  extractedData?: any;
+  extractedData?: FlightExtractionResult | DocumentMetadataExtraction | null;
   error?: string;
   standardisedName?: string;
   filePath?: string;
+  extractionConfidence?: number;
+  detectedCrewMemberId?: string | null;
 }
 
 const documentTypes = [
@@ -47,28 +59,17 @@ export default function DocumentUploadPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { toast } = useToast();
+  const { data: crewMembers = [] } = useCrewOptions();
 
   const [files, setFiles] = useState<UploadedFile[]>([]);
   const [selectedCrewMember, setSelectedCrewMember] = useState('');
   const [documentType, setDocumentType] = useState('flight_ticket');
-  const [crewMembers, setCrewMembers] = useState<any[]>([]);
-
-  useEffect(() => {
-    loadCrewMembers();
-  }, []);
-
-  async function loadCrewMembers() {
-    const { data } = await supabase
-      .from('profiles')
-      .select('user_id, first_name, last_name')
-      .order('last_name');
-    setCrewMembers(data || []);
-  }
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const newFiles = acceptedFiles.map(file => ({
       id: crypto.randomUUID(),
       file,
+      documentType,
       status: 'uploading' as const,
       progress: 0,
     }));
@@ -78,7 +79,7 @@ export default function DocumentUploadPage() {
     for (const uploadedFile of newFiles) {
       await processFile(uploadedFile);
     }
-  }, [selectedCrewMember, documentType, profile]);
+  }, [documentType, crewMembers, selectedCrewMember]);
 
   async function processFile(uploadedFile: UploadedFile) {
     try {
@@ -94,31 +95,73 @@ export default function DocumentUploadPage() {
 
       updateFileStatus(uploadedFile.id, { status: 'processing', progress: 60, filePath });
 
-      // Call AI extraction Edge Function for flight tickets
-      if (['flight_ticket', 'e_ticket', 'boarding_pass', 'itinerary'].includes(documentType)) {
-        try {
-          const { data: extractionResult, error: extractionError } = await supabase.functions
-            .invoke('extract-flight-data', {
-              body: { filePath, documentType }
-            });
+      const isFlightDocument = ['flight_ticket', 'e_ticket', 'boarding_pass', 'itinerary'].includes(
+        uploadedFile.documentType,
+      );
 
-          if (!extractionError && extractionResult) {
-            const standardisedName = generateStandardisedName(
-              extractionResult, 
-              documentType, 
-              uploadedFile.file.name
-            );
+      if (isFlightDocument) {
+        const extractionResult = await extractFlightData({
+          filePath,
+          documentType: uploadedFile.documentType,
+        });
 
-            updateFileStatus(uploadedFile.id, { 
-              status: 'extracted', 
-              progress: 100,
-              extractedData: extractionResult,
-              standardisedName,
-            });
-            return;
+        if (extractionResult) {
+          const detectedCrewMemberId = matchCrewIdFromName(
+            extractionResult.passengerName,
+            crewMembers.map((crew) => ({
+              id: crew.id,
+              first_name: crew.first_name,
+              last_name: crew.last_name,
+            })),
+          );
+          if (!selectedCrewMember && detectedCrewMemberId) {
+            setSelectedCrewMember(detectedCrewMemberId);
           }
-        } catch (e) {
-          console.warn('AI extraction failed, proceeding without extraction:', e);
+
+          const standardisedName = generateStandardisedName(
+            extractionResult,
+            uploadedFile.documentType,
+            uploadedFile.file.name,
+          );
+
+          updateFileStatus(uploadedFile.id, {
+            status: 'extracted',
+            progress: 100,
+            extractedData: extractionResult,
+            standardisedName,
+            extractionConfidence: extractionResult.confidence,
+            detectedCrewMemberId,
+          });
+          return;
+        }
+      } else {
+        const metadata = await extractDocumentMetadata({
+          file: uploadedFile.file,
+          documentType: uploadedFile.documentType,
+          hintTitle: uploadedFile.file.name.replace(/\.[^/.]+$/, ''),
+        });
+
+        if (metadata) {
+          const detectedCrewMemberId = matchCrewIdFromName(
+            metadata.entities?.crew_name,
+            crewMembers.map((crew) => ({
+              id: crew.id,
+              first_name: crew.first_name,
+              last_name: crew.last_name,
+            })),
+          );
+          if (!selectedCrewMember && detectedCrewMemberId) {
+            setSelectedCrewMember(detectedCrewMemberId);
+          }
+
+          updateFileStatus(uploadedFile.id, {
+            status: 'extracted',
+            progress: 100,
+            extractedData: metadata,
+            extractionConfidence: metadata.confidence,
+            detectedCrewMemberId,
+          });
+          return;
         }
       }
 
@@ -140,7 +183,11 @@ export default function DocumentUploadPage() {
     setFiles(prev => prev.map(f => f.id === fileId ? { ...f, ...updates } : f));
   }
 
-  function generateStandardisedName(extractedData: any, docType: string, originalName: string): string {
+  function generateStandardisedName(
+    extractedData: FlightExtractionResult,
+    docType: string,
+    originalName: string,
+  ): string {
     if (!extractedData?.flights?.length) return originalName;
 
     const flight = extractedData.flights[0];
@@ -160,23 +207,40 @@ export default function DocumentUploadPage() {
   }
 
   async function saveDocuments() {
-    if (!selectedCrewMember) {
+    const successfulFiles = files.filter(f => f.status === 'extracted' && f.filePath);
+
+    const missingCrewSelection = successfulFiles.find(
+      (file) => !(selectedCrewMember || file.detectedCrewMemberId),
+    );
+    if (missingCrewSelection) {
       toast({
-        title: 'Error',
-        description: 'Please select a crew member',
+        title: 'Crew member required',
+        description: 'Select a crew member or upload files with detectable crew names.',
         variant: 'destructive',
       });
       return;
     }
-
-    const successfulFiles = files.filter(f => f.status === 'extracted' && f.filePath);
     
     for (const file of successfulFiles) {
       try {
+        const flight = isFlightExtraction(file.extractedData) ? file.extractedData.flights?.[0] : undefined;
+        const metadata = isMetadataExtraction(file.extractedData) ? file.extractedData : undefined;
+        const travelDate = pickBestDate([
+          metadata?.dates?.travel_date,
+          flight?.departureDateTime,
+          flight?.arrivalDateTime,
+          metadata?.dates?.valid_from,
+        ]);
+        const validFrom = pickBestDate([metadata?.dates?.valid_from, travelDate]);
+        const validUntil = pickBestDate([metadata?.dates?.valid_until, metadata?.dates?.next_review_date]);
+        const originLocation = metadata?.entities?.origin_location || flight?.departureCity || flight?.departureAirport || null;
+        const destinationLocation =
+          metadata?.entities?.destination_location || flight?.arrivalCity || flight?.arrivalAirport || null;
+
         await supabase.from('crew_travel_documents').insert({
-          crew_member_id: selectedCrewMember,
+          crew_member_id: selectedCrewMember || file.detectedCrewMemberId!,
           company_id: profile?.company_id,
-          document_type: documentType,
+          document_type: file.documentType,
           original_filename: file.file.name,
           original_file_path: file.filePath!,
           file_size_bytes: file.file.size,
@@ -184,6 +248,11 @@ export default function DocumentUploadPage() {
           standardised_filename: file.standardisedName,
           extracted_data: file.extractedData || {},
           extraction_status: file.extractedData ? 'completed' : 'manual',
+          origin_location: originLocation,
+          destination_location: destinationLocation,
+          travel_date: travelDate,
+          valid_from: validFrom,
+          valid_until: validUntil,
           uploaded_by: profile?.user_id,
         });
       } catch (error) {
@@ -213,6 +282,21 @@ export default function DocumentUploadPage() {
   });
 
   const hasSuccessfulUploads = files.some(f => f.status === 'extracted');
+  const allReadyFilesHaveCrew = files
+    .filter((f) => f.status === 'extracted' && f.filePath)
+    .every((f) => Boolean(selectedCrewMember || f.detectedCrewMemberId));
+
+  function isFlightExtraction(
+    data: UploadedFile['extractedData'],
+  ): data is FlightExtractionResult {
+    return !!data && typeof data === 'object' && Array.isArray((data as FlightExtractionResult).flights);
+  }
+
+  function isMetadataExtraction(
+    data: UploadedFile['extractedData'],
+  ): data is DocumentMetadataExtraction {
+    return !!data && typeof data === 'object' && ('entities' in data || 'dates' in data || 'title' in data);
+  }
 
   return (
     <div className="space-y-6">
@@ -227,7 +311,7 @@ export default function DocumentUploadPage() {
             Upload Travel Documents
           </h1>
           <p className="text-muted-foreground">
-            Upload flight tickets and travel documents. AI will automatically extract flight data.
+            Upload travel documents. AI will extract names, routes, dates, and key metadata automatically.
           </p>
         </div>
       </div>
@@ -244,12 +328,15 @@ export default function DocumentUploadPage() {
                 </SelectTrigger>
                 <SelectContent>
                   {crewMembers.map((cm) => (
-                    <SelectItem key={cm.user_id} value={cm.user_id}>
-                      {cm.last_name}, {cm.first_name}
+                    <SelectItem key={cm.id} value={cm.id}>
+                      {cm.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                AI will auto-suggest crew names from uploaded documents when possible.
+              </p>
             </div>
             <div className="space-y-2">
               <Label>Document Type</Label>
@@ -336,15 +423,39 @@ export default function DocumentUploadPage() {
 
                     {file.status === 'extracted' && file.extractedData && (
                       <div className="mt-2 p-3 bg-muted/50 rounded-lg text-sm space-y-1">
-                        <p className="font-medium text-green-700">Extracted Flight Data:</p>
-                        <p>Passenger: {file.extractedData.passengerName}</p>
-                        {file.extractedData.flights?.map((flight: any, i: number) => (
-                          <div key={i} className="flex items-center gap-2 text-muted-foreground">
-                            <Plane className="w-3 h-3" />
-                            <span>{flight.flightNumber}</span>
-                            <span>{flight.departureAirport} → {flight.arrivalAirport}</span>
-                          </div>
-                        ))}
+                        <p className="font-medium text-green-700">
+                          Extracted Data
+                          {typeof file.extractionConfidence === 'number'
+                            ? ` (${Math.round(file.extractionConfidence * 100)}% confidence)`
+                            : ''}
+                          :
+                        </p>
+                        {isFlightExtraction(file.extractedData) ? (
+                          <>
+                            <p>Passenger: {file.extractedData.passengerName || 'Not detected'}</p>
+                            {file.extractedData.flights?.map((flight, i) => (
+                              <div key={i} className="flex items-center gap-2 text-muted-foreground">
+                                <Plane className="w-3 h-3" />
+                                <span>{flight.flightNumber}</span>
+                                <span>{flight.departureAirport} → {flight.arrivalAirport}</span>
+                              </div>
+                            ))}
+                          </>
+                        ) : isMetadataExtraction(file.extractedData) ? (
+                          <>
+                            {file.extractedData.title && <p>Title: {file.extractedData.title}</p>}
+                            {file.extractedData.entities?.crew_name && (
+                              <p>Crew: {file.extractedData.entities.crew_name}</p>
+                            )}
+                            {(file.extractedData.entities?.origin_location ||
+                              file.extractedData.entities?.destination_location) && (
+                              <p>
+                                Route: {file.extractedData.entities?.origin_location || 'Unknown'} →{' '}
+                                {file.extractedData.entities?.destination_location || 'Unknown'}
+                              </p>
+                            )}
+                          </>
+                        ) : null}
                         {file.standardisedName && (
                           <p className="text-xs text-muted-foreground mt-2">
                             Saved as: {file.standardisedName}
@@ -379,7 +490,7 @@ export default function DocumentUploadPage() {
           <Button variant="outline" onClick={() => setFiles([])}>
             Clear All
           </Button>
-          <Button onClick={saveDocuments} disabled={!hasSuccessfulUploads || !selectedCrewMember}>
+          <Button onClick={saveDocuments} disabled={!hasSuccessfulUploads || !allReadyFilesHaveCrew}>
             Save {files.filter(f => f.status === 'extracted').length} Document(s)
           </Button>
         </div>
