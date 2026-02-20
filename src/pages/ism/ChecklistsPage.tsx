@@ -60,7 +60,7 @@ const ChecklistsPage: React.FC = () => {
               Safety and operational checklists for vessel operations
             </p>
           </div>
-          <Button onClick={() => navigate('/ism/forms/create-template', { state: { preselectedType: 'CHECKLIST' } })}>
+          <Button onClick={() => navigate('/ism/forms/templates/create', { state: { preselectedType: 'CHECKLIST' } })}>
             <Plus className="w-4 h-4 mr-2" />
             Create Checklist
           </Button>
@@ -146,10 +146,10 @@ const ChecklistsPage: React.FC = () => {
                   <p className="text-muted-foreground mb-4">
                     Create your first checklist to get started
                   </p>
-                  <Button onClick={() => navigate('/ism/forms/create-template', { state: { preselectedType: 'CHECKLIST' } })}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Checklist
-                  </Button>
+                   <Button onClick={() => navigate('/ism/forms/templates/create', { state: { preselectedType: 'CHECKLIST' } })}>
+                     <Plus className="w-4 h-4 mr-2" />
+                     Create Checklist
+                   </Button>
                 </CardContent>
               </Card>
             ) : (
