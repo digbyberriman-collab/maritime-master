@@ -138,7 +138,7 @@ function validateRow(row: Record<string, string>, rowNumber: number): Validation
   // Optional field validation
   const phoneNumber = row.phone_number?.trim() || row.phone?.trim() || '';
   if (phoneNumber) {
-    const phoneRegex = /^[\d\s+()\-]+$/;
+    const phoneRegex = /^[\d\s+()-]+$/;
     if (!phoneRegex.test(phoneNumber)) {
       warnings.push('Phone number format may be invalid');
     }

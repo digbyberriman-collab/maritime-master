@@ -62,10 +62,10 @@ const ImportCSVModal: React.FC<ImportCSVModalProps> = ({ open, onOpenChange }) =
     // Try YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
     // Try DD/MM/YYYY
-    const dmy = val.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    const dmy = val.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
     if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
     // Try MM/DD/YYYY
-    const mdy = val.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+    const mdy = val.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
     if (mdy) return `${mdy[3]}-${mdy[1].padStart(2, '0')}-${mdy[2].padStart(2, '0')}`;
     return null;
   };
