@@ -13,7 +13,7 @@ import {
   isHRAuditAccessAllowed,
   getAllowedHRFieldsForAudit,
   transformForAuditView,
-} from '@/lib/permissions/auditModeRules';
+} from '@/modules/auth/lib/auditModeRules';
 
 describe('auditModeRules', () => {
   describe('AUDIT_MODE_RULES', () => {

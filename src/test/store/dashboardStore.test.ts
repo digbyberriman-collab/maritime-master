@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useDashboardStore } from '@/store/dashboardStore';
+import { useDashboardStore } from '@/modules/dashboard/store/dashboardStore';
 
 // Mock supabase
 vi.mock('@/integrations/supabase/client', () => ({

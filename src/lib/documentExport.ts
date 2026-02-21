@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import ExcelJS from 'exceljs';
-import { Document } from '@/hooks/useDocuments';
+import { Document } from '@/modules/documents/hooks/useDocuments';
 import { format } from 'date-fns';
 
 interface ExportDocument {

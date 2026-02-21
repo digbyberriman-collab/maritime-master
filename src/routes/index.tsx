@@ -1,8 +1,8 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import ProtectedRoute from '@/components/ProtectedRoute';
-import DashboardLayout from '@/components/layout/DashboardLayout';
-import { PlaceholderPage } from '@/components/common/PlaceholderPage';
+import ProtectedRoute from '@/shared/components/ProtectedRoute';
+import DashboardLayout from '@/shared/components/layout/DashboardLayout';
+import { PlaceholderPage } from '@/shared/components/common/PlaceholderPage';
 import { 
   Ship, Users, Award, Plane, Clock, CalendarDays,
   AlertTriangle, ClipboardList, BookOpen, Shield, FileCheck, Layers, LayoutGrid,
@@ -11,110 +11,110 @@ import {
 } from 'lucide-react';
 
 // Main Pages - Keep critical path pages sync, lazy load the rest
-import Index from '@/pages/Index';
-import Auth from '@/pages/Auth';
-import ResetPassword from '@/pages/ResetPassword';
-import Dashboard from '@/pages/Dashboard';
+import Index from '@/shared/pages/Index';
+import Auth from '@/modules/auth/pages/Auth';
+import ResetPassword from '@/modules/auth/pages/ResetPassword';
+import Dashboard from '@/modules/dashboard/pages/Dashboard';
 
 // New module pages - lazy loaded
-const CompliancePage = React.lazy(() => import('@/pages/compliance/CompliancePage'));
-const NewChecklistsPage = React.lazy(() => import('@/pages/checklists/ChecklistsPage'));
-const FlightsTravelPage = React.lazy(() => import('@/pages/flights/FlightsTravelPage'));
-const IndividualVesselDashboard = React.lazy(() => import('@/pages/vessels/IndividualVesselDashboard'));
-const NewPermissionsPage = React.lazy(() => import('@/pages/settings/PermissionsPage'));
+const CompliancePage = React.lazy(() => import('@/modules/compliance/pages/CompliancePage'));
+const NewChecklistsPage = React.lazy(() => import('@/modules/ism/pages/ChecklistsPage'));
+const FlightsTravelPage = React.lazy(() => import('@/modules/flights/pages/FlightsTravelPage'));
+const IndividualVesselDashboard = React.lazy(() => import('@/modules/vessels/pages/IndividualVesselDashboard'));
+const NewPermissionsPage = React.lazy(() => import('@/modules/settings/pages/PermissionsPage'));
 
 // Lazy loaded pages
-const Vessels = React.lazy(() => import('@/pages/Vessels'));
-const VesselDashboard = React.lazy(() => import('@/pages/VesselDashboard'));
-const CrewRoster = React.lazy(() => import('@/pages/CrewRoster'));
-const Documents = React.lazy(() => import('@/pages/Documents'));
-const Certificates = React.lazy(() => import('@/pages/Certificates'));
-const Incidents = React.lazy(() => import('@/pages/Incidents'));
-const Audits = React.lazy(() => import('@/pages/Audits'));
-const Drills = React.lazy(() => import('@/pages/Drills'));
-const Training = React.lazy(() => import('@/pages/Training'));
-const Maintenance = React.lazy(() => import('@/pages/Maintenance'));
-const FleetMap = React.lazy(() => import('@/pages/FleetMap'));
-const RiskAssessments = React.lazy(() => import('@/pages/RiskAssessments'));
-const Alerts = React.lazy(() => import('@/pages/Alerts'));
-const Settings = React.lazy(() => import('@/pages/Settings'));
-const NotFound = React.lazy(() => import('@/pages/NotFound'));
-const InsurancePage = React.lazy(() => import('@/pages/InsurancePage'));
-const HRPage = React.lazy(() => import('@/pages/HRPage'));
+const Vessels = React.lazy(() => import('@/modules/vessels/pages/Vessels'));
+const VesselDashboard = React.lazy(() => import('@/modules/vessels/pages/VesselDashboard'));
+const CrewRoster = React.lazy(() => import('@/modules/crew/pages/CrewRoster'));
+const Documents = React.lazy(() => import('@/modules/documents/pages/Documents'));
+const Certificates = React.lazy(() => import('@/modules/certificates/pages/Certificates'));
+const Incidents = React.lazy(() => import('@/modules/incidents/pages/Incidents'));
+const Audits = React.lazy(() => import('@/modules/audits/pages/Audits'));
+const Drills = React.lazy(() => import('@/modules/drills/pages/Drills'));
+const Training = React.lazy(() => import('@/modules/training/pages/Training'));
+const Maintenance = React.lazy(() => import('@/modules/maintenance/pages/Maintenance'));
+const FleetMap = React.lazy(() => import('@/modules/dashboard/pages/FleetMap'));
+const RiskAssessments = React.lazy(() => import('@/modules/risk-assessments/pages/RiskAssessments'));
+const Alerts = React.lazy(() => import('@/modules/alerts/pages/Alerts'));
+const Settings = React.lazy(() => import('@/modules/settings/pages/Settings'));
+const NotFound = React.lazy(() => import('@/shared/pages/NotFound'));
+const InsurancePage = React.lazy(() => import('@/modules/compliance/pages/InsurancePage'));
+const HRPage = React.lazy(() => import('@/modules/compliance/pages/HRPage'));
 
 // ISM Pages - Lazy loaded for better code splitting
-const ERMPage = React.lazy(() => import('@/pages/ism/ERMPage'));
-const ChecklistsPage = React.lazy(() => import('@/pages/ism/ChecklistsPage'));
-const RiskAssessmentsPage = React.lazy(() => import('@/pages/ism/RiskAssessmentsPage'));
-const SOPsPage = React.lazy(() => import('@/pages/ism/SOPsPage'));
-const AuditsSurveysPage = React.lazy(() => import('@/pages/ism/AuditsSurveysPage'));
-const CorrectiveActionsPage = React.lazy(() => import('@/pages/ism/CorrectiveActionsPage'));
-const ISMDrillsPage = React.lazy(() => import('@/pages/ism/DrillsPage'));
-const ISMIncidentsPage = React.lazy(() => import('@/pages/ism/IncidentsPage'));
-const InvestigationsPage = React.lazy(() => import('@/pages/ism/InvestigationsPage'));
-const MeetingsPage = React.lazy(() => import('@/pages/ism/MeetingsPage'));
-const MiscellaneousPage = React.lazy(() => import('@/pages/ism/MiscellaneousPage'));
-const NonConformitiesPage = React.lazy(() => import('@/pages/ism/NonConformitiesPage'));
-const ObservationsPage = React.lazy(() => import('@/pages/ism/ObservationsPage'));
-const PermitsToWorkPage = React.lazy(() => import('@/pages/ism/PermitsToWorkPage'));
-const ISMTrainingPage = React.lazy(() => import('@/pages/ism/TrainingPage'));
+const ERMPage = React.lazy(() => import('@/modules/ism/pages/ERMPage'));
+const ChecklistsPage = React.lazy(() => import('@/modules/ism/pages/ChecklistsPage'));
+const RiskAssessmentsPage = React.lazy(() => import('@/modules/ism/pages/RiskAssessmentsPage'));
+const SOPsPage = React.lazy(() => import('@/modules/ism/pages/SOPsPage'));
+const AuditsSurveysPage = React.lazy(() => import('@/modules/ism/pages/AuditsSurveysPage'));
+const CorrectiveActionsPage = React.lazy(() => import('@/modules/ism/pages/CorrectiveActionsPage'));
+const ISMDrillsPage = React.lazy(() => import('@/modules/ism/pages/DrillsPage'));
+const ISMIncidentsPage = React.lazy(() => import('@/modules/ism/pages/IncidentsPage'));
+const InvestigationsPage = React.lazy(() => import('@/modules/ism/pages/InvestigationsPage'));
+const MeetingsPage = React.lazy(() => import('@/modules/ism/pages/MeetingsPage'));
+const MiscellaneousPage = React.lazy(() => import('@/modules/ism/pages/MiscellaneousPage'));
+const NonConformitiesPage = React.lazy(() => import('@/modules/ism/pages/NonConformitiesPage'));
+const ObservationsPage = React.lazy(() => import('@/modules/ism/pages/ObservationsPage'));
+const PermitsToWorkPage = React.lazy(() => import('@/modules/ism/pages/PermitsToWorkPage'));
+const ISMTrainingPage = React.lazy(() => import('@/modules/ism/pages/TrainingPage'));
 
 // Document Sub-pages - lazy loaded
-const ReviewQueue = React.lazy(() => import('@/pages/ReviewQueue'));
-const AcknowledgmentTracking = React.lazy(() => import('@/pages/AcknowledgmentTracking'));
-const MasterDocumentIndex = React.lazy(() => import('@/pages/MasterDocumentIndex'));
-const DocumentSearch = React.lazy(() => import('@/pages/DocumentSearch'));
-const ReviewDashboard = React.lazy(() => import('@/pages/ReviewDashboard'));
+const ReviewQueue = React.lazy(() => import('@/modules/documents/pages/ReviewQueue'));
+const AcknowledgmentTracking = React.lazy(() => import('@/modules/crew/pages/AcknowledgmentTracking'));
+const MasterDocumentIndex = React.lazy(() => import('@/modules/documents/pages/MasterDocumentIndex'));
+const DocumentSearch = React.lazy(() => import('@/modules/documents/pages/DocumentSearch'));
+const ReviewDashboard = React.lazy(() => import('@/modules/documents/pages/ReviewDashboard'));
 
 // Report Pages - lazy loaded (heavy recharts dependency)
-const IncidentAnalytics = React.lazy(() => import('@/pages/IncidentAnalytics'));
-const CAPATracker = React.lazy(() => import('@/pages/CAPATracker'));
-const DrillAnalytics = React.lazy(() => import('@/pages/DrillAnalytics'));
-const CertificateAlerts = React.lazy(() => import('@/pages/CertificateAlerts'));
+const IncidentAnalytics = React.lazy(() => import('@/modules/incidents/pages/IncidentAnalytics'));
+const CAPATracker = React.lazy(() => import('@/modules/incidents/pages/CAPATracker'));
+const DrillAnalytics = React.lazy(() => import('@/modules/drills/pages/DrillAnalytics'));
+const CertificateAlerts = React.lazy(() => import('@/modules/certificates/pages/CertificateAlerts'));
 
 // Settings Sub-pages - lazy loaded
-const BrandingSettings = React.lazy(() => import('@/pages/BrandingSettings'));
-const DPADashboard = React.lazy(() => import('@/pages/DPADashboard'));
-const RolesPermissionsPage = React.lazy(() => import('@/pages/settings/RolesPermissionsPage'));
+const BrandingSettings = React.lazy(() => import('@/modules/settings/pages/BrandingSettings'));
+const DPADashboard = React.lazy(() => import('@/modules/dashboard/pages/DPADashboard'));
+const RolesPermissionsPage = React.lazy(() => import('@/modules/settings/pages/RolesPermissionsPage'));
 
 // Admin Pages - lazy loaded
-const UserManagement = React.lazy(() => import('@/pages/admin/UserManagement'));
-const FleetGroups = React.lazy(() => import('@/pages/admin/FleetGroups'));
-const AlertConfiguration = React.lazy(() => import('@/pages/admin/AlertConfiguration'));
-const APIIntegrations = React.lazy(() => import('@/pages/admin/APIIntegrations'));
+const UserManagement = React.lazy(() => import('@/modules/settings/pages/UserManagement'));
+const FleetGroups = React.lazy(() => import('@/modules/settings/pages/FleetGroups'));
+const AlertConfiguration = React.lazy(() => import('@/modules/settings/pages/AlertConfiguration'));
+const APIIntegrations = React.lazy(() => import('@/modules/settings/pages/APIIntegrations'));
 
 // Document Pages - lazy loaded
-const Manuals = React.lazy(() => import('@/pages/documents/Manuals'));
-const Policies = React.lazy(() => import('@/pages/documents/Policies'));
-const Procedures = React.lazy(() => import('@/pages/documents/Procedures'));
-const ISM_SMS = React.lazy(() => import('@/pages/documents/ISM_SMS'));
-const Drawings = React.lazy(() => import('@/pages/documents/Drawings'));
+const Manuals = React.lazy(() => import('@/modules/documents/pages/Manuals'));
+const Policies = React.lazy(() => import('@/modules/documents/pages/Policies'));
+const Procedures = React.lazy(() => import('@/modules/documents/pages/Procedures'));
+const ISM_SMS = React.lazy(() => import('@/modules/documents/pages/ISM_SMS'));
+const Drawings = React.lazy(() => import('@/modules/documents/pages/Drawings'));
 
 // Crew Pages - lazy loaded
-const FlightsTravel = React.lazy(() => import('@/pages/crew/FlightsTravel'));
-const LeavePlannerPage = React.lazy(() => import('@/pages/crew/LeavePlannerPage'));
-const LeaveRequestsPage = React.lazy(() => import('@/pages/crew/LeaveRequestsPage'));
-const TravelRecordDetail = React.lazy(() => import('@/pages/crew/admin/TravelRecordDetail'));
-const QuarantineBookingsPage = React.lazy(() => import('@/pages/crew/admin/QuarantineBookingsPage'));
+const FlightsTravel = React.lazy(() => import('@/modules/crew/pages/FlightsTravel'));
+const LeavePlannerPage = React.lazy(() => import('@/modules/crew/pages/LeavePlannerPage'));
+const LeaveRequestsPage = React.lazy(() => import('@/modules/crew/pages/LeaveRequestsPage'));
+const TravelRecordDetail = React.lazy(() => import('@/modules/crew/pages/admin/TravelRecordDetail'));
+const QuarantineBookingsPage = React.lazy(() => import('@/modules/crew/pages/admin/QuarantineBookingsPage'));
 
 // Certificate Pages - lazy loaded
-const CrewCertificatesOverview = React.lazy(() => import('@/pages/certificates/CrewCertificatesOverview'));
+const CrewCertificatesOverview = React.lazy(() => import('@/modules/certificates/pages/CrewCertificatesOverview'));
 
 // ISM Forms Pages - lazy loaded
-const DraftTemplates = React.lazy(() => import('@/pages/ism/forms/DraftTemplates'));
-const FormsArchive = React.lazy(() => import('@/pages/ism/forms/FormsArchive'));
-const FormSchedules = React.lazy(() => import('@/pages/ism/forms/FormSchedules'));
-const FormExports = React.lazy(() => import('@/pages/ism/forms/FormExports'));
+const DraftTemplates = React.lazy(() => import('@/modules/ism/forms/pages/DraftTemplates'));
+const FormsArchive = React.lazy(() => import('@/modules/ism/forms/pages/FormsArchive'));
+const FormSchedules = React.lazy(() => import('@/modules/ism/forms/pages/FormSchedules'));
+const FormExports = React.lazy(() => import('@/modules/ism/forms/pages/FormExports'));
 
 // Maintenance Pages - lazy loaded
-const SpareParts = React.lazy(() => import('@/pages/maintenance/SpareParts'));
+const SpareParts = React.lazy(() => import('@/modules/maintenance/pages/SpareParts'));
 
 // Maintenance Pages - lazy loaded
-const MaintenanceDefects = React.lazy(() => import('@/pages/maintenance/MaintenanceDefects'));
-const CriticalEquipment = React.lazy(() => import('@/pages/maintenance/CriticalEquipment'));
+const MaintenanceDefects = React.lazy(() => import('@/modules/maintenance/pages/MaintenanceDefects'));
+const CriticalEquipment = React.lazy(() => import('@/modules/maintenance/pages/CriticalEquipment'));
 
 // Vessel Pages - lazy loaded
-const CompanyDetails = React.lazy(() => import('@/pages/vessels/CompanyDetails'));
+const CompanyDetails = React.lazy(() => import('@/modules/vessels/pages/CompanyDetails'));
 
 // Loading spinner for lazy components
 const LazyLoader = () => (
@@ -168,14 +168,14 @@ export const AppRoutes: React.FC = () => {
       <Route path="/vessels/emergency-details" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            {React.createElement(React.lazy(() => import('@/pages/vessels/VesselEmergencyDetailsPage')))}
+            {React.createElement(React.lazy(() => import('@/modules/vessels/pages/VesselEmergencyDetailsPage')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/vessels/:vesselId/emergency" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            {React.createElement(React.lazy(() => import('@/pages/vessels/VesselEmergencyDetailsPage')))}
+            {React.createElement(React.lazy(() => import('@/modules/vessels/pages/VesselEmergencyDetailsPage')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
@@ -186,7 +186,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/crew/certificates" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            {React.createElement(React.lazy(() => import('@/pages/crew/CrewDocuments')))}
+            {React.createElement(React.lazy(() => import('@/modules/crew/pages/CrewDocuments')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
@@ -198,21 +198,21 @@ export const AppRoutes: React.FC = () => {
       <Route path="/crew/hours-of-rest" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            {React.createElement(React.lazy(() => import('@/pages/crew/HoursOfRest')))}
+            {React.createElement(React.lazy(() => import('@/modules/crew/pages/HoursOfRest')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/crew/calendar" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            {React.createElement(React.lazy(() => import('@/pages/crew/VesselCalendar')))}
+            {React.createElement(React.lazy(() => import('@/modules/crew/pages/VesselCalendar')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/crew/my-dashboard" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            {React.createElement(React.lazy(() => import('@/pages/crew/CrewDashboard')))}
+            {React.createElement(React.lazy(() => import('@/modules/crew/pages/CrewDashboard')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
@@ -229,14 +229,14 @@ export const AppRoutes: React.FC = () => {
       <Route path="/crew/tasks" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            {React.createElement(React.lazy(() => import('@/pages/crew/CrewTasksPage')))}
+            {React.createElement(React.lazy(() => import('@/modules/crew/pages/CrewTasksPage')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/crew/acknowledgements" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            {React.createElement(React.lazy(() => import('@/pages/crew/DocumentAcknowledgementsPage')))}
+            {React.createElement(React.lazy(() => import('@/modules/crew/pages/DocumentAcknowledgementsPage')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
@@ -246,7 +246,7 @@ export const AppRoutes: React.FC = () => {
         <ProtectedRoute>
           <DashboardLayout>
             <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-              {React.createElement(React.lazy(() => import('@/pages/crew/admin/CrewAdminDashboard')))}
+              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/CrewAdminDashboard')))}
             </React.Suspense>
           </DashboardLayout>
         </ProtectedRoute>
@@ -255,7 +255,7 @@ export const AppRoutes: React.FC = () => {
         <ProtectedRoute>
           <DashboardLayout>
             <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-              {React.createElement(React.lazy(() => import('@/pages/crew/admin/TravelRecordsPage')))}
+              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/TravelRecordsPage')))}
             </React.Suspense>
           </DashboardLayout>
         </ProtectedRoute>
@@ -264,7 +264,7 @@ export const AppRoutes: React.FC = () => {
         <ProtectedRoute>
           <DashboardLayout>
             <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-              {React.createElement(React.lazy(() => import('@/pages/crew/admin/CreateTravelRecordPage')))}
+              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/CreateTravelRecordPage')))}
             </React.Suspense>
           </DashboardLayout>
         </ProtectedRoute>
@@ -278,7 +278,7 @@ export const AppRoutes: React.FC = () => {
         <ProtectedRoute>
           <DashboardLayout>
             <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-              {React.createElement(React.lazy(() => import('@/pages/crew/admin/PreDepartureListPage')))}
+              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/PreDepartureListPage')))}
             </React.Suspense>
           </DashboardLayout>
         </ProtectedRoute>
@@ -287,7 +287,7 @@ export const AppRoutes: React.FC = () => {
         <ProtectedRoute>
           <DashboardLayout>
             <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-              {React.createElement(React.lazy(() => import('@/pages/crew/admin/PreDepartureDetailPage')))}
+              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/PreDepartureDetailPage')))}
             </React.Suspense>
           </DashboardLayout>
         </ProtectedRoute>
@@ -296,7 +296,7 @@ export const AppRoutes: React.FC = () => {
         <ProtectedRoute>
           <DashboardLayout>
             <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-              {React.createElement(React.lazy(() => import('@/pages/crew/admin/TravelDocumentsPage')))}
+              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/TravelDocumentsPage')))}
             </React.Suspense>
           </DashboardLayout>
         </ProtectedRoute>
@@ -305,7 +305,7 @@ export const AppRoutes: React.FC = () => {
         <ProtectedRoute>
           <DashboardLayout>
             <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-              {React.createElement(React.lazy(() => import('@/pages/crew/admin/DocumentUploadPage')))}
+              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/DocumentUploadPage')))}
             </React.Suspense>
           </DashboardLayout>
         </ProtectedRoute>
@@ -314,7 +314,7 @@ export const AppRoutes: React.FC = () => {
         <ProtectedRoute>
           <DashboardLayout>
             <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-              {React.createElement(React.lazy(() => import('@/pages/crew/admin/QuarantineHousesPage')))}
+              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/QuarantineHousesPage')))}
             </React.Suspense>
           </DashboardLayout>
         </ProtectedRoute>
@@ -323,7 +323,7 @@ export const AppRoutes: React.FC = () => {
         <ProtectedRoute>
           <DashboardLayout>
             <React.Suspense fallback={<LazyLoader />}>
-              {React.createElement(React.lazy(() => import('@/pages/crew/admin/QuarantineBookingsPage')))}
+              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/QuarantineBookingsPage')))}
             </React.Suspense>
           </DashboardLayout>
         </ProtectedRoute>
@@ -332,7 +332,7 @@ export const AppRoutes: React.FC = () => {
         <ProtectedRoute>
           <DashboardLayout>
             <React.Suspense fallback={<LazyLoader />}>
-              {React.createElement(React.lazy(() => import('@/pages/crew/admin/AddQuarantineHousePage')))}
+              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/AddQuarantineHousePage')))}
             </React.Suspense>
           </DashboardLayout>
         </ProtectedRoute>
@@ -346,49 +346,49 @@ export const AppRoutes: React.FC = () => {
       <Route path="/ism/forms/templates" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div>Loading...</div>}>
-            {React.createElement(React.lazy(() => import('@/pages/ism/forms/FormTemplates')))}
+            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/FormTemplates')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/ism/forms/templates/create" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div>Loading...</div>}>
-            {React.createElement(React.lazy(() => import('@/pages/ism/forms/CreateTemplate')))}
+            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/CreateTemplate')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/ism/forms/templates/:templateId" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div>Loading...</div>}>
-            {React.createElement(React.lazy(() => import('@/pages/ism/forms/TemplateDetail')))}
+            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/TemplateDetail')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/ism/forms/templates/:templateId/edit" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div>Loading...</div>}>
-            {React.createElement(React.lazy(() => import('@/pages/ism/forms/CreateTemplate')))}
+            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/CreateTemplate')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/ism/forms/new" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div>Loading...</div>}>
-            {React.createElement(React.lazy(() => import('@/pages/ism/forms/FormSubmission')))}
+            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/FormSubmission')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/ism/forms/submission/:submissionId" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div>Loading...</div>}>
-            {React.createElement(React.lazy(() => import('@/pages/ism/forms/FormSubmission')))}
+            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/FormSubmission')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/ism/forms/submissions" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div>Loading...</div>}>
-            {React.createElement(React.lazy(() => import('@/pages/ism/forms/SubmissionsList')))}
+            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/SubmissionsList')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
@@ -400,14 +400,14 @@ export const AppRoutes: React.FC = () => {
       <Route path="/ism/forms/my-drafts" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div>Loading...</div>}>
-            {React.createElement(React.lazy(() => import('@/pages/ism/forms/MyDrafts')))}
+            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/MyDrafts')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/ism/forms/pending" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div>Loading...</div>}>
-            {React.createElement(React.lazy(() => import('@/pages/ism/forms/PendingSignatures')))}
+            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/PendingSignatures')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
@@ -470,7 +470,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/documents/procedures" element={
         <ProtectedRoute>
           <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/pages/documents/Procedures')))}
+            {React.createElement(React.lazy(() => import('@/modules/documents/pages/Procedures')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
@@ -496,28 +496,28 @@ export const AppRoutes: React.FC = () => {
       <Route path="/itinerary/planning" element={
         <ProtectedRoute>
           <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/pages/itinerary/FleetPlanningPage')))}
+            {React.createElement(React.lazy(() => import('@/modules/itinerary/pages/FleetPlanningPage')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/itinerary/timeline" element={
         <ProtectedRoute>
           <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/pages/itinerary/FleetTimelinePage')))}
+            {React.createElement(React.lazy(() => import('@/modules/itinerary/pages/FleetTimelinePage')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/itinerary/suggestions" element={
         <ProtectedRoute>
           <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/pages/itinerary/TripSuggestionsPage')))}
+            {React.createElement(React.lazy(() => import('@/modules/itinerary/pages/TripSuggestionsPage')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/itinerary/postponed" element={
         <ProtectedRoute>
           <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/pages/itinerary/PostponedEntriesPage')))}
+            {React.createElement(React.lazy(() => import('@/modules/itinerary/pages/PostponedEntriesPage')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
@@ -527,28 +527,28 @@ export const AppRoutes: React.FC = () => {
       <Route path="/development/my" element={
         <ProtectedRoute>
           <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/pages/development/MyDevelopment')))}
+            {React.createElement(React.lazy(() => import('@/modules/development/pages/MyDevelopment')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/development/catalogue" element={
         <ProtectedRoute>
           <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/pages/development/CourseCatalogue')))}
+            {React.createElement(React.lazy(() => import('@/modules/development/pages/CourseCatalogue')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/development/applications" element={
         <ProtectedRoute>
           <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/pages/development/DevelopmentApplications')))}
+            {React.createElement(React.lazy(() => import('@/modules/development/pages/DevelopmentApplications')))}
           </React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/development/admin" element={
         <ProtectedRoute>
           <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/pages/development/DevelopmentAdmin')))}
+            {React.createElement(React.lazy(() => import('@/modules/development/pages/DevelopmentAdmin')))}
           </React.Suspense>
         </ProtectedRoute>
       } />

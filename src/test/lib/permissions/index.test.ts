@@ -7,8 +7,8 @@ import {
   isExternalUser,
   getHighestRole,
   mapLegacyRole,
-} from '@/lib/permissions/index';
-import type { AppRole } from '@/lib/permissions/types';
+} from '@/modules/auth/lib/permissionsIndex';
+import type { AppRole } from '@/modules/auth/lib/types';
 
 describe('permissions/index', () => {
   describe('hasPermission', () => {

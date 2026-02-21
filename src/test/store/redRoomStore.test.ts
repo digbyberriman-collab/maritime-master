@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useRedRoomStore } from '@/store/redRoomStore';
+import { useRedRoomStore } from '@/modules/red-room/store/redRoomStore';
 
 // Mock supabase
 vi.mock('@/integrations/supabase/client', () => ({
