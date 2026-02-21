@@ -71,7 +71,7 @@ serve(async (req: Request) => {
       } catch (downloadError) {
         console.error('Failed to download file:', downloadError);
         // Fall back to URL-only extraction
-        base64Data = null;
+        base64Data = undefined;
       }
     }
 
