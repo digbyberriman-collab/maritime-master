@@ -50,9 +50,8 @@ function generateCrewListData(): CrewListEntry[] {
     const cocExpiry = addDays(new Date(baseYear, (i * 7) % 12, 10), (i * 53) % 1095 + 365);
     const signOn = addDays(new Date(2025, (i * 2) % 12, (i * 7) % 28 + 1), 0);
 
-    // Make a few expired/expiring for testing
-    const isExpired = i === 12 || i === 28; // Douglas Cullingworth, Darrol John Patterson
-    const isExpiring = i === 5 || i === 20; // Oliver Kincart, Charlotte Elizabeth Williams
+    const isExpired = i === 12 || i === 28;
+    const isExpiring = i === 5 || i === 20;
 
     return {
       name: crew.name,
@@ -77,7 +76,7 @@ function generateCrewListData(): CrewListEntry[] {
           ? format(addDays(new Date(), -10), 'yyyy-MM-dd')
           : format(medicalExpiry, 'yyyy-MM-dd'),
       signOnDate: format(signOn, 'yyyy-MM-dd'),
-      currentlyOnboard: i < 30, // Most onboard, a few on leave
+      currentlyOnboard: i < 30,
     };
   });
 }
@@ -127,8 +126,8 @@ const MLCTab: React.FC = () => {
         || c.nationality.toLowerCase().includes(q);
     })
     .sort((a, b) => {
-      const aVal = (a as Record<string, unknown>)[sortCol] as string || '';
-      const bVal = (b as Record<string, unknown>)[sortCol] as string || '';
+      const aVal = (a as unknown as Record<string, unknown>)[sortCol] as string || '';
+      const bVal = (b as unknown as Record<string, unknown>)[sortCol] as string || '';
       return sortAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
 
@@ -166,10 +165,10 @@ const MLCTab: React.FC = () => {
     <div className="space-y-6">
       {/* Section A - MLC Certificates */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card className="bg-[#111D33] border-[#1A2740]">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <FileCheck className="w-5 h-5 text-[#22C55E]" />
+            <CardTitle className="flex items-center gap-2">
+              <FileCheck className="w-5 h-5 text-success" />
               Maritime Labour Certificate
             </CardTitle>
           </CardHeader>
@@ -181,76 +180,76 @@ const MLCTab: React.FC = () => {
               { label: 'Authority', value: 'CISR' },
             ].map((f, i) => (
               <div key={i} className="flex justify-between">
-                <span className="text-[#94A3B8] text-sm">{f.label}</span>
-                <span className="text-white text-sm">{f.value}</span>
+                <span className="text-muted-foreground text-sm">{f.label}</span>
+                <span className="text-foreground text-sm">{f.value}</span>
               </div>
             ))}
             <div className="flex justify-between items-center">
-              <span className="text-[#94A3B8] text-sm">Status</span>
-              <Badge className="bg-[#22C55E] text-white">Valid</Badge>
+              <span className="text-muted-foreground text-sm">Status</span>
+              <Badge className="bg-success text-success-foreground">Valid</Badge>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="bg-[#111D33] border-[#1A2740]">
+        <Card>
           <CardHeader>
-            <CardTitle className="text-white flex items-center gap-2">
-              <FileCheck className="w-5 h-5 text-[#3B82F6]" />
+            <CardTitle className="flex items-center gap-2">
+              <FileCheck className="w-5 h-5 text-primary" />
               DMLC Tracking
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex justify-between">
-              <span className="text-[#94A3B8] text-sm">DMLC Part I</span>
-              <Badge className="bg-[#22C55E] text-white">Current</Badge>
+              <span className="text-muted-foreground text-sm">DMLC Part I</span>
+              <Badge className="bg-success text-success-foreground">Current</Badge>
             </div>
             <div className="flex justify-between">
-              <span className="text-[#94A3B8] text-sm">DMLC Part II</span>
-              <Badge className="bg-[#22C55E] text-white">Current</Badge>
+              <span className="text-muted-foreground text-sm">DMLC Part II</span>
+              <Badge className="bg-success text-success-foreground">Current</Badge>
             </div>
             <div className="flex justify-between">
-              <span className="text-[#94A3B8] text-sm">Last Inspection</span>
-              <span className="text-white text-sm">15 Nov 2025</span>
+              <span className="text-muted-foreground text-sm">Last Inspection</span>
+              <span className="text-foreground text-sm">15 Nov 2025</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-[#94A3B8] text-sm">Next Due</span>
-              <span className="text-white text-sm">15 Nov 2028</span>
+              <span className="text-muted-foreground text-sm">Next Due</span>
+              <span className="text-foreground text-sm">15 Nov 2028</span>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Section B - Crew List Generator — CRITICAL */}
-      <Card className="bg-[#111D33] border-[#1A2740]">
+      {/* Section B - Crew List Generator */}
+      <Card>
         <CardHeader>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <CardTitle className="text-white flex items-center gap-2">
-              <Users className="w-5 h-5 text-[#3B82F6]" />
+            <CardTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5 text-primary" />
               Crew List
             </CardTitle>
             <div className="flex items-center gap-3 flex-wrap">
               <div className="flex items-center gap-2">
-                <span className="text-[#94A3B8] text-sm">Onboard only</span>
+                <span className="text-muted-foreground text-sm">Onboard only</span>
                 <Switch checked={showOnboardOnly} onCheckedChange={setShowOnboardOnly} />
               </div>
               <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[#94A3B8]" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search crew..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="pl-8 w-48 bg-[#1A2740] border-[#1A2740] text-white"
+                  className="pl-8 w-48"
                 />
               </div>
               {/* Column Toggle */}
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button size="sm" variant="outline" className="gap-1 border-[#1A2740] text-[#94A3B8]">
+                  <Button size="sm" variant="outline" className="gap-1">
                     <Columns className="w-4 h-4" /> Columns
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="bg-[#111D33] border-[#1A2740] w-80 p-4" align="end">
-                  <p className="text-white font-semibold text-sm mb-3">Column Visibility</p>
+                <PopoverContent className="w-80 p-4" align="end">
+                  <p className="font-semibold text-sm mb-3">Column Visibility</p>
                   <div className="space-y-2 max-h-[300px] overflow-y-auto">
                     {ALL_COLUMNS.map(col => (
                       <label key={col.key} className="flex items-center gap-2 cursor-pointer">
@@ -259,17 +258,17 @@ const MLCTab: React.FC = () => {
                           checked={visibleCols.has(col.key)}
                           onChange={() => toggleCol(col.key)}
                           disabled={col.locked}
-                          className="rounded border-[#94A3B8]"
+                          className="rounded"
                         />
-                        <span className={cn('text-sm', col.locked ? 'text-[#94A3B8]' : 'text-white')}>
+                        <span className={cn('text-sm', col.locked ? 'text-muted-foreground' : 'text-foreground')}>
                           {col.label}
-                          {col.locked && <span className="text-xs text-[#94A3B8] ml-1">(locked)</span>}
+                          {col.locked && <span className="text-xs text-muted-foreground ml-1">(locked)</span>}
                         </span>
                       </label>
                     ))}
                   </div>
-                  <div className="mt-4 pt-3 border-t border-[#1A2740]">
-                    <p className="text-xs text-[#94A3B8] mb-2">Quick Presets</p>
+                  <div className="mt-4 pt-3 border-t">
+                    <p className="text-xs text-muted-foreground mb-2">Quick Presets</p>
                     <div className="flex flex-wrap gap-2">
                       {[
                         { key: 'port-state', label: 'Port State Control' },
@@ -282,7 +281,7 @@ const MLCTab: React.FC = () => {
                           size="sm"
                           variant="outline"
                           onClick={() => applyPreset(p.key)}
-                          className="text-xs border-[#1A2740] text-[#94A3B8] hover:text-white"
+                          className="text-xs"
                         >
                           {p.label}
                         </Button>
@@ -291,15 +290,15 @@ const MLCTab: React.FC = () => {
                   </div>
                 </PopoverContent>
               </Popover>
-              <Button size="sm" className="gap-1 bg-[#3B82F6]">
+              <Button size="sm" className="gap-1">
                 <Download className="w-4 h-4" /> Generate Crew List
               </Button>
-              <Button size="sm" variant="outline" className="gap-1 border-[#1A2740] text-[#94A3B8]">
+              <Button size="sm" variant="outline" className="gap-1">
                 <Printer className="w-4 h-4" /> Print
               </Button>
             </div>
           </div>
-          <p className="text-[#94A3B8] text-sm mt-1">
+          <p className="text-muted-foreground text-sm mt-1">
             {filteredCrew.length} crew {showOnboardOnly ? 'onboard' : 'total'} — DRAAK
           </p>
         </CardHeader>
@@ -307,11 +306,11 @@ const MLCTab: React.FC = () => {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="border-[#1A2740]">
+                <TableRow>
                   {visibleColumns.map(col => (
                     <TableHead
                       key={col.key}
-                      className="text-[#94A3B8] cursor-pointer hover:text-white whitespace-nowrap"
+                      className="cursor-pointer hover:text-foreground whitespace-nowrap"
                       onClick={() => handleSort(col.key)}
                     >
                       {col.label}
@@ -322,15 +321,14 @@ const MLCTab: React.FC = () => {
               </TableHeader>
               <TableBody>
                 {filteredCrew.map((crew, i) => {
-                  // Determine row highlight
                   const hasExpired = ['passportExpiry', 'cocExpiry', 'medicalExpiry', 'seamansBookExpiry']
                     .some(field => {
-                      const val = (crew as Record<string, unknown>)[field] as string;
+                      const val = (crew as unknown as Record<string, unknown>)[field] as string;
                       return val && visibleCols.has(field) && getExpiryStatus(val) === 'expired';
                     });
                   const hasExpiring = ['passportExpiry', 'cocExpiry', 'medicalExpiry', 'seamansBookExpiry']
                     .some(field => {
-                      const val = (crew as Record<string, unknown>)[field] as string;
+                      const val = (crew as unknown as Record<string, unknown>)[field] as string;
                       return val && visibleCols.has(field) && getExpiryStatus(val) === 'expiring';
                     });
 
@@ -338,13 +336,13 @@ const MLCTab: React.FC = () => {
                     <TableRow
                       key={i}
                       className={cn(
-                        'border-[#1A2740] cursor-pointer hover:bg-[#1A2740]/50',
-                        hasExpired && 'bg-[#EF4444]/10',
-                        !hasExpired && hasExpiring && 'bg-[#F59E0B]/10',
+                        'cursor-pointer',
+                        hasExpired && 'bg-destructive/10',
+                        !hasExpired && hasExpiring && 'bg-warning/10',
                       )}
                     >
                       {visibleColumns.map(col => {
-                        const val = (crew as Record<string, unknown>)[col.key] as string;
+                        const val = (crew as unknown as Record<string, unknown>)[col.key] as string;
                         const isDateCol = col.key.includes('Expiry') || col.key === 'dob' || col.key === 'signOnDate';
                         const isExpiryCol = col.key.includes('Expiry');
 
@@ -355,11 +353,11 @@ const MLCTab: React.FC = () => {
                           } catch { displayVal = val; }
                         }
 
-                        let cellClass = 'text-white';
+                        let cellClass = '';
                         if (isExpiryCol && val) {
                           const status = getExpiryStatus(val);
-                          if (status === 'expired') cellClass = 'text-[#EF4444] font-semibold';
-                          else if (status === 'expiring') cellClass = 'text-[#F59E0B] font-semibold';
+                          if (status === 'expired') cellClass = 'text-destructive font-semibold';
+                          else if (status === 'expiring') cellClass = 'text-warning font-semibold';
                         }
 
                         return (
@@ -378,53 +376,53 @@ const MLCTab: React.FC = () => {
       </Card>
 
       {/* Section C - Working Hours & Rest */}
-      <Card className="bg-[#111D33] border-[#1A2740]">
+      <Card>
         <CardHeader>
-          <CardTitle className="text-white flex items-center gap-2">
-            <Clock className="w-5 h-5 text-[#F59E0B]" />
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="w-5 h-5 text-warning" />
             Working Hours & Rest
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-4 rounded-lg bg-[#1A2740]">
-              <p className="text-xs text-[#94A3B8]">Compliance Rate</p>
-              <p className="text-2xl font-bold text-[#22C55E]">98.5%</p>
-              <p className="text-xs text-[#94A3B8]">Last 30 days</p>
+            <div className="p-4 rounded-lg bg-muted">
+              <p className="text-xs text-muted-foreground">Compliance Rate</p>
+              <p className="text-2xl font-bold text-success">98.5%</p>
+              <p className="text-xs text-muted-foreground">Last 30 days</p>
             </div>
-            <div className="p-4 rounded-lg bg-[#1A2740]">
-              <p className="text-xs text-[#94A3B8]">Non-Conformances</p>
-              <p className="text-2xl font-bold text-[#F59E0B]">2</p>
-              <p className="text-xs text-[#94A3B8]">This month</p>
+            <div className="p-4 rounded-lg bg-muted">
+              <p className="text-xs text-muted-foreground">Non-Conformances</p>
+              <p className="text-2xl font-bold text-warning">2</p>
+              <p className="text-xs text-muted-foreground">This month</p>
             </div>
-            <div className="p-4 rounded-lg bg-[#1A2740]">
-              <p className="text-xs text-[#94A3B8]">Records Pending</p>
-              <p className="text-2xl font-bold text-white">5</p>
-              <p className="text-xs text-[#94A3B8]">Awaiting sign-off</p>
+            <div className="p-4 rounded-lg bg-muted">
+              <p className="text-xs text-muted-foreground">Records Pending</p>
+              <p className="text-2xl font-bold text-foreground">5</p>
+              <p className="text-xs text-muted-foreground">Awaiting sign-off</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Section D - SEAs */}
-      <Card className="bg-[#111D33] border-[#1A2740]">
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-white flex items-center gap-2">
-            <FileCheck className="w-5 h-5 text-[#3B82F6]" />
+          <CardTitle className="flex items-center gap-2">
+            <FileCheck className="w-5 h-5 text-primary" />
             Seafarer Employment Agreements
           </CardTitle>
-          <Button size="sm" className="gap-1 bg-[#3B82F6]">
+          <Button size="sm" className="gap-1">
             <Plus className="w-4 h-4" /> Add SEA
           </Button>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
-              <TableRow className="border-[#1A2740]">
-                <TableHead className="text-[#94A3B8]">Crew Member</TableHead>
-                <TableHead className="text-[#94A3B8]">Start Date</TableHead>
-                <TableHead className="text-[#94A3B8]">End Date</TableHead>
-                <TableHead className="text-[#94A3B8]">Status</TableHead>
+              <TableRow>
+                <TableHead>Crew Member</TableHead>
+                <TableHead>Start Date</TableHead>
+                <TableHead>End Date</TableHead>
+                <TableHead>Status</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -433,12 +431,12 @@ const MLCTab: React.FC = () => {
                 const end = addDays(start, 365);
                 const isExpiring = differenceInDays(end, new Date()) < 60;
                 return (
-                  <TableRow key={i} className="border-[#1A2740]">
-                    <TableCell className="text-white">{crew.name}</TableCell>
-                    <TableCell className="text-white">{format(start, 'dd MMM yyyy')}</TableCell>
-                    <TableCell className="text-white">{format(end, 'dd MMM yyyy')}</TableCell>
+                  <TableRow key={i}>
+                    <TableCell>{crew.name}</TableCell>
+                    <TableCell>{format(start, 'dd MMM yyyy')}</TableCell>
+                    <TableCell>{format(end, 'dd MMM yyyy')}</TableCell>
                     <TableCell>
-                      <Badge className={isExpiring ? 'bg-[#F59E0B] text-black' : 'bg-[#22C55E] text-white'}>
+                      <Badge className={isExpiring ? 'bg-warning text-warning-foreground' : 'bg-success text-success-foreground'}>
                         {isExpiring ? 'Expiring' : 'Active'}
                       </Badge>
                     </TableCell>
@@ -451,21 +449,21 @@ const MLCTab: React.FC = () => {
       </Card>
 
       {/* Section E - Crew Complaints */}
-      <Card className="bg-[#111D33] border-[#1A2740]">
+      <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-white flex items-center gap-2">
-            <MessageSquare className="w-5 h-5 text-[#94A3B8]" />
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="w-5 h-5 text-muted-foreground" />
             Crew Complaints
           </CardTitle>
-          <Button size="sm" className="gap-1 bg-[#3B82F6]">
+          <Button size="sm" className="gap-1">
             <Plus className="w-4 h-4" /> Submit Complaint
           </Button>
         </CardHeader>
         <CardContent>
           <div className="p-8 text-center">
-            <MessageSquare className="w-12 h-12 text-[#94A3B8]/30 mx-auto mb-3" />
-            <p className="text-[#94A3B8]">No active complaints</p>
-            <p className="text-xs text-[#94A3B8]/70 mt-1">
+            <MessageSquare className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground">No active complaints</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">
               Complaints are confidential and accessible only to Captain, DPA, and HR.
             </p>
           </div>

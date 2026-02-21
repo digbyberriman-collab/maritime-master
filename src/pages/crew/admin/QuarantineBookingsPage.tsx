@@ -126,7 +126,7 @@ export default function QuarantineBookingsPage() {
       const cMap: Record<string, CrewProfile> = {};
       crewList.forEach((c) => { cMap[c.user_id] = c; });
 
-      setBookings(bookingsRes.data || []);
+      setBookings((bookingsRes.data || []) as QuarantineBooking[]);
       setHouses(housesList);
       setCrewProfiles(crewList);
       setHousesMap(hMap);
