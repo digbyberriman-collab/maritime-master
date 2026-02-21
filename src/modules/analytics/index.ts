@@ -10,4 +10,4 @@ export { VesselComparisonTable } from './components/VesselComparisonTable';
 
 // Hooks
 export { useIncidentAnalytics } from './hooks/useIncidentAnalytics';
-export { useCAPAAnalytics } from './hooks/useCAPAAnalytics';
+export { useCAPAMetrics, useCAPAList, useCAPAAging, useAssigneePerformance, useOverdueCAPAs, useRecentIncidents } from './hooks/useCAPAAnalytics';
