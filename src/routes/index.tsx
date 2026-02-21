@@ -16,6 +16,13 @@ import Auth from '@/pages/Auth';
 import ResetPassword from '@/pages/ResetPassword';
 import Dashboard from '@/pages/Dashboard';
 
+// New module pages - lazy loaded
+const CompliancePage = React.lazy(() => import('@/pages/compliance/CompliancePage'));
+const NewChecklistsPage = React.lazy(() => import('@/pages/checklists/ChecklistsPage'));
+const FlightsTravelPage = React.lazy(() => import('@/pages/flights/FlightsTravelPage'));
+const IndividualVesselDashboard = React.lazy(() => import('@/pages/vessels/IndividualVesselDashboard'));
+const NewPermissionsPage = React.lazy(() => import('@/pages/settings/PermissionsPage'));
+
 // Lazy loaded pages
 const Vessels = React.lazy(() => import('@/pages/Vessels'));
 const VesselDashboard = React.lazy(() => import('@/pages/VesselDashboard'));
@@ -624,6 +631,72 @@ export const AppRoutes: React.FC = () => {
           <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
             <DrillAnalytics />
           </React.Suspense>
+        </ProtectedRoute>
+      } />
+
+      {/* Compliance — ISM / ISPS / MLC */}
+      <Route path="/compliance" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}><CompliancePage /></React.Suspense>
+        </ProtectedRoute>
+      } />
+
+      {/* Checklists — department-based */}
+      <Route path="/checklists" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}><NewChecklistsPage /></React.Suspense>
+        </ProtectedRoute>
+      } />
+
+      {/* Flights & Travel */}
+      <Route path="/flights-travel" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}><FlightsTravelPage /></React.Suspense>
+        </ProtectedRoute>
+      } />
+
+      {/* Individual Vessel Dashboards */}
+      <Route path="/vessel/:vesselSlug/dashboard" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}><IndividualVesselDashboard /></React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/vessel/:vesselSlug" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}><IndividualVesselDashboard /></React.Suspense>
+        </ProtectedRoute>
+      } />
+      {/* Convenience routes for all 7 vessels */}
+      <Route path="/vessel/:vesselSlug/checklists" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}><NewChecklistsPage /></React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/vessel/:vesselSlug/compliance" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}><CompliancePage /></React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/vessel/:vesselSlug/compliance/ism" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}><CompliancePage /></React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/vessel/:vesselSlug/compliance/isps" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}><CompliancePage /></React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/vessel/:vesselSlug/compliance/mlc" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}><CompliancePage /></React.Suspense>
+        </ProtectedRoute>
+      } />
+
+      {/* Permissions (user-based toggle matrix) */}
+      <Route path="/settings/user-permissions" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}><NewPermissionsPage /></React.Suspense>
         </ProtectedRoute>
       } />
 

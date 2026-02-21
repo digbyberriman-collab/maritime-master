@@ -6,7 +6,7 @@ import { Users, Award, Plane, Clock, CalendarDays } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 const CREW_PAGES: Record<string, { title: string; description: string; icon: React.ElementType }> = {
-  '/crew/roster': { title: 'Crew Roster', description: 'Manage crew members and assignments', icon: Users },
+  '/crew/roster': { title: 'Crew List', description: 'Manage crew members and assignments', icon: Users },
   '/crew/certificates': { title: 'Crew Certificates', description: 'Crew certification and compliance tracking', icon: Award },
   '/crew/flights': { title: 'Flights & Travel', description: 'Travel arrangements and flight bookings', icon: Plane },
   '/crew/hours-of-rest': { title: 'Hours of Rest', description: 'STCW rest hour compliance tracking', icon: Clock },

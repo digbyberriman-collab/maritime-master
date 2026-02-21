@@ -31,7 +31,7 @@ const DataExportsSection: React.FC = () => {
               <div className="flex items-center gap-3">
                 <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
                 <div>
-                  <p className="font-medium">Crew Roster</p>
+                  <p className="font-medium">Crew List</p>
                   <p className="text-sm text-muted-foreground">Export crew member data</p>
                 </div>
               </div>
