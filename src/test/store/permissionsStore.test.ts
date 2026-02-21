@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { usePermissionsStore } from '@/store/permissionsStore';
+import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
 
 // Mock supabase
 vi.mock('@/integrations/supabase/client', () => ({

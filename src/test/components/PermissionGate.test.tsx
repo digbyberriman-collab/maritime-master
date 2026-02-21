@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { PermissionGate, ProtectedRoute, RequireRole, useCanAccess } from '@/components/auth/PermissionGate';
-import { usePermissionsStore } from '@/store/permissionsStore';
+import { PermissionGate, ProtectedRoute, RequireRole, useCanAccess } from '@/modules/auth/components/PermissionGate';
+import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
 
 // Mock supabase (needed by permissionsStore)
 vi.mock('@/integrations/supabase/client', () => ({

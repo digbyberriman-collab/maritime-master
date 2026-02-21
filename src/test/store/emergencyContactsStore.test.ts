@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { useEmergencyContactsStore } from '@/store/emergencyContactsStore';
+import { useEmergencyContactsStore } from '@/modules/emergency/store/emergencyContactsStore';
 
 // Mock supabase
 vi.mock('@/integrations/supabase/client', () => ({

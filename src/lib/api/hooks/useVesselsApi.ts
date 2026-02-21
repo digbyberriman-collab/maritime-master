@@ -1,8 +1,8 @@
 // Vessels API Hooks (7.2) - Simplified version
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
-import { toast } from '@/hooks/use-toast';
+import { useAuth } from '@/modules/auth/contexts/AuthContext';
+import { toast } from '@/shared/hooks/use-toast';
 import type { 
   Vessel, 
   UpdateVesselRequest, 

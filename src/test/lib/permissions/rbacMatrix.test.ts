@@ -6,8 +6,8 @@ import {
   getRolesForAction,
   roleHasModuleAccess,
   getPermissionsForRole,
-} from '@/lib/permissions/rbacMatrix';
-import type { AppRole } from '@/lib/permissions/types';
+} from '@/modules/auth/lib/rbacMatrix';
+import type { AppRole } from '@/modules/auth/lib/types';
 
 describe('rbacMatrix', () => {
   describe('SCOPE_MATRIX', () => {

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { APP_ROLES, ROLE_LABELS } from '@/lib/permissions/types';
-import type { AppRole } from '@/lib/permissions/types';
+import { APP_ROLES, ROLE_LABELS } from '@/modules/auth/lib/types';
+import type { AppRole } from '@/modules/auth/lib/types';
 
 describe('permissions/types', () => {
   describe('APP_ROLES', () => {

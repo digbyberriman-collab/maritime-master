@@ -8,7 +8,7 @@ import {
   DEPARTMENTS,
   GENDERS,
   CREW_STATUSES,
-} from '@/lib/permissions';
+} from '@/modules/auth/lib/permissions';
 
 describe('permissions', () => {
   describe('ROLE_PERMISSIONS', () => {
