@@ -217,7 +217,7 @@ const CrewRoster: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `STORM_Crew_Roster_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.download = `STORM_Crew_List_${format(new Date(), 'yyyy-MM-dd')}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -303,7 +303,7 @@ const CrewRoster: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Crew Roster</h1>
+            <h1 className="text-2xl font-bold text-foreground">Crew List</h1>
             <p className="text-muted-foreground">Manage crew assignments and profiles</p>
           </div>
           {canManageCrew && (

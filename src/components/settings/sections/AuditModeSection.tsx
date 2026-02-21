@@ -85,7 +85,7 @@ const DEFAULT_CONFIG: AuditModeConfig = {
 
 const VISIBLE_MODULES = [
   { key: 'certificates', label: 'Certificates' },
-  { key: 'crew', label: 'Crew Roster' },
+  { key: 'crew', label: 'Crew List' },
   { key: 'incidents', label: 'Incidents' },
   { key: 'drills', label: 'Drills' },
   { key: 'training', label: 'Training' },

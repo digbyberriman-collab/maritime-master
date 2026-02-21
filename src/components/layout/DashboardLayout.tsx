@@ -7,6 +7,8 @@ import InkfishFooter from '@/components/layout/InkfishFooter';
 import InkfishWatermark from '@/components/InkfishWatermark';
 import GlobalHeaderControls from '@/components/layout/GlobalHeaderControls';
 import VesselSelector from '@/components/VesselSelector';
+import VesselToggleBar from '@/components/layout/VesselToggleBar';
+import AdaptiveActionBar from '@/components/layout/AdaptiveActionBar';
 import SidebarNavigation from '@/components/layout/SidebarNavigation';
 import {
   LogOut,
@@ -144,9 +146,19 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             <Menu className="w-5 h-5" />
           </button>
 
+          {/* Vessel Toggle Pills (Task 0.1) */}
+          <div className="hidden lg:block">
+            <VesselToggleBar />
+          </div>
+
           {/* Mobile vessel selector */}
           <div className="hidden sm:block lg:hidden">
             <VesselSelector />
+          </div>
+
+          {/* Adaptive Frequent Actions Bar (Task 0.2) */}
+          <div className="hidden xl:block mx-2">
+            <AdaptiveActionBar />
           </div>
 
           {/* Spacer */}
