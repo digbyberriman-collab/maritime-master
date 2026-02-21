@@ -29,16 +29,16 @@ const CompliancePage: React.FC = () => {
         </div>
 
         <Tabs value={tab} onValueChange={handleTabChange}>
-          <TabsList className="bg-[#111D33] border border-[#1A2740]">
-            <TabsTrigger value="ism" className="gap-2 data-[state=active]:bg-[#1A2740] data-[state=active]:text-white">
+          <TabsList>
+            <TabsTrigger value="ism" className="gap-2">
               <Shield className="w-4 h-4" />
               ISM Code
             </TabsTrigger>
-            <TabsTrigger value="isps" className="gap-2 data-[state=active]:bg-[#1A2740] data-[state=active]:text-white">
+            <TabsTrigger value="isps" className="gap-2">
               <Anchor className="w-4 h-4" />
               ISPS
             </TabsTrigger>
-            <TabsTrigger value="mlc" className="gap-2 data-[state=active]:bg-[#1A2740] data-[state=active]:text-white">
+            <TabsTrigger value="mlc" className="gap-2">
               <Users className="w-4 h-4" />
               MLC
             </TabsTrigger>
