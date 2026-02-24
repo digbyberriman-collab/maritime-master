@@ -34,6 +34,7 @@ export const InkfishWatermark: React.FC = () => {
           <img
             src="/assets/inkfish-logo.png"
             alt=""
+            fetchPriority="high"
             className="w-full h-full object-contain opacity-[0.04] grayscale"
             onError={() => setImageError(true)}
             draggable={false}
