@@ -6,8 +6,6 @@ import { canManageBranding } from '@/shared/hooks/useBranding';
 import InkfishFooter from '@/shared/components/layout/InkfishFooter';
 import InkfishWatermark from '@/shared/components/InkfishWatermark';
 import GlobalHeaderControls from '@/shared/components/layout/GlobalHeaderControls';
-import VesselSelector from '@/modules/vessels/components/VesselSelector';
-import VesselToggleBar from '@/shared/components/layout/VesselToggleBar';
 import AdaptiveActionBar from '@/shared/components/layout/AdaptiveActionBar';
 import SidebarNavigation from '@/shared/components/layout/SidebarNavigation';
 import {
@@ -146,23 +144,13 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             <Menu className="w-5 h-5" />
           </button>
 
-          {/* Vessel Toggle Pills (Task 0.1) */}
-          <div className="hidden lg:block">
-            <VesselToggleBar />
-          </div>
-
-          {/* Mobile vessel selector */}
-          <div className="hidden sm:block lg:hidden">
-            <VesselSelector />
-          </div>
-
-          {/* Adaptive Frequent Actions Bar (Task 0.2) */}
-          <div className="hidden xl:block mx-2">
+          {/* Frequently Used Quick Actions Bar */}
+          <div className="hidden sm:block flex-1 mx-2">
             <AdaptiveActionBar />
           </div>
 
-          {/* Spacer */}
-          <div className="flex-1" />
+          {/* Spacer for mobile */}
+          <div className="flex-1 sm:hidden" />
 
           {/* Client logo (desktop only) */}
           {clientLogoUrl && (
