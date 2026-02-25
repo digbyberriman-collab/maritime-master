@@ -15,7 +15,6 @@ import { format } from 'date-fns';
 import { getIncidentTypeColor } from '@/modules/incidents/constants';
 import MaintenanceWidgets from '@/modules/dashboard/components/MaintenanceWidgets';
 import CrewFormModal from '@/modules/crew/components/CrewFormModal';
-import DevTodoWidget from '@/modules/dashboard/components/DevTodoWidget';
 import DPADashboard from './DPADashboard';
 import DashboardGrid from '@/modules/dashboard/components/DashboardGrid';
 import type { WidgetDefinition } from '@/modules/dashboard/hooks/useDashboardLayout';
@@ -30,8 +29,7 @@ const WIDGET_DEFS: WidgetDefinition[] = [
   { id: 'ack-stats', label: 'Acknowledgment Status', description: 'Document acknowledgment progress', defaultOrder: 5, defaultVisible: true, defaultColSpan: 1 },
   { id: 'crew-changes', label: 'Recent Crew Changes', description: 'Latest crew movements', defaultOrder: 6, defaultVisible: true, defaultColSpan: 1 },
   { id: 'maintenance', label: 'Maintenance', description: 'Maintenance overview widgets', defaultOrder: 7, defaultVisible: true, defaultColSpan: 1 },
-  { id: 'activity', label: 'Recent Activity', description: 'Your latest actions and updates', defaultOrder: 8, defaultVisible: true, defaultColSpan: 1 },
-  { id: 'dev-todos', label: 'Dev To-Do', description: 'Bug tracker and feature requests', defaultOrder: 9, defaultVisible: true, defaultColSpan: 1 },
+  { id: 'activity', label: 'Recent Activity', description: 'Latest actions and updates', defaultOrder: 8, defaultVisible: true, defaultColSpan: 1 },
 ];
 
 const Dashboard: React.FC = () => {
@@ -246,8 +244,6 @@ const Dashboard: React.FC = () => {
         </CardContent>
       </Card>
     ),
-
-    'dev-todos': <DevTodoWidget />,
   };
 
   return (

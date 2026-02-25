@@ -2356,56 +2356,6 @@ export type Database = {
           },
         ]
       }
-      dev_todos: {
-        Row: {
-          assigned_to: string | null
-          company_id: string
-          created_at: string
-          created_by: string
-          description: string | null
-          id: string
-          image_urls: string[] | null
-          priority: number
-          status: string
-          title: string
-          updated_at: string
-        }
-        Insert: {
-          assigned_to?: string | null
-          company_id: string
-          created_at?: string
-          created_by: string
-          description?: string | null
-          id?: string
-          image_urls?: string[] | null
-          priority?: number
-          status?: string
-          title: string
-          updated_at?: string
-        }
-        Update: {
-          assigned_to?: string | null
-          company_id?: string
-          created_at?: string
-          created_by?: string
-          description?: string | null
-          id?: string
-          image_urls?: string[] | null
-          priority?: number
-          status?: string
-          title?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dev_todos_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       development_applications: {
         Row: {
           application_number: string
