@@ -247,8 +247,8 @@ const Dashboard: React.FC = () => {
   };
 
   return (
-    <DashboardLayout>
-      <DashboardFilterProvider>
+    <DashboardFilterProvider>
+      <DashboardLayout>
         <div className="animate-fade-in">
           <DashboardGrid widgetDefs={WIDGET_DEFS}>
             {widgetContent}
@@ -265,8 +265,8 @@ const Dashboard: React.FC = () => {
             isLoading={addCrewMember.isPending}
           />
         </div>
-      </DashboardFilterProvider>
-    </DashboardLayout>
+      </DashboardLayout>
+    </DashboardFilterProvider>
   );
 };
 
