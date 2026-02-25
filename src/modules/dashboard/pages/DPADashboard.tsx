@@ -18,6 +18,7 @@ import AlertSections from '@/modules/red-room/components/AlertSections';
 import CrewFormModal from '@/modules/crew/components/CrewFormModal';
 import DashboardGrid from '@/modules/dashboard/components/DashboardGrid';
 import type { WidgetDefinition } from '@/modules/dashboard/hooks/useDashboardLayout';
+import { DashboardFilterProvider } from '@/modules/dashboard/contexts/DashboardFilterContext';
 
 const DPA_WIDGET_DEFS: WidgetDefinition[] = [
   { id: 'welcome', label: 'Welcome', description: 'Welcome card', defaultOrder: 0, defaultVisible: true, defaultColSpan: 1 },
@@ -152,22 +153,24 @@ const DPADashboard: React.FC = () => {
 
   return (
     <DashboardLayout>
-      <div className="animate-fade-in">
-        <DashboardGrid widgetDefs={DPA_WIDGET_DEFS}>
-          {widgetContent}
-        </DashboardGrid>
+      <DashboardFilterProvider>
+        <div className="animate-fade-in">
+          <DashboardGrid widgetDefs={DPA_WIDGET_DEFS}>
+            {widgetContent}
+          </DashboardGrid>
 
-        <CrewFormModal
-          isOpen={isAddCrewModalOpen}
-          onClose={() => setIsAddCrewModalOpen(false)}
-          onSubmit={async (data) => {
-            await addCrewMember.mutateAsync(data);
-            refetchCrewCount();
-            refetchRecentChanges();
-          }}
-          isLoading={addCrewMember.isPending}
-        />
-      </div>
+          <CrewFormModal
+            isOpen={isAddCrewModalOpen}
+            onClose={() => setIsAddCrewModalOpen(false)}
+            onSubmit={async (data) => {
+              await addCrewMember.mutateAsync(data);
+              refetchCrewCount();
+              refetchRecentChanges();
+            }}
+            isLoading={addCrewMember.isPending}
+          />
+        </div>
+      </DashboardFilterProvider>
     </DashboardLayout>
   );
 };

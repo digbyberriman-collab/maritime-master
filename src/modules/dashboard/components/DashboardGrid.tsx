@@ -4,6 +4,8 @@ import { Pencil, ChevronUp, ChevronDown, Eye, EyeOff, RotateCcw } from 'lucide-r
 import { cn } from '@/lib/utils';
 import type { WidgetDefinition } from '@/modules/dashboard/hooks/useDashboardLayout';
 import { useDashboardLayout } from '@/modules/dashboard/hooks/useDashboardLayout';
+import DashboardVesselFilter from '@/modules/dashboard/components/DashboardVesselFilter';
+import { useDashboardFilter } from '@/modules/dashboard/contexts/DashboardFilterContext';
 
 interface DashboardGridProps {
   widgetDefs: WidgetDefinition[];
@@ -22,34 +24,42 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ widgetDefs, children }) =
     loading,
   } = useDashboardLayout(widgetDefs);
 
+  const { selectedVesselIds, setSelectedVesselIds } = useDashboardFilter();
+
   if (loading) return null;
 
   const widgetsToRender = editMode ? orderedWidgets : visibleWidgets;
 
   return (
     <div className="space-y-4">
-      {/* Edit toggle */}
-      <div className="flex items-center justify-end gap-2">
-        {editMode && (
+      {/* Top bar: vessel filter + edit toggle */}
+      <div className="flex items-center justify-between gap-2">
+        <DashboardVesselFilter
+          selectedVesselIds={selectedVesselIds}
+          onSelectionChange={setSelectedVesselIds}
+        />
+        <div className="flex items-center gap-2">
+          {editMode && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs gap-1 text-muted-foreground"
+              onClick={resetToDefaults}
+            >
+              <RotateCcw className="w-3 h-3" />
+              Reset
+            </Button>
+          )}
           <Button
-            variant="ghost"
+            variant={editMode ? 'default' : 'outline'}
             size="sm"
-            className="h-7 px-2 text-xs gap-1 text-muted-foreground"
-            onClick={resetToDefaults}
+            className="h-7 px-3 text-xs gap-1.5"
+            onClick={() => setEditMode(!editMode)}
           >
-            <RotateCcw className="w-3 h-3" />
-            Reset
+            <Pencil className="w-3 h-3" />
+            {editMode ? 'Done' : 'Customize'}
           </Button>
-        )}
-        <Button
-          variant={editMode ? 'default' : 'outline'}
-          size="sm"
-          className="h-7 px-3 text-xs gap-1.5"
-          onClick={() => setEditMode(!editMode)}
-        >
-          <Pencil className="w-3 h-3" />
-          {editMode ? 'Done' : 'Customize'}
-        </Button>
+        </div>
       </div>
 
       {/* Widgets */}
@@ -68,7 +78,6 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ widgetDefs, children }) =
                 editMode && !widget.is_visible && 'opacity-40'
               )}
             >
-              {/* Edit overlay controls */}
               {editMode && (
                 <div className="absolute -top-3 right-2 z-10 flex items-center gap-0.5 bg-card border rounded-md shadow-sm px-1 py-0.5">
                   <Button
