@@ -4,8 +4,6 @@ import { Pencil, ChevronUp, ChevronDown, Eye, EyeOff, RotateCcw } from 'lucide-r
 import { cn } from '@/lib/utils';
 import type { WidgetDefinition } from '@/modules/dashboard/hooks/useDashboardLayout';
 import { useDashboardLayout } from '@/modules/dashboard/hooks/useDashboardLayout';
-import DashboardVesselFilter from '@/modules/dashboard/components/DashboardVesselFilter';
-import { useDashboardFilter } from '@/modules/dashboard/contexts/DashboardFilterContext';
 
 interface DashboardGridProps {
   widgetDefs: WidgetDefinition[];
@@ -24,20 +22,14 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ widgetDefs, children }) =
     loading,
   } = useDashboardLayout(widgetDefs);
 
-  const { selectedVesselIds, setSelectedVesselIds } = useDashboardFilter();
-
   if (loading) return null;
 
   const widgetsToRender = editMode ? orderedWidgets : visibleWidgets;
 
   return (
     <div className="space-y-4">
-      {/* Top bar: vessel filter + edit toggle */}
-      <div className="flex items-center justify-between gap-2">
-        <DashboardVesselFilter
-          selectedVesselIds={selectedVesselIds}
-          onSelectionChange={setSelectedVesselIds}
-        />
+      {/* Top bar: edit toggle */}
+      <div className="flex items-center justify-end gap-2">
         <div className="flex items-center gap-2">
           {editMode && (
             <Button
