@@ -25,6 +25,7 @@ import {
   InsuranceAuditModeSection,
   HRAuditAccessSection,
   GDPRRequestsSection,
+  ShortcutsSection,
 } from '@/modules/settings/components/sections';
 
 const Settings: React.FC = () => {
@@ -70,6 +71,8 @@ const Settings: React.FC = () => {
         return <NotificationsSection />;
       case 'appearance':
         return <AppearanceSection />;
+      case 'shortcuts':
+        return <ShortcutsSection />;
       case 'data-exports':
         return <DataExportsSection />;
       case 'support':
