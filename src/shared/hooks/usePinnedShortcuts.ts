@@ -20,6 +20,7 @@ export interface AvailableShortcut {
 export const ALL_AVAILABLE_SHORTCUTS: AvailableShortcut[] = [
   { target: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
   { target: '/crew', label: 'Crew List', icon: 'users' },
+  { target: '/crew?new=true', label: 'Add Crew Member', icon: 'users' },
   { target: '/certificates', label: 'Certificates', icon: 'award' },
   { target: '/crew/flights', label: 'Flights', icon: 'plane' },
   { target: '/compliance', label: 'Compliance', icon: 'shield' },
@@ -28,8 +29,10 @@ export const ALL_AVAILABLE_SHORTCUTS: AvailableShortcut[] = [
   { target: '/itinerary', label: 'Itinerary', icon: 'compass' },
   { target: '/alerts', label: 'Alerts', icon: 'bell' },
   { target: '/incidents', label: 'Incidents', icon: 'alert-triangle' },
+  { target: '/incidents?new=true', label: 'Report Incident', icon: 'alert-triangle' },
   { target: '/fleet-map', label: 'Fleet Map', icon: 'map' },
   { target: '/vessels/list', label: 'Vessels', icon: 'ship' },
+  { target: '/vessels/list?new=true', label: 'Add Vessel', icon: 'ship' },
   { target: '/ism/forms/templates', label: 'Forms', icon: 'file-text' },
   { target: '/ism/audits', label: 'Audits', icon: 'check-square' },
   { target: '/ism/drills', label: 'Drills', icon: 'target' },
