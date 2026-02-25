@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Users, Award, Plane, CheckSquare, LayoutDashboard, FileText, Shield, Wrench,
-  Compass, Bell, Ship, MoreHorizontal,
+  Compass, Bell, Ship, MoreHorizontal, Pencil, Plus, X, Target, AlertTriangle, Map,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -10,14 +10,11 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
-
-interface FrequentAction {
-  target: string;
-  label: string;
-  icon: string;
-  count: number;
-}
+import { Button } from '@/components/ui/button';
+import { usePinnedShortcuts, ALL_AVAILABLE_SHORTCUTS, type AvailableShortcut } from '@/shared/hooks/usePinnedShortcuts';
 
 const ICON_MAP: Record<string, React.ElementType> = {
   dashboard: LayoutDashboard,
@@ -31,49 +28,10 @@ const ICON_MAP: Record<string, React.ElementType> = {
   compass: Compass,
   bell: Bell,
   ship: Ship,
+  target: Target,
+  'alert-triangle': AlertTriangle,
+  map: Map,
 };
-
-const DEFAULT_ACTIONS: FrequentAction[] = [
-  { target: '/dashboard', label: 'Dashboard', icon: 'dashboard', count: 0 },
-  { target: '/crew', label: 'Crew List', icon: 'users', count: 0 },
-  { target: '/certificates', label: 'Certificates', icon: 'award', count: 0 },
-  { target: '/crew/flights', label: 'Flights', icon: 'plane', count: 0 },
-  { target: '/vessel/draak/checklists', label: 'Checklists', icon: 'check-square', count: 0 },
-  { target: '/compliance', label: 'Compliance', icon: 'shield', count: 0 },
-];
-
-// Simple hook that tracks page views in sessionStorage
-function useFrequentActions(limit: number = 6): { actions: FrequentAction[]; logActivity: (target: string, label: string, icon: string) => void } {
-  const [actions, setActions] = React.useState<FrequentAction[]>(DEFAULT_ACTIONS.slice(0, limit));
-
-  const logActivity = React.useCallback((target: string, label: string, icon: string) => {
-    try {
-      const key = 'storm_activity_log';
-      const raw = sessionStorage.getItem(key);
-      const log: Record<string, { label: string; icon: string; count: number }> = raw ? JSON.parse(raw) : {};
-
-      if (!log[target]) {
-        log[target] = { label, icon, count: 0 };
-      }
-      log[target].count += 1;
-
-      sessionStorage.setItem(key, JSON.stringify(log));
-
-      const sorted = Object.entries(log)
-        .map(([t, data]) => ({ target: t, label: data.label, icon: data.icon, count: data.count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, limit);
-
-      if (sorted.length >= 3) {
-        setActions(sorted);
-      }
-    } catch {
-      // Ignore storage errors
-    }
-  }, [limit]);
-
-  return { actions, logActivity };
-}
 
 interface AdaptiveActionBarProps {
   className?: string;
@@ -82,9 +40,10 @@ interface AdaptiveActionBarProps {
 const AdaptiveActionBar: React.FC<AdaptiveActionBarProps> = ({ className }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { actions, logActivity } = useFrequentActions(6);
+  const { effectiveShortcuts, suggestions, addPin, removePin, isPinned, hasPins } = usePinnedShortcuts();
+  const [editMode, setEditMode] = useState(false);
 
-  // Log current page view
+  // Log activity to sessionStorage for suggestions
   React.useEffect(() => {
     const path = location.pathname;
     const pathLabels: Record<string, { label: string; icon: string }> = {
@@ -99,62 +58,137 @@ const AdaptiveActionBar: React.FC<AdaptiveActionBarProps> = ({ className }) => {
       '/itinerary': { label: 'Itinerary', icon: 'compass' },
       '/alerts': { label: 'Alerts', icon: 'bell' },
     };
-
     const match = pathLabels[path];
     if (match) {
-      logActivity(path, match.label, match.icon);
+      try {
+        const key = 'storm_activity_log';
+        const raw = sessionStorage.getItem(key);
+        const log: Record<string, { label: string; icon: string; count: number }> = raw ? JSON.parse(raw) : {};
+        if (!log[path]) log[path] = { ...match, count: 0 };
+        log[path].count += 1;
+        sessionStorage.setItem(key, JSON.stringify(log));
+      } catch { /* ignore */ }
     }
-  }, [location.pathname, logActivity]);
+  }, [location.pathname]);
 
-  const visibleActions = actions.slice(0, 5);
-  const overflowActions = actions.slice(5);
+  const unpinnedShortcuts = ALL_AVAILABLE_SHORTCUTS.filter(s => !isPinned(s.target));
 
   return (
     <div className={cn('flex items-center gap-1.5', className)}>
-      {visibleActions.map((action) => {
+      {/* Pinned / Default shortcuts */}
+      {effectiveShortcuts.map((action) => {
         const IconComponent = ICON_MAP[action.icon] || FileText;
         const isActive = location.pathname === action.target;
 
         return (
-          <button
-            key={action.target}
-            onClick={() => navigate(action.target)}
-            className={cn(
-              'flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all duration-200',
-              isActive
-                ? 'bg-[#1A2740] text-white'
-                : 'bg-[#1A2740]/30 text-[#94A3B8] hover:bg-[#1A2740]/60 hover:text-white'
+          <div key={action.target} className="relative group">
+            <button
+              onClick={() => !editMode && navigate(action.target)}
+              className={cn(
+                'flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all duration-200',
+                editMode && 'ring-1 ring-dashed ring-muted-foreground/40',
+                isActive
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+              )}
+            >
+              <IconComponent className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">{action.label}</span>
+            </button>
+            {/* Remove button in edit mode */}
+            {editMode && hasPins && (
+              <button
+                onClick={() => removePin(action.target)}
+                className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
             )}
-          >
-            <IconComponent className="w-3.5 h-3.5" />
-            <span className="hidden lg:inline">{action.label}</span>
-          </button>
+          </div>
         );
       })}
 
-      {overflowActions.length > 0 && (
+      {/* Suggestions indicator */}
+      {!editMode && suggestions.length > 0 && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="flex items-center px-1.5 py-1 rounded text-xs text-[#94A3B8] hover:bg-[#1A2740]/30 transition">
-              <MoreHorizontal className="w-3.5 h-3.5" />
+            <button className="flex items-center px-1.5 py-1 rounded text-xs text-muted-foreground hover:bg-accent transition">
+              <Plus className="w-3.5 h-3.5" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="bg-[#111D33] border-[#1A2740]">
-            {overflowActions.map((action) => {
-              const IconComponent = ICON_MAP[action.icon] || FileText;
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuLabel className="text-xs text-muted-foreground">
+              Suggested shortcuts
+            </DropdownMenuLabel>
+            {suggestions.map((s) => {
+              const Icon = ICON_MAP[s.icon] || FileText;
               return (
                 <DropdownMenuItem
-                  key={action.target}
-                  onClick={() => navigate(action.target)}
-                  className="gap-2 text-[#E2E8F0] hover:bg-[#1A2740]"
+                  key={s.target}
+                  onClick={() => addPin(s)}
+                  className="gap-2 cursor-pointer"
                 >
-                  <IconComponent className="w-4 h-4" />
-                  {action.label}
+                  <Icon className="w-4 h-4" />
+                  {s.label}
+                  <Plus className="w-3 h-3 ml-auto text-muted-foreground" />
                 </DropdownMenuItem>
               );
             })}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setEditMode(true)} className="gap-2 cursor-pointer">
+              <Pencil className="w-4 h-4" />
+              Customize bar
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      )}
+
+      {/* Edit mode: add more + done button */}
+      {editMode && (
+        <>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="h-6 px-2 text-xs gap-1">
+                <Plus className="w-3 h-3" />
+                Add
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52 max-h-64 overflow-y-auto">
+              {unpinnedShortcuts.map((s) => {
+                const Icon = ICON_MAP[s.icon] || FileText;
+                return (
+                  <DropdownMenuItem
+                    key={s.target}
+                    onClick={() => addPin(s)}
+                    className="gap-2 cursor-pointer"
+                  >
+                    <Icon className="w-4 h-4" />
+                    {s.label}
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 px-2 text-xs"
+            onClick={() => setEditMode(false)}
+          >
+            Done
+          </Button>
+        </>
+      )}
+
+      {/* Edit toggle when not in edit mode and no suggestions */}
+      {!editMode && suggestions.length === 0 && (
+        <button
+          onClick={() => setEditMode(true)}
+          className="flex items-center px-1.5 py-1 rounded text-xs text-muted-foreground hover:bg-accent transition"
+          title="Customize shortcuts"
+        >
+          <Pencil className="w-3.5 h-3.5" />
+        </button>
       )}
     </div>
   );

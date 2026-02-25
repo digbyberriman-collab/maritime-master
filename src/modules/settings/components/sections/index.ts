@@ -16,3 +16,4 @@ export { default as DataRetentionSection } from './DataRetentionSection';
 export { default as InsuranceAuditModeSection } from './InsuranceAuditModeSection';
 export { default as HRAuditAccessSection } from './HRAuditAccessSection';
 export { default as GDPRRequestsSection } from './GDPRRequestsSection';
+export { default as ShortcutsSection } from './ShortcutsSection';

@@ -9338,6 +9338,36 @@ export type Database = {
           },
         ]
       }
+      user_pinned_shortcuts: {
+        Row: {
+          created_at: string
+          id: string
+          shortcut_icon: string
+          shortcut_label: string
+          shortcut_target: string
+          sort_order: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          shortcut_icon: string
+          shortcut_label: string
+          shortcut_target: string
+          sort_order?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          shortcut_icon?: string
+          shortcut_label?: string
+          shortcut_target?: string
+          sort_order?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_preferences: {
         Row: {
           alert_severities: Json | null
