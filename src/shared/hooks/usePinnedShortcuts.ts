@@ -140,6 +140,15 @@ export function usePinnedShortcuts() {
     return pins.some(p => p.shortcut_target === target);
   }, [pins]);
 
+  const clearAllPins = useCallback(async () => {
+    if (!user?.id) return;
+    const { error } = await supabase
+      .from('user_pinned_shortcuts')
+      .delete()
+      .eq('user_id', user.id);
+    if (!error) await fetchPins();
+  }, [user?.id, fetchPins]);
+
   return {
     pins,
     effectiveShortcuts,
@@ -150,5 +159,6 @@ export function usePinnedShortcuts() {
     reorderPins,
     isPinned,
     hasPins: pins.length > 0,
+    clearAllPins,
   };
 }
