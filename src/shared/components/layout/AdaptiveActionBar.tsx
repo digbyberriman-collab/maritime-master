@@ -75,8 +75,8 @@ const AdaptiveActionBar: React.FC<AdaptiveActionBarProps> = ({ className }) => {
 
   const unpinnedShortcuts = ALL_AVAILABLE_SHORTCUTS.filter(s => !isPinned(s.target));
 
-  // Consistent button style for uniform sizing
-  const btnBase = 'inline-flex items-center gap-1.5 h-7 px-2.5 rounded text-xs font-medium transition-all duration-200 whitespace-nowrap';
+  // Compact button style for uniform sizing
+  const btnBase = 'inline-flex items-center gap-1 h-6 px-2 rounded text-[11px] font-medium transition-all duration-200 whitespace-nowrap';
 
   return (
     <div className={cn('flex items-center gap-1', className)}>
@@ -97,14 +97,14 @@ const AdaptiveActionBar: React.FC<AdaptiveActionBarProps> = ({ className }) => {
                   : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
               )}
             >
-              <IconComponent className="w-3.5 h-3.5 shrink-0" />
+              <IconComponent className="w-3 h-3 shrink-0" />
               <span className="hidden lg:inline">{action.label}</span>
             </button>
             {/* Remove button – always visible in edit mode */}
             {editMode && (
               <button
                 onClick={() => removePin(action.target)}
-                className="absolute right-0.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:scale-110 transition-transform"
+                className="absolute right-0.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:scale-110 transition-transform"
                 title={`Remove ${action.label}`}
               >
                 <X className="w-2.5 h-2.5" />
@@ -122,7 +122,7 @@ const AdaptiveActionBar: React.FC<AdaptiveActionBarProps> = ({ className }) => {
               className={cn(btnBase, 'bg-muted/50 text-muted-foreground hover:bg-accent hover:text-accent-foreground')}
               title="Customize shortcuts"
             >
-              <Pencil className="w-3.5 h-3.5" />
+              <Pencil className="w-3 h-3" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
@@ -162,7 +162,7 @@ const AdaptiveActionBar: React.FC<AdaptiveActionBarProps> = ({ className }) => {
           {/* Add shortcut dropdown with suggestions */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-7 px-2 text-xs gap-1">
+              <Button variant="outline" size="sm" className="h-6 px-2 text-[11px] gap-1">
                 <Plus className="w-3 h-3" />
                 Add
               </Button>
@@ -220,7 +220,7 @@ const AdaptiveActionBar: React.FC<AdaptiveActionBarProps> = ({ className }) => {
             <Button
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-xs gap-1 text-destructive hover:text-destructive"
+              className="h-6 px-2 text-[11px] gap-1 text-destructive hover:text-destructive"
               onClick={clearAllPins}
             >
               <Trash2 className="w-3 h-3" />
@@ -232,7 +232,7 @@ const AdaptiveActionBar: React.FC<AdaptiveActionBarProps> = ({ className }) => {
           <Button
             variant="default"
             size="sm"
-            className="h-7 px-3 text-xs"
+            className="h-6 px-2.5 text-[11px]"
             onClick={() => setEditMode(false)}
           >
             Done

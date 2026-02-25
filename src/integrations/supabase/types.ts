@@ -9288,6 +9288,39 @@ export type Database = {
           },
         ]
       }
+      user_dashboard_layouts: {
+        Row: {
+          column_span: number
+          created_at: string
+          id: string
+          is_visible: boolean
+          sort_order: number
+          updated_at: string
+          user_id: string
+          widget_id: string
+        }
+        Insert: {
+          column_span?: number
+          created_at?: string
+          id?: string
+          is_visible?: boolean
+          sort_order?: number
+          updated_at?: string
+          user_id: string
+          widget_id: string
+        }
+        Update: {
+          column_span?: number
+          created_at?: string
+          id?: string
+          is_visible?: boolean
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+          widget_id?: string
+        }
+        Relationships: []
+      }
       user_permission_overrides: {
         Row: {
           created_at: string | null
