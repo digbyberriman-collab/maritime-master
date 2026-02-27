@@ -21,10 +21,10 @@ import type { WidgetDefinition } from '@/modules/dashboard/hooks/useDashboardLay
 import { DashboardFilterProvider } from '@/modules/dashboard/contexts/DashboardFilterContext';
 
 const DPA_WIDGET_DEFS: WidgetDefinition[] = [
-  { id: 'welcome', label: 'Welcome', description: 'Welcome card', defaultOrder: 0, defaultVisible: true, defaultColSpan: 1 },
-  { id: 'kpi-tiles', label: 'KPI Tiles', description: 'Alert severity overview tiles', defaultOrder: 1, defaultVisible: true, defaultColSpan: 1 },
-  { id: 'red-room', label: 'Red Room', description: 'Critical alerts requiring immediate action', defaultOrder: 2, defaultVisible: true, defaultColSpan: 1 },
-  { id: 'alert-sections', label: 'Alert Sections', description: 'Orange and yellow alert categories', defaultOrder: 3, defaultVisible: true, defaultColSpan: 1 },
+  { id: 'welcome', label: 'Welcome', description: 'Welcome card', defaultOrder: 0, defaultVisible: true, defaultColSpan: 2 },
+  { id: 'kpi-tiles', label: 'KPI Tiles', description: 'Alert severity overview tiles', defaultOrder: 1, defaultVisible: true, defaultColSpan: 2 },
+  { id: 'red-room', label: 'Red Room', description: 'Critical alerts requiring immediate action', defaultOrder: 2, defaultVisible: true, defaultColSpan: 2 },
+  { id: 'alert-sections', label: 'Alert Sections', description: 'Orange and yellow alert categories', defaultOrder: 3, defaultVisible: true, defaultColSpan: 2 },
   { id: 'crew-changes', label: 'Recent Crew Changes', description: 'Latest crew movements', defaultOrder: 4, defaultVisible: true, defaultColSpan: 1 },
   { id: 'activity', label: 'Recent Activity', description: 'Latest actions and updates', defaultOrder: 5, defaultVisible: true, defaultColSpan: 1 },
 ];
