@@ -6,7 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Ship, Users, Activity, Anchor, Clock, ArrowRightLeft, FileCheck, AlertCircle, AlertTriangle, TrendingUp, Wrench, UserPlus, Plus } from 'lucide-react';
+import { Ship, Users, Activity, Anchor, Clock, ArrowRightLeft, FileCheck, AlertCircle, AlertTriangle, TrendingUp, Wrench, UserPlus, Plus, Shield, BookOpen, ClipboardCheck, Navigation, BarChart3, PieChart } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useVesselCount } from '@/modules/vessels/hooks/useVessels';
 import { useCrewCount, useRecentCrewChanges, useCrew } from '@/modules/crew/hooks/useCrew';
 import { useMandatoryDocumentsPending, useAcknowledgmentStats } from '@/modules/auth/hooks/useAcknowledgments';
@@ -21,15 +22,17 @@ import type { WidgetDefinition } from '@/modules/dashboard/hooks/useDashboardLay
 import { DashboardFilterProvider } from '@/modules/dashboard/contexts/DashboardFilterContext';
 
 const WIDGET_DEFS: WidgetDefinition[] = [
-  { id: 'welcome', label: 'Welcome', description: 'Welcome card with role info', defaultOrder: 0, defaultVisible: true, defaultColSpan: 1 },
-  { id: 'stats', label: 'Fleet Stats', description: 'Vessels, crew, system status', defaultOrder: 1, defaultVisible: true, defaultColSpan: 1 },
-  { id: 'overdue-capas', label: 'Overdue CAPAs', description: 'Overdue corrective actions alert', defaultOrder: 2, defaultVisible: true, defaultColSpan: 1 },
-  { id: 'recent-incidents', label: 'Recent Incidents', description: 'Latest reported incidents', defaultOrder: 3, defaultVisible: true, defaultColSpan: 1 },
-  { id: 'pending-docs', label: 'Pending Acknowledgments', description: 'Documents requiring acknowledgment', defaultOrder: 4, defaultVisible: true, defaultColSpan: 1 },
-  { id: 'ack-stats', label: 'Acknowledgment Status', description: 'Document acknowledgment progress', defaultOrder: 5, defaultVisible: true, defaultColSpan: 1 },
-  { id: 'crew-changes', label: 'Recent Crew Changes', description: 'Latest crew movements', defaultOrder: 6, defaultVisible: true, defaultColSpan: 1 },
-  { id: 'maintenance', label: 'Maintenance', description: 'Maintenance overview widgets', defaultOrder: 7, defaultVisible: true, defaultColSpan: 1 },
-  { id: 'activity', label: 'Recent Activity', description: 'Latest actions and updates', defaultOrder: 8, defaultVisible: true, defaultColSpan: 1 },
+  { id: 'welcome', label: 'Welcome', description: 'Welcome card with role info', defaultOrder: 0, defaultVisible: true, defaultColSpan: 2 },
+  { id: 'stats', label: 'Fleet Stats', description: 'Vessels, crew, system status', defaultOrder: 1, defaultVisible: true, defaultColSpan: 2 },
+  { id: 'quick-links', label: 'Quick Navigation', description: 'Quick links to key modules', defaultOrder: 2, defaultVisible: true, defaultColSpan: 2 },
+  { id: 'overdue-capas', label: 'Overdue CAPAs', description: 'Overdue corrective actions alert', defaultOrder: 3, defaultVisible: true, defaultColSpan: 1 },
+  { id: 'recent-incidents', label: 'Recent Incidents', description: 'Latest reported incidents', defaultOrder: 4, defaultVisible: true, defaultColSpan: 1 },
+  { id: 'pending-docs', label: 'Pending Acknowledgments', description: 'Documents requiring acknowledgment', defaultOrder: 5, defaultVisible: true, defaultColSpan: 1 },
+  { id: 'ack-stats', label: 'Acknowledgment Status', description: 'Document acknowledgment progress', defaultOrder: 6, defaultVisible: true, defaultColSpan: 1 },
+  { id: 'compliance-summary', label: 'Compliance Overview', description: 'Fleet compliance summary tiles', defaultOrder: 7, defaultVisible: true, defaultColSpan: 2 },
+  { id: 'crew-changes', label: 'Recent Crew Changes', description: 'Latest crew movements', defaultOrder: 8, defaultVisible: true, defaultColSpan: 1 },
+  { id: 'maintenance', label: 'Maintenance', description: 'Maintenance overview widgets', defaultOrder: 9, defaultVisible: true, defaultColSpan: 1 },
+  { id: 'activity', label: 'Recent Activity', description: 'Latest actions and updates', defaultOrder: 10, defaultVisible: true, defaultColSpan: 1 },
 ];
 
 const Dashboard: React.FC = () => {
@@ -223,6 +226,61 @@ const Dashboard: React.FC = () => {
               <p className="text-sm">Crew movements will appear here</p>
             </div>
           )}
+        </CardContent>
+      </Card>
+    ),
+
+    'quick-links': (
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+        {[
+          { label: 'Vessels', icon: Ship, path: '/vessels', color: 'text-blue-500' },
+          { label: 'Crew', icon: Users, path: '/crew', color: 'text-emerald-500' },
+          { label: 'Certificates', icon: Shield, path: '/certificates', color: 'text-amber-500' },
+          { label: 'Incidents', icon: AlertCircle, path: '/incidents', color: 'text-red-500' },
+          { label: 'Drills', icon: ClipboardCheck, path: '/drills', color: 'text-purple-500' },
+          { label: 'Documents', icon: BookOpen, path: '/documents', color: 'text-cyan-500' },
+        ].map((link) => (
+          <Card
+            key={link.label}
+            className="shadow-card hover:shadow-card-hover transition-all cursor-pointer hover:scale-[1.02]"
+            onClick={() => navigate(link.path)}
+          >
+            <CardContent className="pt-4 pb-3 flex flex-col items-center gap-2 text-center">
+              <link.icon className={cn('w-6 h-6', link.color)} />
+              <span className="text-xs font-medium">{link.label}</span>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    ),
+
+    'compliance-summary': (
+      <Card className="shadow-card">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base"><BarChart3 className="w-5 h-5" />Fleet Compliance Overview</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { label: 'Active Vessels', value: String(vesselCount ?? 0), trend: 'stable' },
+              { label: 'Crew Onboard', value: String(crewCount ?? 0), trend: 'up' },
+              { label: 'Overdue CAPAs', value: String(overdueCapas?.length ?? 0), trend: overdueCapas?.length ? 'alert' : 'good' },
+              { label: 'Recent Incidents', value: String(recentIncidents?.length ?? 0), trend: recentIncidents?.length ? 'warn' : 'good' },
+            ].map((item) => (
+              <div key={item.label} className="text-center p-3 rounded-lg bg-muted/50">
+                <p className="text-2xl font-bold">{item.value}</p>
+                <p className="text-xs text-muted-foreground mt-1">{item.label}</p>
+                <span className={cn(
+                  'inline-flex w-2 h-2 rounded-full mt-2',
+                  item.trend === 'good' && 'bg-success',
+                  item.trend === 'up' && 'bg-success',
+                  item.trend === 'stable' && 'bg-primary',
+                  item.trend === 'warn' && 'bg-warning',
+                  item.trend === 'alert' && 'bg-destructive animate-pulse-soft',
+                )} />
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
     ),

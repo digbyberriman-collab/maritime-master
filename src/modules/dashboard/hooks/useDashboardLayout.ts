@@ -148,6 +148,35 @@ export function useDashboardLayout(widgetDefs: WidgetDefinition[]) {
     );
   }, [user?.id, widgetDefs]);
 
+  const toggleColSpan = useCallback(
+    async (widgetId: string) => {
+      if (!user?.id) return;
+      const widget = layouts.find((w) => w.widget_id === widgetId);
+      if (!widget) return;
+
+      const newColSpan = widget.column_span >= 2 ? 1 : 2;
+
+      // Optimistic update
+      setLayouts((prev) =>
+        prev.map((w) => (w.widget_id === widgetId ? { ...w, column_span: newColSpan } : w))
+      );
+
+      await supabase
+        .from('user_dashboard_layouts')
+        .upsert(
+          {
+            user_id: user.id,
+            widget_id: widgetId,
+            sort_order: widget.sort_order,
+            is_visible: widget.is_visible,
+            column_span: newColSpan,
+          },
+          { onConflict: 'user_id,widget_id' }
+        );
+    },
+    [user?.id, layouts]
+  );
+
   return {
     orderedWidgets,
     visibleWidgets,
@@ -157,6 +186,7 @@ export function useDashboardLayout(widgetDefs: WidgetDefinition[]) {
     setEditMode,
     toggleVisibility,
     moveWidget,
+    toggleColSpan,
     resetToDefaults,
   };
 }

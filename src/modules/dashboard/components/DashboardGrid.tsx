@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Pencil, ChevronUp, ChevronDown, Eye, EyeOff, RotateCcw } from 'lucide-react';
+import { Pencil, ChevronUp, ChevronDown, Eye, EyeOff, RotateCcw, Maximize2, Minimize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { WidgetDefinition } from '@/modules/dashboard/hooks/useDashboardLayout';
 import { useDashboardLayout } from '@/modules/dashboard/hooks/useDashboardLayout';
@@ -18,6 +18,7 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ widgetDefs, children }) =
     setEditMode,
     toggleVisibility,
     moveWidget,
+    toggleColSpan,
     resetToDefaults,
     loading,
   } = useDashboardLayout(widgetDefs);
@@ -54,19 +55,22 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ widgetDefs, children }) =
         </div>
       </div>
 
-      {/* Widgets */}
-      <div className="space-y-4">
+      {/* Widgets in responsive grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {widgetsToRender.map((widget, idx) => {
           const def = widgetDefs.find((d) => d.id === widget.widget_id);
           const content = children[widget.widget_id];
           if (!def || !content) return null;
+
+          const isFullWidth = widget.column_span >= 2;
 
           return (
             <div
               key={widget.widget_id}
               className={cn(
                 'relative transition-all duration-200',
-                editMode && 'ring-1 ring-dashed ring-muted-foreground/30 rounded-lg',
+                isFullWidth && 'md:col-span-2',
+                editMode && 'ring-1 ring-dashed ring-muted-foreground/30 rounded-lg p-1',
                 editMode && !widget.is_visible && 'opacity-40'
               )}
             >
@@ -78,6 +82,7 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ widgetDefs, children }) =
                     className="h-6 w-6"
                     onClick={() => moveWidget(widget.widget_id, 'up')}
                     disabled={idx === 0}
+                    title="Move up"
                   >
                     <ChevronUp className="w-3 h-3" />
                   </Button>
@@ -87,8 +92,22 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ widgetDefs, children }) =
                     className="h-6 w-6"
                     onClick={() => moveWidget(widget.widget_id, 'down')}
                     disabled={idx === widgetsToRender.length - 1}
+                    title="Move down"
                   >
                     <ChevronDown className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => toggleColSpan(widget.widget_id)}
+                    title={isFullWidth ? 'Half width' : 'Full width'}
+                  >
+                    {isFullWidth ? (
+                      <Minimize2 className="w-3 h-3" />
+                    ) : (
+                      <Maximize2 className="w-3 h-3" />
+                    )}
                   </Button>
                   <Button
                     variant="ghost"
