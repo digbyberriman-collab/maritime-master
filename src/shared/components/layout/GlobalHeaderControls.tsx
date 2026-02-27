@@ -14,23 +14,14 @@ interface GlobalHeaderControlsProps {
 const GlobalHeaderControls: React.FC<GlobalHeaderControlsProps> = ({
   className,
 }) => {
-  // Safe usage: filter context may not be available on non-dashboard pages
-  let filterProps = null;
-  try {
-    const { selectedVesselIds, setSelectedVesselIds } = useDashboardFilter();
-    filterProps = { selectedVesselIds, setSelectedVesselIds };
-  } catch {
-    // Not inside DashboardFilterProvider — skip vessel filter
-  }
+  const { selectedVesselIds, setSelectedVesselIds } = useDashboardFilter();
 
   return (
     <div className={cn('flex items-center gap-2', className)}>
-      {filterProps && (
-        <DashboardVesselFilter
-          selectedVesselIds={filterProps.selectedVesselIds}
-          onSelectionChange={filterProps.setSelectedVesselIds}
-        />
-      )}
+      <DashboardVesselFilter
+        selectedVesselIds={selectedVesselIds}
+        onSelectionChange={setSelectedVesselIds}
+      />
       <NotificationBell />
     </div>
   );

@@ -8,6 +8,7 @@ import InkfishWatermark from '@/shared/components/InkfishWatermark';
 import GlobalHeaderControls from '@/shared/components/layout/GlobalHeaderControls';
 import AdaptiveActionBar from '@/shared/components/layout/AdaptiveActionBar';
 import SidebarNavigation from '@/shared/components/layout/SidebarNavigation';
+import { DashboardFilterProvider } from '@/modules/dashboard/contexts/DashboardFilterContext';
 import {
   LogOut,
   User,
@@ -60,6 +61,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const canAccessBranding = canManageBranding(profile?.role);
 
   return (
+    <DashboardFilterProvider>
     <div className="min-h-screen bg-background flex relative">
       {/* Inkfish watermark - renders behind all content */}
       <InkfishWatermark />
@@ -217,6 +219,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         <InkfishFooter />
       </div>
     </div>
+    </DashboardFilterProvider>
   );
 };
 
