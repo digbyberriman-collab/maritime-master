@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLocation } from 'react-router-dom';
-import { X, Bug, Lightbulb, HelpCircle, Paperclip, Send, ChevronLeft } from 'lucide-react';
+import { X, Bug, Lightbulb, HelpCircle, Paperclip, Send, ChevronLeft, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,7 +49,7 @@ const FeedbackPanel: React.FC = () => {
   const [description, setDescription] = useState('');
   const [screenshot, setScreenshot] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [successBanner, setSuccessBanner] = useState(false);
 
   useEffect(() => {
     if (panelOpen && user?.id) {
@@ -63,6 +63,7 @@ const FeedbackPanel: React.FC = () => {
       setTimeout(() => {
         setView('list');
         resetForm();
+        setSuccessBanner(false);
       }, 300);
     }
   }, [panelOpen]);
@@ -72,7 +73,6 @@ const FeedbackPanel: React.FC = () => {
     setTitle('');
     setDescription('');
     setScreenshot(null);
-    setSubmitted(false);
   };
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -93,11 +93,10 @@ const FeedbackPanel: React.FC = () => {
     setSubmitting(false);
 
     if (success) {
-      setSubmitted(true);
-      setTimeout(() => {
-        setView('list');
-        resetForm();
-      }, 1500);
+      resetForm();
+      setView('list');
+      setSuccessBanner(true);
+      setTimeout(() => setSuccessBanner(false), 3000);
     }
   }, [user?.id, type, title, description, screenshot, location.pathname, profile?.role, submitFeedback]);
 
@@ -192,6 +191,12 @@ const FeedbackPanel: React.FC = () => {
         <div className="flex-1 overflow-y-auto">
           {view === 'list' ? (
             <>
+              {successBanner && (
+                <div className="flex items-center gap-2 px-4 py-2.5 bg-green-50 dark:bg-green-900/20 border-b border-green-200 dark:border-green-800">
+                  <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400 shrink-0" />
+                  <p className="text-xs font-medium text-green-700 dark:text-green-300">Submitted! We'll take a look shortly.</p>
+                </div>
+              )}
               {isLoading && submissions.length === 0 ? (
                 <div className="flex items-center justify-center h-32">
                   <p className="text-sm text-muted-foreground">Loading...</p>
@@ -207,14 +212,6 @@ const FeedbackPanel: React.FC = () => {
                 submissions.map(renderSubmissionItem)
               )}
             </>
-          ) : submitted ? (
-            <div className="flex flex-col items-center justify-center h-48 px-6 text-center">
-              <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mb-3">
-                <Send className="w-5 h-5 text-green-600 dark:text-green-400" />
-              </div>
-              <p className="text-sm font-medium text-foreground">Thanks for your feedback!</p>
-              <p className="text-xs text-muted-foreground mt-1">We'll take a look shortly.</p>
-            </div>
           ) : (
             <form onSubmit={handleSubmit} className="p-4 space-y-4">
               {/* Type selector */}
@@ -321,7 +318,7 @@ const FeedbackPanel: React.FC = () => {
         </div>
 
         {/* Footer action - only in list view */}
-        {view === 'list' && !submitted && (
+        {view === 'list' && (
           <div className="px-4 py-3 border-t border-border shrink-0">
             <Button
               onClick={() => setView('form')}
