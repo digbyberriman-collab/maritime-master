@@ -249,4 +249,5 @@ export const ADMIN_NAV_ITEMS: NavChild[] = [
   { id: 'fleet-groups', label: 'Fleet Groups', path: '/admin/fleet-groups', icon: Ship },
   { id: 'alert-configuration', label: 'Alert Configuration', path: '/admin/alerts', icon: Bell },
   { id: 'api-integrations', label: 'API Integrations', path: '/admin/integrations', icon: Wrench },
+  { id: 'feedback-admin', label: 'Feedback', path: '/admin/feedback', icon: MessageSquare },
 ];
