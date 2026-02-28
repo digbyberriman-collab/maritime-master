@@ -10,6 +10,7 @@ import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
 import { z } from 'zod';
 import InkfishWatermark from '@/shared/components/InkfishWatermark';
+import { getDomainValidationError } from '@/shared/utils/domainValidation';
 
 type AuthMode = 'login' | 'register' | 'forgot-password';
 
@@ -65,6 +66,10 @@ const Auth: React.FC = () => {
 
     try {
       emailSchema.parse(email);
+      const domainError = getDomainValidationError(email);
+      if (domainError) {
+        newErrors.email = domainError;
+      }
     } catch (e) {
       if (e instanceof z.ZodError) {
         newErrors.email = e.errors[0].message;
@@ -193,7 +198,7 @@ const Auth: React.FC = () => {
                 <Input
                   id="email"
                   type="email"
-                  placeholder="captain@yacht.com"
+                  placeholder="captain@ink.fish"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className={errors.email ? 'border-destructive' : ''}
