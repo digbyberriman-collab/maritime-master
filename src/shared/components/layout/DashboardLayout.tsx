@@ -9,6 +9,9 @@ import GlobalHeaderControls from '@/shared/components/layout/GlobalHeaderControl
 import AdaptiveActionBar from '@/shared/components/layout/AdaptiveActionBar';
 import SidebarNavigation from '@/shared/components/layout/SidebarNavigation';
 import { DashboardFilterProvider } from '@/modules/dashboard/contexts/DashboardFilterContext';
+import FeedbackPanel from '@/modules/feedback/components/FeedbackPanel';
+import FeedbackResolvedToast from '@/modules/feedback/components/FeedbackResolvedToast';
+import { useFeedbackStore } from '@/modules/feedback/store/feedbackStore';
 import {
   LogOut,
   User,
@@ -17,6 +20,7 @@ import {
   X,
   Palette,
   Settings,
+  MessageSquareWarning,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -59,6 +63,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   };
 
   const canAccessBranding = canManageBranding(profile?.role);
+  const { setPanelOpen } = useFeedbackStore();
 
   return (
     <DashboardFilterProvider>
@@ -110,11 +115,22 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           {/* Navigation */}
           <SidebarNavigation onNavigate={() => setSidebarOpen(false)} />
 
+          {/* Feedback button - above user profile */}
+          <div className="px-3 pb-1">
+            <button
+              onClick={() => setPanelOpen(true)}
+              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+            >
+              <MessageSquareWarning className="w-5 h-5" />
+              <span>Report an Issue</span>
+            </button>
+          </div>
+
           {/* User info at bottom */}
           <div className="p-4 border-t border-sidebar-border">
             <div className="flex items-center gap-3 text-sidebar-foreground">
               <Avatar className="w-8 h-8">
-                <AvatarFallback 
+                <AvatarFallback
                   className="text-sm"
                   style={{ backgroundColor: brandColor, color: 'white' }}
                 >
@@ -219,6 +235,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         <InkfishFooter />
       </div>
     </div>
+
+    {/* Feedback panel & resolved notification */}
+    <FeedbackPanel />
+    <FeedbackResolvedToast />
     </DashboardFilterProvider>
   );
 };

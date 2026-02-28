@@ -82,6 +82,7 @@ const UserManagement = React.lazy(() => import('@/modules/settings/pages/UserMan
 const FleetGroups = React.lazy(() => import('@/modules/settings/pages/FleetGroups'));
 const AlertConfiguration = React.lazy(() => import('@/modules/settings/pages/AlertConfiguration'));
 const APIIntegrations = React.lazy(() => import('@/modules/settings/pages/APIIntegrations'));
+const FeedbackAdmin = React.lazy(() => import('@/modules/feedback/pages/FeedbackAdmin'));
 
 // Document Pages - lazy loaded
 const Manuals = React.lazy(() => import('@/modules/documents/pages/Manuals'));
@@ -598,6 +599,13 @@ export const AppRoutes: React.FC = () => {
       <Route path="/admin/fleet-groups" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><FleetGroups /></React.Suspense></ProtectedRoute>} />
       <Route path="/admin/alerts" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><AlertConfiguration /></React.Suspense></ProtectedRoute>} />
       <Route path="/admin/integrations" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><APIIntegrations /></React.Suspense></ProtectedRoute>} />
+      <Route path="/admin/feedback" element={
+        <ProtectedRoute>
+          <DashboardLayout>
+            <React.Suspense fallback={<LazyLoader />}><FeedbackAdmin /></React.Suspense>
+          </DashboardLayout>
+        </ProtectedRoute>
+      } />
 
       {/* Legacy/Report Routes */}
       <Route path="/drills" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Drills /></React.Suspense></ProtectedRoute>} />
