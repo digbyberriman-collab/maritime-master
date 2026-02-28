@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 import type { FeedbackSubmission, FeedbackFormData } from '../types';
 
+// Use untyped access since feedback_submissions may not be in generated types
+const fb = () => supabase.from('feedback_submissions' as any);
+
 interface FeedbackState {
   submissions: FeedbackSubmission[];
   isLoading: boolean;
@@ -18,7 +21,6 @@ interface FeedbackState {
     userRole: string;
   }) => Promise<boolean>;
   dismissResolved: (id: string) => void;
-  // Admin methods
   loadAllSubmissions: () => Promise<FeedbackSubmission[]>;
   updateStatus: (id: string, status: FeedbackSubmission['status']) => Promise<boolean>;
   addAdminNote: (id: string, note: string) => Promise<boolean>;
@@ -37,17 +39,14 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
   loadSubmissions: async (userId: string) => {
     set({ isLoading: true, error: null });
     try {
-      const { data, error } = await supabase
-        .from('feedback_submissions')
+      const { data, error } = await fb()
         .select('*')
         .eq('user_id', userId)
-        .order('created_at', { ascending: false }) as { data: FeedbackSubmission[] | null; error: any };
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
-      const submissions = (data || []) as FeedbackSubmission[];
-
-      // Check for newly resolved items (resolved since last load)
+      const submissions = (data || []) as unknown as FeedbackSubmission[];
       const previousIds = new Set(get().submissions.filter(s => s.status === 'fixed').map(s => s.id));
       const newlyResolved = submissions.filter(
         s => s.status === 'fixed' && !previousIds.has(s.id) && s.admin_response
@@ -79,7 +78,7 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
         }
       }
 
-      const { error } = await supabase.from('feedback_submissions').insert({
+      const { error } = await fb().insert({
         user_id: userId,
         type: data.type,
         title: data.title,
@@ -90,7 +89,7 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
         browser: context.browser,
         page_url: context.pageUrl,
         user_role: context.userRole,
-      } as any) as { error: any };
+      });
 
       if (error) throw error;
 
@@ -112,13 +111,12 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
   loadAllSubmissions: async () => {
     set({ isLoading: true, error: null });
     try {
-      const { data, error } = await supabase
-        .from('feedback_submissions')
+      const { data, error } = await fb()
         .select('*')
-        .order('created_at', { ascending: false }) as { data: FeedbackSubmission[] | null; error: any };
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
-      const submissions = (data || []) as FeedbackSubmission[];
+      const submissions = (data || []) as unknown as FeedbackSubmission[];
       set({ submissions, isLoading: false });
       return submissions;
     } catch (err: any) {
@@ -133,10 +131,9 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
       if (status === 'fixed') {
         updateData.resolved_at = new Date().toISOString();
       }
-      const { error } = await supabase
-        .from('feedback_submissions')
+      const { error } = await fb()
         .update(updateData)
-        .eq('id', id) as { error: any };
+        .eq('id', id);
 
       if (error) throw error;
       set(state => ({
@@ -152,10 +149,9 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
 
   addAdminNote: async (id, note) => {
     try {
-      const { error } = await supabase
-        .from('feedback_submissions')
-        .update({ admin_note: note, updated_at: new Date().toISOString() } as any)
-        .eq('id', id) as { error: any };
+      const { error } = await fb()
+        .update({ admin_note: note, updated_at: new Date().toISOString() })
+        .eq('id', id);
 
       if (error) throw error;
       set(state => ({
@@ -171,10 +167,9 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
 
   addAdminResponse: async (id, response) => {
     try {
-      const { error } = await supabase
-        .from('feedback_submissions')
-        .update({ admin_response: response, updated_at: new Date().toISOString() } as any)
-        .eq('id', id) as { error: any };
+      const { error } = await fb()
+        .update({ admin_response: response, updated_at: new Date().toISOString() })
+        .eq('id', id);
 
       if (error) throw error;
       set(state => ({
