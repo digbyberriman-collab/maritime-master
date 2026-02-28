@@ -4147,6 +4147,63 @@ export type Database = {
           },
         ]
       }
+      feedback_submissions: {
+        Row: {
+          admin_note: string | null
+          admin_response: string | null
+          app_version: string
+          browser: string
+          created_at: string
+          description: string
+          id: string
+          page_url: string
+          resolved_at: string | null
+          screenshot_url: string | null
+          status: string
+          title: string
+          type: string
+          updated_at: string
+          user_id: string
+          user_role: string
+        }
+        Insert: {
+          admin_note?: string | null
+          admin_response?: string | null
+          app_version?: string
+          browser?: string
+          created_at?: string
+          description: string
+          id?: string
+          page_url?: string
+          resolved_at?: string | null
+          screenshot_url?: string | null
+          status?: string
+          title: string
+          type: string
+          updated_at?: string
+          user_id: string
+          user_role?: string
+        }
+        Update: {
+          admin_note?: string | null
+          admin_response?: string | null
+          app_version?: string
+          browser?: string
+          created_at?: string
+          description?: string
+          id?: string
+          page_url?: string
+          resolved_at?: string | null
+          screenshot_url?: string | null
+          status?: string
+          title?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+          user_role?: string
+        }
+        Relationships: []
+      }
       field_redactions: {
         Row: {
           company_id: string

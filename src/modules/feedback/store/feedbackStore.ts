@@ -41,7 +41,7 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
         .from('feedback_submissions')
         .select('*')
         .eq('user_id', userId)
-        .order('created_at', { ascending: false }) as { data: FeedbackSubmission[] | null; error: any };
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
@@ -90,7 +90,7 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
         browser: context.browser,
         page_url: context.pageUrl,
         user_role: context.userRole,
-      } as any) as { error: any };
+      });
 
       if (error) throw error;
 
@@ -115,7 +115,7 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
       const { data, error } = await supabase
         .from('feedback_submissions')
         .select('*')
-        .order('created_at', { ascending: false }) as { data: FeedbackSubmission[] | null; error: any };
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       const submissions = (data || []) as FeedbackSubmission[];
@@ -129,14 +129,15 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
 
   updateStatus: async (id, status) => {
     try {
-      const updateData: any = { status, updated_at: new Date().toISOString() };
+      const now = new Date().toISOString();
+      const updateData: { status: string; updated_at: string; resolved_at?: string } = { status, updated_at: now };
       if (status === 'fixed') {
-        updateData.resolved_at = new Date().toISOString();
+        updateData.resolved_at = now;
       }
       const { error } = await supabase
         .from('feedback_submissions')
         .update(updateData)
-        .eq('id', id) as { error: any };
+        .eq('id', id);
 
       if (error) throw error;
       set(state => ({
@@ -154,8 +155,8 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
     try {
       const { error } = await supabase
         .from('feedback_submissions')
-        .update({ admin_note: note, updated_at: new Date().toISOString() } as any)
-        .eq('id', id) as { error: any };
+        .update({ admin_note: note, updated_at: new Date().toISOString() })
+        .eq('id', id);
 
       if (error) throw error;
       set(state => ({
@@ -173,8 +174,8 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
     try {
       const { error } = await supabase
         .from('feedback_submissions')
-        .update({ admin_response: response, updated_at: new Date().toISOString() } as any)
-        .eq('id', id) as { error: any };
+        .update({ admin_response: response, updated_at: new Date().toISOString() })
+        .eq('id', id);
 
       if (error) throw error;
       set(state => ({

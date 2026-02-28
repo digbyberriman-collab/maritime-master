@@ -184,8 +184,8 @@ const FeedbackAdmin: React.FC = () => {
                 >
                   <Icon className={cn('w-4 h-4 shrink-0', TYPE_COLORS[item.type])} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{item.title}</p>
-                    <p className="text-xs text-muted-foreground truncate">{item.description}</p>
+                    <p className={cn('text-sm font-medium text-foreground truncate', item.status === 'fixed' && 'line-through text-muted-foreground')}>{item.title}</p>
+                    <p className={cn('text-xs text-muted-foreground truncate', item.status === 'fixed' && 'line-through')}>{item.description}</p>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className={cn('inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium', statusConf.className)}>

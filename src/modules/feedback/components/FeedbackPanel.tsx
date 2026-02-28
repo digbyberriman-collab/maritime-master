@@ -127,10 +127,10 @@ const FeedbackPanel: React.FC = () => {
           <Icon className={cn('w-4 h-4 mt-0.5 shrink-0', typeOption?.color)} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-medium text-foreground truncate">{item.title}</p>
+              <p className={cn('text-sm font-medium text-foreground truncate', item.status === 'fixed' && 'line-through text-muted-foreground')}>{item.title}</p>
               {renderStatusBadge(item.status)}
             </div>
-            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{item.description}</p>
+            <p className={cn('text-xs text-muted-foreground mt-0.5 line-clamp-2', item.status === 'fixed' && 'line-through')}>{item.description}</p>
             {item.admin_response && (
               <div className="mt-2 rounded-md bg-muted/50 px-2.5 py-1.5 text-xs text-muted-foreground">
                 <span className="font-medium text-foreground">Response:</span> {item.admin_response}
