@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format, differenceInDays } from 'date-fns';
+import { toast } from 'sonner';
 
 interface CrewDocument {
   id: string;
@@ -205,7 +206,7 @@ export default function CrewDocuments() {
               Fleet-wide crew document management and compliance tracking
             </p>
           </div>
-          <Button>
+          <Button onClick={() => toast.info('Upload document feature coming soon')}>
             <Upload className="h-4 w-4 mr-2" />
             Upload Document
           </Button>
@@ -337,10 +338,15 @@ export default function CrewDocuments() {
                     <div className="flex gap-1">
                       {doc.fileUrl && (
                         <>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" onClick={() => window.open(doc.fileUrl, '_blank')} title="View document">
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = doc.fileUrl;
+                            link.download = doc.fileName;
+                            link.click();
+                          }} title="Download document">
                             <Download className="h-4 w-4" />
                           </Button>
                         </>

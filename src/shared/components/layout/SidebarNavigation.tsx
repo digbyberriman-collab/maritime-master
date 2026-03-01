@@ -20,12 +20,26 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
     return NAVIGATION_ITEMS.filter(item => canAccessModule(item.id));
   }, [canAccessModule]);
 
+  // Helper to check if a path (possibly with query params) matches the current location
+  const matchesPath = (path: string): boolean => {
+    const [pathname, queryString] = path.split('?');
+    if (location.pathname !== pathname) return false;
+    if (!queryString) return true;
+    const params = new URLSearchParams(queryString);
+    const currentParams = new URLSearchParams(location.search);
+    for (const [key, value] of params.entries()) {
+      if (currentParams.get(key) !== value) return false;
+    }
+    return true;
+  };
+
   // Helper to check if path matches any child
   const hasActiveDescendant = (item: NavItem): boolean => {
     if (item.children) {
-      return item.children.some(child => 
-        location.pathname === child.path || location.pathname.startsWith(child.path + '/')
-      );
+      return item.children.some(child => {
+        const [pathname] = child.path.split('?');
+        return matchesPath(child.path) || location.pathname.startsWith(pathname + '/');
+      });
     }
     return false;
   };
@@ -52,7 +66,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
   };
 
   const isActive = (path: string) => {
-    return location.pathname === path;
+    return matchesPath(path);
   };
 
   // Render child (2nd level) - flat, no nested children

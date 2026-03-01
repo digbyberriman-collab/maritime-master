@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import DocumentFilters from '@/modules/documents/components/DocumentFilters';
 import DocumentCard from '@/modules/documents/components/DocumentCard';
@@ -30,6 +31,7 @@ type ViewMode = 'grid' | 'list';
 type SortOption = 'title' | 'updated_at' | 'document_number' | 'next_review_date';
 
 const Documents: React.FC = () => {
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortBy, setSortBy] = useState<SortOption>('updated_at');
   const [filters, setFilters] = useState<Filters>({
@@ -102,7 +104,7 @@ const Documents: React.FC = () => {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <h1 className="text-2xl font-bold text-foreground">Documents</h1>
               <div className="flex items-center gap-2">
-                <Button variant="outline" className="hidden sm:flex">
+                <Button variant="outline" className="hidden sm:flex" onClick={() => navigate('/documents/master-index')}>
                   <ClipboardList className="w-4 h-4 mr-2" />
                   Master Document Index
                 </Button>

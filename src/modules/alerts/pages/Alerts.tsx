@@ -1,4 +1,5 @@
 import React from 'react';
+import { toast } from 'sonner';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Bell, AlertCircle, AlertTriangle, Info, CheckCircle, Clock } from 'lucide-react';
@@ -42,7 +43,7 @@ const Alerts: React.FC = () => {
             <h1 className="text-2xl font-bold text-foreground">Alerts</h1>
             <p className="text-muted-foreground mt-1">Monitor and manage system alerts across your fleet</p>
           </div>
-          <Button variant="outline">
+          <Button variant="outline" onClick={() => toast.success('All alerts marked as read')}>
             <CheckCircle className="h-4 w-4 mr-2" />
             Mark All Read
           </Button>
@@ -133,7 +134,7 @@ const Alerts: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-3">
                         {getStatusBadge(alert.status)}
-                        <Button variant="ghost" size="sm">View</Button>
+                        <Button variant="ghost" size="sm" onClick={() => toast.info(`Viewing alert: ${alert.title}`)}>View</Button>
                       </div>
                     </div>
                   ))}
@@ -159,7 +160,7 @@ const Alerts: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-3">
                         {getStatusBadge(alert.status)}
-                        <Button variant="ghost" size="sm">View</Button>
+                        <Button variant="ghost" size="sm" onClick={() => toast.info(`Viewing alert: ${alert.title}`)}>View</Button>
                       </div>
                     </div>
                   ))}
@@ -185,7 +186,7 @@ const Alerts: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-3">
                         {getStatusBadge(alert.status)}
-                        <Button variant="ghost" size="sm">View</Button>
+                        <Button variant="ghost" size="sm" onClick={() => toast.info(`Viewing alert: ${alert.title}`)}>View</Button>
                       </div>
                     </div>
                   ))}
@@ -211,7 +212,7 @@ const Alerts: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-3">
                         {getStatusBadge(alert.status)}
-                        <Button variant="ghost" size="sm">View</Button>
+                        <Button variant="ghost" size="sm" onClick={() => toast.info(`Viewing alert: ${alert.title}`)}>View</Button>
                       </div>
                     </div>
                   ))}

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { toast } from 'sonner';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -162,7 +163,7 @@ const ReviewDashboard: React.FC = () => {
               </TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end gap-2">
-                  <Button variant="ghost" size="sm">
+                  <Button variant="ghost" size="sm" onClick={() => toast.info(`Viewing document: ${doc.title}`)}>
                     <Eye className="w-4 h-4" />
                   </Button>
                   <Button size="sm" onClick={() => openReviewModal(doc)}>

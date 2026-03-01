@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { 
   Shield, Search, Filter, Plus, FolderOpen, FileText,
@@ -125,7 +126,7 @@ export default function ISM_SMS() {
             </h1>
             <p className="text-muted-foreground">ISM Code and Safety Management System documents</p>
           </div>
-          <Button>
+          <Button onClick={() => toast.info('Add document feature coming soon')}>
             <Plus className="w-4 h-4 mr-2" />
             Add Document
           </Button>
