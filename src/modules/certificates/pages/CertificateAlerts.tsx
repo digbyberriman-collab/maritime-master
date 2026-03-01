@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { toast } from 'sonner';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -110,14 +111,14 @@ const CertificateAlerts: React.FC = () => {
         </TableCell>
         <TableCell>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" title="Start Renewal">
+            <Button variant="ghost" size="icon" title="Start Renewal" onClick={() => toast.info(`Starting renewal for ${alert.certificate_name}`)}>
               <RotateCcw className="w-4 h-4" />
             </Button>
-            <Button variant="ghost" size="icon" title="Snooze Alert">
+            <Button variant="ghost" size="icon" title="Snooze Alert" onClick={() => toast.info(`Alert snoozed for ${alert.certificate_name}`)}>
               <BellOff className="w-4 h-4" />
             </Button>
             {isExpired && (
-              <Button variant="ghost" size="icon" title="Archive">
+              <Button variant="ghost" size="icon" title="Archive" onClick={() => toast.info(`Archived alert for ${alert.certificate_name}`)}>
                 <Archive className="w-4 h-4" />
               </Button>
             )}

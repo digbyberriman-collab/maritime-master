@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { toast } from 'sonner';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -332,7 +333,7 @@ const Policies: React.FC = () => {
               Company policies and guidelines with acknowledgment tracking
             </p>
           </div>
-          <Button className="gap-2">
+          <Button className="gap-2" onClick={() => toast.info('Create policy feature coming soon')}>
             <Plus className="w-4 h-4" />
             Create Policy
           </Button>

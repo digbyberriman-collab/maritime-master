@@ -176,7 +176,7 @@ const ChecklistsPage: React.FC = () => {
                         <span>{template.created_at && format(new Date(template.created_at), 'MMM d, yyyy')}</span>
                       </div>
                       <div className="mt-4 flex gap-2">
-                        <Button variant="outline" size="sm" className="flex-1">
+                        <Button variant="outline" size="sm" className="flex-1" onClick={(e) => { e.stopPropagation(); navigate(`/ism/forms/templates/${template.id}`); }}>
                           Preview
                         </Button>
                         <Button size="sm" className="flex-1" onClick={(e) => { e.stopPropagation(); navigate(`/ism/forms/new?templateId=${template.id}`); }}>

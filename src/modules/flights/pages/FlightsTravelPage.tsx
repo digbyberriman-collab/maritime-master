@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { toast } from 'sonner';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -63,7 +64,7 @@ const FlightsTravelPage: React.FC = () => {
             <p className="text-muted-foreground">Manage crew travel bookings and budget</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="gap-1 border-[#1A2740] text-[#94A3B8]">
+            <Button variant="outline" className="gap-1 border-[#1A2740] text-[#94A3B8]" onClick={() => toast.info('Manual entry feature coming soon')}>
               <Plus className="w-4 h-4" /> Manual Entry
             </Button>
             <Button className="gap-1 bg-[#3B82F6]" onClick={() => setShowSearchModal(true)}>
@@ -190,6 +191,7 @@ const FlightsTravelPage: React.FC = () => {
                       variant="outline"
                       size="sm"
                       className="gap-1 border-[#1A2740] text-[#94A3B8] hover:text-white"
+                      onClick={() => setShowSearchModal(true)}
                     >
                       <span className="font-mono">{route.origin}</span>
                       <ArrowRight className="w-3 h-3" />
@@ -250,7 +252,7 @@ const FlightsTravelPage: React.FC = () => {
                             <p className="text-white font-bold text-lg">${flight.price}</p>
                             <p className="text-[#94A3B8] text-xs">{flight.cabin}</p>
                           </div>
-                          <Button size="sm" className="bg-[#3B82F6]">Book</Button>
+                          <Button size="sm" className="bg-[#3B82F6]" onClick={() => toast.success(`Booking ${flight.flight} - ${flight.origin} to ${flight.destination}`)}>Book</Button>
                         </div>
                       </div>
                     ))}

@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { toast } from "sonner";
 import DashboardLayout from "@/shared/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,7 +74,7 @@ const CAPATracker: React.FC = () => {
               Corrective and Preventive Action management
             </p>
           </div>
-          <Button variant="outline" className="gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => toast.info('Export report feature coming soon')}>
             <Download className="w-4 h-4" />
             Export Report
           </Button>
@@ -285,7 +286,7 @@ const CAPATracker: React.FC = () => {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="sm">
+                          <Button variant="ghost" size="sm" onClick={() => toast.info(`Viewing CAPA: ${capa.capa_number}`)}>
                             <ChevronRight className="w-4 h-4" />
                           </Button>
                         </TableCell>

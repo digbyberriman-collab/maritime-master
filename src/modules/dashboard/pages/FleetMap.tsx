@@ -1,5 +1,6 @@
 // Fleet Map - Interactive vessel tracking with Leaflet
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -124,6 +125,7 @@ const getPortTypeLabel = (type: string) => {
 };
 
 const FleetMap: React.FC = () => {
+  const navigate = useNavigate();
   const { vesselFilter } = useVesselFilter();
   const { profile } = useAuth();
   const companyId = profile?.company_id;
@@ -457,7 +459,7 @@ const FleetMap: React.FC = () => {
                     <Button 
                       className="w-full" 
                       size="sm"
-                      onClick={() => window.location.href = `/vessels/dashboard?vessel=${selectedVessel.id}`}
+                      onClick={() => navigate(`/vessels/dashboard?vessel=${selectedVessel.id}`)}
                     >
                       View Vessel Dashboard
                     </Button>

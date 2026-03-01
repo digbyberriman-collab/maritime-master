@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { toast } from 'sonner';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -373,7 +374,7 @@ const CriticalEquipment: React.FC = () => {
               ISM critical equipment status monitoring and maintenance tracking
             </p>
           </div>
-          <Button className="gap-2">
+          <Button className="gap-2" onClick={() => toast.info('Add equipment feature coming soon')}>
             <Plus className="w-4 h-4" />
             Add Equipment
           </Button>
@@ -575,28 +576,28 @@ const CriticalEquipment: React.FC = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem className="gap-2">
+                          <DropdownMenuItem className="gap-2" onClick={() => toast.info(`Viewing details for ${equipment.equipment_name}`)}>
                             <Eye className="h-4 w-4" />
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2">
+                          <DropdownMenuItem className="gap-2" onClick={() => toast.info(`Updating status for ${equipment.equipment_name}`)}>
                             <Edit className="h-4 w-4" />
                             Update Status
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2">
+                          <DropdownMenuItem className="gap-2" onClick={() => toast.info(`Scheduling maintenance for ${equipment.equipment_name}`)}>
                             <Wrench className="h-4 w-4" />
                             Schedule Maintenance
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2">
+                          <DropdownMenuItem className="gap-2" onClick={() => toast.info(`Recording test for ${equipment.equipment_name}`)}>
                             <TestTube className="h-4 w-4" />
                             Record Test
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="gap-2">
+                          <DropdownMenuItem className="gap-2" onClick={() => toast.info(`Managing spares for ${equipment.equipment_name}`)}>
                             <Package className="h-4 w-4" />
                             Manage Spares
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem className="gap-2">
+                          <DropdownMenuItem className="gap-2" onClick={() => toast.info(`Viewing history for ${equipment.equipment_name}`)}>
                             <FileText className="h-4 w-4" />
                             View History
                           </DropdownMenuItem>

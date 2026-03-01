@@ -34,7 +34,7 @@ export const ALL_AVAILABLE_SHORTCUTS: AvailableShortcut[] = [
   { target: '/vessels/list', label: 'Vessels', icon: 'ship' },
   { target: '/vessels/list?new=true', label: 'Add Vessel', icon: 'ship' },
   { target: '/ism/forms/templates', label: 'Forms', icon: 'file-text' },
-  { target: '/ism/audits', label: 'Audits', icon: 'check-square' },
+  { target: '/ism/audits-surveys', label: 'Audits', icon: 'check-square' },
   { target: '/ism/drills', label: 'Drills', icon: 'target' },
   { target: '/risk-assessments', label: 'Risk Assessments', icon: 'shield' },
 ];
