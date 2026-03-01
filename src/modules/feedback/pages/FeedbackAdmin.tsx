@@ -11,11 +11,12 @@ import {
   Globe,
   User,
   Monitor,
+  History,
+  ArrowRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -29,8 +30,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from '@/components/ui/dialog';
+import { toast } from 'sonner';
+import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useFeedbackStore } from '../store/feedbackStore';
 import type { FeedbackSubmission, FeedbackStatus, FeedbackType } from '../types';
 
@@ -52,14 +54,25 @@ const STATUS_CONFIG: Record<FeedbackStatus, { label: string; icon: React.Element
   fixed: { label: 'Fixed', icon: CheckCircle, className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
 };
 
+const ACTION_LABELS: Record<string, string> = {
+  created: 'Feedback submitted',
+  status_changed: 'Status changed',
+  note_added: 'Internal note added',
+  response_sent: 'Response sent to user',
+  screenshot_added: 'Screenshot attached',
+};
+
 const FeedbackAdmin: React.FC = () => {
+  const { user } = useAuth();
   const {
     submissions,
     isLoading,
+    activityEntries,
     loadAllSubmissions,
     updateStatus,
     addAdminNote,
     addAdminResponse,
+    loadActivityLog,
   } = useFeedbackStore();
 
   const [filterStatus, setFilterStatus] = useState<'all' | FeedbackStatus>('all');
@@ -79,33 +92,52 @@ const FeedbackAdmin: React.FC = () => {
     return true;
   });
 
-  const openDetail = (item: FeedbackSubmission) => {
+  const openDetail = async (item: FeedbackSubmission) => {
     setSelectedItem(item);
     setNoteText(item.admin_note || '');
     setResponseText(item.admin_response || '');
+    await loadActivityLog(item.id);
   };
 
   const handleStatusChange = async (status: FeedbackStatus) => {
-    if (!selectedItem) return;
+    if (!selectedItem || !user?.id) return;
     setSaving(true);
-    await updateStatus(selectedItem.id, status);
-    setSelectedItem(prev => prev ? { ...prev, status } : null);
+    const success = await updateStatus(selectedItem.id, status, user.id);
+    if (success) {
+      setSelectedItem(prev => prev ? { ...prev, status } : null);
+      toast.success(`Status updated to "${STATUS_CONFIG[status].label}"`);
+      await loadActivityLog(selectedItem.id);
+    } else {
+      toast.error('Failed to update status');
+    }
     setSaving(false);
   };
 
   const handleSaveNote = async () => {
-    if (!selectedItem) return;
+    if (!selectedItem || !user?.id) return;
     setSaving(true);
-    await addAdminNote(selectedItem.id, noteText);
-    setSelectedItem(prev => prev ? { ...prev, admin_note: noteText } : null);
+    const success = await addAdminNote(selectedItem.id, noteText, user.id);
+    if (success) {
+      setSelectedItem(prev => prev ? { ...prev, admin_note: noteText } : null);
+      toast.success('Internal note saved');
+      await loadActivityLog(selectedItem.id);
+    } else {
+      toast.error('Failed to save note');
+    }
     setSaving(false);
   };
 
   const handleSendResponse = async () => {
-    if (!selectedItem || !responseText.trim()) return;
+    if (!selectedItem || !responseText.trim() || !user?.id) return;
     setSaving(true);
-    await addAdminResponse(selectedItem.id, responseText.trim());
-    setSelectedItem(prev => prev ? { ...prev, admin_response: responseText.trim() } : null);
+    const success = await addAdminResponse(selectedItem.id, responseText.trim(), user.id);
+    if (success) {
+      setSelectedItem(prev => prev ? { ...prev, admin_response: responseText.trim() } : null);
+      toast.success('Response sent to user');
+      await loadActivityLog(selectedItem.id);
+    } else {
+      toast.error('Failed to send response');
+    }
     setSaving(false);
   };
 
@@ -204,7 +236,7 @@ const FeedbackAdmin: React.FC = () => {
 
       {/* Detail dialog */}
       <Dialog open={!!selectedItem} onOpenChange={(open) => { if (!open) setSelectedItem(null); }}>
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
           {selectedItem && (
             <>
               <DialogHeader>
@@ -308,6 +340,43 @@ const FeedbackAdmin: React.FC = () => {
                 >
                   Send Response
                 </Button>
+              </div>
+
+              {/* Activity Log */}
+              <div>
+                <div className="flex items-center gap-1.5 mb-2">
+                  <History className="w-3 h-3 text-muted-foreground" />
+                  <p className="text-xs font-medium text-muted-foreground">Activity Log</p>
+                </div>
+                {activityEntries.length === 0 ? (
+                  <p className="text-xs text-muted-foreground/60 py-2">No activity recorded yet.</p>
+                ) : (
+                  <div className="space-y-0 border-l-2 border-border ml-1.5 pl-3">
+                    {activityEntries.map(entry => (
+                      <div key={entry.id} className="relative pb-3 last:pb-0">
+                        <div className="absolute -left-[17px] top-1 w-2 h-2 rounded-full bg-muted-foreground/40" />
+                        <p className="text-xs font-medium text-foreground">
+                          {ACTION_LABELS[entry.action] || entry.action}
+                        </p>
+                        {entry.action === 'status_changed' && entry.old_value && entry.new_value && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                            <span className="capitalize">{entry.old_value.replace('_', ' ')}</span>
+                            <ArrowRight className="w-3 h-3" />
+                            <span className="capitalize">{entry.new_value.replace('_', ' ')}</span>
+                          </p>
+                        )}
+                        {entry.action !== 'status_changed' && entry.new_value && (
+                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
+                            {entry.new_value}
+                          </p>
+                        )}
+                        <p className="text-[10px] text-muted-foreground/50 mt-0.5">
+                          {new Date(entry.created_at).toLocaleString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           )}

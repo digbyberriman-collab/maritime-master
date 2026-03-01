@@ -153,7 +153,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       {/* Main content - z-10 to be above watermark */}
       <div className="flex-1 flex flex-col min-w-0 relative z-10">
         {/* Top navbar */}
-        <header className="h-16 bg-card border-b border-border flex items-center justify-between px-4 lg:px-6 shadow-navbar relative z-20">
+        <header className="h-14 lg:h-16 bg-card border-b border-border flex items-center justify-between px-3 lg:px-6 shadow-navbar relative z-20">
           {/* Mobile menu button */}
           <button
             onClick={() => setSidebarOpen(true)}
@@ -163,34 +163,31 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           </button>
 
           {/* Frequently Used Quick Actions Bar */}
-          <div className="hidden sm:block flex-1 mx-2">
+          <div className="flex-1 mx-2">
             <AdaptiveActionBar />
           </div>
 
-          {/* Spacer for mobile */}
-          <div className="flex-1 sm:hidden" />
-
-          {/* Client logo (desktop only) */}
+          {/* Client logo */}
           {clientLogoUrl && (
-            <div className="hidden lg:flex items-center mr-2">
+            <div className="flex items-center mr-2">
               <img
                 src={clientLogoUrl}
                 alt="Client logo"
-                className="max-h-8 max-w-[120px] object-contain"
+                className="max-h-6 sm:max-h-8 max-w-[80px] sm:max-w-[120px] object-contain"
               />
             </div>
           )}
 
           {/* Global Header Controls: Fleet Filter + Alerts Bell */}
-          <GlobalHeaderControls className="mr-2" />
+          <GlobalHeaderControls className="mr-1 sm:mr-2" />
 
           {/* User menu */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="gap-2">
-                <Avatar className="w-8 h-8">
-                  <AvatarFallback 
-                    className="text-sm"
+              <Button variant="ghost" className="gap-1 sm:gap-2 px-2 sm:px-4">
+                <Avatar className="w-7 h-7 sm:w-8 sm:h-8">
+                  <AvatarFallback
+                    className="text-xs sm:text-sm"
                     style={{ backgroundColor: brandColor, color: 'white' }}
                   >
                     {userInitials}
@@ -199,7 +196,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 <span className="hidden sm:inline text-sm font-medium">
                   {profile?.first_name}
                 </span>
-                <ChevronDown className="w-4 h-4" />
+                <ChevronDown className="w-4 h-4 hidden sm:block" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 bg-popover">
@@ -226,9 +223,22 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           </DropdownMenu>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 p-4 lg:p-6 overflow-auto">
-          {children}
+        {/* Page content with washed-out client logo watermark */}
+        <main className="flex-1 p-4 lg:p-6 overflow-auto relative">
+          {/* Client logo watermark - washed out behind content */}
+          {clientLogoUrl && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden" aria-hidden="true">
+              <img
+                src={clientLogoUrl}
+                alt=""
+                className="w-[60%] sm:w-[50%] lg:w-[40%] max-w-[500px] object-contain opacity-[0.04] grayscale"
+                draggable={false}
+              />
+            </div>
+          )}
+          <div className="relative z-[1]">
+            {children}
+          </div>
         </main>
 
         {/* Inkfish ownership watermark - persistent, unaffected by client branding */}

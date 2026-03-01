@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
-import type { FeedbackSubmission, FeedbackFormData } from '../types';
+import type { FeedbackSubmission, FeedbackFormData, FeedbackActivityEntry } from '../types';
 
 // Use untyped access since feedback_submissions may not be in generated types
 const fb = () => supabase.from('feedback_submissions' as any);
+const activityLog = () => supabase.from('feedback_activity_log' as any);
 
 interface FeedbackState {
   submissions: FeedbackSubmission[];
@@ -11,6 +12,7 @@ interface FeedbackState {
   error: string | null;
   panelOpen: boolean;
   newlyResolved: FeedbackSubmission[];
+  activityEntries: FeedbackActivityEntry[];
 
   setPanelOpen: (open: boolean) => void;
   loadSubmissions: (userId: string) => Promise<void>;
@@ -22,9 +24,10 @@ interface FeedbackState {
   }) => Promise<boolean>;
   dismissResolved: (id: string) => void;
   loadAllSubmissions: () => Promise<FeedbackSubmission[]>;
-  updateStatus: (id: string, status: FeedbackSubmission['status']) => Promise<boolean>;
-  addAdminNote: (id: string, note: string) => Promise<boolean>;
-  addAdminResponse: (id: string, response: string) => Promise<boolean>;
+  updateStatus: (id: string, status: FeedbackSubmission['status'], userId: string) => Promise<boolean>;
+  addAdminNote: (id: string, note: string, userId: string) => Promise<boolean>;
+  addAdminResponse: (id: string, response: string, userId: string) => Promise<boolean>;
+  loadActivityLog: (feedbackId: string) => Promise<FeedbackActivityEntry[]>;
 }
 
 export const useFeedbackStore = create<FeedbackState>((set, get) => ({
@@ -33,6 +36,7 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
   error: null,
   panelOpen: false,
   newlyResolved: [],
+  activityEntries: [],
 
   setPanelOpen: (open) => set({ panelOpen: open }),
 
@@ -78,7 +82,7 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
         }
       }
 
-      const { error } = await fb().insert({
+      const { data: inserted, error } = await fb().insert({
         user_id: userId,
         type: data.type,
         title: data.title,
@@ -89,9 +93,19 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
         browser: context.browser,
         page_url: context.pageUrl,
         user_role: context.userRole,
-      });
+      }).select('id').single();
 
       if (error) throw error;
+
+      // Log creation activity
+      if (inserted?.id) {
+        await activityLog().insert({
+          feedback_id: inserted.id,
+          user_id: userId,
+          action: 'created',
+          new_value: `${data.type}: ${data.title}`,
+        });
+      }
 
       await get().loadSubmissions(userId);
       set({ isLoading: false });
@@ -125,9 +139,13 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
     }
   },
 
-  updateStatus: async (id, status) => {
+  updateStatus: async (id, status, userId) => {
     try {
-      const updateData: any = { status, updated_at: new Date().toISOString() };
+      // Get current status for activity log
+      const current = get().submissions.find(s => s.id === id);
+      const oldStatus = current?.status || 'unknown';
+
+      const updateData: any = { status };
       if (status === 'fixed') {
         updateData.resolved_at = new Date().toISOString();
       }
@@ -136,9 +154,19 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
         .eq('id', id);
 
       if (error) throw error;
+
+      // Log status change
+      await activityLog().insert({
+        feedback_id: id,
+        user_id: userId,
+        action: 'status_changed',
+        old_value: oldStatus,
+        new_value: status,
+      });
+
       set(state => ({
         submissions: state.submissions.map(s =>
-          s.id === id ? { ...s, status, ...updateData } : s
+          s.id === id ? { ...s, status, updated_at: new Date().toISOString(), ...(status === 'fixed' ? { resolved_at: new Date().toISOString() } : {}) } : s
         ),
       }));
       return true;
@@ -147,16 +175,25 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
     }
   },
 
-  addAdminNote: async (id, note) => {
+  addAdminNote: async (id, note, userId) => {
     try {
       const { error } = await fb()
-        .update({ admin_note: note, updated_at: new Date().toISOString() })
+        .update({ admin_note: note })
         .eq('id', id);
 
       if (error) throw error;
+
+      // Log note added
+      await activityLog().insert({
+        feedback_id: id,
+        user_id: userId,
+        action: 'note_added',
+        new_value: note,
+      });
+
       set(state => ({
         submissions: state.submissions.map(s =>
-          s.id === id ? { ...s, admin_note: note } : s
+          s.id === id ? { ...s, admin_note: note, updated_at: new Date().toISOString() } : s
         ),
       }));
       return true;
@@ -165,21 +202,47 @@ export const useFeedbackStore = create<FeedbackState>((set, get) => ({
     }
   },
 
-  addAdminResponse: async (id, response) => {
+  addAdminResponse: async (id, response, userId) => {
     try {
       const { error } = await fb()
-        .update({ admin_response: response, updated_at: new Date().toISOString() })
+        .update({ admin_response: response })
         .eq('id', id);
 
       if (error) throw error;
+
+      // Log response sent
+      await activityLog().insert({
+        feedback_id: id,
+        user_id: userId,
+        action: 'response_sent',
+        new_value: response,
+      });
+
       set(state => ({
         submissions: state.submissions.map(s =>
-          s.id === id ? { ...s, admin_response: response } : s
+          s.id === id ? { ...s, admin_response: response, updated_at: new Date().toISOString() } : s
         ),
       }));
       return true;
     } catch {
       return false;
+    }
+  },
+
+  loadActivityLog: async (feedbackId: string) => {
+    try {
+      const { data, error } = await activityLog()
+        .select('*')
+        .eq('feedback_id', feedbackId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      const entries = (data || []) as unknown as FeedbackActivityEntry[];
+      set({ activityEntries: entries });
+      return entries;
+    } catch {
+      set({ activityEntries: [] });
+      return [];
     }
   },
 }));
