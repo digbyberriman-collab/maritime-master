@@ -252,7 +252,7 @@ const FlightsTravelPage: React.FC = () => {
                             <p className="text-white font-bold text-lg">${flight.price}</p>
                             <p className="text-[#94A3B8] text-xs">{flight.cabin}</p>
                           </div>
-                          <Button size="sm" className="bg-[#3B82F6]" onClick={() => toast.success(`Booking ${flight.flight} - ${flight.origin} to ${flight.destination}`)}>Book</Button>
+                          <Button size="sm" className="bg-[#3B82F6]" onClick={() => toast.success(`Booking ${flight.flight} - ${flight.origin} to ${flight.dest}`)}>Book</Button>
                         </div>
                       </div>
                     ))}

@@ -286,7 +286,7 @@ const CAPATracker: React.FC = () => {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button variant="ghost" size="sm" onClick={() => toast.info(`Viewing CAPA: ${capa.capa_number}`)}>
+                          <Button variant="ghost" size="sm" onClick={() => toast.info(`Viewing CAPA: ${capa.action_number}`)}>
                             <ChevronRight className="w-4 h-4" />
                           </Button>
                         </TableCell>

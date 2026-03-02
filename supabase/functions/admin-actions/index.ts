@@ -106,7 +106,9 @@ serve(async (req: Request) => {
     }
 
     const body: AdminActionRequest = await req.json();
-    const { action, targetUserId, resetType, enableAccess, vesselId, effectiveDate, endDate, reason, pin, position } = body;
+    const { action, resetType, enableAccess, vesselId, effectiveDate, endDate, reason, position } = body;
+    const targetUserId = body.targetUserId as string | undefined;
+    const pin = body.pin as string | undefined;
 
     // Get actor's profile for logging
     const { data: actorProfile } = await supabaseAdmin
@@ -272,7 +274,7 @@ serve(async (req: Request) => {
 
           case 'invalidate_sessions':
             // Sign out user from all sessions
-            const { error: signOutError } = await supabaseAdmin.auth.admin.signOut(targetUserId, 'global');
+            const { error: signOutError } = await supabaseAdmin.auth.admin.signOut(targetUserId as string, 'global' as any);
             if (signOutError) throw signOutError;
             result = { success: true, message: 'All sessions invalidated' };
             break;
@@ -352,7 +354,7 @@ serve(async (req: Request) => {
 
         // If disabling, also sign out the user
         if (!enableAccess) {
-          await supabaseAdmin.auth.admin.signOut(targetUserId, 'global');
+          await supabaseAdmin.auth.admin.signOut(targetUserId as string, 'global' as any);
         }
 
         // Log action
