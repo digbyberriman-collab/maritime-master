@@ -341,7 +341,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/crew/admin/quarantine/:id" element={
         <ProtectedRoute>
           <DashboardLayout>
-            <PlaceholderPage title="Quarantine House Details" icon={Building2} description="View and manage quarantine house details, availability, and booking history." />
+            <PlaceholderPage title="Quarantine House Details" icon={<Building2 />} description="View and manage quarantine house details, availability, and booking history." />
           </DashboardLayout>
         </ProtectedRoute>
       } />

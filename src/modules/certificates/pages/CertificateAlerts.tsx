@@ -111,14 +111,14 @@ const CertificateAlerts: React.FC = () => {
         </TableCell>
         <TableCell>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" title="Start Renewal" onClick={() => toast.info(`Starting renewal for ${alert.certificate_name}`)}>
+            <Button variant="ghost" size="icon" title="Start Renewal" onClick={() => toast.info(`Starting renewal for ${cert.certificate_name}`)}>
               <RotateCcw className="w-4 h-4" />
             </Button>
-            <Button variant="ghost" size="icon" title="Snooze Alert" onClick={() => toast.info(`Alert snoozed for ${alert.certificate_name}`)}>
+            <Button variant="ghost" size="icon" title="Snooze Alert" onClick={() => toast.info(`Alert snoozed for ${cert.certificate_name}`)}>
               <BellOff className="w-4 h-4" />
             </Button>
             {isExpired && (
-              <Button variant="ghost" size="icon" title="Archive" onClick={() => toast.info(`Archived alert for ${alert.certificate_name}`)}>
+              <Button variant="ghost" size="icon" title="Archive" onClick={() => toast.info(`Archived alert for ${cert.certificate_name}`)}>
                 <Archive className="w-4 h-4" />
               </Button>
             )}
