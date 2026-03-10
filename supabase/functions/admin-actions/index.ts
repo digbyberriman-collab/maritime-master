@@ -262,7 +262,7 @@ serve(async (req: Request) => {
         const beforeState = { account_status: targetProfile.account_status };
 
         switch (resetType) {
-          case 'password_reset':
+          case 'password_reset': {
             // Send password reset email
             const { error: resetError } = await supabaseAdmin.auth.admin.generateLink({
               type: 'recovery',
@@ -271,15 +271,17 @@ serve(async (req: Request) => {
             if (resetError) throw resetError;
             result = { success: true, message: 'Password reset email sent' };
             break;
+          }
 
-          case 'invalidate_sessions':
+          case 'invalidate_sessions': {
             // Sign out user from all sessions
             const { error: signOutError } = await supabaseAdmin.auth.admin.signOut(targetUserId as string, 'global' as any);
             if (signOutError) throw signOutError;
             result = { success: true, message: 'All sessions invalidated' };
             break;
+          }
 
-          case 'resend_invitation':
+          case 'resend_invitation': {
             // Resend invitation via magic link
             const { error: inviteError } = await supabaseAdmin.auth.admin.generateLink({
               type: 'magiclink',
@@ -295,6 +297,7 @@ serve(async (req: Request) => {
               
             result = { success: true, message: 'Invitation resent' };
             break;
+          }
         }
 
         // Log action (redact email in logs)

@@ -177,7 +177,7 @@ export interface UpdateVesselRequest {
   operationalStatus?: string;
 }
 
-export interface UpdateEmergencyContactsRequest extends VesselEmergencyContacts {}
+export type UpdateEmergencyContactsRequest = VesselEmergencyContacts;
 
 export interface VesselDashboard {
   vessel: Vessel;
