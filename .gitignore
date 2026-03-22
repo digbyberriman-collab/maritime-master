@@ -22,3 +22,10 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Skills output files
+skills/yt_research_results.json
+notebooklm_*.png
+notebooklm_*.pdf
+notebooklm_*.json
+notebooklm_*.mp3
