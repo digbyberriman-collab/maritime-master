@@ -61,10 +61,10 @@ export const usePermissionsStore = create<PermissionsState>((set, get) => ({
 
   loadPermissions: async () => {
     const { isLoading, isInitialized } = get();
-    
-    // Prevent duplicate loads
-    if (isLoading) return;
-    
+
+    // Prevent duplicate or redundant loads
+    if (isLoading || isInitialized) return;
+
     set({ isLoading: true, error: null });
     
     try {

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
+import { isAllowedDomain } from '@/shared/utils/domainValidation';
 
 interface Profile {
   id: string;
@@ -186,38 +187,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [userRole, rbacInitialized, canView]);
 
   useEffect(() => {
+    let initialSessionHandled = false;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        // Skip the INITIAL_SESSION event if we already handled it via getSession
+        if (event === 'INITIAL_SESSION' && initialSessionHandled) {
+          return;
+        }
+
         setSession(session);
         setUser(session?.user ?? null);
 
-        // Defer profile fetch with setTimeout
         if (session?.user) {
+          // Defer Supabase calls to avoid auth deadlock during state change
           setTimeout(() => {
-            fetchProfile(session.user.id).then(setProfile);
-            // Load RBAC permissions when user logs in
+            fetchProfile(session.user.id).then((p) => {
+              setProfile(p);
+              setLoading(false);
+            });
             loadPermissions();
           }, 0);
         } else {
           setProfile(null);
-          // Reset RBAC permissions when user logs out
           resetPermissions();
+          setLoading(false);
         }
       }
     );
 
     // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      initialSessionHandled = true;
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
         fetchProfile(session.user.id).then((p) => {
           setProfile(p);
           setLoading(false);
         });
-        // Load RBAC permissions for existing session
         loadPermissions();
       } else {
         setLoading(false);
@@ -228,11 +238,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [loadPermissions, resetPermissions]);
 
   const signIn = async (email: string, password: string) => {
+    if (!isAllowedDomain(email)) {
+      return { error: new Error('Access is restricted to @ink.fish and @krakenfleet.co email addresses.') };
+    }
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error ? new Error(error.message) : null };
   };
 
   const signUp = async (data: SignUpData) => {
+    if (!isAllowedDomain(data.email)) {
+      return { error: new Error('Registration is restricted to @ink.fish and @krakenfleet.co email addresses.') };
+    }
+
     try {
       // First, create the user
       const { data: authData, error: authError } = await supabase.auth.signUp({
