@@ -96,29 +96,72 @@ serve(async (req: Request) => {
 
     console.log(`Creating crew member: ${body.email}`);
 
-    // Create the auth user
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: body.email,
-      password: body.password,
-      email_confirm: true, // Auto-confirm the email
+    // Check if an auth user with this email already exists
+    const normalizedEmail = body.email.trim().toLowerCase();
+    const { data: existingList, error: listError } = await supabaseAdmin.auth.admin.listUsers({
+      page: 1,
+      perPage: 200,
     });
-
-    if (authError) {
-      console.error('Auth creation error:', authError);
-      throw new Error(`Failed to create user: ${authError.message}`);
+    if (listError) {
+      console.error('Failed to list users:', listError);
+      throw new Error(`Failed to verify email availability: ${listError.message}`);
     }
+    const existingAuthUser = existingList?.users?.find(
+      (u) => u.email?.toLowerCase() === normalizedEmail
+    );
 
-    if (!authData.user) {
-      throw new Error('No user returned from creation');
+    let authUserId: string;
+
+    if (existingAuthUser) {
+      // If a profile already exists for this auth user, this is a true duplicate.
+      const { data: existingProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('user_id')
+        .eq('user_id', existingAuthUser.id)
+        .maybeSingle();
+
+      if (existingProfile) {
+        return new Response(
+          JSON.stringify({
+            error: `A crew member with the email "${body.email}" already exists.`,
+            code: 'email_exists',
+          }),
+          {
+            status: 409,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      // Auth user exists but no profile — reuse it so the create can complete.
+      console.log(`Reusing orphaned auth user: ${existingAuthUser.id}`);
+      authUserId = existingAuthUser.id;
+    } else {
+      // Create a new auth user
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: body.email,
+        password: body.password,
+        email_confirm: true, // Auto-confirm the email
+      });
+
+      if (authError) {
+        console.error('Auth creation error:', authError);
+        throw new Error(`Failed to create user: ${authError.message}`);
+      }
+
+      if (!authData.user) {
+        throw new Error('No user returned from creation');
+      }
+
+      authUserId = authData.user.id;
+      console.log(`Created auth user: ${authUserId}`);
     }
-
-    console.log(`Created auth user: ${authData.user.id}`);
 
     // Create the profile
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .insert({
-        user_id: authData.user.id,
+        user_id: authUserId,
         email: body.email,
         first_name: body.firstName,
         last_name: body.lastName,
@@ -132,8 +175,10 @@ serve(async (req: Request) => {
 
     if (profileError) {
       console.error('Profile creation error:', profileError);
-      // Try to clean up the auth user
-      await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
+      // Only clean up the auth user if WE created it in this call
+      if (!existingAuthUser) {
+        await supabaseAdmin.auth.admin.deleteUser(authUserId);
+      }
       throw new Error(`Failed to create profile: ${profileError.message}`);
     }
 
@@ -144,7 +189,7 @@ serve(async (req: Request) => {
       const { error: assignmentError } = await supabaseAdmin
         .from('crew_assignments')
         .insert({
-          user_id: authData.user.id,
+          user_id: authUserId,
           vessel_id: body.vesselId,
           position: body.position,
           join_date: body.joinDate,
@@ -162,7 +207,7 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         success: true,
-        userId: authData.user.id,
+        userId: authUserId,
       }),
       {
         status: 200,
