@@ -193,6 +193,7 @@ export const useCrew = (vesselFilter?: string) => {
           account_status: p.account_status,
           last_login_at: p.last_login_at,
           invited_at: p.invited_at,
+          is_imported: p.is_imported ?? false,
           current_assignment: assignment
             ? {
                 id: assignment.id,
