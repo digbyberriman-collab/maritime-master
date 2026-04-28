@@ -7603,6 +7603,7 @@ export type Database = {
           invitation_token: string | null
           invitation_token_expires: string | null
           invited_at: string | null
+          is_imported: boolean
           last_invited_at: string | null
           last_login_at: string | null
           last_name: string
@@ -7620,7 +7621,7 @@ export type Database = {
           status: string | null
           updated_at: string
           updated_by: string | null
-          user_id: string
+          user_id: string | null
           version: number | null
           visa_status: string | null
         }
@@ -7644,6 +7645,7 @@ export type Database = {
           invitation_token?: string | null
           invitation_token_expires?: string | null
           invited_at?: string | null
+          is_imported?: boolean
           last_invited_at?: string | null
           last_login_at?: string | null
           last_name: string
@@ -7661,7 +7663,7 @@ export type Database = {
           status?: string | null
           updated_at?: string
           updated_by?: string | null
-          user_id: string
+          user_id?: string | null
           version?: number | null
           visa_status?: string | null
         }
@@ -7685,6 +7687,7 @@ export type Database = {
           invitation_token?: string | null
           invitation_token_expires?: string | null
           invited_at?: string | null
+          is_imported?: boolean
           last_invited_at?: string | null
           last_login_at?: string | null
           last_name?: string
@@ -7702,7 +7705,7 @@ export type Database = {
           status?: string | null
           updated_at?: string
           updated_by?: string | null
-          user_id?: string
+          user_id?: string | null
           version?: number | null
           visa_status?: string | null
         }

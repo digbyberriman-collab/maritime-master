@@ -5,7 +5,9 @@ import { toast } from '@/shared/hooks/use-toast';
 
 export interface CrewMember {
   id: string;
-  user_id: string;
+  // Imported crew live in the roster without a login account yet, so
+  // user_id can be null until they're invited and verify their email.
+  user_id: string | null;
   email: string;
   first_name: string;
   last_name: string;
@@ -35,6 +37,8 @@ export interface CrewMember {
   account_status?: string | null;
   last_login_at?: string | null;
   invited_at?: string | null;
+  // Imported via CSV / bulk import — has profile but no auth account yet.
+  is_imported?: boolean;
   // Assignment
   current_assignment?: {
     id: string;
@@ -189,6 +193,7 @@ export const useCrew = (vesselFilter?: string) => {
           account_status: p.account_status,
           last_login_at: p.last_login_at,
           invited_at: p.invited_at,
+          is_imported: p.is_imported ?? false,
           current_assignment: assignment
             ? {
                 id: assignment.id,

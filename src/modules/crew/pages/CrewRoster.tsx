@@ -60,6 +60,8 @@ import {
   UserCheck,
   ShieldAlert,
   RefreshCw,
+  Mail,
+  Send,
 } from 'lucide-react';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useCrew, type CrewMember } from '@/modules/crew/hooks/useCrew';
@@ -114,6 +116,9 @@ const CrewRoster: React.FC = () => {
   
   const { isConfirmed } = useAdminActions();
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Invite flow state
+  const [isInviting, setIsInviting] = useState(false);
   
   const { vessels, isLoading: vesselsLoading } = useVessels();
   const {
@@ -250,6 +255,48 @@ const CrewRoster: React.FC = () => {
         return <Badge variant="outline">{status}</Badge>;
     }
   };
+
+  // A crew member can be invited if they don't have a verified active
+  // login yet — i.e. they're imported (no auth user) or have only been
+  // sent an invite that hasn't been completed.
+  const isInvitable = (member: CrewMember) => {
+    const status = (member.account_status || '').toLowerCase();
+    return (
+      member.is_imported === true ||
+      status === 'not_invited' ||
+      status === 'invited' ||
+      member.user_id == null
+    );
+  };
+
+  const handleSendInvite = async (member: CrewMember) => {
+    if (!canManageCrew && !isDPAAdmin) return;
+    setIsInviting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-invitation', {
+        body: {
+          profileId: member.id,
+          redirectTo: `${window.location.origin}/auth/accept-invitation`,
+        },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      toast({
+        title: 'Invitation sent',
+        description: `Verification email sent to ${member.email}.`,
+      });
+      refetchCrew();
+    } catch (err) {
+      toast({
+        title: 'Could not send invitation',
+        description: err instanceof Error ? err.message : 'Unexpected error',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
 
   // Admin action handlers
   const handleAdminAction = (member: CrewMember, action: 'reset' | 'toggle' | 'reallocate') => {
@@ -593,6 +640,18 @@ const CrewRoster: React.FC = () => {
                                     <ShieldAlert className="w-3 h-3" />
                                     Admin Actions
                                   </DropdownMenuLabel>
+                                  {isInvitable(member) && (
+                                    <DropdownMenuItem
+                                      onClick={() => handleSendInvite(member)}
+                                      disabled={isInviting}
+                                    >
+                                      {member.account_status === 'invited' ? (
+                                        <><Send className="w-4 h-4 mr-2" />Resend Invite</>
+                                      ) : (
+                                        <><Mail className="w-4 h-4 mr-2" />Send Invite</>
+                                      )}
+                                    </DropdownMenuItem>
+                                  )}
                                   <DropdownMenuItem onClick={() => handleAdminAction(member, 'reset')}>
                                     <KeyRound className="w-4 h-4 mr-2" />
                                     Reset Account

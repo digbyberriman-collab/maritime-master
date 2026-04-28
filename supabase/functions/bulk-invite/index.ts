@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.2';
+import { inviteProfileById } from '../_shared/invite-helpers.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,14 +8,10 @@ const corsHeaders = {
 };
 
 interface BulkInviteRequest {
-  userIds: string[];
-}
-
-interface InviteResult {
-  userId: string;
-  email: string;
-  success: boolean;
-  error?: string;
+  // Either supply profileIds (preferred) or userIds (back-compat).
+  profileIds?: string[];
+  userIds?: string[];
+  redirectTo?: string;
 }
 
 serve(async (req: Request) => {
@@ -55,76 +52,43 @@ serve(async (req: Request) => {
       throw new Error('Could not verify permissions');
     }
 
-    // Only DPA can bulk invite
-    if (callerProfile.role !== 'dpa') {
-      throw new Error('Only DPA can send bulk invitations');
+    // Only DPA, Shore Management, Master, and superadmin can bulk invite
+    if (!['dpa', 'shore_management', 'master', 'superadmin'].includes(callerProfile.role)) {
+      throw new Error('Insufficient permissions to send invitations');
     }
 
-    const { userIds }: BulkInviteRequest = await req.json();
+    const { profileIds, userIds, redirectTo }: BulkInviteRequest = await req.json();
 
-    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
-      throw new Error('Missing or invalid userIds array');
+    let ids: string[] = [];
+    if (profileIds?.length) {
+      ids = profileIds;
+    } else if (userIds?.length) {
+      // Back-compat: translate auth user ids to profile ids.
+      const { data: rows } = await supabaseAdmin
+        .from('profiles')
+        .select('id, user_id')
+        .in('user_id', userIds);
+      ids = (rows ?? []).map((r) => r.id);
     }
 
-    if (userIds.length > 50) {
+    if (ids.length === 0) {
+      throw new Error('Missing or invalid profileIds array');
+    }
+    if (ids.length > 50) {
       throw new Error('Maximum 50 invitations per batch');
     }
 
-    const results: InviteResult[] = [];
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-
-    for (const userId of userIds) {
-      try {
-        // Get user profile
-        const { data: profile, error: profileError } = await supabaseAdmin
-          .from('profiles')
-          .select('*')
-          .eq('user_id', userId)
-          .single();
-
-        if (profileError || !profile) {
-          results.push({ userId, email: '', success: false, error: 'User not found' });
-          continue;
-        }
-
-        // Check same company
-        if (profile.company_id !== callerProfile.company_id) {
-          results.push({ userId, email: profile.email, success: false, error: 'Different company' });
-          continue;
-        }
-
-        // Check cooldown
-        if (profile.last_invited_at && new Date(profile.last_invited_at) > fiveMinutesAgo) {
-          results.push({ userId, email: profile.email, success: false, error: 'Cooldown period active' });
-          continue;
-        }
-
-        // Generate invitation token
-        const invitationToken = crypto.randomUUID();
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-        // Update profile
-        const { error: updateError } = await supabaseAdmin
-          .from('profiles')
-          .update({
-            invitation_token: invitationToken,
-            invitation_token_expires: expiresAt,
-            last_invited_at: new Date().toISOString(),
-            invitation_count: (profile.invitation_count || 0) + 1,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('user_id', userId);
-
-        if (updateError) {
-          results.push({ userId, email: profile.email, success: false, error: 'Failed to update' });
-          continue;
-        }
-
-        results.push({ userId, email: profile.email, success: true });
-        console.log(`Invitation sent to ${profile.email}`);
-      } catch (err: any) {
-        results.push({ userId, email: '', success: false, error: err.message });
-      }
+    const results = [];
+    for (const id of ids) {
+      const r = await inviteProfileById(
+        supabaseAdmin,
+        id,
+        callerProfile.company_id,
+        redirectTo,
+      );
+      results.push(r);
+      // Light delay to avoid hammering the auth admin API
+      await new Promise((res) => setTimeout(res, 100));
     }
 
     const successCount = results.filter(r => r.success).length;
