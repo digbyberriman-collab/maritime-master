@@ -119,12 +119,7 @@ const CrewRoster: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
 
   // Invite flow state
-  const [selectedForInvite, setSelectedForInvite] = useState<Set<string>>(new Set());
   const [isInviting, setIsInviting] = useState(false);
-  const [inviteResults, setInviteResults] = useState<
-    | { open: boolean; success: number; failed: number; errors: { email: string; error: string }[] }
-    | null
-  >(null);
   
   const { vessels, isLoading: vesselsLoading } = useVessels();
   const {
