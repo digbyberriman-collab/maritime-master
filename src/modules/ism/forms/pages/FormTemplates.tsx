@@ -158,11 +158,36 @@ const FormTemplates: React.FC = () => {
     if (!pendingDeleteId) return;
     setDeleting(true);
     try {
-      const { error } = await supabase
+      // Clean up dependent rows that don't have ON DELETE CASCADE,
+      // otherwise the delete will fail silently due to FK constraints.
+      await supabase.from('form_ai_extraction_jobs').delete().eq('template_id', pendingDeleteId);
+      await supabase.from('form_schedules').delete().eq('template_id', pendingDeleteId);
+      await supabase
+        .from('form_templates')
+        .update({ supersedes_template_id: null })
+        .eq('supersedes_template_id', pendingDeleteId);
+
+      // Check for submissions — these are records we should NOT silently destroy.
+      const { count: submissionCount } = await supabase
+        .from('form_submissions')
+        .select('id', { count: 'exact', head: true })
+        .eq('template_id', pendingDeleteId);
+
+      if ((submissionCount ?? 0) > 0) {
+        throw new Error(
+          `Cannot delete: ${submissionCount} submission(s) reference this template. Archive it instead to preserve history.`
+        );
+      }
+
+      const { data: deleted, error } = await supabase
         .from('form_templates')
         .delete()
-        .eq('id', pendingDeleteId);
+        .eq('id', pendingDeleteId)
+        .select('id');
       if (error) throw error;
+      if (!deleted || deleted.length === 0) {
+        throw new Error('Delete blocked: you may not have permission (DPA role required).');
+      }
       toast({ title: 'Template deleted', description: 'The form template has been permanently removed.' });
       setTemplates(prev => prev.filter(t => t.id !== pendingDeleteId));
       setConfirmOpen(false);
