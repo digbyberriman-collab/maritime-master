@@ -459,6 +459,12 @@ const FormTemplates: React.FC = () => {
     const allowed = await checkDpaAccess();
     if (!allowed) return;
     if (!isWithinRestoreWindow(template.archived_at)) {
+      await writeAuditLog(
+        'TEMPLATE_RESTORE_DENIED',
+        template.id,
+        { outcome: 'denied', archived_at: template.archived_at, restore_window_hours: RESTORE_WINDOW_HOURS },
+        'Restore attempted after grace window expired'
+      );
       toast({
         title: 'Restore window expired',
         description: `This template was archived more than ${RESTORE_WINDOW_HOURS} hours ago. A DPA must re-publish it manually.`,
@@ -480,6 +486,12 @@ const FormTemplates: React.FC = () => {
         title: 'Template restored',
         description: `${template.template_name} is published again.`,
       });
+      await writeAuditLog(
+        'TEMPLATE_RESTORE_SUCCESS',
+        template.id,
+        { outcome: 'restored', previously_archived_at: template.archived_at },
+        'DPA restored archived template within grace window'
+      );
       setTemplates(prev =>
         prev.map(t =>
           t.id === template.id ? { ...t, status: 'PUBLISHED', archived_at: null } : t
