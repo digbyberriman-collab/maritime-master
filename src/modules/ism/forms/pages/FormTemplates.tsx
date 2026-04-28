@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
@@ -80,6 +80,7 @@ const FormTemplates: React.FC = () => {
   const [pinOpen, setPinOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const pinConfirmedRef = useRef(false);
 
   useEffect(() => {
     loadTemplates();
@@ -145,11 +146,13 @@ const FormTemplates: React.FC = () => {
   const pendingTemplate = templates.find(t => t.id === pendingDeleteId);
 
   const handleDeleteClick = (id: string) => {
+    pinConfirmedRef.current = false;
     setPendingDeleteId(id);
     setPinOpen(true);
   };
 
   const handlePinConfirmed = () => {
+    pinConfirmedRef.current = true;
     setPinOpen(false);
     setConfirmOpen(true);
   };
@@ -192,6 +195,7 @@ const FormTemplates: React.FC = () => {
       setTemplates(prev => prev.filter(t => t.id !== pendingDeleteId));
       setConfirmOpen(false);
       setPendingDeleteId(null);
+      pinConfirmedRef.current = false;
     } catch (err: any) {
       toast({
         title: 'Delete failed',
@@ -382,7 +386,7 @@ const FormTemplates: React.FC = () => {
         open={pinOpen}
         onOpenChange={(open) => {
           setPinOpen(open);
-          if (!open && !confirmOpen) setPendingDeleteId(null);
+          if (!open && !pinConfirmedRef.current) setPendingDeleteId(null);
         }}
         onConfirmed={handlePinConfirmed}
         title="DPA PIN Required"
@@ -391,7 +395,10 @@ const FormTemplates: React.FC = () => {
 
       <AlertDialog open={confirmOpen} onOpenChange={(open) => {
         setConfirmOpen(open);
-        if (!open) setPendingDeleteId(null);
+        if (!open && !deleting) {
+          setPendingDeleteId(null);
+          pinConfirmedRef.current = false;
+        }
       }}>
         <AlertDialogContent>
           <AlertDialogHeader>
