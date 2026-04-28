@@ -499,6 +499,12 @@ const FormTemplates: React.FC = () => {
       );
     } catch (err: any) {
       const { kind, detail } = classifyError(err);
+      await writeAuditLog(
+        'TEMPLATE_RESTORE_FAILED',
+        template.id,
+        { outcome: 'failed', error_kind: kind, error_code: err?.code ?? null, error_message: detail },
+        `Restore failed: ${kind}`
+      );
       toast({
         title: `Restore failed — ${kind}`,
         description: `${kind}: ${detail}`,
