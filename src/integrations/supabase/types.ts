@@ -7719,6 +7719,7 @@ export type Database = {
       profiles: {
         Row: {
           account_status: string | null
+          airtable_id: string | null
           avatar_url: string | null
           cabin: string | null
           company_id: string | null
@@ -7733,6 +7734,7 @@ export type Database = {
           first_name: string
           gender: string | null
           id: string
+          imported_vessel_id: string | null
           invitation_count: number | null
           invitation_token: string | null
           invitation_token_expires: string | null
@@ -7761,6 +7763,7 @@ export type Database = {
         }
         Insert: {
           account_status?: string | null
+          airtable_id?: string | null
           avatar_url?: string | null
           cabin?: string | null
           company_id?: string | null
@@ -7775,6 +7778,7 @@ export type Database = {
           first_name: string
           gender?: string | null
           id?: string
+          imported_vessel_id?: string | null
           invitation_count?: number | null
           invitation_token?: string | null
           invitation_token_expires?: string | null
@@ -7803,6 +7807,7 @@ export type Database = {
         }
         Update: {
           account_status?: string | null
+          airtable_id?: string | null
           avatar_url?: string | null
           cabin?: string | null
           company_id?: string | null
@@ -7817,6 +7822,7 @@ export type Database = {
           first_name?: string
           gender?: string | null
           id?: string
+          imported_vessel_id?: string | null
           invitation_count?: number | null
           invitation_token?: string | null
           invitation_token_expires?: string | null
@@ -7849,6 +7855,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_imported_vessel_id_fkey"
+            columns: ["imported_vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
             referencedColumns: ["id"]
           },
         ]
