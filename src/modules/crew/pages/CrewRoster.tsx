@@ -346,7 +346,8 @@ const CrewRoster: React.FC = () => {
     }
   };
 
-  const activeVessels = vessels.filter((v) => v.status === 'Active');
+  // Show every vessel in the fleet (excluding sold) so all crew assignments are reachable
+  const activeVessels = vessels.filter((v) => v.status !== 'Sold');
   
   // Get selected vessel name for display
   const selectedVesselName = useMemo(() => {
