@@ -98,6 +98,8 @@ const CrewRoster: React.FC = () => {
   }, [localVesselFilter, masterVesselFilter, isAllVessels]);
   
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 25;
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -160,6 +162,18 @@ const CrewRoster: React.FC = () => {
         member.email.toLowerCase().includes(query)
     );
   }, [crew, searchQuery]);
+
+  // Reset to page 1 whenever filters/search change or underlying list size changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, effectiveVesselFilter, crew.length]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCrew.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedCrew = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE;
+    return filteredCrew.slice(start, start + PAGE_SIZE);
+  }, [filteredCrew, safePage]);
 
   const handleViewProfile = (member: CrewMember) => {
     setSelectedCrew(member);
