@@ -552,10 +552,11 @@ const FormTemplates: React.FC = () => {
 
       <AlertDialog open={confirmOpen} onOpenChange={(open) => {
         setConfirmOpen(open);
-        if (!open && !deleting) {
+        if (!open && !deleting && !archiving) {
           setPendingDeleteId(null);
           pinConfirmedRef.current = false;
           setDeleteError(null);
+          setArchiveOffered(false);
         }
       }}>
         <AlertDialogContent>
@@ -576,13 +577,29 @@ const FormTemplates: React.FC = () => {
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               <div className="font-semibold mb-1">Backend rejected the delete</div>
               <div className="break-words whitespace-pre-wrap font-mono text-xs">{deleteError}</div>
+              {archiveOffered && (
+                <div className="mt-2 text-xs text-foreground/80">
+                  Submissions or related records depend on this template. You can{' '}
+                  <strong>archive</strong> it instead — this hides the template from active
+                  use while preserving full history for audits.
+                </div>
+              )}
             </div>
           )}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting || archiving}>Cancel</AlertDialogCancel>
+            {archiveOffered && (
+              <Button
+                variant="secondary"
+                onClick={handleArchiveInstead}
+                disabled={deleting || archiving}
+              >
+                {archiving ? 'Archiving…' : 'Archive instead'}
+              </Button>
+            )}
             <AlertDialogAction
               onClick={(e) => { e.preventDefault(); handleConfirmDelete(); }}
-              disabled={deleting}
+              disabled={deleting || archiving}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? 'Deleting…' : 'Delete permanently'}
