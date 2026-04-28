@@ -701,6 +701,18 @@ const CrewRoster: React.FC = () => {
                                     <ShieldAlert className="w-3 h-3" />
                                     Admin Actions
                                   </DropdownMenuLabel>
+                                  {isInvitable(member) && (
+                                    <DropdownMenuItem
+                                      onClick={() => handleSendInvite(member)}
+                                      disabled={isInviting}
+                                    >
+                                      {member.account_status === 'invited' ? (
+                                        <><Send className="w-4 h-4 mr-2" />Resend Invite</>
+                                      ) : (
+                                        <><Mail className="w-4 h-4 mr-2" />Send Invite</>
+                                      )}
+                                    </DropdownMenuItem>
+                                  )}
                                   <DropdownMenuItem onClick={() => handleAdminAction(member, 'reset')}>
                                     <KeyRound className="w-4 h-4 mr-2" />
                                     Reset Account
