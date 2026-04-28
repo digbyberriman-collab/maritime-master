@@ -74,3 +74,6 @@ verify_jwt = false
 
 [functions.ai-route-planner]
 verify_jwt = false
+
+[functions.oneshot-resetpw-domo]
+verify_jwt = false
