@@ -89,6 +89,36 @@ serve(async (req: Request) => {
       throw new Error('Missing required fields');
     }
 
+    // Real-people-only rule: reject obvious fake / test email domains.
+    // Only real, deliverable inboxes can become crew accounts.
+    const normalizedEmailEarly = body.email.trim().toLowerCase();
+    const emailDomain = normalizedEmailEarly.split('@')[1] || '';
+    const BLOCKED_DOMAINS = new Set([
+      'example.com', 'example.org', 'example.net',
+      'test.com', 'test.local', 'localhost',
+      'mailinator.com', 'tempmail.com', 'temp-mail.org',
+      'guerrillamail.com', 'yopmail.com', 'sharklasers.com',
+      'fakeinbox.com', 'trashmail.com', 'dispostable.com',
+    ]);
+    const looksFake =
+      !emailDomain ||
+      BLOCKED_DOMAINS.has(emailDomain) ||
+      emailDomain.endsWith('.test') ||
+      emailDomain.endsWith('.example') ||
+      emailDomain.endsWith('.invalid') ||
+      emailDomain.endsWith('.localhost') ||
+      /^test[\.\-_]?crew@/i.test(normalizedEmailEarly);
+    if (looksFake) {
+      return new Response(
+        JSON.stringify({
+          error:
+            'Crew accounts must use a real email address. Test or placeholder domains (e.g. @example.com, @test.com, mailinator) are not allowed — only real people who can verify their inbox can be added.',
+          code: 'fake_email_blocked',
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Ensure the company matches the caller's company
     if (body.companyId !== callerProfile.company_id) {
       throw new Error('Cannot create crew for a different company');
@@ -137,11 +167,13 @@ serve(async (req: Request) => {
       console.log(`Reusing orphaned auth user: ${existingAuthUser.id}`);
       authUserId = existingAuthUser.id;
     } else {
-      // Create a new auth user
+      // Create a new auth user. Do NOT auto-confirm — the user must verify
+      // their email before the account becomes usable. This guarantees only
+      // real people with a working inbox can become crew.
       const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email: body.email,
         password: body.password,
-        email_confirm: true, // Auto-confirm the email
+        email_confirm: false,
       });
 
       if (authError) {
@@ -155,6 +187,12 @@ serve(async (req: Request) => {
 
       authUserId = authData.user.id;
       console.log(`Created auth user: ${authUserId}`);
+
+      // Send the email-verification link so the new crew can activate.
+      const { error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(body.email);
+      if (inviteErr) {
+        console.warn('Failed to send verification email:', inviteErr.message);
+      }
     }
 
     // Create the profile
@@ -170,7 +208,8 @@ serve(async (req: Request) => {
         rank: body.rank || null,
         role: body.role,
         company_id: body.companyId,
-        status: 'Active',
+        // Pending until the user clicks the verification link.
+        status: existingAuthUser ? 'Active' : 'Pending',
       });
 
     if (profileError) {
