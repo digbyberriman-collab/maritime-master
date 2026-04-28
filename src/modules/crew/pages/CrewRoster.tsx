@@ -98,6 +98,8 @@ const CrewRoster: React.FC = () => {
   }, [localVesselFilter, masterVesselFilter, isAllVessels]);
   
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 25;
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -160,6 +162,18 @@ const CrewRoster: React.FC = () => {
         member.email.toLowerCase().includes(query)
     );
   }, [crew, searchQuery]);
+
+  // Reset to page 1 whenever filters/search change or underlying list size changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, effectiveVesselFilter, crew.length]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCrew.length / PAGE_SIZE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedCrew = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE;
+    return filteredCrew.slice(start, start + PAGE_SIZE);
+  }, [filteredCrew, safePage]);
 
   const handleViewProfile = (member: CrewMember) => {
     setSelectedCrew(member);
@@ -527,7 +541,7 @@ const CrewRoster: React.FC = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredCrew.map((member) => (
+                     {paginatedCrew.map((member) => (
                       <TableRow key={member.id} className={member.status === 'Inactive' ? 'opacity-50' : ''}>
                         <TableCell className="font-medium whitespace-nowrap">
                           {member.first_name} {member.last_name}
@@ -676,6 +690,51 @@ const CrewRoster: React.FC = () => {
                     ))}
                   </TableBody>
                 </Table>
+              </div>
+            )}
+            {!isLoading && filteredCrew.length > PAGE_SIZE && (
+              <div className="flex items-center justify-between gap-4 pt-4 border-t mt-4 flex-wrap">
+                <div className="text-sm text-muted-foreground">
+                  Showing {(safePage - 1) * PAGE_SIZE + 1}–
+                  {Math.min(safePage * PAGE_SIZE, filteredCrew.length)} of {filteredCrew.length}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={safePage === 1}
+                  >
+                    First
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={safePage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-sm font-medium px-2">
+                    Page {safePage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={safePage === totalPages}
+                  >
+                    Next
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={safePage === totalPages}
+                  >
+                    Last
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
