@@ -145,7 +145,54 @@ const FormTemplates: React.FC = () => {
 
   const pendingTemplate = templates.find(t => t.id === pendingDeleteId);
 
-  const handleDeleteClick = (id: string) => {
+  const checkDpaAccess = async (): Promise<boolean> => {
+    if (!user?.id) {
+      toast({
+        title: 'Not signed in',
+        description: 'You must be signed in as a DPA to delete templates.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+
+    // Check user_roles table for active DPA / superadmin role
+    const { data: roles, error: rolesError } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .in('role', ['dpa', 'superadmin']);
+
+    if (rolesError) {
+      console.error('Role check failed:', rolesError);
+    }
+
+    if (roles && roles.length > 0) return true;
+
+    // Legacy fallback: profiles.role
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    const legacy = (profile?.role || '').toString().toLowerCase();
+    if (legacy === 'dpa' || legacy === 'superadmin' || legacy === 'shore_management') {
+      return true;
+    }
+
+    toast({
+      title: 'Permission denied',
+      description:
+        'Only the Designated Person Ashore (DPA) can permanently delete form templates. Please ask your DPA to perform this action, or archive the template instead.',
+      variant: 'destructive',
+    });
+    return false;
+  };
+
+  const handleDeleteClick = async (id: string) => {
+    const allowed = await checkDpaAccess();
+    if (!allowed) return;
     pinConfirmedRef.current = false;
     setPendingDeleteId(id);
     setPinOpen(true);
