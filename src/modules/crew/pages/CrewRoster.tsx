@@ -99,7 +99,8 @@ const CrewRoster: React.FC = () => {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 25;
+  const [pageSize, setPageSize] = useState<number>(25);
+  const PAGE_SIZE_OPTIONS = [10, 25, 50];
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -166,14 +167,14 @@ const CrewRoster: React.FC = () => {
   // Reset to page 1 whenever filters/search change or underlying list size changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, effectiveVesselFilter, crew.length]);
+  }, [searchQuery, effectiveVesselFilter, crew.length, pageSize]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredCrew.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filteredCrew.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
   const paginatedCrew = useMemo(() => {
-    const start = (safePage - 1) * PAGE_SIZE;
-    return filteredCrew.slice(start, start + PAGE_SIZE);
-  }, [filteredCrew, safePage]);
+    const start = (safePage - 1) * pageSize;
+    return filteredCrew.slice(start, start + pageSize);
+  }, [filteredCrew, safePage, pageSize]);
 
   const handleViewProfile = (member: CrewMember) => {
     setSelectedCrew(member);
