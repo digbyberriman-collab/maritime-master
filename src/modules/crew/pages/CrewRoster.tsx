@@ -262,6 +262,103 @@ const CrewRoster: React.FC = () => {
     }
   };
 
+  // A crew member can be invited if they don't have a verified active
+  // login yet — i.e. they're imported (no auth user) or have only been
+  // sent an invite that hasn't been completed.
+  const isInvitable = (member: CrewMember) => {
+    const status = (member.account_status || '').toLowerCase();
+    return (
+      member.is_imported === true ||
+      status === 'not_invited' ||
+      status === 'invited' ||
+      member.user_id == null
+    );
+  };
+
+  const invitableSelection = useMemo(
+    () => filteredCrew.filter((m) => isInvitable(m) && selectedForInvite.has(m.id)),
+    [filteredCrew, selectedForInvite],
+  );
+
+  const toggleInviteSelection = (member: CrewMember, checked: boolean) => {
+    setSelectedForInvite((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(member.id);
+      else next.delete(member.id);
+      return next;
+    });
+  };
+
+  const toggleSelectAllInvitable = (checked: boolean) => {
+    setSelectedForInvite(() => {
+      if (!checked) return new Set();
+      return new Set(filteredCrew.filter(isInvitable).map((m) => m.id));
+    });
+  };
+
+  const handleSendInvite = async (member: CrewMember) => {
+    if (!canManageCrew && !isDPAAdmin) return;
+    setIsInviting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-invitation', {
+        body: {
+          profileId: member.id,
+          redirectTo: `${window.location.origin}/auth/accept-invitation`,
+        },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      toast({
+        title: 'Invitation sent',
+        description: `Verification email sent to ${member.email}.`,
+      });
+      refetchCrew();
+    } catch (err) {
+      toast({
+        title: 'Could not send invitation',
+        description: err instanceof Error ? err.message : 'Unexpected error',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
+  const handleBulkInvite = async () => {
+    if (invitableSelection.length === 0) return;
+    setIsInviting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('bulk-invite', {
+        body: {
+          profileIds: invitableSelection.map((m) => m.id),
+          redirectTo: `${window.location.origin}/auth/accept-invitation`,
+        },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+
+      const results: Array<{ email: string; success: boolean; error?: string }> =
+        data?.results ?? [];
+      const success = results.filter((r) => r.success).length;
+      const failed = results.length - success;
+      const errors = results
+        .filter((r) => !r.success)
+        .map((r) => ({ email: r.email || '(unknown)', error: r.error || 'Failed' }));
+
+      setInviteResults({ open: true, success, failed, errors });
+      setSelectedForInvite(new Set());
+      refetchCrew();
+    } catch (err) {
+      toast({
+        title: 'Bulk invite failed',
+        description: err instanceof Error ? err.message : 'Unexpected error',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
   // Admin action handlers
   const handleAdminAction = (member: CrewMember, action: 'reset' | 'toggle' | 'reallocate') => {
     setSelectedCrew(member);
