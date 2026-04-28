@@ -81,6 +81,8 @@ const FormTemplates: React.FC = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [archiveOffered, setArchiveOffered] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const pinConfirmedRef = useRef(false);
 
   useEffect(() => {
@@ -196,6 +198,7 @@ const FormTemplates: React.FC = () => {
     if (!allowed) return;
     pinConfirmedRef.current = false;
     setDeleteError(null);
+    setArchiveOffered(false);
     setPendingDeleteId(id);
     setPinOpen(true);
   };
@@ -308,6 +311,12 @@ const FormTemplates: React.FC = () => {
       const full = `${kind}${code}: ${detail}${stage}`;
       console.error('Template delete failed:', { kind, code: err?.code, stage: err?._stage, err });
       setDeleteError(full);
+      // Offer archive fallback when delete is blocked by data dependencies
+      const canArchive =
+        kind === 'Foreign key constraint' ||
+        kind === 'Blocked by existing submissions' ||
+        err?._stage === 'guard:submissions';
+      setArchiveOffered(canArchive);
       toast({
         title: `Delete failed — ${kind}`,
         description: full,
@@ -315,6 +324,43 @@ const FormTemplates: React.FC = () => {
       });
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleArchiveInstead = async () => {
+    if (!pendingDeleteId) return;
+    setArchiving(true);
+    try {
+      const { data, error } = await supabase
+        .from('form_templates')
+        .update({ status: 'ARCHIVED' })
+        .eq('id', pendingDeleteId)
+        .select('id, status');
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('Archive blocked by Row-Level Security (no rows updated).');
+      }
+      toast({
+        title: 'Template archived',
+        description: 'History is preserved. The template is now hidden from active use.',
+      });
+      setTemplates(prev =>
+        prev.map(t => (t.id === pendingDeleteId ? { ...t, status: 'ARCHIVED' } : t))
+      );
+      setConfirmOpen(false);
+      setPendingDeleteId(null);
+      setDeleteError(null);
+      setArchiveOffered(false);
+      pinConfirmedRef.current = false;
+    } catch (err: any) {
+      const { kind, detail } = classifyError(err);
+      toast({
+        title: `Archive failed — ${kind}`,
+        description: `${kind}: ${detail}`,
+        variant: 'destructive',
+      });
+    } finally {
+      setArchiving(false);
     }
   };
 
@@ -506,10 +552,11 @@ const FormTemplates: React.FC = () => {
 
       <AlertDialog open={confirmOpen} onOpenChange={(open) => {
         setConfirmOpen(open);
-        if (!open && !deleting) {
+        if (!open && !deleting && !archiving) {
           setPendingDeleteId(null);
           pinConfirmedRef.current = false;
           setDeleteError(null);
+          setArchiveOffered(false);
         }
       }}>
         <AlertDialogContent>
@@ -530,13 +577,29 @@ const FormTemplates: React.FC = () => {
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               <div className="font-semibold mb-1">Backend rejected the delete</div>
               <div className="break-words whitespace-pre-wrap font-mono text-xs">{deleteError}</div>
+              {archiveOffered && (
+                <div className="mt-2 text-xs text-foreground/80">
+                  Submissions or related records depend on this template. You can{' '}
+                  <strong>archive</strong> it instead — this hides the template from active
+                  use while preserving full history for audits.
+                </div>
+              )}
             </div>
           )}
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={deleting || archiving}>Cancel</AlertDialogCancel>
+            {archiveOffered && (
+              <Button
+                variant="secondary"
+                onClick={handleArchiveInstead}
+                disabled={deleting || archiving}
+              >
+                {archiving ? 'Archiving…' : 'Archive instead'}
+              </Button>
+            )}
             <AlertDialogAction
               onClick={(e) => { e.preventDefault(); handleConfirmDelete(); }}
-              disabled={deleting}
+              disabled={deleting || archiving}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deleting ? 'Deleting…' : 'Delete permanently'}
