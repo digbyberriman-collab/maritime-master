@@ -12,6 +12,8 @@ export { useCrewLeave } from './hooks/useCrewLeave';
 export { useCrewTasks } from './hooks/useCrewTasks';
 export type { CrewTask, CreateTaskInput, TaskType, TaskPriority, TaskStatus } from './hooks/useCrewTasks';
 
+export { useCrewImportLookups } from './hooks/useCrewImportLookups';
+
 // Constants
 export { RANKS, NATIONALITIES, CREW_ROLES } from './constants';
 export type { Rank, Nationality } from './constants';

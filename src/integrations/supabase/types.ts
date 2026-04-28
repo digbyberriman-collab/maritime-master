@@ -1439,6 +1439,140 @@ export type Database = {
           },
         ]
       }
+      crew_import: {
+        Row: {
+          airtable_id: string
+          casual_name: string | null
+          cellular_phone: string | null
+          couple: string | null
+          created: string | null
+          crew_id: number | null
+          crew_type: string | null
+          date_of_birth: string | null
+          department: string | null
+          department_secondary: string | null
+          first_name: string | null
+          full_legal_name: string | null
+          home_airport: string | null
+          home_city: string | null
+          id: string
+          imported_at: string
+          is_archived: boolean | null
+          is_temporary: boolean | null
+          krakenfleet_email: string | null
+          last_modified: string | null
+          last_name: string | null
+          middle_name: string | null
+          nationality: string | null
+          nationality_secondary: string | null
+          next_of_kin_name: string | null
+          next_of_kin_phone: string | null
+          personal_email: string | null
+          photo_url: string | null
+          preferred_name: string | null
+          repatriation: string | null
+          role: string | null
+          rotational_partner: string | null
+          rotational_position: string | null
+          secondary_phone: string | null
+          status: string | null
+          vessel: string | null
+          vessel_airtable_id: string | null
+          whatsapp_signal: string | null
+          work_email: string | null
+        }
+        Insert: {
+          airtable_id: string
+          casual_name?: string | null
+          cellular_phone?: string | null
+          couple?: string | null
+          created?: string | null
+          crew_id?: number | null
+          crew_type?: string | null
+          date_of_birth?: string | null
+          department?: string | null
+          department_secondary?: string | null
+          first_name?: string | null
+          full_legal_name?: string | null
+          home_airport?: string | null
+          home_city?: string | null
+          id?: string
+          imported_at?: string
+          is_archived?: boolean | null
+          is_temporary?: boolean | null
+          krakenfleet_email?: string | null
+          last_modified?: string | null
+          last_name?: string | null
+          middle_name?: string | null
+          nationality?: string | null
+          nationality_secondary?: string | null
+          next_of_kin_name?: string | null
+          next_of_kin_phone?: string | null
+          personal_email?: string | null
+          photo_url?: string | null
+          preferred_name?: string | null
+          repatriation?: string | null
+          role?: string | null
+          rotational_partner?: string | null
+          rotational_position?: string | null
+          secondary_phone?: string | null
+          status?: string | null
+          vessel?: string | null
+          vessel_airtable_id?: string | null
+          whatsapp_signal?: string | null
+          work_email?: string | null
+        }
+        Update: {
+          airtable_id?: string
+          casual_name?: string | null
+          cellular_phone?: string | null
+          couple?: string | null
+          created?: string | null
+          crew_id?: number | null
+          crew_type?: string | null
+          date_of_birth?: string | null
+          department?: string | null
+          department_secondary?: string | null
+          first_name?: string | null
+          full_legal_name?: string | null
+          home_airport?: string | null
+          home_city?: string | null
+          id?: string
+          imported_at?: string
+          is_archived?: boolean | null
+          is_temporary?: boolean | null
+          krakenfleet_email?: string | null
+          last_modified?: string | null
+          last_name?: string | null
+          middle_name?: string | null
+          nationality?: string | null
+          nationality_secondary?: string | null
+          next_of_kin_name?: string | null
+          next_of_kin_phone?: string | null
+          personal_email?: string | null
+          photo_url?: string | null
+          preferred_name?: string | null
+          repatriation?: string | null
+          role?: string | null
+          rotational_partner?: string | null
+          rotational_position?: string | null
+          secondary_phone?: string | null
+          status?: string | null
+          vessel?: string | null
+          vessel_airtable_id?: string | null
+          whatsapp_signal?: string | null
+          work_email?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_import_vessel_airtable_id_fkey"
+            columns: ["vessel_airtable_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_import"
+            referencedColumns: ["airtable_id"]
+          },
+        ]
+      }
       crew_leave_carryover: {
         Row: {
           carryover_days: number
@@ -9832,6 +9966,27 @@ export type Database = {
           },
         ]
       }
+      vessels_import: {
+        Row: {
+          airtable_id: string
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          airtable_id: string
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          airtable_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       webhook_configurations: {
         Row: {
           allowed_data_types: string[]
@@ -10088,7 +10243,140 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      crew_import_active: {
+        Row: {
+          airtable_id: string | null
+          casual_name: string | null
+          cellular_phone: string | null
+          couple: string | null
+          created: string | null
+          crew_id: number | null
+          crew_type: string | null
+          date_of_birth: string | null
+          department: string | null
+          department_secondary: string | null
+          first_name: string | null
+          full_legal_name: string | null
+          home_airport: string | null
+          home_city: string | null
+          id: string | null
+          imported_at: string | null
+          is_archived: boolean | null
+          is_temporary: boolean | null
+          krakenfleet_email: string | null
+          last_modified: string | null
+          last_name: string | null
+          middle_name: string | null
+          nationality: string | null
+          nationality_secondary: string | null
+          next_of_kin_name: string | null
+          next_of_kin_phone: string | null
+          personal_email: string | null
+          photo_url: string | null
+          preferred_name: string | null
+          repatriation: string | null
+          role: string | null
+          rotational_partner: string | null
+          rotational_position: string | null
+          secondary_phone: string | null
+          status: string | null
+          vessel: string | null
+          vessel_airtable_id: string | null
+          whatsapp_signal: string | null
+          work_email: string | null
+        }
+        Insert: {
+          airtable_id?: string | null
+          casual_name?: string | null
+          cellular_phone?: string | null
+          couple?: string | null
+          created?: string | null
+          crew_id?: number | null
+          crew_type?: string | null
+          date_of_birth?: string | null
+          department?: string | null
+          department_secondary?: string | null
+          first_name?: string | null
+          full_legal_name?: string | null
+          home_airport?: string | null
+          home_city?: string | null
+          id?: string | null
+          imported_at?: string | null
+          is_archived?: boolean | null
+          is_temporary?: boolean | null
+          krakenfleet_email?: string | null
+          last_modified?: string | null
+          last_name?: string | null
+          middle_name?: string | null
+          nationality?: string | null
+          nationality_secondary?: string | null
+          next_of_kin_name?: string | null
+          next_of_kin_phone?: string | null
+          personal_email?: string | null
+          photo_url?: string | null
+          preferred_name?: string | null
+          repatriation?: string | null
+          role?: string | null
+          rotational_partner?: string | null
+          rotational_position?: string | null
+          secondary_phone?: string | null
+          status?: string | null
+          vessel?: string | null
+          vessel_airtable_id?: string | null
+          whatsapp_signal?: string | null
+          work_email?: string | null
+        }
+        Update: {
+          airtable_id?: string | null
+          casual_name?: string | null
+          cellular_phone?: string | null
+          couple?: string | null
+          created?: string | null
+          crew_id?: number | null
+          crew_type?: string | null
+          date_of_birth?: string | null
+          department?: string | null
+          department_secondary?: string | null
+          first_name?: string | null
+          full_legal_name?: string | null
+          home_airport?: string | null
+          home_city?: string | null
+          id?: string | null
+          imported_at?: string | null
+          is_archived?: boolean | null
+          is_temporary?: boolean | null
+          krakenfleet_email?: string | null
+          last_modified?: string | null
+          last_name?: string | null
+          middle_name?: string | null
+          nationality?: string | null
+          nationality_secondary?: string | null
+          next_of_kin_name?: string | null
+          next_of_kin_phone?: string | null
+          personal_email?: string | null
+          photo_url?: string | null
+          preferred_name?: string | null
+          repatriation?: string | null
+          role?: string | null
+          rotational_partner?: string | null
+          rotational_position?: string | null
+          secondary_phone?: string | null
+          status?: string | null
+          vessel?: string | null
+          vessel_airtable_id?: string | null
+          whatsapp_signal?: string | null
+          work_email?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_import_vessel_airtable_id_fkey"
+            columns: ["vessel_airtable_id"]
+            isOneToOne: false
+            referencedRelation: "vessels_import"
+            referencedColumns: ["airtable_id"]
+          },
+        ]
+      }
     }
     Functions: {
       acknowledge_alert_action: {
