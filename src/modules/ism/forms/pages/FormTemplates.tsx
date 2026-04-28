@@ -18,7 +18,7 @@ import {
 import { 
   Plus, Search, FileText, Copy, 
   Calendar, Clock, CheckCircle, Edit, Eye, 
-  MoreHorizontal, Loader2, Trash2, ShieldAlert
+  MoreHorizontal, Loader2, Trash2, ShieldAlert, RotateCcw
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -52,7 +52,10 @@ interface FormTemplate {
   vessel_scope: string;
   initiation_mode: string;
   created_at: string;
+  archived_at?: string | null;
 }
+
+const RESTORE_WINDOW_HOURS = 24;
 
 const FORM_TYPES = [
   { value: 'CHECKLIST', label: 'Checklist', icon: '☑️' },
@@ -330,22 +333,25 @@ const FormTemplates: React.FC = () => {
   const handleArchiveInstead = async () => {
     if (!pendingDeleteId) return;
     setArchiving(true);
+    const archivedAt = new Date().toISOString();
     try {
       const { data, error } = await supabase
         .from('form_templates')
-        .update({ status: 'ARCHIVED' })
+        .update({ status: 'ARCHIVED', archived_at: archivedAt })
         .eq('id', pendingDeleteId)
-        .select('id, status');
+        .select('id, status, archived_at');
       if (error) throw error;
       if (!data || data.length === 0) {
         throw new Error('Archive blocked by Row-Level Security (no rows updated).');
       }
       toast({
         title: 'Template archived',
-        description: 'History is preserved. The template is now hidden from active use.',
+        description: `History preserved. You have ${RESTORE_WINDOW_HOURS} hours to undo this from the Archived view.`,
       });
       setTemplates(prev =>
-        prev.map(t => (t.id === pendingDeleteId ? { ...t, status: 'ARCHIVED' } : t))
+        prev.map(t =>
+          t.id === pendingDeleteId ? { ...t, status: 'ARCHIVED', archived_at: archivedAt } : t
+        )
       );
       setConfirmOpen(false);
       setPendingDeleteId(null);
@@ -361,6 +367,62 @@ const FormTemplates: React.FC = () => {
       });
     } finally {
       setArchiving(false);
+    }
+  };
+
+  const isWithinRestoreWindow = (archivedAt?: string | null): boolean => {
+    if (!archivedAt) return false;
+    const ageMs = Date.now() - new Date(archivedAt).getTime();
+    return ageMs >= 0 && ageMs < RESTORE_WINDOW_HOURS * 3600_000;
+  };
+
+  const restoreLabel = (archivedAt?: string | null): string => {
+    if (!archivedAt) return '';
+    const remainingMs =
+      RESTORE_WINDOW_HOURS * 3600_000 - (Date.now() - new Date(archivedAt).getTime());
+    if (remainingMs <= 0) return 'Restore window expired';
+    const hours = Math.floor(remainingMs / 3600_000);
+    const mins = Math.floor((remainingMs % 3600_000) / 60_000);
+    return hours > 0 ? `Restore (${hours}h ${mins}m left)` : `Restore (${mins}m left)`;
+  };
+
+  const handleRestore = async (template: FormTemplate) => {
+    const allowed = await checkDpaAccess();
+    if (!allowed) return;
+    if (!isWithinRestoreWindow(template.archived_at)) {
+      toast({
+        title: 'Restore window expired',
+        description: `This template was archived more than ${RESTORE_WINDOW_HOURS} hours ago. A DPA must re-publish it manually.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('form_templates')
+        .update({ status: 'PUBLISHED', archived_at: null })
+        .eq('id', template.id)
+        .select('id, status, archived_at');
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('Restore blocked by Row-Level Security (no rows updated).');
+      }
+      toast({
+        title: 'Template restored',
+        description: `${template.template_name} is published again.`,
+      });
+      setTemplates(prev =>
+        prev.map(t =>
+          t.id === template.id ? { ...t, status: 'PUBLISHED', archived_at: null } : t
+        )
+      );
+    } catch (err: any) {
+      const { kind, detail } = classifyError(err);
+      toast({
+        title: `Restore failed — ${kind}`,
+        description: `${kind}: ${detail}`,
+        variant: 'destructive',
+      });
     }
   };
 
@@ -522,12 +584,22 @@ const FormTemplates: React.FC = () => {
                         </DropdownMenu>
                       </div>
                       
-                      {template.status === 'PUBLISHED' && (
+                       {template.status === 'PUBLISHED' && (
                         <Button
                           size="sm"
                           onClick={() => navigate(`/ism/forms/new?template=${template.id}`)}
                         >
                           Start Form
+                        </Button>
+                      )}
+                      {template.status === 'ARCHIVED' && isWithinRestoreWindow(template.archived_at) && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => handleRestore(template)}
+                        >
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          {restoreLabel(template.archived_at)}
                         </Button>
                       )}
                     </div>

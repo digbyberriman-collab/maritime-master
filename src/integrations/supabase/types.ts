@@ -5504,6 +5504,7 @@ export type Database = {
         Row: {
           allow_line_items: boolean | null
           allow_parallel_signing: boolean | null
+          archived_at: string | null
           auto_attach_to_audit: boolean | null
           can_trigger_capa: boolean | null
           can_trigger_incident: boolean | null
@@ -5544,6 +5545,7 @@ export type Database = {
         Insert: {
           allow_line_items?: boolean | null
           allow_parallel_signing?: boolean | null
+          archived_at?: string | null
           auto_attach_to_audit?: boolean | null
           can_trigger_capa?: boolean | null
           can_trigger_incident?: boolean | null
@@ -5584,6 +5586,7 @@ export type Database = {
         Update: {
           allow_line_items?: boolean | null
           allow_parallel_signing?: boolean | null
+          archived_at?: string | null
           auto_attach_to_audit?: boolean | null
           can_trigger_capa?: boolean | null
           can_trigger_incident?: boolean | null
