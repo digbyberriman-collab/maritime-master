@@ -99,7 +99,8 @@ const CrewRoster: React.FC = () => {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const PAGE_SIZE = 25;
+  const [pageSize, setPageSize] = useState<number>(25);
+  const PAGE_SIZE_OPTIONS = [10, 25, 50];
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -166,14 +167,14 @@ const CrewRoster: React.FC = () => {
   // Reset to page 1 whenever filters/search change or underlying list size changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, effectiveVesselFilter, crew.length]);
+  }, [searchQuery, effectiveVesselFilter, crew.length, pageSize]);
 
-  const totalPages = Math.max(1, Math.ceil(filteredCrew.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filteredCrew.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
   const paginatedCrew = useMemo(() => {
-    const start = (safePage - 1) * PAGE_SIZE;
-    return filteredCrew.slice(start, start + PAGE_SIZE);
-  }, [filteredCrew, safePage]);
+    const start = (safePage - 1) * pageSize;
+    return filteredCrew.slice(start, start + pageSize);
+  }, [filteredCrew, safePage, pageSize]);
 
   const handleViewProfile = (member: CrewMember) => {
     setSelectedCrew(member);
@@ -346,7 +347,8 @@ const CrewRoster: React.FC = () => {
     }
   };
 
-  const activeVessels = vessels.filter((v) => v.status === 'Active');
+  // Show every vessel in the fleet (excluding sold) so all crew assignments are reachable
+  const activeVessels = vessels.filter((v) => v.status !== 'Sold');
   
   // Get selected vessel name for display
   const selectedVesselName = useMemo(() => {
@@ -692,13 +694,33 @@ const CrewRoster: React.FC = () => {
                 </Table>
               </div>
             )}
-            {!isLoading && filteredCrew.length > PAGE_SIZE && (
+            {!isLoading && filteredCrew.length > 0 && (
               <div className="flex items-center justify-between gap-4 pt-4 border-t mt-4 flex-wrap">
-                <div className="text-sm text-muted-foreground">
-                  Showing {(safePage - 1) * PAGE_SIZE + 1}–
-                  {Math.min(safePage * PAGE_SIZE, filteredCrew.length)} of {filteredCrew.length}
+                <div className="flex items-center gap-3 flex-wrap">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {(safePage - 1) * pageSize + 1}–
+                    {Math.min(safePage * pageSize, filteredCrew.length)} of {filteredCrew.length}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">Rows per page</span>
+                    <Select
+                      value={String(pageSize)}
+                      onValueChange={(v) => setPageSize(Number(v))}
+                    >
+                      <SelectTrigger className="h-8 w-[80px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover">
+                        {PAGE_SIZE_OPTIONS.map((n) => (
+                          <SelectItem key={n} value={String(n)}>
+                            {n}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Button
                     variant="outline"
                     size="sm"
@@ -715,9 +737,25 @@ const CrewRoster: React.FC = () => {
                   >
                     Previous
                   </Button>
-                  <span className="text-sm font-medium px-2">
-                    Page {safePage} of {totalPages}
-                  </span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm">Page</span>
+                    <Select
+                      value={String(safePage)}
+                      onValueChange={(v) => setCurrentPage(Number(v))}
+                    >
+                      <SelectTrigger className="h-8 w-[80px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-popover max-h-[260px]">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                          <SelectItem key={p} value={String(p)}>
+                            {p}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <span className="text-sm text-muted-foreground">of {totalPages}</span>
+                  </div>
                   <Button
                     variant="outline"
                     size="sm"
