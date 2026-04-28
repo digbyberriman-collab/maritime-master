@@ -80,6 +80,7 @@ const FormTemplates: React.FC = () => {
   const [pinOpen, setPinOpen] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const pinConfirmedRef = useRef(false);
 
   useEffect(() => {
@@ -194,6 +195,7 @@ const FormTemplates: React.FC = () => {
     const allowed = await checkDpaAccess();
     if (!allowed) return;
     pinConfirmedRef.current = false;
+    setDeleteError(null);
     setPendingDeleteId(id);
     setPinOpen(true);
   };
@@ -204,28 +206,79 @@ const FormTemplates: React.FC = () => {
     setConfirmOpen(true);
   };
 
+  const classifyError = (err: any): { kind: string; detail: string } => {
+    // Network / fetch failure
+    if (err?.name === 'TypeError' && /fetch|network/i.test(err?.message || '')) {
+      return { kind: 'Network error', detail: err.message };
+    }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      return { kind: 'Network error', detail: 'Browser is offline.' };
+    }
+
+    const code = err?.code as string | undefined;
+    const msg = (err?.message || '').toString();
+    const details = (err?.details || '').toString();
+    const hint = (err?.hint || '').toString();
+    const combined = `${msg} ${details} ${hint}`.toLowerCase();
+
+    // Postgres error codes
+    // 23503 = foreign_key_violation, 42501 = insufficient_privilege
+    if (code === '23503' || combined.includes('foreign key') || combined.includes('violates foreign key')) {
+      return {
+        kind: 'Foreign key constraint',
+        detail: `${msg}${details ? ` — ${details}` : ''}`,
+      };
+    }
+    if (
+      code === '42501' ||
+      combined.includes('row-level security') ||
+      combined.includes('row level security') ||
+      combined.includes('permission denied') ||
+      combined.includes('rls')
+    ) {
+      return {
+        kind: 'Row-Level Security (permission denied)',
+        detail: msg || 'The database refused this delete for the current user.',
+      };
+    }
+    if (code) {
+      return { kind: `Database error (${code})`, detail: msg };
+    }
+    return { kind: 'Unknown error', detail: msg || 'No error message returned.' };
+  };
+
   const handleConfirmDelete = async () => {
     if (!pendingDeleteId) return;
     setDeleting(true);
+    setDeleteError(null);
     try {
       // Clean up dependent rows that don't have ON DELETE CASCADE,
       // otherwise the delete will fail silently due to FK constraints.
-      await supabase.from('form_ai_extraction_jobs').delete().eq('template_id', pendingDeleteId);
-      await supabase.from('form_schedules').delete().eq('template_id', pendingDeleteId);
-      await supabase
+      const jobsRes = await supabase.from('form_ai_extraction_jobs').delete().eq('template_id', pendingDeleteId);
+      if (jobsRes.error) throw Object.assign(jobsRes.error, { _stage: 'cleanup:form_ai_extraction_jobs' });
+
+      const schedRes = await supabase.from('form_schedules').delete().eq('template_id', pendingDeleteId);
+      if (schedRes.error) throw Object.assign(schedRes.error, { _stage: 'cleanup:form_schedules' });
+
+      const supRes = await supabase
         .from('form_templates')
         .update({ supersedes_template_id: null })
         .eq('supersedes_template_id', pendingDeleteId);
+      if (supRes.error) throw Object.assign(supRes.error, { _stage: 'cleanup:supersedes' });
 
       // Check for submissions — these are records we should NOT silently destroy.
-      const { count: submissionCount } = await supabase
+      const { count: submissionCount, error: countErr } = await supabase
         .from('form_submissions')
         .select('id', { count: 'exact', head: true })
         .eq('template_id', pendingDeleteId);
+      if (countErr) throw Object.assign(countErr, { _stage: 'count:form_submissions' });
 
       if ((submissionCount ?? 0) > 0) {
-        throw new Error(
-          `Cannot delete: ${submissionCount} submission(s) reference this template. Archive it instead to preserve history.`
+        throw Object.assign(
+          new Error(
+            `${submissionCount} submission(s) reference this template. Archive the template instead to preserve history.`
+          ),
+          { _stage: 'guard:submissions', _kind: 'Blocked by existing submissions' }
         );
       }
 
@@ -234,9 +287,12 @@ const FormTemplates: React.FC = () => {
         .delete()
         .eq('id', pendingDeleteId)
         .select('id');
-      if (error) throw error;
+      if (error) throw Object.assign(error, { _stage: 'delete:form_templates' });
       if (!deleted || deleted.length === 0) {
-        throw new Error('Delete blocked: you may not have permission (DPA role required).');
+        throw Object.assign(
+          new Error('No rows deleted. Most likely a Row-Level Security policy denied this user, or the row no longer exists.'),
+          { _stage: 'delete:form_templates', _kind: 'Row-Level Security (no rows affected)' }
+        );
       }
       toast({ title: 'Template deleted', description: 'The form template has been permanently removed.' });
       setTemplates(prev => prev.filter(t => t.id !== pendingDeleteId));
@@ -244,9 +300,17 @@ const FormTemplates: React.FC = () => {
       setPendingDeleteId(null);
       pinConfirmedRef.current = false;
     } catch (err: any) {
+      const { kind, detail } = err?._kind
+        ? { kind: err._kind as string, detail: err.message as string }
+        : classifyError(err);
+      const stage = err?._stage ? ` [stage: ${err._stage}]` : '';
+      const code = err?.code ? ` (code ${err.code})` : '';
+      const full = `${kind}${code}: ${detail}${stage}`;
+      console.error('Template delete failed:', { kind, code: err?.code, stage: err?._stage, err });
+      setDeleteError(full);
       toast({
-        title: 'Delete failed',
-        description: err?.message || 'Could not delete the template. It may be referenced by submissions.',
+        title: `Delete failed — ${kind}`,
+        description: full,
         variant: 'destructive',
       });
     } finally {
@@ -445,6 +509,7 @@ const FormTemplates: React.FC = () => {
         if (!open && !deleting) {
           setPendingDeleteId(null);
           pinConfirmedRef.current = false;
+          setDeleteError(null);
         }
       }}>
         <AlertDialogContent>
@@ -461,6 +526,12 @@ const FormTemplates: React.FC = () => {
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {deleteError && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              <div className="font-semibold mb-1">Backend rejected the delete</div>
+              <div className="break-words whitespace-pre-wrap font-mono text-xs">{deleteError}</div>
+            </div>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
             <AlertDialogAction
