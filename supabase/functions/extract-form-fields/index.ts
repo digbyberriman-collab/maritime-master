@@ -270,11 +270,33 @@ Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
       }
     }
 
-    // Ensure field IDs are unique
-    const fields = (extractedData.extracted_fields || []).map((field: any, index: number) => ({
-      ...field,
-      id: field.id || `field_${Date.now()}_${index}`,
-    }));
+    // Normalise field shape for the form builder:
+    //  - guarantee unique id and order
+    //  - map legacy AI types (text -> text_input, textarea -> text_area, number -> numeric, section -> header)
+    //  - default checkbox rows to allow an optional comment field
+    const typeMap: Record<string, string> = {
+      text: 'text_input',
+      textarea: 'text_area',
+      number: 'numeric',
+      section: 'header',
+    };
+    const fields = (extractedData.extracted_fields || []).map((field: any, index: number) => {
+      const mappedType = typeMap[field.type] || field.type;
+      const normalized: any = {
+        ...field,
+        id: field.id || `field_${Date.now()}_${index}`,
+        type: mappedType,
+        order: field.order ?? index + 1,
+        page: field.page ?? field.pageNumber ?? 1,
+        pageNumber: field.pageNumber ?? field.page ?? 1,
+        required: field.required ?? false,
+      };
+      // Allow an optional comment alongside every checkbox row
+      if (mappedType === 'checkbox' && normalized.requireCommentOnNo === undefined) {
+        normalized.requireCommentOnNo = false;
+      }
+      return normalized;
+    });
 
     console.log(`Extracted ${fields.length} fields successfully`);
 
