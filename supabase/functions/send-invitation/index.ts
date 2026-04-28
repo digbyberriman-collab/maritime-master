@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.2';
+import { inviteProfileById } from '../_shared/invite-helpers.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,7 +8,12 @@ const corsHeaders = {
 };
 
 interface SendInvitationRequest {
-  userId: string;
+  // Either may be supplied. profileId is preferred and works for both
+  // imported (no auth user yet) and existing crew. userId is kept for
+  // backwards compatibility with older callers.
+  profileId?: string;
+  userId?: string;
+  redirectTo?: string;
 }
 
 serve(async (req: Request) => {
@@ -48,75 +54,44 @@ serve(async (req: Request) => {
       throw new Error('Could not verify permissions');
     }
 
-    // Only DPA, Master, and Purser can send invitations
-    if (!['dpa', 'shore_management', 'master'].includes(callerProfile.role)) {
+    // Only DPA, Shore Management, Master, and superadmin can send invitations
+    if (!['dpa', 'shore_management', 'master', 'superadmin'].includes(callerProfile.role)) {
       throw new Error('Insufficient permissions to send invitations');
     }
 
-    const { userId }: SendInvitationRequest = await req.json();
+    const { profileId, userId, redirectTo }: SendInvitationRequest = await req.json();
 
-    if (!userId) {
-      throw new Error('Missing required field: userId');
+    let resolvedProfileId = profileId;
+    if (!resolvedProfileId && userId) {
+      // Backwards compat: caller passed the auth user id. Look up the profile.
+      const { data: byUser } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      resolvedProfileId = byUser?.id;
     }
 
-    // Get the target user's profile
-    const { data: targetProfile, error: targetError } = await supabaseAdmin
-      .from('profiles')
-      .select('*')
-      .eq('user_id', userId)
-      .single();
-
-    if (targetError || !targetProfile) {
-      throw new Error('User not found');
+    if (!resolvedProfileId) {
+      throw new Error('Missing required field: profileId (or userId)');
     }
 
-    // Ensure same company
-    if (targetProfile.company_id !== callerProfile.company_id) {
-      throw new Error('Cannot send invitation to user from different company');
+    const result = await inviteProfileById(
+      supabaseAdmin,
+      resolvedProfileId,
+      callerProfile.company_id,
+      redirectTo,
+    );
+
+    if (!result.success) {
+      return new Response(
+        JSON.stringify({ success: false, error: result.error, email: result.email }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
-
-    // Check 5-minute cooldown
-    if (targetProfile.last_invited_at) {
-      const lastInvited = new Date(targetProfile.last_invited_at);
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-      if (lastInvited > fiveMinutesAgo) {
-        throw new Error('Please wait 5 minutes before sending another invitation');
-      }
-    }
-
-    // Generate invitation token (7-day expiry)
-    const invitationToken = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-
-    // Update profile with invitation token
-    const { error: updateError } = await supabaseAdmin
-      .from('profiles')
-      .update({
-        invitation_token: invitationToken,
-        invitation_token_expires: expiresAt,
-        last_invited_at: new Date().toISOString(),
-        invitation_count: (targetProfile.invitation_count || 0) + 1,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('user_id', userId);
-
-    if (updateError) {
-      console.error('Failed to update profile:', updateError);
-      throw new Error('Failed to generate invitation');
-    }
-
-    // TODO: Send email with invitation link
-    // For now, just return the token (in production, this would be sent via email)
-    console.log(`Invitation sent to ${targetProfile.email}, token: ${invitationToken}`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Invitation sent successfully',
-        // In production, don't return the token - it should be sent via email
-        invitationToken: invitationToken,
-        expiresAt: expiresAt,
-      }),
+      JSON.stringify({ success: true, message: `Invitation sent to ${result.email}`, email: result.email }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: any) {
