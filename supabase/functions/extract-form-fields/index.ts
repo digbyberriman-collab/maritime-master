@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import mammoth from 'npm:mammoth@1.8.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,6 +40,7 @@ serve(async (req: Request) => {
     // Download the file and convert to base64 if not provided
     let base64Data = file_base64;
     let mimeType = file_mime_type || 'application/pdf';
+    let fileBytes: Uint8Array | null = null;
 
     if (!base64Data && file_url) {
       console.log('Downloading file from:', file_url);
@@ -49,6 +51,7 @@ serve(async (req: Request) => {
         }
         const fileBuffer = await fileResponse.arrayBuffer();
         const uint8Array = new Uint8Array(fileBuffer);
+        fileBytes = uint8Array;
         
         // Convert to base64
         let binary = '';
@@ -73,35 +76,75 @@ serve(async (req: Request) => {
         // Fall back to URL-only extraction
         base64Data = undefined;
       }
+    } else if (base64Data) {
+      // Decode base64 to bytes for potential DOCX text extraction
+      try {
+        const binary = atob(base64Data);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        fileBytes = bytes;
+      } catch (e) {
+        console.error('Failed to decode base64 to bytes:', e);
+      }
     }
 
-    const systemPrompt = `You are a maritime forms expert. Analyze the uploaded document image/PDF and extract ALL form fields that should be converted into a digital form.
+    // ========== DOCX TEXT EXTRACTION ==========
+    // Multimodal AI (Gemini) does NOT accept DOCX. We must extract the text
+    // structure (including tables) server-side using mammoth, then send as
+    // a text prompt. This preserves section headers and checklist rows.
+    const isDocx =
+      mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      file_type?.toLowerCase() === 'docx';
 
-For each field you identify, determine:
-1. Field type: text, textarea, checkbox, yes_no, yes_no_na, date, datetime, time, number, dropdown, signature, table, file, section
-2. Field label (the text describing what should be entered)
-3. Whether it's required
-4. Any options (for dropdowns)
-5. Placeholder text suggestion
-6. Which page it's on
+    let docxText: string | null = null;
+    let docxHtml: string | null = null;
+    if (isDocx && fileBytes) {
+      try {
+        console.log('Extracting DOCX content with mammoth...');
+        const buffer = fileBytes.buffer.slice(
+          fileBytes.byteOffset,
+          fileBytes.byteOffset + fileBytes.byteLength
+        ) as ArrayBuffer;
+        const [textResult, htmlResult] = await Promise.all([
+          mammoth.extractRawText({ arrayBuffer: buffer }),
+          mammoth.convertToHtml({ arrayBuffer: buffer }),
+        ]);
+        docxText = textResult.value;
+        docxHtml = htmlResult.value;
+        console.log(
+          `DOCX extracted: ${docxText.length} chars text, ${docxHtml.length} chars HTML`
+        );
+      } catch (mammothErr) {
+        console.error('mammoth extraction failed:', mammothErr);
+      }
+    }
 
-Return ONLY a valid JSON object with this structure:
+    const systemPrompt = `You are a maritime forms expert converting paper-based ISM/ERM checklists, inspection forms, and report templates into digital electronic forms.
+
+CRITICAL RULES:
+1. PRESERVE the EXACT structure, section headings and ordering of the source document. Do not invent fields.
+2. Use the EXACT label text from the source for every field — do not paraphrase, summarise or shorten.
+3. For grey/banner section rows like "INITIAL ACTIONS", "DUTIES & RESPONSIBILITIES", "COMMUNICATIONS", "EQUIPMENT", "ESCALATION & CONTINGENCIES", "FOLLOW UP ACTIONS" → emit a field with type "header".
+4. For checklist rows that have a tickbox / checkmark / empty box / square at the end → emit type "checkbox" with requireCommentOnNo=false. The 'label' is the action text (verbatim).
+5. For rows that explicitly ask Yes/No → use "yes_no". For Yes/No/N/A → use "yes_no_na".
+6. Free-text fields → "text_input" (single line) or "text_area" (multi-line).
+7. Date / time / number / dropdown / signature → use the matching type.
+8. Order fields top-to-bottom, left-to-right exactly as they appear in the source.
+
+Field types you may use: text_input, text_area, checkbox, yes_no, yes_no_na, date, datetime, time, numeric, dropdown, header, divider, instructions, signature.
+
+Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
 {
   "extracted_fields": [
-    { "id": "field_1", "type": "text", "label": "Vessel Name", "required": true, "placeholder": "Enter vessel name", "pageNumber": 1 },
-    { "id": "field_2", "type": "yes_no", "label": "All navigation lights operational", "required": true, "pageNumber": 1 }
+    { "id": "field_1", "type": "header", "label": "INITIAL ACTIONS", "required": false, "pageNumber": 1, "order": 1 },
+    { "id": "field_2", "type": "checkbox", "label": "Fix vessel position and log in OLB", "required": true, "pageNumber": 1, "order": 2 }
   ],
   "pages": [{ "id": "page_1", "number": 1, "title": "Page 1" }],
-  "document_title": "Detected title of the form",
-  "document_description": "Brief description of the form's purpose",
-  "confidence": 0.85,
-  "notes": "Any observations"
-}
-
-Focus on: text inputs, checkbox items (Yes/No), date/time fields, signature blocks, tables, section headers, dropdown fields.
-For maritime checklists, look for: equipment status checks, officer signatures, weather conditions, fuel levels, safety equipment items, watch handover entries.
-
-Return ONLY valid JSON, no markdown formatting, no code blocks.`;
+  "document_title": "Detected title",
+  "document_description": "Brief description",
+  "confidence": 0.9,
+  "notes": "any observations"
+}`;
 
     // Build messages with multimodal content if we have the file
     const userContent: any[] = [
@@ -118,7 +161,13 @@ Return ONLY valid JSON, no markdown formatting, no code blocks.`;
     ];
     const canSendAsMultimodal = base64Data && supportedMultimodalTypes.includes(mimeType);
 
-    if (base64Data && canSendAsMultimodal) {
+    if (docxHtml) {
+      // DOCX path: send extracted HTML+text, NOT a hallucinated fallback prompt.
+      userContent[0] = {
+        type: 'text',
+        text: `The user uploaded a DOCX file${template_name ? ` titled "${template_name}"` : ''}. Below is the FULL extracted content of the document, including tables. Extract ALL form fields verbatim, preserving section headers (table banner rows in CAPS) as type "header" and checklist tick-rows as type "checkbox". DO NOT invent or omit any rows.\n\n=== EXTRACTED HTML (preserves table structure) ===\n${docxHtml.slice(0, 30000)}\n\n=== PLAIN TEXT (for reference) ===\n${(docxText || '').slice(0, 10000)}`,
+      };
+    } else if (base64Data && canSendAsMultimodal) {
       userContent.push({
         type: 'image_url',
         image_url: {
@@ -129,11 +178,14 @@ Return ONLY valid JSON, no markdown formatting, no code blocks.`;
       // Fallback: just describe what we know
       userContent[0] = {
         type: 'text',
-        text: `I need you to generate a reasonable set of form fields for a maritime document${template_name ? ` titled "${template_name}"` : ''}. The document type is ${file_type || 'PDF'}. Since I cannot provide the actual file content, please generate typical fields for a maritime ${template_name || 'checklist'} form. Include common fields like vessel name, date, officer signatures, checklist items with Yes/No/N/A options, and section headers.`
+        text: `I could not read the actual content of the document${template_name ? ` titled "${template_name}"` : ''}. Return ONLY this JSON: {"extracted_fields":[],"pages":[{"id":"page_1","number":1,"title":"Page 1"}],"confidence":0,"notes":"Source file content unavailable — please add fields manually or re-upload as PDF."}`,
       };
     }
 
-    console.log('Calling AI Gateway with', base64Data ? 'multimodal (file attached)' : 'text-only (no file)');
+    console.log(
+      'Calling AI Gateway with',
+      docxHtml ? 'docx-text (mammoth extracted)' : (canSendAsMultimodal ? 'multimodal (file attached)' : 'text-only fallback')
+    );
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -142,13 +194,13 @@ Return ONLY valid JSON, no markdown formatting, no code blocks.`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'google/gemini-2.5-pro',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userContent }
         ],
-        temperature: 0.2,
-        max_tokens: 8000,
+        temperature: 0.1,
+        max_tokens: 16000,
       }),
     });
 
