@@ -311,6 +311,12 @@ const FormTemplates: React.FC = () => {
       const full = `${kind}${code}: ${detail}${stage}`;
       console.error('Template delete failed:', { kind, code: err?.code, stage: err?._stage, err });
       setDeleteError(full);
+      // Offer archive fallback when delete is blocked by data dependencies
+      const canArchive =
+        kind === 'Foreign key constraint' ||
+        kind === 'Blocked by existing submissions' ||
+        err?._stage === 'guard:submissions';
+      setArchiveOffered(canArchive);
       toast({
         title: `Delete failed — ${kind}`,
         description: full,
@@ -318,6 +324,43 @@ const FormTemplates: React.FC = () => {
       });
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleArchiveInstead = async () => {
+    if (!pendingDeleteId) return;
+    setArchiving(true);
+    try {
+      const { data, error } = await supabase
+        .from('form_templates')
+        .update({ status: 'ARCHIVED' })
+        .eq('id', pendingDeleteId)
+        .select('id, status');
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        throw new Error('Archive blocked by Row-Level Security (no rows updated).');
+      }
+      toast({
+        title: 'Template archived',
+        description: 'History is preserved. The template is now hidden from active use.',
+      });
+      setTemplates(prev =>
+        prev.map(t => (t.id === pendingDeleteId ? { ...t, status: 'ARCHIVED' } : t))
+      );
+      setConfirmOpen(false);
+      setPendingDeleteId(null);
+      setDeleteError(null);
+      setArchiveOffered(false);
+      pinConfirmedRef.current = false;
+    } catch (err: any) {
+      const { kind, detail } = classifyError(err);
+      toast({
+        title: `Archive failed — ${kind}`,
+        description: `${kind}: ${detail}`,
+        variant: 'destructive',
+      });
+    } finally {
+      setArchiving(false);
     }
   };
 
