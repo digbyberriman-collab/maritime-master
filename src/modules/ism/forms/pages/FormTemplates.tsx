@@ -81,6 +81,8 @@ const FormTemplates: React.FC = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [archiveOffered, setArchiveOffered] = useState(false);
+  const [archiving, setArchiving] = useState(false);
   const pinConfirmedRef = useRef(false);
 
   useEffect(() => {
@@ -196,6 +198,7 @@ const FormTemplates: React.FC = () => {
     if (!allowed) return;
     pinConfirmedRef.current = false;
     setDeleteError(null);
+    setArchiveOffered(false);
     setPendingDeleteId(id);
     setPinOpen(true);
   };
