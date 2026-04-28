@@ -18,14 +18,27 @@ import {
 import { 
   Plus, Search, FileText, Copy, 
   Calendar, Clock, CheckCircle, Edit, Eye, 
-  MoreHorizontal, Loader2
+  MoreHorizontal, Loader2, Trash2, ShieldAlert
 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import AdminPinModal from '@/modules/crew/components/AdminPinModal';
+import { toast } from '@/shared/hooks/use-toast';
 
 interface FormTemplate {
   id: string;
@@ -63,6 +76,10 @@ const FormTemplates: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('PUBLISHED');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [pinOpen, setPinOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadTemplates();
@@ -123,6 +140,42 @@ const FormTemplates: React.FC = () => {
 
   const getFormTypeInfo = (type: string) => {
     return FORM_TYPES.find(t => t.value === type) || { value: type, label: type, icon: '📄' };
+  };
+
+  const pendingTemplate = templates.find(t => t.id === pendingDeleteId);
+
+  const handleDeleteClick = (id: string) => {
+    setPendingDeleteId(id);
+    setPinOpen(true);
+  };
+
+  const handlePinConfirmed = () => {
+    setPinOpen(false);
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!pendingDeleteId) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('form_templates')
+        .delete()
+        .eq('id', pendingDeleteId);
+      if (error) throw error;
+      toast({ title: 'Template deleted', description: 'The form template has been permanently removed.' });
+      setTemplates(prev => prev.filter(t => t.id !== pendingDeleteId));
+      setConfirmOpen(false);
+      setPendingDeleteId(null);
+    } catch (err: any) {
+      toast({
+        title: 'Delete failed',
+        description: err?.message || 'Could not delete the template. It may be referenced by submissions.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -271,6 +324,14 @@ const FormTemplates: React.FC = () => {
                               <Copy className="h-4 w-4 mr-2" />
                               Duplicate
                             </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => handleDeleteClick(template.id)}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete (DPA PIN)
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </div>
@@ -291,6 +352,48 @@ const FormTemplates: React.FC = () => {
           </div>
         )}
       </div>
+
+      <AdminPinModal
+        open={pinOpen}
+        onOpenChange={(open) => {
+          setPinOpen(open);
+          if (!open && !confirmOpen) setPendingDeleteId(null);
+        }}
+        onConfirmed={handlePinConfirmed}
+        title="DPA PIN Required"
+        description="Deleting a form template is permanent. Enter the DPA PIN to authorise this action."
+      />
+
+      <AlertDialog open={confirmOpen} onOpenChange={(open) => {
+        setConfirmOpen(open);
+        if (!open) setPendingDeleteId(null);
+      }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <ShieldAlert className="h-5 w-5 text-destructive" />
+              Delete this template?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingTemplate ? (
+                <>You are about to permanently delete <strong>{pendingTemplate.template_name}</strong> ({pendingTemplate.template_code}). This cannot be undone. Existing submissions referencing this template may also be affected.</>
+              ) : (
+                <>This action cannot be undone.</>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleConfirmDelete(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? 'Deleting…' : 'Delete permanently'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 };
