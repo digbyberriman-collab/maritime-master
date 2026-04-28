@@ -159,9 +159,35 @@ export const useCrew = (vesselFilter?: string) => {
 
       if (assignmentsError) throw assignmentsError;
 
+      // For imported crew (no auth user yet, no crew_assignment), look up
+      // their assigned vessel via the profiles.imported_vessel_id link.
+      const importedVesselIds = Array.from(
+        new Set(
+          profiles
+            .filter((p: any) => p.is_imported && p.imported_vessel_id)
+            .map((p: any) => p.imported_vessel_id as string),
+        ),
+      );
+      let importedVesselMap: Record<string, { id: string; name: string }> = {};
+      if (importedVesselIds.length > 0) {
+        const { data: vesselsData } = await supabase
+          .from('vessels')
+          .select('id, name')
+          .in('id', importedVesselIds);
+        importedVesselMap = Object.fromEntries(
+          (vesselsData ?? []).map((v) => [v.id, v]),
+        );
+      }
+
       // Map profiles with their current assignments
       const crewMembers: CrewMember[] = profiles.map((p) => {
         const assignment = assignments?.find((a) => a.user_id === p.user_id);
+        // Imported crew fallback: synthesize a "current assignment"-shaped
+        // object from imported_vessel_id so the existing UI keeps working.
+        const importedVessel =
+          !assignment && p.is_imported && (p as any).imported_vessel_id
+            ? importedVesselMap[(p as any).imported_vessel_id as string]
+            : null;
         return {
           id: p.id,
           user_id: p.user_id,
@@ -201,6 +227,14 @@ export const useCrew = (vesselFilter?: string) => {
                 vessel_name: (assignment.vessels as any)?.name || 'Unknown',
                 position: assignment.position,
                 join_date: assignment.join_date,
+              }
+            : importedVessel
+            ? {
+                id: `imported-${p.id}`,
+                vessel_id: importedVessel.id,
+                vessel_name: importedVessel.name,
+                position: p.rank ?? 'Crew',
+                join_date: p.created_at,
               }
             : null,
         };
