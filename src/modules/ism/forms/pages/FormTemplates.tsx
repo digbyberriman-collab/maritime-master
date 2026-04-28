@@ -584,12 +584,22 @@ const FormTemplates: React.FC = () => {
                         </DropdownMenu>
                       </div>
                       
-                      {template.status === 'PUBLISHED' && (
+                       {template.status === 'PUBLISHED' && (
                         <Button
                           size="sm"
                           onClick={() => navigate(`/ism/forms/new?template=${template.id}`)}
                         >
                           Start Form
+                        </Button>
+                      )}
+                      {template.status === 'ARCHIVED' && isWithinRestoreWindow(template.archived_at) && (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => handleRestore(template)}
+                        >
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                          {restoreLabel(template.archived_at)}
                         </Button>
                       )}
                     </div>
