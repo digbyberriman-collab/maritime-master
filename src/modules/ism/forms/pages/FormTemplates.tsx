@@ -18,7 +18,7 @@ import {
 import { 
   Plus, Search, FileText, Copy, 
   Calendar, Clock, CheckCircle, Edit, Eye, 
-  MoreHorizontal, Loader2, Trash2, ShieldAlert
+  MoreHorizontal, Loader2, Trash2, ShieldAlert, RotateCcw
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -52,7 +52,10 @@ interface FormTemplate {
   vessel_scope: string;
   initiation_mode: string;
   created_at: string;
+  archived_at?: string | null;
 }
+
+const RESTORE_WINDOW_HOURS = 24;
 
 const FORM_TYPES = [
   { value: 'CHECKLIST', label: 'Checklist', icon: '☑️' },
