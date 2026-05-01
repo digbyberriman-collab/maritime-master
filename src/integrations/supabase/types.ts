@@ -10410,6 +10410,7 @@ export type Database = {
         Returns: Json
       }
       can_user_assign_tasks: { Args: never; Returns: boolean }
+      current_user_company_id: { Args: never; Returns: string }
       get_dashboard_alerts: {
         Args: {
           p_all_vessels?: boolean
