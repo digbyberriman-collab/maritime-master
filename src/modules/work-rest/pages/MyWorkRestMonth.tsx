@@ -13,6 +13,13 @@ import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
@@ -41,6 +48,14 @@ interface CrewProfile {
   hod_user_id?: string | null;
 }
 
+interface CrewOption {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  rank?: string | null;
+  department?: string | null;
+}
+
 const sb = supabase as any;
 
 /**
@@ -63,6 +78,7 @@ const MyWorkRestMonth: React.FC = () => {
   const isOwner = !params.crewId || params.crewId === user?.id;
 
   const [crewProfile, setCrewProfile] = useState<CrewProfile | null>(null);
+  const [crewList, setCrewList] = useState<CrewOption[]>([]);
 
   const yearParam = Number(searchParams.get('year')) || new Date().getFullYear();
   const monthParam = Number(searchParams.get('month')) || new Date().getMonth() + 1;
@@ -107,6 +123,58 @@ const MyWorkRestMonth: React.FC = () => {
     if (userRole) set.add(userRole);
     return Array.from(set);
   }, [roles, userRole]);
+
+  const canSelectOtherCrew = useMemo(
+    () =>
+      actorRoles.some((r) =>
+        ['superadmin', 'dpa', 'captain', 'master', 'hod', 'purser', 'fleet_master'].includes(
+          (r || '').toLowerCase()
+        )
+      ),
+    [actorRoles]
+  );
+
+  // Load selectable crew (current vessel's crew assignments)
+  useEffect(() => {
+    if (!canSelectOtherCrew || !vesselId) {
+      setCrewList([]);
+      return;
+    }
+    sb.from('crew_assignments')
+      .select('user_id, profiles:profiles!crew_assignments_user_id_fkey(user_id, first_name, last_name, rank, department)')
+      .eq('vessel_id', vesselId)
+      .eq('is_current', true)
+      .then(({ data }: any) => {
+        const list: CrewOption[] = (data || [])
+          .map((row: any) => row.profiles)
+          .filter((p: any) => p && p.user_id)
+          .sort((a: CrewOption, b: CrewOption) =>
+            `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`)
+          );
+        // Ensure current user is in the list
+        if (user?.id && !list.find((p) => p.user_id === user.id) && profile) {
+          list.unshift({
+            user_id: user.id,
+            first_name: (profile as any).first_name ?? 'Me',
+            last_name: (profile as any).last_name ?? '',
+            rank: (profile as any).rank ?? null,
+            department: (profile as any).department ?? null,
+          });
+        }
+        setCrewList(list);
+      });
+  }, [canSelectOtherCrew, vesselId, user?.id, profile]);
+
+  const handleCrewChange = (newCrewId: string) => {
+    const params = new URLSearchParams();
+    params.set('year', String(yearParam));
+    params.set('month', String(monthParam));
+    if (newCrewId === user?.id) {
+      navigate(`/crew/work-rest?${params.toString()}`);
+    } else {
+      navigate(`/crew/work-rest/${newCrewId}?${params.toString()}`);
+    }
+  };
 
   const wr = useMonthlyWorkRest({
     crewId: targetCrewId,
@@ -224,6 +292,22 @@ const MyWorkRestMonth: React.FC = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {canSelectOtherCrew && crewList.length > 0 && (
+              <Select value={targetCrewId} onValueChange={handleCrewChange}>
+                <SelectTrigger className="h-9 w-[220px]">
+                  <SelectValue placeholder="Select crew member" />
+                </SelectTrigger>
+                <SelectContent className="max-h-80">
+                  {crewList.map((c) => (
+                    <SelectItem key={c.user_id} value={c.user_id}>
+                      {c.last_name}, {c.first_name}
+                      {c.rank ? ` · ${c.rank}` : ''}
+                      {c.user_id === user?.id ? ' (me)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Button variant="outline" size="sm" onClick={handlePrev}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
