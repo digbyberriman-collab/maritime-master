@@ -292,6 +292,22 @@ const MyWorkRestMonth: React.FC = () => {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {canSelectOtherCrew && crewList.length > 0 && (
+              <Select value={targetCrewId} onValueChange={handleCrewChange}>
+                <SelectTrigger className="h-9 w-[220px]">
+                  <SelectValue placeholder="Select crew member" />
+                </SelectTrigger>
+                <SelectContent className="max-h-80">
+                  {crewList.map((c) => (
+                    <SelectItem key={c.user_id} value={c.user_id}>
+                      {c.last_name}, {c.first_name}
+                      {c.rank ? ` · ${c.rank}` : ''}
+                      {c.user_id === user?.id ? ' (me)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
             <Button variant="outline" size="sm" onClick={handlePrev}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
