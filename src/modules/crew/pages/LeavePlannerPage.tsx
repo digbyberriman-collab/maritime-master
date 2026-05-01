@@ -1,20 +1,21 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { useCrewLeave } from '@/modules/crew/hooks/useCrewLeave';
+import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import { LEAVE_STATUS_CODES, STATUS_CODE_MAP, LEAVE_DEPARTMENTS, type LeaveDepartment } from '@/modules/crew/leaveConstants';
 import { getDaysInMonth, format, isWeekend, isToday, getDay } from 'date-fns';
-import { 
-  ChevronLeft, ChevronRight, Lock, Unlock, Search, Paintbrush, 
-  Undo2, Loader2, Info, CalendarDays
+import {
+  ChevronLeft, ChevronRight, Lock, Unlock, Search, Paintbrush,
+  Undo2, Loader2, Info, CalendarDays, Download, Ship, AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { exportLeavePlannerCSV } from '@/modules/leave/lib/leaveExport';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -42,23 +43,33 @@ export default function LeavePlannerPage() {
   } | null>(null);
   const [dragRange, setDragRange] = useState<{ crewId: string; minDay: number; maxDay: number; code: string } | null>(null);
 
-  const { crewLeaveData, loading, isMonthLocked, setEntry, bulkFill, undo, toggleMonthLock, canUndo } = useCrewLeave(year, month);
+  const { selectedVessel } = useVessel();
+  const { crewLeaveData, loading, error, isFleetLevel, isMonthLocked, setEntry, bulkFill, undo, toggleMonthLock, canUndo } = useCrewLeave(year, month);
 
   const daysInMonth = getDaysInMonth(new Date(year, month - 1));
   const locked = isMonthLocked(month);
+
+  // Departments shown in the dropdown — merge static list with anything that
+  // appears in the actual loaded crew so we never silently hide rows.
+  const departmentOptions = useMemo<string[]>(() => {
+    const set = new Set<string>(LEAVE_DEPARTMENTS as readonly string[]);
+    crewLeaveData.forEach((c) => { if (c.department) set.add(c.department); });
+    return Array.from(set);
+  }, [crewLeaveData]);
 
   // Filter crew
   const filteredCrew = useMemo(() => {
     let data = crewLeaveData;
     if (departmentFilter !== 'All') {
-      data = data.filter(c => c.department === departmentFilter);
+      data = data.filter((c) => c.department === departmentFilter);
     }
     if (search) {
       const s = search.toLowerCase();
-      data = data.filter(c => 
-        c.firstName.toLowerCase().includes(s) || 
+      data = data.filter((c) =>
+        c.firstName.toLowerCase().includes(s) ||
         c.lastName.toLowerCase().includes(s) ||
-        c.position.toLowerCase().includes(s)
+        (c.position || '').toLowerCase().includes(s) ||
+        (c.rank || '').toLowerCase().includes(s)
       );
     }
     return data;
@@ -168,12 +179,53 @@ export default function LeavePlannerPage() {
               <CalendarDays className="w-6 h-6" />
               Leave Planner
             </h1>
-            <p className="text-sm text-muted-foreground">Crew leave calendar — {year}</p>
+            <p className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+              <span>Crew leave calendar — {year}</span>
+              {selectedVessel && (
+                <span className="inline-flex items-center gap-1">
+                  <Ship className="h-3 w-3" /> {selectedVessel.name}
+                </span>
+              )}
+              {isFleetLevel && (
+                <Badge variant="outline" className="text-[10px] uppercase">Fleet view</Badge>
+              )}
+            </p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => navigate('/crew/leave/requests')}>
-            Leave Requests →
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const csv = exportLeavePlannerCSV(filteredCrew);
+                const tag = selectedVessel?.name?.replace(/\W+/g, '-') ?? 'fleet';
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+                a.download = `leave-planner-${tag}-${year}-${String(month).padStart(2, '0')}.csv`;
+                a.click();
+                URL.revokeObjectURL(a.href);
+              }}
+            >
+              <Download className="w-4 h-4 mr-1" /> Export CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/crew/leave/requests')}>
+              Leave Requests →
+            </Button>
+          </div>
         </div>
+
+        {error && (
+          <div className="bg-destructive/10 border border-destructive/30 text-destructive rounded-lg p-3 text-sm flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4" /> {error}
+          </div>
+        )}
+
+        {!loading && crewLeaveData.length === 0 && (
+          <div className="bg-muted/30 border rounded-lg p-6 text-center text-sm text-muted-foreground">
+            No crew assigned to {selectedVessel?.name ?? 'this vessel'}. Check the
+            <strong> Crew Roster </strong> page to assign crew members before
+            using the planner.
+          </div>
+        )}
 
         {/* Toolbar */}
         <div className="flex items-center gap-2 flex-wrap bg-card border rounded-lg p-3">
@@ -195,11 +247,11 @@ export default function LeavePlannerPage() {
 
           {/* Department Filter */}
           <Select value={departmentFilter} onValueChange={(v) => setDepartmentFilter(v as LeaveDepartment)}>
-            <SelectTrigger className="h-8 w-[140px] text-xs">
+            <SelectTrigger className="h-8 w-[160px] text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {LEAVE_DEPARTMENTS.map(d => (
+              {departmentOptions.map((d) => (
                 <SelectItem key={d} value={d}>{d}</SelectItem>
               ))}
             </SelectContent>
@@ -365,13 +417,22 @@ export default function LeavePlannerPage() {
                         <td className="sticky left-[180px] z-10 bg-card px-2 py-1 border-r whitespace-nowrap text-muted-foreground">
                           {crew.position}
                         </td>
-                        {/* Balance */}
-                        <td className={cn(
-                          'sticky left-[280px] z-10 bg-card px-2 py-1 border-r text-right font-bold',
-                          crew.balance < 0 && 'text-red-600',
-                          crew.balance > 40 && 'text-green-600'
-                        )}>
-                          {crew.balance}
+                        {/* Balance — calculator-driven */}
+                        <td
+                          className={cn(
+                            'sticky left-[280px] z-10 bg-card px-2 py-1 border-r text-right font-bold',
+                            crew.remaining < 0 && 'text-red-600',
+                            crew.remaining > 40 && 'text-green-600'
+                          )}
+                          title={
+                            `Entitlement: ${crew.entitlement.toFixed(1)}d  ·  Carryover: ${crew.carryover.toFixed(1)}d\n` +
+                            `Accrued: ${crew.accrued.toFixed(1)}d  ·  Taken: ${crew.taken.toFixed(1)}d  ·  Booked: ${crew.booked.toFixed(1)}d\n` +
+                            `Available now: ${crew.available.toFixed(1)}d  ·  Remaining (year): ${crew.remaining.toFixed(1)}d` +
+                            (crew.next_leave_start ? `\nNext leave: ${crew.next_leave_start} → ${crew.next_leave_end}` : '') +
+                            (crew.notes && crew.notes.length ? `\n${crew.notes.join(' · ')}` : '')
+                          }
+                        >
+                          {crew.remaining.toFixed(0)}
                         </td>
                         {/* Day cells */}
                         {Array.from({ length: daysInMonth }, (_, i) => {

@@ -1,11 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
-import { LEAVE_STATUS_CODES, STATUS_CODE_MAP, CREW_SEED_DATA, type CrewLeaveRequest } from '@/modules/crew/leaveConstants';
+import { useActiveRoles } from '@/modules/auth/hooks/useUserRoles';
+import { LEAVE_STATUS_CODES, STATUS_CODE_MAP, type CrewLeaveRequest } from '@/modules/crew/leaveConstants';
 import {
-  CalendarDays, Plus, Search, Check, X, Loader2, ArrowLeft
+  CalendarDays, Plus, Search, Check, X, Loader2, ArrowLeft, Ban, ShieldCheck, Ship,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,24 +19,67 @@ import { Textarea } from '@/components/ui/textarea';
 import { format, eachDayOfInterval, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
+import { logLeaveAudit } from '@/modules/leave/services/leaveAudit';
+
+const sb = supabase as any;
 
 const statusBadgeColors: Record<string, string> = {
+  draft: 'bg-slate-100 text-slate-800',
   pending: 'bg-amber-100 text-amber-800',
+  requested: 'bg-amber-100 text-amber-800',
+  hod_reviewed: 'bg-blue-100 text-blue-800',
   approved: 'bg-green-100 text-green-800',
   declined: 'bg-red-100 text-red-800',
+  rejected: 'bg-red-100 text-red-800',
+  cancelled: 'bg-gray-200 text-gray-700',
+  completed: 'bg-emerald-100 text-emerald-800',
+};
+
+interface CrewOption {
+  user_id: string;
+  first_name: string;
+  last_name: string;
+  rank: string | null;
+  department: string | null;
+  vessel_id: string | null;
+  vessel_name: string | null;
+  hod_user_id: string | null;
+}
+
+type EnrichedRequest = CrewLeaveRequest & {
+  crewName?: string;
+  crewPosition?: string;
+  crewDepartment?: string;
 };
 
 export default function LeaveRequestsPage() {
   const { profile, user } = useAuth();
   const { selectedVessel } = useVessel();
+  const { roles } = useActiveRoles();
   const companyId = profile?.company_id;
   const navigate = useNavigate();
 
-  const [requests, setRequests] = useState<(CrewLeaveRequest & { crewName?: string; crewPosition?: string; crewDepartment?: string })[]>([]);
+  const isFleetLevel = useMemo(
+    () => roles.some((r) => ['superadmin', 'dpa', 'fleet_master'].includes(r)),
+    [roles]
+  );
+  const canApprove = useMemo(
+    () => roles.some((r) => ['superadmin', 'dpa', 'captain', 'purser'].includes(r)),
+    [roles]
+  );
+  const canHodReview = useMemo(
+    () => roles.some((r) => ['superadmin', 'dpa', 'captain', 'purser', 'hod'].includes(r)),
+    [roles]
+  );
+
+  const [requests, setRequests] = useState<EnrichedRequest[]>([]);
+  const [crewOptions, setCrewOptions] = useState<CrewOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<EnrichedRequest | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
 
   const [form, setForm] = useState({
     crew_id: '',
@@ -45,39 +89,70 @@ export default function LeaveRequestsPage() {
     notes: '',
   });
 
+  // Load real crew (assigned to selected vessel unless fleet-level)
+  const loadCrew = useCallback(async () => {
+    if (!companyId) return;
+    let q = sb
+      .from('crew_assignments')
+      .select(`
+        vessel_id, position,
+        vessels:vessel_id ( id, name, company_id ),
+        profiles:user_id ( user_id, first_name, last_name, rank, department, hod_user_id )
+      `)
+      .eq('is_current', true);
+    if (selectedVessel?.id && !isFleetLevel) q = q.eq('vessel_id', selectedVessel.id);
+    const { data } = await q;
+    const seen = new Set<string>();
+    const opts: CrewOption[] = [];
+    (data || []).forEach((r: any) => {
+      if (!r.profiles || r.vessels?.company_id !== companyId) return;
+      if (seen.has(r.profiles.user_id)) return;
+      seen.add(r.profiles.user_id);
+      opts.push({
+        user_id: r.profiles.user_id,
+        first_name: r.profiles.first_name,
+        last_name: r.profiles.last_name,
+        rank: r.profiles.rank ?? r.position ?? null,
+        department: r.profiles.department ?? null,
+        vessel_id: r.vessel_id,
+        vessel_name: r.vessels?.name ?? null,
+        hod_user_id: r.profiles.hod_user_id ?? null,
+      });
+    });
+    opts.sort((a, b) => `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`));
+    setCrewOptions(opts);
+  }, [companyId, selectedVessel?.id, isFleetLevel]);
+
   const loadRequests = useCallback(async () => {
     if (!companyId) return;
     setLoading(true);
-    let query = supabase
+    let query = sb
       .from('crew_leave_requests')
       .select('*')
       .eq('company_id', companyId)
       .order('submitted_at', { ascending: false });
 
-    if (statusFilter !== 'all') {
-      query = query.eq('status', statusFilter);
-    }
+    if (statusFilter !== 'all') query = query.eq('status', statusFilter);
+    if (selectedVessel?.id && !isFleetLevel) query = query.eq('vessel_id', selectedVessel.id);
 
     const { data } = await query;
-    
-    // Enrich with crew names from seed data or profiles
+
+    // Enrich with names from real crew options
+    const crewMap = new Map(crewOptions.map((c) => [c.user_id, c]));
     const enriched = (data || []).map((r: any) => {
-      const seed = CREW_SEED_DATA.find(s => {
-        const seedId = `seed-${s.lastName}-${s.firstName}`.replace(/\s/g, '-').toLowerCase();
-        return seedId === r.crew_id;
-      });
+      const c = crewMap.get(r.crew_id);
       return {
         ...r,
-        crewName: seed ? `${seed.lastName}, ${seed.firstName}` : r.crew_id,
-        crewPosition: seed?.position || '',
-        crewDepartment: seed?.department || '',
-      };
-    }) as any[];
-    
+        crewName: c ? `${c.last_name}, ${c.first_name}` : '(unknown crew)',
+        crewPosition: c?.rank ?? '',
+        crewDepartment: c?.department ?? '',
+      } as EnrichedRequest;
+    });
     setRequests(enriched);
     setLoading(false);
-  }, [companyId, statusFilter]);
+  }, [companyId, statusFilter, selectedVessel?.id, isFleetLevel, crewOptions]);
 
+  useEffect(() => { loadCrew(); }, [loadCrew]);
   useEffect(() => { loadRequests(); }, [loadRequests]);
 
   const handleSubmit = async () => {
@@ -85,21 +160,54 @@ export default function LeaveRequestsPage() {
       toast.error('Please fill in all required fields');
       return;
     }
+    if (form.end_date < form.start_date) {
+      toast.error('End date must be on or after start date.');
+      return;
+    }
 
-    const { error } = await supabase.from('crew_leave_requests').insert({
+    const crew = crewOptions.find((c) => c.user_id === form.crew_id);
+
+    // Overlap check against existing approved/pending requests for this crew
+    const { data: existing } = await sb
+      .from('crew_leave_requests')
+      .select('id, start_date, end_date, status')
+      .eq('crew_id', form.crew_id)
+      .in('status', ['pending', 'requested', 'hod_reviewed', 'approved']);
+    const overlap = (existing || []).find(
+      (r: any) => r.start_date <= form.end_date && r.end_date >= form.start_date
+    );
+    if (overlap) {
+      toast.warning('This crew member already has an overlapping request — proceeding will require review.');
+    }
+
+    const { data, error } = await sb.from('crew_leave_requests').insert({
       crew_id: form.crew_id,
       leave_type: form.leave_type,
       start_date: form.start_date,
       end_date: form.end_date,
       notes: form.notes || null,
-      status: 'pending',
+      status: 'requested',
       company_id: companyId,
-      vessel_id: selectedVessel?.id || null,
-    });
+      vessel_id: crew?.vessel_id ?? selectedVessel?.id ?? null,
+    }).select().single();
 
     if (error) {
+      console.error(error);
       toast.error('Failed to submit request');
       return;
+    }
+
+    if (user?.id && data) {
+      await logLeaveAudit({
+        companyId,
+        vesselId: crew?.vessel_id ?? selectedVessel?.id ?? null,
+        crewId: form.crew_id,
+        actorId: user.id,
+        action: 'leave_requested',
+        entityType: 'crew_leave_request',
+        entityId: data.id,
+        newValue: { ...form, status: 'requested' },
+      });
     }
 
     toast.success('Leave request submitted');
@@ -108,86 +216,208 @@ export default function LeaveRequestsPage() {
     loadRequests();
   };
 
-  const handleApprove = async (req: CrewLeaveRequest) => {
-    if (!companyId) return;
+  const handleHodReview = async (req: EnrichedRequest) => {
+    await sb.from('crew_leave_requests').update({
+      status: 'hod_reviewed',
+      hod_reviewed_at: new Date().toISOString(),
+      hod_reviewed_by: user?.id ?? null,
+    }).eq('id', req.id);
 
-    // Create leave entries for the date range
+    if (user?.id) {
+      await logLeaveAudit({
+        companyId,
+        vesselId: req.vessel_id,
+        crewId: req.crew_id,
+        actorId: user.id,
+        action: 'leave_hod_reviewed',
+        entityType: 'crew_leave_request',
+        entityId: req.id,
+        oldValue: { status: req.status },
+        newValue: { status: 'hod_reviewed' },
+      });
+    }
+    toast.success('Marked as HoD reviewed');
+    loadRequests();
+  };
+
+  const writeEntries = async (req: EnrichedRequest) => {
+    if (!companyId) return { inserted: 0, skipped: 0 };
     const days = eachDayOfInterval({ start: new Date(req.start_date), end: new Date(req.end_date) });
-    
-    // Check locked months
-    const { data: lockedMonths } = await supabase
+
+    const { data: lockedMonths } = await sb
       .from('crew_leave_locked_months')
-      .select('month, year')
+      .select('month, year, vessel_id')
       .eq('company_id', companyId);
 
-    const lockedSet = new Set((lockedMonths || []).map((lm: any) => `${lm.year}-${lm.month}`));
-    
-    let skippedCount = 0;
-    const inserts = days.filter(d => {
-      const key = `${d.getFullYear()}-${d.getMonth() + 1}`;
-      if (lockedSet.has(key)) { skippedCount++; return false; }
+    const isLocked = (d: Date) =>
+      (lockedMonths || []).some(
+        (lm: any) =>
+          lm.year === d.getFullYear() &&
+          lm.month === d.getMonth() + 1 &&
+          (lm.vessel_id === null || lm.vessel_id === req.vessel_id)
+      );
+
+    let skipped = 0;
+    const inserts = days.filter((d) => {
+      if (isLocked(d)) { skipped++; return false; }
       return true;
-    }).map(d => ({
+    }).map((d) => ({
       crew_id: req.crew_id,
       date: format(d, 'yyyy-MM-dd'),
       status_code: req.leave_type,
       company_id: companyId,
-      vessel_id: selectedVessel?.id || null,
+      vessel_id: req.vessel_id,
     }));
 
-    // Delete existing entries in this range first
     for (const ins of inserts) {
-      await supabase.from('crew_leave_entries').delete().eq('crew_id', ins.crew_id).eq('date', ins.date);
+      await sb.from('crew_leave_entries').delete().eq('crew_id', ins.crew_id).eq('date', ins.date);
     }
-
-    if (inserts.length > 0) {
-      await supabase.from('crew_leave_entries').insert(inserts);
+    if (inserts.length) {
+      await sb.from('crew_leave_entries').insert(inserts);
     }
+    return { inserted: inserts.length, skipped };
+  };
 
-    // Update request status
-    await supabase.from('crew_leave_requests').update({
+  /** Reverse calendar entries previously created from an approved request. */
+  const reverseEntries = async (req: EnrichedRequest) => {
+    if (!companyId) return;
+    const days = eachDayOfInterval({ start: new Date(req.start_date), end: new Date(req.end_date) });
+    for (const d of days) {
+      await sb
+        .from('crew_leave_entries')
+        .delete()
+        .eq('crew_id', req.crew_id)
+        .eq('date', format(d, 'yyyy-MM-dd'))
+        .eq('status_code', req.leave_type);
+    }
+  };
+
+  const handleApprove = async (req: EnrichedRequest) => {
+    if (!companyId) return;
+    const { inserted, skipped } = await writeEntries(req);
+
+    await sb.from('crew_leave_requests').update({
       status: 'approved',
+      approved_by: user?.id ?? null,
+      approved_at: new Date().toISOString(),
       reviewed_at: new Date().toISOString(),
-      reviewed_by: user?.id || null,
+      reviewed_by: user?.id ?? null,
     }).eq('id', req.id);
 
-    if (skippedCount > 0) {
-      toast.warning(`Approved. ${skippedCount} days in locked months were skipped.`);
-    } else {
-      toast.success(`Approved. ${inserts.length} days applied to calendar.`);
+    if (user?.id) {
+      await logLeaveAudit({
+        companyId,
+        vesselId: req.vessel_id,
+        crewId: req.crew_id,
+        actorId: user.id,
+        action: 'leave_approved',
+        entityType: 'crew_leave_request',
+        entityId: req.id,
+        oldValue: { status: req.status },
+        newValue: { status: 'approved', days_inserted: inserted, days_skipped: skipped },
+      });
     }
+
+    if (skipped > 0) toast.warning(`Approved. ${skipped} days in locked months were skipped.`);
+    else toast.success(`Approved. ${inserted} day${inserted === 1 ? '' : 's'} applied to calendar.`);
     loadRequests();
   };
 
-  const handleDecline = async (id: string) => {
-    await supabase.from('crew_leave_requests').update({
-      status: 'declined',
+  const handleDecline = async (req: EnrichedRequest) => {
+    const reason = window.prompt('Reason for declining (optional):') || null;
+    // If the request was previously approved, reverse the calendar entries.
+    if (req.status === 'approved') {
+      await reverseEntries(req);
+    }
+    await sb.from('crew_leave_requests').update({
+      status: 'rejected',
+      rejection_reason: reason,
       reviewed_at: new Date().toISOString(),
-      reviewed_by: user?.id || null,
-    }).eq('id', id);
+      reviewed_by: user?.id ?? null,
+    }).eq('id', req.id);
 
+    if (user?.id) {
+      await logLeaveAudit({
+        companyId,
+        vesselId: req.vessel_id,
+        crewId: req.crew_id,
+        actorId: user.id,
+        action: 'leave_rejected',
+        entityType: 'crew_leave_request',
+        entityId: req.id,
+        oldValue: { status: req.status },
+        newValue: { status: 'rejected' },
+        reason,
+      });
+    }
     toast.success('Request declined');
     loadRequests();
   };
 
-  const filtered = requests.filter(r => {
+  const openCancel = (req: EnrichedRequest) => {
+    setCancelTarget(req);
+    setCancelReason('');
+  };
+
+  const confirmCancel = async () => {
+    if (!cancelTarget) return;
+    if (cancelTarget.status === 'approved') {
+      await reverseEntries(cancelTarget);
+    }
+    await sb.from('crew_leave_requests').update({
+      status: 'cancelled',
+      cancelled_at: new Date().toISOString(),
+      cancelled_by: user?.id ?? null,
+      cancel_reason: cancelReason || null,
+    }).eq('id', cancelTarget.id);
+
+    if (user?.id) {
+      await logLeaveAudit({
+        companyId,
+        vesselId: cancelTarget.vessel_id,
+        crewId: cancelTarget.crew_id,
+        actorId: user.id,
+        action: 'leave_cancelled',
+        entityType: 'crew_leave_request',
+        entityId: cancelTarget.id,
+        oldValue: { status: cancelTarget.status },
+        newValue: { status: 'cancelled' },
+        reason: cancelReason || null,
+      });
+    }
+    toast.success('Request cancelled');
+    setCancelTarget(null);
+    loadRequests();
+  };
+
+  const filtered = requests.filter((r) => {
     if (!search) return true;
     const s = search.toLowerCase();
-    return r.crewName?.toLowerCase().includes(s) || r.crewPosition?.toLowerCase().includes(s);
+    return (
+      r.crewName?.toLowerCase().includes(s) ||
+      r.crewPosition?.toLowerCase().includes(s) ||
+      r.crewDepartment?.toLowerCase().includes(s)
+    );
   });
 
   const counts = {
     all: requests.length,
-    pending: requests.filter(r => r.status === 'pending').length,
-    approved: requests.filter(r => r.status === 'approved').length,
-    declined: requests.filter(r => r.status === 'declined').length,
+    pending: requests.filter((r) => ['pending', 'requested', 'draft'].includes(r.status)).length,
+    hod_reviewed: requests.filter((r) => r.status === 'hod_reviewed').length,
+    approved: requests.filter((r) => r.status === 'approved').length,
+    declined: requests.filter((r) => ['rejected', 'declined'].includes(r.status)).length,
+    cancelled: requests.filter((r) => r.status === 'cancelled').length,
   };
 
-  // Build crew dropdown from seed data
-  const crewOptions = CREW_SEED_DATA.map(s => ({
-    value: `seed-${s.lastName}-${s.firstName}`.replace(/\s/g, '-').toLowerCase(),
-    label: `${s.lastName}, ${s.firstName} — ${s.position}`,
-  })).sort((a, b) => a.label.localeCompare(b.label));
+  // Crew dropdown — real assigned crew, scoped by vessel
+  const crewDropdownOptions = useMemo(
+    () =>
+      crewOptions.map((c) => ({
+        value: c.user_id,
+        label: `${c.last_name}, ${c.first_name}${c.rank ? ' — ' + c.rank : ''}${c.vessel_name ? ' · ' + c.vessel_name : ''}`,
+      })),
+    [crewOptions]
+  );
 
   return (
     <DashboardLayout>
@@ -203,7 +433,17 @@ export default function LeaveRequestsPage() {
                 <CalendarDays className="w-6 h-6" />
                 Leave Requests
               </h1>
-              <p className="text-sm text-muted-foreground">Submit & review leave requests</p>
+              <p className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+                Submit & review leave requests
+                {selectedVessel && (
+                  <span className="inline-flex items-center gap-1">
+                    <Ship className="h-3 w-3" /> {selectedVessel.name}
+                  </span>
+                )}
+                {isFleetLevel && (
+                  <Badge variant="outline" className="text-[10px] uppercase">Fleet view</Badge>
+                )}
+              </p>
             </div>
           </div>
           <Button onClick={() => setDialogOpen(true)}>
@@ -214,7 +454,7 @@ export default function LeaveRequestsPage() {
 
         {/* Filter tabs */}
         <div className="flex items-center gap-2 flex-wrap">
-          {(['all', 'pending', 'approved', 'declined'] as const).map(s => (
+          {(['all', 'pending', 'hod_reviewed', 'approved', 'declined', 'cancelled'] as const).map((s) => (
             <Button
               key={s}
               variant={statusFilter === s ? 'default' : 'outline'}
@@ -222,9 +462,9 @@ export default function LeaveRequestsPage() {
               className="text-xs h-8"
               onClick={() => setStatusFilter(s)}
             >
-              {s.charAt(0).toUpperCase() + s.slice(1)}
+              {s.replace('_', ' ').replace(/\b\w/g, (m) => m.toUpperCase())}
               <Badge variant="secondary" className="ml-1.5 text-[10px] h-4 px-1">
-                {counts[s]}
+                {counts[s as keyof typeof counts] ?? 0}
               </Badge>
             </Button>
           ))}
@@ -254,21 +494,31 @@ export default function LeaveRequestsPage() {
           </Card>
         ) : (
           <div className="space-y-2">
-            {filtered.map(req => {
+            {filtered.map((req) => {
               const codeInfo = STATUS_CODE_MAP[req.leave_type];
               const dayCount = differenceInDays(new Date(req.end_date), new Date(req.start_date)) + 1;
+              const isOwner = req.crew_id === user?.id;
+              const showHod = canHodReview && ['requested', 'pending', 'draft'].includes(req.status);
+              const showApprove = canApprove && ['hod_reviewed', 'requested', 'pending'].includes(req.status);
+              const showDecline = canApprove && req.status !== 'rejected' && req.status !== 'declined' && req.status !== 'cancelled';
+              const showCancel =
+                (isOwner && ['draft', 'requested', 'pending', 'hod_reviewed'].includes(req.status)) ||
+                (canApprove && req.status === 'approved');
               return (
                 <Card key={req.id}>
                   <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-4 flex-wrap">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <span className="font-medium text-sm">{req.crewName}</span>
                           {req.crewPosition && (
                             <span className="text-xs text-muted-foreground">({req.crewPosition})</span>
                           )}
+                          {req.crewDepartment && (
+                            <Badge variant="outline" className="text-[10px]">{req.crewDepartment}</Badge>
+                          )}
                           <Badge className={statusBadgeColors[req.status] || ''}>
-                            {req.status}
+                            {req.status.replace('_', ' ')}
                           </Badge>
                           {codeInfo && (
                             <span
@@ -279,28 +529,37 @@ export default function LeaveRequestsPage() {
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                           <span>{format(new Date(req.start_date), 'MMM d')} — {format(new Date(req.end_date), 'MMM d, yyyy')}</span>
                           <span>•</span>
                           <span>{dayCount} day{dayCount !== 1 ? 's' : ''}</span>
-                          {req.notes && (
-                            <>
-                              <span>•</span>
-                              <span className="truncate max-w-[200px]">{req.notes}</span>
-                            </>
-                          )}
+                          {req.notes && (<><span>•</span><span className="truncate max-w-[200px]">{req.notes}</span></>)}
+                          {req.cancel_reason && (<><span>•</span><span className="text-destructive">cancelled: {req.cancel_reason}</span></>)}
+                          {req.rejection_reason && (<><span>•</span><span className="text-destructive">rejected: {req.rejection_reason}</span></>)}
                         </div>
                       </div>
-                      {req.status === 'pending' && (
-                        <div className="flex gap-2 shrink-0">
+                      <div className="flex gap-2 shrink-0 flex-wrap">
+                        {showHod && (
+                          <Button size="sm" variant="outline" className="text-blue-600 h-8" onClick={() => handleHodReview(req)}>
+                            <ShieldCheck className="w-4 h-4 mr-1" /> HoD review
+                          </Button>
+                        )}
+                        {showApprove && (
                           <Button size="sm" variant="outline" className="text-green-600 h-8" onClick={() => handleApprove(req)}>
                             <Check className="w-4 h-4 mr-1" /> Approve
                           </Button>
-                          <Button size="sm" variant="outline" className="text-red-600 h-8" onClick={() => handleDecline(req.id)}>
+                        )}
+                        {showDecline && (
+                          <Button size="sm" variant="outline" className="text-red-600 h-8" onClick={() => handleDecline(req)}>
                             <X className="w-4 h-4 mr-1" /> Decline
                           </Button>
-                        </div>
-                      )}
+                        )}
+                        {showCancel && (
+                          <Button size="sm" variant="outline" className="text-gray-600 h-8" onClick={() => openCancel(req)}>
+                            <Ban className="w-4 h-4 mr-1" /> Cancel
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -318,10 +577,10 @@ export default function LeaveRequestsPage() {
             <div className="space-y-4 py-2">
               <div className="space-y-1.5">
                 <Label className="text-xs">Crew Member *</Label>
-                <Select value={form.crew_id} onValueChange={v => setForm({ ...form, crew_id: v })}>
-                  <SelectTrigger><SelectValue placeholder="Select crew member" /></SelectTrigger>
+                <Select value={form.crew_id} onValueChange={(v) => setForm({ ...form, crew_id: v })}>
+                  <SelectTrigger><SelectValue placeholder={crewDropdownOptions.length ? 'Select crew member' : 'No crew assigned'} /></SelectTrigger>
                   <SelectContent className="max-h-60">
-                    {crewOptions.map(c => (
+                    {crewDropdownOptions.map((c) => (
                       <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -329,10 +588,10 @@ export default function LeaveRequestsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Leave Type *</Label>
-                <Select value={form.leave_type} onValueChange={v => setForm({ ...form, leave_type: v })}>
+                <Select value={form.leave_type} onValueChange={(v) => setForm({ ...form, leave_type: v })}>
                   <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                   <SelectContent>
-                    {LEAVE_STATUS_CODES.map(s => (
+                    {LEAVE_STATUS_CODES.map((s) => (
                       <SelectItem key={s.code} value={s.code}>
                         <span className="flex items-center gap-1.5">
                           <span className="w-3 h-3 rounded-sm" style={{ backgroundColor: s.bgColor, border: `1px solid ${s.color}` }} />
@@ -346,11 +605,11 @@ export default function LeaveRequestsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label className="text-xs">Start Date *</Label>
-                  <Input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} />
+                  <Input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-xs">End Date *</Label>
-                  <Input type="date" value={form.end_date} onChange={e => setForm({ ...form, end_date: e.target.value })} />
+                  <Input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
                 </div>
               </div>
               <div className="space-y-1.5">
@@ -358,7 +617,7 @@ export default function LeaveRequestsPage() {
                 <Textarea
                   placeholder="Additional details..."
                   value={form.notes}
-                  onChange={e => setForm({ ...form, notes: e.target.value })}
+                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
                   rows={2}
                 />
               </div>
@@ -366,6 +625,34 @@ export default function LeaveRequestsPage() {
             <DialogFooter>
               <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
               <Button onClick={handleSubmit}>Submit</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Cancel Dialog */}
+        <Dialog open={!!cancelTarget} onOpenChange={(o) => !o && setCancelTarget(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cancel leave request</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-2 py-2 text-sm">
+              <p>
+                Cancel request for <strong>{cancelTarget?.crewName}</strong>{' '}
+                ({cancelTarget && format(new Date(cancelTarget.start_date), 'd MMM')} →{' '}
+                {cancelTarget && format(new Date(cancelTarget.end_date), 'd MMM yyyy')})?
+              </p>
+              {cancelTarget?.status === 'approved' && (
+                <p className="text-warning text-xs">
+                  This request was previously approved — cancelling will also remove its
+                  calendar entries and recalculate the crew member's balance.
+                </p>
+              )}
+              <Label className="text-xs">Reason (optional)</Label>
+              <Textarea rows={2} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCancelTarget(null)}>Back</Button>
+              <Button variant="destructive" onClick={confirmCancel}>Cancel request</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

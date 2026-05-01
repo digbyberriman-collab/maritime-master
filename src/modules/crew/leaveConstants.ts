@@ -21,9 +21,14 @@ export const LEAVE_STATUS_CODES: LeaveStatusCode[] = [
 ];
 
 export const STATUS_CODE_MAP = Object.fromEntries(
-  LEAVE_STATUS_CODES.map(s => [s.code, s])
+  LEAVE_STATUS_CODES.map((s) => [s.code, s])
 );
 
+/**
+ * Departments shown in the planner department filter.
+ * The "All" option is rendered specially by the UI; dynamic departments
+ * discovered from real crew profiles are merged into this list at runtime.
+ */
 export const LEAVE_DEPARTMENTS = [
   'All',
   'Bridge',
@@ -37,7 +42,7 @@ export const LEAVE_DEPARTMENTS = [
   'Fleet Chefs',
 ] as const;
 
-export type LeaveDepartment = typeof LEAVE_DEPARTMENTS[number];
+export type LeaveDepartment = (typeof LEAVE_DEPARTMENTS)[number] | string;
 
 export interface CrewLeaveEntry {
   id: string;
@@ -66,6 +71,17 @@ export interface CrewLeaveLockedMonth {
   locked_by: string | null;
 }
 
+export type LeaveRequestStatus =
+  | 'draft'
+  | 'requested'
+  | 'pending'
+  | 'hod_reviewed'
+  | 'approved'
+  | 'rejected'
+  | 'declined'
+  | 'cancelled'
+  | 'completed';
+
 export interface CrewLeaveRequest {
   id: string;
   crew_id: string;
@@ -73,106 +89,55 @@ export interface CrewLeaveRequest {
   start_date: string;
   end_date: string;
   notes: string | null;
-  status: 'pending' | 'approved' | 'declined';
+  status: LeaveRequestStatus;
   company_id: string;
   vessel_id: string | null;
   submitted_at: string;
   reviewed_at: string | null;
   reviewed_by: string | null;
+  hod_reviewed_at?: string | null;
+  hod_reviewed_by?: string | null;
+  hod_review_notes?: string | null;
+  approved_by?: string | null;
+  approved_at?: string | null;
+  cancelled_at?: string | null;
+  cancelled_by?: string | null;
+  cancel_reason?: string | null;
+  rejection_reason?: string | null;
 }
 
+/**
+ * Leave row for the planner / calendar — backed entirely by real Supabase
+ * data (crew_assignments + profiles + crew_leave_entries + carryover +
+ * leave_policies). No more seed data.
+ */
 export interface CrewMemberLeave {
   userId: string;
   firstName: string;
   lastName: string;
   position: string;
   department: string;
-  entries: Record<string, string>; // date -> status_code
+  rank: string;
+  rotation: string | null;
+  joiningDate: string | null;
+  leavingDate: string | null;
+  vesselId: string | null;
+  vesselName: string | null;
+  hodUserId: string | null;
+  entries: Record<string, string>; // date -> status_code (current month)
   carryover: number;
-  counts: Record<string, number>;
-  balance: number;
-}
+  counts: Record<string, number>; // status counts for the year
+  balance: number;            // legacy alias for `remaining`
 
-// Seed data for crew with departments
-export const CREW_SEED_DATA = [
-  // BRIDGE
-  { lastName: 'Berriman', firstName: 'Digby', position: 'Captain', department: 'Bridge', carryover: 37 },
-  { lastName: 'Carter', firstName: 'Phil', position: 'Captain', department: 'Bridge', carryover: 14 },
-  { lastName: 'Tyrrell', firstName: 'Simon', position: 'Captain', department: 'Bridge', carryover: 48 },
-  { lastName: 'Atkins', firstName: 'Georgia', position: 'Temp Chief Officer', department: 'Bridge', carryover: 42 },
-  { lastName: 'Cheney', firstName: 'Zachary', position: 'Chief Officer', department: 'Bridge', carryover: 14 },
-  { lastName: 'Coldicutt', firstName: 'Mitchell', position: 'Chief Officer', department: 'Bridge', carryover: 42 },
-  { lastName: 'Norman', firstName: 'Juan-Craig', position: 'Chief Officer', department: 'Bridge', carryover: 42 },
-  { lastName: 'Sanguinetti', firstName: 'Jack', position: 'Chief Officer', department: 'Bridge', carryover: 14 },
-  { lastName: 'Fowler-Kok', firstName: 'Ben', position: 'First Officer', department: 'Bridge', carryover: 6 },
-  { lastName: 'Neocleous', firstName: 'Louie', position: 'First Officer', department: 'Bridge', carryover: 32 },
-  // DECK
-  { lastName: 'Rohlfs', firstName: 'Vanessa', position: 'Deck Officer', department: 'Deck', carryover: 42 },
-  { lastName: 'Coleman', firstName: 'Finn', position: 'Stew 2A', department: 'Deck', carryover: 0 },
-  { lastName: 'Gregory', firstName: 'Matthew', position: 'Bosun', department: 'Deck', carryover: 12 },
-  { lastName: 'Lisle', firstName: 'James', position: 'Bosun', department: 'Deck', carryover: 14 },
-  { lastName: 'Lynch', firstName: 'Ambrogino', position: 'Bosun', department: 'Deck', carryover: 14 },
-  { lastName: 'Schwarz', firstName: 'Emil', position: 'Bosun', department: 'Deck', carryover: 2 },
-  { lastName: 'Smith', firstName: 'Matthew', position: 'Bosun', department: 'Deck', carryover: 14 },
-  { lastName: 'Syred', firstName: 'Vincent', position: 'Bosun', department: 'Deck', carryover: 42 },
-  { lastName: 'Seetio Nugroho', firstName: 'Widodo', position: 'Lead Deckhand', department: 'Deck', carryover: 27 },
-  { lastName: 'Baxter', firstName: 'Louis', position: 'Deckhand', department: 'Deck', carryover: 0 },
-  { lastName: 'Leadbetter', firstName: 'Sam', position: 'Deckhand', department: 'Deck', carryover: 15 },
-  { lastName: 'Servos', firstName: 'Athanasios', position: 'Deckhand', department: 'Deck', carryover: 42 },
-  { lastName: 'Aurelio', firstName: 'Ronaldo', position: 'Deckhand', department: 'Deck', carryover: 48 },
-  { lastName: 'Pollard', firstName: 'Ed', position: 'Deckhand', department: 'Deck', carryover: 0 },
-  { lastName: 'Hurst', firstName: 'Michael', position: 'Deckhand', department: 'Deck', carryover: 0 },
-  // ENGINEERING
-  { lastName: 'Brown', firstName: 'Callum', position: 'Chief Engineer', department: 'Engineering', carryover: 32 },
-  { lastName: 'Cullingworth', firstName: 'Doug', position: 'Chief Engineer', department: 'Engineering', carryover: 14 },
-  { lastName: 'Heafield', firstName: 'Stephen', position: 'Chief Engineer', department: 'Engineering', carryover: 14 },
-  { lastName: 'Walker', firstName: 'Alan', position: 'Chief Engineer', department: 'Engineering', carryover: 8 },
-  { lastName: 'Hibbard', firstName: 'Adrian', position: 'Chief Engineer', department: 'Engineering', carryover: 0 },
-  { lastName: 'Rymer', firstName: 'Ashley', position: 'First Engineering', department: 'Engineering', carryover: 14 },
-  { lastName: 'Hickman', firstName: 'Richard', position: '2nd Engineer', department: 'Engineering', carryover: 70 },
-  { lastName: 'Hughson', firstName: 'Jack', position: '2nd Engineer', department: 'Engineering', carryover: 3 },
-  { lastName: 'Reid', firstName: 'Sam', position: '2nd Engineer', department: 'Engineering', carryover: 14 },
-  { lastName: 'Targett-Parker', firstName: 'Will', position: 'Engineer (Study Leave)', department: 'Engineering', carryover: 3 },
-  { lastName: 'Van Staden', firstName: 'Renaldo', position: 'AVIT', department: 'Engineering', carryover: 4 },
-  { lastName: 'Venter', firstName: 'Renier', position: 'AVIT', department: 'Engineering', carryover: 34 },
-  // INTERIOR
-  { lastName: 'Simons', firstName: 'Catherine', position: 'Purser', department: 'Interior', carryover: 6 },
-  { lastName: 'Murray', firstName: 'Jessii', position: 'Purser', department: 'Interior', carryover: 15 },
-  { lastName: 'Brown', firstName: 'Sammie', position: 'Chief Stew', department: 'Interior', carryover: 14 },
-  { lastName: 'de Gregory', firstName: 'Ellie', position: 'Chief Stew', department: 'Interior', carryover: 51 },
-  { lastName: 'Ettling', firstName: 'Charlotte', position: 'Chief Stew', department: 'Interior', carryover: 35 },
-  { lastName: 'Goodchild', firstName: 'Laura', position: 'Chief Stew', department: 'Interior', carryover: 12 },
-  { lastName: 'Hehir', firstName: 'Amanda', position: 'Chief Stew', department: 'Interior', carryover: 14 },
-  { lastName: 'Sjunesson', firstName: 'Catarina', position: 'Chief Stew', department: 'Interior', carryover: 0 },
-  { lastName: 'van der Walt', firstName: 'Roxy', position: 'Chief Stew', department: 'Interior', carryover: 24 },
-  { lastName: 'Wyke', firstName: 'Allabama', position: 'First Stew', department: 'Interior', carryover: 3 },
-  { lastName: 'Panday', firstName: 'Dinesh', position: 'Lead Stew', department: 'Interior', carryover: 14 },
-  { lastName: 'Schoeman', firstName: 'Milla', position: 'Lead Stew', department: 'Interior', carryover: 2 },
-  { lastName: 'Co', firstName: 'Ivy', position: 'Stew', department: 'Interior', carryover: 42 },
-  { lastName: 'Williamson', firstName: 'Megan', position: 'Stew', department: 'Interior', carryover: 0 },
-  { lastName: 'Venn', firstName: 'Amy', position: 'Stew', department: 'Interior', carryover: 0 },
-  { lastName: "O'Malley", firstName: 'Kirsty', position: 'Hair/Stew', department: 'Interior', carryover: 0 },
-  { lastName: 'Ros', firstName: 'Agnes', position: 'Hair/Stew', department: 'Interior', carryover: 0 },
-  { lastName: 'Protopsaltis', firstName: 'Sofia', position: 'Stew 1A', department: 'Interior', carryover: 0 },
-  { lastName: 'Lumandas', firstName: 'Jay', position: 'Laundry Master', department: 'Interior', carryover: 0 },
-  { lastName: 'Pangatungan', firstName: 'Marvin', position: 'Laundry Master', department: 'Interior', carryover: 0 },
-  // GALLEY
-  { lastName: 'Sjostrom', firstName: 'Robin', position: 'Chef', department: 'Galley', carryover: 2 },
-  { lastName: 'Wadsworth', firstName: 'Henry', position: 'Chef', department: 'Galley', carryover: -4 },
-  { lastName: 'Wilkinson', firstName: 'Steve', position: 'Chef', department: 'Galley', carryover: 0 },
-  { lastName: 'Hayat', firstName: 'Azraa', position: 'Chef', department: 'Galley', carryover: 8 },
-  { lastName: 'Pena', firstName: 'Victoria', position: 'Chef', department: 'Galley', carryover: 0 },
-  { lastName: 'Hood', firstName: 'Toby', position: 'Chef', department: 'Galley', carryover: 0 },
-  // MEDICS
-  { lastName: 'van Schalkwyk', firstName: 'Janus', position: 'Medic', department: 'Medics', carryover: 2 },
-  { lastName: 'Phillips', firstName: 'Molly', position: 'Medic', department: 'Medics', carryover: 0 },
-  { lastName: 'Ruetlinger', firstName: 'Nina', position: 'Nurse (Study Leave)', department: 'Medics', carryover: 31 },
-  // DIVE
-  { lastName: 'Beard', firstName: 'Adam', position: 'Dive Instructor', department: 'Dive', carryover: 28 },
-  { lastName: 'Thomas', firstName: 'Daffyd', position: 'Dive Instructor', department: 'Dive', carryover: -6 },
-  { lastName: 'Lamp', firstName: 'Michaella', position: 'Dive Instructor', department: 'Dive', carryover: 0 },
-  { lastName: 'Valenti', firstName: 'Jessica', position: 'Dive Instructor', department: 'Dive', carryover: 0 },
-  // MEDIA
-  { lastName: 'Lewington', firstName: 'Michael', position: 'Media', department: 'Media', carryover: 6 },
-  { lastName: 'Heunis', firstName: 'Naude', position: 'Media', department: 'Media', carryover: 0 },
-];
+  // Calculator outputs
+  entitlement: number;
+  accrued: number;
+  taken: number;
+  booked: number;
+  available: number;
+  remaining: number;
+  monthly_accrual: number;
+  next_leave_start?: string;
+  next_leave_end?: string;
+  notes: string[];
+}
