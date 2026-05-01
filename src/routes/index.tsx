@@ -95,6 +95,7 @@ const Drawings = React.lazy(() => import('@/modules/documents/pages/Drawings'));
 const FlightsTravel = React.lazy(() => import('@/modules/crew/pages/FlightsTravel'));
 const LeavePlannerPage = React.lazy(() => import('@/modules/crew/pages/LeavePlannerPage'));
 const LeaveRequestsPage = React.lazy(() => import('@/modules/crew/pages/LeaveRequestsPage'));
+const LeaveCalculatorPage = React.lazy(() => import('@/modules/crew/pages/LeaveCalculatorPage'));
 const TravelRecordDetail = React.lazy(() => import('@/modules/crew/pages/admin/TravelRecordDetail'));
 const QuarantineBookingsPage = React.lazy(() => import('@/modules/crew/pages/admin/QuarantineBookingsPage'));
 
@@ -240,6 +241,11 @@ export const AppRoutes: React.FC = () => {
       <Route path="/crew/leave/requests" element={
         <ProtectedRoute>
           <React.Suspense fallback={<LazyLoader />}><LeaveRequestsPage /></React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/leave/calculator" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}><LeaveCalculatorPage /></React.Suspense>
         </ProtectedRoute>
       } />
       <Route path="/crew/tasks" element={

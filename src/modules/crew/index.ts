@@ -8,6 +8,28 @@ export { useCrewAttachments, formatFileSize, ATTACHMENT_TYPES } from './hooks/us
 export type { CrewAttachment, AttachmentFormData } from './hooks/useCrewAttachments';
 
 export { useCrewLeave } from './hooks/useCrewLeave';
+export { useLeavePolicy } from './hooks/useLeavePolicy';
+
+export {
+  calculateLeaveBreakdown,
+  calculateAccruedDays,
+  resolveAccrualAnchor,
+  findNextLeaveBlock,
+  overlapsAny,
+  DEFAULT_LEAVE_POLICY,
+} from './services/leaveCalculator';
+export type {
+  LeavePolicy,
+  AccrualMethod,
+  RoundingMethod,
+  AccrualBreakdown,
+  CrewProfileLite,
+  LeaveEntryLite,
+  LeaveRequestLite,
+} from './services/leaveCalculator';
+
+export { logLeaveAudit } from './services/leaveAudit';
+export type { LeaveAuditEntry, LeaveAction, LeaveEntityType } from './services/leaveAudit';
 
 export { useCrewTasks } from './hooks/useCrewTasks';
 export type { CrewTask, CreateTaskInput, TaskType, TaskPriority, TaskStatus } from './hooks/useCrewTasks';

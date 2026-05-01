@@ -113,6 +113,7 @@ export const NAVIGATION_ITEMS: NavItem[] = [
       { id: 'work-rest-overview', label: 'Work/Rest Overview', path: '/crew/work-rest/overview', icon: Clock },
       { id: 'leave-planner', label: 'Leave Planner', path: '/crew/leave', icon: CalendarDays },
       { id: 'leave-requests', label: 'Leave Requests', path: '/crew/leave/requests', icon: CalendarDays },
+      { id: 'leave-calculator', label: 'Leave Calculator', path: '/crew/leave/calculator', icon: CalendarDays },
     ],
   },
   {
