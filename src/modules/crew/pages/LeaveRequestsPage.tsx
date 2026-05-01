@@ -98,7 +98,8 @@ export default function LeaveRequestsPage() {
     });
 
     if (error) {
-      toast.error('Failed to submit request');
+      console.error('[leave-requests] insert failed:', error);
+      toast.error(`Failed to submit request: ${error.message}`);
       return;
     }
 
