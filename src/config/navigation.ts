@@ -109,7 +109,8 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     children: [
       { id: 'crew-list', label: 'Crew List', path: '/crew/roster', icon: Users },
       { id: 'crew-admin', label: 'Crew Admin', path: '/crew/admin', icon: Briefcase },
-      { id: 'hours-of-rest', label: 'Hours of Rest', path: '/crew/hours-of-rest', icon: Clock },
+      { id: 'work-rest', label: 'Hours of Work & Rest', path: '/crew/work-rest', icon: Clock },
+      { id: 'work-rest-overview', label: 'Work/Rest Overview', path: '/crew/work-rest/overview', icon: Clock },
       { id: 'leave-planner', label: 'Leave Planner', path: '/crew/leave', icon: CalendarDays },
       { id: 'leave-requests', label: 'Leave Requests', path: '/crew/leave/requests', icon: CalendarDays },
     ],

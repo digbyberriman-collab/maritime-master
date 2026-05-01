@@ -196,10 +196,25 @@ export const AppRoutes: React.FC = () => {
           <React.Suspense fallback={<LazyLoader />}><FlightsTravel /></React.Suspense>
         </ProtectedRoute>
       } />
-      <Route path="/crew/hours-of-rest" element={
+      <Route path="/crew/hours-of-rest" element={<Navigate to="/crew/work-rest" replace />} />
+      <Route path="/crew/work-rest" element={
         <ProtectedRoute>
-          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            {React.createElement(React.lazy(() => import('@/modules/crew/pages/HoursOfRest')))}
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/work-rest/pages/MyWorkRestMonth')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/work-rest/overview" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/work-rest/pages/WorkRestOverview')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/work-rest/:crewId" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/work-rest/pages/MyWorkRestMonth')))}
           </React.Suspense>
         </ProtectedRoute>
       } />

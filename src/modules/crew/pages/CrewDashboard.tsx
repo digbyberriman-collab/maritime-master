@@ -366,9 +366,9 @@ export default function CrewDashboard() {
                   </Link>
                 </Button>
                 <Button variant="outline" size="sm" className="w-full justify-start" asChild>
-                  <Link to="/crew/hours-of-rest">
+                  <Link to="/crew/work-rest">
                     <Clock className="h-4 w-4 mr-2" />
-                    Log Hours of Rest
+                    Log Hours of Work & Rest
                   </Link>
                 </Button>
                 <Button variant="outline" size="sm" className="w-full justify-start" asChild>
