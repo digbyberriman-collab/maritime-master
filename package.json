@@ -103,7 +103,7 @@
   "main": "eslint.config.js",
   "repository": {
     "type": "git",
-    "url": "git+https://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@github.com/digbyberriman-collab/maritime-master.git"
+    "url": "git+https://github.com/digbyberriman-collab/maritime-master.git"
   },
   "keywords": [],
   "author": "",
