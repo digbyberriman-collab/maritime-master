@@ -9,12 +9,7 @@ import {
   type CrewLeaveCarryover,
   type CrewLeaveLockedMonth,
 } from '@/modules/crew/leaveConstants';
-import {
-  endOfMonth,
-  format,
-  eachDayOfInterval,
-  parseISO,
-} from 'date-fns';
+import { endOfMonth, format, eachDayOfInterval, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import { logLeaveAudit } from '@/modules/leave/services/leaveAudit';
 import { resolveLeavePolicy } from '@/modules/leave/services/leavePolicies';
@@ -30,34 +25,61 @@ interface CrewSourceRow {
   user_id: string;
   first_name: string;
   last_name: string;
-  rank?: string | null;
-  department?: string | null;
-  hod_user_id?: string | null;
-  joining_date?: string | null;
-  leaving_date?: string | null;
-  contract_start_date?: string | null;
-  contract_end_date?: string | null;
-  rotation?: string | null;
-  annual_leave_days?: number | null;
-  position?: string | null;
-  vessel_id?: string | null;
-  vessel_name?: string | null;
-  is_current?: boolean | null;
+  rank: string | null;
+  department: string | null;
+  hod_user_id: string | null;
+  joining_date: string | null;
+  leaving_date: string | null;
+  contract_start_date: string | null;
+  contract_end_date: string | null;
+  rotation: string | null;
+  annual_leave_days: number | null;
+  position: string | null;
+  vessel_id: string | null;
+  vessel_name: string | null;
+  is_current: boolean | null;
+  /** True when this row was loaded as a fallback from `profiles` rather than
+   * a real `crew_assignments` row (used to surface a soft warning). */
+  from_profile_fallback?: boolean;
 }
+
+/**
+ * Capability flags exposed to the UI so it can hide buttons whose backing
+ * columns / rows / CHECKs aren't yet present in the live DB.
+ */
+export interface LeaveSchemaCapabilities {
+  /** Profiles has the new `joining_date` etc. */
+  rich_profiles: boolean;
+  /** crew_leave_requests CHECK accepts hod_reviewed / cancelled. */
+  extended_statuses: boolean;
+  /** crew_leave_requests has cancelled_at / cancelled_by columns. */
+  has_cancel_columns: boolean;
+  /** crew_leave_requests has hod_reviewed_at / hod_reviewed_by columns. */
+  has_hod_columns: boolean;
+}
+
+const FULL_PROFILE_COLS = `
+  user_id, first_name, last_name, rank, department, hod_user_id,
+  joining_date, leaving_date, contract_start_date, contract_end_date,
+  rotation, annual_leave_days
+`.replace(/\s+/g, ' ');
+
+const SAFE_PROFILE_COLS = `
+  user_id, first_name, last_name, department,
+  contract_start_date, contract_end_date, rotation
+`.replace(/\s+/g, ' ');
 
 /**
  * Drive the leave planner / calendar / calculator from real data.
  *
- * Crew rows come from `crew_assignments` joined to `profiles`, scoped to:
- *  - the active vessel (if `useVesselFilter` and the user is *not* fleet-level)
- *  - the user's company otherwise
+ * Tiered crew loading (most → least specific):
+ *   1. crew_assignments JOIN profiles with the rich column set
+ *   2. crew_assignments JOIN profiles with a safe column set (degraded)
+ *   3. profiles only (when no assignments exist for the company / vessel)
  *
- * Calendar entries / requests / carryover / locks are fetched scoped to the
- * same vessel or company as appropriate.
- *
- * Returned `crewLeaveData` includes a fully calculated leave summary
- * (entitlement / accrued / taken / booked / remaining / next leave) per
- * crew member.
+ * Each step that fails feeds a `schemaCapabilities` flag so the UI can
+ * communicate the degradation, and so action buttons that need newer DB
+ * features can be hidden.
  */
 export function useCrewLeave(year: number, month: number, options: { useVesselFilter?: boolean } = {}) {
   const { useVesselFilter = true } = options;
@@ -81,76 +103,187 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [policies, setPolicies] = useState<Record<string, LeavePolicy>>({});
+  const [schemaCapabilities, setSchemaCapabilities] = useState<LeaveSchemaCapabilities>({
+    rich_profiles: true,
+    extended_statuses: true,
+    has_cancel_columns: true,
+    has_hod_columns: true,
+  });
+  const [warnings, setWarnings] = useState<string[]>([]);
   const [undoStack, setUndoStack] = useState<{ crewId: string; date: string; previousCode: string | null }[]>([]);
 
-  // ----- Crew source: real assignments joined with profiles -----
-  const loadCrewSource = useCallback(async () => {
-    if (!companyId) return;
-    let q = sb
-      .from('crew_assignments')
-      .select(`
-        is_current, position, department, vessel_id,
-        vessels:vessel_id ( id, name, company_id ),
-        profiles:user_id (
-          user_id, first_name, last_name, rank, department, hod_user_id,
-          joining_date, leaving_date, contract_start_date, contract_end_date,
-          rotation, annual_leave_days
+  const addWarning = useCallback((msg: string) => {
+    setWarnings((prev) => (prev.includes(msg) ? prev : [...prev, msg]));
+  }, []);
+
+  // ----- Probe schema capabilities -----
+  const probeSchema = useCallback(async () => {
+    const caps: LeaveSchemaCapabilities = {
+      rich_profiles: true,
+      extended_statuses: true,
+      has_cancel_columns: true,
+      has_hod_columns: true,
+    };
+
+    // Profile rich-column probe
+    const { error: e1 } = await sb
+      .from('profiles')
+      .select('joining_date, leaving_date, hod_user_id, annual_leave_days')
+      .limit(1);
+    if (e1) caps.rich_profiles = false;
+
+    // Cancel column probe
+    const { error: e2 } = await sb
+      .from('crew_leave_requests')
+      .select('cancelled_at, cancelled_by, cancel_reason')
+      .limit(1);
+    if (e2) caps.has_cancel_columns = false;
+
+    // HoD review column probe
+    const { error: e3 } = await sb
+      .from('crew_leave_requests')
+      .select('hod_reviewed_at, hod_reviewed_by, hod_review_notes')
+      .limit(1);
+    if (e3) caps.has_hod_columns = false;
+
+    // Extended status probe (insert isn't safe; assume aligned with column probes)
+    caps.extended_statuses = caps.has_cancel_columns && caps.has_hod_columns;
+
+    setSchemaCapabilities(caps);
+
+    if (!caps.rich_profiles) {
+      addWarning(
+        'Schema not fully migrated: profile fields like joining date and annual leave days are missing. ' +
+          'Calculations fall back to defaults until the migration is applied.'
+      );
+    }
+    if (!caps.extended_statuses) {
+      addWarning(
+        'Schema not fully migrated: HoD review and Cancel actions are disabled until the leave migration is applied.'
+      );
+    }
+    return caps;
+  }, [addWarning]);
+
+  // ----- Crew source: tiered fallback loader -----
+  const loadCrewSource = useCallback(
+    async (caps: LeaveSchemaCapabilities) => {
+      if (!companyId) return;
+
+      const profileSelect = caps.rich_profiles ? FULL_PROFILE_COLS : SAFE_PROFILE_COLS;
+
+      // 1. Try crew_assignments + profile join
+      const buildAssignmentQuery = () => {
+        let q = sb
+          .from('crew_assignments')
+          .select(`
+            is_current, position, department, vessel_id,
+            vessels:vessel_id ( id, name, company_id ),
+            profiles:user_id ( ${profileSelect} )
+          `)
+          .eq('is_current', true);
+        if (useVesselFilter && vesselId && !isFleetLevel) {
+          q = q.eq('vessel_id', vesselId);
+        }
+        return q;
+      };
+
+      let assignmentRows: any[] = [];
+      const { data: aData, error: aErr } = await buildAssignmentQuery();
+      if (aErr) {
+        console.warn('[leave] crew_assignments query failed, retrying with safe columns', aErr);
+        // Retry with safe columns even if rich_profiles claimed true (defensive)
+        let retryQ = sb
+          .from('crew_assignments')
+          .select(`
+            is_current, position, department, vessel_id,
+            vessels:vessel_id ( id, name, company_id ),
+            profiles:user_id ( ${SAFE_PROFILE_COLS} )
+          `)
+          .eq('is_current', true);
+        if (useVesselFilter && vesselId && !isFleetLevel) retryQ = retryQ.eq('vessel_id', vesselId);
+        const { data: retry, error: retryErr } = await retryQ;
+        if (retryErr) {
+          setError(retryErr.message);
+          return;
+        }
+        assignmentRows = retry || [];
+        addWarning('Some profile fields could not be loaded — calculations may use defaults.');
+      } else {
+        assignmentRows = aData || [];
+      }
+
+      const fromAssignments: CrewSourceRow[] = assignmentRows
+        .filter((r: any) => r.profiles && r.vessels?.company_id === companyId)
+        .map((r: any) => ({
+          user_id: r.profiles.user_id,
+          first_name: r.profiles.first_name,
+          last_name: r.profiles.last_name,
+          rank: r.profiles.rank ?? r.position ?? null,
+          department: r.profiles.department ?? r.department ?? null,
+          hod_user_id: r.profiles.hod_user_id ?? null,
+          joining_date: r.profiles.joining_date ?? null,
+          leaving_date: r.profiles.leaving_date ?? null,
+          contract_start_date: r.profiles.contract_start_date ?? null,
+          contract_end_date: r.profiles.contract_end_date ?? null,
+          rotation: r.profiles.rotation ?? null,
+          annual_leave_days:
+            typeof r.profiles.annual_leave_days === 'number' ? r.profiles.annual_leave_days : null,
+          position: r.position ?? r.profiles.rank ?? null,
+          vessel_id: r.vessel_id,
+          vessel_name: r.vessels?.name ?? null,
+          is_current: r.is_current,
+        }));
+
+      let final: CrewSourceRow[] = fromAssignments;
+
+      // 2. Profile-only fallback when assignments are empty
+      if (final.length === 0) {
+        let pq = sb
+          .from('profiles')
+          .select(profileSelect + ', company_id')
+          .eq('company_id', companyId);
+        const { data: pData, error: pErr } = await pq;
+        if (pErr) {
+          // Try the safe set in case rich query fails despite probe
+          const { data: pSafe } = await sb
+            .from('profiles')
+            .select(SAFE_PROFILE_COLS + ', company_id')
+            .eq('company_id', companyId);
+          if (pSafe) {
+            final = (pSafe as any[]).map((p: any) => buildRowFromProfile(p));
+          }
+        } else {
+          final = (pData as any[]).map((p: any) => buildRowFromProfile(p));
+        }
+
+        if (final.length > 0) {
+          addWarning(
+            'No crew assignments found for this vessel. Showing all crew in the company. ' +
+              'Assign crew to vessels via the Crew Roster for vessel-scoped views.'
+          );
+        }
+      }
+
+      // Deduplicate
+      const seen = new Set<string>();
+      const deduped: CrewSourceRow[] = [];
+      for (const row of final) {
+        if (seen.has(row.user_id)) continue;
+        seen.add(row.user_id);
+        deduped.push(row);
+      }
+      deduped.sort((a, b) =>
+        `${a.last_name ?? ''} ${a.first_name ?? ''}`.localeCompare(
+          `${b.last_name ?? ''} ${b.first_name ?? ''}`
         )
-      `)
-      .eq('is_current', true);
+      );
+      setCrewSource(deduped);
+    },
+    [companyId, vesselId, isFleetLevel, useVesselFilter, addWarning]
+  );
 
-    // Vessel filter: only crew on selected vessel unless user is fleet-level
-    if (useVesselFilter && vesselId && !isFleetLevel) {
-      q = q.eq('vessel_id', vesselId);
-    }
-
-    const { data, error: err } = await q;
-    if (err) {
-      console.error('[leave] crew source load failed:', err);
-      setError(err.message);
-      return;
-    }
-
-    // Filter to company in app-layer (RLS already does this, but defensive).
-    const rows: CrewSourceRow[] = (data || [])
-      .filter((r: any) => r.profiles && r.vessels?.company_id === companyId)
-      .map((r: any) => ({
-        user_id: r.profiles.user_id,
-        first_name: r.profiles.first_name,
-        last_name: r.profiles.last_name,
-        rank: r.profiles.rank ?? r.position ?? null,
-        department: r.profiles.department ?? r.department ?? null,
-        hod_user_id: r.profiles.hod_user_id ?? null,
-        joining_date: r.profiles.joining_date,
-        leaving_date: r.profiles.leaving_date,
-        contract_start_date: r.profiles.contract_start_date,
-        contract_end_date: r.profiles.contract_end_date,
-        rotation: r.profiles.rotation,
-        annual_leave_days: r.profiles.annual_leave_days,
-        position: r.position ?? r.profiles.rank ?? null,
-        vessel_id: r.vessel_id,
-        vessel_name: r.vessels?.name ?? null,
-        is_current: r.is_current,
-      }));
-
-    // Deduplicate on user_id (a crew member with two assignments shouldn't
-    // appear twice in the planner).
-    const seen = new Set<string>();
-    const deduped: CrewSourceRow[] = [];
-    for (const row of rows) {
-      if (seen.has(row.user_id)) continue;
-      seen.add(row.user_id);
-      deduped.push(row);
-    }
-    deduped.sort((a, b) =>
-      `${a.last_name ?? ''} ${a.first_name ?? ''}`.localeCompare(
-        `${b.last_name ?? ''} ${b.first_name ?? ''}`
-      )
-    );
-    setCrewSource(deduped);
-  }, [companyId, vesselId, isFleetLevel, useVesselFilter]);
-
-  // ----- Calendar entries for visible month -----
+  // ----- Calendar entries / requests / carryover / locks -----
   const loadMonthEntries = useCallback(async () => {
     if (!companyId) return;
     const monthStart = format(new Date(year, month - 1, 1), 'yyyy-MM-dd');
@@ -167,7 +300,6 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
     setEntries((data || []) as CrewLeaveEntry[]);
   }, [companyId, vesselId, isFleetLevel, useVesselFilter, year, month]);
 
-  // ----- Calendar entries for the YTD year (used for balance calc) -----
   const loadYearEntries = useCallback(async () => {
     if (!companyId) return;
     let q = sb
@@ -181,7 +313,6 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
     setYearEntries((data || []) as CrewLeaveEntry[]);
   }, [companyId, vesselId, isFleetLevel, useVesselFilter, year]);
 
-  // ----- Carryover for accrual year -----
   const loadCarryovers = useCallback(async () => {
     if (!companyId) return;
     const { data } = await sb
@@ -192,7 +323,6 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
     setCarryovers((data || []) as CrewLeaveCarryover[]);
   }, [companyId, year]);
 
-  // ----- Locked months (vessel-aware) -----
   const loadLockedMonths = useCallback(async () => {
     if (!companyId) return;
     let q = sb
@@ -201,14 +331,12 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
       .eq('company_id', companyId)
       .eq('year', year);
     if (useVesselFilter && vesselId && !isFleetLevel) {
-      // Locks may apply company-wide (vessel_id NULL) or vessel-specific
       q = q.or(`vessel_id.eq.${vesselId},vessel_id.is.null`);
     }
     const { data } = await q;
     setLockedMonths((data || []) as CrewLeaveLockedMonth[]);
   }, [companyId, vesselId, isFleetLevel, useVesselFilter, year]);
 
-  // ----- Open / future leave requests for booked-leave totals -----
   const loadRequests = useCallback(async () => {
     if (!companyId) return;
     let q = sb
@@ -228,12 +356,16 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
     const next: Record<string, LeavePolicy> = {};
     await Promise.all(
       crewSource.map(async (c) => {
-        const p = await resolveLeavePolicy({
-          crewId: c.user_id,
-          vesselId: c.vessel_id ?? vesselId,
-          companyId: companyId ?? null,
-        });
-        // If crew profile has its own annual_leave_days override, apply it
+        let p: LeavePolicy = DEFAULT_LEAVE_POLICY;
+        try {
+          p = await resolveLeavePolicy({
+            crewId: c.user_id,
+            vesselId: c.vessel_id ?? vesselId,
+            companyId: companyId ?? null,
+          });
+        } catch {
+          /* leave_policies table may not exist yet — fall through to default */
+        }
         if (typeof c.annual_leave_days === 'number' && c.annual_leave_days > 0) {
           next[c.user_id] = { ...p, annual_entitlement_days: c.annual_leave_days };
         } else {
@@ -248,8 +380,10 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setWarnings([]);
     try {
-      await loadCrewSource();
+      const caps = await probeSchema();
+      await loadCrewSource(caps);
       await Promise.all([
         loadMonthEntries(),
         loadYearEntries(),
@@ -262,7 +396,7 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
     } finally {
       setLoading(false);
     }
-  }, [loadCrewSource, loadMonthEntries, loadYearEntries, loadCarryovers, loadLockedMonths, loadRequests]);
+  }, [probeSchema, loadCrewSource, loadMonthEntries, loadYearEntries, loadCarryovers, loadLockedMonths, loadRequests]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
   useEffect(() => { loadPolicies(); }, [loadPolicies]);
@@ -272,12 +406,11 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
     [lockedMonths, year]
   );
 
-  // ----- Cell setEntry with audit logging -----
+  // ----- setEntry with audit logging -----
   const setEntry = useCallback(
     async (crewId: string, date: string, statusCode: string | null) => {
       if (!companyId) return;
 
-      // Block edits to non-existent crew (catches the legacy seed-id bug).
       if (!crewSource.find((c) => c.user_id === crewId)) {
         toast.error('Cannot edit leave for unknown crew member.');
         return;
@@ -296,12 +429,7 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
 
       try {
         if (statusCode === null) {
-          await sb
-            .from('crew_leave_entries')
-            .delete()
-            .eq('crew_id', crewId)
-            .eq('date', date);
-
+          await sb.from('crew_leave_entries').delete().eq('crew_id', crewId).eq('date', date);
           setEntries((prev) => prev.filter((e) => !(e.crew_id === crewId && e.date === date)));
           setYearEntries((prev) => prev.filter((e) => !(e.crew_id === crewId && e.date === date)));
         } else if (existing) {
@@ -310,16 +438,11 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
             .update({ status_code: statusCode })
             .eq('crew_id', crewId)
             .eq('date', date);
-
           setEntries((prev) =>
-            prev.map((e) =>
-              e.crew_id === crewId && e.date === date ? { ...e, status_code: statusCode } : e
-            )
+            prev.map((e) => (e.crew_id === crewId && e.date === date ? { ...e, status_code: statusCode } : e))
           );
           setYearEntries((prev) =>
-            prev.map((e) =>
-              e.crew_id === crewId && e.date === date ? { ...e, status_code: statusCode } : e
-            )
+            prev.map((e) => (e.crew_id === crewId && e.date === date ? { ...e, status_code: statusCode } : e))
           );
         } else {
           const { data } = await sb
@@ -360,7 +483,7 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
     [companyId, vesselId, entries, isMonthLocked, crewSource, user?.id]
   );
 
-  // ----- Bulk fill (drag) with locked-month skip + audit -----
+  // ----- Bulk fill -----
   const bulkFill = useCallback(
     async (crewId: string, startDate: string, endDate: string, statusCode: string) => {
       if (!companyId) return;
@@ -390,13 +513,8 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
         vessel_id: crewVessel,
       }));
 
-      // Replace existing entries day-by-day to satisfy unique(crew_id, date)
       for (const ins of inserts) {
-        await sb
-          .from('crew_leave_entries')
-          .delete()
-          .eq('crew_id', crewId)
-          .eq('date', ins.date);
+        await sb.from('crew_leave_entries').delete().eq('crew_id', crewId).eq('date', ins.date);
       }
       const { data } = await sb.from('crew_leave_entries').insert(inserts).select();
 
@@ -421,17 +539,14 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
     [companyId, vesselId, isMonthLocked, crewSource, loadMonthEntries, loadYearEntries, user?.id]
   );
 
-  // ----- Undo last edit -----
   const undo = useCallback(async () => {
     const last = undoStack[undoStack.length - 1];
     if (!last) return;
     setUndoStack((prev) => prev.slice(0, -1));
     await setEntry(last.crewId, last.date, last.previousCode);
-    // Remove the stack entry that the setEntry call appended
     setUndoStack((prev) => prev.slice(0, -1));
   }, [undoStack, setEntry]);
 
-  // ----- Toggle month lock (vessel-scoped if vessel selected) -----
   const toggleMonthLock = useCallback(
     async (m: number) => {
       if (!companyId) return;
@@ -498,18 +613,36 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
           leave_type: r.leave_type,
         }));
 
+      // Calculator gracefully handles all-null dates: returns entitlement = 0
+      // when no employmentStart and no contractStart. Surface this as a note.
+      const employmentStart = c.joining_date ? parseISO(c.joining_date) : null;
+      const contractStart = c.contract_start_date ? parseISO(c.contract_start_date) : null;
+      const employmentEnd = c.leaving_date ? parseISO(c.leaving_date) : null;
+      const contractEnd = c.contract_end_date ? parseISO(c.contract_end_date) : null;
+
       const calc = calculateLeave({
         asOf: today,
-        employmentStart: c.joining_date ? parseISO(c.joining_date) : null,
-        contractStart: c.contract_start_date ? parseISO(c.contract_start_date) : null,
-        employmentEnd: c.leaving_date ? parseISO(c.leaving_date) : null,
-        contractEnd: c.contract_end_date ? parseISO(c.contract_end_date) : null,
+        employmentStart,
+        contractStart,
+        employmentEnd,
+        contractEnd,
         carryoverDays: carryover,
         entries: crewYearEntries.map((e) => ({ date: e.date, status_code: e.status_code })),
         bookedRequests,
         policy,
         year,
       });
+
+      // If we have NO employment/contract info, expose the full default
+      // entitlement rather than 0 so the planner is at least informative.
+      const fallbackEntitlement =
+        !employmentStart && !contractStart ? policy.annual_entitlement_days : calc.entitlement;
+      const fallbackAccrued =
+        !employmentStart && !contractStart ? 0 : calc.accrued;
+      const calcNotes = [...calc.notes];
+      if (!employmentStart && !contractStart) {
+        calcNotes.push('No joining or contract start date on profile — entitlement shown is the policy default.');
+      }
 
       return {
         userId: c.user_id,
@@ -528,9 +661,8 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
         carryover,
         counts,
         balance: calc.remaining,
-        // Calculator outputs
-        entitlement: calc.entitlement,
-        accrued: calc.accrued,
+        entitlement: fallbackEntitlement,
+        accrued: fallbackAccrued,
         taken: calc.taken,
         booked: calc.booked,
         available: calc.available,
@@ -538,7 +670,7 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
         monthly_accrual: calc.monthly_accrual,
         next_leave_start: calc.next_leave_start,
         next_leave_end: calc.next_leave_end,
-        notes: calc.notes,
+        notes: calcNotes,
       } as CrewMemberLeave;
     });
   }, [crewSource, entries, yearEntries, carryovers, requests, policies, today, year]);
@@ -547,6 +679,8 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
     crewLeaveData,
     loading,
     error,
+    warnings,
+    schemaCapabilities,
     isFleetLevel,
     entries,
     requests,
@@ -558,5 +692,29 @@ export function useCrewLeave(year: number, month: number, options: { useVesselFi
     toggleMonthLock,
     canUndo: undoStack.length > 0,
     refresh: loadAll,
+  };
+}
+
+// ----- helpers -----
+
+function buildRowFromProfile(p: any): CrewSourceRow {
+  return {
+    user_id: p.user_id,
+    first_name: p.first_name,
+    last_name: p.last_name,
+    rank: p.rank ?? null,
+    department: p.department ?? null,
+    hod_user_id: p.hod_user_id ?? null,
+    joining_date: p.joining_date ?? null,
+    leaving_date: p.leaving_date ?? null,
+    contract_start_date: p.contract_start_date ?? null,
+    contract_end_date: p.contract_end_date ?? null,
+    rotation: p.rotation ?? null,
+    annual_leave_days: typeof p.annual_leave_days === 'number' ? p.annual_leave_days : null,
+    position: p.rank ?? null,
+    vessel_id: null,
+    vessel_name: null,
+    is_current: null,
+    from_profile_fallback: true,
   };
 }

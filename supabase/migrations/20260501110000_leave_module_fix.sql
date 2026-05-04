@@ -1,15 +1,29 @@
 -- =============================================
 -- LEAVE MODULE FIX MIGRATION
--- - Adds leave policy settings (company default + vessel/crew overrides)
--- - Adds 'cancelled' + HoD review states to crew_leave_requests
--- - Adds explicit reversal/cancellation columns
--- - Adds dedicated leave audit log
--- - Tightens RLS so non-officers see only their own leave entries / requests
--- - Adds annual leave entitlement column on profiles
+-- - Self-contained: re-adds profile columns the leave module relies on
+--   even when the work-rest migration hasn't run.
+-- - Adds leave policy settings (company default + vessel/crew overrides).
+-- - Adds 'cancelled' + HoD review states to crew_leave_requests.
+-- - Adds explicit reversal/cancellation columns.
+-- - Adds dedicated leave audit log.
+-- - Tightens RLS so non-officers see only their own leave entries / requests.
+-- - Adds annual leave entitlement column on profiles.
+--
+-- Idempotent: every column / table / policy uses IF NOT EXISTS or IF EXISTS
+-- so the migration can be re-applied safely.
 -- =============================================
 
 -- ---------- Profile leave fields ----------
+-- (Some of these are also added by the work-rest module migration; we
+-- duplicate them with IF NOT EXISTS so the leave module is functional
+-- without the work-rest migration having run.)
 ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS hod_user_id UUID REFERENCES public.profiles(user_id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS rank TEXT,
+  ADD COLUMN IF NOT EXISTS employment_status TEXT,
+  ADD COLUMN IF NOT EXISTS watch_pattern TEXT,
+  ADD COLUMN IF NOT EXISTS joining_date DATE,
+  ADD COLUMN IF NOT EXISTS leaving_date DATE,
   ADD COLUMN IF NOT EXISTS annual_leave_days NUMERIC(5,2),
   ADD COLUMN IF NOT EXISTS leave_accrual_method TEXT
     CHECK (leave_accrual_method IN ('monthly','daily','contract','rotation','none')),
@@ -23,20 +37,14 @@ CREATE TABLE IF NOT EXISTS public.leave_policies (
   crew_id UUID REFERENCES public.profiles(user_id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   is_default BOOLEAN DEFAULT false,
-  -- Days of paid annual leave per full year of service.
   annual_entitlement_days NUMERIC(5,2) NOT NULL DEFAULT 28,
-  -- One of monthly | daily | contract | rotation
   accrual_method TEXT NOT NULL DEFAULT 'monthly'
     CHECK (accrual_method IN ('monthly','daily','contract','rotation')),
-  -- Rounding: 0 = no rounding, 0.5 = half-day, 1 = full-day
   rounding_step NUMERIC(3,2) NOT NULL DEFAULT 0,
-  -- Whether booked-but-not-yet-taken leave reduces the available balance
   booked_deducts_available BOOLEAN NOT NULL DEFAULT true,
-  -- Sick / training / unpaid leave inclusion in balance maths
   sick_affects_balance BOOLEAN NOT NULL DEFAULT false,
   training_affects_balance BOOLEAN NOT NULL DEFAULT false,
   unpaid_affects_balance BOOLEAN NOT NULL DEFAULT false,
-  -- Pro-rate accrual for partial months / start mid-month
   prorate_partial_months BOOLEAN NOT NULL DEFAULT true,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT now(),
@@ -46,6 +54,7 @@ CREATE TABLE IF NOT EXISTS public.leave_policies (
 
 ALTER TABLE public.leave_policies ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "View leave policies in company" ON public.leave_policies;
 CREATE POLICY "View leave policies in company"
   ON public.leave_policies FOR SELECT
   USING (
@@ -53,6 +62,7 @@ CREATE POLICY "View leave policies in company"
     OR public.user_belongs_to_company(auth.uid(), company_id)
   );
 
+DROP POLICY IF EXISTS "Manage leave policies" ON public.leave_policies;
 CREATE POLICY "Manage leave policies"
   ON public.leave_policies FOR ALL
   USING (public.has_any_role(auth.uid(), ARRAY['superadmin','dpa','captain','purser']::public.app_role[]));
@@ -62,23 +72,33 @@ CREATE INDEX IF NOT EXISTS idx_leave_policies_vessel ON public.leave_policies(ve
 CREATE INDEX IF NOT EXISTS idx_leave_policies_crew ON public.leave_policies(crew_id);
 
 -- ---------- crew_leave_requests upgrades ----------
--- Drop the existing CHECK and re-add expanded one for new statuses
+-- Drop ONLY the status CHECK constraint, then re-add an expanded one.
 DO $$
 DECLARE conname TEXT;
 BEGIN
   FOR conname IN
-    SELECT conname FROM pg_constraint
-    WHERE conrelid = 'public.crew_leave_requests'::regclass
-      AND contype = 'c'
-      AND pg_get_constraintdef(oid) LIKE '%status%'
+    SELECT c.conname
+    FROM pg_constraint c
+    WHERE c.conrelid = 'public.crew_leave_requests'::regclass
+      AND c.contype = 'c'
+      AND pg_get_constraintdef(c.oid) ILIKE '%status%IN%'
   LOOP
     EXECUTE 'ALTER TABLE public.crew_leave_requests DROP CONSTRAINT ' || quote_ident(conname);
   END LOOP;
 END $$;
 
-ALTER TABLE public.crew_leave_requests
-  ADD CONSTRAINT crew_leave_requests_status_check
-  CHECK (status IN ('draft','requested','hod_reviewed','approved','rejected','declined','cancelled','completed','pending'));
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conrelid = 'public.crew_leave_requests'::regclass
+      AND conname = 'crew_leave_requests_status_check'
+  ) THEN
+    ALTER TABLE public.crew_leave_requests
+      ADD CONSTRAINT crew_leave_requests_status_check
+      CHECK (status IN ('draft','requested','hod_reviewed','approved','rejected','declined','cancelled','completed','pending'));
+  END IF;
+END $$;
 
 ALTER TABLE public.crew_leave_requests
   ADD COLUMN IF NOT EXISTS hod_reviewed_at TIMESTAMPTZ,
@@ -91,14 +111,13 @@ ALTER TABLE public.crew_leave_requests
   ADD COLUMN IF NOT EXISTS cancel_reason TEXT,
   ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
 
--- ---------- Tighten RLS so crew only see their own leave ----------
+-- ---------- Tighten RLS on entries / requests ----------
 DROP POLICY IF EXISTS "Users can view leave entries in their company" ON public.crew_leave_entries;
+DROP POLICY IF EXISTS "View leave entries scoped" ON public.crew_leave_entries;
 CREATE POLICY "View leave entries scoped"
   ON public.crew_leave_entries FOR SELECT
   USING (
-    -- Self
     crew_id = auth.uid()
-    -- Officers / fleet management see all in company
     OR (
       company_id = public.get_user_company_id(auth.uid())
       AND public.has_any_role(auth.uid(), ARRAY['superadmin','dpa','fleet_master','captain','purser','hod','chief_officer','chief_engineer']::public.app_role[])
@@ -106,6 +125,7 @@ CREATE POLICY "View leave entries scoped"
   );
 
 DROP POLICY IF EXISTS "Users can insert leave entries in their company" ON public.crew_leave_entries;
+DROP POLICY IF EXISTS "Insert leave entries scoped" ON public.crew_leave_entries;
 CREATE POLICY "Insert leave entries scoped"
   ON public.crew_leave_entries FOR INSERT
   WITH CHECK (
@@ -117,6 +137,7 @@ CREATE POLICY "Insert leave entries scoped"
   );
 
 DROP POLICY IF EXISTS "Users can update leave entries in their company" ON public.crew_leave_entries;
+DROP POLICY IF EXISTS "Update leave entries scoped" ON public.crew_leave_entries;
 CREATE POLICY "Update leave entries scoped"
   ON public.crew_leave_entries FOR UPDATE
   USING (
@@ -128,6 +149,7 @@ CREATE POLICY "Update leave entries scoped"
   );
 
 DROP POLICY IF EXISTS "Users can delete leave entries in their company" ON public.crew_leave_entries;
+DROP POLICY IF EXISTS "Delete leave entries scoped" ON public.crew_leave_entries;
 CREATE POLICY "Delete leave entries scoped"
   ON public.crew_leave_entries FOR DELETE
   USING (
@@ -139,6 +161,7 @@ CREATE POLICY "Delete leave entries scoped"
   );
 
 DROP POLICY IF EXISTS "Users can view leave requests in their company" ON public.crew_leave_requests;
+DROP POLICY IF EXISTS "View leave requests scoped" ON public.crew_leave_requests;
 CREATE POLICY "View leave requests scoped"
   ON public.crew_leave_requests FOR SELECT
   USING (
@@ -150,6 +173,7 @@ CREATE POLICY "View leave requests scoped"
   );
 
 DROP POLICY IF EXISTS "Users can insert leave requests in their company" ON public.crew_leave_requests;
+DROP POLICY IF EXISTS "Insert leave requests scoped" ON public.crew_leave_requests;
 CREATE POLICY "Insert leave requests scoped"
   ON public.crew_leave_requests FOR INSERT
   WITH CHECK (
@@ -161,6 +185,7 @@ CREATE POLICY "Insert leave requests scoped"
   );
 
 DROP POLICY IF EXISTS "Users can update leave requests in their company" ON public.crew_leave_requests;
+DROP POLICY IF EXISTS "Update leave requests scoped" ON public.crew_leave_requests;
 CREATE POLICY "Update leave requests scoped"
   ON public.crew_leave_requests FOR UPDATE
   USING (
@@ -191,6 +216,7 @@ CREATE TABLE IF NOT EXISTS public.crew_leave_audit_log (
 
 ALTER TABLE public.crew_leave_audit_log ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "View leave audit log" ON public.crew_leave_audit_log;
 CREATE POLICY "View leave audit log"
   ON public.crew_leave_audit_log FOR SELECT
   USING (
@@ -198,6 +224,7 @@ CREATE POLICY "View leave audit log"
     OR public.has_any_role(auth.uid(), ARRAY['superadmin','dpa','captain','purser','hod','auditor_flag','auditor_class']::public.app_role[])
   );
 
+DROP POLICY IF EXISTS "Insert leave audit log" ON public.crew_leave_audit_log;
 CREATE POLICY "Insert leave audit log"
   ON public.crew_leave_audit_log FOR INSERT
   WITH CHECK (auth.uid() IS NOT NULL);

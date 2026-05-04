@@ -207,4 +207,61 @@ describe('leave calculator', () => {
     );
     expect(r.accrued % 0.5).toBe(0);
   });
+
+  it('handles null employment + contract dates without throwing', () => {
+    const r = calculateLeave(
+      mkInput({
+        employmentStart: null,
+        contractStart: null,
+        employmentEnd: null,
+        contractEnd: null,
+      })
+    );
+    expect(r.accrued).toBe(0);
+    expect(r.taken).toBe(0);
+    expect(r.booked).toBe(0);
+    // entitlement falls back to full policy entitlement
+    expect(r.entitlement).toBe(28);
+  });
+
+  it('uses contract_start when employment_start missing', () => {
+    const r = calculateLeave(
+      mkInput({
+        employmentStart: null,
+        contractStart: new Date(2026, 0, 1),
+        asOf: new Date(2026, 11, 31),
+      })
+    );
+    expect(r.accrued).toBeCloseTo(28, 1);
+  });
+
+  it('counts entries even when employment dates are null', () => {
+    // Crew profile may be missing dates but calendar entries still recorded.
+    const r = calculateLeave(
+      mkInput({
+        employmentStart: null,
+        contractStart: null,
+        entries: [
+          { date: '2026-03-01', status_code: 'L' },
+          { date: '2026-03-02', status_code: 'L' },
+        ],
+      })
+    );
+    expect(r.taken).toBe(2);
+  });
+
+  it('booked future leave with null employment dates still surfaces', () => {
+    const r = calculateLeave(
+      mkInput({
+        employmentStart: null,
+        contractStart: null,
+        asOf: new Date(2026, 5, 1),
+        bookedRequests: [
+          { start_date: '2026-08-01', end_date: '2026-08-05', status: 'approved', leave_type: 'L' },
+        ],
+      })
+    );
+    expect(r.booked).toBe(5);
+    expect(r.next_leave_start).toBe('2026-08-01');
+  });
 });

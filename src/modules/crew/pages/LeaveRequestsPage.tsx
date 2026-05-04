@@ -6,7 +6,7 @@ import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import { useActiveRoles } from '@/modules/auth/hooks/useUserRoles';
 import { LEAVE_STATUS_CODES, STATUS_CODE_MAP, type CrewLeaveRequest } from '@/modules/crew/leaveConstants';
 import {
-  CalendarDays, Plus, Search, Check, X, Loader2, ArrowLeft, Ban, ShieldCheck, Ship,
+  CalendarDays, Plus, Search, Check, X, Loader2, ArrowLeft, Ban, ShieldCheck, Ship, AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -80,6 +80,27 @@ export default function LeaveRequestsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<EnrichedRequest | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+  const [caps, setCaps] = useState({ hod: true, cancel: true });
+
+  // Probe whether the migration's new columns exist. If not, hide actions
+  // that would otherwise throw at the database layer.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { error: e1 } = await sb
+        .from('crew_leave_requests')
+        .select('hod_reviewed_at')
+        .limit(1);
+      const { error: e2 } = await sb
+        .from('crew_leave_requests')
+        .select('cancelled_at')
+        .limit(1);
+      if (!cancelled) setCaps({ hod: !e1, cancel: !e2 });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [form, setForm] = useState({
     crew_id: '',
@@ -180,13 +201,15 @@ export default function LeaveRequestsPage() {
       toast.warning('This crew member already has an overlapping request — proceeding will require review.');
     }
 
+    // 'pending' is in both the legacy CHECK and the new CHECK so the insert
+    // succeeds whether or not the leave migration has been applied.
     const { data, error } = await sb.from('crew_leave_requests').insert({
       crew_id: form.crew_id,
       leave_type: form.leave_type,
       start_date: form.start_date,
       end_date: form.end_date,
       notes: form.notes || null,
-      status: 'requested',
+      status: 'pending',
       company_id: companyId,
       vessel_id: crew?.vessel_id ?? selectedVessel?.id ?? null,
     }).select().single();
@@ -217,11 +240,19 @@ export default function LeaveRequestsPage() {
   };
 
   const handleHodReview = async (req: EnrichedRequest) => {
-    await sb.from('crew_leave_requests').update({
+    if (!caps.hod) {
+      toast.error('HoD review unavailable — leave migration has not been applied yet.');
+      return;
+    }
+    const { error } = await sb.from('crew_leave_requests').update({
       status: 'hod_reviewed',
       hod_reviewed_at: new Date().toISOString(),
       hod_reviewed_by: user?.id ?? null,
     }).eq('id', req.id);
+    if (error) {
+      toast.error('HoD review failed: ' + error.message);
+      return;
+    }
 
     if (user?.id) {
       await logLeaveAudit({
@@ -296,13 +327,25 @@ export default function LeaveRequestsPage() {
     if (!companyId) return;
     const { inserted, skipped } = await writeEntries(req);
 
-    await sb.from('crew_leave_requests').update({
+    // Only include the new approved_at / approved_by columns when the schema
+    // has them; reviewed_at / reviewed_by exist in the legacy schema too.
+    const updates: Record<string, unknown> = {
       status: 'approved',
-      approved_by: user?.id ?? null,
-      approved_at: new Date().toISOString(),
       reviewed_at: new Date().toISOString(),
       reviewed_by: user?.id ?? null,
-    }).eq('id', req.id);
+    };
+    if (caps.cancel) {
+      updates.approved_by = user?.id ?? null;
+      updates.approved_at = new Date().toISOString();
+    }
+    const { error: updateErr } = await sb
+      .from('crew_leave_requests')
+      .update(updates)
+      .eq('id', req.id);
+    if (updateErr) {
+      toast.error('Approval failed: ' + updateErr.message);
+      return;
+    }
 
     if (user?.id) {
       await logLeaveAudit({
@@ -329,12 +372,20 @@ export default function LeaveRequestsPage() {
     if (req.status === 'approved') {
       await reverseEntries(req);
     }
-    await sb.from('crew_leave_requests').update({
-      status: 'rejected',
-      rejection_reason: reason,
+    // 'declined' is in both the legacy CHECK and the new CHECK; 'rejected'
+    // is only in the new one. Use 'declined' for backwards compatibility.
+    const updates: Record<string, unknown> = {
+      status: 'declined',
       reviewed_at: new Date().toISOString(),
       reviewed_by: user?.id ?? null,
-    }).eq('id', req.id);
+    };
+    if (caps.cancel) updates.rejection_reason = reason;
+
+    const { error } = await sb.from('crew_leave_requests').update(updates).eq('id', req.id);
+    if (error) {
+      toast.error('Decline failed: ' + error.message);
+      return;
+    }
 
     if (user?.id) {
       await logLeaveAudit({
@@ -342,11 +393,11 @@ export default function LeaveRequestsPage() {
         vesselId: req.vessel_id,
         crewId: req.crew_id,
         actorId: user.id,
-        action: 'leave_rejected',
+        action: 'leave_declined',
         entityType: 'crew_leave_request',
         entityId: req.id,
         oldValue: { status: req.status },
-        newValue: { status: 'rejected' },
+        newValue: { status: 'declined' },
         reason,
       });
     }
@@ -361,15 +412,23 @@ export default function LeaveRequestsPage() {
 
   const confirmCancel = async () => {
     if (!cancelTarget) return;
+    if (!caps.cancel) {
+      toast.error('Cancel unavailable — leave migration has not been applied yet.');
+      return;
+    }
     if (cancelTarget.status === 'approved') {
       await reverseEntries(cancelTarget);
     }
-    await sb.from('crew_leave_requests').update({
+    const { error } = await sb.from('crew_leave_requests').update({
       status: 'cancelled',
       cancelled_at: new Date().toISOString(),
       cancelled_by: user?.id ?? null,
       cancel_reason: cancelReason || null,
     }).eq('id', cancelTarget.id);
+    if (error) {
+      toast.error('Cancel failed: ' + error.message);
+      return;
+    }
 
     if (user?.id) {
       await logLeaveAudit({
@@ -452,6 +511,22 @@ export default function LeaveRequestsPage() {
           </Button>
         </div>
 
+        {(!caps.hod || !caps.cancel) && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-3 text-xs flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <div>
+              <p className="font-medium">Leave schema not fully migrated</p>
+              <p>
+                Apply migration <code>20260501110000_leave_module_fix.sql</code> to enable
+                {!caps.hod && ' HoD review,'}
+                {!caps.cancel && ' cancellation with calendar reversal,'} and the
+                full audit log. The basic request / approve / decline flow continues to
+                work in the meantime.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Filter tabs */}
         <div className="flex items-center gap-2 flex-wrap">
           {(['all', 'pending', 'hod_reviewed', 'approved', 'declined', 'cancelled'] as const).map((s) => (
@@ -498,12 +573,13 @@ export default function LeaveRequestsPage() {
               const codeInfo = STATUS_CODE_MAP[req.leave_type];
               const dayCount = differenceInDays(new Date(req.end_date), new Date(req.start_date)) + 1;
               const isOwner = req.crew_id === user?.id;
-              const showHod = canHodReview && ['requested', 'pending', 'draft'].includes(req.status);
+              const showHod = caps.hod && canHodReview && ['requested', 'pending', 'draft'].includes(req.status);
               const showApprove = canApprove && ['hod_reviewed', 'requested', 'pending'].includes(req.status);
               const showDecline = canApprove && req.status !== 'rejected' && req.status !== 'declined' && req.status !== 'cancelled';
               const showCancel =
-                (isOwner && ['draft', 'requested', 'pending', 'hod_reviewed'].includes(req.status)) ||
-                (canApprove && req.status === 'approved');
+                caps.cancel &&
+                ((isOwner && ['draft', 'requested', 'pending', 'hod_reviewed'].includes(req.status)) ||
+                  (canApprove && req.status === 'approved'));
               return (
                 <Card key={req.id}>
                   <CardContent className="p-4">

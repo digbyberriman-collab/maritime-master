@@ -44,7 +44,20 @@ export default function LeavePlannerPage() {
   const [dragRange, setDragRange] = useState<{ crewId: string; minDay: number; maxDay: number; code: string } | null>(null);
 
   const { selectedVessel } = useVessel();
-  const { crewLeaveData, loading, error, isFleetLevel, isMonthLocked, setEntry, bulkFill, undo, toggleMonthLock, canUndo } = useCrewLeave(year, month);
+  const {
+    crewLeaveData,
+    loading,
+    error,
+    warnings,
+    schemaCapabilities,
+    isFleetLevel,
+    isMonthLocked,
+    setEntry,
+    bulkFill,
+    undo,
+    toggleMonthLock,
+    canUndo,
+  } = useCrewLeave(year, month);
 
   const daysInMonth = getDaysInMonth(new Date(year, month - 1));
   const locked = isMonthLocked(month);
@@ -216,6 +229,17 @@ export default function LeavePlannerPage() {
         {error && (
           <div className="bg-destructive/10 border border-destructive/30 text-destructive rounded-lg p-3 text-sm flex items-center gap-2">
             <AlertTriangle className="w-4 h-4" /> {error}
+          </div>
+        )}
+
+        {warnings && warnings.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-3 text-xs space-y-1">
+            {warnings.map((w, i) => (
+              <div key={i} className="flex items-start gap-2">
+                <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                <span>{w}</span>
+              </div>
+            ))}
           </div>
         )}
 
