@@ -110,7 +110,7 @@ export function useCrewLeave(year: number, month: number, options: CrewLeaveOpti
       return;
     }
 
-    const userIds = (profiles ?? []).map((p) => p.user_id).filter((id): id is string => !!id);
+    const userIds = ((profiles ?? []) as any[]).map((p) => p.user_id).filter((id): id is string => !!id);
     let assignments: any[] = [];
     if (userIds.length > 0) {
       const { data } = await supabase
