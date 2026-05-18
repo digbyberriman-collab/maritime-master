@@ -431,7 +431,7 @@ export default function LeaveRequestsPage() {
     pending: filtered.filter((r) => r.status === 'pending').length,
     approved: filtered.filter((r) => r.status === 'approved').length,
     declined: filtered.filter((r) => r.status === 'declined').length,
-    cancelled: filtered.filter((r) => r.status === 'cancelled').length,
+    cancelled: filtered.filter((r) => (r.status as string) === 'cancelled').length,
   }), [filtered]);
 
   const exportCsv = () => {
