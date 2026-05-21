@@ -1,105 +1,99 @@
+# STORM → Destination App: Staged Migration Plan
 
-# Migrating this app into a different-workspace Lovable project
+## Ground rules (locked in from your answers)
 
-## Constraints to know up front
+- **Bridge**: manual hand-off. I produce a packet per stage (SQL migration + module folder + paste instructions); you apply it in the destination project.
+- **Scope**: all ~23 STORM modules eventually move.
+- **Integration shape**: namespaced under **Vessel Management** in the destination's sidebar. Vessel Management becomes a collapsible parent group; every STORM module is a sub-item under it (same pattern as the current STORM sidebar's expandable groups). Routes mirror the nesting (e.g. `/vessels/crew`, `/vessels/certificates`, `/vessels/ism/forms`, etc.).
+- **Data**: schema only. No row migration. Destination starts empty for STORM tables.
+- **Auth & RBAC**: destination's existing auth wins. STORM's `user_roles` / `rbac_user_roles` / `roles` / `role_permissions` tables do **not** move. Instead, each stage ships a thin **role adapter** that maps destination roles → the STORM role names the ported code expects, so RLS and UI gates keep working without rewriting every check.
+- **Order**: dependency order (foundation first, leaves last).
 
-- **Cross-workspace tools don't reach the destination.** Lovable's cross-project read/copy tools are workspace-scoped, so I cannot inspect the destination project from here. We need to bring the two projects into the same workspace first.
-- **This database has only one company** — `Sample Yacht Management` (`11111111-1111-1111-1111-111111111111`). Every row in every tenant table is scoped to this company, which makes "real vs demo" easy to separate: by default everything here is demo, and you'll tell me which specific rows are real before we move them.
-- **Scale of what we're moving:** 23 frontend modules, 145 public tables, 25 edge functions, 50 schema migrations, 7 storage buckets, an RBAC system, and Lovable Cloud secrets.
+## Stage 0 — One-time foundation (before any module moves)
 
-## Step 1 — Get both projects into one workspace
+The destination needs this before stage 1, or nothing else compiles.
 
-You picked "Transfer this project to that workspace." Concrete steps:
+**0a. Sidebar shell**
+- Add a `Vessels` collapsible group to the destination's sidebar with a chevron sub-menu (Shadcn `SidebarGroup` + `Collapsible`, matching STORM's pattern). Empty for now — modules slot in over time.
 
-1. In **this** project: top-left project name → **Settings → Transfer workspace** → pick the destination workspace.
-2. After transfer, both projects are visible to me in the destination workspace, and I can finally read the destination's code, schema, and assets via the cross-project tools.
-3. **Do not delete this project after transfer** — we'll keep it as the read-only source of truth until migration is complete and verified.
+**0b. Role adapter**
+- Add `src/integrations/storm/roleAdapter.ts` in the destination. Single function: `toStormRole(destRole) → 'dpa' | 'captain' | 'crew' | …`. You and I fill the mapping table together once we know the destination's role names.
+- Add `useStormRoles()` hook that wraps the destination's auth and returns STORM-shaped roles. Ported STORM hooks import from this instead of from `@/modules/auth`.
 
-If transfer is blocked (e.g. you're not an admin in the destination workspace, or workspace policy disallows it), the fallback is the GitHub route: connect this project to GitHub, give me read access to the destination, and we mirror the same plan against a branch.
+**0c. Foundation tables**
+- Port `companies`, `profiles`, `vessels` schemas only if the destination doesn't already have equivalents. If it does, write a mapping note (`destination_table.column ↔ storm_table.column`) — we'll alias in code, not in SQL.
+- Port the shared security-definer helpers that almost everything depends on: `has_role`, `has_any_role`, `get_user_company_id`, `current_user_company_id`, `user_belongs_to_company`. These read from destination tables via the adapter — I rewrite their bodies during port.
 
-## Step 2 — Discovery in the destination project
+**0d. Shared frontend**
+- Copy `src/shared/components/layout/*` pieces the modules need (AdaptiveActionBar, GlobalHeaderControls, VesselToggleBar, NotificationBell), `src/modules/vessels/contexts/VesselContext.tsx`, design tokens from `src/index.css` (Storm blue, semantic HSL), and the `src/lib/pdf/*` helpers.
+- Reconcile against destination's existing `components/ui/*` — adopt destination's versions where they exist.
 
-Once both projects sit in the same workspace, I'll do a structured audit and produce a written **Migration Mapping Document** covering:
+Stage 0 is the only stage where you may need to touch destination chrome. Every later stage is additive.
 
-- **Schema diff** — for each of the 145 tables here, mark as: `exists in destination` / `partial match` / `missing`. For matches, map column-by-column (including type and nullability differences).
-- **Module diff** — for each frontend module (crew, certificates, incidents, …), mark as: `destination has equivalent` / `destination has stub` / `not present`.
-- **Auth & RBAC diff** — compare the two role systems (this project uses both a legacy `user_roles` enum table and the newer `rbac_user_roles` + `roles` + `role_permissions` matrix). The destination almost certainly has its own; we need an explicit role-to-role mapping.
-- **Edge function diff** — list the 25 functions and whether the destination has an equivalent, a different name, or none.
-- **Storage bucket diff** — 7 buckets here (`client-logos`, `documents`, `incident-attachments`, `crew-travel-documents`, `trip-suggestion-attachments`, `development-documents`, `dev-todo-images`).
-- **Secrets diff** — list missing secrets the destination will need (Airtable key, Lovable AI key are already here; service-role/anon are auto-provisioned).
+## Stage sequence (dependency order)
 
-You review and approve this document before any code or data moves. This is the single most important artifact in the migration.
-
-## Step 3 — Code migration (module-by-module, not big-bang)
-
-We port modules in dependency order so the destination stays buildable at every step:
+Each stage = one packet from me containing: SQL migration file(s), module folder, sidebar entry snippet, route registration snippet, and a short README of gotchas.
 
 ```text
-Foundation        → companies, profiles, vessels, RBAC, auth
-Operational core  → crew, certificates, alerts, dashboard
-Compliance        → incidents, audits, drills, risk-assessments, ism, training
-Workflow          → maintenance, documents, flights, itinerary
-Auxiliary         → development, emergency, feedback, analytics, red-room, settings
+Stage  Module(s)                              Depends on
+-----  -------------------------------------  -----------------
+1      Vessels (entity + dashboard)           0
+2      Crew roster + assignments              1
+3      Certificates (vessel + crew + alerts)  2
+4      Alerts engine + Red Room               1
+5      Documents                              1
+6      ISM Forms (templates + submissions)    5
+7      Incidents + CAPA                       4
+8      Drills                                 2, 4
+9      Audits + Management Reviews            7
+10     Risk Assessments + Work Permits        1
+11     Training & Familiarization             2, 3
+12     Planned Maintenance + Defects          1, 4
+13     Hours of Rest                          2
+14     Itinerary + Trip Suggestions           1
+15     Flights / Travel                       2
+16     Crew Development                       2
+17     HR                                     2
+18     Insurance                              1
+19     Emergency Contacts                     1
+20     Compliance hub (ISM/ISPS/MLC index)    6–13
+21     Analytics dashboards                   most of the above
+22     Settings (alerts, branding, fleet groups)  all
+23     Audit logs                              all
 ```
 
-For each module:
-1. Copy the module folder from `src/modules/<name>/` into the destination, **renaming imports** to match destination paths.
-2. Reconcile shared dependencies (`src/shared/*`, `src/components/ui/*`, `src/lib/*`) — adopt the destination's version where it already exists; only add files that don't.
-3. Wire routes into the destination's `src/routes/index.tsx` (or equivalent).
-4. Run a build after each module. Don't move on while the destination is broken.
+The order means: if you stop after stage N, the destination is still buildable and the migrated modules still work.
 
-Modules that overlap with destination features (e.g. if destination already has a Crew page) become **merge** rather than **copy**: I'll diff the two implementations and bring across only the missing fields/screens, preserving the destination's UI conventions.
+## What each stage packet contains
 
-## Step 4 — Schema migration
+1. **`supabase/migrations/<timestamp>_storm_<module>.sql`** — `CREATE TABLE`s, RLS policies (rewritten to call destination-side helpers), security-definer functions, triggers, storage buckets + policies if needed. No data inserts.
+2. **`src/modules/<name>/`** — the module folder lifted from STORM, with imports rewritten to:
+   - `@/integrations/storm/roleAdapter` instead of `@/modules/auth/hooks/useUserRoles`
+   - destination's paths for `components/ui/*` and `lib/utils`
+3. **Sidebar snippet** — the `<SidebarMenuItem>` to drop into the `Vessels` group.
+4. **Route snippet** — the lazy-loaded route lines for the destination's router.
+5. **Edge functions** (when the module has them) — drop into `supabase/functions/<name>/`, auto-deploys.
+6. **Secrets checklist** — names of any secrets the module needs (e.g. Airtable for Crew, Lovable AI for forms extraction). You add them in destination's Cloud settings.
+7. **Verification checklist** — 3–5 things to click in the destination after applying, to confirm the module is alive.
 
-Three categories, handled differently:
+## Things that need explicit decisions per stage (I'll flag them in the packet)
 
-- **Tables the destination already has** → write `ALTER TABLE` migrations to add only the missing columns/indexes. Never drop existing columns.
-- **Tables that exist with a different shape** → keep destination's table, add a thin compatibility view or extra columns; rewrite this project's hooks to read from the destination's column names.
-- **Tables that don't exist at all** → port the original `CREATE TABLE` migration plus its RLS policies, security-definer functions, and triggers. The 50 migrations in `supabase/migrations/` are the source.
+- **Table-name collisions** with destination's existing tables. Default: keep STORM's name, prefix with `storm_` only if there's a hard conflict.
+- **Role mapping gaps** — if a STORM module checks for a role the destination doesn't have (e.g. `dpa`, `purser`), we either add it to the adapter as an alias of an existing destination role, or gate the feature off.
+- **Shared dependencies already present** in destination (e.g. their own VesselContext) — we adopt destination's version and rewrite STORM module imports.
 
-Special attention required for:
-- **RBAC tables** (`roles`, `role_permissions`, `rbac_user_roles`, `user_permission_overrides`, `permission_audit_log`, `modules`) — these are foundational; if destination has its own role model, we map roles 1:1 in a translation table rather than overwriting.
-- **Database functions** — 30+ security-definer functions (`get_red_room_items`, `get_vessel_dashboard_summary`, `assign_alert_task`, `has_role`, `user_has_permission`, etc.). Each must be ported and re-pointed at destination column names if they changed.
-- **Storage buckets and their policies** — recreated in destination via migration.
+## What I need from you to start Stage 0
 
-## Step 5 — Selective data migration
+1. **Destination project's auth model**: paste the role names it uses (or a screenshot of its user/roles table), so I can build the role-adapter mapping.
+2. **Destination's sidebar file path** (or its current sidebar component), so my Stage 0 packet patches the right file.
+3. **Confirmation that destination uses Lovable Cloud** (Supabase under the hood) so my SQL migrations will apply cleanly.
 
-You chose "everything except obvious demo/seed rows." Mechanically:
+Once those three land, I'll produce the Stage 0 packet. After you apply it and confirm the destination still builds, we move to Stage 1 (Vessels) and keep going one stage at a time.
 
-1. **Tag what's real.** Because there's only one company here, I'll generate a short worksheet listing each top-level entity (companies, profiles, vessels, crew, etc.) with row counts (e.g. 6 vessels, 14 profiles, 7 incidents, 17 crew assignments). You mark each row "real" or "demo." Anything unmarked defaults to demo and is skipped.
-2. **Map IDs.** Real rows usually need to slot into existing destination records (e.g. your real company already exists in the destination with a different UUID). Mapping table: `(this_project_table, this_project_id) → (destination_table, destination_id)`.
-3. **Export → transform → import.** For each table being moved, dump rows as CSV/JSON, rewrite foreign keys via the ID map, then insert into destination. Run inside a transaction per table; abort the table on first FK violation rather than partially loading.
-4. **Storage objects.** For real records that have associated files (crew documents, incident attachments, certificates), download from this project's buckets and re-upload to destination's buckets, updating the stored URLs.
-5. **Order matters.** Load companies → profiles → vessels → crew_assignments → everything else, respecting FK direction.
+## Technical notes
 
-Demo data simply isn't moved. The destination keeps its own real data untouched.
-
-## Step 6 — Edge functions, secrets, and integrations
-
-- Re-deploy the 25 edge functions into the destination (they get auto-deployed by Lovable once the files exist).
-- You add any missing secrets in the destination's Cloud settings (I'll give you the exact list from Step 2).
-- Reconfigure third-party hooks: Airtable sync map, webhook configurations, integration API keys — these are environment-specific and should be re-pointed, not copied.
-
-## Step 7 — Verification
-
-Before we call it done:
-- Build passes in destination.
-- Auth flow works end-to-end in destination (login, role check, RLS).
-- Spot-check each migrated module against a real record (open it, edit it, save it).
-- Compare row counts: `(real rows expected to move) == (rows actually in destination after migration)`.
-- Run the Supabase linter against the destination schema to catch RLS gaps introduced by the new tables.
-
-## Step 8 — Decommission source
-
-Once you've signed off, this project gets archived (not deleted) so we have a rollback point for ~30 days.
-
----
-
-## What I need from you to start
-
-1. **Do the workspace transfer** (Step 1). Tell me when it's done.
-2. **Confirm the destination project's name** so I can locate it after transfer.
-3. **Heads-up on any modules in the destination I should *not* touch** (e.g. "don't replace our existing Incidents module, only add missing fields").
-
-Once those are in hand, I'll start Step 2 (the Migration Mapping Document) and bring it back for your approval before any code or data moves.
+- All RLS policies on ported tables will be rewritten to use `current_user_company_id()` (destination-resolved) instead of STORM's `user_roles` lookup. This is the key trick that lets us drop STORM's RBAC tables without touching every policy.
+- Edge functions that call `supabase.auth.getUser()` work unchanged — they read destination's JWT.
+- The `Powered by Inkfish` watermark + STORM brand tokens are scoped to the `/vessels/*` route subtree only, so the rest of the destination app keeps its own branding.
+- Storage buckets are recreated empty in destination; no object copy.
+- The `airtable-sync` edge function (Crew) needs the `Airtable` secret re-added in destination — flagged in Stage 2.
