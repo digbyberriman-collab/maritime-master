@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Umbrella, Plus, Info, FileText, Calendar, Building2, Upload, Eye, EyeOff, Clock, Shield } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -261,6 +262,8 @@ const InsuranceTabContent: React.FC<InsuranceTabContentProps> = ({ tab, isAuditM
 const InsurancePage: React.FC = () => {
   const [isAuditMode, setIsAuditMode] = useState(false);
   const [auditExpiry] = useState(() => new Date(Date.now() + 2 * 60 * 60 * 1000)); // 2 hours from now
+  const [searchParams, setSearchParams] = useSearchParams();
+  const insTab = searchParams.get('tab') || 'bunker-liability';
 
   return (
     <DashboardLayout>
@@ -327,7 +330,7 @@ const InsurancePage: React.FC = () => {
         </div>
 
         {/* Tabbed Content */}
-        <Tabs defaultValue="bunker-liability" className="w-full">
+        <Tabs value={insTab} onValueChange={(v) => setSearchParams({ tab: v })} className="w-full">
           <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 h-auto">
             {insuranceTabs.map((tab) => (
               <TabsTrigger key={tab.id} value={tab.id} className="text-xs px-2 py-2">

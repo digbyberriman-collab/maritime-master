@@ -1,4 +1,5 @@
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Users, Plus, Info, FileText, Calendar, Shield, Upload, Lock, Download, UserX } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -263,6 +264,8 @@ const HRTabContent: React.FC<HRTabContentProps> = ({ tab, isAuditMode = false })
 const HRPage: React.FC = () => {
   // In production, this would come from context/hook
   const isAuditMode = false;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const hrTab = searchParams.get('tab') || 'annual-evaluations';
 
   return (
     <DashboardLayout>
@@ -320,7 +323,7 @@ const HRPage: React.FC = () => {
         </Alert>
 
         {/* Tabbed Content */}
-        <Tabs defaultValue="annual-evaluations" className="w-full">
+        <Tabs value={hrTab} onValueChange={(v) => setSearchParams({ tab: v })} className="w-full">
           <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7 h-auto">
             {hrTabs.map((tab) => (
               <TabsTrigger key={tab.id} value={tab.id} className="text-xs px-2 py-2">

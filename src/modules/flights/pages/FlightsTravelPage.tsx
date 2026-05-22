@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,6 +44,8 @@ const FlightsTravelPage: React.FC = () => {
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [searchResults, setSearchResults] = useState<typeof MOCK_FLIGHTS | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const ftTab = searchParams.get('tab') || 'upcoming';
 
   const handleSearch = () => {
     setIsSearching(true);
@@ -73,7 +76,7 @@ const FlightsTravelPage: React.FC = () => {
           </div>
         </div>
 
-        <Tabs defaultValue="upcoming">
+        <Tabs value={ftTab} onValueChange={(v) => setSearchParams({ tab: v })}>
           <TabsList className="bg-[#111D33] border border-[#1A2740]">
             <TabsTrigger value="upcoming" className="data-[state=active]:bg-[#1A2740] data-[state=active]:text-white">
               Upcoming Trips
