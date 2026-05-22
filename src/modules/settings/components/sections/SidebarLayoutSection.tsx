@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, GripVertical, LayoutList, RotateCcw, Lock, Inbox, Info } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, GripVertical, LayoutList, RotateCcw, Lock, Inbox, Info } from 'lucide-react';
 import { NAVIGATION_ITEMS, type NavChild, type NavItem } from '@/config/navigation';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useSidebarOrder, applySidebarOrder, SIDEBAR_ROOT } from '@/shared/hooks/useSidebarOrder';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/shared/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -20,6 +21,7 @@ interface RowProps {
   expandable?: boolean;
   expanded?: boolean;
   onToggleExpand?: () => void;
+  childCount?: number;
   draggingId: string | null;
   overId: string | null;
   onDragStart: (id: string) => void;
@@ -33,7 +35,7 @@ interface RowProps {
 
 const Row: React.FC<RowProps> = ({
   id, label, icon: Icon, index, total, depth = 0,
-  expandable, expanded, onToggleExpand,
+  expandable, expanded, onToggleExpand, childCount,
   draggingId, overId,
   onDragStart, onDragEnd, onDragOver, onDrop,
   onMoveUp, onMoveDown, readOnly = false,
@@ -78,6 +80,11 @@ const Row: React.FC<RowProps> = ({
       )}
       <Icon className="w-4 h-4 text-muted-foreground" />
       <span className="flex-1 text-sm font-medium truncate">{label}</span>
+      {expandable && typeof childCount === 'number' && (
+        <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
+          {childCount} {childCount === 1 ? 'item' : 'items'}
+        </Badge>
+      )}
       <span className="text-xs text-muted-foreground tabular-nums w-6 text-right">{index + 1}</span>
       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
         <Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={isFirst || readOnly} onClick={onMoveUp} aria-label={`Move ${label} up`}>
@@ -120,6 +127,28 @@ const SidebarLayoutSection: React.FC = () => {
     const allowed = NAVIGATION_ITEMS.filter((item) => canAccessModule(item.id));
     return applySidebarOrder(allowed, order);
   }, [canAccessModule, order]);
+
+  // All parent modules (those with at least one accessible child) — used for
+  // expand-all / collapse-all so every nested group is reachable.
+  const expandableParents = useMemo(
+    () => rootItems.filter((i) => !!i.children?.length),
+    [rootItems]
+  );
+  const allExpanded =
+    expandableParents.length > 0 &&
+    expandableParents.every((p) => expanded[p.id]);
+
+  const toggleAll = () => {
+    if (allExpanded) {
+      setExpanded({});
+    } else {
+      const next: Record<string, boolean> = {};
+      expandableParents.forEach((p) => {
+        next[p.id] = true;
+      });
+      setExpanded(next);
+    }
+  };
 
   const handleDrop = (groupId: string, allIds: string[], targetId: string) => {
     const clear = () => {
@@ -189,10 +218,30 @@ const SidebarLayoutSection: React.FC = () => {
             arrows that appear on hover. Click the chevron to reveal a module's sub-items.
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={handleReset} disabled={readOnly || loading}>
-          <RotateCcw className="w-4 h-4 mr-2" />
-          Reset
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={toggleAll}
+            disabled={loading || expandableParents.length === 0}
+          >
+            {allExpanded ? (
+              <>
+                <ChevronsDownUp className="w-4 h-4 mr-2" />
+                Collapse all
+              </>
+            ) : (
+              <>
+                <ChevronsUpDown className="w-4 h-4 mr-2" />
+                Expand all
+              </>
+            )}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleReset} disabled={readOnly || loading}>
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Reset
+          </Button>
+        </div>
       </div>
 
       {readOnly && (
@@ -265,6 +314,7 @@ const SidebarLayoutSection: React.FC = () => {
                   total={rootItems.length}
                   expandable={hasChildren}
                   expanded={isExpanded}
+                  childCount={hasChildren ? orderedChildren.length : undefined}
                   onToggleExpand={() => setExpanded((p) => ({ ...p, [item.id]: !p[item.id] }))}
                   draggingId={dragGroup === SIDEBAR_ROOT ? draggingId : null}
                   overId={dragGroup === SIDEBAR_ROOT ? overId : null}
