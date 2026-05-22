@@ -97,6 +97,8 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
     onNavigate?.();
   }, [navigate, onNavigate]);
 
+  const isActive = matchesPath;
+
   // Render a child at any depth. Recurses when the child has its own children
   // so deeper inner sub-items are expandable and visually nested.
   const renderNavChild = (child: NavChild, depth: number = 1): React.ReactNode => {
