@@ -32,6 +32,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
+import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -43,6 +44,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const { selectedVessel, isAllVessels } = useVessel();
 
   const handleSignOut = async () => {
     await signOut();
@@ -166,7 +168,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       {/* Main content - z-10 to be above watermark */}
       <div className="flex-1 flex flex-col min-w-0 relative z-10">
         {/* Top navbar */}
-        <header className="h-16 bg-card border-b border-border flex items-center justify-between px-4 lg:px-6 shadow-navbar relative z-20">
+        <header className="h-16 bg-card border-b border-border flex items-center justify-between gap-2 px-4 lg:px-6 shadow-navbar relative z-20">
           {/* Mobile menu button */}
           <button
             onClick={() => setSidebarOpen(true)}
@@ -194,13 +196,46 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             </div>
           )}
 
-          {/* Global Header Controls: Fleet Filter + Alerts Bell */}
-          <GlobalHeaderControls className="mr-2" />
+          {/* Right-side chip cluster (Sealogical-style pill controls) */}
+          <div className="flex items-center gap-2">
+            {/* Vessel chip */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="hidden md:inline-flex rounded-full h-8 gap-2"
+              onClick={() => navigate('/vessels/dashboard')}
+            >
+              <Ship className="w-4 h-4" />
+              <span className="text-sm">
+                {isAllVessels ? 'All Vessels' : selectedVessel?.name || 'Vessel'}
+              </span>
+            </Button>
 
-          {/* User menu */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="gap-2">
+            {/* Fleet chip */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="hidden md:inline-flex rounded-full h-8 gap-2"
+              onClick={() => navigate('/fleet-map')}
+            >
+              <Anchor className="w-4 h-4" />
+              <span className="text-sm">Fleet</span>
+            </Button>
+
+            {/* Global Header Controls (multi-vessel filter + bell) */}
+            <GlobalHeaderControls />
+
+            {/* Role chip */}
+            {profile?.role && (
+              <span className="hidden lg:inline-flex items-center h-8 px-3 rounded-full border border-border bg-card text-xs font-medium text-muted-foreground">
+                {roleLabels[profile.role] || profile.role}
+              </span>
+            )}
+
+            {/* User menu chip */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="rounded-full h-8 gap-2">
                 <Avatar className="w-8 h-8">
                   <AvatarFallback 
                     className="text-sm"
@@ -209,12 +244,12 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                     {userInitials}
                   </AvatarFallback>
                 </Avatar>
-                <span className="hidden sm:inline text-sm font-medium">
-                  {profile?.first_name}
+                <span className="hidden sm:inline text-sm font-medium max-w-[180px] truncate">
+                  {profile?.email || profile?.first_name}
                 </span>
                 <ChevronDown className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
+                </Button>
+              </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 bg-popover">
               <DropdownMenuItem onClick={() => navigate('/settings')}>
                 <User className="w-4 h-4 mr-2" />
@@ -236,7 +271,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 Logout
               </DropdownMenuItem>
             </DropdownMenuContent>
-          </DropdownMenu>
+            </DropdownMenu>
+          </div>
         </header>
 
         {/* Page content */}
