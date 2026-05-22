@@ -429,7 +429,16 @@ const SidebarLayoutSection: React.FC = () => {
             </div>
           )}
 
-          {!loading && rootItems.length > 0 && renderBranch(rootItems, SIDEBAR_ROOT, 0)}
+          {!loading && rootItems.length > 0 && (
+            <div
+              role="tree"
+              aria-label="Sidebar navigation order"
+              aria-multiselectable="false"
+              className="space-y-2"
+            >
+              {renderBranch(rootItems, SIDEBAR_ROOT, 0)}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
