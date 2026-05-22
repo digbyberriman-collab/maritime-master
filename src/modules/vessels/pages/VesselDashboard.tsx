@@ -30,6 +30,7 @@ import { OperationsSnapshot } from '@/modules/dashboard/components/OperationsSna
 import { RecentActivityFeed } from '@/modules/dashboard/components/RecentActivityFeed';
 import { QuickActionsMenu } from '@/modules/dashboard/components/QuickActionsMenu';
 import { EmergencyContactsWidget } from '@/modules/emergency/components/EmergencyContactsWidget';
+import VesselProfileCard from '@/modules/vessels/components/VesselProfileCard';
 import {
   AlertsWidget,
   CrewWidget,
@@ -132,6 +133,11 @@ const VesselDashboard: React.FC = () => {
           <p className="text-xs text-muted-foreground -mt-4">
             Last updated: {lastRefreshed.toLocaleString()}
           </p>
+        )}
+
+        {/* Vessel Profile - visible when a single vessel is selected */}
+        {selectedVesselId && !isAllVessels && (
+          <VesselProfileCard vesselId={selectedVesselId} />
         )}
 
         {/* KPI Widget Grid - Enhanced */}
