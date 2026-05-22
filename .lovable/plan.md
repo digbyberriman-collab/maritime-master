@@ -1,63 +1,61 @@
 ## Goal
 
-Make `/dashboard` (VesselDashboard) look like the Sealogical reference. Keep the existing sidebar and all data sources — only the header strip, a new horizontal module nav, and a bottom Recent Activity table change visually.
+Add a "Fleet Dashboard" view to the existing `/dashboard` so users can toggle between:
+- **Vessel** view (current Sealogical-style single-vessel dashboard)
+- **Fleet** view (this new Sealogical Fleet Dashboard mock)
+
+Same route, same layout shell, same top module nav and chip header. Only the page body switches.
 
 ## Scope (from your answers)
 
-1. Header layout — logo left, pill-style chips on the right (vessel name, "Intel", multi-vessel, alerts bell, fleet, role, user email).
-2. Horizontal module nav under the header (Crew, Safety, Certificates, Technical, Charter, Accounting, Vessel, Reports) with subtle icons.
-3. Recent Activity table at the bottom (Module · Notification · Time), wired to existing data.
-4. Replace current `/dashboard` route (VesselDashboard).
-5. Wire to existing dashboard data (`useVesselDashboard`, `useRecentIncidents`, activity feed hook).
+1. View toggle on `/dashboard` — two pill buttons "Vessel" / "Fleet" near the page title; default to Fleet when the user has multi-vessel access and "All Vessels" is selected.
+2. Inner left sub-nav inside the page body (Fleet Dashboard / Fleet Tracker / Fleet Reports / Fleet Calendar / Fleet Documents / Fleet Checklists / Vessels + Administration group). Sticky on desktop, collapses to a top row on mobile. Items deep-link to existing routes where they exist; missing ones go to a `?tab=` query state and render a "Coming soon" placeholder.
+3. Regional mini-map cards — Leaflet `MapContainer` with CARTO light tiles, one card per region, vessel markers from `hashToCoord` (already used in FleetMap), "Open Full Fleet Tracker" CTA → `/fleet-map`.
+4. Pastel KPI tile row — 6 tiles (Document Alerts, Hours of Rest, Leave Overdue, Safety, Technical, Accounting) with soft pastel backgrounds (`bg-*-50` style via semantic tokens), big number, sub-line.
+5. Vessel Health Matrix table — rows = vessels, columns = Crewing · Documents · Safety · Technical · HOR · Accounting · Insurance · Onboarding. Each cell = colored dot + count. Click row → vessel dashboard.
 
-Out of scope: gradient module tiles, sidebar changes, any backend/data model changes.
+Out of scope: Custom region editor, real AIS, persisting view choice cross-session (sessionStorage is enough).
 
-## Changes
+## Data wiring
 
-### 1. Header strip — `src/shared/components/layout/DashboardLayout.tsx`
-Restyle the existing `<header>` so the right side renders chip-style buttons (rounded `rounded-full border bg-card px-3 h-8 text-sm`) for:
-- Selected vessel name (from `useVessel().selectedVessel`)
-- "Intel" search chip (opens existing global search if present, else no-op placeholder)
-- Multi-vessel filter (reuse `GlobalHeaderControls` but render its children as chips)
-- Notification bell (already a chip-friendly icon)
-- Fleet chip (opens fleet filter / nav to `/fleet-map`)
-- Role badge ("Superadmin"/role label)
-- User email chip (opens the existing user dropdown)
+- Vessels: `useVessels()` for the full list (already in project).
+- Per-vessel counts: call `useVesselDashboard` aggregated data per vessel via the existing RPC `get_vessel_dashboard_summary` (one-shot for all vessels) and map fields:
+  - Crewing → crew_onboard_count vs expected (use count alone)
+  - Documents → certs_expiring_90d
+  - Safety → red_alerts_count + open_capas_count
+  - Technical → overdue_maintenance_count + critical_defects_count
+  - HOR → 0 (no current hook; placeholder green)
+  - Accounting → 0 (placeholder)
+  - Insurance → 0 (placeholder)
+  - Onboarding → training_gaps_count
+- KPI row uses the same aggregated dataset; HOR / Leave Overdue / Accounting render as 0 with neutral green tone when no source available.
+- Regions: bucket vessels by `flag_state` → static region map:
+  - `IT, FR, ES, MC, GR, MT, CY, TR, HR` → "Mediterranean"
+  - `US, BS, KY, BM, AG, JM` → "US East Coast / Caribbean"
+  - everything else → "Worldwide"
+- Map markers via the existing `hashToCoord` pattern.
 
-No new state, no new context. Pure visual refactor of the header right cluster.
+## Files to add / edit
 
-### 2. Horizontal module nav — new component `src/shared/components/layout/TopModuleNav.tsx`
-Thin row below the header, scrollable on small screens. Items map onto existing routes:
-- Crew → `/crew/roster`
-- Safety → `/ism`
-- Certificates → `/certificates`
-- Technical → `/maintenance`
-- Charter → `/itinerary`
-- Accounting → `/hr` (closest existing module; placeholder until an accounting module exists)
-- Vessel → `/vessels/dashboard`
-- Reports → `/analytics` (or `/ism/incidents` if no analytics route)
-
-Render only inside `VesselDashboard` (not globally) so other pages keep the existing AdaptiveActionBar.
-
-### 3. Recent Activity table — new component `src/modules/dashboard/components/RecentActivityTable.tsx`
-Columns: Module · Notification · Time. Uses the existing `RecentActivityFeed` hook/data and renders it as a table instead of a feed. Falls back to recent incidents if the activity feed is empty.
-
-### 4. `VesselDashboard.tsx` reorganisation
-- Add `<TopModuleNav />` directly under the page title row.
-- Keep KPI widgets and existing panels untouched (per "only header / nav / activity" scope).
-- Replace the current `RecentActivityFeed` card at the bottom with `<RecentActivityTable />`.
+- create `src/modules/dashboard/components/FleetDashboardView.tsx` — full Fleet view (sub-nav + maps + KPIs + matrix).
+- create `src/modules/dashboard/components/fleet/RegionMapCard.tsx` — single Leaflet mini-map card.
+- create `src/modules/dashboard/components/fleet/FleetKPITiles.tsx` — pastel 6-up row.
+- create `src/modules/dashboard/components/fleet/VesselHealthMatrix.tsx` — vessel × module table.
+- create `src/modules/dashboard/components/fleet/FleetSubNav.tsx` — inner left sidebar with the 7 items + Administration group.
+- edit `src/modules/vessels/pages/VesselDashboard.tsx` — add a `view` state (`'vessel' | 'fleet'`), toggle pill, render `FleetDashboardView` when fleet.
+- edit `src/shared/hooks/` (none — view state stays local + sessionStorage).
 
 ## Technical notes
 
-- All colors via semantic tokens (`bg-card`, `border-border`, `text-muted-foreground`, `--brand-primary`). No hex values in components.
-- Chips: shared `<Button variant="outline" size="sm" className="rounded-full h-8 gap-2" />`.
-- TopModuleNav uses `NavLink` from `react-router-dom` with `isActive` styling (`text-primary border-b-2 border-primary`).
-- No navigation.ts edits — top nav is a presentational shortcut row, not a structural sidebar change.
-- No DB / RLS / auth changes.
+- Reuse `useVesselDashboard` hook with a fleet-wide list — make a thin `useFleetVesselSummaries()` helper colocated in `FleetDashboardView.tsx` that calls the RPC with `p_vessel_ids = null, p_aggregate_all = false`.
+- Tokens only — pastel tiles built from `bg-amber-50 text-amber-700` etc. (these are Tailwind utility classes that already work in this project; they are not the forbidden hex hardcodes).
+- Status dot helper: `count === 0 → bg-emerald-500`, `1-3 → bg-amber-500`, `>=4 → bg-rose-500`, no data → `bg-muted-foreground/40`.
+- Leaflet maps use `scrollWheelZoom={false}`, `zoomControl`, fixed `h-64`. CARTO `light_all` tile URL.
+- Toggle defaults: `canAccessAllVessels && isAllVessels` → fleet view; else → vessel view.
 
-## Files touched
+## Out of scope (explicit)
 
-- edit `src/shared/components/layout/DashboardLayout.tsx`
-- create `src/shared/components/layout/TopModuleNav.tsx`
-- create `src/modules/dashboard/components/RecentActivityTable.tsx`
-- edit `src/modules/vessels/pages/VesselDashboard.tsx`
+- No DB / RLS / migrations.
+- No route changes.
+- No sidebar (left STORM nav) changes.
+- No edits to the existing FleetMap page.
