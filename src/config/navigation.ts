@@ -256,19 +256,6 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     ],
   },
   {
-    id: 'alerts',
-    label: 'Alerts',
-    icon: Bell,
-    path: '/alerts',
-    permissions: ['DPA', 'Management', 'Captain'],
-    children: [
-      { id: 'alerts-all', label: 'All', path: '/alerts?tab=all', icon: Bell },
-      { id: 'alerts-critical', label: 'Critical', path: '/alerts?tab=critical', icon: AlertCircle },
-      { id: 'alerts-warning', label: 'Warnings', path: '/alerts?tab=warning', icon: AlertTriangle },
-      { id: 'alerts-info', label: 'Info', path: '/alerts?tab=info', icon: MessageSquare },
-    ],
-  },
-  {
     id: 'settings',
     label: 'Settings',
     icon: Settings,
