@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { NAVIGATION_ITEMS, type NavItem, type NavChild } from '@/config/navigation';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
+import { useSidebarOrder, applySidebarOrder } from '@/shared/hooks/useSidebarOrder';
 
 interface SidebarNavigationProps {
   onNavigate?: () => void;
@@ -14,11 +15,13 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
   const navigate = useNavigate();
   const location = useLocation();
   const { canAccessModule } = useAuth();
-  
-  // Filter navigation items based on user permissions
+  const { order } = useSidebarOrder();
+
+  // Filter navigation items based on user permissions, then apply custom user order
   const visibleNavItems = useMemo(() => {
-    return NAVIGATION_ITEMS.filter(item => canAccessModule(item.id));
-  }, [canAccessModule]);
+    const allowed = NAVIGATION_ITEMS.filter(item => canAccessModule(item.id));
+    return applySidebarOrder(allowed, order);
+  }, [canAccessModule, order]);
 
   // Helper to check if a path (possibly with query params) matches the current location
   const matchesPath = (path: string): boolean => {
