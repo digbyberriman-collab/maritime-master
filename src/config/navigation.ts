@@ -41,12 +41,15 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-// Child for 2nd level navigation
+// Child for nested navigation. May itself contain further children for
+// arbitrarily deep menus; the sidebar layout editor renders recursively so
+// every level can be expanded and reordered.
 export interface NavChild {
   id: string;
   label: string;
   path: string;
   icon: LucideIcon;
+  children?: NavChild[];
 }
 
 export interface NavItem {
