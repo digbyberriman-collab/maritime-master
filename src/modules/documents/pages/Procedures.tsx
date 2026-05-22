@@ -187,9 +187,9 @@ const Procedures: React.FC = () => {
 
   const stats = [
     {
-      title: 'Total Procedures',
+      title: 'Total SOPs',
       value: mockProcedures.length,
-      description: 'All procedures in system',
+      description: 'All SOPs in system',
       icon: ClipboardList,
     },
     {
