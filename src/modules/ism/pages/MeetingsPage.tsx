@@ -22,7 +22,10 @@ import {
   Clock,
   CheckCircle,
   FileText,
-  Eye
+  Eye,
+  Download,
+  Upload,
+  History
 } from 'lucide-react';
 import { format, isPast, isFuture, addDays } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -152,7 +155,9 @@ const MeetingsPage: React.FC = () => {
             <TabsList>
               <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
               <TabsTrigger value="past">Past Meetings</TabsTrigger>
+              <TabsTrigger value="document-control">Document Control</TabsTrigger>
             </TabsList>
+            {activeTab !== 'document-control' && (
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
@@ -162,6 +167,7 @@ const MeetingsPage: React.FC = () => {
                 className="pl-9"
               />
             </div>
+            )}
           </div>
 
           <TabsContent value="upcoming" className="mt-4">
@@ -282,6 +288,92 @@ const MeetingsPage: React.FC = () => {
                     </TableBody>
                   </Table>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="document-control" className="mt-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <CardTitle>Safety Meeting Document Control</CardTitle>
+                    <CardDescription>
+                      Manage the controlled template used to record safety meetings.
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm">
+                      <Download className="w-4 h-4 mr-2" />
+                      Download
+                    </Button>
+                    <Button size="sm">
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload New Revision
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Document Code</p>
+                    <p className="text-sm font-medium">SMS-FRM-MTG-001</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Title</p>
+                    <p className="text-sm font-medium">Safety Meeting Minutes</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Current Revision</p>
+                    <Badge variant="outline">Rev 0</Badge>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Status</p>
+                    <Badge className="bg-green-500 text-white">Controlled</Badge>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Document Owner</p>
+                    <p className="text-sm font-medium">DPA</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Approved By</p>
+                    <p className="text-sm font-medium">—</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Issue Date</p>
+                    <p className="text-sm font-medium">—</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Next Review</p>
+                    <p className="text-sm font-medium">—</p>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <History className="w-4 h-4 text-muted-foreground" />
+                    <h3 className="text-sm font-semibold">Revision History</h3>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Revision</TableHead>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Changed By</TableHead>
+                        <TableHead>Description of Change</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          No revisions recorded yet.
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
