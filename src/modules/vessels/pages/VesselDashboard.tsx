@@ -371,6 +371,9 @@ const VesselDashboard: React.FC = () => {
             </Card>
           )}
         </div>
+
+        {/* Recent Activity table (Module · Notification · Time) */}
+        <RecentActivityTable />
       </div>
     </DashboardLayout>
   );
