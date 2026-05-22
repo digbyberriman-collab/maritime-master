@@ -54,9 +54,50 @@ const RowImpl: React.FC<RowProps> = ({
   const isFirst = index === 0;
   const isLast = index === total - 1;
 
+  // Keyboard support (focus on the row container):
+  //  - Ctrl/Cmd + ArrowUp/Down: reorder within the group
+  //  - ArrowRight / ArrowLeft: expand / collapse the branch
+  //  - Enter / Space: toggle expand when expandable
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (readOnly) return;
+    if (e.target !== e.currentTarget) return;
+    const reorderModifier = e.ctrlKey || e.metaKey;
+    if (e.key === 'ArrowUp' && reorderModifier) {
+      if (isFirst) return;
+      e.preventDefault();
+      onMoveUp();
+    } else if (e.key === 'ArrowDown' && reorderModifier) {
+      if (isLast) return;
+      e.preventDefault();
+      onMoveDown();
+    } else if (expandable && e.key === 'ArrowRight' && !expanded) {
+      e.preventDefault();
+      onToggleExpand?.();
+    } else if (expandable && e.key === 'ArrowLeft' && expanded) {
+      e.preventDefault();
+      onToggleExpand?.();
+    } else if (expandable && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      onToggleExpand?.();
+    }
+  };
+
   return (
     <div
       draggable={!readOnly}
+      role="treeitem"
+      tabIndex={readOnly ? -1 : 0}
+      aria-level={depth + 1}
+      aria-setsize={total}
+      aria-posinset={index + 1}
+      aria-grabbed={isDragging || undefined}
+      aria-expanded={expandable ? !!expanded : undefined}
+      aria-label={
+        expandable
+          ? `${label}, ${childCount ?? 0} ${childCount === 1 ? 'item' : 'items'}, position ${index + 1} of ${total}`
+          : `${label}, position ${index + 1} of ${total}`
+      }
+      onKeyDown={handleKeyDown}
       onDragStart={() => !readOnly && onDragStart(id)}
       onDragEnd={() => !readOnly && onDragEnd()}
       onDragOver={(e) => { if (readOnly) return; e.preventDefault(); onDragOver(id); }}
@@ -64,12 +105,14 @@ const RowImpl: React.FC<RowProps> = ({
       style={{ marginLeft: depth * 20 }}
       className={cn(
         'group flex items-center gap-2 rounded-lg border bg-card px-3 py-2 transition-colors',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
         isDragging && 'opacity-50',
         isOver && 'border-primary ring-1 ring-primary',
         readOnly && 'opacity-70'
       )}
     >
       <GripVertical
+        aria-hidden="true"
         className={cn(
           'w-4 h-4 text-muted-foreground',
           readOnly ? 'cursor-not-allowed opacity-50' : 'cursor-grab active:cursor-grabbing'
@@ -79,15 +122,17 @@ const RowImpl: React.FC<RowProps> = ({
         <button
           type="button"
           onClick={onToggleExpand}
-          className="text-muted-foreground hover:text-foreground"
-          aria-label={expanded ? 'Collapse' : 'Expand'}
+          className="text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+          aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
+          aria-expanded={!!expanded}
+          tabIndex={-1}
         >
-          {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+          {expanded ? <ChevronDown className="w-4 h-4" aria-hidden="true" /> : <ChevronRight className="w-4 h-4" aria-hidden="true" />}
         </button>
       ) : (
         <span className="w-4" />
       )}
-      <Icon className="w-4 h-4 text-muted-foreground" />
+      <Icon className="w-4 h-4 text-muted-foreground" aria-hidden="true" />
       <span className="flex-1 text-sm font-medium truncate">{label}</span>
       {expandable && typeof childCount === 'number' && (
         <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-normal">
@@ -95,12 +140,12 @@ const RowImpl: React.FC<RowProps> = ({
         </Badge>
       )}
       <span className="text-xs text-muted-foreground tabular-nums w-6 text-right">{index + 1}</span>
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
         <Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={isFirst || readOnly} onClick={onMoveUp} aria-label={`Move ${label} up`}>
-          <ArrowUp className="w-4 h-4" />
+          <ArrowUp className="w-4 h-4" aria-hidden="true" />
         </Button>
         <Button type="button" variant="ghost" size="icon" className="h-7 w-7" disabled={isLast || readOnly} onClick={onMoveDown} aria-label={`Move ${label} down`}>
-          <ArrowDown className="w-4 h-4" />
+          <ArrowDown className="w-4 h-4" aria-hidden="true" />
         </Button>
       </div>
     </div>
@@ -384,7 +429,16 @@ const SidebarLayoutSection: React.FC = () => {
             </div>
           )}
 
-          {!loading && rootItems.length > 0 && renderBranch(rootItems, SIDEBAR_ROOT, 0)}
+          {!loading && rootItems.length > 0 && (
+            <div
+              role="tree"
+              aria-label="Sidebar navigation order"
+              aria-multiselectable="false"
+              className="space-y-2"
+            >
+              {renderBranch(rootItems, SIDEBAR_ROOT, 0)}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

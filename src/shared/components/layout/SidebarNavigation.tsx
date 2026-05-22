@@ -118,6 +118,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
         <button
           key={child.id}
           onClick={() => handleNavigate(child.path)}
+          aria-current={active ? 'page' : undefined}
           className={cn(
             'w-full flex items-center gap-3 pr-3 py-2 rounded-lg text-sm font-medium transition-colors',
             pad,
@@ -126,7 +127,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
               : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
           )}
         >
-          <child.icon className="w-4 h-4" />
+          <child.icon className="w-4 h-4" aria-hidden="true" />
           <span className="truncate">{child.label}</span>
         </button>
       );
@@ -173,6 +174,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
         <button
           key={item.id}
           onClick={() => handleNavigate(item.path)}
+          aria-current={active ? 'page' : undefined}
           className={cn(
             'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
             active
@@ -180,7 +182,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
               : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
           )}
         >
-          <item.icon className="w-5 h-5" />
+          <item.icon className="w-5 h-5" aria-hidden="true" />
           <span className="truncate">{item.label}</span>
         </button>
       );
@@ -222,7 +224,10 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
   };
 
   return (
-    <nav className="flex-1 min-h-0 px-3 py-4 space-y-1 overflow-y-auto">
+    <nav
+      aria-label="Main"
+      className="flex-1 min-h-0 px-3 py-4 space-y-1 overflow-y-auto"
+    >
       {visibleNavItems.map((item) => renderNavItem(item))}
     </nav>
   );
