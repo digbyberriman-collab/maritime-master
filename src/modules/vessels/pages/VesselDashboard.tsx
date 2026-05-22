@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,7 @@ import TopModuleNav from '@/shared/components/layout/TopModuleNav';
 import { QuickActionsMenu } from '@/modules/dashboard/components/QuickActionsMenu';
 import { EmergencyContactsWidget } from '@/modules/emergency/components/EmergencyContactsWidget';
 import VesselProfileCard from '@/modules/vessels/components/VesselProfileCard';
+import FleetDashboardView from '@/modules/dashboard/components/FleetDashboardView';
 import {
   AlertsWidget,
   CrewWidget,
@@ -56,6 +57,31 @@ const VesselDashboard: React.FC = () => {
   const { dashboardData, isLoading, refetch } = useVesselDashboard();
   const { canView, isInitialized } = useRBACPermissions();
   const { data: recentIncidents } = useRecentIncidents(5);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // View toggle: 'vessel' | 'fleet'. URL takes precedence, then sessionStorage,
+  // then default to fleet when the user has multi-vessel access and "All Vessels" is selected.
+  const initialView: 'vessel' | 'fleet' = (() => {
+    const fromUrl = searchParams.get('view');
+    if (fromUrl === 'fleet' || fromUrl === 'vessel') return fromUrl;
+    if (typeof window !== 'undefined') {
+      const stored = sessionStorage.getItem('dashboard:view');
+      if (stored === 'fleet' || stored === 'vessel') return stored;
+    }
+    return canAccessAllVessels && isAllVessels ? 'fleet' : 'vessel';
+  })();
+  const [view, setView] = useState<'vessel' | 'fleet'>(initialView);
+
+  useEffect(() => {
+    sessionStorage.setItem('dashboard:view', view);
+  }, [view]);
+
+  useEffect(() => {
+    const fromUrl = searchParams.get('view');
+    if ((fromUrl === 'fleet' || fromUrl === 'vessel') && fromUrl !== view) {
+      setView(fromUrl);
+    }
+  }, [searchParams, view]);
 
   // Initialize the dashboard store
   const {
@@ -105,6 +131,31 @@ const VesselDashboard: React.FC = () => {
           <TopModuleNav />
         </div>
 
+        {/* View toggle: Vessel vs Fleet */}
+        {canAccessAllVessels && (
+          <div className="inline-flex rounded-md border bg-card p-0.5 shadow-sm">
+            {(['vessel', 'fleet'] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setView(v)}
+                className={cn(
+                  'px-4 py-1.5 text-sm font-medium rounded-[5px] transition-colors capitalize',
+                  view === v
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {v}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {view === 'fleet' ? (
+          <FleetDashboardView />
+        ) : (
+          <>
         {/* Enhanced Header with Fleet Filter */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <VesselHeader
@@ -374,6 +425,8 @@ const VesselDashboard: React.FC = () => {
 
         {/* Recent Activity table (Module · Notification · Time) */}
         <RecentActivityTable />
+          </>
+        )}
       </div>
     </DashboardLayout>
   );
