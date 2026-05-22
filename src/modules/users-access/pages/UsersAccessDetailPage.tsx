@@ -17,6 +17,8 @@ import {
   type PermissionLevel,
 } from '../lib/presets';
 import { derivePreset } from '../lib/derivePreset';
+import { OTHER_MODULE_GROUPS, groupLevelFor } from '../lib/moduleGroups';
+import { ModuleGroupRow } from '../components/ModuleGroupRow';
 
 const PERM_OPTIONS: Array<{ value: string; label: string; color: string }> = [
   { value: 'none', label: 'No Access', color: 'text-muted-foreground' },
@@ -45,6 +47,12 @@ const UsersAccessDetailPage: React.FC = () => {
     () => (modules ?? []).filter((m) => !CREW_MODULE_KEYS.includes(m.key as typeof CREW_MODULE_KEYS[number])),
     [modules]
   );
+
+  const moduleByKey = useMemo(() => {
+    const map = new Map<string, { key: string; name: string }>();
+    (modules ?? []).forEach((m) => map.set(m.key, { key: m.key, name: m.name }));
+    return map;
+  }, [modules]);
 
   if (isLoading || !detail) {
     return (
@@ -80,13 +88,26 @@ const UsersAccessDetailPage: React.FC = () => {
   const handleSetAll = (value: string) => {
     if (!userId) return;
     const matrix: Record<string, PermissionLevel | null> = {};
-    otherModules.forEach((m) => {
-      matrix[m.key] = parsePerm(value);
-    });
+    OTHER_MODULE_GROUPS.forEach((g) => g.moduleKeys.forEach((k) => { matrix[k] = parsePerm(value); }));
     applyPreset.mutate(
       { userId, matrix },
       {
         onSuccess: () => toast({ title: 'Applied to all modules' }),
+        onError: (e: any) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
+      }
+    );
+  };
+
+  const handleGroupChange = (groupKey: string, value: string) => {
+    if (!userId) return;
+    const group = OTHER_MODULE_GROUPS.find((g) => g.key === groupKey);
+    if (!group) return;
+    const matrix: Record<string, PermissionLevel | null> = {};
+    group.moduleKeys.forEach((k) => { matrix[k] = parsePerm(value); });
+    applyPreset.mutate(
+      { userId, matrix },
+      {
+        onSuccess: () => toast({ title: `${group.label} updated` }),
         onError: (e: any) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
       }
     );
@@ -149,7 +170,7 @@ const UsersAccessDetailPage: React.FC = () => {
           <CardHeader className="flex flex-row items-start justify-between gap-4">
             <div>
               <CardTitle className="text-base">Other Modules</CardTitle>
-              <CardDescription>No Access = no visibility into the module</CardDescription>
+              <CardDescription>None = no access</CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Set all to:</span>
@@ -165,31 +186,24 @@ const UsersAccessDetailPage: React.FC = () => {
               </Select>
             </div>
           </CardHeader>
-          <CardContent className="space-y-1.5">
-            {otherModules.map((m) => {
-              const v = permValue(detail.permissions[m.key]);
+          <CardContent className="space-y-2">
+            {OTHER_MODULE_GROUPS.map((group) => {
+              const groupLevel = groupLevelFor(detail.permissions, group);
+              const childModules = group.moduleKeys
+                .map((k) => moduleByKey.get(k) ?? { key: k, name: k })
+                .filter(Boolean);
               return (
-                <div key={m.key} className="flex items-center justify-between gap-4 px-3 py-2.5 rounded-md border border-border/50 bg-background">
-                  <div className="font-medium text-sm">{m.name}</div>
-                  <Select value={v} onValueChange={(nv) => handleModuleChange(m.key, nv)}>
-                    <SelectTrigger className="w-44 h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PERM_OPTIONS.map((o) => (
-                        <SelectItem key={o.value} value={o.value}>
-                          <span className={o.color}>● </span>
-                          {o.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <ModuleGroupRow
+                  key={group.key}
+                  group={group}
+                  modules={childModules}
+                  perms={detail.permissions}
+                  groupLevel={groupLevel}
+                  onGroupChange={(v) => handleGroupChange(group.key, v)}
+                  onModuleChange={handleModuleChange}
+                />
               );
             })}
-            {otherModules.length === 0 && (
-              <div className="text-sm text-muted-foreground">No additional modules.</div>
-            )}
           </CardContent>
         </Card>
       </div>
