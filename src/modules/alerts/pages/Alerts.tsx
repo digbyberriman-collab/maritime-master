@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import { Bell, AlertCircle, AlertTriangle, Info, CheckCircle, Clock } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,69 +43,48 @@ const Alerts: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Alerts</h1>
-            <p className="text-muted-foreground mt-1">Monitor and manage system alerts across your fleet</p>
-          </div>
-          <Button variant="outline" onClick={() => toast.success('All alerts marked as read')}>
-            <CheckCircle className="h-4 w-4 mr-2" />
-            Mark All Read
-          </Button>
-        </div>
+        <PageHeader
+          title="Alerts"
+          description="Monitor and manage system alerts across your fleet"
+          actions={
+            <Button variant="outline" onClick={() => toast.success('All alerts marked as read')}>
+              <CheckCircle className="h-4 w-4 mr-2" />
+              Mark All Read
+            </Button>
+          }
+        />
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Critical</p>
-                  <p className="text-2xl font-bold text-destructive">2</p>
-                </div>
-                <AlertCircle className="h-8 w-8 text-destructive/30" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Warnings</p>
-                  <p className="text-2xl font-bold text-orange-500">2</p>
-                </div>
-                <AlertTriangle className="h-8 w-8 text-orange-500/30" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Info</p>
-                  <p className="text-2xl font-bold text-blue-500">1</p>
-                </div>
-                <Info className="h-8 w-8 text-blue-500/30" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Resolved Today</p>
-                  <p className="text-2xl font-bold text-green-500">3</p>
-                </div>
-                <CheckCircle className="h-8 w-8 text-green-500/30" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid>
+          <StatCard
+            label="Critical"
+            value={2}
+            tone="danger"
+            icon={<AlertCircle className="h-5 w-5 text-destructive/60" />}
+          />
+          <StatCard
+            label="Warnings"
+            value={2}
+            tone="warning"
+            icon={<AlertTriangle className="h-5 w-5 text-orange-500/60" />}
+          />
+          <StatCard
+            label="Info"
+            value={1}
+            tone="info"
+            icon={<Info className="h-5 w-5 text-blue-500/60" />}
+          />
+          <StatCard
+            label="Resolved Today"
+            value={3}
+            tone="success"
+            icon={<CheckCircle className="h-5 w-5 text-green-500/60" />}
+          />
+        </StatGrid>
 
         {/* Alerts List */}
         <Card>
           <CardHeader>
-            <CardTitle>Active Alerts</CardTitle>
+            <CardTitle className="text-base">Active Alerts</CardTitle>
             <CardDescription>Alerts requiring attention across all vessels</CardDescription>
           </CardHeader>
           <CardContent>

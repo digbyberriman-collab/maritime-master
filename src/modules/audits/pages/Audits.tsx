@@ -39,112 +39,71 @@ const Audits: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Audits & Reviews</h1>
-            <p className="text-muted-foreground">Manage internal audits, external audits, and management reviews</p>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={() => handleScheduleAudit('Internal')}>
-              <Plus className="w-4 h-4 mr-2" />
-              Schedule Audit
-            </Button>
-            <Button variant="outline" onClick={() => setShowScheduleReviewModal(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Management Review
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          title="Audits & Reviews"
+          description="Manage internal audits, external audits, and management reviews"
+          actions={
+            <>
+              <Button onClick={() => handleScheduleAudit('Internal')}>
+                <Plus className="w-4 h-4 mr-2" />
+                Schedule Audit
+              </Button>
+              <Button variant="outline" onClick={() => setShowScheduleReviewModal(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Management Review
+              </Button>
+            </>
+          }
+        />
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Next Audit</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {nextAudit ? (
-                <>
-                  <div className="text-2xl font-bold">{format(new Date(nextAudit.scheduled_date), 'MMM d')}</div>
-                  <p className="text-xs text-muted-foreground">{nextAudit.audit_type} - {nextAudit.vessel?.name || 'Company'}</p>
-                </>
-              ) : (
-                <div className="text-sm text-muted-foreground">No audits scheduled</div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Open Findings</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{openFindings.length}</div>
-              <p className="text-xs text-muted-foreground">
-                {openFindings.filter(f => f.finding_type === 'Major_NC').length} Major, {' '}
-                {openFindings.filter(f => f.finding_type === 'Minor_NC').length} Minor
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">DOC Valid Until</CardTitle>
-              <FileCheck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {docCertificate ? (
-                <>
-                  <div className="text-2xl font-bold">{format(new Date(docCertificate.expiry_date), 'MMM yyyy')}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {differenceInDays(new Date(docCertificate.expiry_date), new Date())} days remaining
-                  </p>
-                </>
-              ) : (
-                <div className="text-sm text-muted-foreground">Not configured</div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">SMC Valid Until</CardTitle>
-              <FileCheck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {smcCertificate ? (
-                <>
-                  <div className="text-2xl font-bold">{format(new Date(smcCertificate.expiry_date), 'MMM yyyy')}</div>
-                  <p className="text-xs text-muted-foreground">
-                    {differenceInDays(new Date(smcCertificate.expiry_date), new Date())} days remaining
-                  </p>
-                </>
-              ) : (
-                <div className="text-sm text-muted-foreground">Not configured</div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Last Management Review</CardTitle>
-              <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {lastReview ? (
-                <>
-                  <div className="text-2xl font-bold">{format(new Date(lastReview.review_date), 'MMM d, yyyy')}</div>
-                  <p className="text-xs text-muted-foreground">{lastReview.period_covered}</p>
-                </>
-              ) : (
-                <div className="text-sm text-muted-foreground">No reviews completed</div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={5}>
+          <StatCard
+            label="Next Audit"
+            icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
+            value={
+              nextAudit
+                ? format(new Date(nextAudit.scheduled_date), 'MMM d')
+                : <span className="text-sm text-muted-foreground">No audits scheduled</span>
+            }
+            hint={nextAudit ? `${nextAudit.audit_type} - ${nextAudit.vessel?.name || 'Company'}` : undefined}
+          />
+          <StatCard
+            label="Open Findings"
+            icon={<AlertTriangle className="h-4 w-4 text-muted-foreground" />}
+            value={openFindings.length}
+            hint={`${openFindings.filter(f => f.finding_type === 'Major_NC').length} Major, ${openFindings.filter(f => f.finding_type === 'Minor_NC').length} Minor`}
+          />
+          <StatCard
+            label="DOC Valid Until"
+            icon={<FileCheck className="h-4 w-4 text-muted-foreground" />}
+            value={
+              docCertificate
+                ? format(new Date(docCertificate.expiry_date), 'MMM yyyy')
+                : <span className="text-sm text-muted-foreground">Not configured</span>
+            }
+            hint={docCertificate ? `${differenceInDays(new Date(docCertificate.expiry_date), new Date())} days remaining` : undefined}
+          />
+          <StatCard
+            label="SMC Valid Until"
+            icon={<FileCheck className="h-4 w-4 text-muted-foreground" />}
+            value={
+              smcCertificate
+                ? format(new Date(smcCertificate.expiry_date), 'MMM yyyy')
+                : <span className="text-sm text-muted-foreground">Not configured</span>
+            }
+            hint={smcCertificate ? `${differenceInDays(new Date(smcCertificate.expiry_date), new Date())} days remaining` : undefined}
+          />
+          <StatCard
+            label="Last Management Review"
+            icon={<ClipboardCheck className="h-4 w-4 text-muted-foreground" />}
+            value={
+              lastReview
+                ? format(new Date(lastReview.review_date), 'MMM d, yyyy')
+                : <span className="text-sm text-muted-foreground">No reviews completed</span>
+            }
+            hint={lastReview ? lastReview.period_covered : undefined}
+          />
+        </StatGrid>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
