@@ -1,61 +1,106 @@
-## Goal
+## Users & Access — list + member detail (wired to RBAC)
 
-Add a "Fleet Dashboard" view to the existing `/dashboard` so users can toggle between:
-- **Vessel** view (current Sealogical-style single-vessel dashboard)
-- **Fleet** view (this new Sealogical Fleet Dashboard mock)
+Builds the two pages from the screenshots and wires them to the existing RBAC tables (`rbac_user_roles`, `roles`, `role_permissions`, `user_permission_overrides`, `modules`, `profiles`).
 
-Same route, same layout shell, same top module nav and chip header. Only the page body switches.
+The existing `/admin/users` (mock UserManagement) stays untouched. We add a new route group under `/users-access` so the screenshots' design ships cleanly without disturbing legacy code.
 
-## Scope (from your answers)
+### Routes
 
-1. View toggle on `/dashboard` — two pill buttons "Vessel" / "Fleet" near the page title; default to Fleet when the user has multi-vessel access and "All Vessels" is selected.
-2. Inner left sub-nav inside the page body (Fleet Dashboard / Fleet Tracker / Fleet Reports / Fleet Calendar / Fleet Documents / Fleet Checklists / Vessels + Administration group). Sticky on desktop, collapses to a top row on mobile. Items deep-link to existing routes where they exist; missing ones go to a `?tab=` query state and render a "Coming soon" placeholder.
-3. Regional mini-map cards — Leaflet `MapContainer` with CARTO light tiles, one card per region, vessel markers from `hashToCoord` (already used in FleetMap), "Open Full Fleet Tracker" CTA → `/fleet-map`.
-4. Pastel KPI tile row — 6 tiles (Document Alerts, Hours of Rest, Leave Overdue, Safety, Technical, Accounting) with soft pastel backgrounds (`bg-*-50` style via semantic tokens), big number, sub-line.
-5. Vessel Health Matrix table — rows = vessels, columns = Crewing · Documents · Safety · Technical · HOR · Accounting · Insurance · Onboarding. Each cell = colored dot + count. Click row → vessel dashboard.
+- `/users-access` — list page (default for the "Users & Access" sub-nav item)
+- `/users-access/:userId` — member detail page
+- Update `FleetSubNav` item from `/settings/users` → `/users-access`
 
-Out of scope: Custom region editor, real AIS, persisting view choice cross-session (sessionStorage is enough).
+Both wrapped in `ProtectedRoute`. Access gated to roles with `settings.admin` (DPA / Superadmin / Fleet Manager) — non-admins get redirected to `/dashboard`.
 
-## Data wiring
+### Page 1 — `UsersAccessListPage`
 
-- Vessels: `useVessels()` for the full list (already in project).
-- Per-vessel counts: call `useVesselDashboard` aggregated data per vessel via the existing RPC `get_vessel_dashboard_summary` (one-shot for all vessels) and map fields:
-  - Crewing → crew_onboard_count vs expected (use count alone)
-  - Documents → certs_expiring_90d
-  - Safety → red_alerts_count + open_capas_count
-  - Technical → overdue_maintenance_count + critical_defects_count
-  - HOR → 0 (no current hook; placeholder green)
-  - Accounting → 0 (placeholder)
-  - Insurance → 0 (placeholder)
-  - Onboarding → training_gaps_count
-- KPI row uses the same aggregated dataset; HOR / Leave Overdue / Accounting render as 0 with neutral green tone when no source available.
-- Regions: bucket vessels by `flag_state` → static region map:
-  - `IT, FR, ES, MC, GR, MT, CY, TR, HR` → "Mediterranean"
-  - `US, BS, KY, BM, AG, JM` → "US East Coast / Caribbean"
-  - everything else → "Worldwide"
-- Map markers via the existing `hashToCoord` pattern.
+Layout matches screenshot 1 (rows of crew with badges + module chips + Edit button on the right).
 
-## Files to add / edit
+Data:
+- Source: `profiles` joined to `crew_assignments` (current) + `rbac_user_roles` + `roles` (one row per user, scoped to `current_user_company_id()`).
+- For each user, derive the **preset badge** from their highest role:
+  - `View Only` (gray) — only `view` perms across modules
+  - `Department Head` (green) — has `edit`/`admin` on department-scoped modules
+  - `Full Access` (green-solid) — has `admin` on HR + Medical
+  - `Custom` (amber) — mixed / per-module overrides exist
+- Module chips read from `get_user_permissions_full(p_user_id)` aggregated into 6 fixed groups: **Safety, Certs, Tech, Vessel, Charter, Acct** — render `R/W` (green) or `RO` (blue) or hide if no access.
 
-- create `src/modules/dashboard/components/FleetDashboardView.tsx` — full Fleet view (sub-nav + maps + KPIs + matrix).
-- create `src/modules/dashboard/components/fleet/RegionMapCard.tsx` — single Leaflet mini-map card.
-- create `src/modules/dashboard/components/fleet/FleetKPITiles.tsx` — pastel 6-up row.
-- create `src/modules/dashboard/components/fleet/VesselHealthMatrix.tsx` — vessel × module table.
-- create `src/modules/dashboard/components/fleet/FleetSubNav.tsx` — inner left sidebar with the 7 items + Administration group.
-- edit `src/modules/vessels/pages/VesselDashboard.tsx` — add a `view` state (`'vessel' | 'fleet'`), toggle pill, render `FleetDashboardView` when fleet.
-- edit `src/shared/hooks/` (none — view state stays local + sessionStorage).
+Row UI:
+- Avatar circle + name + `active` status pill
+- Position (from `crew_assignments.position`)
+- Preset badge (color per above)
+- Module chips row (only ones with access)
+- `Login as` (only for Superadmin viewer, only for non-self rows) + `Edit` button → `/users-access/:userId`
 
-## Technical notes
+Top of page:
+- Title "Users & Access"
+- Search input (filters by name/position client-side)
+- Filters: status (active/inactive), preset, vessel (uses existing multi-vessel store)
+- "Add User" button (opens existing `AddUserModal`)
 
-- Reuse `useVesselDashboard` hook with a fleet-wide list — make a thin `useFleetVesselSummaries()` helper colocated in `FleetDashboardView.tsx` that calls the RPC with `p_vessel_ids = null, p_aggregate_all = false`.
-- Tokens only — pastel tiles built from `bg-amber-50 text-amber-700` etc. (these are Tailwind utility classes that already work in this project; they are not the forbidden hex hardcodes).
-- Status dot helper: `count === 0 → bg-emerald-500`, `1-3 → bg-amber-500`, `>=4 → bg-rose-500`, no data → `bg-muted-foreground/40`.
-- Leaflet maps use `scrollWheelZoom={false}`, `zoomControl`, fixed `h-64`. CARTO `light_all` tile URL.
-- Toggle defaults: `canAccessAllVessels && isAllVessels` → fleet view; else → vessel view.
+### Page 2 — `UsersAccessDetailPage`
 
-## Out of scope (explicit)
+Layout matches screenshot 2 (vessel selector at top, Back link, name + role badges, Crew Module Access card, Other Modules card with per-module R/W selects).
 
-- No DB / RLS / migrations.
-- No route changes.
-- No sidebar (left STORM nav) changes.
-- No edits to the existing FleetMap page.
+Sections:
+
+1. **Header card** — name, `active` chip, role chip (from `roles.display_name`)
+2. **Crew Module Access** card
+   - Single `Select` "Access Preset" with options:
+     - View Only — "Can see crew list only"
+     - Department Head — "Manage crew, approve leave and hours of rest, …"
+     - Full Access — "Full access including medical records, employment, and all approvals"
+     - Custom — "Configure individual permissions manually" (auto-set when user diverges)
+   - Selecting a preset writes a batch of `user_permission_overrides` rows for crew-related modules (`crew`, `hr`, `crew_certificates`, `hours_of_rest`, `medical`) at the matching permission level.
+3. **Other Modules** card
+   - Header: "None = no access" + "Set all to:" `Select` (No Access / Read Only / Read & Write / Admin) applies to all rows.
+   - One row per module from `modules` table (excluding the crew-cluster handled above):
+     - Module name on the left
+     - `Select` on the right with options: `No Access` (gray), `Read Only` (blue), `Read & Write` (green), `Admin` (purple)
+   - Selecting writes/updates a `user_permission_overrides` row for `(user_id, module_key, permission)` and invalidates cache.
+
+Save behavior:
+- Each select change debounces 400ms then upserts via `user_permission_overrides` (`is_granted=true`, scope inherited from role, `granted_by=auth.uid()`).
+- Toast on success/failure.
+- After every write, call `log_permission_change(...)` for audit trail.
+
+### Hooks / files to add
+
+```
+src/modules/users-access/
+  pages/
+    UsersAccessListPage.tsx
+    UsersAccessDetailPage.tsx
+  components/
+    UserRow.tsx              // one list row
+    PresetBadge.tsx          // colored preset chip
+    ModulePermChip.tsx       // R/W or RO chip
+    AccessPresetSelect.tsx   // Crew Module Access dropdown
+    ModulePermissionRow.tsx  // module name + R/W select
+  hooks/
+    useUsersWithAccess.ts    // list query
+    useUserAccessDetail.ts   // detail query (perms + role)
+    useSavePermissionOverride.ts  // mutation
+    useApplyPreset.ts        // batch mutation for presets
+  lib/
+    presets.ts               // preset → module/permission matrix
+    derivePreset.ts          // infer preset from current perms
+```
+
+### Wiring
+
+- `src/routes/index.tsx`: add the two routes (lazy-loaded).
+- `src/modules/dashboard/components/fleet/FleetSubNav.tsx`: change `/settings/users` → `/users-access`.
+
+### Design tokens
+
+- Use semantic tokens only (`bg-card`, `text-muted-foreground`, `text-primary`, `bg-success/10`, etc.).
+- Preset/chip color variants live in `PresetBadge.tsx` and `ModulePermChip.tsx` using existing badge variants (no inline hex).
+
+### Out of scope
+
+- No schema changes — `rbac_user_roles`, `roles`, `role_permissions`, `user_permission_overrides`, `modules` already exist.
+- No new RPCs.
+- Leaves existing `/admin/users` (UserManagement mock) and `/settings/permissions` intact.
+- No bulk role editing (checkboxes shown but actions land later).
+- No invite flow changes — reuses existing `AddUserModal`.

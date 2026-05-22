@@ -79,6 +79,8 @@ const RolesPermissionsPage = React.lazy(() => import('@/modules/settings/pages/R
 
 // Admin Pages - lazy loaded
 const UserManagement = React.lazy(() => import('@/modules/settings/pages/UserManagement'));
+const UsersAccessListPage = React.lazy(() => import('@/modules/users-access/pages/UsersAccessListPage'));
+const UsersAccessDetailPage = React.lazy(() => import('@/modules/users-access/pages/UsersAccessDetailPage'));
 const FleetGroups = React.lazy(() => import('@/modules/settings/pages/FleetGroups'));
 const AlertConfiguration = React.lazy(() => import('@/modules/settings/pages/AlertConfiguration'));
 const APIIntegrations = React.lazy(() => import('@/modules/settings/pages/APIIntegrations'));
@@ -624,6 +626,8 @@ export const AppRoutes: React.FC = () => {
       {/* Admin Routes */}
       <Route path="/admin" element={<Navigate to="/admin/users" replace />} />
       <Route path="/admin/users" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><UserManagement /></React.Suspense></ProtectedRoute>} />
+      <Route path="/users-access" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><UsersAccessListPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/users-access/:userId" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><UsersAccessDetailPage /></React.Suspense></ProtectedRoute>} />
       <Route path="/admin/roles" element={
         <ProtectedRoute>
           <DashboardLayout>

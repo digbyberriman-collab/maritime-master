@@ -32,7 +32,7 @@ const PRIMARY: Item[] = [
 ];
 
 const ADMIN: Item[] = [
-  { label: 'Users & Access', to: '/settings/users', icon: Users },
+  { label: 'Users & Access', to: '/users-access', icon: Users },
   { label: 'Notification Management', to: '/settings/notifications', icon: Bell },
   { label: 'Account', to: '/settings', icon: UserCog },
 ];
