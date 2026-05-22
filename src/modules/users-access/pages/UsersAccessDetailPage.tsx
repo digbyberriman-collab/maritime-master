@@ -10,7 +10,6 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { useUserAccessDetail, useModulesList } from '../hooks/useUserAccessDetail';
 import { useApplyPreset, useSavePermissionOverride } from '../hooks/useSavePermissionOverride';
 import {
-  CREW_MODULE_KEYS,
   PRESET_MATRIX,
   PRESET_OPTIONS,
   type AccessPreset,
@@ -27,7 +26,6 @@ const PERM_OPTIONS: Array<{ value: string; label: string; color: string }> = [
   { value: 'admin', label: 'Admin', color: 'text-warning' },
 ];
 
-const permValue = (p?: PermissionLevel | null) => (p ?? 'none');
 const parsePerm = (v: string): PermissionLevel | null => (v === 'none' ? null : (v as PermissionLevel));
 
 const UsersAccessDetailPage: React.FC = () => {
@@ -41,11 +39,6 @@ const UsersAccessDetailPage: React.FC = () => {
   const currentPreset: AccessPreset = useMemo(
     () => (detail ? derivePreset(detail.permissions) : 'custom'),
     [detail]
-  );
-
-  const otherModules = useMemo(
-    () => (modules ?? []).filter((m) => !CREW_MODULE_KEYS.includes(m.key as typeof CREW_MODULE_KEYS[number])),
-    [modules]
   );
 
   const moduleByKey = useMemo(() => {
