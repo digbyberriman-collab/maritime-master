@@ -1,99 +1,63 @@
-# STORM → Destination App: Staged Migration Plan
+## Goal
 
-## Ground rules (locked in from your answers)
+Make `/dashboard` (VesselDashboard) look like the Sealogical reference. Keep the existing sidebar and all data sources — only the header strip, a new horizontal module nav, and a bottom Recent Activity table change visually.
 
-- **Bridge**: manual hand-off. I produce a packet per stage (SQL migration + module folder + paste instructions); you apply it in the destination project.
-- **Scope**: all ~23 STORM modules eventually move.
-- **Integration shape**: namespaced under **Vessel Management** in the destination's sidebar. Vessel Management becomes a collapsible parent group; every STORM module is a sub-item under it (same pattern as the current STORM sidebar's expandable groups). Routes mirror the nesting (e.g. `/vessels/crew`, `/vessels/certificates`, `/vessels/ism/forms`, etc.).
-- **Data**: schema only. No row migration. Destination starts empty for STORM tables.
-- **Auth & RBAC**: destination's existing auth wins. STORM's `user_roles` / `rbac_user_roles` / `roles` / `role_permissions` tables do **not** move. Instead, each stage ships a thin **role adapter** that maps destination roles → the STORM role names the ported code expects, so RLS and UI gates keep working without rewriting every check.
-- **Order**: dependency order (foundation first, leaves last).
+## Scope (from your answers)
 
-## Stage 0 — One-time foundation (before any module moves)
+1. Header layout — logo left, pill-style chips on the right (vessel name, "Intel", multi-vessel, alerts bell, fleet, role, user email).
+2. Horizontal module nav under the header (Crew, Safety, Certificates, Technical, Charter, Accounting, Vessel, Reports) with subtle icons.
+3. Recent Activity table at the bottom (Module · Notification · Time), wired to existing data.
+4. Replace current `/dashboard` route (VesselDashboard).
+5. Wire to existing dashboard data (`useVesselDashboard`, `useRecentIncidents`, activity feed hook).
 
-The destination needs this before stage 1, or nothing else compiles.
+Out of scope: gradient module tiles, sidebar changes, any backend/data model changes.
 
-**0a. Sidebar shell**
-- Add a `Vessels` collapsible group to the destination's sidebar with a chevron sub-menu (Shadcn `SidebarGroup` + `Collapsible`, matching STORM's pattern). Empty for now — modules slot in over time.
+## Changes
 
-**0b. Role adapter**
-- Add `src/integrations/storm/roleAdapter.ts` in the destination. Single function: `toStormRole(destRole) → 'dpa' | 'captain' | 'crew' | …`. You and I fill the mapping table together once we know the destination's role names.
-- Add `useStormRoles()` hook that wraps the destination's auth and returns STORM-shaped roles. Ported STORM hooks import from this instead of from `@/modules/auth`.
+### 1. Header strip — `src/shared/components/layout/DashboardLayout.tsx`
+Restyle the existing `<header>` so the right side renders chip-style buttons (rounded `rounded-full border bg-card px-3 h-8 text-sm`) for:
+- Selected vessel name (from `useVessel().selectedVessel`)
+- "Intel" search chip (opens existing global search if present, else no-op placeholder)
+- Multi-vessel filter (reuse `GlobalHeaderControls` but render its children as chips)
+- Notification bell (already a chip-friendly icon)
+- Fleet chip (opens fleet filter / nav to `/fleet-map`)
+- Role badge ("Superadmin"/role label)
+- User email chip (opens the existing user dropdown)
 
-**0c. Foundation tables**
-- Port `companies`, `profiles`, `vessels` schemas only if the destination doesn't already have equivalents. If it does, write a mapping note (`destination_table.column ↔ storm_table.column`) — we'll alias in code, not in SQL.
-- Port the shared security-definer helpers that almost everything depends on: `has_role`, `has_any_role`, `get_user_company_id`, `current_user_company_id`, `user_belongs_to_company`. These read from destination tables via the adapter — I rewrite their bodies during port.
+No new state, no new context. Pure visual refactor of the header right cluster.
 
-**0d. Shared frontend**
-- Copy `src/shared/components/layout/*` pieces the modules need (AdaptiveActionBar, GlobalHeaderControls, VesselToggleBar, NotificationBell), `src/modules/vessels/contexts/VesselContext.tsx`, design tokens from `src/index.css` (Storm blue, semantic HSL), and the `src/lib/pdf/*` helpers.
-- Reconcile against destination's existing `components/ui/*` — adopt destination's versions where they exist.
+### 2. Horizontal module nav — new component `src/shared/components/layout/TopModuleNav.tsx`
+Thin row below the header, scrollable on small screens. Items map onto existing routes:
+- Crew → `/crew/roster`
+- Safety → `/ism`
+- Certificates → `/certificates`
+- Technical → `/maintenance`
+- Charter → `/itinerary`
+- Accounting → `/hr` (closest existing module; placeholder until an accounting module exists)
+- Vessel → `/vessels/dashboard`
+- Reports → `/analytics` (or `/ism/incidents` if no analytics route)
 
-Stage 0 is the only stage where you may need to touch destination chrome. Every later stage is additive.
+Render only inside `VesselDashboard` (not globally) so other pages keep the existing AdaptiveActionBar.
 
-## Stage sequence (dependency order)
+### 3. Recent Activity table — new component `src/modules/dashboard/components/RecentActivityTable.tsx`
+Columns: Module · Notification · Time. Uses the existing `RecentActivityFeed` hook/data and renders it as a table instead of a feed. Falls back to recent incidents if the activity feed is empty.
 
-Each stage = one packet from me containing: SQL migration file(s), module folder, sidebar entry snippet, route registration snippet, and a short README of gotchas.
-
-```text
-Stage  Module(s)                              Depends on
------  -------------------------------------  -----------------
-1      Vessels (entity + dashboard)           0
-2      Crew roster + assignments              1
-3      Certificates (vessel + crew + alerts)  2
-4      Alerts engine + Red Room               1
-5      Documents                              1
-6      ISM Forms (templates + submissions)    5
-7      Incidents + CAPA                       4
-8      Drills                                 2, 4
-9      Audits + Management Reviews            7
-10     Risk Assessments + Work Permits        1
-11     Training & Familiarization             2, 3
-12     Planned Maintenance + Defects          1, 4
-13     Hours of Rest                          2
-14     Itinerary + Trip Suggestions           1
-15     Flights / Travel                       2
-16     Crew Development                       2
-17     HR                                     2
-18     Insurance                              1
-19     Emergency Contacts                     1
-20     Compliance hub (ISM/ISPS/MLC index)    6–13
-21     Analytics dashboards                   most of the above
-22     Settings (alerts, branding, fleet groups)  all
-23     Audit logs                              all
-```
-
-The order means: if you stop after stage N, the destination is still buildable and the migrated modules still work.
-
-## What each stage packet contains
-
-1. **`supabase/migrations/<timestamp>_storm_<module>.sql`** — `CREATE TABLE`s, RLS policies (rewritten to call destination-side helpers), security-definer functions, triggers, storage buckets + policies if needed. No data inserts.
-2. **`src/modules/<name>/`** — the module folder lifted from STORM, with imports rewritten to:
-   - `@/integrations/storm/roleAdapter` instead of `@/modules/auth/hooks/useUserRoles`
-   - destination's paths for `components/ui/*` and `lib/utils`
-3. **Sidebar snippet** — the `<SidebarMenuItem>` to drop into the `Vessels` group.
-4. **Route snippet** — the lazy-loaded route lines for the destination's router.
-5. **Edge functions** (when the module has them) — drop into `supabase/functions/<name>/`, auto-deploys.
-6. **Secrets checklist** — names of any secrets the module needs (e.g. Airtable for Crew, Lovable AI for forms extraction). You add them in destination's Cloud settings.
-7. **Verification checklist** — 3–5 things to click in the destination after applying, to confirm the module is alive.
-
-## Things that need explicit decisions per stage (I'll flag them in the packet)
-
-- **Table-name collisions** with destination's existing tables. Default: keep STORM's name, prefix with `storm_` only if there's a hard conflict.
-- **Role mapping gaps** — if a STORM module checks for a role the destination doesn't have (e.g. `dpa`, `purser`), we either add it to the adapter as an alias of an existing destination role, or gate the feature off.
-- **Shared dependencies already present** in destination (e.g. their own VesselContext) — we adopt destination's version and rewrite STORM module imports.
-
-## What I need from you to start Stage 0
-
-1. **Destination project's auth model**: paste the role names it uses (or a screenshot of its user/roles table), so I can build the role-adapter mapping.
-2. **Destination's sidebar file path** (or its current sidebar component), so my Stage 0 packet patches the right file.
-3. **Confirmation that destination uses Lovable Cloud** (Supabase under the hood) so my SQL migrations will apply cleanly.
-
-Once those three land, I'll produce the Stage 0 packet. After you apply it and confirm the destination still builds, we move to Stage 1 (Vessels) and keep going one stage at a time.
+### 4. `VesselDashboard.tsx` reorganisation
+- Add `<TopModuleNav />` directly under the page title row.
+- Keep KPI widgets and existing panels untouched (per "only header / nav / activity" scope).
+- Replace the current `RecentActivityFeed` card at the bottom with `<RecentActivityTable />`.
 
 ## Technical notes
 
-- All RLS policies on ported tables will be rewritten to use `current_user_company_id()` (destination-resolved) instead of STORM's `user_roles` lookup. This is the key trick that lets us drop STORM's RBAC tables without touching every policy.
-- Edge functions that call `supabase.auth.getUser()` work unchanged — they read destination's JWT.
-- The `Powered by Inkfish` watermark + STORM brand tokens are scoped to the `/vessels/*` route subtree only, so the rest of the destination app keeps its own branding.
-- Storage buckets are recreated empty in destination; no object copy.
-- The `airtable-sync` edge function (Crew) needs the `Airtable` secret re-added in destination — flagged in Stage 2.
+- All colors via semantic tokens (`bg-card`, `border-border`, `text-muted-foreground`, `--brand-primary`). No hex values in components.
+- Chips: shared `<Button variant="outline" size="sm" className="rounded-full h-8 gap-2" />`.
+- TopModuleNav uses `NavLink` from `react-router-dom` with `isActive` styling (`text-primary border-b-2 border-primary`).
+- No navigation.ts edits — top nav is a presentational shortcut row, not a structural sidebar change.
+- No DB / RLS / auth changes.
+
+## Files touched
+
+- edit `src/shared/components/layout/DashboardLayout.tsx`
+- create `src/shared/components/layout/TopModuleNav.tsx`
+- create `src/modules/dashboard/components/RecentActivityTable.tsx`
+- edit `src/modules/vessels/pages/VesselDashboard.tsx`
