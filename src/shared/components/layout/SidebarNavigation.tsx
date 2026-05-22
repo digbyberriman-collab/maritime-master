@@ -1,63 +1,57 @@
-import React, { useState, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { NAVIGATION_ITEMS, type NavItem, type NavChild } from '@/config/navigation';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import {
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarGroup,
+  SidebarSeparator,
+} from '@/components/ui/sidebar';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
+import {
+  getPrimaryDomains,
+  getPinnedDomains,
+  isPhase2Enabled,
+  type NavDomain,
+  type NavRole,
+} from '@/config/navigation';
 
 interface SidebarNavigationProps {
   onNavigate?: () => void;
 }
 
+/**
+ * Top-level sidebar items. Each item represents a functional domain and
+ * routes to that domain's default tab; sub-navigation is rendered as
+ * horizontal tabs in the content header via `SmartTabBar`. There is no
+ * nested submenu in the sidebar.
+ */
 const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { canAccessModule } = useAuth();
-  
-  // Filter navigation items based on user permissions
-  const visibleNavItems = useMemo(() => {
-    return NAVIGATION_ITEMS.filter(item => canAccessModule(item.id));
-  }, [canAccessModule]);
+  const { canAccessModule, profile } = useAuth();
+  const role = (profile?.role ?? null) as NavRole | null;
+  const phase2 = isPhase2Enabled();
 
-  // Helper to check if a path (possibly with query params) matches the current location
-  const matchesPath = (path: string): boolean => {
-    const [pathname, queryString] = path.split('?');
-    if (location.pathname !== pathname) return false;
-    if (!queryString) return true;
-    const params = new URLSearchParams(queryString);
-    const currentParams = new URLSearchParams(location.search);
-    for (const [key, value] of params.entries()) {
-      if (currentParams.get(key) !== value) return false;
-    }
-    return true;
-  };
+  const { primary, pinned } = useMemo(() => {
+    const filter = (domain: NavDomain): boolean => {
+      if (domain.phase === 2 && !phase2) return false;
+      if (domain.requiredRoles && (!role || !domain.requiredRoles.includes(role))) return false;
+      return canAccessModule(domain.moduleId ?? domain.id);
+    };
+    return {
+      primary: getPrimaryDomains().filter(filter),
+      pinned: getPinnedDomains().filter(filter),
+    };
+  }, [canAccessModule, role, phase2]);
 
-  // Helper to check if path matches any child
-  const hasActiveDescendant = (item: NavItem): boolean => {
-    if (item.children) {
-      return item.children.some(child => {
-        const [pathname] = child.path.split('?');
-        return matchesPath(child.path) || location.pathname.startsWith(pathname + '/');
-      });
-    }
-    return false;
-  };
-  
-  // Track which groups are open
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {};
-    visibleNavItems.forEach((item) => {
-      if (item.children) {
-        const hasActiveChild = hasActiveDescendant(item);
-        initial[item.id] = hasActiveChild || item.defaultOpen || false;
-      }
-    });
-    return initial;
-  });
-
-  const toggleGroup = (groupId: string) => {
-    setOpenGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }));
+  // A domain is active when the pathname starts with its first path segment.
+  const isDomainActive = (domain: NavDomain): boolean => {
+    const segments = domain.path.split('/').filter(Boolean);
+    if (segments.length === 0) return location.pathname === '/';
+    const prefix = `/${segments[0]}`;
+    return location.pathname === prefix || location.pathname.startsWith(`${prefix}/`);
   };
 
   const handleNavigate = (path: string) => {
@@ -65,93 +59,47 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
     onNavigate?.();
   };
 
-  const isActive = (path: string) => {
-    return matchesPath(path);
-  };
+  const renderItem = (domain: NavDomain) => {
+    const active = isDomainActive(domain);
+    const isEmergency = domain.id === 'emergency';
 
-  // Render child (2nd level) - flat, no nested children
-  const renderNavChild = (child: NavChild) => {
-    const active = isActive(child.path);
-    
     return (
-      <button
-        key={child.id}
-        onClick={() => handleNavigate(child.path)}
-        className={cn(
-          'w-full flex items-center gap-3 pl-10 pr-3 py-2 rounded-lg text-sm font-medium transition-colors',
-          active
-            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-            : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
-        )}
-      >
-        <child.icon className="w-4 h-4" />
-        <span className="truncate">{child.label}</span>
-      </button>
-    );
-  };
-
-  const renderNavItem = (item: NavItem) => {
-    const hasChildren = item.children && item.children.length > 0;
-    const active = isActive(item.path);
-    const groupActive = hasActiveDescendant(item) || active;
-
-    if (!hasChildren) {
-      return (
-        <button
-          key={item.id}
-          onClick={() => handleNavigate(item.path)}
+      <SidebarMenuItem key={domain.id}>
+        <SidebarMenuButton
+          tooltip={domain.label}
+          isActive={active}
+          onClick={() => handleNavigate(domain.path)}
           className={cn(
-            'w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-            active
-              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-              : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
+            isEmergency &&
+              'border border-sidebar-border bg-sidebar-accent/30 data-[active=true]:bg-sidebar-accent',
           )}
+          data-emergency={isEmergency || undefined}
+          aria-label={domain.label}
         >
-          <item.icon className="w-5 h-5" />
-          <span className="truncate">{item.label}</span>
-        </button>
-      );
-    }
-
-    const isOpen = openGroups[item.id];
-
-    return (
-      <Collapsible
-        key={item.id}
-        open={isOpen}
-        onOpenChange={() => toggleGroup(item.id)}
-      >
-        <CollapsibleTrigger asChild>
-          <button
-            className={cn(
-              'w-full flex items-center justify-between gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-              groupActive
-                ? 'bg-sidebar-accent/50 text-sidebar-accent-foreground'
-                : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
-            )}
-          >
-            <div className="flex items-center gap-3">
-              <item.icon className="w-5 h-5" />
-              <span>{item.label}</span>
-            </div>
-            {isOpen ? (
-              <ChevronDown className="w-4 h-4" />
-            ) : (
-              <ChevronRight className="w-4 h-4" />
-            )}
-          </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="mt-1 space-y-1">
-          {item.children!.map((child) => renderNavChild(child))}
-        </CollapsibleContent>
-      </Collapsible>
+          <domain.icon className="w-5 h-5" />
+          <span>{domain.label}</span>
+        </SidebarMenuButton>
+      </SidebarMenuItem>
     );
   };
 
   return (
-    <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-      {visibleNavItems.map((item) => renderNavItem(item))}
-    </nav>
+    <>
+      <SidebarGroup className="flex-1 overflow-y-auto">
+        <SidebarMenu>
+          {primary.map(renderItem)}
+        </SidebarMenu>
+      </SidebarGroup>
+
+      {pinned.length > 0 && (
+        <>
+          <SidebarSeparator />
+          <SidebarGroup>
+            <SidebarMenu>{pinned.map(renderItem)}</SidebarMenu>
+          </SidebarGroup>
+        </>
+      )}
+    </>
   );
 };
 

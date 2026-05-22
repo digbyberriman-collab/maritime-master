@@ -736,8 +736,271 @@ export const AppRoutes: React.FC = () => {
         </ProtectedRoute>
       } />
 
-      {/* Catch-all - redirect to dashboard instead of 404 */}
-      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+      {/* ================================================================
+          NEW IA — Canonical routes (Phase 1). The sidebar + SmartTabBar
+          link here; the legacy paths above continue to work for bookmarks.
+          ================================================================ */}
+
+      {/* Home */}
+      <Route path="/home" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/home/dpa" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><DPADashboard /></React.Suspense></ProtectedRoute>} />
+      <Route path="/home/my" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/crew/pages/CrewDashboard')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/home/approvals" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><ReviewDashboard /></React.Suspense></ProtectedRoute>} />
+      <Route path="/home/alerts" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Alerts /></React.Suspense></ProtectedRoute>} />
+
+      {/* Operations */}
+      <Route path="/operations/map" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><FleetMap /></React.Suspense></ProtectedRoute>} />
+      <Route path="/operations/itinerary" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/itinerary/pages/FleetPlanningPage')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/operations/voyage-planning" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/itinerary/pages/FleetPlanningPage')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/operations/fleet-timeline" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/itinerary/pages/FleetTimelinePage')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/operations/postponed" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/itinerary/pages/PostponedEntriesPage')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/operations/vessels/:vesselSlug" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><IndividualVesselDashboard /></React.Suspense></ProtectedRoute>} />
+      <Route path="/operations/vessels/:vesselSlug/dashboard" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><IndividualVesselDashboard /></React.Suspense></ProtectedRoute>} />
+      <Route path="/operations/vessels/:vesselSlug/checklists" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><NewChecklistsPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/operations/vessels/:vesselSlug/compliance" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CompliancePage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/operations/vessels/:vesselSlug/compliance/:section" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CompliancePage /></React.Suspense></ProtectedRoute>} />
+      {/* Operations placeholders (phase 2) */}
+      <Route path="/operations/port-calls" element={<PlaceholderWrapper title="Port Calls" />} />
+      <Route path="/operations/weather" element={<PlaceholderWrapper title="Weather" />} />
+      <Route path="/operations/fuel" element={<PlaceholderWrapper title="Fuel & Consumption" />} />
+      <Route path="/operations/guest-movements" element={<PlaceholderWrapper title="Guest Movements" />} />
+      <Route path="/operations/flight-tracking" element={<PlaceholderWrapper title="Flight Tracking" />} />
+      <Route path="/operations/logistics" element={<PlaceholderWrapper title="Logistics" />} />
+
+      {/* Crew */}
+      <Route path="/crew/list" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CrewRoster /></React.Suspense></ProtectedRoute>} />
+      <Route path="/crew/hours-of-rest/overview" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/work-rest/pages/WorkRestOverview')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/hours-of-rest/:crewId" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/work-rest/pages/MyWorkRestMonth')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/leave/calendar" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/crew/pages/VesselCalendar')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/training" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/development/pages/MyDevelopment')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/training/catalogue" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/development/pages/CourseCatalogue')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/training/applications" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/development/pages/DevelopmentApplications')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/crew/travel-visa" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><FlightsTravelPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/crew/travel-visa/flights" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><FlightsTravel /></React.Suspense></ProtectedRoute>} />
+      {/* Crew placeholders (phase 2) */}
+      <Route path="/crew/performance" element={<PlaceholderWrapper title="Crew Performance" />} />
+      <Route path="/crew/medical" element={<PlaceholderWrapper title="Crew Medical" />} />
+      <Route path="/crew/recruitment" element={<PlaceholderWrapper title="Crew Recruitment" />} />
+      <Route path="/crew/welfare" element={<PlaceholderWrapper title="Crew Welfare" />} />
+
+      {/* Compliance — new canonical paths render existing pages */}
+      <Route path="/compliance/ism" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CompliancePage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/compliance/isps" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CompliancePage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/compliance/mlc" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CompliancePage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/compliance/audits" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><AuditsSurveysPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/compliance/non-conformities" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><NonConformitiesPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/compliance/non-conformities/capa" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CorrectiveActionsPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/compliance/risk-assessments" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><RiskAssessmentsPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/compliance/drills" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><ISMDrillsPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/compliance/incidents" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><ISMIncidentsPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/compliance/incidents/investigations" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><InvestigationsPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/compliance/safety-meetings" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><MeetingsPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/compliance/permits" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><PermitsToWorkPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/compliance/checklists" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><NewChecklistsPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/compliance/insurance" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><InsurancePage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/compliance/other-ism" element={<Navigate to="/compliance/other-ism/observations" replace />} />
+      <Route path="/compliance/other-ism/observations" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><ObservationsPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/compliance/other-ism/erm" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><ERMPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/compliance/other-ism/miscellaneous" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><MiscellaneousPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/compliance/marpol" element={<PlaceholderWrapper title="MARPOL" />} />
+
+      {/* Technical */}
+      <Route path="/technical/planned-maintenance" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Maintenance /></React.Suspense></ProtectedRoute>} />
+      <Route path="/technical/defects" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><MaintenanceDefects /></React.Suspense></ProtectedRoute>} />
+      <Route path="/technical/critical-equipment" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CriticalEquipment /></React.Suspense></ProtectedRoute>} />
+      <Route path="/technical/inventory" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><SpareParts /></React.Suspense></ProtectedRoute>} />
+      <Route path="/technical/certificates" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Certificates /></React.Suspense></ProtectedRoute>} />
+      <Route path="/technical/certificates/alerts" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CertificateAlerts /></React.Suspense></ProtectedRoute>} />
+      <Route path="/technical/drawings" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Drawings /></React.Suspense></ProtectedRoute>} />
+      {/* Technical placeholders (phase 2) */}
+      <Route path="/technical/work-orders" element={<PlaceholderWrapper title="Work Orders" />} />
+      <Route path="/technical/service-reports" element={<PlaceholderWrapper title="Service Reports" />} />
+      <Route path="/technical/class-conditions" element={<PlaceholderWrapper title="Class Conditions" />} />
+      <Route path="/technical/refit" element={<PlaceholderWrapper title="Refit & Dry Dock" />} />
+      <Route path="/technical/contractors" element={<PlaceholderWrapper title="Contractors" />} />
+      <Route path="/technical/projects" element={<PlaceholderWrapper title="Technical Projects" />} />
+
+      {/* Knowledge */}
+      <Route path="/knowledge/register" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><MasterDocumentIndex /></React.Suspense></ProtectedRoute>} />
+      <Route path="/knowledge/manuals" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Manuals /></React.Suspense></ProtectedRoute>} />
+      <Route path="/knowledge/sops" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Procedures /></React.Suspense></ProtectedRoute>} />
+      <Route path="/knowledge/policies" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Policies /></React.Suspense></ProtectedRoute>} />
+      <Route path="/knowledge/handbooks" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><ISM_SMS /></React.Suspense></ProtectedRoute>} />
+      <Route path="/knowledge/drawings" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Drawings /></React.Suspense></ProtectedRoute>} />
+      <Route path="/knowledge/templates" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/FormTemplates')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/knowledge/emergency-plans" element={<PlaceholderWrapper title="Emergency Plans" />} />
+
+      {/* Administration */}
+      <Route path="/administration/company" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CompanyDetails /></React.Suspense></ProtectedRoute>} />
+      <Route path="/administration/emergency-contacts" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/vessels/pages/VesselEmergencyDetailsPage')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/administration/emergency-contacts/:vesselId" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/vessels/pages/VesselEmergencyDetailsPage')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/administration/users" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><UserManagement /></React.Suspense></ProtectedRoute>} />
+      <Route path="/administration/roles" element={
+        <ProtectedRoute>
+          <DashboardLayout>
+            <React.Suspense fallback={<LazyLoader />}><RolesPermissionsPage /></React.Suspense>
+          </DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/administration/vessel-settings" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Settings /></React.Suspense></ProtectedRoute>} />
+      <Route path="/administration/vessel-settings/*" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Settings /></React.Suspense></ProtectedRoute>} />
+      <Route path="/administration/fleet-settings" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><FleetGroups /></React.Suspense></ProtectedRoute>} />
+      <Route path="/administration/notifications" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><AlertConfiguration /></React.Suspense></ProtectedRoute>} />
+      <Route path="/administration/integrations" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><APIIntegrations /></React.Suspense></ProtectedRoute>} />
+      <Route path="/administration/branding" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><BrandingSettings /></React.Suspense></ProtectedRoute>} />
+      <Route path="/administration/hr" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><HRPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/administration/feedback" element={
+        <ProtectedRoute>
+          <DashboardLayout>
+            <React.Suspense fallback={<LazyLoader />}><FeedbackAdmin /></React.Suspense>
+          </DashboardLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/administration/training" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/development/pages/DevelopmentAdmin')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/administration/audit-logs" element={<PlaceholderWrapper title="Audit Logs" />} />
+      <Route path="/administration/api-access" element={<PlaceholderWrapper title="API Access" />} />
+
+      {/* Emergency (pinned) */}
+      <Route path="/emergency" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/vessels/pages/VesselEmergencyDetailsPage')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+
+      {/* Charter & Guest, Procurement — all phase 2 placeholders */}
+      <Route path="/charter/bookings" element={<PlaceholderWrapper title="Bookings & Contracts" />} />
+      <Route path="/charter/billing" element={<PlaceholderWrapper title="Billing" />} />
+      <Route path="/charter/broker-comms" element={<PlaceholderWrapper title="Broker Comms" />} />
+      <Route path="/charter/guest-preferences" element={<PlaceholderWrapper title="Guest Preferences" />} />
+      <Route path="/charter/provisioning" element={<PlaceholderWrapper title="Provisioning" />} />
+      <Route path="/charter/service-delivery" element={<PlaceholderWrapper title="Service Delivery" />} />
+      <Route path="/charter/turnaround" element={<PlaceholderWrapper title="Turnaround" />} />
+      <Route path="/charter/briefing-packs" element={<PlaceholderWrapper title="Briefing Packs" />} />
+      <Route path="/procurement/requisitions" element={<PlaceholderWrapper title="Requisitions" />} />
+      <Route path="/procurement/purchase-orders" element={<PlaceholderWrapper title="Purchase Orders" />} />
+      <Route path="/procurement/vendors" element={<PlaceholderWrapper title="Vendors" />} />
+      <Route path="/procurement/budgets" element={<PlaceholderWrapper title="Budgets" />} />
+      <Route path="/procurement/approvals" element={<PlaceholderWrapper title="Approvals" />} />
+
+      {/* Insights (phase 2) */}
+      <Route path="/insights" element={<Navigate to="/insights/incidents" replace />} />
+      <Route path="/insights/incidents" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}><IncidentAnalytics /></React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/insights/capa" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}><CAPATracker /></React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/insights/drills" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}><DrillAnalytics /></React.Suspense>
+        </ProtectedRoute>
+      } />
+      <Route path="/insights/trip-suggestions" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/itinerary/pages/TripSuggestionsPage')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
+
+      {/* Catch-all - redirect to home instead of 404 */}
+      <Route path="*" element={<Navigate to="/home" replace />} />
     </Routes>
   );
 };

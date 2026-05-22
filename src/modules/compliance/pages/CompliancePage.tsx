@@ -1,5 +1,5 @@
 import React from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Shield, Anchor, Users } from 'lucide-react';
@@ -8,13 +8,28 @@ import ISPSTab from '@/modules/compliance/components/ISPSTab';
 import MLCTab from '@/modules/compliance/components/MLCTab';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 
+const PATH_TABS: Record<string, string> = {
+  '/compliance/ism': 'ism',
+  '/compliance/isps': 'isps',
+  '/compliance/mlc': 'mlc',
+};
+
 const CompliancePage: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tab = searchParams.get('tab') || 'ism';
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Tab is derived from the URL path first (new IA), then ?tab= query
+  // (legacy in-app links), then defaults to ISM.
+  const tab = PATH_TABS[location.pathname] ?? searchParams.get('tab') ?? 'ism';
   const { selectedVessel } = useVessel();
+  const isPathRouted = location.pathname in PATH_TABS || location.pathname === '/compliance';
 
   const handleTabChange = (value: string) => {
-    setSearchParams({ tab: value });
+    if (isPathRouted) {
+      navigate(`/compliance/${value}`);
+    } else {
+      navigate({ pathname: location.pathname, search: `?tab=${value}` });
+    }
   };
 
   return (
