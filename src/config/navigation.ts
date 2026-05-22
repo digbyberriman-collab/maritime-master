@@ -255,13 +255,6 @@ export const NAVIGATION_ITEMS: NavItem[] = [
       { id: 'spare-parts', label: 'Spare Parts', path: '/maintenance/spares', icon: Package },
     ],
   },
-  {
-    id: 'settings',
-    label: 'Settings',
-    icon: Settings,
-    path: '/settings',
-    permissions: ['all'],
-  },
 ];
 
 // Admin-only items (shown in Settings or separate admin section)
