@@ -75,6 +75,30 @@ export function useSidebarOrder() {
     });
   }, []);
 
+  /**
+   * Reorder within a group using a reducer over the previous saved order so
+   * rapid successive moves in the same group never operate on stale data.
+   */
+  const reorderGroup = useCallback(
+    (groupId: string, allIds: string[], updater: (currentOrder: string[]) => string[] | null) => {
+      setMap((prev) => {
+        const saved = prev[groupId] ?? [];
+        const base = saved.length ? [...saved] : [...allIds];
+        // Append any newly-visible ids (e.g. permissions changed) at the end so
+        // they participate in reordering instead of silently disappearing.
+        allIds.forEach((x) => {
+          if (!base.includes(x)) base.push(x);
+        });
+        const next = updater(base);
+        if (!next) return prev;
+        const updated = { ...prev, [groupId]: next };
+        write(updated);
+        return updated;
+      });
+    },
+    []
+  );
+
   const reset = useCallback(() => {
     try {
       localStorage.removeItem(STORAGE_KEY);
@@ -88,19 +112,17 @@ export function useSidebarOrder() {
 
   const moveInGroup = useCallback(
     (groupId: string, id: string, direction: 'up' | 'down', allIds: string[]) => {
-      const current = map[groupId] ?? [];
-      const base = current.length ? [...current] : [...allIds];
-      allIds.forEach((x) => {
-        if (!base.includes(x)) base.push(x);
+      reorderGroup(groupId, allIds, (base) => {
+        const idx = base.indexOf(id);
+        if (idx === -1) return null;
+        const target = direction === 'up' ? idx - 1 : idx + 1;
+        if (target < 0 || target >= base.length) return null;
+        const next = [...base];
+        [next[idx], next[target]] = [next[target], next[idx]];
+        return next;
       });
-      const idx = base.indexOf(id);
-      if (idx === -1) return;
-      const target = direction === 'up' ? idx - 1 : idx + 1;
-      if (target < 0 || target >= base.length) return;
-      [base[idx], base[target]] = [base[target], base[idx]];
-      setGroupOrder(groupId, base);
     },
-    [map, setGroupOrder]
+    [reorderGroup]
   );
 
   // Back-compat: `order` is the root-level order array.
@@ -123,6 +145,7 @@ export function useSidebarOrder() {
     getGroupOrder,
     setGroupOrder,
     moveInGroup,
+    reorderGroup,
     ROOT,
   };
 }
