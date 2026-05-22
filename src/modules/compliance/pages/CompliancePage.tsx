@@ -22,9 +22,9 @@ const CompliancePage: React.FC = () => {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">ISM & Compliance</h1>
+          <h1 className="text-2xl font-bold text-foreground">ISM</h1>
           <p className="text-muted-foreground">
-            ISM, ISPS, MLC & MARPOL compliance management
+            ISM compliance management
             {selectedVessel && <span className="ml-1">— {selectedVessel.name}</span>}
           </p>
         </div>
