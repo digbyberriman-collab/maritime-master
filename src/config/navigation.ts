@@ -149,7 +149,7 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     permissions: ['all'],
     children: [
       { id: 'manuals', label: 'Manuals', path: '/documents/manuals', icon: BookOpen },
-      { id: 'procedures-sops', label: 'Procedures & SOPs', path: '/documents/procedures', icon: ClipboardList },
+      { id: 'procedures-sops', label: 'SOPs', path: '/documents/procedures', icon: ClipboardList },
       { id: 'policies', label: 'Policies', path: '/documents/policies', icon: FileCheck },
       { id: 'ism-sms', label: 'ISM / SMS', path: '/documents/ism-sms', icon: Shield },
       { id: 'drawings', label: 'Drawings', path: '/documents/drawings', icon: Layers },

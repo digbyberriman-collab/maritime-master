@@ -69,204 +69,8 @@ interface Procedure {
   updated_at: string;
 }
 
-// Mock data for demo purposes
-const mockProcedures: Procedure[] = [
-  {
-    id: '1',
-    title: 'Bridge Watchkeeping Procedure',
-    type: 'bridge_operations',
-    document_number: 'SOP-BRG-001',
-    version: '4.1',
-    status: 'current',
-    vessel_applicability: 'all',
-    file_size: '2.4 MB',
-    pages: 42,
-    last_review_date: '2024-03-10T00:00:00Z',
-    next_review_date: '2025-03-10T00:00:00Z',
-    reviewed_by: 'Captain Sarah Johnson',
-    approval_date: '2024-03-15T00:00:00Z',
-    approved_by: 'Fleet Manager',
-    linked_checklists: 5,
-    amendment_count: 3,
-    amendment_history: [
-      { version: '4.1', date: '2024-03-15', description: 'Updated ECDIS cross-check requirements' },
-      { version: '4.0', date: '2023-09-01', description: 'Added COLREG compliance section' },
-      { version: '3.2', date: '2023-03-20', description: 'Revised night watch protocols' },
-    ],
-    created_at: '2022-06-01T00:00:00Z',
-    updated_at: '2024-03-15T00:00:00Z',
-  },
-  {
-    id: '2',
-    title: 'Engine Room Daily Rounds',
-    type: 'engine_room',
-    document_number: 'SOP-ENG-003',
-    version: '2.5',
-    status: 'current',
-    vessel_applicability: 'specific',
-    vessels: ['MV Atlantic Pioneer', 'MV Pacific Voyager'],
-    file_size: '3.1 MB',
-    pages: 58,
-    last_review_date: '2024-01-20T00:00:00Z',
-    next_review_date: '2025-01-20T00:00:00Z',
-    reviewed_by: 'Chief Engineer Robert Chen',
-    approval_date: '2024-01-25T00:00:00Z',
-    approved_by: 'Technical Superintendent',
-    linked_checklists: 8,
-    amendment_count: 4,
-    amendment_history: [
-      { version: '2.5', date: '2024-01-25', description: 'Added bilge monitoring frequency' },
-      { version: '2.4', date: '2023-07-10', description: 'Updated fuel system checks' },
-      { version: '2.3', date: '2023-01-15', description: 'Revised alarm response procedures' },
-      { version: '2.2', date: '2022-08-20', description: 'Added turbocharger inspection steps' },
-    ],
-    created_at: '2022-03-15T00:00:00Z',
-    updated_at: '2024-01-25T00:00:00Z',
-  },
-  {
-    id: '3',
-    title: 'Mooring Operations Procedure',
-    type: 'deck_operations',
-    document_number: 'SOP-DK-002',
-    version: '3.0',
-    status: 'under_review',
-    vessel_applicability: 'all',
-    file_size: '1.8 MB',
-    pages: 34,
-    last_review_date: '2024-02-05T00:00:00Z',
-    next_review_date: '2025-02-05T00:00:00Z',
-    reviewed_by: 'Chief Officer Mike Wilson',
-    created_at: '2022-08-10T00:00:00Z',
-    updated_at: '2024-02-05T00:00:00Z',
-    linked_checklists: 3,
-    amendment_count: 2,
-    amendment_history: [
-      { version: '3.0', date: '2024-02-05', description: 'Revised snap-back zone markings' },
-      { version: '2.1', date: '2023-04-12', description: 'Updated PPE requirements for mooring' },
-    ],
-  },
-  {
-    id: '4',
-    title: 'Enclosed Space Entry Procedure',
-    type: 'safety',
-    document_number: 'SOP-SAF-001',
-    version: '5.2',
-    status: 'current',
-    vessel_applicability: 'all',
-    file_size: '2.9 MB',
-    pages: 48,
-    last_review_date: '2024-04-01T00:00:00Z',
-    next_review_date: '2025-04-01T00:00:00Z',
-    reviewed_by: 'Safety Officer Elena Rossi',
-    approval_date: '2024-04-05T00:00:00Z',
-    approved_by: 'DPA Manager',
-    linked_checklists: 6,
-    amendment_count: 5,
-    amendment_history: [
-      { version: '5.2', date: '2024-04-05', description: 'Added gas monitoring calibration checks' },
-      { version: '5.1', date: '2023-10-15', description: 'Updated rescue team requirements' },
-      { version: '5.0', date: '2023-04-01', description: 'Full revision per IMO Res. A.1050(27)' },
-      { version: '4.3', date: '2022-11-20', description: 'Added ventilation duration requirements' },
-      { version: '4.2', date: '2022-06-10', description: 'Revised permit-to-work form' },
-    ],
-    created_at: '2021-01-15T00:00:00Z',
-    updated_at: '2024-04-05T00:00:00Z',
-  },
-  {
-    id: '5',
-    title: 'Fire and Abandon Ship Drill Procedure',
-    type: 'emergency',
-    document_number: 'SOP-EMR-001',
-    version: '3.4',
-    status: 'current',
-    vessel_applicability: 'all',
-    file_size: '3.6 MB',
-    pages: 72,
-    last_review_date: '2023-12-10T00:00:00Z',
-    next_review_date: '2024-12-10T00:00:00Z',
-    reviewed_by: 'Captain David Martinez',
-    approval_date: '2023-12-15T00:00:00Z',
-    approved_by: 'Fleet Manager',
-    linked_checklists: 7,
-    amendment_count: 3,
-    amendment_history: [
-      { version: '3.4', date: '2023-12-15', description: 'Updated muster station assignments' },
-      { version: '3.3', date: '2023-06-01', description: 'Added helicopter evacuation procedures' },
-      { version: '3.2', date: '2022-12-20', description: 'Revised fire boundary cooling protocols' },
-    ],
-    created_at: '2021-06-01T00:00:00Z',
-    updated_at: '2023-12-15T00:00:00Z',
-  },
-  {
-    id: '6',
-    title: 'Cargo Loading and Discharge Plan',
-    type: 'cargo',
-    document_number: 'SOP-CRG-002',
-    version: '2.0',
-    status: 'draft',
-    vessel_applicability: 'specific',
-    vessels: ['MV Ocean Explorer'],
-    file_size: '1.5 MB',
-    pages: 38,
-    next_review_date: '2025-06-01T00:00:00Z',
-    linked_checklists: 4,
-    amendment_count: 1,
-    amendment_history: [
-      { version: '2.0', date: '2024-02-10', description: 'Draft for containerized cargo operations' },
-    ],
-    created_at: '2024-01-05T00:00:00Z',
-    updated_at: '2024-02-10T00:00:00Z',
-  },
-  {
-    id: '7',
-    title: 'Ballast Water Management Procedure',
-    type: 'environmental',
-    document_number: 'SOP-ENV-001',
-    version: '3.1',
-    status: 'current',
-    vessel_applicability: 'all',
-    file_size: '2.2 MB',
-    pages: 45,
-    last_review_date: '2024-02-20T00:00:00Z',
-    next_review_date: '2025-02-20T00:00:00Z',
-    reviewed_by: 'Environmental Officer Anna Berg',
-    approval_date: '2024-02-25T00:00:00Z',
-    approved_by: 'DPA Manager',
-    linked_checklists: 3,
-    amendment_count: 2,
-    amendment_history: [
-      { version: '3.1', date: '2024-02-25', description: 'Updated for BWM Convention D-2 standard' },
-      { version: '3.0', date: '2023-08-10', description: 'Added treatment system maintenance steps' },
-    ],
-    created_at: '2022-02-01T00:00:00Z',
-    updated_at: '2024-02-25T00:00:00Z',
-  },
-  {
-    id: '8',
-    title: 'ISPS Code Ship Security Procedure',
-    type: 'security',
-    document_number: 'SOP-SEC-001',
-    version: '2.3',
-    status: 'archived',
-    vessel_applicability: 'specific',
-    vessels: ['MV Atlantic Pioneer', 'MV Pacific Voyager', 'MV Ocean Explorer'],
-    file_size: '1.9 MB',
-    pages: 52,
-    last_review_date: '2022-09-15T00:00:00Z',
-    next_review_date: '2023-09-15T00:00:00Z',
-    reviewed_by: 'Ship Security Officer James Park',
-    approval_date: '2022-09-20T00:00:00Z',
-    approved_by: 'Company Security Officer',
-    linked_checklists: 2,
-    amendment_count: 2,
-    amendment_history: [
-      { version: '2.3', date: '2022-09-20', description: 'Updated security level change protocols' },
-      { version: '2.2', date: '2022-03-05', description: 'Revised access control procedures' },
-    ],
-    created_at: '2021-09-01T00:00:00Z',
-    updated_at: '2022-09-20T00:00:00Z',
-  },
-];
+// SOPs start empty; upload to populate.
+const mockProcedures: Procedure[] = [];
 
 const Procedures: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -383,9 +187,9 @@ const Procedures: React.FC = () => {
 
   const stats = [
     {
-      title: 'Total Procedures',
+      title: 'Total SOPs',
       value: mockProcedures.length,
-      description: 'All procedures in system',
+      description: 'All SOPs in system',
       icon: ClipboardList,
     },
     {
@@ -416,14 +220,14 @@ const Procedures: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Procedures & SOPs</h1>
+            <h1 className="text-3xl font-bold tracking-tight">SOPs</h1>
             <p className="text-muted-foreground">
-              Standard operating procedures, work instructions, and linked checklists
+              Standard operating procedures and linked checklists
             </p>
           </div>
-          <Button className="gap-2" onClick={() => toast.info('Upload procedure feature coming soon')}>
+          <Button className="gap-2" onClick={() => toast.info('Upload SOP feature coming soon')}>
             <Plus className="w-4 h-4" />
-            Upload Procedure
+            Upload SOP
           </Button>
         </div>
 
@@ -452,7 +256,7 @@ const Procedures: React.FC = () => {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
-                  placeholder="Search procedures by title, document number, or type..."
+                  placeholder="Search SOPs by title, document number, or type..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
@@ -507,16 +311,16 @@ const Procedures: React.FC = () => {
         {/* Procedures Table */}
         <Card className="shadow-card">
           <CardHeader>
-            <CardTitle>Procedures ({filteredProcedures.length})</CardTitle>
+            <CardTitle>SOPs ({filteredProcedures.length})</CardTitle>
             <CardDescription>
-              Standard operating procedures and work instructions with linked checklists
+              Standard operating procedures with linked checklists
             </CardDescription>
           </CardHeader>
           <CardContent>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Procedure</TableHead>
+                  <TableHead>SOP</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Version</TableHead>
                   <TableHead>Status</TableHead>
@@ -644,8 +448,8 @@ const Procedures: React.FC = () => {
             {filteredProcedures.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 <ClipboardList className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>No procedures found</p>
-                <p className="text-sm">Try adjusting your search criteria</p>
+                <p>No SOPs yet</p>
+                <p className="text-sm">Upload your first SOP to get started.</p>
               </div>
             )}
           </CardContent>
