@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -171,111 +173,79 @@ const Certificates: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Certificates</h1>
-            <p className="text-muted-foreground">All vessel, crew, company, and class certificates in one place</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsAIModalOpen(true)} className="gap-1">
-              <ScanLine className="w-4 h-4" />
-              Upload & Scan
-            </Button>
-            <Button onClick={() => handleAddCertificate()}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Certificate
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          title="Certificates"
+          description="All vessel, crew, company, and class certificates in one place"
+          actions={
+            <>
+              <Button variant="outline" onClick={() => setIsAIModalOpen(true)} className="gap-1">
+                <ScanLine className="w-4 h-4" />
+                Upload & Scan
+              </Button>
+              <Button onClick={() => handleAddCertificate()}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Certificate
+              </Button>
+            </>
+          }
+        />
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Certificates</p>
-                  <p className="text-3xl font-bold text-foreground">{stats.total}</p>
-                </div>
-                <div className="p-3 bg-primary/10 rounded-full">
-                  <Award className="w-6 h-6 text-primary" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Expiring Soon</p>
-                  <p className="text-3xl font-bold text-yellow-600">{stats.expiringSoon}</p>
-                  <p className="text-xs text-muted-foreground">Within 90 days</p>
-                </div>
-                <div className="p-3 bg-yellow-500/10 rounded-full">
-                  <AlertTriangle className="w-6 h-6 text-yellow-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Expired</p>
-                  <p className="text-3xl font-bold text-destructive">{stats.expired}</p>
-                  <p className="text-xs text-muted-foreground">Requires immediate action</p>
-                </div>
-                <div className="p-3 bg-destructive/10 rounded-full">
-                  <XCircle className="w-6 h-6 text-destructive" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Next Expiry</p>
-                  {stats.nextExpiry ? (
-                    <>
-                      <p className="text-lg font-semibold text-foreground truncate max-w-[150px]">
-                        {stats.nextExpiry.certificate_name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {format(new Date(stats.nextExpiry.expiry_date), 'dd MMM yyyy')}
-                        {' '}
-                        <Badge
-                          variant="outline"
-                          className={
-                            daysUntilExpiry(stats.nextExpiry.expiry_date) < 0
-                              ? 'text-destructive border-destructive'
-                              : daysUntilExpiry(stats.nextExpiry.expiry_date) <= 30
-                                ? 'text-yellow-600 border-yellow-600'
-                                : 'text-muted-foreground'
-                          }
-                        >
-                          {daysUntilExpiry(stats.nextExpiry.expiry_date) < 0
-                            ? `${Math.abs(daysUntilExpiry(stats.nextExpiry.expiry_date))} days overdue`
-                            : `${daysUntilExpiry(stats.nextExpiry.expiry_date)} days left`
-                          }
-                        </Badge>
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No certificates</p>
-                  )}
-                </div>
-                <div className="p-3 bg-muted rounded-full">
-                  <Clock className="w-6 h-6 text-muted-foreground" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid>
+          <StatCard
+            label="Total Certificates"
+            value={stats.total}
+            icon={<Award className="w-5 h-5 text-primary" />}
+          />
+          <StatCard
+            label="Expiring Soon"
+            value={stats.expiringSoon}
+            tone="warning"
+            icon={<AlertTriangle className="w-5 h-5 text-yellow-600" />}
+            hint="Within 90 days"
+          />
+          <StatCard
+            label="Expired"
+            value={stats.expired}
+            tone="danger"
+            icon={<XCircle className="w-5 h-5 text-destructive" />}
+            hint="Requires immediate action"
+          />
+          <StatCard
+            label="Next Expiry"
+            icon={<Clock className="w-5 h-5 text-muted-foreground" />}
+            value={
+              stats.nextExpiry ? (
+                <span className="text-lg font-semibold text-foreground truncate block max-w-[180px]">
+                  {stats.nextExpiry.certificate_name}
+                </span>
+              ) : (
+                <span className="text-sm text-muted-foreground">No certificates</span>
+              )
+            }
+            hint={
+              stats.nextExpiry ? (
+                <>
+                  {format(new Date(stats.nextExpiry.expiry_date), 'dd MMM yyyy')}{' '}
+                  <Badge
+                    variant="outline"
+                    className={
+                      daysUntilExpiry(stats.nextExpiry.expiry_date) < 0
+                        ? 'text-destructive border-destructive'
+                        : daysUntilExpiry(stats.nextExpiry.expiry_date) <= 30
+                          ? 'text-yellow-600 border-yellow-600'
+                          : 'text-muted-foreground'
+                    }
+                  >
+                    {daysUntilExpiry(stats.nextExpiry.expiry_date) < 0
+                      ? `${Math.abs(daysUntilExpiry(stats.nextExpiry.expiry_date))} days overdue`
+                      : `${daysUntilExpiry(stats.nextExpiry.expiry_date)} days left`
+                    }
+                  </Badge>
+                </>
+              ) : undefined
+            }
+          />
+        </StatGrid>
 
         {/* Filter Tabs — FLAT, not nested. No "Vessel Certificates" subfolder. */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>

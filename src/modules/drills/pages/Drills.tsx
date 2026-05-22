@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Plus, Calendar, AlertTriangle, CheckCircle, Phone, FileText } from 'lucide-react';
 import { useDrills } from '@/modules/drills/hooks/useDrills';
-import { format, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import DrillScheduleTab from '@/modules/drills/components/DrillScheduleTab';
 import DrillHistoryTab from '@/modules/drills/components/DrillHistoryTab';
 import EmergencyProceduresTab from '@/modules/drills/components/EmergencyProceduresTab';
@@ -19,12 +19,10 @@ const Drills: React.FC = () => {
   const [showScheduleDrillModal, setShowScheduleDrillModal] = useState(false);
   const [showContactsModal, setShowContactsModal] = useState(false);
 
-  const { 
-    drills, 
-    thisYearDrills, 
-    nextScheduledDrill, 
-    drillTypes,
-    isLoading 
+  const {
+    drills,
+    thisYearDrills,
+    nextScheduledDrill,
   } = useDrills();
 
   // Calculate compliance rate
@@ -44,88 +42,54 @@ const Drills: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Drills & Emergency Preparedness</h1>
-            <p className="text-muted-foreground">Manage drills, emergency contacts, and procedures</p>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={() => setShowScheduleDrillModal(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Schedule Drill
-            </Button>
-            <Button variant="outline" onClick={() => setShowContactsModal(true)}>
-              <Phone className="w-4 h-4 mr-2" />
-              Emergency Contacts
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          title="Drills & Emergency Preparedness"
+          description="Manage drills, emergency contacts, and procedures"
+          actions={
+            <>
+              <Button onClick={() => setShowScheduleDrillModal(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Schedule Drill
+              </Button>
+              <Button variant="outline" onClick={() => setShowContactsModal(true)}>
+                <Phone className="w-4 h-4 mr-2" />
+                Emergency Contacts
+              </Button>
+            </>
+          }
+        />
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Drills This Year</CardTitle>
-              <CheckCircle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{thisYearDrills.length}</div>
-              <p className="text-xs text-muted-foreground">
-                {completedDrillsThisYear.length} completed
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Next Scheduled Drill</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {nextScheduledDrill ? (
-                <>
-                  <div className="text-2xl font-bold">
-                    {format(new Date(nextScheduledDrill.drill_date_scheduled), 'MMM d')}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {nextScheduledDrill.drill_type?.drill_name || 'Drill'}
-                  </p>
-                </>
-              ) : (
-                <div className="text-sm text-muted-foreground">No drills scheduled</div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Compliance Rate</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{complianceRate}%</div>
-              <p className="text-xs text-muted-foreground">
-                Required drills completed on time
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Overdue Drills</CardTitle>
-              <AlertTriangle className={`h-4 w-4 ${overdueDrills.length > 0 ? 'text-red-500' : 'text-muted-foreground'}`} />
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${overdueDrills.length > 0 ? 'text-red-500' : ''}`}>
-                {overdueDrills.length}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {overdueDrills.length > 0 ? 'Require immediate attention' : 'All drills on schedule'}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid>
+          <StatCard
+            label="Drills This Year"
+            icon={<CheckCircle className="h-4 w-4 text-muted-foreground" />}
+            value={thisYearDrills.length}
+            hint={`${completedDrillsThisYear.length} completed`}
+          />
+          <StatCard
+            label="Next Scheduled Drill"
+            icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
+            value={
+              nextScheduledDrill
+                ? format(new Date(nextScheduledDrill.drill_date_scheduled), 'MMM d')
+                : <span className="text-sm text-muted-foreground">No drills scheduled</span>
+            }
+            hint={nextScheduledDrill ? nextScheduledDrill.drill_type?.drill_name || 'Drill' : undefined}
+          />
+          <StatCard
+            label="Compliance Rate"
+            icon={<FileText className="h-4 w-4 text-muted-foreground" />}
+            value={`${complianceRate}%`}
+            hint="Required drills completed on time"
+          />
+          <StatCard
+            label="Overdue Drills"
+            icon={<AlertTriangle className={`h-4 w-4 ${overdueDrills.length > 0 ? 'text-red-500' : 'text-muted-foreground'}`} />}
+            value={overdueDrills.length}
+            tone={overdueDrills.length > 0 ? 'danger' : 'default'}
+            hint={overdueDrills.length > 0 ? 'Require immediate attention' : 'All drills on schedule'}
+          />
+        </StatGrid>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>

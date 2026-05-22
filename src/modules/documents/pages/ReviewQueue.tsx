@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 import { usePendingReviews, useDocumentWorkflowMutations } from '@/modules/documents/hooks/useDocumentWorkflow';
 import { useDocument } from '@/modules/documents/hooks/useDocuments';
 import { Button } from '@/components/ui/button';
@@ -77,13 +78,10 @@ const ReviewQueue: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="max-w-5xl mx-auto space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Review Queue</h1>
-          <p className="text-muted-foreground">
-            Documents awaiting your review and approval
-          </p>
-        </div>
+        <PageHeader
+          title="Review Queue"
+          description="Documents awaiting your review and approval"
+        />
 
         {/* Pending Reviews */}
         {isLoading ? (

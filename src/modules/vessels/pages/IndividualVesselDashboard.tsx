@@ -5,10 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Ship, Users, Award, Shield, CheckSquare, Wrench, AlertTriangle,
-  MapPin, Calendar, FileText, Plane, ArrowRight, Anchor,
+  Ship, Users, Award, Shield, CheckSquare, Wrench,
+  MapPin, FileText, Plane, Anchor,
 } from 'lucide-react';
 import { getVesselBySlug, getCrewByVessel, DRAAK_PORTS_OF_CALL } from '@/data/seedData';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 
 const IndividualVesselDashboard: React.FC = () => {
   const { vesselSlug } = useParams<{ vesselSlug: string }>();
@@ -49,35 +51,33 @@ const IndividualVesselDashboard: React.FC = () => {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Vessel Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-lg bg-[#3B82F6]/20 flex items-center justify-center">
-              <Ship className="w-8 h-8 text-[#3B82F6]" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">{vessel.name}</h1>
-              <div className="flex items-center gap-3 mt-1">
-                <Badge variant="outline" className="text-[#94A3B8] border-[#1A2740]">{vessel.type}</Badge>
-                <span className="text-[#94A3B8] text-sm flex items-center gap-1">
-                  <Anchor className="w-3.5 h-3.5" /> {vessel.flag}
-                </span>
-                <Badge className="bg-[#22C55E] text-white">
-                  {currentPort ? 'In Port' : 'At Sea'}
-                </Badge>
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" className="gap-1 border-[#1A2740] text-[#94A3B8]"
-              onClick={() => navigate(`/compliance?tab=ism`)}>
-              <Shield className="w-4 h-4" /> Compliance
-            </Button>
-            <Button className="gap-1 bg-[#3B82F6]"
-              onClick={() => navigate(`/compliance?tab=mlc`)}>
-              <Users className="w-4 h-4" /> Crew List
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          icon={<Ship className="w-5 h-5" />}
+          title={vessel.name}
+          description={
+            <span className="flex items-center gap-3 flex-wrap">
+              <Badge variant="outline" className="text-[#94A3B8] border-[#1A2740]">{vessel.type}</Badge>
+              <span className="text-[#94A3B8] text-sm flex items-center gap-1">
+                <Anchor className="w-3.5 h-3.5" /> {vessel.flag}
+              </span>
+              <Badge className="bg-[#22C55E] text-white">
+                {currentPort ? 'In Port' : 'At Sea'}
+              </Badge>
+            </span>
+          }
+          actions={
+            <>
+              <Button variant="outline" className="gap-1 border-[#1A2740] text-[#94A3B8]"
+                onClick={() => navigate(`/compliance?tab=ism`)}>
+                <Shield className="w-4 h-4" /> Compliance
+              </Button>
+              <Button className="gap-1 bg-[#3B82F6]"
+                onClick={() => navigate(`/compliance?tab=mlc`)}>
+                <Users className="w-4 h-4" /> Crew List
+              </Button>
+            </>
+          }
+        />
 
         {/* Current Location */}
         {currentPort && (
@@ -96,50 +96,14 @@ const IndividualVesselDashboard: React.FC = () => {
         )}
 
         {/* KPI Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <Card className="bg-[#111D33] border-[#1A2740]">
-            <CardContent className="pt-4 pb-4">
-              <Users className="w-5 h-5 text-[#3B82F6] mb-2" />
-              <p className="text-2xl font-bold text-white">{crewCount}</p>
-              <p className="text-xs text-[#94A3B8]">Crew Onboard</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-[#111D33] border-[#1A2740]">
-            <CardContent className="pt-4 pb-4">
-              <Shield className="w-5 h-5 text-[#22C55E] mb-2" />
-              <p className="text-2xl font-bold text-[#22C55E]">{stats.complianceRate}%</p>
-              <p className="text-xs text-[#94A3B8]">Compliance</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-[#111D33] border-[#1A2740]">
-            <CardContent className="pt-4 pb-4">
-              <AlertTriangle className="w-5 h-5 text-[#F59E0B] mb-2" />
-              <p className="text-2xl font-bold text-[#F59E0B]">{stats.openIncidents}</p>
-              <p className="text-xs text-[#94A3B8]">Open Incidents</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-[#111D33] border-[#1A2740]">
-            <CardContent className="pt-4 pb-4">
-              <Wrench className="w-5 h-5 text-[#EF4444] mb-2" />
-              <p className="text-2xl font-bold text-[#EF4444]">{stats.overdueMainten}</p>
-              <p className="text-xs text-[#94A3B8]">Overdue Maint.</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-[#111D33] border-[#1A2740]">
-            <CardContent className="pt-4 pb-4">
-              <Award className="w-5 h-5 text-[#F59E0B] mb-2" />
-              <p className="text-2xl font-bold text-[#F59E0B]">{stats.expiringCerts}</p>
-              <p className="text-xs text-[#94A3B8]">Expiring Certs</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-[#111D33] border-[#1A2740]">
-            <CardContent className="pt-4 pb-4">
-              <CheckSquare className="w-5 h-5 text-[#3B82F6] mb-2" />
-              <p className="text-2xl font-bold text-white">{stats.completedChecklists}</p>
-              <p className="text-xs text-[#94A3B8]">Checklists Done</p>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={6}>
+          <StatCard label="Crew Onboard" value={crewCount} icon={<Users className="w-5 h-5 text-muted-foreground" />} />
+          <StatCard label="Compliance" value={`${stats.complianceRate}%`} tone="success" icon={<Shield className="w-5 h-5 text-muted-foreground" />} />
+          <StatCard label="Open Incidents" value={stats.openIncidents} tone="warning" icon={<Wrench className="w-5 h-5 text-muted-foreground" />} />
+          <StatCard label="Overdue Maint." value={stats.overdueMainten} tone="danger" icon={<Wrench className="w-5 h-5 text-muted-foreground" />} />
+          <StatCard label="Expiring Certs" value={stats.expiringCerts} tone="warning" icon={<Award className="w-5 h-5 text-muted-foreground" />} />
+          <StatCard label="Checklists Done" value={stats.completedChecklists} icon={<CheckSquare className="w-5 h-5 text-muted-foreground" />} />
+        </StatGrid>
 
         {/* Module Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

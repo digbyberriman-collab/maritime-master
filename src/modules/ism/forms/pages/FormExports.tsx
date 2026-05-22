@@ -1,18 +1,17 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { 
-  Download, FileText, Calendar, Ship, Filter, Search,
-  Loader2, CheckCircle, FileSpreadsheet, File, Archive
+import {
+  Download, FileText, Calendar,
+  Loader2, FileSpreadsheet, File, Archive
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 import { toast } from 'sonner';
 
 interface FormTemplate {
@@ -116,14 +115,11 @@ export default function FormExports() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Download className="w-6 h-6" />
-            Form Exports
-          </h1>
-          <p className="text-muted-foreground">Export form submissions in bulk</p>
-        </div>
+        <PageHeader
+          icon={<Download className="w-6 h-6" />}
+          title="Form Exports"
+          description="Export form submissions in bulk"
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column - Selection */}
@@ -133,7 +129,7 @@ export default function FormExports() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-lg">Select Form Templates</CardTitle>
+                    <CardTitle className="text-base">Select Form Templates</CardTitle>
                     <CardDescription>Choose which forms to export</CardDescription>
                   </div>
                   <Button variant="outline" size="sm" onClick={selectAllTemplates}>
@@ -185,7 +181,7 @@ export default function FormExports() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-lg">Filter by Vessels</CardTitle>
+                    <CardTitle className="text-base">Filter by Vessels</CardTitle>
                     <CardDescription>Leave empty for all vessels</CardDescription>
                   </div>
                   <Button variant="outline" size="sm" onClick={selectAllVessels}>
@@ -228,7 +224,7 @@ export default function FormExports() {
             {/* Export Options */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Export Options</CardTitle>
+                <CardTitle className="text-base">Export Options</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
@@ -314,7 +310,7 @@ export default function FormExports() {
             {/* Export Summary & Button */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Export Summary</CardTitle>
+                <CardTitle className="text-base">Export Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2 text-sm">

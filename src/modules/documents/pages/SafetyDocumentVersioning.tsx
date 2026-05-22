@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -41,46 +42,46 @@ const SafetyDocumentVersioning: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Safety Document</p>
-            <h1 className="text-2xl font-bold text-foreground">Safety Management System Manual</h1>
-            <p className="text-muted-foreground">STORM-DOC-2024-0042 · Owner: DPA Office · Review cycle: 12 months</p>
-          </div>
-          <Dialog open={showUpload} onOpenChange={setShowUpload}>
-            <DialogTrigger asChild>
-              <Button><Upload className="w-4 h-4 mr-2" />Upload New Version</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader><DialogTitle>Upload New Version</DialogTitle></DialogHeader>
-              <div className="space-y-4 py-2">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label>Version Number</Label>
-                    <Input placeholder="v4.3" />
+        <PageHeader
+          eyebrow="Safety Document"
+          title="Safety Management System Manual"
+          description="STORM-DOC-2024-0042 · Owner: DPA Office · Review cycle: 12 months"
+          actions={
+            <Dialog open={showUpload} onOpenChange={setShowUpload}>
+              <DialogTrigger asChild>
+                <Button><Upload className="w-4 h-4 mr-2" />Upload New Version</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Upload New Version</DialogTitle></DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Version Number</Label>
+                      <Input placeholder="v4.3" />
+                    </div>
+                    <div>
+                      <Label>Effective Date</Label>
+                      <Input type="date" />
+                    </div>
                   </div>
                   <div>
-                    <Label>Effective Date</Label>
-                    <Input type="date" />
+                    <Label>Change Summary</Label>
+                    <Textarea rows={4} placeholder="Describe what changed in this revision..." />
+                  </div>
+                  <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+                    <FileUp className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm font-medium">Drop PDF here or click to browse</p>
+                    <p className="text-xs text-muted-foreground mt-1">Max 25 MB · PDF only</p>
                   </div>
                 </div>
-                <div>
-                  <Label>Change Summary</Label>
-                  <Textarea rows={4} placeholder="Describe what changed in this revision..." />
-                </div>
-                <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
-                  <FileUp className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-sm font-medium">Drop PDF here or click to browse</p>
-                  <p className="text-xs text-muted-foreground mt-1">Max 25 MB · PDF only</p>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setShowUpload(false)}>Cancel</Button>
-                <Button onClick={() => setShowUpload(false)}>Upload & Notify Crew</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowUpload(false)}>Cancel</Button>
+                  <Button onClick={() => setShowUpload(false)}>Upload & Notify Crew</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          }
+        />
 
         <Card className="border-emerald-500/40 bg-gradient-to-br from-emerald-500/5 to-transparent">
           <CardHeader>

@@ -16,6 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -273,38 +274,33 @@ export default function LeavePlannerPage() {
   return (
     <DashboardLayout>
       <div className="space-y-3">
-        {/* Header */}
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <CalendarDays className="w-6 h-6" />
-              Leave Planner
-            </h1>
-            <p className="text-sm text-muted-foreground">
-              {scopeLabel} — {year} • {filteredCrew.length} crew shown
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {canAccessAllVessels && (
-              <Button
-                variant={fleetView ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setFleetView(!fleetView)}
-              >
-                Fleet View
+        <PageHeader
+          icon={<CalendarDays className="w-6 h-6" />}
+          title="Leave Planner"
+          description={`${scopeLabel} — ${year} • ${filteredCrew.length} crew shown`}
+          actions={
+            <>
+              {canAccessAllVessels && (
+                <Button
+                  variant={fleetView ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setFleetView(!fleetView)}
+                >
+                  Fleet View
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={exportCsv}>
+                <Download className="w-4 h-4 mr-1" /> Export CSV
               </Button>
-            )}
-            <Button variant="outline" size="sm" onClick={exportCsv}>
-              <Download className="w-4 h-4 mr-1" /> Export CSV
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/crew/leave/calculator')}>
-              <Calculator className="w-4 h-4 mr-1" /> Calculator
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/crew/leave/requests')}>
-              Requests →
-            </Button>
-          </div>
-        </div>
+              <Button variant="outline" size="sm" onClick={() => navigate('/crew/leave/calculator')}>
+                <Calculator className="w-4 h-4 mr-1" /> Calculator
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => navigate('/crew/leave/requests')}>
+                Requests →
+              </Button>
+            </>
+          }
+        />
 
         {/* View toggle + toolbar */}
         <div className="flex items-center gap-2 flex-wrap bg-card border rounded-lg p-3">

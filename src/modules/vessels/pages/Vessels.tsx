@@ -13,11 +13,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Ship, Plus, Search, Pencil, Trash2, Eye } from 'lucide-react';
+import { Ship, Plus, Search, Pencil, Trash2 } from 'lucide-react';
 import { useVessels, Vessel, VesselFormData } from '@/modules/vessels/hooks/useVessels';
 import VesselFormModal from '@/modules/vessels/components/VesselFormModal';
 import DeleteVesselDialog from '@/modules/vessels/components/DeleteVesselDialog';
 import { Skeleton } from '@/components/ui/skeleton';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 const Vessels: React.FC = () => {
   const { vessels, isLoading, createVessel, updateVessel, deleteVessel } = useVessels();
@@ -94,16 +95,16 @@ const Vessels: React.FC = () => {
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Vessels</h1>
-            <p className="text-muted-foreground">Manage your fleet vessels</p>
-          </div>
-          <Button onClick={handleAddVessel} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Add Vessel
-          </Button>
-        </div>
+        <PageHeader
+          title="Vessels"
+          description="Manage your fleet vessels"
+          actions={
+            <Button onClick={handleAddVessel} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Add Vessel
+            </Button>
+          }
+        />
 
         {/* Search */}
         <Card className="shadow-card">
@@ -123,7 +124,7 @@ const Vessels: React.FC = () => {
         {/* Vessels Table */}
         <Card className="shadow-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base">
               <Ship className="w-5 h-5" />
               Fleet Vessels
             </CardTitle>

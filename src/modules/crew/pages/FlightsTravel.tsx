@@ -13,6 +13,8 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format, isAfter, isBefore, addDays } from 'date-fns';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 
 interface FlightBooking {
   id: string;
@@ -116,87 +118,52 @@ export default function FlightsTravel() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Plane className="w-6 h-6" />
-              Flights & Travel
-            </h1>
-            <p className="text-muted-foreground">Manage crew flight bookings and travel arrangements</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" asChild>
-              <Link to="/crew/admin/travel">
-                View All Travel Records
-              </Link>
-            </Button>
-            <Button asChild>
-              <Link to="/crew/admin/travel/new">
-                <Plus className="w-4 h-4 mr-2" />
-                New Booking
-              </Link>
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          icon={<Plane className="w-6 h-6" />}
+          title="Flights & Travel"
+          description="Manage crew flight bookings and travel arrangements"
+          actions={
+            <>
+              <Button variant="outline" asChild>
+                <Link to="/crew/admin/travel">
+                  View All Travel Records
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link to="/crew/admin/travel/new">
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Booking
+                </Link>
+              </Button>
+            </>
+          }
+        />
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Plane className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{upcomingFlights.length}</p>
-                  <p className="text-sm text-muted-foreground">Upcoming Flights</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <Calendar className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{todayFlights.length}</p>
-                  <p className="text-sm text-muted-foreground">Today's Flights</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-yellow-100 rounded-lg">
-                  <AlertCircle className="w-5 h-5 text-yellow-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{urgentFlights.length}</p>
-                  <p className="text-sm text-muted-foreground">Next 72 Hours</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Clock className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {bookings.filter(b => b.status === 'pending').length}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Pending Confirmation</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={4}>
+          <StatCard
+            label="Upcoming Flights"
+            value={upcomingFlights.length}
+            icon={<Plane className="w-4 h-4 text-sky-600" />}
+          />
+          <StatCard
+            label="Today's Flights"
+            value={todayFlights.length}
+            tone="success"
+            icon={<Calendar className="w-4 h-4 text-emerald-600" />}
+          />
+          <StatCard
+            label="Next 72 Hours"
+            value={urgentFlights.length}
+            tone="warning"
+            icon={<AlertCircle className="w-4 h-4 text-amber-600" />}
+          />
+          <StatCard
+            label="Pending Confirmation"
+            value={bookings.filter(b => b.status === 'pending').length}
+            icon={<Clock className="w-4 h-4 text-primary" />}
+          />
+        </StatGrid>
 
         {/* Filters */}
         <Card>

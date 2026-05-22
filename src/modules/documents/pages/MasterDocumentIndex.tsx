@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -170,31 +171,28 @@ const MasterDocumentIndex: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in print:space-y-2">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 print:hidden">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <FileText className="w-6 h-6" />
-              Master Document Index
-            </h1>
-            <p className="text-muted-foreground">
-              Complete list of all controlled documents
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleExportPDF}>
-              <Download className="w-4 h-4 mr-2" />
-              Export PDF
-            </Button>
-            <Button variant="outline" onClick={handleExportExcel}>
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
-              Export Excel
-            </Button>
-            <Button variant="outline" onClick={handlePrint}>
-              <Printer className="w-4 h-4 mr-2" />
-              Print
-            </Button>
-          </div>
+        <div className="print:hidden">
+          <PageHeader
+            title="Master Document Index"
+            description="Complete list of all controlled documents"
+            icon={<FileText className="w-5 h-5" />}
+            actions={
+              <>
+                <Button variant="outline" onClick={handleExportPDF}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Export PDF
+                </Button>
+                <Button variant="outline" onClick={handleExportExcel}>
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  Export Excel
+                </Button>
+                <Button variant="outline" onClick={handlePrint}>
+                  <Printer className="w-4 h-4 mr-2" />
+                  Print
+                </Button>
+              </>
+            }
+          />
         </div>
 
         {/* Print Header */}

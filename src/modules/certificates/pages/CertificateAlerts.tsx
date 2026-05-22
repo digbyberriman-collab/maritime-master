@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -140,7 +142,7 @@ const CertificateAlerts: React.FC = () => {
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
             {icon}
-            <CardTitle className="text-lg">{title}</CardTitle>
+            <CardTitle className="text-base">{title}</CardTitle>
             <Badge variant={variant === 'expired' ? 'destructive' : 'secondary'}>
               {filtered.length}
             </Badge>
@@ -171,64 +173,36 @@ const CertificateAlerts: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Certificate Alerts</h1>
-          <p className="text-muted-foreground">Track and manage certificate expiries and renewals</p>
-        </div>
+        <PageHeader
+          title="Certificate Alerts"
+          description="Track and manage certificate expiries and renewals"
+        />
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="border-destructive/50 bg-destructive/5">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Expired</p>
-                  <p className="text-3xl font-bold text-destructive">{expiredCerts.length}</p>
-                </div>
-                <XCircle className="w-8 h-8 text-destructive" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-red-500/50 bg-red-50">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Within 7 Days</p>
-                  <p className="text-3xl font-bold text-red-600">{expiring7Days.length}</p>
-                </div>
-                <AlertTriangle className="w-8 h-8 text-red-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-yellow-500/50 bg-yellow-50">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Within 30 Days</p>
-                  <p className="text-3xl font-bold text-yellow-600">{expiring30Days.length}</p>
-                </div>
-                <Clock className="w-8 h-8 text-yellow-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Within 90 Days</p>
-                  <p className="text-3xl font-bold text-foreground">
-                    {expiring60Days.length + expiring90Days.length}
-                  </p>
-                </div>
-                <Bell className="w-8 h-8 text-muted-foreground" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid>
+          <StatCard
+            label="Expired"
+            value={expiredCerts.length}
+            tone="danger"
+            icon={<XCircle className="w-5 h-5 text-destructive" />}
+          />
+          <StatCard
+            label="Within 7 Days"
+            value={expiring7Days.length}
+            tone="danger"
+            icon={<AlertTriangle className="w-5 h-5 text-red-600" />}
+          />
+          <StatCard
+            label="Within 30 Days"
+            value={expiring30Days.length}
+            tone="warning"
+            icon={<Clock className="w-5 h-5 text-yellow-600" />}
+          />
+          <StatCard
+            label="Within 90 Days"
+            value={expiring60Days.length + expiring90Days.length}
+            icon={<Bell className="w-5 h-5 text-muted-foreground" />}
+          />
+        </StatGrid>
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4">

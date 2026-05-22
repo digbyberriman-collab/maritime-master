@@ -8,10 +8,12 @@ import { useRiskAssessments } from '@/modules/risk-assessments/hooks/useRiskAsse
 import { useIncidents } from '@/modules/incidents/hooks/useIncidents';
 import { useCorrectiveActions } from '@/modules/incidents/hooks/useCorrectiveActions';
 import { useAudits } from '@/modules/audits/hooks/useAudits';
-import { 
-  Shield, 
-  TrendingUp, 
-  AlertTriangle, 
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
+import {
+  Shield,
+  TrendingUp,
+  AlertTriangle,
   CheckCircle,
   ArrowRight,
   BarChart3,
@@ -72,24 +74,17 @@ const ERMPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Shield className="w-6 h-6 text-primary" />
-              </div>
-              <h1 className="text-2xl font-bold text-foreground">Enterprise Risk Management</h1>
-            </div>
-            <p className="text-muted-foreground">
-              Overview of organizational risk posture and safety performance
-            </p>
-          </div>
-          <Button>
-            <BarChart3 className="w-4 h-4 mr-2" />
-            Generate Report
-          </Button>
-        </div>
+        <PageHeader
+          icon={<Shield className="w-6 h-6" />}
+          title="Enterprise Risk Management"
+          description="Overview of organizational risk posture and safety performance"
+          actions={
+            <Button>
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Generate Report
+            </Button>
+          }
+        />
 
         {/* Overall Risk Score */}
         <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
@@ -121,86 +116,71 @@ const ERMPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Key Metrics Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">High/Critical Risks</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className={cn("text-2xl font-bold", highRiskCount > 0 && "text-red-600")}>
-                {highRiskCount}
-              </div>
-              <p className="text-xs text-muted-foreground">
+        <StatGrid cols={4}>
+          <StatCard
+            label="High/Critical Risks"
+            value={highRiskCount}
+            icon={<AlertTriangle className="w-4 h-4 text-red-500" />}
+            tone={highRiskCount > 0 ? 'danger' : 'default'}
+            hint={
+              <>
                 of {totalRisks} total risks
-              </p>
-              <Button variant="link" size="sm" className="px-0 mt-2">
-                View Details <ArrowRight className="w-3 h-3 ml-1" />
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Open Incidents</CardTitle>
-              <FileWarning className="h-4 w-4 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className={cn("text-2xl font-bold", openIncidents > 0 && "text-orange-600")}>
-                {openIncidents}
-              </div>
-              <p className="text-xs text-muted-foreground">
+                <Button variant="link" size="sm" className="px-0 mt-2 block">
+                  View Details <ArrowRight className="w-3 h-3 ml-1" />
+                </Button>
+              </>
+            }
+          />
+          <StatCard
+            label="Open Incidents"
+            value={openIncidents}
+            icon={<FileWarning className="w-4 h-4 text-orange-500" />}
+            tone={openIncidents > 0 ? 'warning' : 'default'}
+            hint={
+              <>
                 {recentIncidents} in last 30 days
-              </p>
-              <Button variant="link" size="sm" className="px-0 mt-2">
-                View Details <ArrowRight className="w-3 h-3 ml-1" />
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Open Actions</CardTitle>
-              <Clock className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{openCAPAs}</div>
-              <p className="text-xs text-muted-foreground">
+                <Button variant="link" size="sm" className="px-0 mt-2 block">
+                  View Details <ArrowRight className="w-3 h-3 ml-1" />
+                </Button>
+              </>
+            }
+          />
+          <StatCard
+            label="Open Actions"
+            value={openCAPAs}
+            icon={<Clock className="w-4 h-4 text-yellow-500" />}
+            hint={
+              <>
                 <span className={overdueCAPAs > 0 ? "text-red-600 font-medium" : ""}>
                   {overdueCAPAs} overdue
                 </span>
-              </p>
-              <Button variant="link" size="sm" className="px-0 mt-2">
-                View Details <ArrowRight className="w-3 h-3 ml-1" />
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Audit Findings</CardTitle>
-              <Target className="h-4 w-4 text-purple-500" />
-            </CardHeader>
-            <CardContent>
-              <div className={cn("text-2xl font-bold", openFindingsCount > 0 && "text-purple-600")}>
-                {openFindingsCount}
-              </div>
-              <p className="text-xs text-muted-foreground">
+                <Button variant="link" size="sm" className="px-0 mt-2 block">
+                  View Details <ArrowRight className="w-3 h-3 ml-1" />
+                </Button>
+              </>
+            }
+          />
+          <StatCard
+            label="Audit Findings"
+            value={openFindingsCount}
+            icon={<Target className="w-4 h-4 text-purple-500" />}
+            tone={openFindingsCount > 0 ? 'primary' : 'default'}
+            hint={
+              <>
                 Open findings
-              </p>
-              <Button variant="link" size="sm" className="px-0 mt-2">
-                View Details <ArrowRight className="w-3 h-3 ml-1" />
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+                <Button variant="link" size="sm" className="px-0 mt-2 block">
+                  View Details <ArrowRight className="w-3 h-3 ml-1" />
+                </Button>
+              </>
+            }
+          />
+        </StatGrid>
 
         {/* Risk Categories */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Risk Distribution</CardTitle>
+              <CardTitle className="text-base">Risk Distribution</CardTitle>
               <CardDescription>Active risk assessments by level</CardDescription>
             </CardHeader>
             <CardContent>
@@ -241,7 +221,7 @@ const ERMPage: React.FC = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Quick Actions</CardTitle>
+              <CardTitle className="text-base">Quick Actions</CardTitle>
               <CardDescription>Common risk management tasks</CardDescription>
             </CardHeader>
             <CardContent>
@@ -270,7 +250,7 @@ const ERMPage: React.FC = () => {
         {/* Key Performance Indicators */}
         <Card>
           <CardHeader>
-            <CardTitle>Key Performance Indicators</CardTitle>
+            <CardTitle className="text-base">Key Performance Indicators</CardTitle>
             <CardDescription>Safety and compliance metrics</CardDescription>
           </CardHeader>
           <CardContent>

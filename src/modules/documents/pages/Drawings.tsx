@@ -1,16 +1,17 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { 
-  Layers, Search, Filter, Plus, FolderOpen, FileImage,
-  Eye, Download, Loader2, Ship, ZoomIn, Grid, List
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
+import {
+  Layers, Search, Plus, FolderOpen, FileImage,
+  Download, Loader2, Ship, ZoomIn, Grid, List
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 
 interface Drawing {
@@ -121,102 +122,62 @@ export default function Drawings() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Layers className="w-6 h-6" />
-              Technical Drawings
-            </h1>
-            <p className="text-muted-foreground">Technical drawings, plans, and system diagrams</p>
-          </div>
-          <div className="flex gap-2">
-            <div className="flex border rounded-lg">
-              <Button
-                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('list')}
-                className="rounded-r-none"
-              >
-                <List className="w-4 h-4" />
+        <PageHeader
+          title="Technical Drawings"
+          description="Technical drawings, plans, and system diagrams"
+          icon={<Layers className="w-5 h-5" />}
+          actions={
+            <>
+              <div className="flex border rounded-lg">
+                <Button
+                  variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('list')}
+                  className="rounded-r-none"
+                >
+                  <List className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('grid')}
+                  className="rounded-l-none"
+                >
+                  <Grid className="w-4 h-4" />
+                </Button>
+              </div>
+              <Button>
+                <Plus className="w-4 h-4 mr-2" />
+                Upload Drawing
               </Button>
-              <Button
-                variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setViewMode('grid')}
-                className="rounded-l-none"
-              >
-                <Grid className="w-4 h-4" />
-              </Button>
-            </div>
-            <Button>
-              <Plus className="w-4 h-4 mr-2" />
-              Upload Drawing
-            </Button>
-          </div>
-        </div>
+            </>
+          }
+        />
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <FileImage className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{drawings.length}</p>
-                  <p className="text-sm text-muted-foreground">Total Drawings</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <FolderOpen className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {new Set(drawings.map(d => d.category)).size}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Categories</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Ship className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {new Set(drawings.filter(d => d.vessel_id).map(d => d.vessel_id)).size}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Vessels</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-yellow-100 rounded-lg">
-                  <Layers className="w-5 h-5 text-yellow-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {drawings.filter(d => d.status === 'under_review').length}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Under Review</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={4}>
+          <StatCard
+            label="Total Drawings"
+            value={drawings.length}
+            icon={<FileImage className="w-5 h-5 text-blue-600" />}
+          />
+          <StatCard
+            label="Categories"
+            value={new Set(drawings.map(d => d.category)).size}
+            icon={<FolderOpen className="w-5 h-5 text-green-600" />}
+          />
+          <StatCard
+            label="Vessels"
+            value={new Set(drawings.filter(d => d.vessel_id).map(d => d.vessel_id)).size}
+            icon={<Ship className="w-5 h-5 text-purple-600" />}
+          />
+          <StatCard
+            label="Under Review"
+            value={drawings.filter(d => d.status === 'under_review').length}
+            icon={<Layers className="w-5 h-5 text-yellow-600" />}
+            tone="warning"
+          />
+        </StatGrid>
 
         {/* Filters */}
         <Card>

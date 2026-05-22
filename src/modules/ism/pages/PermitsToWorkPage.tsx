@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -20,10 +20,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { 
-  Shield, 
-  Plus, 
-  Search, 
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
+import {
+  Shield,
+  Plus,
+  Search,
   Clock,
   CheckCircle,
   AlertTriangle,
@@ -33,7 +35,7 @@ import {
   Zap,
   Wind
 } from 'lucide-react';
-import { format, isPast, isFuture, addHours } from 'date-fns';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 // Mock data for permits (would come from hook in production)
@@ -146,73 +148,46 @@ const PermitsToWorkPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Shield className="w-6 h-6 text-primary" />
-              </div>
-              <h1 className="text-2xl font-bold text-foreground">Permits to Work</h1>
-            </div>
-            <p className="text-muted-foreground">
-              Manage work permits for hazardous operations
-            </p>
-          </div>
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            New Permit
-          </Button>
-        </div>
+        <PageHeader
+          icon={<Shield className="w-6 h-6" />}
+          title="Permits to Work"
+          description="Manage work permits for hazardous operations"
+          actions={
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              New Permit
+            </Button>
+          }
+        />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Permits</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{activeCount}</div>
-              <p className="text-xs text-muted-foreground">Currently valid</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Approval</CardTitle>
-              <Clock className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className={cn("text-2xl font-bold", pendingCount > 0 && "text-yellow-600")}>
-                {pendingCount}
-              </div>
-              <p className="text-xs text-muted-foreground">Awaiting authorization</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Closed Today</CardTitle>
-              <XCircle className="h-4 w-4 text-gray-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{closedToday}</div>
-              <p className="text-xs text-muted-foreground">Completed permits</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total This Week</CardTitle>
-              <Shield className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{permits.length}</div>
-              <p className="text-xs text-muted-foreground">All permits</p>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={4}>
+          <StatCard
+            label="Active Permits"
+            value={activeCount}
+            icon={<CheckCircle className="w-4 h-4 text-green-500" />}
+            tone="success"
+            hint="Currently valid"
+          />
+          <StatCard
+            label="Pending Approval"
+            value={pendingCount}
+            icon={<Clock className="w-4 h-4 text-yellow-500" />}
+            tone={pendingCount > 0 ? 'warning' : 'default'}
+            hint="Awaiting authorization"
+          />
+          <StatCard
+            label="Closed Today"
+            value={closedToday}
+            icon={<XCircle className="w-4 h-4 text-gray-500" />}
+            hint="Completed permits"
+          />
+          <StatCard
+            label="Total This Week"
+            value={permits.length}
+            icon={<Shield className="w-4 h-4 text-blue-500" />}
+            hint="All permits"
+          />
+        </StatGrid>
 
         {/* Permit Types Quick Access */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">

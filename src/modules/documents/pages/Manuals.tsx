@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { toast } from 'sonner';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -293,37 +295,29 @@ const Manuals: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Manuals</h1>
-            <p className="text-muted-foreground">
-              Operational and safety manuals with version control and distribution tracking
-            </p>
-          </div>
-          <Button className="gap-2" onClick={() => toast.info('Upload manual feature coming soon')}>
-            <Plus className="w-4 h-4" />
-            Upload Manual
-          </Button>
-        </div>
+        <PageHeader
+          title="Manuals"
+          description="Operational and safety manuals with version control and distribution tracking"
+          actions={
+            <Button className="gap-2" onClick={() => toast.info('Upload manual feature coming soon')}>
+              <Plus className="w-4 h-4" />
+              Upload Manual
+            </Button>
+          }
+        />
 
         {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <StatGrid cols={3}>
           {stats.map((stat) => (
-            <Card key={stat.title} className="shadow-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {stat.title}
-                </CardTitle>
-                <stat.icon className="w-5 h-5 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
-              </CardContent>
-            </Card>
+            <StatCard
+              key={stat.title}
+              label={stat.title}
+              value={stat.value}
+              hint={stat.description}
+              icon={<stat.icon className="w-5 h-5 text-muted-foreground" />}
+            />
           ))}
-        </div>
+        </StatGrid>
 
         {/* Filters */}
         <Card className="shadow-card">
@@ -387,7 +381,7 @@ const Manuals: React.FC = () => {
         {/* Manuals Table */}
         <Card className="shadow-card">
           <CardHeader>
-            <CardTitle>Manuals ({filteredManuals.length})</CardTitle>
+            <CardTitle className="text-base">Manuals ({filteredManuals.length})</CardTitle>
             <CardDescription>
               Operational and safety manuals with version control
             </CardDescription>

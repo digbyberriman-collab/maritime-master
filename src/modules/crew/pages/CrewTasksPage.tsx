@@ -31,6 +31,8 @@ import { useCrewTasks, CrewTask, TaskStatus } from '@/modules/crew/hooks/useCrew
 import { AssignTaskModal } from '@/modules/crew/components/AssignTaskModal';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { format, formatDistanceToNow, isPast } from 'date-fns';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 
 export default function CrewTasksPage() {
   const { user } = useAuth();
@@ -106,51 +108,43 @@ export default function CrewTasksPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <ClipboardCheck className="h-6 w-6" />
-              Crew Tasks
-            </h1>
-            <p className="text-muted-foreground">
-              Manage assigned tasks, reviews, and evaluations
-            </p>
-          </div>
-          <Button onClick={() => setShowAssignModal(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Assign Task
-          </Button>
-        </div>
+        <PageHeader
+          icon={<ClipboardCheck className="h-6 w-6" />}
+          title="Crew Tasks"
+          description="Manage assigned tasks, reviews, and evaluations"
+          actions={
+            <Button onClick={() => setShowAssignModal(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Assign Task
+            </Button>
+          }
+        />
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard 
-            label="Pending" 
-            value={taskCounts.pending} 
-            icon={Clock} 
-            color="text-blue-600 bg-blue-100" 
+        <StatGrid cols={4}>
+          <StatCard
+            label="Pending"
+            value={taskCounts.pending}
+            icon={<Clock className="w-4 h-4 text-sky-600" />}
           />
-          <StatCard 
-            label="In Progress" 
-            value={taskCounts.inProgress} 
-            icon={Play} 
-            color="text-yellow-600 bg-yellow-100" 
+          <StatCard
+            label="In Progress"
+            value={taskCounts.inProgress}
+            tone="warning"
+            icon={<Play className="w-4 h-4 text-amber-600" />}
           />
-          <StatCard 
-            label="Overdue" 
-            value={taskCounts.overdue} 
-            icon={AlertTriangle} 
-            color="text-destructive bg-destructive/10" 
-            alert={taskCounts.overdue > 0}
+          <StatCard
+            label="Overdue"
+            value={taskCounts.overdue}
+            tone="danger"
+            icon={<AlertTriangle className="w-4 h-4 text-destructive" />}
           />
-          <StatCard 
-            label="Awaiting Verification" 
-            value={taskCounts.awaitingVerification} 
-            icon={CheckSquare} 
-            color="text-purple-600 bg-purple-100" 
+          <StatCard
+            label="Awaiting Verification"
+            value={taskCounts.awaitingVerification}
+            icon={<CheckSquare className="w-4 h-4 text-primary" />}
           />
-        </div>
+        </StatGrid>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
@@ -238,36 +232,6 @@ export default function CrewTasksPage() {
         </DialogContent>
       </Dialog>
     </DashboardLayout>
-  );
-}
-
-function StatCard({ 
-  label, 
-  value, 
-  icon: Icon, 
-  color,
-  alert 
-}: { 
-  label: string; 
-  value: number; 
-  icon: React.ElementType;
-  color: string;
-  alert?: boolean;
-}) {
-  return (
-    <Card className={alert ? 'border-destructive' : ''}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="text-2xl font-bold mt-1">{value}</p>
-          </div>
-          <div className={`p-2 rounded-lg ${color}`}>
-            <Icon className="h-4 w-4" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 

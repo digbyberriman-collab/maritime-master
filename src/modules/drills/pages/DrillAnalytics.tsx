@@ -1,6 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -187,99 +189,76 @@ const DrillAnalytics: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Drill Analytics</h1>
-            <p className="text-muted-foreground">
-              Performance insights and compliance tracking
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Date Range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="3">Last 3 Months</SelectItem>
-                <SelectItem value="6">Last 6 Months</SelectItem>
-                <SelectItem value="12">Last 12 Months</SelectItem>
-                <SelectItem value="24">Last 24 Months</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={selectedVessel} onValueChange={setSelectedVessel}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="All Vessels" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Vessels</SelectItem>
-                {vessels.map(vessel => (
-                  <SelectItem key={vessel.id} value={vessel.id}>
-                    {vessel.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          title="Drill Analytics"
+          description="Performance insights and compliance tracking"
+          actions={
+            <>
+              <Select value={dateRange} onValueChange={setDateRange}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Date Range" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="3">Last 3 Months</SelectItem>
+                  <SelectItem value="6">Last 6 Months</SelectItem>
+                  <SelectItem value="12">Last 12 Months</SelectItem>
+                  <SelectItem value="24">Last 24 Months</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={selectedVessel} onValueChange={setSelectedVessel}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="All Vessels" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Vessels</SelectItem>
+                  {vessels.map(vessel => (
+                    <SelectItem key={vessel.id} value={vessel.id}>
+                      {vessel.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Export
+              </Button>
+            </>
+          }
+        />
 
-        {/* Top Metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Total Drills</span>
-              </div>
-              <p className="text-2xl font-bold mt-1">{totalDrills}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <Target className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Compliance</span>
-              </div>
-              <p className={`text-2xl font-bold mt-1 ${overallCompliance >= 90 ? 'text-green-600' : overallCompliance >= 70 ? 'text-yellow-600' : 'text-red-600'}`}>
-                {overallCompliance.toFixed(0)}%
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <Star className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Avg Rating</span>
-              </div>
-              <div className="flex items-center gap-1 mt-1">
-                <p className="text-2xl font-bold">{avgRating.toFixed(1)}</p>
+        <StatGrid cols={5}>
+          <StatCard
+            label="Total Drills"
+            icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
+            value={totalDrills}
+          />
+          <StatCard
+            label="Compliance"
+            icon={<Target className="h-4 w-4 text-muted-foreground" />}
+            value={`${overallCompliance.toFixed(0)}%`}
+            tone={overallCompliance >= 90 ? 'success' : overallCompliance >= 70 ? 'warning' : 'danger'}
+          />
+          <StatCard
+            label="Avg Rating"
+            icon={<Star className="h-4 w-4 text-muted-foreground" />}
+            value={
+              <span className="flex items-center gap-1">
+                {avgRating.toFixed(1)}
                 <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Deficiencies</span>
-              </div>
-              <p className="text-2xl font-bold mt-1">0</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <ClipboardCheck className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">CAPAs</span>
-              </div>
-              <p className="text-2xl font-bold mt-1">0</p>
-            </CardContent>
-          </Card>
-        </div>
+              </span>
+            }
+          />
+          <StatCard
+            label="Deficiencies"
+            icon={<AlertTriangle className="h-4 w-4 text-muted-foreground" />}
+            value={0}
+          />
+          <StatCard
+            label="CAPAs"
+            icon={<ClipboardCheck className="h-4 w-4 text-muted-foreground" />}
+            value={0}
+          />
+        </StatGrid>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Drill Frequency Chart */}

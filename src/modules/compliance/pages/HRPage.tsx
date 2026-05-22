@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { GDPRCompliancePanel, RetentionStatusBadge, RedactedField } from '@/modules/compliance/components';
 import type { GDPRMapping } from '@/modules/compliance/components';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 // HR tab data with GDPR compliance mapping - alphabetically ordered
 const hrTabs: Array<{
@@ -270,20 +271,12 @@ const HRPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Page Header */}
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Users className="w-6 h-6 text-primary" />
-            </div>
-            <div className="flex-1">
-              <h1 className="text-2xl font-semibold text-foreground">Human Resources</h1>
-              <p className="text-muted-foreground">
-                Crew HR records, contracts, evaluations, and compensation
-              </p>
-            </div>
-            {/* DPA Actions */}
-            <div className="flex items-center gap-2">
+        <PageHeader
+          icon={<Users className="w-6 h-6" />}
+          title="Human Resources"
+          description="Crew HR records, contracts, evaluations, and compensation"
+          actions={
+            <>
               <Button variant="outline" size="sm" disabled>
                 <Download className="w-4 h-4 mr-2" />
                 Export Data (GDPR)
@@ -292,9 +285,9 @@ const HRPage: React.FC = () => {
                 <UserX className="w-4 h-4 mr-2" />
                 Anonymise Expired
               </Button>
-            </div>
-          </div>
-        </div>
+            </>
+          }
+        />
 
         {/* Permission Info Banner */}
         <Alert variant="destructive" className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20">

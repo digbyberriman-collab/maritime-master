@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard } from '@/shared/components/common/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -168,26 +170,22 @@ export default function CrewCertificatesOverview() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Award className="w-6 h-6" />
-              Crew Certificates Overview
-            </h1>
-            <p className="text-muted-foreground">Fleet-wide crew certification compliance</p>
-          </div>
-          <Button variant="outline">
-            <Download className="w-4 h-4 mr-2" />
-            Export Report
-          </Button>
-        </div>
+        <PageHeader
+          icon={<Award className="w-6 h-6" />}
+          title="Crew Certificates Overview"
+          description="Fleet-wide crew certification compliance"
+          actions={
+            <Button variant="outline">
+              <Download className="w-4 h-4 mr-2" />
+              Export Report
+            </Button>
+          }
+        />
 
-        {/* Compliance Overview */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <Card className="md:col-span-2">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
+              <CardTitle className="text-base text-muted-foreground">
                 Fleet Compliance Rate
               </CardTitle>
             </CardHeader>
@@ -200,48 +198,25 @@ export default function CrewCertificatesOverview() {
               </div>
             </CardContent>
           </Card>
-          
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{stats.valid}</p>
-                  <p className="text-sm text-muted-foreground">Valid</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-yellow-100 rounded-lg">
-                  <Clock className="w-5 h-5 text-yellow-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{stats.expiringSoon}</p>
-                  <p className="text-sm text-muted-foreground">Expiring Soon</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <AlertCircle className="w-5 h-5 text-red-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{stats.expired}</p>
-                  <p className="text-sm text-muted-foreground">Expired</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+
+          <StatCard
+            label="Valid"
+            value={stats.valid}
+            tone="success"
+            icon={<CheckCircle className="w-5 h-5 text-green-600" />}
+          />
+          <StatCard
+            label="Expiring Soon"
+            value={stats.expiringSoon}
+            tone="warning"
+            icon={<Clock className="w-5 h-5 text-yellow-600" />}
+          />
+          <StatCard
+            label="Expired"
+            value={stats.expired}
+            tone="danger"
+            icon={<AlertCircle className="w-5 h-5 text-red-600" />}
+          />
         </div>
 
         {/* Filters */}

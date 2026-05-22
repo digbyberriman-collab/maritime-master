@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { 
-  ClipboardCheck, FileText, Calendar, AlertTriangle, CheckCircle,
-  Clock, ChevronRight, Loader2, Award, Bell, User, Ship, FileCheck
+import {
+  ClipboardCheck, FileText, AlertTriangle, CheckCircle,
+  Clock, ChevronRight, Loader2, Award
 } from 'lucide-react';
 import { useCrewTasks } from '@/modules/crew/hooks/useCrewTasks';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { format, differenceInDays, isBefore, addDays } from 'date-fns';
+import { format, differenceInDays, isBefore } from 'date-fns';
 import { PageHeader } from '@/shared/components/common/PageHeader';
 import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 
@@ -382,36 +382,6 @@ export default function CrewDashboard() {
         </div>
       </div>
     </DashboardLayout>
-  );
-}
-
-function StatCard({ 
-  label, 
-  value, 
-  icon: Icon, 
-  color, 
-  alert 
-}: { 
-  label: string; 
-  value: number; 
-  icon: React.ElementType; 
-  color: string;
-  alert?: boolean;
-}) {
-  return (
-    <Card className={alert ? 'border-destructive' : ''}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="text-2xl font-bold mt-1">{value}</p>
-          </div>
-          <div className={`p-2 rounded-lg ${color}`}>
-            <Icon className="h-4 w-4" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 

@@ -262,7 +262,7 @@ const VesselDashboard: React.FC = () => {
         {/* Quick Actions */}
         <Card className="shadow-card">
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
+            <CardTitle className="text-base">Quick Actions</CardTitle>
             <CardDescription>Common tasks for this vessel</CardDescription>
           </CardHeader>
           <CardContent>
@@ -316,7 +316,7 @@ const VesselDashboard: React.FC = () => {
           <Card className="shadow-card">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="flex items-center gap-2">
+                <CardTitle className="flex items-center gap-2 text-base">
                   <AlertTriangle className="w-5 h-5" />
                   Recent Incidents
                 </CardTitle>

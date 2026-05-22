@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, Filter, LayoutGrid, List, BookOpen, ChevronDown, ChevronUp, ExternalLink, Plus } from 'lucide-react';
+import { Search, LayoutGrid, List, BookOpen, ChevronDown, ChevronUp, Plus } from 'lucide-react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,7 @@ import {
   type DevCategory,
   type DevFormat,
 } from '@/modules/development/constants';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 export default function CourseCatalogue() {
   const [search, setSearch] = useState('');
@@ -75,30 +76,28 @@ export default function CourseCatalogue() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Course Catalogue</h1>
-            <p className="text-muted-foreground">
-              {courses.length} course{courses.length !== 1 ? 's' : ''} available
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={viewMode === 'grid' ? 'default' : 'outline'}
-              size="icon"
-              onClick={() => setViewMode('grid')}
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'outline'}
-              size="icon"
-              onClick={() => setViewMode('list')}
-            >
-              <List className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          title="Course Catalogue"
+          description={`${courses.length} course${courses.length !== 1 ? 's' : ''} available`}
+          actions={
+            <>
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'outline'}
+                size="icon"
+                onClick={() => setViewMode('grid')}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'outline'}
+                size="icon"
+                onClick={() => setViewMode('list')}
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </>
+          }
+        />
 
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Sidebar Filters */}

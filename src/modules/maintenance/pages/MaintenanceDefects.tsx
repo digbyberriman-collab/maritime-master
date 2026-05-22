@@ -41,6 +41,8 @@ import {
 import { useToast } from '@/shared/hooks/use-toast';
 import AddDefectModal from '@/shared/components/modals/AddDefectModal';
 import DeleteConfirmModal from '@/shared/components/modals/DeleteConfirmModal';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 
 interface MaintenanceDefect {
   id: string;
@@ -444,42 +446,35 @@ const MaintenanceDefects: React.FC = () => {
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Maintenance Defects</h1>
-            <p className="text-muted-foreground">
-              Track and manage open defects across your fleet
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleResetData} className="gap-2">
-              <RefreshCw className="w-4 h-4" />
-              Reset Data
-            </Button>
-            <Button onClick={handleAddDefect} className="gap-2">
-              <Plus className="w-4 h-4" />
-              Report Defect
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          title="Maintenance Defects"
+          description="Track and manage open defects across your fleet"
+          actions={
+            <>
+              <Button variant="outline" onClick={handleResetData} className="gap-2">
+                <RefreshCw className="w-4 h-4" />
+                Reset Data
+              </Button>
+              <Button onClick={handleAddDefect} className="gap-2">
+                <Plus className="w-4 h-4" />
+                Report Defect
+              </Button>
+            </>
+          }
+        />
 
         {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <StatGrid cols={3}>
           {stats.map((stat) => (
-            <Card key={stat.title} className="shadow-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {stat.title}
-                </CardTitle>
-                <stat.icon className="w-5 h-5 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
-              </CardContent>
-            </Card>
+            <StatCard
+              key={stat.title}
+              label={stat.title}
+              value={stat.value}
+              icon={<stat.icon className="w-5 h-5 text-muted-foreground" />}
+              hint={stat.description}
+            />
           ))}
-        </div>
+        </StatGrid>
 
         {/* Filters */}
         <Card className="shadow-card">
@@ -547,7 +542,7 @@ const MaintenanceDefects: React.FC = () => {
         {/* Defects Table */}
         <Card className="shadow-card">
           <CardHeader>
-            <CardTitle>Open Defects ({filteredDefects.length})</CardTitle>
+            <CardTitle className="text-base">Open Defects ({filteredDefects.length})</CardTitle>
             <CardDescription>
               Maintenance defects requiring attention
             </CardDescription>

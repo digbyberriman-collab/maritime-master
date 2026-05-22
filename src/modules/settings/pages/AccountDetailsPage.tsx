@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -16,21 +18,36 @@ const AccountDetailsPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-6xl">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-wider text-muted-foreground font-medium">Administration</p>
-            <h1 className="text-2xl font-bold text-foreground">Account Details</h1>
-            <p className="text-muted-foreground">Fleet identity, account holder and subscription status</p>
-          </div>
-          <Button><Save className="w-4 h-4 mr-2" />Save Changes</Button>
-        </div>
+        <PageHeader
+          eyebrow="Administration"
+          title="Account Details"
+          description="Fleet identity, account holder and subscription status"
+          actions={<Button><Save className="w-4 h-4 mr-2" />Save Changes</Button>}
+        />
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <StatCard icon={<CheckCircle2 className="w-4 h-4 text-emerald-500" />} label="Account Status" value="Active" valueClass="text-emerald-600" />
-          <StatCard icon={<Ship className="w-4 h-4 text-primary" />} label="Vessels" value="7 / 10" />
-          <StatCard icon={<Users className="w-4 h-4 text-primary" />} label="Active Users" value="84 / 120" />
-          <StatCard icon={<Calendar className="w-4 h-4 text-muted-foreground" />} label="Renews" value="12 Mar 2027" />
-        </div>
+        <StatGrid cols={4}>
+          <StatCard
+            label="Account Status"
+            value="Active"
+            tone="success"
+            icon={<CheckCircle2 className="w-4 h-4 text-emerald-500" />}
+          />
+          <StatCard
+            label="Vessels"
+            value="7 / 10"
+            icon={<Ship className="w-4 h-4 text-primary" />}
+          />
+          <StatCard
+            label="Active Users"
+            value="84 / 120"
+            icon={<Users className="w-4 h-4 text-primary" />}
+          />
+          <StatCard
+            label="Renews"
+            value="12 Mar 2027"
+            icon={<Calendar className="w-4 h-4 text-muted-foreground" />}
+          />
+        </StatGrid>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card>
@@ -158,18 +175,6 @@ const AccountDetailsPage: React.FC = () => {
     </DashboardLayout>
   );
 };
-
-const StatCard: React.FC<{ icon: React.ReactNode; label: string; value: string; valueClass?: string }> = ({ icon, label, value, valueClass }) => (
-  <Card>
-    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle className="text-sm font-medium">{label}</CardTitle>
-      {icon}
-    </CardHeader>
-    <CardContent>
-      <div className={`text-2xl font-bold ${valueClass ?? ''}`}>{value}</div>
-    </CardContent>
-  </Card>
-);
 
 const Meta: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div>

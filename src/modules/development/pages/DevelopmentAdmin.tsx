@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  BarChart3, Users, DollarSign, BookOpen, TrendingUp, ClipboardList,
-  CheckCircle, Clock, XCircle, Eye, Filter
+  DollarSign, TrendingUp, ClipboardList,
+  Clock, Eye
 } from 'lucide-react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,8 +10,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import { useFleetApplications, useFleetExpenses } from '@/modules/development/hooks/useDevelopmentMutations';
 import ApplicationDetailModal from '@/modules/development/components/ApplicationDetailModal';
 import {
@@ -112,68 +113,35 @@ export default function DevelopmentAdmin() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold">Crew Development Admin</h1>
-          <p className="text-muted-foreground">
-            Fleet-wide development overview, applications pipeline, and expense tracking
-          </p>
-        </div>
+        <PageHeader
+          title="Crew Development Admin"
+          description="Fleet-wide development overview, applications pipeline, and expense tracking"
+        />
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Total Applications</p>
-                  <p className="text-2xl font-bold mt-1">{stats.total}</p>
-                </div>
-                <div className="p-2 rounded-lg bg-muted text-muted-foreground">
-                  <ClipboardList className="h-4 w-4" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="border-amber/30">
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Pending Review</p>
-                  <p className="text-2xl font-bold mt-1">{stats.pending}</p>
-                </div>
-                <div className="p-2 rounded-lg bg-amber/10 text-amber">
-                  <Clock className="h-4 w-4" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">YTD Spend</p>
-                  <p className="text-2xl font-bold mt-1">${stats.totalSpend.toLocaleString()}</p>
-                </div>
-                <div className="p-2 rounded-lg bg-muted text-muted-foreground">
-                  <DollarSign className="h-4 w-4" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Pending Expenses</p>
-                  <p className="text-2xl font-bold mt-1">{stats.pendingExpenses}</p>
-                </div>
-                <div className="p-2 rounded-lg bg-muted text-muted-foreground">
-                  <TrendingUp className="h-4 w-4" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={4}>
+          <StatCard
+            label="Total Applications"
+            value={stats.total}
+            icon={<ClipboardList className="h-4 w-4 text-muted-foreground" />}
+          />
+          <StatCard
+            label="Pending Review"
+            value={stats.pending}
+            tone={stats.pending > 0 ? 'warning' : 'default'}
+            icon={<Clock className="h-4 w-4 text-muted-foreground" />}
+          />
+          <StatCard
+            label="YTD Spend"
+            value={`$${stats.totalSpend.toLocaleString()}`}
+            icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+          />
+          <StatCard
+            label="Pending Expenses"
+            value={stats.pendingExpenses}
+            icon={<TrendingUp className="h-4 w-4 text-muted-foreground" />}
+          />
+        </StatGrid>
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

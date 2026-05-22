@@ -1,6 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -82,28 +84,28 @@ const DrillsAnnualGrid: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Drills — Annual Calendar</h1>
-            <p className="text-muted-foreground">SOLAS, operational and security drills by month</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => setYear(y => y - 1)}>
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <div className="px-4 py-2 rounded-md bg-card border border-border font-semibold min-w-[80px] text-center">{year}</div>
-            <Button variant="outline" size="icon" onClick={() => setYear(y => y + 1)}>
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          title="Drills — Annual Calendar"
+          description="SOLAS, operational and security drills by month"
+          actions={
+            <>
+              <Button variant="outline" size="icon" onClick={() => setYear(y => y - 1)}>
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <div className="px-4 py-2 rounded-md bg-card border border-border font-semibold min-w-[80px] text-center">{year}</div>
+              <Button variant="outline" size="icon" onClick={() => setYear(y => y + 1)}>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </>
+          }
+        />
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatGrid>
           <StatCard label="Annual Compliance" value={`${compliance}%`} icon={<CheckCircle2 className="w-4 h-4 text-emerald-500" />} />
           <StatCard label="Completed" value={stats.completed} icon={<CheckCircle2 className="w-4 h-4 text-emerald-500" />} />
           <StatCard label="Scheduled" value={stats.scheduled} icon={<Circle className="w-4 h-4 text-sky-500" />} />
           <StatCard label="Overdue" value={stats.overdue} icon={<AlertCircle className="w-4 h-4 text-destructive" />} tone={stats.overdue ? 'danger' : 'default'} />
-        </div>
+        </StatGrid>
 
         <Card>
           <CardHeader>
@@ -225,18 +227,6 @@ const DrillsAnnualGrid: React.FC = () => {
     </DashboardLayout>
   );
 };
-
-const StatCard: React.FC<{ label: string; value: React.ReactNode; icon: React.ReactNode; tone?: 'default' | 'danger' }> = ({ label, value, icon, tone }) => (
-  <Card>
-    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle className="text-sm font-medium">{label}</CardTitle>
-      {icon}
-    </CardHeader>
-    <CardContent>
-      <div className={cn('text-2xl font-bold', tone === 'danger' && 'text-destructive')}>{value}</div>
-    </CardContent>
-  </Card>
-);
 
 const Legend: React.FC<{ color: string; label: string }> = ({ color, label }) => (
   <div className="flex items-center gap-1.5">

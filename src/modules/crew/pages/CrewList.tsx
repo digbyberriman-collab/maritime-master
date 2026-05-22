@@ -2,21 +2,20 @@ import React from 'react';
 import { Users } from 'lucide-react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 const CrewList: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Crew List</h1>
-          <p className="text-muted-foreground">
-            Operational crew roster — manage who is currently assigned, on board, or scheduled.
-          </p>
-        </div>
+        <PageHeader
+          title="Crew List"
+          description="Operational crew roster — manage who is currently assigned, on board, or scheduled."
+        />
 
         <Card className="shadow-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="text-base flex items-center gap-2">
               <Users className="w-5 h-5" />
               Coming soon
             </CardTitle>

@@ -32,6 +32,7 @@ import {
   FileText,
   StickyNote,
 } from 'lucide-react';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 const PostponedEntriesPage: React.FC = () => {
   const [search, setSearch] = useState('');
@@ -98,29 +99,27 @@ const PostponedEntriesPage: React.FC = () => {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
+        <PageHeader
+          icon={<PauseCircle className="w-5 h-5" />}
+          title={
+            <span className="flex items-center gap-2">
+              Postponed Entries
+              {!isLoading && (
+                <Badge variant="secondary" className="text-sm">
+                  {postponedEntries.length}
+                </Badge>
+              )}
+            </span>
+          }
+          description="Review and reinstate postponed itinerary entries or remove them permanently."
+          actions={
             <Link to="/itinerary/planning">
               <Button variant="ghost" size="icon">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
             </Link>
-            <div>
-              <div className="flex items-center gap-2">
-                <PauseCircle className="w-6 h-6 text-amber-500" />
-                <h1 className="text-2xl font-bold">Postponed Entries</h1>
-                {!isLoading && (
-                  <Badge variant="secondary" className="text-sm">
-                    {postponedEntries.length}
-                  </Badge>
-                )}
-              </div>
-              <p className="text-muted-foreground mt-1">
-                Review and reinstate postponed itinerary entries or remove them permanently.
-              </p>
-            </div>
-          </div>
-        </div>
+          }
+        />
 
         {/* Search bar */}
         <Card>

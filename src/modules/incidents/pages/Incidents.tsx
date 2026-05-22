@@ -4,7 +4,9 @@ import DashboardLayout from "@/shared/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { PageHeader } from "@/shared/components/common/PageHeader";
+import { StatCard, StatGrid } from "@/shared/components/common/StatCard";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
@@ -127,80 +129,44 @@ export default function Incidents() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Incidents & Near Misses</h1>
-            <p className="text-muted-foreground">
-              Report and track safety incidents across the fleet
-            </p>
-          </div>
-          <Button
-            onClick={() => setShowReportModal(true)}
-            className="bg-red-600 hover:bg-red-700"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Report Incident
-          </Button>
-        </div>
+        <PageHeader
+          title="Incidents & Near Misses"
+          description="Report and track safety incidents across the fleet"
+          actions={
+            <Button
+              onClick={() => setShowReportModal(true)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Report Incident
+            </Button>
+          }
+        />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Incidents This Month
-              </CardTitle>
-              <AlertTriangle className="h-4 w-4 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats?.totalThisMonth || 0}</div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Open Investigations
-              </CardTitle>
-              <Search className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {stats?.openInvestigations || 0}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Overdue CAPAs</CardTitle>
-              <Clock className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className={cn(
-                "text-2xl font-bold",
-                (stats?.overdueCAPAs || 0) > 0 && "text-red-600"
-              )}>
-                {stats?.overdueCAPAs || 0}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Days Since Last Incident
-              </CardTitle>
-              <Shield className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {stats?.daysSinceLastIncident || 0}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid>
+          <StatCard
+            label="Incidents This Month"
+            value={stats?.totalThisMonth || 0}
+            icon={<AlertTriangle className="h-4 w-4 text-orange-500" />}
+          />
+          <StatCard
+            label="Open Investigations"
+            value={stats?.openInvestigations || 0}
+            icon={<Search className="h-4 w-4 text-blue-500" />}
+          />
+          <StatCard
+            label="Overdue CAPAs"
+            value={stats?.overdueCAPAs || 0}
+            icon={<Clock className="h-4 w-4 text-red-500" />}
+            tone={(stats?.overdueCAPAs || 0) > 0 ? 'danger' : 'default'}
+          />
+          <StatCard
+            label="Days Since Last Incident"
+            value={stats?.daysSinceLastIncident || 0}
+            icon={<Shield className="h-4 w-4 text-green-500" />}
+            tone="success"
+          />
+        </StatGrid>
 
         {/* Filters */}
         <Card>

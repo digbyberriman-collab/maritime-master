@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -20,12 +20,14 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useIncidents } from '@/modules/incidents/hooks/useIncidents';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import { format } from 'date-fns';
-import { 
-  Search as SearchIcon, 
-  FileSearch, 
-  AlertTriangle, 
-  CheckCircle, 
+import {
+  Search as SearchIcon,
+  FileSearch,
+  AlertTriangle,
+  CheckCircle,
   Clock,
   Eye,
   PlayCircle
@@ -80,58 +82,35 @@ const InvestigationsPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <FileSearch className="w-6 h-6 text-primary" />
-              </div>
-              <h1 className="text-2xl font-bold text-foreground">Investigations</h1>
-            </div>
-            <p className="text-muted-foreground">
-              Root cause analysis and incident investigations
-            </p>
-          </div>
-        </div>
+        <PageHeader
+          icon={<FileSearch className="w-6 h-6" />}
+          title="Investigations"
+          description="Root cause analysis and incident investigations"
+        />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Awaiting Investigation</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className={cn("text-2xl font-bold", notStarted > 0 && "text-red-600")}>
-                {notStarted}
-              </div>
-              <p className="text-xs text-muted-foreground">Not yet started</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-              <Clock className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{inProgress}</div>
-              <p className="text-xs text-muted-foreground">Currently investigating</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{completed}</div>
-              <p className="text-xs text-muted-foreground">Investigations closed</p>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={3}>
+          <StatCard
+            label="Awaiting Investigation"
+            value={notStarted}
+            icon={<AlertTriangle className="w-4 h-4 text-red-500" />}
+            tone={notStarted > 0 ? 'danger' : 'default'}
+            hint="Not yet started"
+          />
+          <StatCard
+            label="In Progress"
+            value={inProgress}
+            icon={<Clock className="w-4 h-4 text-yellow-500" />}
+            tone="warning"
+            hint="Currently investigating"
+          />
+          <StatCard
+            label="Completed"
+            value={completed}
+            icon={<CheckCircle className="w-4 h-4 text-green-500" />}
+            tone="success"
+            hint="Investigations closed"
+          />
+        </StatGrid>
 
         {/* Filters */}
         <Card>

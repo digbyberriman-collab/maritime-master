@@ -14,10 +14,12 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useAudits } from '@/modules/audits/hooks/useAudits';
-import { 
-  Users, 
-  Plus, 
-  Search, 
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
+import {
+  Users,
+  Plus,
+  Search,
   Calendar,
   Clock,
   CheckCircle,
@@ -27,8 +29,7 @@ import {
   Upload,
   History
 } from 'lucide-react';
-import { format, isPast, isFuture, addDays } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { format, isPast, isFuture } from 'date-fns';
 
 const MeetingsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -83,71 +84,45 @@ const MeetingsPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Users className="w-6 h-6 text-primary" />
-              </div>
-              <h1 className="text-2xl font-bold text-foreground">Meetings & Reviews</h1>
-            </div>
-            <p className="text-muted-foreground">
-              Safety committee meetings and management reviews
-            </p>
-          </div>
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            Schedule Meeting
-          </Button>
-        </div>
+        <PageHeader
+          icon={<Users className="w-6 h-6" />}
+          title="Meetings & Reviews"
+          description="Safety committee meetings and management reviews"
+          actions={
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Schedule Meeting
+            </Button>
+          }
+        />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
-              <Calendar className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{upcomingReviews.length}</div>
-              <p className="text-xs text-muted-foreground">Scheduled meetings</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">This Month</CardTitle>
-              <Clock className="h-4 w-4 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{scheduledThisMonth}</div>
-              <p className="text-xs text-muted-foreground">Meetings planned</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed This Year</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{completedThisYear}</div>
-              <p className="text-xs text-muted-foreground">Reviews conducted</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Records</CardTitle>
-              <FileText className="h-4 w-4 text-purple-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{reviews.length}</div>
-              <p className="text-xs text-muted-foreground">All meetings</p>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={4}>
+          <StatCard
+            label="Upcoming"
+            value={upcomingReviews.length}
+            icon={<Calendar className="w-4 h-4 text-blue-500" />}
+            hint="Scheduled meetings"
+          />
+          <StatCard
+            label="This Month"
+            value={scheduledThisMonth}
+            icon={<Clock className="w-4 h-4 text-orange-500" />}
+            hint="Meetings planned"
+          />
+          <StatCard
+            label="Completed This Year"
+            value={completedThisYear}
+            icon={<CheckCircle className="w-4 h-4 text-green-500" />}
+            tone="success"
+            hint="Reviews conducted"
+          />
+          <StatCard
+            label="Total Records"
+            value={reviews.length}
+            icon={<FileText className="w-4 h-4 text-purple-500" />}
+            hint="All meetings"
+          />
+        </StatGrid>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -297,7 +272,7 @@ const MeetingsPage: React.FC = () => {
               <CardHeader>
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <CardTitle>Safety Meeting Document Control</CardTitle>
+                    <CardTitle className="text-base">Safety Meeting Document Control</CardTitle>
                     <CardDescription>
                       Manage the controlled template used to record safety meetings.
                     </CardDescription>

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -132,11 +133,10 @@ const BrandingSettings: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-2xl animate-fade-in">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Branding Settings</h1>
-          <p className="text-muted-foreground">Customize your company branding for reports and emails</p>
-        </div>
+        <PageHeader
+          title="Branding Settings"
+          description="Customize your company branding for reports and emails"
+        />
 
         {isLoading ? (
           <div className="space-y-4">

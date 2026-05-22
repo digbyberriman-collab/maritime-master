@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { AuditModeIndicator, RedactedField } from '@/modules/compliance/components';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 // Insurance tab data - alphabetically ordered with audit visibility rules
 const insuranceTabs = [
@@ -268,26 +269,18 @@ const InsurancePage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Page Header */}
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-primary/10 rounded-lg">
-              <Umbrella className="w-6 h-6 text-primary" />
-            </div>
-            <div className="flex-1">
-              <h1 className="text-2xl font-semibold text-foreground">Insurance</h1>
-              <p className="text-muted-foreground">
-                Vessel insurance policies, certificates, and claims management
-              </p>
-            </div>
-            {/* Audit Mode Toggle */}
+        <PageHeader
+          icon={<Umbrella className="w-6 h-6" />}
+          title="Insurance"
+          description="Vessel insurance policies, certificates, and claims management"
+          actions={
             <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
               <div className="flex items-center gap-2">
                 <Shield className="w-4 h-4 text-muted-foreground" />
                 <span className="text-sm font-medium">Insurance Audit Mode</span>
               </div>
-              <Switch 
-                checked={isAuditMode} 
+              <Switch
+                checked={isAuditMode}
                 onCheckedChange={setIsAuditMode}
               />
               {isAuditMode && (
@@ -297,8 +290,8 @@ const InsurancePage: React.FC = () => {
                 </Badge>
               )}
             </div>
-          </div>
-        </div>
+          }
+        />
 
         {/* Audit Mode Indicator */}
         {isAuditMode && (

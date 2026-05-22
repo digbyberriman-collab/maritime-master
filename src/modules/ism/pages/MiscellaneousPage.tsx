@@ -2,9 +2,9 @@ import React from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
-  FolderOpen, 
-  FileText, 
+import {
+  FolderOpen,
+  FileText,
   Upload,
   Download,
   Archive,
@@ -14,6 +14,8 @@ import {
   Plus
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 
 const MiscellaneousPage: React.FC = () => {
   const categories = [
@@ -28,24 +30,17 @@ const MiscellaneousPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <FolderOpen className="w-6 h-6 text-primary" />
-              </div>
-              <h1 className="text-2xl font-bold text-foreground">Miscellaneous</h1>
-            </div>
-            <p className="text-muted-foreground">
-              Other ISM-related documents and items
-            </p>
-          </div>
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Item
-          </Button>
-        </div>
+        <PageHeader
+          icon={<FolderOpen className="w-6 h-6" />}
+          title="Miscellaneous"
+          description="Other ISM-related documents and items"
+          actions={
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Item
+            </Button>
+          }
+        />
 
         {/* Search */}
         <Card>
@@ -60,32 +55,26 @@ const MiscellaneousPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Categories Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <StatGrid cols={3}>
           {categories.map((category) => {
             const Icon = category.icon;
             return (
-              <Card 
-                key={category.name} 
+              <StatCard
+                key={category.name}
+                label={category.name}
+                value={category.count}
+                icon={<Icon className={`w-4 h-4 ${category.color}`} />}
+                hint="items"
                 className="cursor-pointer hover:shadow-md transition-shadow"
-              >
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-base font-medium">{category.name}</CardTitle>
-                  <Icon className={`h-5 w-5 ${category.color}`} />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-2xl font-bold">{category.count}</div>
-                  <p className="text-xs text-muted-foreground">items</p>
-                </CardContent>
-              </Card>
+              />
             );
           })}
-        </div>
+        </StatGrid>
 
         {/* Recent Items */}
         <Card>
           <CardHeader>
-            <CardTitle>Recent Items</CardTitle>
+            <CardTitle className="text-base">Recent Items</CardTitle>
             <CardDescription>Recently added or modified miscellaneous items</CardDescription>
           </CardHeader>
           <CardContent>
@@ -106,7 +95,7 @@ const MiscellaneousPage: React.FC = () => {
         {/* Quick Actions */}
         <Card>
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
+            <CardTitle className="text-base">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

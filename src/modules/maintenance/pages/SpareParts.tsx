@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { 
-  Package, Search, Filter, Plus, AlertCircle, CheckCircle,
+import {
+  Package, Search, Filter, Plus, AlertCircle,
   Ship, Loader2, ArrowDown, ArrowUp, Settings, Tag
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -145,21 +147,20 @@ export default function SpareParts() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Package className="w-6 h-6" />
-              Spare Parts Inventory
-            </h1>
-            <p className="text-muted-foreground">Manage spare parts inventory across the fleet</p>
-          </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Part
-              </Button>
-            </DialogTrigger>
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <PageHeader
+            icon={<Package className="w-5 h-5" />}
+            title="Spare Parts Inventory"
+            description="Manage spare parts inventory across the fleet"
+            actions={
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Part
+                </Button>
+              </DialogTrigger>
+            }
+          />
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add Spare Part</DialogTitle>
@@ -238,73 +239,37 @@ export default function SpareParts() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Package className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{parts.length}</p>
-                  <p className="text-sm text-muted-foreground">Total Parts</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-yellow-100 rounded-lg">
-                  <ArrowDown className="w-5 h-5 text-yellow-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{lowStockCount}</p>
-                  <p className="text-sm text-muted-foreground">Low Stock</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <AlertCircle className="w-5 h-5 text-red-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{outOfStockCount}</p>
-                  <p className="text-sm text-muted-foreground">Out of Stock</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <Settings className="w-5 h-5 text-orange-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{criticalLowCount}</p>
-                  <p className="text-sm text-muted-foreground">Critical Low</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <Tag className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">${(totalValue / 1000).toFixed(1)}k</p>
-                  <p className="text-sm text-muted-foreground">Total Value</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={5}>
+          <StatCard
+            label="Total Parts"
+            value={parts.length}
+            icon={<Package className="w-5 h-5 text-muted-foreground" />}
+          />
+          <StatCard
+            label="Low Stock"
+            value={lowStockCount}
+            tone={lowStockCount > 0 ? 'warning' : 'default'}
+            icon={<ArrowDown className="w-5 h-5 text-muted-foreground" />}
+          />
+          <StatCard
+            label="Out of Stock"
+            value={outOfStockCount}
+            tone={outOfStockCount > 0 ? 'danger' : 'default'}
+            icon={<AlertCircle className="w-5 h-5 text-muted-foreground" />}
+          />
+          <StatCard
+            label="Critical Low"
+            value={criticalLowCount}
+            tone={criticalLowCount > 0 ? 'warning' : 'default'}
+            icon={<Settings className="w-5 h-5 text-muted-foreground" />}
+          />
+          <StatCard
+            label="Total Value"
+            value={`$${(totalValue / 1000).toFixed(1)}k`}
+            tone="success"
+            icon={<Tag className="w-5 h-5 text-muted-foreground" />}
+          />
+        </StatGrid>
 
         {/* Filters */}
         <Card>

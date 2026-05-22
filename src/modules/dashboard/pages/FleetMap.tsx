@@ -6,16 +6,16 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  Ship, 
+import {
+  Ship,
   Maximize2,
   Minimize2,
   RefreshCw,
   Layers,
   X,
-  Anchor,
   Navigation
 } from 'lucide-react';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 import { useVesselFilter } from '@/modules/vessels/hooks/useVesselFilter';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -322,18 +322,16 @@ const FleetMap: React.FC = () => {
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Fleet Map</h1>
-            <p className="text-muted-foreground">Real-time vessel tracking and AIS data</p>
-          </div>
-          <div className="flex gap-2">
+        <PageHeader
+          title="Fleet Map"
+          description="Real-time vessel tracking and AIS data"
+          actions={
             <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
               <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
               {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
-          </div>
-        </div>
+          }
+        />
 
         {/* Map Container */}
         <Card className="shadow-card overflow-hidden">

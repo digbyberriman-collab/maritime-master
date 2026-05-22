@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { 
+import {
   Calendar, Plus, Search, Clock, Play, Pause, Trash2,
-  FileText, Loader2, Ship, Edit, RefreshCw, AlertCircle
+  FileText, Loader2, Ship, Edit, RefreshCw
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -199,23 +200,19 @@ export default function FormSchedules() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Calendar className="w-6 h-6" />
-              Form Schedules
-            </h1>
-            <p className="text-muted-foreground">Manage recurring form schedules for vessels</p>
-          </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Create Schedule
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
+        <PageHeader
+          icon={<Calendar className="w-6 h-6" />}
+          title="Form Schedules"
+          description="Manage recurring form schedules for vessels"
+          actions={
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Schedule
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
               <DialogHeader>
                 <DialogTitle>New Form Schedule</DialogTitle>
               </DialogHeader>

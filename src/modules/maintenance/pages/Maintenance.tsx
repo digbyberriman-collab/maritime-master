@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMaintenance, Equipment } from '@/modules/maintenance/hooks/useMaintenance';
-import { 
-  Wrench, 
+import {
+  Wrench,
   Plus,
   AlertTriangle,
   Calendar,
@@ -15,6 +14,8 @@ import {
   ClipboardList,
   RefreshCw
 } from 'lucide-react';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import EquipmentRegisterTab from '@/modules/maintenance/components/EquipmentRegisterTab';
 import MaintenanceScheduleTab from '@/modules/maintenance/components/MaintenanceScheduleTab';
 import DefectsTab from '@/modules/maintenance/components/DefectsTab';
@@ -57,90 +58,64 @@ const Maintenance: React.FC = () => {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Planned Maintenance System</h1>
-            <p className="text-muted-foreground">ISM Code Section 10 - Maintenance of Ship & Equipment</p>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            <Button variant="outline" onClick={() => setShowAddEquipment(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Equipment
-            </Button>
-            <Button variant="outline" onClick={() => setShowCreateTask(true)}>
-              <ClipboardList className="h-4 w-4 mr-2" />
-              Create Task
-            </Button>
-            <Button onClick={() => setShowLogDefect(true)}>
-              <AlertTriangle className="h-4 w-4 mr-2" />
-              Log Defect
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          title="Planned Maintenance System"
+          description="ISM Code Section 10 - Maintenance of Ship & Equipment"
+          actions={
+            <>
+              <Button variant="outline" onClick={() => setShowAddEquipment(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Equipment
+              </Button>
+              <Button variant="outline" onClick={() => setShowCreateTask(true)}>
+                <ClipboardList className="h-4 w-4 mr-2" />
+                Create Task
+              </Button>
+              <Button onClick={() => setShowLogDefect(true)}>
+                <AlertTriangle className="h-4 w-4 mr-2" />
+                Log Defect
+              </Button>
+            </>
+          }
+        />
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total Equipment</CardTitle>
-              <Settings className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalEquipment}</div>
-              <p className="text-xs text-muted-foreground">Registered items</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Overdue Tasks</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-critical" />
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${stats.overdueTasks > 0 ? 'text-critical' : ''}`}>
-                {stats.overdueTasks}
-              </div>
-              <p className="text-xs text-muted-foreground">Require attention</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Critical Defects</CardTitle>
-              <Wrench className="h-4 w-4 text-critical" />
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${stats.criticalDefects > 0 ? 'text-critical' : ''}`}>
-                {stats.criticalDefects}
-              </div>
-              <p className="text-xs text-muted-foreground">Open P1 issues</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Due This Week</CardTitle>
-              <Calendar className="h-4 w-4 text-warning" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-warning">{stats.tasksDueThisWeek}</div>
-              <p className="text-xs text-muted-foreground">Upcoming tasks</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Low Stock Parts</CardTitle>
-              <Package className="h-4 w-4 text-warning" />
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${stats.lowStockParts > 0 ? 'text-warning' : ''}`}>
-                {stats.lowStockParts}
-              </div>
-              <p className="text-xs text-muted-foreground">Below minimum</p>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={5}>
+          <StatCard
+            label="Total Equipment"
+            value={stats.totalEquipment}
+            icon={<Settings className="h-4 w-4 text-muted-foreground" />}
+            hint="Registered items"
+          />
+          <StatCard
+            label="Overdue Tasks"
+            value={stats.overdueTasks}
+            tone={stats.overdueTasks > 0 ? 'danger' : 'default'}
+            icon={<AlertTriangle className="h-4 w-4 text-muted-foreground" />}
+            hint="Require attention"
+          />
+          <StatCard
+            label="Critical Defects"
+            value={stats.criticalDefects}
+            tone={stats.criticalDefects > 0 ? 'danger' : 'default'}
+            icon={<Wrench className="h-4 w-4 text-muted-foreground" />}
+            hint="Open P1 issues"
+          />
+          <StatCard
+            label="Due This Week"
+            value={stats.tasksDueThisWeek}
+            tone="warning"
+            icon={<Calendar className="h-4 w-4 text-muted-foreground" />}
+            hint="Upcoming tasks"
+          />
+          <StatCard
+            label="Low Stock Parts"
+            value={stats.lowStockParts}
+            tone={stats.lowStockParts > 0 ? 'warning' : 'default'}
+            icon={<Package className="h-4 w-4 text-muted-foreground" />}
+            hint="Below minimum"
+          />
+        </StatGrid>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">

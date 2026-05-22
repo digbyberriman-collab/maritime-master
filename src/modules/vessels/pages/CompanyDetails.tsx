@@ -12,21 +12,20 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
-import { 
-  Building2, 
-  Phone, 
-  Mail, 
-  MapPin, 
-  Globe, 
-  Shield, 
-  Users,
+import {
+  Building2,
+  Phone,
+  Mail,
+  MapPin,
+  Globe,
+  Shield,
   FileText,
   Edit,
   Save,
   X,
   Plus,
-  Trash2
 } from 'lucide-react';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 interface CompanyContact {
   id: string;
@@ -161,31 +160,29 @@ const CompanyDetails: React.FC = () => {
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Company Details</h1>
-            <p className="text-muted-foreground">
-              Company information and management contacts
-            </p>
-          </div>
-          {!isEditing ? (
-            <Button onClick={() => setIsEditing(true)} className="gap-2">
-              <Edit className="w-4 h-4" />
-              Edit Details
-            </Button>
-          ) : (
-            <div className="flex gap-2">
-              <Button onClick={handleSaveCompany} className="gap-2">
-                <Save className="w-4 h-4" />
-                Save Changes
+        <PageHeader
+          title="Company Details"
+          description="Company information and management contacts"
+          actions={
+            !isEditing ? (
+              <Button onClick={() => setIsEditing(true)} className="gap-2">
+                <Edit className="w-4 h-4" />
+                Edit Details
               </Button>
-              <Button variant="outline" onClick={handleCancelEdit} className="gap-2">
-                <X className="w-4 h-4" />
-                Cancel
-              </Button>
-            </div>
-          )}
-        </div>
+            ) : (
+              <>
+                <Button onClick={handleSaveCompany} className="gap-2">
+                  <Save className="w-4 h-4" />
+                  Save Changes
+                </Button>
+                <Button variant="outline" onClick={handleCancelEdit} className="gap-2">
+                  <X className="w-4 h-4" />
+                  Cancel
+                </Button>
+              </>
+            )
+          }
+        />
 
         <Tabs defaultValue="company" className="space-y-4">
           <TabsList className="grid w-full grid-cols-4">
@@ -200,7 +197,7 @@ const CompanyDetails: React.FC = () => {
               {/* Basic Information */}
               <Card className="shadow-card">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
                     <Building2 className="w-5 h-5" />
                     Basic Information
                   </CardTitle>
@@ -253,7 +250,7 @@ const CompanyDetails: React.FC = () => {
               {/* Contact Information */}
               <Card className="shadow-card">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
                     <Phone className="w-5 h-5" />
                     Contact Information
                   </CardTitle>
@@ -313,7 +310,7 @@ const CompanyDetails: React.FC = () => {
               {/* Address */}
               <Card className="shadow-card md:col-span-2">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
                     <MapPin className="w-5 h-5" />
                     Address
                   </CardTitle>
@@ -439,7 +436,7 @@ const CompanyDetails: React.FC = () => {
             <div className="grid gap-6 md:grid-cols-2">
               <Card className="shadow-card">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
                     <FileText className="w-5 h-5" />
                     Document of Compliance (DOC)
                   </CardTitle>
@@ -468,7 +465,7 @@ const CompanyDetails: React.FC = () => {
 
               <Card className="shadow-card">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
                     <Shield className="w-5 h-5" />
                     Safety Management Certificate
                   </CardTitle>
@@ -506,7 +503,7 @@ const CompanyDetails: React.FC = () => {
             <div className="grid gap-6 md:grid-cols-2">
               <Card className="shadow-card">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
                     <Shield className="w-5 h-5" />
                     Flag State
                   </CardTitle>
@@ -532,7 +529,7 @@ const CompanyDetails: React.FC = () => {
 
               <Card className="shadow-card">
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
                     <FileText className="w-5 h-5" />
                     Classification Society
                   </CardTitle>

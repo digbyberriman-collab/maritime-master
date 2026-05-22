@@ -1,6 +1,7 @@
 import React from 'react';
 import { useLocation } from 'react-router-dom';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Ship, LayoutGrid, Building2, Phone } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -23,15 +24,15 @@ const VesselPlaceholder: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-foreground">{pageConfig.title}</h1>
+        <PageHeader
+          title={
+            <span className="inline-flex items-center gap-3">
+              {pageConfig.title}
               <Badge variant="secondary">Coming Soon</Badge>
-            </div>
-            <p className="text-muted-foreground mt-1">{pageConfig.description}</p>
-          </div>
-        </div>
+            </span>
+          }
+          description={pageConfig.description}
+        />
 
         <Card>
           <CardHeader>
@@ -40,7 +41,7 @@ const VesselPlaceholder: React.FC = () => {
                 <Icon className="h-8 w-8 text-primary" />
               </div>
               <div>
-                <CardTitle>{pageConfig.title}</CardTitle>
+                <CardTitle className="text-base">{pageConfig.title}</CardTitle>
                 <CardDescription>This module is under development</CardDescription>
               </div>
             </div>

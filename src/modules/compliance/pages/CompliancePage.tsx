@@ -8,6 +8,7 @@ import ISPSTab from '@/modules/compliance/components/ISPSTab';
 import MLCTab from '@/modules/compliance/components/MLCTab';
 import MARPOLTab from '@/modules/compliance/components/MARPOLTab';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 const CompliancePage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -21,13 +22,15 @@ const CompliancePage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Compliance</h1>
-          <p className="text-muted-foreground">
-            Compliance management
-            {selectedVessel && <span className="ml-1">— {selectedVessel.name}</span>}
-          </p>
-        </div>
+        <PageHeader
+          title="Compliance"
+          description={
+            <>
+              Compliance management
+              {selectedVessel && <span className="ml-1">— {selectedVessel.name}</span>}
+            </>
+          }
+        />
 
         <Tabs value={tab} onValueChange={handleTabChange}>
           <TabsList>

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 import { 
   Select,
   SelectContent,
@@ -850,7 +851,7 @@ const CreateTemplate: React.FC = () => {
 
             <Card>
               <CardHeader>
-                <CardTitle>{templateData.template_name || 'Untitled Template'}</CardTitle>
+                <CardTitle className="text-base">{templateData.template_name || 'Untitled Template'}</CardTitle>
                 <CardDescription>{templateData.template_code}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -920,16 +921,15 @@ const CreateTemplate: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="max-w-4xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Create Form Template</h1>
-            <p className="text-muted-foreground">Convert documents into digital forms with AI assistance</p>
-          </div>
-          <Button variant="outline" onClick={() => navigate('/ism/forms/templates')}>
-            Cancel
-          </Button>
-        </div>
+        <PageHeader
+          title="Create Form Template"
+          description="Convert documents into digital forms with AI assistance"
+          actions={
+            <Button variant="outline" onClick={() => navigate('/ism/forms/templates')}>
+              Cancel
+            </Button>
+          }
+        />
 
         {/* Progress Steps */}
         <div className="flex items-center justify-between">

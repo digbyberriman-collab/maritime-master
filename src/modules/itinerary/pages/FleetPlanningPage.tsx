@@ -8,6 +8,7 @@ import EntryDetailPanel from '@/modules/itinerary/components/EntryDetailPanel';
 import { useItineraryEntries, useTripTypes, useItineraryVessels } from '@/modules/itinerary/hooks/useItinerary';
 import { Loader2 } from 'lucide-react';
 import type { ItineraryEntry, ViewMode, ItineraryStatus } from '@/modules/itinerary/types';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 const ALL_STATUSES: ItineraryStatus[] = ['draft', 'tentative', 'confirmed', 'postponed', 'cancelled', 'completed'];
 
@@ -73,10 +74,10 @@ const FleetPlanningPage: React.FC = () => {
       <div className="flex flex-col h-[calc(100vh-4rem)]">
         {/* Header */}
         <div className="px-4 pt-4 pb-2">
-          <h1 className="text-lg font-bold text-foreground">Fleet Planning</h1>
-          <p className="text-xs text-muted-foreground">
-            {entries.length} entries across {vessels.length} vessels
-          </p>
+          <PageHeader
+            title="Fleet Planning"
+            description={`${entries.length} entries across ${vessels.length} vessels`}
+          />
         </div>
 
         {/* Toolbar */}

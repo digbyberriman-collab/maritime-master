@@ -7,6 +7,7 @@ import EntryDetailPanel from '@/modules/itinerary/components/EntryDetailPanel';
 import { useItineraryEntries, useTripTypes, useItineraryVessels } from '@/modules/itinerary/hooks/useItinerary';
 import { Loader2 } from 'lucide-react';
 import type { ItineraryEntry, ViewMode, ItineraryStatus } from '@/modules/itinerary/types';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 const ALL_STATUSES: ItineraryStatus[] = ['draft', 'tentative', 'confirmed', 'postponed', 'cancelled', 'completed'];
 
@@ -43,10 +44,10 @@ const FleetTimelinePage: React.FC = () => {
       <div className="flex flex-col h-[calc(100vh-4rem)]">
         {/* Header */}
         <div className="px-4 pt-4 pb-2">
-          <h1 className="text-lg font-bold text-foreground">Fleet Timeline</h1>
-          <p className="text-xs text-muted-foreground">
-            Gantt-style view — {entries.length} entries across {vessels.length} vessels
-          </p>
+          <PageHeader
+            title="Fleet Timeline"
+            description={`Gantt-style view — ${entries.length} entries across ${vessels.length} vessels`}
+          />
         </div>
 
         {/* Toolbar (reused, view mode toggle hidden since this is always timeline) */}

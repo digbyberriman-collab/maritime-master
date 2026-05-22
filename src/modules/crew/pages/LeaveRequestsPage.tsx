@@ -23,6 +23,7 @@ import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { logLeaveAudit } from '@/modules/crew/services/leaveAudit';
 import { overlapsAny } from '@/modules/crew/services/leaveCalculator';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 const statusBadgeColors: Record<string, string> = {
   pending: 'bg-amber-100 text-amber-800',
@@ -471,32 +472,40 @@ export default function LeaveRequestsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate('/crew/leave')}>
+        <PageHeader
+          icon={
+            <button
+              onClick={() => navigate('/crew/leave')}
+              className="inline-flex"
+              aria-label="Back"
+            >
               <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                <CalendarDays className="w-6 h-6" />
-                Leave Requests
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                Submit & review leave requests
-                {selectedVessel && !isAllVessels && ` — ${selectedVessel.name}`}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={exportCsv}>
-              <Download className="w-4 h-4 mr-1" /> CSV
-            </Button>
-            <Button onClick={() => setDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              New Request
-            </Button>
-          </div>
-        </div>
+            </button>
+          }
+          title={
+            <span className="flex items-center gap-2">
+              <CalendarDays className="w-6 h-6" />
+              Leave Requests
+            </span>
+          }
+          description={
+            <>
+              Submit & review leave requests
+              {selectedVessel && !isAllVessels && ` — ${selectedVessel.name}`}
+            </>
+          }
+          actions={
+            <>
+              <Button variant="outline" size="sm" onClick={exportCsv}>
+                <Download className="w-4 h-4 mr-1" /> CSV
+              </Button>
+              <Button onClick={() => setDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                New Request
+              </Button>
+            </>
+          }
+        />
 
         <div className="flex items-center gap-2 flex-wrap">
           {(['all', 'pending', 'approved', 'declined', 'cancelled'] as const).map((s) => (

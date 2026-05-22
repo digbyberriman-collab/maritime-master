@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -94,26 +96,23 @@ const WorkRestOverview: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-4">
-        {/* Header */}
-        <div className="flex items-start justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Hours of Rest</h1>
-            <p className="text-sm text-muted-foreground">
-              {selectedVessel?.name ?? 'No vessel selected'} — Monthly compliance report
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
-              <FileText className="h-4 w-4 mr-1.5" /> Summary PDF
-            </Button>
-            <Button variant="outline" size="sm">
-              <FileSpreadsheet className="h-4 w-4 mr-1.5" /> Summary Excel
-            </Button>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-1.5" /> Export All Crew (PDF)
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          title="Hours of Rest"
+          description={`${selectedVessel?.name ?? 'No vessel selected'} — Monthly compliance report`}
+          actions={
+            <>
+              <Button variant="outline" size="sm">
+                <FileText className="h-4 w-4 mr-1.5" /> Summary PDF
+              </Button>
+              <Button variant="outline" size="sm">
+                <FileSpreadsheet className="h-4 w-4 mr-1.5" /> Summary Excel
+              </Button>
+              <Button variant="outline" size="sm">
+                <Download className="h-4 w-4 mr-1.5" /> Export All Crew (PDF)
+              </Button>
+            </>
+          }
+        />
 
         {/* Month nav */}
         <div className="flex items-center gap-2">

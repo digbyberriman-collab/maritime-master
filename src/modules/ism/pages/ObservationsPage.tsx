@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -30,18 +30,18 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { 
-  Eye, 
-  Plus, 
-  Search, 
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
+import {
+  Eye,
+  Plus,
+  Search,
   ThumbsUp,
-  ThumbsDown,
   AlertTriangle,
   TrendingUp,
   MessageSquare
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
 
 // Mock data for observations (would come from hook in production)
 const mockObservations = [
@@ -106,27 +106,19 @@ const ObservationsPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <Eye className="w-6 h-6 text-primary" />
-              </div>
-              <h1 className="text-2xl font-bold text-foreground">Safety Observations</h1>
-            </div>
-            <p className="text-muted-foreground">
-              Report positive behaviors and safety concerns
-            </p>
-          </div>
-          <Dialog open={showNewObservation} onOpenChange={setShowNewObservation}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                New Observation
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
+        <PageHeader
+          icon={<Eye className="w-6 h-6" />}
+          title="Safety Observations"
+          description="Report positive behaviors and safety concerns"
+          actions={
+            <Dialog open={showNewObservation} onOpenChange={setShowNewObservation}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Observation
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle>Report Observation</DialogTitle>
                 <DialogDescription>
@@ -193,58 +185,39 @@ const ObservationsPage: React.FC = () => {
                   Submit Observation
                 </Button>
               </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+              </DialogContent>
+            </Dialog>
+          }
+        />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Positive</CardTitle>
-              <ThumbsUp className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{positiveCount}</div>
-              <p className="text-xs text-muted-foreground">Good behaviors noted</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Concerns</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className={cn("text-2xl font-bold", concernCount > 0 && "text-orange-600")}>
-                {concernCount}
-              </div>
-              <p className="text-xs text-muted-foreground">Areas for improvement</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Open</CardTitle>
-              <MessageSquare className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{openCount}</div>
-              <p className="text-xs text-muted-foreground">Awaiting review</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">This Month</CardTitle>
-              <TrendingUp className="h-4 w-4 text-purple-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{observations.length}</div>
-              <p className="text-xs text-muted-foreground">Total observations</p>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={4}>
+          <StatCard
+            label="Positive"
+            value={positiveCount}
+            icon={<ThumbsUp className="w-4 h-4 text-green-500" />}
+            tone="success"
+            hint="Good behaviors noted"
+          />
+          <StatCard
+            label="Concerns"
+            value={concernCount}
+            icon={<AlertTriangle className="w-4 h-4 text-orange-500" />}
+            tone={concernCount > 0 ? 'warning' : 'default'}
+            hint="Areas for improvement"
+          />
+          <StatCard
+            label="Open"
+            value={openCount}
+            icon={<MessageSquare className="w-4 h-4 text-blue-500" />}
+            hint="Awaiting review"
+          />
+          <StatCard
+            label="This Month"
+            value={observations.length}
+            icon={<TrendingUp className="w-4 h-4 text-purple-500" />}
+            hint="Total observations"
+          />
+        </StatGrid>
 
         {/* Filters */}
         <Card>

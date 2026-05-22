@@ -2,14 +2,15 @@ import React, { useState } from "react";
 import { toast } from "sonner";
 import DashboardLayout from "@/shared/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PageHeader } from "@/shared/components/common/PageHeader";
+import { StatCard, StatGrid } from "@/shared/components/common/StatCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
-import { 
+import {
   AlertCircle,
-  CheckCircle2,
   Clock,
   TrendingUp,
   Download,
@@ -66,99 +67,47 @@ const CAPATracker: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold">CAPA Tracker</h1>
-            <p className="text-muted-foreground">
-              Corrective and Preventive Action management
-            </p>
-          </div>
-          <Button variant="outline" className="gap-2" onClick={() => toast.info('Export report feature coming soon')}>
-            <Download className="w-4 h-4" />
-            Export Report
-          </Button>
-        </div>
+        <PageHeader
+          title="CAPA Tracker"
+          description="Corrective and Preventive Action management"
+          actions={
+            <Button variant="outline" className="gap-2" onClick={() => toast.info('Export report feature coming soon')}>
+              <Download className="w-4 h-4" />
+              Export Report
+            </Button>
+          }
+        />
 
-        {/* Metrics Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card className="shadow-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Open CAPAs
-              </CardTitle>
-              <FileText className="w-5 h-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <span className="text-2xl font-bold">
-                {isMetricsLoading ? "..." : metrics?.totalOpen || 0}
-              </span>
-              <p className="text-xs text-muted-foreground mt-1">
-                Requiring action
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className={cn(
-            "shadow-card",
-            metrics?.overdue && metrics.overdue > 0 ? "border-destructive" : ""
-          )}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Overdue CAPAs
-              </CardTitle>
-              <AlertCircle className={cn(
-                "w-5 h-5",
-                metrics?.overdue && metrics.overdue > 0 ? "text-destructive" : "text-muted-foreground"
-              )} />
-            </CardHeader>
-            <CardContent>
-              <span className={cn(
-                "text-2xl font-bold",
-                metrics?.overdue && metrics.overdue > 0 ? "text-destructive" : ""
-              )}>
-                {isMetricsLoading ? "..." : metrics?.overdue || 0}
-              </span>
-              <p className="text-xs text-muted-foreground mt-1">
-                Past due date
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Avg. Days to Complete
-              </CardTitle>
-              <Clock className="w-5 h-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <span className="text-2xl font-bold">
-                {isMetricsLoading ? "..." : metrics?.avgDaysToComplete || 0}
-              </span>
-              <p className="text-xs text-muted-foreground mt-1">
-                Days from creation to close
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="shadow-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Completion Rate
-              </CardTitle>
-              <TrendingUp className="w-5 h-5 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <span className="text-2xl font-bold">
-                {isMetricsLoading ? "..." : `${metrics?.completionRateThisMonth || 0}%`}
-              </span>
-              <p className="text-xs text-muted-foreground mt-1">
-                This month ({metrics?.completedThisMonth || 0}/{metrics?.totalThisMonth || 0})
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid>
+          <StatCard
+            label="Open CAPAs"
+            icon={<FileText className="w-5 h-5 text-muted-foreground" />}
+            value={isMetricsLoading ? "..." : metrics?.totalOpen || 0}
+            hint="Requiring action"
+          />
+          <StatCard
+            label="Overdue CAPAs"
+            icon={<AlertCircle className={cn(
+              "w-5 h-5",
+              metrics?.overdue && metrics.overdue > 0 ? "text-destructive" : "text-muted-foreground"
+            )} />}
+            value={isMetricsLoading ? "..." : metrics?.overdue || 0}
+            tone={metrics?.overdue && metrics.overdue > 0 ? 'danger' : 'default'}
+            hint="Past due date"
+          />
+          <StatCard
+            label="Avg. Days to Complete"
+            icon={<Clock className="w-5 h-5 text-muted-foreground" />}
+            value={isMetricsLoading ? "..." : metrics?.avgDaysToComplete || 0}
+            hint="Days from creation to close"
+          />
+          <StatCard
+            label="Completion Rate"
+            icon={<TrendingUp className="w-5 h-5 text-muted-foreground" />}
+            value={isMetricsLoading ? "..." : `${metrics?.completionRateThisMonth || 0}%`}
+            hint={`This month (${metrics?.completedThisMonth || 0}/${metrics?.totalThisMonth || 0})`}
+          />
+        </StatGrid>
 
         {/* Filters */}
         <Card className="shadow-card">
@@ -221,7 +170,7 @@ const CAPATracker: React.FC = () => {
         {/* CAPA Table */}
         <Card className="shadow-card">
           <CardHeader>
-            <CardTitle>CAPA List</CardTitle>
+            <CardTitle className="text-base">CAPA List</CardTitle>
             <CardDescription>
               {capas?.length || 0} corrective actions found
             </CardDescription>
@@ -303,7 +252,7 @@ const CAPATracker: React.FC = () => {
         <div className="grid gap-4 lg:grid-cols-2">
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle>CAPA Aging</CardTitle>
+              <CardTitle className="text-base">CAPA Aging</CardTitle>
               <CardDescription>Distribution by age</CardDescription>
             </CardHeader>
             <CardContent>
@@ -313,7 +262,7 @@ const CAPATracker: React.FC = () => {
 
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle>Assignee Performance</CardTitle>
+              <CardTitle className="text-base">Assignee Performance</CardTitle>
               <CardDescription>CAPA management by person</CardDescription>
             </CardHeader>
             <CardContent>

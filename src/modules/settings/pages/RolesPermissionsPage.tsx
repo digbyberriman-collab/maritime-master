@@ -3,6 +3,7 @@ import { Shield, Check, X, Download, Users, History, Loader2, AlertTriangle } fr
 import { supabase } from '@/integrations/supabase/client';
 import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -138,15 +139,11 @@ export default function RolesPermissionsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Shield className="w-6 h-6" />
-          Roles & Permissions
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Configure module access for each role in your organization
-        </p>
-      </div>
+      <PageHeader
+        title="Roles & Permissions"
+        description="Configure module access for each role in your organization"
+        icon={<Shield className="w-5 h-5" />}
+      />
 
       <Tabs defaultValue="matrix" className="space-y-4">
         <TabsList>
@@ -358,7 +355,7 @@ function AuditLogViewer() {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div>
-            <CardTitle>Permission Change History</CardTitle>
+            <CardTitle className="text-base">Permission Change History</CardTitle>
             <CardDescription>Recent changes to roles and permissions</CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={exportCSV} className="gap-2">

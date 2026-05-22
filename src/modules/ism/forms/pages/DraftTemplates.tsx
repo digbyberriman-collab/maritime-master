@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { 
-  FileText, Search, Filter, Edit, Trash2, Clock,
-  Eye, Send, Loader2, AlertCircle
+import {
+  FileText, Search, Edit, Trash2, Clock,
+  Eye, Send, Loader2
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -111,72 +113,40 @@ export default function DraftTemplates() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <FileText className="w-6 h-6" />
-              Draft Templates
-            </h1>
-            <p className="text-muted-foreground">Templates in draft state awaiting review</p>
-          </div>
-          <Button asChild>
-            <Link to="/ism/forms/templates/create">
-              Create New Template
-            </Link>
-          </Button>
-        </div>
+        <PageHeader
+          icon={<FileText className="w-6 h-6" />}
+          title="Draft Templates"
+          description="Templates in draft state awaiting review"
+          actions={
+            <Button asChild>
+              <Link to="/ism/forms/templates/create">
+                Create New Template
+              </Link>
+            </Button>
+          }
+        />
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-yellow-100 rounded-lg">
-                  <Clock className="w-5 h-5 text-yellow-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{templates.length}</p>
-                  <p className="text-sm text-muted-foreground">Total Drafts</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Edit className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {templates.filter(t => {
-                      const updated = new Date(t.updated_at);
-                      const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-                      return updated > dayAgo;
-                    }).length}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Updated Today</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <Send className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {templates.filter(t => t.field_count > 0).length}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Ready to Publish</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={3}>
+          <StatCard
+            label="Total Drafts"
+            value={templates.length}
+            icon={<Clock className="w-4 h-4 text-yellow-600" />}
+          />
+          <StatCard
+            label="Updated Today"
+            value={templates.filter(t => {
+              const updated = new Date(t.updated_at);
+              const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+              return updated > dayAgo;
+            }).length}
+            icon={<Edit className="w-4 h-4 text-blue-600" />}
+          />
+          <StatCard
+            label="Ready to Publish"
+            value={templates.filter(t => t.field_count > 0).length}
+            icon={<Send className="w-4 h-4 text-green-600" />}
+          />
+        </StatGrid>
 
         {/* Search */}
         <Card>

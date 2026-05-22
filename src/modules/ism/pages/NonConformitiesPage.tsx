@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -20,13 +20,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useCorrectiveActions } from '@/modules/incidents/hooks/useCorrectiveActions';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import { format, differenceInDays, isPast } from 'date-fns';
-import { 
-  XCircle, 
-  Plus, 
-  Search, 
-  AlertTriangle, 
-  CheckCircle, 
+import {
+  XCircle,
+  Plus,
+  Search,
+  AlertTriangle,
+  CheckCircle,
   Clock,
   Eye,
   FileWarning
@@ -104,75 +106,48 @@ const NonConformitiesPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <FileWarning className="w-6 h-6 text-primary" />
-              </div>
-              <h1 className="text-2xl font-bold text-foreground">Non-Conformities</h1>
-            </div>
-            <p className="text-muted-foreground">
-              Track and resolve audit findings and non-conformity reports
-            </p>
-          </div>
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            Report NCR
-          </Button>
-        </div>
+        <PageHeader
+          icon={<FileWarning className="w-6 h-6" />}
+          title="Non-Conformities"
+          description="Track and resolve audit findings and non-conformity reports"
+          actions={
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Report NCR
+            </Button>
+          }
+        />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Open NCRs</CardTitle>
-              <XCircle className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className={cn("text-2xl font-bold", openNCRs > 0 && "text-red-600")}>
-                {openNCRs}
-              </div>
-              <p className="text-xs text-muted-foreground">Requires action</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-              <Clock className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-600">{inProgressNCRs}</div>
-              <p className="text-xs text-muted-foreground">Being addressed</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Overdue</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-red-500" />
-            </CardHeader>
-            <CardContent>
-              <div className={cn("text-2xl font-bold", overdueNCRs > 0 && "text-red-600")}>
-                {overdueNCRs}
-              </div>
-              <p className="text-xs text-muted-foreground">Past due date</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Closed This Month</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{closedThisMonth}</div>
-              <p className="text-xs text-muted-foreground">Resolved NCRs</p>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={4}>
+          <StatCard
+            label="Open NCRs"
+            value={openNCRs}
+            icon={<XCircle className="w-4 h-4 text-red-500" />}
+            tone={openNCRs > 0 ? 'danger' : 'default'}
+            hint="Requires action"
+          />
+          <StatCard
+            label="In Progress"
+            value={inProgressNCRs}
+            icon={<Clock className="w-4 h-4 text-yellow-500" />}
+            tone="warning"
+            hint="Being addressed"
+          />
+          <StatCard
+            label="Overdue"
+            value={overdueNCRs}
+            icon={<AlertTriangle className="w-4 h-4 text-red-500" />}
+            tone={overdueNCRs > 0 ? 'danger' : 'default'}
+            hint="Past due date"
+          />
+          <StatCard
+            label="Closed This Month"
+            value={closedThisMonth}
+            icon={<CheckCircle className="w-4 h-4 text-green-500" />}
+            tone="success"
+            hint="Resolved NCRs"
+          />
+        </StatGrid>
 
         {/* Filters */}
         <Card>

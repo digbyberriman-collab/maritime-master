@@ -22,12 +22,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { 
-  Shield, 
-  Search, 
-  Plus, 
-  MoreHorizontal, 
-  Edit, 
+import {
+  Shield,
+  Search,
+  Plus,
+  MoreHorizontal,
+  Edit,
   Eye,
   CheckCircle,
   AlertTriangle,
@@ -35,12 +35,13 @@ import {
   Ship,
   Wrench,
   Calendar,
-  User,
   Package,
   FileText,
   TestTube,
   Activity
 } from 'lucide-react';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 
 interface CriticalEquipment {
   id: string;
@@ -367,36 +368,29 @@ const CriticalEquipment: React.FC = () => {
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Critical Equipment</h1>
-            <p className="text-muted-foreground">
-              ISM critical equipment status monitoring and maintenance tracking
-            </p>
-          </div>
-          <Button className="gap-2" onClick={() => toast.info('Add equipment feature coming soon')}>
-            <Plus className="w-4 h-4" />
-            Add Equipment
-          </Button>
-        </div>
+        <PageHeader
+          title="Critical Equipment"
+          description="ISM critical equipment status monitoring and maintenance tracking"
+          actions={
+            <Button className="gap-2" onClick={() => toast.info('Add equipment feature coming soon')}>
+              <Plus className="w-4 h-4" />
+              Add Equipment
+            </Button>
+          }
+        />
 
         {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <StatGrid cols={3}>
           {stats.map((stat) => (
-            <Card key={stat.title} className="shadow-card">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {stat.title}
-                </CardTitle>
-                <stat.icon className="w-5 h-5 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stat.value}</div>
-                <p className="text-xs text-muted-foreground mt-1">{stat.description}</p>
-              </CardContent>
-            </Card>
+            <StatCard
+              key={stat.title}
+              label={stat.title}
+              value={stat.value}
+              icon={<stat.icon className="w-5 h-5 text-muted-foreground" />}
+              hint={stat.description}
+            />
           ))}
-        </div>
+        </StatGrid>
 
         {/* Filters */}
         <Card className="shadow-card">
@@ -460,7 +454,7 @@ const CriticalEquipment: React.FC = () => {
         {/* Equipment Table */}
         <Card className="shadow-card">
           <CardHeader>
-            <CardTitle>Critical Equipment ({filteredEquipment.length})</CardTitle>
+            <CardTitle className="text-base">Critical Equipment ({filteredEquipment.length})</CardTitle>
             <CardDescription>
               Equipment status monitoring and maintenance tracking
             </CardDescription>
@@ -623,7 +617,7 @@ const CriticalEquipment: React.FC = () => {
         <div className="grid gap-4 md:grid-cols-2">
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <AlertTriangle className="w-5 h-5" />
                 Attention Required
               </CardTitle>
@@ -665,7 +659,7 @@ const CriticalEquipment: React.FC = () => {
 
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-base">
                 <CheckCircle className="w-5 h-5" />
                 System Health Overview
               </CardTitle>

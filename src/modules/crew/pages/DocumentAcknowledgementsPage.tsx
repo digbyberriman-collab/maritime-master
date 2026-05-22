@@ -22,6 +22,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useToast } from '@/shared/hooks/use-toast';
 import { format } from 'date-fns';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 
 interface Document {
   id: string;
@@ -191,48 +193,27 @@ export default function DocumentAcknowledgementsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <FileCheck className="h-6 w-6" />
-              Document Acknowledgements
-            </h1>
-            <p className="text-muted-foreground">
-              Review and acknowledge required documents
-            </p>
-          </div>
-        </div>
+        <PageHeader
+          icon={<FileCheck className="h-6 w-6" />}
+          title="Document Acknowledgements"
+          description="Review and acknowledge required documents"
+        />
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-4">
-          <Card className={counts.pending > 0 ? 'border-warning' : ''}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Pending</p>
-                  <p className="text-2xl font-bold">{counts.pending}</p>
-                </div>
-                <div className="p-2 rounded-lg bg-warning/10 text-warning">
-                  <Clock className="h-5 w-5" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-muted-foreground">Acknowledged</p>
-                  <p className="text-2xl font-bold">{counts.acknowledged}</p>
-                </div>
-                <div className="p-2 rounded-lg bg-success/10 text-success">
-                  <CheckCircle className="h-5 w-5" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={2}>
+          <StatCard
+            label="Pending"
+            value={counts.pending}
+            tone={counts.pending > 0 ? 'warning' : 'default'}
+            icon={<Clock className="w-4 h-4 text-amber-600" />}
+          />
+          <StatCard
+            label="Acknowledged"
+            value={counts.acknowledged}
+            tone="success"
+            icon={<CheckCircle className="w-4 h-4 text-emerald-600" />}
+          />
+        </StatGrid>
 
         {/* Tabs & Search */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>

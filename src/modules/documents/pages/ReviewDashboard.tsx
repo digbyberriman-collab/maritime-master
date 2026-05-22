@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -182,16 +183,11 @@ const ReviewDashboard: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <RefreshCw className="w-6 h-6" />
-            Document Reviews
-          </h1>
-          <p className="text-muted-foreground">
-            Manage document review schedules and track overdue reviews
-          </p>
-        </div>
+        <PageHeader
+          title="Document Reviews"
+          description="Manage document review schedules and track overdue reviews"
+          icon={<RefreshCw className="w-5 h-5" />}
+        />
 
         {/* Summary Cards */}
         <div className="grid gap-4 md:grid-cols-4">

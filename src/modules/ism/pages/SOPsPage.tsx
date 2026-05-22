@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -20,19 +20,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useDocuments } from '@/modules/documents/hooks/useDocuments';
-import { 
-  BookOpen, 
-  Plus, 
-  Search, 
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
+import {
+  BookOpen,
+  Plus,
+  Search,
   FileText,
   Download,
   Eye,
   Clock,
-  CheckCircle,
-  AlertCircle
+  CheckCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
 
 const SOPsPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -94,62 +94,40 @@ const SOPsPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <BookOpen className="w-6 h-6 text-primary" />
-              </div>
-              <h1 className="text-2xl font-bold text-foreground">Standard Operating Procedures</h1>
-            </div>
-            <p className="text-muted-foreground">
-              Manage and access vessel SOPs and operational procedures
-            </p>
-          </div>
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            New SOP
-          </Button>
-        </div>
+        <PageHeader
+          icon={<BookOpen className="w-6 h-6" />}
+          title="Standard Operating Procedures"
+          description="Manage and access vessel SOPs and operational procedures"
+          actions={
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              New SOP
+            </Button>
+          }
+        />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active SOPs</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{activeSOPs}</div>
-              <p className="text-xs text-muted-foreground">Currently in effect</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Pending Review</CardTitle>
-              <Clock className="h-4 w-4 text-yellow-500" />
-            </CardHeader>
-            <CardContent>
-              <div className={cn("text-2xl font-bold", pendingReview > 0 && "text-yellow-600")}>
-                {pendingReview}
-              </div>
-              <p className="text-xs text-muted-foreground">Awaiting approval</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Procedures</CardTitle>
-              <FileText className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalSOPs}</div>
-              <p className="text-xs text-muted-foreground">All SOPs</p>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={3}>
+          <StatCard
+            label="Active SOPs"
+            value={activeSOPs}
+            icon={<CheckCircle className="w-4 h-4 text-green-500" />}
+            tone="success"
+            hint="Currently in effect"
+          />
+          <StatCard
+            label="Pending Review"
+            value={pendingReview}
+            icon={<Clock className="w-4 h-4 text-yellow-500" />}
+            tone={pendingReview > 0 ? 'warning' : 'default'}
+            hint="Awaiting approval"
+          />
+          <StatCard
+            label="Total Procedures"
+            value={totalSOPs}
+            icon={<FileText className="w-4 h-4 text-blue-500" />}
+            hint="All SOPs"
+          />
+        </StatGrid>
 
         {/* Filters */}
         <Card>

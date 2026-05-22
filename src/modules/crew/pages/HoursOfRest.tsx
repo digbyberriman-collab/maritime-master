@@ -14,10 +14,12 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/shared/hooks/use-toast';
-import { 
-  format, startOfWeek, endOfWeek, eachDayOfInterval, 
+import {
+  format, startOfWeek, endOfWeek, eachDayOfInterval,
   addWeeks, subWeeks, parseISO, isSameDay
 } from 'date-fns';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 
 interface HourBlock {
   hour: number;
@@ -243,22 +245,17 @@ export default function HoursOfRest() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Clock className="h-6 w-6" />
-              Hours of Rest
-            </h1>
-            <p className="text-muted-foreground">
-              STCW/MLC rest hour compliance tracking
-            </p>
-          </div>
-          <Button onClick={saveRecords} disabled={saving}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-            Save Changes
-          </Button>
-        </div>
+        <PageHeader
+          icon={<Clock className="h-6 w-6" />}
+          title="Hours of Rest"
+          description="STCW/MLC rest hour compliance tracking"
+          actions={
+            <Button onClick={saveRecords} disabled={saving}>
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+              Save Changes
+            </Button>
+          }
+        />
 
         {/* Week Navigation */}
         <Card>
@@ -281,37 +278,26 @@ export default function HoursOfRest() {
         </Card>
 
         {/* Weekly Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className={weeklyStats.isWeeklyCompliant ? 'border-success' : 'border-destructive'}>
-            <CardContent className="py-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Weekly Rest Total</p>
-                  <p className="text-2xl font-bold">{weeklyStats.totalRest}h / 77h</p>
-                </div>
-                {weeklyStats.isWeeklyCompliant ? (
-                  <CheckCircle className="h-8 w-8 text-success" />
-                ) : (
-                  <AlertTriangle className="h-8 w-8 text-destructive" />
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="py-4">
-              <p className="text-sm text-muted-foreground">Compliant Days</p>
-              <p className="text-2xl font-bold">
-                {7 - weeklyStats.nonCompliantDays} / 7
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="py-4">
-              <p className="text-sm text-muted-foreground">STCW Status</p>
-              <Badge 
-                variant="outline" 
+        <StatGrid cols={3}>
+          <StatCard
+            label="Weekly Rest Total"
+            value={`${weeklyStats.totalRest}h / 77h`}
+            tone={weeklyStats.isWeeklyCompliant ? 'success' : 'danger'}
+            icon={
+              weeklyStats.isWeeklyCompliant
+                ? <CheckCircle className="w-4 h-4 text-emerald-600" />
+                : <AlertTriangle className="w-4 h-4 text-destructive" />
+            }
+          />
+          <StatCard
+            label="Compliant Days"
+            value={`${7 - weeklyStats.nonCompliantDays} / 7`}
+          />
+          <StatCard
+            label="STCW Status"
+            value={
+              <Badge
+                variant="outline"
                 className={weeklyStats.isWeeklyCompliant && weeklyStats.nonCompliantDays === 0
                   ? 'bg-success/10 text-success'
                   : 'bg-destructive/10 text-destructive'
@@ -322,9 +308,9 @@ export default function HoursOfRest() {
                   : 'Non-Compliant'
                 }
               </Badge>
-            </CardContent>
-          </Card>
-        </div>
+            }
+          />
+        </StatGrid>
 
         {/* Day Selector */}
         <div className="grid grid-cols-7 gap-2">

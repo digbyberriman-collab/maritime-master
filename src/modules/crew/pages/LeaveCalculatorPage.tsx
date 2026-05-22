@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { LEAVE_DEPARTMENTS, type LeaveDepartment } from '@/modules/crew/leaveConstants';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 const csvEscape = (v: any): string => {
   if (v === null || v === undefined) return '';
@@ -110,39 +111,43 @@ export default function LeaveCalculatorPage() {
   return (
     <DashboardLayout>
       <div className="space-y-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate('/crew/leave')}>
+        <PageHeader
+          icon={
+            <button
+              onClick={() => navigate('/crew/leave')}
+              className="inline-flex"
+              aria-label="Back"
+            >
               <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                <Calculator className="w-6 h-6" />
-                Leave Calculator
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {scopeLabel} — {year} • {filtered.length} crew • Policy: {policyRow?.scope_label ?? 'default'}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2 items-center">
-            {canAccessAllVessels && (
-              <Button variant={fleetView ? 'default' : 'outline'} size="sm" onClick={() => setFleetView(!fleetView)}>
-                Fleet View
+            </button>
+          }
+          title={
+            <span className="flex items-center gap-2">
+              <Calculator className="w-6 h-6" />
+              Leave Calculator
+            </span>
+          }
+          description={`${scopeLabel} — ${year} • ${filtered.length} crew • Policy: ${policyRow?.scope_label ?? 'default'}`}
+          actions={
+            <>
+              {canAccessAllVessels && (
+                <Button variant={fleetView ? 'default' : 'outline'} size="sm" onClick={() => setFleetView(!fleetView)}>
+                  Fleet View
+                </Button>
+              )}
+              <Tabs value={String(year)} onValueChange={(v) => setYear(parseInt(v, 10))}>
+                <TabsList className="h-8">
+                  {[year - 1, year, year + 1].map((y) => (
+                    <TabsTrigger key={y} value={String(y)} className="text-xs h-7">{y}</TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+              <Button variant="outline" size="sm" onClick={exportCsv}>
+                <Download className="w-4 h-4 mr-1" /> Export CSV
               </Button>
-            )}
-            <Tabs value={String(year)} onValueChange={(v) => setYear(parseInt(v, 10))}>
-              <TabsList className="h-8">
-                {[year - 1, year, year + 1].map((y) => (
-                  <TabsTrigger key={y} value={String(y)} className="text-xs h-7">{y}</TabsTrigger>
-                ))}
-              </TabsList>
-            </Tabs>
-            <Button variant="outline" size="sm" onClick={exportCsv}>
-              <Download className="w-4 h-4 mr-1" /> Export CSV
-            </Button>
-          </div>
-        </div>
+            </>
+          }
+        />
 
         {/* Policy summary */}
         {policy && (
@@ -189,7 +194,7 @@ export default function LeaveCalculatorPage() {
           {/* Crew list */}
           <Card className="lg:col-span-1">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Crew</CardTitle>
+              <CardTitle className="text-base">Crew</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="max-h-[600px] overflow-y-auto divide-y">

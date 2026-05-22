@@ -11,6 +11,7 @@ import { CATEGORY_CONFIG, APPLICATION_STATUS_CONFIG, type DevCategory, type Appl
 import { format } from 'date-fns';
 import ApplicationDetailModal from '@/modules/development/components/ApplicationDetailModal';
 import ExpenseClaimModal from '@/modules/development/components/ExpenseClaimModal';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 export default function DevelopmentApplications() {
   const { data: applications = [], isLoading } = useMyApplications();
@@ -71,19 +72,17 @@ export default function DevelopmentApplications() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">My Applications</h1>
-            <p className="text-muted-foreground">
-              {applications.length} application{applications.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-          <Button asChild>
-            <Link to="/development/catalogue">
-              <Plus className="h-4 w-4 mr-2" /> New Application
-            </Link>
-          </Button>
-        </div>
+        <PageHeader
+          title="My Applications"
+          description={`${applications.length} application${applications.length !== 1 ? 's' : ''}`}
+          actions={
+            <Button asChild>
+              <Link to="/development/catalogue">
+                <Plus className="h-4 w-4 mr-2" /> New Application
+              </Link>
+            </Button>
+          }
+        />
 
         {isLoading ? (
           <div className="flex items-center justify-center min-h-[300px]">

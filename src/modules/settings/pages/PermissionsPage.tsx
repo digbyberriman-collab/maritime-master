@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -139,13 +140,11 @@ const PermissionsPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Shield className="w-6 h-6" />
-            Permissions
-          </h1>
-          <p className="text-muted-foreground">Select a user and configure their module access</p>
-        </div>
+        <PageHeader
+          title="Permissions"
+          description="Select a user and configure their module access"
+          icon={<Shield className="w-5 h-5" />}
+        />
 
         <div className="grid grid-cols-12 gap-6">
           {/* User List */}

@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { 
-  Shield, Search, Filter, Plus, FolderOpen, FileText,
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
+import {
+  Shield, Search, Plus, FileText,
   Eye, Download, Edit, Loader2, CheckCircle, Book, FileCheck
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -117,20 +119,17 @@ export default function ISM_SMS() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Shield className="w-6 h-6" />
-              ISM / SMS Documentation
-            </h1>
-            <p className="text-muted-foreground">ISM Code and Safety Management System documents</p>
-          </div>
-          <Button onClick={() => toast.info('Add document feature coming soon')}>
-            <Plus className="w-4 h-4 mr-2" />
-            Add Document
-          </Button>
-        </div>
+        <PageHeader
+          title="ISM / SMS Documentation"
+          description="ISM Code and Safety Management System documents"
+          icon={<Shield className="w-5 h-5" />}
+          actions={
+            <Button onClick={() => toast.info('Add document feature coming soon')}>
+              <Plus className="w-4 h-4 mr-2" />
+              Add Document
+            </Button>
+          }
+        />
 
         {/* Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -152,34 +151,17 @@ export default function ISM_SMS() {
               </div>
             </CardContent>
           </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <FileText className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{documents.length}</p>
-                  <p className="text-sm text-muted-foreground">Total Documents</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {documents.filter(d => d.status === 'active').length}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Active</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard
+            label="Total Documents"
+            value={documents.length}
+            icon={<FileText className="w-5 h-5 text-blue-600" />}
+          />
+          <StatCard
+            label="Active"
+            value={documents.filter(d => d.status === 'active').length}
+            icon={<CheckCircle className="w-5 h-5 text-green-600" />}
+            tone="success"
+          />
         </div>
 
         {/* Tabs */}

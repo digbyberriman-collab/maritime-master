@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   GraduationCap, BookOpen, ClipboardList, DollarSign,
-  CheckCircle, Clock, ChevronRight, AlertTriangle, Loader2, FileText
+  CheckCircle, Clock, AlertTriangle, Loader2, FileText
 } from 'lucide-react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,10 +19,12 @@ import {
   type DevCategory,
   type ApplicationStatus,
 } from '@/modules/development/constants';
-import { differenceInDays, differenceInMonths, addMonths, format } from 'date-fns';
+import { differenceInDays, addMonths, format } from 'date-fns';
 import ApplicationDetailModal from '@/modules/development/components/ApplicationDetailModal';
 import ExpenseClaimModal from '@/modules/development/components/ExpenseClaimModal';
 import NewApplicationFlow from '@/modules/development/components/NewApplicationFlow';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard as SharedStatCard, StatGrid } from '@/shared/components/common/StatCard';
 
 export default function MyDevelopment() {
   const [selectedApp, setSelectedApp] = useState<any>(null);
@@ -83,15 +85,11 @@ export default function MyDevelopment() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">My Development</h1>
-            <p className="text-muted-foreground">
-              Track your courses, applications, and reimbursements
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {eligibility.eligible ? (
+        <PageHeader
+          title="My Development"
+          description="Track your courses, applications, and reimbursements"
+          actions={
+            eligibility.eligible ? (
               <Badge className="bg-success/10 text-success border-success/30 text-sm px-3 py-1">
                 <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> Eligible
               </Badge>
@@ -99,26 +97,34 @@ export default function MyDevelopment() {
               <Badge variant="outline" className="bg-amber/10 text-amber border-amber/30 text-sm px-3 py-1">
                 <Clock className="h-3.5 w-3.5 mr-1.5" /> {eligibility.reason}
               </Badge>
-            )}
-          </div>
-        </div>
+            )
+          }
+        />
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard label="Active Applications" value={stats?.activeApps || 0} icon={ClipboardList} />
-          <StatCard label="Completed Courses" value={stats?.completedCourses || 0} icon={CheckCircle} />
-          <StatCard
+        <StatGrid cols={4}>
+          <SharedStatCard
+            label="Active Applications"
+            value={stats?.activeApps || 0}
+            icon={<ClipboardList className="h-4 w-4 text-muted-foreground" />}
+          />
+          <SharedStatCard
+            label="Completed Courses"
+            value={stats?.completedCourses || 0}
+            icon={<CheckCircle className="h-4 w-4 text-muted-foreground" />}
+          />
+          <SharedStatCard
             label="Total Reimbursed"
             value={`$${(stats?.totalReimbursed || 0).toLocaleString()}`}
-            icon={DollarSign}
+            icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
           />
-          <StatCard
+          <SharedStatCard
             label="Outstanding Obligations"
             value={`$${repayments.reduce((s, r) => s + r.remaining_obligation_usd, 0).toLocaleString()}`}
-            icon={AlertTriangle}
-            alert={repayments.length > 0}
+            tone={repayments.length > 0 ? 'warning' : 'default'}
+            icon={<AlertTriangle className="h-4 w-4 text-muted-foreground" />}
           />
-        </div>
+        </StatGrid>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Active Applications */}
@@ -281,34 +287,6 @@ export default function MyDevelopment() {
         onOpenChange={setShowNewApp}
       />
     </DashboardLayout>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  icon: Icon,
-  alert,
-}: {
-  label: string;
-  value: number | string;
-  icon: React.ElementType;
-  alert?: boolean;
-}) {
-  return (
-    <Card className={alert ? 'border-amber/30' : ''}>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="text-2xl font-bold mt-1">{value}</p>
-          </div>
-          <div className={`p-2 rounded-lg ${alert ? 'bg-amber/10 text-amber' : 'bg-muted text-muted-foreground'}`}>
-            <Icon className="h-4 w-4" />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
 

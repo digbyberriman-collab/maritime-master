@@ -11,11 +11,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { 
+import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths,
   isToday, parseISO
 } from 'date-fns';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 interface CalendarEvent {
   id: string;
@@ -171,18 +172,11 @@ export default function VesselCalendar() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Calendar className="h-6 w-6" />
-              Vessel Calendar
-            </h1>
-            <p className="text-muted-foreground">
-              Crew rotations, audits, drills, and yard periods
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
+        <PageHeader
+          icon={<Calendar className="h-6 w-6" />}
+          title="Vessel Calendar"
+          description="Crew rotations, audits, drills, and yard periods"
+          actions={
             <Select value={viewType} onValueChange={(v: 'month' | 'list') => setViewType(v)}>
               <SelectTrigger className="w-[120px]">
                 <SelectValue />
@@ -192,8 +186,8 @@ export default function VesselCalendar() {
                 <SelectItem value="list">List</SelectItem>
               </SelectContent>
             </Select>
-          </div>
-        </div>
+          }
+        />
 
         {/* Calendar Navigation */}
         <Card>

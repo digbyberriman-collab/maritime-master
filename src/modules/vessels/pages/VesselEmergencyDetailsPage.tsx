@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 export default function VesselEmergencyDetailsPage() {
   const { selectedVessel } = useVessel();
@@ -129,27 +130,24 @@ export default function VesselEmergencyDetailsPage() {
     <DashboardLayout>
       <div className="space-y-6 p-6">
         {/* Header */}
-        <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">Emergency Contact Details</h1>
-            <p className="text-muted-foreground mt-1">
-              Critical contact information for emergency situations on {selectedVessel.name}
-            </p>
-          </div>
-          
-          {canEdit && (
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setIsHistoryOpen(true)}>
-                <History className="w-4 h-4 mr-2" />
-                View History
-              </Button>
-              <Button size="sm" onClick={() => setIsEditOpen(true)}>
-                <Edit className="w-4 h-4 mr-2" />
-                Edit Details
-              </Button>
-            </div>
-          )}
-        </div>
+        <PageHeader
+          title="Emergency Contact Details"
+          description={`Critical contact information for emergency situations on ${selectedVessel.name}`}
+          actions={
+            canEdit ? (
+              <>
+                <Button variant="outline" size="sm" onClick={() => setIsHistoryOpen(true)}>
+                  <History className="w-4 h-4 mr-2" />
+                  View History
+                </Button>
+                <Button size="sm" onClick={() => setIsEditOpen(true)}>
+                  <Edit className="w-4 h-4 mr-2" />
+                  Edit Details
+                </Button>
+              </>
+            ) : undefined
+          }
+        />
 
         {/* Emergency Contact Card */}
         <div className="max-w-4xl">

@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 
 interface CrewDocument {
   id: string;
@@ -195,50 +197,25 @@ export default function CrewDocuments() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <FolderOpen className="h-6 w-6" />
-              Crew Documents
-            </h1>
-            <p className="text-muted-foreground">
-              Fleet-wide crew document management and compliance tracking
-            </p>
-          </div>
-          <Button onClick={() => toast.info('Upload document feature coming soon')}>
-            <Upload className="h-4 w-4 mr-2" />
-            Upload Document
-          </Button>
-        </div>
+        <PageHeader
+          icon={<FolderOpen className="h-6 w-6" />}
+          title="Crew Documents"
+          description="Fleet-wide crew document management and compliance tracking"
+          actions={
+            <Button onClick={() => toast.info('Upload document feature coming soon')}>
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Document
+            </Button>
+          }
+        />
 
         {/* Status Summary */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="py-4">
-              <p className="text-sm text-muted-foreground">Total Documents</p>
-              <p className="text-2xl font-bold">{statusCounts.total}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-success/30">
-            <CardContent className="py-4">
-              <p className="text-sm text-muted-foreground">Valid</p>
-              <p className="text-2xl font-bold text-success">{statusCounts.valid}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-warning/30">
-            <CardContent className="py-4">
-              <p className="text-sm text-muted-foreground">Expiring Soon</p>
-              <p className="text-2xl font-bold text-warning">{statusCounts.expiring}</p>
-            </CardContent>
-          </Card>
-          <Card className="border-destructive/30">
-            <CardContent className="py-4">
-              <p className="text-sm text-muted-foreground">Expired</p>
-              <p className="text-2xl font-bold text-destructive">{statusCounts.expired}</p>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={4}>
+          <StatCard label="Total Documents" value={statusCounts.total} />
+          <StatCard label="Valid" value={statusCounts.valid} tone="success" />
+          <StatCard label="Expiring Soon" value={statusCounts.expiring} tone="warning" />
+          <StatCard label="Expired" value={statusCounts.expired} tone="danger" />
+        </StatGrid>
 
         {/* Filters */}
         <Card>

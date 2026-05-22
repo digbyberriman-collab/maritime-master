@@ -17,6 +17,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { format, differenceInDays } from 'date-fns';
 import { toast } from 'sonner';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 
 interface LeaveRequest {
   id: string;
@@ -181,141 +183,107 @@ export default function LeaveManagement() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <CalendarDays className="w-6 h-6" />
-              Leave Management
-            </h1>
-            <p className="text-muted-foreground">Manage crew leave requests and approvals</p>
-          </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Request Leave
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>New Leave Request</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>Leave Type *</Label>
-                  <Select 
-                    value={newRequest.leave_type} 
-                    onValueChange={(v) => setNewRequest({ ...newRequest, leave_type: v })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select leave type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {leaveTypes.map(type => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+        <PageHeader
+          icon={<CalendarDays className="w-6 h-6" />}
+          title="Leave Management"
+          description="Manage crew leave requests and approvals"
+          actions={
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Request Leave
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>New Leave Request</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label>Start Date *</Label>
-                    <Input
-                      type="date"
-                      value={newRequest.start_date}
-                      onChange={(e) => setNewRequest({ ...newRequest, start_date: e.target.value })}
-                    />
+                    <Label>Leave Type *</Label>
+                    <Select
+                      value={newRequest.leave_type}
+                      onValueChange={(v) => setNewRequest({ ...newRequest, leave_type: v })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select leave type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {leaveTypes.map(type => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Start Date *</Label>
+                      <Input
+                        type="date"
+                        value={newRequest.start_date}
+                        onChange={(e) => setNewRequest({ ...newRequest, start_date: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>End Date *</Label>
+                      <Input
+                        type="date"
+                        value={newRequest.end_date}
+                        onChange={(e) => setNewRequest({ ...newRequest, end_date: e.target.value })}
+                      />
+                    </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>End Date *</Label>
-                    <Input
-                      type="date"
-                      value={newRequest.end_date}
-                      onChange={(e) => setNewRequest({ ...newRequest, end_date: e.target.value })}
+                    <Label>Reason</Label>
+                    <Textarea
+                      placeholder="Provide details about your leave request..."
+                      value={newRequest.reason}
+                      onChange={(e) => setNewRequest({ ...newRequest, reason: e.target.value })}
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label>Reason</Label>
-                  <Textarea
-                    placeholder="Provide details about your leave request..."
-                    value={newRequest.reason}
-                    onChange={(e) => setNewRequest({ ...newRequest, reason: e.target.value })}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleSubmitRequest}>
-                  Submit Request
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleSubmitRequest}>
+                    Submit Request
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          }
+        />
+
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-yellow-100 rounded-lg">
-                  <Clock className="w-5 h-5 text-yellow-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{pendingCount}</p>
-                  <p className="text-sm text-muted-foreground">Pending Approval</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{approvedCount}</p>
-                  <p className="text-sm text-muted-foreground">Approved</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Calendar className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{filteredRequests.length}</p>
-                  <p className="text-sm text-muted-foreground">Total Requests</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <User className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {new Set(filteredRequests.map(r => r.crew_member_id)).size}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Crew Members</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={4}>
+          <StatCard
+            label="Pending Approval"
+            value={pendingCount}
+            tone="warning"
+            icon={<Clock className="w-4 h-4 text-amber-600" />}
+          />
+          <StatCard
+            label="Approved"
+            value={approvedCount}
+            tone="success"
+            icon={<CheckCircle className="w-4 h-4 text-emerald-600" />}
+          />
+          <StatCard
+            label="Total Requests"
+            value={filteredRequests.length}
+            icon={<Calendar className="w-4 h-4 text-sky-600" />}
+          />
+          <StatCard
+            label="Crew Members"
+            value={new Set(filteredRequests.map(r => r.crew_member_id)).size}
+            icon={<User className="w-4 h-4 text-primary" />}
+          />
+        </StatGrid>
 
         {/* Filters */}
         <Card>

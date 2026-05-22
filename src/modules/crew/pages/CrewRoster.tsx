@@ -78,6 +78,7 @@ import AdminPinModal from '@/modules/crew/components/AdminPinModal';
 import ResetAccountModal from '@/modules/crew/components/ResetAccountModal';
 import ToggleAccessModal from '@/modules/crew/components/ToggleAccessModal';
 import ReallocateVesselModal from '@/modules/crew/components/ReallocateVesselModal';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 const CrewRoster: React.FC = () => {
   const { profile } = useAuth();
@@ -363,59 +364,58 @@ const CrewRoster: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Crew List</h1>
-            <p className="text-muted-foreground">Manage crew assignments and profiles</p>
-          </div>
-          {canManageCrew && (
-            <div className="flex gap-2">
-              <Button
-                onClick={async () => {
-                  setIsSyncing(true);
-                  try {
-                    const { data, error } = await supabase.functions.invoke('airtable-sync', {
-                      body: { action: 'two_way' },
-                    });
-                    if (error) throw error;
-                    if (data?.error) throw new Error(data.error);
-                    toast({
-                      title: 'Airtable Sync Complete',
-                      description: `Imported: ${data.imported}, Exported: ${data.exported}${data.errored ? `, Errors: ${data.errored}` : ''}`,
-                    });
-                    refetchCrew();
-                  } catch (e: any) {
-                    toast({ title: 'Sync Failed', description: e.message, variant: 'destructive' });
-                  } finally {
-                    setIsSyncing(false);
-                  }
-                }}
-                variant="outline"
-                className="flex items-center gap-2"
-                disabled={isSyncing}
-              >
-                <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
-                {isSyncing ? 'Syncing...' : 'Sync Airtable'}
-              </Button>
-              <Button 
-                onClick={() => setIsImportModalOpen(true)}
-                variant="outline"
-                className="flex items-center gap-2"
-              >
-                <Upload className="w-4 h-4" />
-                Import CSV
-              </Button>
-              <Button 
-                onClick={() => setIsFormModalOpen(true)} 
-                className="flex items-center gap-2"
-              >
-                <UserPlus className="w-4 h-4" />
-                Add Crew Member
-              </Button>
-            </div>
-          )}
-        </div>
+        <PageHeader
+          title="Crew List"
+          description="Manage crew assignments and profiles"
+          actions={
+            canManageCrew && (
+              <>
+                <Button
+                  onClick={async () => {
+                    setIsSyncing(true);
+                    try {
+                      const { data, error } = await supabase.functions.invoke('airtable-sync', {
+                        body: { action: 'two_way' },
+                      });
+                      if (error) throw error;
+                      if (data?.error) throw new Error(data.error);
+                      toast({
+                        title: 'Airtable Sync Complete',
+                        description: `Imported: ${data.imported}, Exported: ${data.exported}${data.errored ? `, Errors: ${data.errored}` : ''}`,
+                      });
+                      refetchCrew();
+                    } catch (e: any) {
+                      toast({ title: 'Sync Failed', description: e.message, variant: 'destructive' });
+                    } finally {
+                      setIsSyncing(false);
+                    }
+                  }}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                  disabled={isSyncing}
+                >
+                  <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                  {isSyncing ? 'Syncing...' : 'Sync Airtable'}
+                </Button>
+                <Button
+                  onClick={() => setIsImportModalOpen(true)}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <Upload className="w-4 h-4" />
+                  Import CSV
+                </Button>
+                <Button
+                  onClick={() => setIsFormModalOpen(true)}
+                  className="flex items-center gap-2"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  Add Crew Member
+                </Button>
+              </>
+            )
+          }
+        />
 
         {/* Filters */}
         <Card className="shadow-card">
@@ -470,7 +470,7 @@ const CrewRoster: React.FC = () => {
         {/* Crew Table */}
         <Card className="shadow-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="text-base flex items-center gap-2">
               <Users className="w-5 h-5" />
               <span>
                 {isLoading ? (
