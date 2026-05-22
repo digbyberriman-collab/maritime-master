@@ -17,14 +17,25 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
   const { canAccessModule } = useAuth();
   const { order, getGroupOrder } = useSidebarOrder();
 
+  // Recursively apply each branch's saved order. Works for arbitrary depth so
+  // any future inner sub-items inherit the same reordering behavior.
+  const orderChildrenDeep = (children: NavChild[], parentId: string): NavChild[] => {
+    const ordered = applySidebarOrder(children, getGroupOrder(parentId));
+    return ordered.map((c) =>
+      c.children?.length
+        ? { ...c, children: orderChildrenDeep(c.children, c.id) }
+        : c
+    );
+  };
+
   // Filter navigation items based on user permissions, then apply custom user order
   const visibleNavItems = useMemo(() => {
     const allowed = NAVIGATION_ITEMS.filter(item => canAccessModule(item.id));
     const rootOrdered = applySidebarOrder(allowed, order);
-    // Also apply saved order to each item's children.
+    // Apply saved order to every level beneath each root item.
     return rootOrdered.map((item) => {
       if (!item.children?.length) return item;
-      return { ...item, children: applySidebarOrder(item.children, getGroupOrder(item.id)) };
+      return { ...item, children: orderChildrenDeep(item.children, item.id) };
     });
   }, [canAccessModule, order, getGroupOrder]);
 
@@ -87,24 +98,67 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
     return matchesPath(path);
   };
 
-  // Render child (2nd level) - flat, no nested children
-  const renderNavChild = (child: NavChild) => {
+  // Render a child at any depth. Recurses when the child has its own children
+  // so deeper inner sub-items are expandable and visually nested.
+  const renderNavChild = (child: NavChild, depth: number = 1): React.ReactNode => {
+    const hasChildren = !!child.children?.length;
     const active = isActive(child.path);
-    
+    // Tailwind-safe padding ladder so JIT keeps the classes.
+    const padMap: Record<number, string> = {
+      1: 'pl-10',
+      2: 'pl-14',
+      3: 'pl-[4.5rem]',
+      4: 'pl-24',
+    };
+    const pad = padMap[depth] ?? 'pl-24';
+
+    if (!hasChildren) {
+      return (
+        <button
+          key={child.id}
+          onClick={() => handleNavigate(child.path)}
+          className={cn(
+            'w-full flex items-center gap-3 pr-3 py-2 rounded-lg text-sm font-medium transition-colors',
+            pad,
+            active
+              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+              : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
+          )}
+        >
+          <child.icon className="w-4 h-4" />
+          <span className="truncate">{child.label}</span>
+        </button>
+      );
+    }
+
+    const isOpen = !!openGroups[child.id];
     return (
-      <button
-        key={child.id}
-        onClick={() => handleNavigate(child.path)}
-        className={cn(
-          'w-full flex items-center gap-3 pl-10 pr-3 py-2 rounded-lg text-sm font-medium transition-colors',
-          active
-            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-            : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
-        )}
-      >
-        <child.icon className="w-4 h-4" />
-        <span className="truncate">{child.label}</span>
-      </button>
+      <Collapsible key={child.id} open={isOpen} onOpenChange={() => toggleGroup(child.id)}>
+        <CollapsibleTrigger asChild>
+          <button
+            className={cn(
+              'w-full flex items-center justify-between gap-3 pr-3 py-2 rounded-lg text-sm font-medium transition-colors',
+              pad,
+              active
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                : 'text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground'
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <child.icon className="w-4 h-4" />
+              <span className="truncate">{child.label}</span>
+            </div>
+            {isOpen ? (
+              <ChevronDown className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-1 space-y-1">
+          {child.children!.map((gc) => renderNavChild(gc, depth + 1))}
+        </CollapsibleContent>
+      </Collapsible>
     );
   };
 
@@ -160,7 +214,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-1 space-y-1">
-          {item.children!.map((child) => renderNavChild(child))}
+          {item.children!.map((child) => renderNavChild(child, 1))}
         </CollapsibleContent>
       </Collapsible>
     );
