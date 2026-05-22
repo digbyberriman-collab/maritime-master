@@ -32,10 +32,14 @@ const Certificates = React.lazy(() => import('@/modules/certificates/pages/Certi
 const Incidents = React.lazy(() => import('@/modules/incidents/pages/Incidents'));
 const Audits = React.lazy(() => import('@/modules/audits/pages/Audits'));
 const Drills = React.lazy(() => import('@/modules/drills/pages/Drills'));
+const DrillsAnnualGrid = React.lazy(() => import('@/modules/drills/pages/DrillsAnnualGrid'));
 const Training = React.lazy(() => import('@/modules/training/pages/Training'));
 const Maintenance = React.lazy(() => import('@/modules/maintenance/pages/Maintenance'));
 const FleetMap = React.lazy(() => import('@/modules/dashboard/pages/FleetMap'));
 const RiskAssessments = React.lazy(() => import('@/modules/risk-assessments/pages/RiskAssessments'));
+const RiskAssessmentForm = React.lazy(() => import('@/modules/risk-assessments/pages/RiskAssessmentForm'));
+const SafetyDocumentVersioning = React.lazy(() => import('@/modules/documents/pages/SafetyDocumentVersioning'));
+const AccountDetailsPage = React.lazy(() => import('@/modules/settings/pages/AccountDetailsPage'));
 const Alerts = React.lazy(() => import('@/modules/alerts/pages/Alerts'));
 const Settings = React.lazy(() => import('@/modules/settings/pages/Settings'));
 const NotFound = React.lazy(() => import('@/shared/pages/NotFound'));
@@ -652,10 +656,14 @@ export const AppRoutes: React.FC = () => {
 
       {/* Legacy/Report Routes */}
       <Route path="/drills" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Drills /></React.Suspense></ProtectedRoute>} />
+      <Route path="/drills/annual-grid" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><DrillsAnnualGrid /></React.Suspense></ProtectedRoute>} />
       <Route path="/training" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Training /></React.Suspense></ProtectedRoute>} />
       <Route path="/incidents" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Incidents /></React.Suspense></ProtectedRoute>} />
       <Route path="/audits" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Audits /></React.Suspense></ProtectedRoute>} />
       <Route path="/risk-assessments" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><RiskAssessments /></React.Suspense></ProtectedRoute>} />
+      <Route path="/risk-assessments/new" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><RiskAssessmentForm /></React.Suspense></ProtectedRoute>} />
+      <Route path="/documents/safety-versioning" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><SafetyDocumentVersioning /></React.Suspense></ProtectedRoute>} />
+      <Route path="/settings/account-details" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><AccountDetailsPage /></React.Suspense></ProtectedRoute>} />
       <Route path="/reports" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
