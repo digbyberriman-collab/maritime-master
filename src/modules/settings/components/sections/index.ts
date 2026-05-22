@@ -17,3 +17,4 @@ export { default as InsuranceAuditModeSection } from './InsuranceAuditModeSectio
 export { default as HRAuditAccessSection } from './HRAuditAccessSection';
 export { default as GDPRRequestsSection } from './GDPRRequestsSection';
 export { default as ShortcutsSection } from './ShortcutsSection';
+export { default as SidebarLayoutSection } from './SidebarLayoutSection';
