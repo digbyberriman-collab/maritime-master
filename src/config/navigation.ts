@@ -177,7 +177,7 @@ export const NAVIGATION_ITEMS: NavItem[] = [
       { id: 'observations', label: 'Observations', path: '/ism/observations', icon: Eye },
       { id: 'training', label: 'Training', path: '/ism/training', icon: GraduationCap },
       { id: 'investigations', label: 'Investigations', path: '/ism/investigations', icon: Search },
-      { id: 'meetings', label: 'Meetings', path: '/ism/meetings', icon: MessageSquare },
+      { id: 'meetings', label: 'Safety Meetings', path: '/ism/meetings', icon: MessageSquare },
       { id: 'erm', label: 'Emergency Response Manual (ERM)', path: '/ism/erm', icon: AlertCircle },
       { id: 'sops', label: 'Standard Operating Procedures (SOPs)', path: '/ism/sops', icon: BookOpen },
       { id: 'miscellaneous', label: 'Miscellaneous ISM Forms', path: '/ism/miscellaneous', icon: FileText },
