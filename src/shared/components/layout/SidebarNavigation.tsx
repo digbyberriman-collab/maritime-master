@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -15,53 +15,56 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
   const navigate = useNavigate();
   const location = useLocation();
   const { canAccessModule } = useAuth();
-  const { order, getGroupOrder } = useSidebarOrder();
+  const { map, order } = useSidebarOrder();
 
-  // Recursively apply each branch's saved order. Works for arbitrary depth so
-  // any future inner sub-items inherit the same reordering behavior.
-  const orderChildrenDeep = (children: NavChild[], parentId: string): NavChild[] => {
-    const ordered = applySidebarOrder(children, getGroupOrder(parentId));
-    return ordered.map((c) =>
-      c.children?.length
-        ? { ...c, children: orderChildrenDeep(c.children, c.id) }
-        : c
-    );
-  };
-
-  // Filter navigation items based on user permissions, then apply custom user order
+  // Filter navigation items based on user permissions, then apply custom user order.
+  // Depends on `map` (single state object) rather than per-call `getGroupOrder`
+  // so the deep recomputation only runs when the saved order actually changes.
   const visibleNavItems = useMemo(() => {
-    const allowed = NAVIGATION_ITEMS.filter(item => canAccessModule(item.id));
+    const orderChildrenDeep = (children: NavChild[], parentId: string): NavChild[] => {
+      const ordered = applySidebarOrder(children, map[parentId]);
+      return ordered.map((c) =>
+        c.children?.length
+          ? { ...c, children: orderChildrenDeep(c.children, c.id) }
+          : c
+      );
+    };
+    const allowed = NAVIGATION_ITEMS.filter((item) => canAccessModule(item.id));
     const rootOrdered = applySidebarOrder(allowed, order);
-    // Apply saved order to every level beneath each root item.
-    return rootOrdered.map((item) => {
-      if (!item.children?.length) return item;
-      return { ...item, children: orderChildrenDeep(item.children, item.id) };
-    });
-  }, [canAccessModule, order, getGroupOrder]);
+    return rootOrdered.map((item) =>
+      item.children?.length
+        ? { ...item, children: orderChildrenDeep(item.children, item.id) }
+        : item
+    );
+  }, [canAccessModule, order, map]);
 
   // Helper to check if a path (possibly with query params) matches the current location
-  const matchesPath = (path: string): boolean => {
-    const [pathname, queryString] = path.split('?');
-    if (location.pathname !== pathname) return false;
-    if (!queryString) return true;
-    const params = new URLSearchParams(queryString);
-    const currentParams = new URLSearchParams(location.search);
-    for (const [key, value] of params.entries()) {
-      if (currentParams.get(key) !== value) return false;
-    }
-    return true;
-  };
+  const matchesPath = useCallback(
+    (path: string): boolean => {
+      const [pathname, queryString] = path.split('?');
+      if (location.pathname !== pathname) return false;
+      if (!queryString) return true;
+      const params = new URLSearchParams(queryString);
+      const currentParams = new URLSearchParams(location.search);
+      for (const [key, value] of params.entries()) {
+        if (currentParams.get(key) !== value) return false;
+      }
+      return true;
+    },
+    [location.pathname, location.search]
+  );
 
-  // Helper to check if path matches any child
-  const hasActiveDescendant = (item: NavItem): boolean => {
-    if (item.children) {
-      return item.children.some(child => {
+  const hasActiveDescendant = useCallback(
+    (item: NavItem | NavChild): boolean => {
+      const kids = (item as NavItem).children;
+      if (!kids?.length) return false;
+      return kids.some((child) => {
         const [pathname] = child.path.split('?');
         return matchesPath(child.path) || location.pathname.startsWith(pathname + '/');
       });
-    }
-    return false;
-  };
+    },
+    [matchesPath, location.pathname]
+  );
   
   // Track which groups are open
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
@@ -75,7 +78,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
     return initial;
   });
 
-  const toggleGroup = (groupId: string) => {
+  const toggleGroup = useCallback((groupId: string) => {
     setOpenGroups(prev => {
       const wasOpen = prev[groupId];
       // Accordion behavior: close all groups, then open the clicked one if it wasn't already open
@@ -87,16 +90,14 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
       });
       return next;
     });
-  };
+  }, [visibleNavItems]);
 
-  const handleNavigate = (path: string) => {
+  const handleNavigate = useCallback((path: string) => {
     navigate(path);
     onNavigate?.();
-  };
+  }, [navigate, onNavigate]);
 
-  const isActive = (path: string) => {
-    return matchesPath(path);
-  };
+  const isActive = matchesPath;
 
   // Render a child at any depth. Recurses when the child has its own children
   // so deeper inner sub-items are expandable and visually nested.
