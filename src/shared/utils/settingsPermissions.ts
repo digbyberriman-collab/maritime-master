@@ -1,6 +1,6 @@
 // Settings page permission utilities for STORM platform
 
-import { LucideIcon, User, Shield, Bell, Palette, Ship, Lock, Eye, Plug, Mail, Download, FileCheck, CreditCard, ScrollText, HelpCircle, Database, FileWarning, UserX, Zap } from 'lucide-react';
+import { LucideIcon, User, Shield, Bell, Palette, Ship, Lock, Eye, Plug, Mail, Download, FileCheck, CreditCard, ScrollText, HelpCircle, Database, FileWarning, UserX, Zap, LayoutList } from 'lucide-react';
 
 export interface SettingsNavItem {
   id: string;
@@ -16,6 +16,7 @@ export const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { id: 'notifications', label: 'Notifications', icon: Bell, scope: 'self' },
   { id: 'appearance', label: 'Appearance', icon: Palette, scope: 'self' },
   { id: 'shortcuts', label: 'Shortcuts', icon: Zap, scope: 'self' },
+  { id: 'sidebar-layout', label: 'Sidebar Layout', icon: LayoutList, scope: 'self' },
   { id: 'vessel-access', label: 'Vessel Access', icon: Ship, scope: 'admin', permission: 'vessel_settings' },
   { id: 'permissions', label: 'Permissions', icon: Lock, scope: 'admin', permission: 'rbac' },
   { id: 'audit-mode', label: 'Audit Visibility', icon: Eye, scope: 'admin', permission: 'audit_mode' },

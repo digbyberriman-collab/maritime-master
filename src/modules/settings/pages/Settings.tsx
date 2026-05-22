@@ -26,6 +26,7 @@ import {
   HRAuditAccessSection,
   GDPRRequestsSection,
   ShortcutsSection,
+  SidebarLayoutSection,
 } from '@/modules/settings/components/sections';
 
 const Settings: React.FC = () => {
@@ -73,6 +74,8 @@ const Settings: React.FC = () => {
         return <AppearanceSection />;
       case 'shortcuts':
         return <ShortcutsSection />;
+      case 'sidebar-layout':
+        return <SidebarLayoutSection />;
       case 'data-exports':
         return <DataExportsSection />;
       case 'support':
