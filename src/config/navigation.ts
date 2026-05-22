@@ -81,7 +81,6 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     ],
   },
   {
-  {
     id: 'fleet-map',
     label: 'Fleet Map',
     icon: MapIcon,
