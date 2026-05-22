@@ -18,6 +18,9 @@ import {
 import { derivePreset } from '../lib/derivePreset';
 import { OTHER_MODULE_GROUPS, groupLevelFor } from '../lib/moduleGroups';
 import { ModuleGroupRow } from '../components/ModuleGroupRow';
+import { CustomPermissionsCard } from '../components/CustomPermissionsCard';
+import { DepartmentScopeCard } from '../components/DepartmentScopeCard';
+import { useDepartmentScope, useSaveDepartmentScope } from '../hooks/useDepartmentScope';
 
 const PERM_OPTIONS: Array<{ value: string; label: string; color: string }> = [
   { value: 'none', label: 'No Access', color: 'text-muted-foreground' },
@@ -35,6 +38,8 @@ const UsersAccessDetailPage: React.FC = () => {
   const saveOverride = useSavePermissionOverride();
   const applyPreset = useApplyPreset();
   const { toast } = useToast();
+  const { data: deptScope = [] } = useDepartmentScope(userId);
+  const saveDept = useSaveDepartmentScope();
 
   const currentPreset: AccessPreset = useMemo(
     () => (detail ? derivePreset(detail.permissions) : 'custom'),
@@ -104,6 +109,21 @@ const UsersAccessDetailPage: React.FC = () => {
         onError: (e: any) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
       }
     );
+  };
+
+  const handleCapToggle = (capKey: string, enabled: boolean) => {
+    if (!userId) return;
+    saveOverride.mutate(
+      { userId, moduleKey: capKey, permission: enabled ? 'view' : null },
+      {
+        onError: (e: any) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
+      }
+    );
+  };
+
+  const handleDeptChange = (next: string[]) => {
+    if (!userId) return;
+    saveDept.mutate({ userId, departments: next });
   };
 
   return (
@@ -199,6 +219,12 @@ const UsersAccessDetailPage: React.FC = () => {
             })}
           </CardContent>
         </Card>
+
+        {currentPreset === 'custom' && (
+          <CustomPermissionsCard permissions={detail.permissions} onToggle={handleCapToggle} />
+        )}
+
+        <DepartmentScopeCard selected={deptScope} onChange={handleDeptChange} />
       </div>
     </DashboardLayout>
   );
