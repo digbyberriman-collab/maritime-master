@@ -1,0 +1,1 @@
+ALTER TABLE public.vessels ADD COLUMN IF NOT EXISTS particulars JSONB NOT NULL DEFAULT '{}'::jsonb;
