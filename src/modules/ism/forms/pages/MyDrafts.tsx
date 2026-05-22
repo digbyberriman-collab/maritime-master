@@ -4,6 +4,7 @@ import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,16 +48,15 @@ const MyDrafts: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">My Drafts</h1>
-            <p className="text-muted-foreground">Continue working on your incomplete form submissions</p>
-          </div>
-          <Button onClick={() => navigate('/ism/forms/templates')}>
-            Start New Form
-          </Button>
-        </div>
+        <PageHeader
+          title="My Drafts"
+          description="Continue working on your incomplete form submissions"
+          actions={
+            <Button onClick={() => navigate('/ism/forms/templates')}>
+              Start New Form
+            </Button>
+          }
+        />
 
         {/* Content */}
         {isLoading ? (

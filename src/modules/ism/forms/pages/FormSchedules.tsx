@@ -282,71 +282,33 @@ export default function FormSchedules() {
                   Create Schedule
                 </Button>
               </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+              </DialogContent>
+            </Dialog>
+          }
+        />
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <Play className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{activeSchedules.length}</p>
-                  <p className="text-sm text-muted-foreground">Active Schedules</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-yellow-100 rounded-lg">
-                  <Pause className="w-5 h-5 text-yellow-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {filteredSchedules.filter(s => !s.is_active).length}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Paused</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <RefreshCw className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {filteredSchedules.filter(s => s.frequency === 'daily').length}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Daily</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <FileText className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {new Set(filteredSchedules.map(s => s.template_id)).size}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Form Types</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={4}>
+          <StatCard
+            label="Active Schedules"
+            value={activeSchedules.length}
+            icon={<Play className="w-4 h-4 text-green-600" />}
+          />
+          <StatCard
+            label="Paused"
+            value={filteredSchedules.filter(s => !s.is_active).length}
+            icon={<Pause className="w-4 h-4 text-yellow-600" />}
+          />
+          <StatCard
+            label="Daily"
+            value={filteredSchedules.filter(s => s.frequency === 'daily').length}
+            icon={<RefreshCw className="w-4 h-4 text-blue-600" />}
+          />
+          <StatCard
+            label="Form Types"
+            value={new Set(filteredSchedules.map(s => s.template_id)).size}
+            icon={<FileText className="w-4 h-4 text-purple-600" />}
+          />
+        </StatGrid>
 
         {/* Search */}
         <Card>

@@ -12,6 +12,7 @@ import {
 import { addMonths, format, subMonths } from 'date-fns';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -273,10 +274,10 @@ const MyWorkRestMonth: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold">Hours of Work & Rest</h1>
-            <p className="text-sm text-muted-foreground">
+        <PageHeader
+          title="Hours of Work & Rest"
+          description={
+            <>
               {crewProfile
                 ? `${crewProfile.first_name} ${crewProfile.last_name}${crewProfile.rank ? ' · ' + crewProfile.rank : ''}${crewProfile.department ? ' · ' + crewProfile.department : ''}`
                 : 'Loading crew…'}
@@ -290,61 +291,63 @@ const MyWorkRestMonth: React.FC = () => {
                   Locked
                 </Badge>
               )}
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            {canSelectOtherCrew && crewList.length > 0 && (
-              <Select value={targetCrewId} onValueChange={handleCrewChange}>
-                <SelectTrigger className="h-9 w-[220px]">
-                  <SelectValue placeholder="Select crew member" />
-                </SelectTrigger>
-                <SelectContent className="max-h-80">
-                  {crewList.map((c) => (
-                    <SelectItem key={c.user_id} value={c.user_id}>
-                      {c.last_name}, {c.first_name}
-                      {c.rank ? ` · ${c.rank}` : ''}
-                      {c.user_id === user?.id ? ' (me)' : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            <Button variant="outline" size="sm" onClick={handlePrev}>
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="font-medium min-w-[10ch] text-center">
-              {format(new Date(yearParam, monthParam - 1, 1), 'MMM yyyy')}
-            </span>
-            <Button variant="outline" size="sm" onClick={handleNext}>
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={wr.saving || !canEdit}
-              size="sm"
-            >
-              {wr.saving ? (
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4 mr-1" />
+            </>
+          }
+          actions={
+            <>
+              {canSelectOtherCrew && crewList.length > 0 && (
+                <Select value={targetCrewId} onValueChange={handleCrewChange}>
+                  <SelectTrigger className="h-9 w-[220px]">
+                    <SelectValue placeholder="Select crew member" />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-80">
+                    {crewList.map((c) => (
+                      <SelectItem key={c.user_id} value={c.user_id}>
+                        {c.last_name}, {c.first_name}
+                        {c.rank ? ` · ${c.rank}` : ''}
+                        {c.user_id === user?.id ? ' (me)' : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
-              Save
-            </Button>
-            <Button variant="outline" size="sm" onClick={exportPDF}>
-              <FileText className="h-4 w-4 mr-1" /> PDF
-            </Button>
-            <Button variant="outline" size="sm" onClick={exportCSV}>
-              <Download className="h-4 w-4 mr-1" /> CSV
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('/crew/work-rest/overview')}
-            >
-              <Users className="h-4 w-4 mr-1" /> Fleet Overview
-            </Button>
-          </div>
-        </div>
+              <Button variant="outline" size="sm" onClick={handlePrev}>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="font-medium min-w-[10ch] text-center">
+                {format(new Date(yearParam, monthParam - 1, 1), 'MMM yyyy')}
+              </span>
+              <Button variant="outline" size="sm" onClick={handleNext}>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={wr.saving || !canEdit}
+                size="sm"
+              >
+                {wr.saving ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-1" />
+                )}
+                Save
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportPDF}>
+                <FileText className="h-4 w-4 mr-1" /> PDF
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportCSV}>
+                <Download className="h-4 w-4 mr-1" /> CSV
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/crew/work-rest/overview')}
+              >
+                <Users className="h-4 w-4 mr-1" /> Fleet Overview
+              </Button>
+            </>
+          }
+        />
 
         {wr.loading ? (
           <Card>

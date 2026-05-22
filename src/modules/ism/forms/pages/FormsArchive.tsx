@@ -1,16 +1,18 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { 
+import {
   Archive, Search, Filter, Download, Eye, Calendar,
   FileText, Loader2, User, Ship, CheckCircle
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -141,91 +143,47 @@ export default function FormsArchive() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Archive className="w-6 h-6" />
-              Form Archive
-            </h1>
-            <p className="text-muted-foreground">Completed and archived form submissions</p>
-          </div>
-          <div className="flex gap-2">
+        <PageHeader
+          icon={<Archive className="w-6 h-6" />}
+          title="Form Archive"
+          description="Completed and archived form submissions"
+          actions={
             <Button variant="outline" asChild>
               <Link to="/ism/forms/exports">
                 <Download className="w-4 h-4 mr-2" />
                 Bulk Export
               </Link>
             </Button>
-          </div>
-        </div>
+          }
+        />
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{submissions.length}</p>
-                  <p className="text-sm text-muted-foreground">Total Archived</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <FileText className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {new Set(submissions.map(s => s.template_id)).size}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Form Types</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Ship className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {new Set(submissions.filter(s => s.vessel_name).map(s => s.vessel_name)).size}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Vessels</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-yellow-100 rounded-lg">
-                  <Calendar className="w-5 h-5 text-yellow-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {submissions.filter(s => {
-                      if (!s.submitted_at) return false;
-                      const submitted = new Date(s.submitted_at);
-                      const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-                      return submitted > monthAgo;
-                    }).length}
-                  </p>
-                  <p className="text-sm text-muted-foreground">This Month</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={4}>
+          <StatCard
+            label="Total Archived"
+            value={submissions.length}
+            icon={<CheckCircle className="w-4 h-4 text-green-600" />}
+          />
+          <StatCard
+            label="Form Types"
+            value={new Set(submissions.map(s => s.template_id)).size}
+            icon={<FileText className="w-4 h-4 text-blue-600" />}
+          />
+          <StatCard
+            label="Vessels"
+            value={new Set(submissions.filter(s => s.vessel_name).map(s => s.vessel_name)).size}
+            icon={<Ship className="w-4 h-4 text-purple-600" />}
+          />
+          <StatCard
+            label="This Month"
+            value={submissions.filter(s => {
+              if (!s.submitted_at) return false;
+              const submitted = new Date(s.submitted_at);
+              const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+              return submitted > monthAgo;
+            }).length}
+            icon={<Calendar className="w-4 h-4 text-yellow-600" />}
+          />
+        </StatGrid>
 
         {/* Filters */}
         <Card>

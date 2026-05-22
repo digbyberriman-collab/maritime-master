@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 import { 
   Select,
   SelectContent,
@@ -516,17 +517,16 @@ const FormTemplates: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Form Templates</h1>
-            <p className="text-muted-foreground">Manage checklists, forms, and document templates</p>
-          </div>
-          <Button onClick={() => navigate('/ism/forms/templates/create')}>
-            <Plus className="h-4 w-4 mr-2" />
-            Create Template
-          </Button>
-        </div>
+        <PageHeader
+          title="Form Templates"
+          description="Manage checklists, forms, and document templates"
+          actions={
+            <Button onClick={() => navigate('/ism/forms/templates/create')}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Template
+            </Button>
+          }
+        />
 
         {/* Filters */}
         <Card>

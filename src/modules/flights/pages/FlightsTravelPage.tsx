@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -58,23 +59,21 @@ const FlightsTravelPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-              <Plane className="w-6 h-6" />
-              Flights & Travel
-            </h1>
-            <p className="text-muted-foreground">Manage crew travel bookings and budget</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" className="gap-1 border-[#1A2740] text-[#94A3B8]" onClick={() => toast.info('Manual entry feature coming soon')}>
-              <Plus className="w-4 h-4" /> Manual Entry
-            </Button>
-            <Button className="gap-1 bg-[#3B82F6]" onClick={() => setShowSearchModal(true)}>
-              <Search className="w-4 h-4" /> Search Flights
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          icon={<Plane className="w-6 h-6" />}
+          title="Flights & Travel"
+          description="Manage crew travel bookings and budget"
+          actions={
+            <>
+              <Button variant="outline" className="gap-1 border-[#1A2740] text-[#94A3B8]" onClick={() => toast.info('Manual entry feature coming soon')}>
+                <Plus className="w-4 h-4" /> Manual Entry
+              </Button>
+              <Button className="gap-1 bg-[#3B82F6]" onClick={() => setShowSearchModal(true)}>
+                <Search className="w-4 h-4" /> Search Flights
+              </Button>
+            </>
+          }
+        />
 
         <Tabs value={ftTab} onValueChange={(v) => setSearchParams({ tab: v })}>
           <TabsList className="bg-[#111D33] border border-[#1A2740]">
@@ -130,7 +129,7 @@ const FlightsTravelPage: React.FC = () => {
           <TabsContent value="search" className="mt-6 space-y-6">
             <Card className="bg-[#111D33] border-[#1A2740]">
               <CardHeader>
-                <CardTitle className="text-white">Search Flights</CardTitle>
+                <CardTitle className="text-base text-white">Search Flights</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
@@ -184,7 +183,7 @@ const FlightsTravelPage: React.FC = () => {
             {/* Frequent Routes */}
             <Card className="bg-[#111D33] border-[#1A2740]">
               <CardHeader>
-                <CardTitle className="text-white text-sm">Frequent Routes</CardTitle>
+                <CardTitle className="text-base text-white">Frequent Routes</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
@@ -217,7 +216,7 @@ const FlightsTravelPage: React.FC = () => {
             {searchResults && !isSearching && (
               <Card className="bg-[#111D33] border-[#1A2740]">
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle className="text-white">{searchResults.length} Flights Found</CardTitle>
+                  <CardTitle className="text-base text-white">{searchResults.length} Flights Found</CardTitle>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" className="gap-1 border-[#1A2740] text-[#94A3B8]">
                       <Filter className="w-3 h-3" /> Filter
@@ -358,7 +357,7 @@ const FlightsTravelPage: React.FC = () => {
             {/* Top spenders */}
             <Card className="bg-[#111D33] border-[#1A2740]">
               <CardHeader>
-                <CardTitle className="text-white">Spend by Crew Member (YTD)</CardTitle>
+                <CardTitle className="text-base text-white">Spend by Crew Member (YTD)</CardTitle>
               </CardHeader>
               <CardContent>
                 <Table>

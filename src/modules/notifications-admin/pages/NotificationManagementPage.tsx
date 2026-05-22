@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { Card, CardContent } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Mail, UserPlus } from 'lucide-react';
@@ -61,17 +62,17 @@ const NotificationManagementPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="p-4 lg:p-6 space-y-4 max-w-6xl">
-        <div>
-          <h1 className="text-2xl font-semibold">Notification Management</h1>
-          <p className="text-sm text-muted-foreground">Configure who receives notifications for each notification type</p>
-        </div>
+        <PageHeader
+          title="Notification Management"
+          description="Configure who receives notifications for each notification type"
+        />
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatGrid>
           <StatCard label="Total types" value={stats.total} />
           <StatCard label="Configured" value={stats.configured} />
-          <StatCard label="No recipients" value={stats.noRecipients} tone={stats.noRecipients > 0 ? 'destructive' : undefined} />
+          <StatCard label="No recipients" value={stats.noRecipients} tone={stats.noRecipients > 0 ? 'danger' : 'default'} />
           <StatCard label="Unique emails" value={stats.uniqueEmails} />
-        </div>
+        </StatGrid>
 
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -144,15 +145,6 @@ const NotificationManagementPage: React.FC = () => {
     </DashboardLayout>
   );
 };
-
-const StatCard: React.FC<{ label: string; value: number; tone?: 'destructive' }> = ({ label, value, tone }) => (
-  <Card>
-    <CardContent className="p-3">
-      <div className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">{label}</div>
-      <div className={cn('text-2xl font-semibold mt-0.5', tone === 'destructive' && value > 0 && 'text-destructive')}>{value}</div>
-    </CardContent>
-  </Card>
-);
 
 const Chip: React.FC<{ active?: boolean; tone?: 'destructive'; onClick: () => void; children: React.ReactNode }> = ({ active, tone, onClick, children }) => (
   <button

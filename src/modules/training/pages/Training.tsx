@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -45,70 +46,52 @@ const Training: React.FC = () => {
   return (
     <DashboardLayout>
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Crew Training & Competency</h1>
-          <p className="text-muted-foreground">ISM Code Section 6 - Training & Familiarization</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowTemplates(true)}>
-            <FileText className="h-4 w-4 mr-2" />
-            Familiarization Templates
-          </Button>
-          <Button onClick={() => setShowAddTraining(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Training Record
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Crew Training & Competency"
+        description="ISM Code Section 6 - Training & Familiarization"
+        actions={
+          <>
+            <Button variant="outline" onClick={() => setShowTemplates(true)}>
+              <FileText className="h-4 w-4 mr-2" />
+              Familiarization Templates
+            </Button>
+            <Button onClick={() => setShowAddTraining(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Training Record
+            </Button>
+          </>
+        }
+      />
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="p-0">
-          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-            <CardTitle className="text-xs font-medium">Crew Qualified</CardTitle>
-            <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-xl font-bold">{complianceStats.validRecords}</div>
-            <p className="text-[10px] text-muted-foreground">Valid certificates</p>
-          </CardContent>
-        </Card>
-
-        <Card className="p-0">
-          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-            <CardTitle className="text-xs font-medium">Expiring Soon</CardTitle>
-            <AlertTriangle className="h-3.5 w-3.5 text-warning" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-xl font-bold text-warning">{complianceStats.expiringSoon}</div>
-            <p className="text-[10px] text-muted-foreground">Within 90 days</p>
-          </CardContent>
-        </Card>
-
-        <Card className="p-0">
-          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-            <CardTitle className="text-xs font-medium">Familiarization</CardTitle>
-            <ClipboardCheck className="h-3.5 w-3.5 text-info" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-xl font-bold text-info">{complianceStats.activeFamiliarizations}</div>
-            <p className="text-[10px] text-muted-foreground">In progress</p>
-          </CardContent>
-        </Card>
-
-        <Card className="p-0">
-          <CardHeader className="flex flex-row items-center justify-between p-3 pb-1">
-            <CardTitle className="text-xs font-medium">Overdue Training</CardTitle>
-            <Award className="h-3.5 w-3.5 text-destructive" />
-          </CardHeader>
-          <CardContent className="p-3 pt-0">
-            <div className="text-xl font-bold text-destructive">{complianceStats.expired}</div>
-            <p className="text-[10px] text-muted-foreground">Requires action</p>
-          </CardContent>
-        </Card>
-      </div>
+      <StatGrid>
+        <StatCard
+          label="Crew Qualified"
+          icon={<GraduationCap className="h-4 w-4 text-muted-foreground" />}
+          value={complianceStats.validRecords}
+          hint="Valid certificates"
+        />
+        <StatCard
+          label="Expiring Soon"
+          icon={<AlertTriangle className="h-4 w-4 text-warning" />}
+          value={complianceStats.expiringSoon}
+          tone="warning"
+          hint="Within 90 days"
+        />
+        <StatCard
+          label="Familiarization"
+          icon={<ClipboardCheck className="h-4 w-4 text-info" />}
+          value={complianceStats.activeFamiliarizations}
+          tone="info"
+          hint="In progress"
+        />
+        <StatCard
+          label="Overdue Training"
+          icon={<Award className="h-4 w-4 text-destructive" />}
+          value={complianceStats.expired}
+          tone="danger"
+          hint="Requires action"
+        />
+      </StatGrid>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">

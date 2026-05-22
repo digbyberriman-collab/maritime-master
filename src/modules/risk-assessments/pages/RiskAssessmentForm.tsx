@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -51,23 +52,24 @@ const RiskAssessmentForm: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">New Risk Assessment</h1>
-              <p className="text-muted-foreground">Identify hazards, assess risk, define controls</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline">Save Draft</Button>
-            <Button>
-              <Save className="w-4 h-4 mr-2" />
-              Submit for Approval
-            </Button>
-          </div>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
+          <PageHeader
+            className="flex-1"
+            title="New Risk Assessment"
+            description="Identify hazards, assess risk, define controls"
+            actions={
+              <>
+                <Button variant="outline">Save Draft</Button>
+                <Button>
+                  <Save className="w-4 h-4 mr-2" />
+                  Submit for Approval
+                </Button>
+              </>
+            }
+          />
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

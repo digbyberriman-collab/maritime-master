@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 import { useToast } from '@/shared/hooks/use-toast';
 import { 
   ArrowLeft, ArrowRight, Save, Send, CheckCircle, Clock, 
@@ -386,20 +387,15 @@ const FormSubmissionPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">{typeInfo.icon}</span>
-                <h1 className="text-2xl font-bold text-foreground">
-                  {activeTemplate.template_name}
-                </h1>
-              </div>
-              <div className="flex items-center gap-2 mt-1 text-muted-foreground text-sm">
+        <div className="flex items-start gap-2">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="shrink-0 mt-1">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <PageHeader
+            icon={<span className="text-2xl leading-none">{typeInfo.icon}</span>}
+            title={activeTemplate.template_name}
+            description={
+              <span className="flex items-center gap-2 flex-wrap">
                 <span>{submission?.submission_number || 'New Submission'}</span>
                 {selectedVessel && (
                   <>
@@ -410,32 +406,32 @@ const FormSubmissionPage: React.FC = () => {
                 {submission && (
                   <>
                     <span>•</span>
-                    <Badge 
-                      variant="outline" 
+                    <Badge
+                      variant="outline"
                       className={getSubmissionStatusConfig(submission.status).color}
                     >
                       {getSubmissionStatusConfig(submission.status).label}
                     </Badge>
                   </>
                 )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {canEdit && (
-              <>
-                <Button variant="outline" onClick={saveSubmission} disabled={saving}>
-                  {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-                  Save Draft
-                </Button>
-                <Button onClick={submitForSignature} disabled={submitting}>
-                  {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
-                  {requiredSigners.length > 0 ? 'Submit for Signature' : 'Complete Form'}
-                </Button>
-              </>
-            )}
-          </div>
+              </span>
+            }
+            actions={
+              canEdit && (
+                <>
+                  <Button variant="outline" onClick={saveSubmission} disabled={saving}>
+                    {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                    Save Draft
+                  </Button>
+                  <Button onClick={submitForSignature} disabled={submitting}>
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+                    {requiredSigners.length > 0 ? 'Submit for Signature' : 'Complete Form'}
+                  </Button>
+                </>
+              )
+            }
+            className="flex-1"
+          />
         </div>
 
         {/* Progress bar */}
@@ -459,7 +455,7 @@ const FormSubmissionPage: React.FC = () => {
         {/* Form Fields */}
         <Card>
           <CardHeader>
-            <CardTitle>
+            <CardTitle className="text-base">
               {totalPages > 1 ? `Section ${currentPage}` : 'Form Details'}
             </CardTitle>
             {activeTemplate.description && (

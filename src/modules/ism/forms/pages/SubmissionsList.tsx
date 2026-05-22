@@ -4,7 +4,9 @@ import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 import {
   Select,
   SelectContent,
@@ -101,53 +103,42 @@ const SubmissionsList: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Form Submissions</h1>
-            <p className="text-muted-foreground">View and manage all form submissions</p>
-          </div>
-          <Button onClick={() => navigate('/ism/forms/templates')}>
-            <Plus className="h-4 w-4 mr-2" />
-            New Submission
-          </Button>
-        </div>
+        <PageHeader
+          title="Form Submissions"
+          description="View and manage all form submissions"
+          actions={
+            <Button onClick={() => navigate('/ism/forms/templates')}>
+              <Plus className="h-4 w-4 mr-2" />
+              New Submission
+            </Button>
+          }
+        />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFilterStatus('all')}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.total}</div>
-          </CardContent>
-        </Card>
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFilterStatus('DRAFT')}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Drafts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-warning">{stats.drafts}</div>
-          </CardContent>
-        </Card>
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFilterStatus('PENDING_SIGNATURE')}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-warning">{stats.pending}</div>
-            </CardContent>
-          </Card>
-        <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFilterStatus('SIGNED')}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-success">{stats.completed}</div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={4}>
+          <StatCard
+            label="Total"
+            value={stats.total}
+            onClick={() => setFilterStatus('all')}
+          />
+          <StatCard
+            label="Drafts"
+            value={stats.drafts}
+            tone="warning"
+            onClick={() => setFilterStatus('DRAFT')}
+          />
+          <StatCard
+            label="Pending"
+            value={stats.pending}
+            tone="warning"
+            onClick={() => setFilterStatus('PENDING_SIGNATURE')}
+          />
+          <StatCard
+            label="Completed"
+            value={stats.completed}
+            tone="success"
+            onClick={() => setFilterStatus('SIGNED')}
+          />
+        </StatGrid>
 
         {/* Filters */}
         <Card>

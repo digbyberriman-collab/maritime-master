@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { 
-  ArrowLeft, Edit, Copy, Archive, Play, Calendar, 
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import {
+  ArrowLeft, Edit, Copy, Archive, Play,
   Clock, CheckCircle, Users, Loader2
 } from 'lucide-react';
 import { useFormTemplate, useDuplicateFormTemplate, useArchiveFormTemplate } from '@/modules/ism/forms/hooks/useFormTemplates';
@@ -80,54 +81,55 @@ const TemplateDetail: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/ism/forms/templates')}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">{typeInfo.icon}</span>
-                <h1 className="text-2xl font-bold text-foreground">{template.template_name}</h1>
+        <div className="flex items-start gap-2">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/ism/forms/templates')} className="shrink-0 mt-1">
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <PageHeader
+            icon={<span className="text-2xl leading-none">{typeInfo.icon}</span>}
+            title={
+              <span className="flex items-center gap-2 flex-wrap">
+                {template.template_name}
                 <Badge variant="outline" className={statusConfig.color}>
                   {statusConfig.label}
                 </Badge>
-              </div>
-              <p className="text-muted-foreground text-sm mt-1">{template.template_code} • v{template.version}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {template.status === 'PUBLISHED' && (
-              <Button onClick={() => navigate(`/ism/forms/new?template=${template.id}`)}>
-                <Play className="h-4 w-4 mr-2" />
-                Start Form
-              </Button>
-            )}
-            <Button variant="outline" onClick={() => navigate(`/ism/forms/templates/${template.id}/edit`)}>
-              <Edit className="h-4 w-4 mr-2" />
-              Edit
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={handleDuplicate}
-              disabled={duplicateMutation.isPending}
-            >
-              <Copy className="h-4 w-4 mr-2" />
-              Duplicate
-            </Button>
-            {template.status !== 'ARCHIVED' && (
-              <Button 
-                variant="outline" 
-                onClick={handleArchive}
-                disabled={archiveMutation.isPending}
-              >
-                <Archive className="h-4 w-4 mr-2" />
-                Archive
-              </Button>
-            )}
-          </div>
+              </span>
+            }
+            description={`${template.template_code} • v${template.version}`}
+            actions={
+              <>
+                {template.status === 'PUBLISHED' && (
+                  <Button onClick={() => navigate(`/ism/forms/new?template=${template.id}`)}>
+                    <Play className="h-4 w-4 mr-2" />
+                    Start Form
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => navigate(`/ism/forms/templates/${template.id}/edit`)}>
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleDuplicate}
+                  disabled={duplicateMutation.isPending}
+                >
+                  <Copy className="h-4 w-4 mr-2" />
+                  Duplicate
+                </Button>
+                {template.status !== 'ARCHIVED' && (
+                  <Button
+                    variant="outline"
+                    onClick={handleArchive}
+                    disabled={archiveMutation.isPending}
+                  >
+                    <Archive className="h-4 w-4 mr-2" />
+                    Archive
+                  </Button>
+                )}
+              </>
+            }
+            className="flex-1"
+          />
         </div>
 
         {/* Template Info */}
@@ -136,7 +138,7 @@ const TemplateDetail: React.FC = () => {
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Template Details</CardTitle>
+                <CardTitle className="text-base">Template Details</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {template.description && (
@@ -182,7 +184,7 @@ const TemplateDetail: React.FC = () => {
             {/* Form Fields Preview */}
             <Card>
               <CardHeader>
-                <CardTitle>Form Fields ({schema?.fields?.length || 0})</CardTitle>
+                <CardTitle className="text-base">Form Fields ({schema?.fields?.length || 0})</CardTitle>
                 <CardDescription>Fields configured in this template</CardDescription>
               </CardHeader>
               <CardContent>
@@ -252,7 +254,7 @@ const TemplateDetail: React.FC = () => {
             {/* Workflow Integration */}
             <Card>
               <CardHeader>
-                <CardTitle>Workflow</CardTitle>
+                <CardTitle className="text-base">Workflow</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
                 {template.can_trigger_incident && (
@@ -290,7 +292,7 @@ const TemplateDetail: React.FC = () => {
             {template.source_file_url && (
               <Card>
                 <CardHeader>
-                  <CardTitle>Source Document</CardTitle>
+                  <CardTitle className="text-base">Source Document</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <a 
@@ -308,7 +310,7 @@ const TemplateDetail: React.FC = () => {
             {/* Metadata */}
             <Card>
               <CardHeader>
-                <CardTitle>Metadata</CardTitle>
+                <CardTitle className="text-base">Metadata</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 text-sm">
                 <div className="flex justify-between">

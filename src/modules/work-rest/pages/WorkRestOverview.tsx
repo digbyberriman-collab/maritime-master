@@ -143,19 +143,18 @@ const WorkRestOverview: React.FC = () => {
           </span>
         </div>
 
-        {/* Stat cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label="TOTAL CREW" value={stats.total} icon={<Users className="h-4 w-4" />} tone="default" />
+        <StatGrid>
+          <StatCard label="TOTAL CREW" value={stats.total} icon={<Users className="h-4 w-4 text-muted-foreground" />} />
           <StatCard
             label="COMPLIANT"
             value={stats.compliant}
-            sub={stats.total ? `${Math.round((stats.compliant / stats.total) * 100)}% of crew` : undefined}
-            icon={<CheckCircle2 className="h-4 w-4" />}
+            hint={stats.total ? `${Math.round((stats.compliant / stats.total) * 100)}% of crew` : undefined}
+            icon={<CheckCircle2 className="h-4 w-4 text-success" />}
             tone="success"
           />
-          <StatCard label="REQUIRES REVIEW" value={stats.review} icon={<AlertTriangle className="h-4 w-4" />} tone="warning" />
-          <StatCard label="NON-COMPLIANT" value={stats.nonCompliant} icon={<XCircle className="h-4 w-4" />} tone="danger" />
-        </div>
+          <StatCard label="REQUIRES REVIEW" value={stats.review} icon={<AlertTriangle className="h-4 w-4 text-warning" />} tone="warning" />
+          <StatCard label="NON-COMPLIANT" value={stats.nonCompliant} icon={<XCircle className="h-4 w-4 text-destructive" />} tone="danger" />
+        </StatGrid>
 
         <p className="text-xs text-muted-foreground">
           Click any crew member to view their individual monthly timesheet
@@ -232,37 +231,6 @@ const WorkRestOverview: React.FC = () => {
         </Card>
       </div>
     </DashboardLayout>
-  );
-};
-
-const StatCard: React.FC<{
-  label: string;
-  value: number;
-  sub?: string;
-  icon: React.ReactNode;
-  tone: 'default' | 'success' | 'warning' | 'danger';
-}> = ({ label, value, sub, icon, tone }) => {
-  const toneClass = {
-    default: 'border-border bg-card',
-    success: 'border-success/30 bg-success/5',
-    warning: 'border-warning/30 bg-warning/5',
-    danger: 'border-destructive/30 bg-destructive/5',
-  }[tone];
-  const iconClass = {
-    default: 'text-muted-foreground',
-    success: 'text-success',
-    warning: 'text-warning',
-    danger: 'text-destructive',
-  }[tone];
-  return (
-    <div className={cn('rounded-lg border p-4', toneClass)}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] font-semibold tracking-wider text-muted-foreground">{label}</span>
-        <span className={iconClass}>{icon}</span>
-      </div>
-      <div className="text-3xl font-bold tabular-nums">{value}</div>
-      {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
-    </div>
   );
 };
 

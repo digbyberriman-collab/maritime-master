@@ -10,6 +10,7 @@ import { Search, Settings2 } from 'lucide-react';
 import { useUsersWithAccess } from '../hooks/useUsersWithAccess';
 import { PresetBadge } from '../components/PresetBadge';
 import { ModulePermChip } from '../components/ModulePermChip';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 const UsersAccessListPage: React.FC = () => {
   const { data: rows, isLoading } = useUsersWithAccess();
@@ -27,12 +28,10 @@ const UsersAccessListPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="p-4 lg:p-6 space-y-4">
-        <header className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Users &amp; Access</h1>
-            <p className="text-sm text-muted-foreground">Manage who can see and do what across the fleet.</p>
-          </div>
-          <div className="flex items-center gap-2">
+        <PageHeader
+          title="Users & Access"
+          description="Manage who can see and do what across the fleet."
+          actions={
             <div className="relative">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -42,8 +41,8 @@ const UsersAccessListPage: React.FC = () => {
                 className="pl-8 w-64"
               />
             </div>
-          </div>
-        </header>
+          }
+        />
 
         <Card className="divide-y">
           {isLoading && <div className="p-6 text-sm text-muted-foreground">Loading…</div>}

@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -64,16 +65,15 @@ const PendingSignatures: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Pending Signatures</h1>
-            <p className="text-muted-foreground">Forms awaiting your signature</p>
-          </div>
-          <Badge variant="outline" className="text-lg px-4 py-2">
-            {pendingSubmissions.length} pending
-          </Badge>
-        </div>
+        <PageHeader
+          title="Pending Signatures"
+          description="Forms awaiting your signature"
+          actions={
+            <Badge variant="outline" className="text-lg px-4 py-2">
+              {pendingSubmissions.length} pending
+            </Badge>
+          }
+        />
 
         {/* Content */}
         {isLoading ? (

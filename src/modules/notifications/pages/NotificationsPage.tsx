@@ -12,6 +12,7 @@ import {
   type NotificationType,
 } from '@/modules/notifications-admin/hooks/useNotificationData';
 import { useToast } from '@/shared/hooks/use-toast';
+import { PageHeader } from '@/shared/components/common/PageHeader';
 
 const NotificationsPage: React.FC = () => {
   const { data: types = [] } = useNotificationTypes();
@@ -38,10 +39,10 @@ const NotificationsPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="p-4 lg:p-6 max-w-3xl mx-auto space-y-4">
-        <div>
-          <h1 className="text-2xl font-semibold">Notifications</h1>
-          <p className="text-sm text-muted-foreground">Choose which notifications appear in your inbox and arrive by email.</p>
-        </div>
+        <PageHeader
+          title="Notifications"
+          description="Choose which notifications appear in your inbox and arrive by email."
+        />
 
         <Tabs defaultValue="preferences">
           <TabsList>
