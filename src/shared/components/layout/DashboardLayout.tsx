@@ -115,30 +115,31 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           {/* Navigation */}
           <SidebarNavigation onNavigate={() => setSidebarOpen(false)} />
 
-          {/* Feedback button - above user profile */}
-          <div className="px-3 pb-1">
-            <button
-              onClick={() => setPanelOpen(true)}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-            >
-              <MessageSquareWarning className="w-5 h-5" />
-              <span>Report an Issue</span>
-            </button>
-          </div>
+          {/* Bottom-pinned group: Report an Issue, Settings, User profile.
+              mt-auto keeps it anchored to the bottom regardless of nav length;
+              shrink-0 prevents it from being compressed away. */}
+          <div className="mt-auto shrink-0">
+            <div className="px-3 pb-1 pt-2">
+              <button
+                onClick={() => setPanelOpen(true)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+              >
+                <MessageSquareWarning className="w-5 h-5" />
+                <span>Report an Issue</span>
+              </button>
+            </div>
 
-          {/* Settings button - below Report an Issue, above user profile divider */}
-          <div className="px-3 pb-2">
-            <button
-              onClick={() => navigate('/settings')}
-              className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
-            >
-              <Settings className="w-5 h-5" />
-              <span>Settings</span>
-            </button>
-          </div>
+            <div className="px-3 pb-2">
+              <button
+                onClick={() => navigate('/settings')}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+              >
+                <Settings className="w-5 h-5" />
+                <span>Settings</span>
+              </button>
+            </div>
 
-          {/* User info at bottom */}
-          <div className="p-4 border-t border-sidebar-border">
+            <div className="p-4 border-t border-sidebar-border">
             <div className="flex items-center gap-3 text-sidebar-foreground">
               <Avatar className="w-8 h-8">
                 <AvatarFallback
@@ -156,6 +157,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                   {profile?.role ? roleLabels[profile.role] : ''}
                 </p>
               </div>
+            </div>
             </div>
           </div>
         </div>
