@@ -42,7 +42,7 @@ interface RowProps {
   readOnly?: boolean;
 }
 
-const Row: React.FC<RowProps> = ({
+const RowImpl: React.FC<RowProps> = ({
   id, label, icon: Icon, index, total, depth = 0,
   expandable, expanded, onToggleExpand, childCount,
   draggingId, overId,
@@ -106,6 +106,8 @@ const Row: React.FC<RowProps> = ({
     </div>
   );
 };
+// Memoize so unrelated rows don't re-render on drag-over / expand changes.
+const Row = React.memo(RowImpl);
 
 const SkeletonRow: React.FC<{ depth?: number }> = ({ depth = 0 }) => (
   <div
@@ -208,9 +210,12 @@ const SidebarLayoutSection: React.FC = () => {
     nodes: NavNode[],
     groupId: string,
     depth: number
-  ): React.ReactNode =>
-    nodes.map((node, idx) => {
-      const siblingIds = nodes.map((n) => n.id);
+  ): React.ReactNode => {
+    // Compute sibling ids once per branch instead of once per row.
+    const siblingIds = nodes.map((n) => n.id);
+    const total = nodes.length;
+    const groupIsDragging = dragGroup === groupId;
+    return nodes.map((node, idx) => {
       const hasChildren = !!node.children?.length;
       const isExpanded = !!expanded[node.id];
       const orderedChildren: NavNode[] = hasChildren
@@ -224,7 +229,7 @@ const SidebarLayoutSection: React.FC = () => {
             label={node.label}
             icon={node.icon}
             index={idx}
-            total={nodes.length}
+            total={total}
             depth={depth}
             expandable={hasChildren}
             expanded={isExpanded}
@@ -232,8 +237,8 @@ const SidebarLayoutSection: React.FC = () => {
             onToggleExpand={() =>
               setExpanded((p) => ({ ...p, [node.id]: !p[node.id] }))
             }
-            draggingId={dragGroup === groupId ? draggingId : null}
-            overId={dragGroup === groupId ? overId : null}
+            draggingId={groupIsDragging ? draggingId : null}
+            overId={groupIsDragging ? overId : null}
             onDragStart={(id) => startDrag(groupId, id)}
             onDragEnd={() => {
               setDraggingId(null);
@@ -241,7 +246,7 @@ const SidebarLayoutSection: React.FC = () => {
               setDragGroup(null);
             }}
             onDragOver={(id) => {
-              if (dragGroup === groupId && overId !== id) setOverId(id);
+              if (groupIsDragging && overId !== id) setOverId(id);
             }}
             onDrop={(id) => handleDrop(groupId, siblingIds, id)}
             onMoveUp={() => handleMove(groupId, node.id, 'up', siblingIds)}
@@ -265,6 +270,7 @@ const SidebarLayoutSection: React.FC = () => {
         </React.Fragment>
       );
     });
+  };
 
   const startDrag = (groupId: string, id: string) => {
     if (readOnly) return;
