@@ -1,13 +1,19 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  Filter,
   Loader2,
   Download,
-  ExternalLink,
+  ChevronLeft,
+  ChevronRight,
+  Users,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle,
+  FileText,
+  FileSpreadsheet,
 } from 'lucide-react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -17,27 +23,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
-import { listVesselSubmissions } from '../services/workRestService';
-import { downloadCSV, exportDepartmentCSV } from '../reports/exports';
+import { listVesselMonthMatrix, type VesselMonthCrewRow } from '../services/workRestService';
+import { cn } from '@/lib/utils';
 
-const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-interface Row {
-  submission_id: string | null;
-  crew_id: string;
-  crew_name: string;
-  rank: string;
-  department: string;
-  total_work: number;
-  total_rest: number;
-  open_ncs: number;
-  status: string;
-  is_compliant: boolean;
-  crew_signed: boolean;
-  hod_signed: boolean;
-}
+const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DEPT_ORDER = ['DECK', 'BRIDGE', 'ENGINEERING', 'INTERIOR', 'OTHER'];
 
 const WorkRestOverview: React.FC = () => {
   const { selectedVessel } = useVessel();
@@ -46,55 +37,41 @@ const WorkRestOverview: React.FC = () => {
   const today = new Date();
   const year = Number(searchParams.get('year')) || today.getFullYear();
   const month = Number(searchParams.get('month')) || today.getMonth() + 1;
-  const dept = searchParams.get('department') || '';
-  const statusFilter = searchParams.get('status') || '';
-  const search = searchParams.get('q') || '';
 
-  const [rows, setRows] = useState<Row[]>([]);
+  const [rows, setRows] = useState<VesselMonthCrewRow[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!selectedVessel?.id) return;
     setLoading(true);
-    listVesselSubmissions({
-      vesselId: selectedVessel.id,
-      year,
-      month,
-      department: dept || null,
-    })
-      .then((data) => {
-        const mapped: Row[] = data.map((d: any) => ({
-          submission_id: d.id,
-          crew_id: d.crew_id,
-          crew_name: `${d.profiles?.first_name ?? ''} ${d.profiles?.last_name ?? ''}`.trim(),
-          rank: d.profiles?.rank ?? '',
-          department: d.profiles?.department ?? '',
-          total_work: Number(d.total_work_hours ?? 0),
-          total_rest: Number(d.total_rest_hours ?? 0),
-          open_ncs: Number(d.open_non_conformities ?? 0),
-          status: d.status,
-          is_compliant: !!d.is_compliant,
-          crew_signed: !!d.crew_signed_at,
-          hod_signed: !!d.hod_signed_at,
-        }));
-        setRows(mapped);
-      })
+    listVesselMonthMatrix({ vesselId: selectedVessel.id, year, month })
+      .then(setRows)
       .finally(() => setLoading(false));
-  }, [selectedVessel?.id, year, month, dept]);
+  }, [selectedVessel?.id, year, month]);
 
-  const filtered = useMemo(() => {
-    return rows.filter((r) => {
-      if (statusFilter && r.status !== statusFilter) return false;
-      if (search && !r.crew_name.toLowerCase().includes(search.toLowerCase()))
-        return false;
-      return true;
-    });
-  }, [rows, statusFilter, search]);
+  const lastDay = useMemo(() => new Date(year, month, 0).getDate(), [year, month]);
+  const days = useMemo(() => Array.from({ length: lastDay }, (_, i) => i + 1), [lastDay]);
 
-  const departments = useMemo(
-    () => Array.from(new Set(rows.map((r) => r.department).filter(Boolean))),
-    [rows]
-  );
+  const grouped = useMemo(() => {
+    const map = new Map<string, VesselMonthCrewRow[]>();
+    for (const r of rows) {
+      const k = r.department || 'OTHER';
+      if (!map.has(k)) map.set(k, []);
+      map.get(k)!.push(r);
+    }
+    const ordered: [string, VesselMonthCrewRow[]][] = [];
+    for (const d of DEPT_ORDER) if (map.has(d)) ordered.push([d, map.get(d)!]);
+    for (const [k, v] of map) if (!DEPT_ORDER.includes(k)) ordered.push([k, v]);
+    return ordered;
+  }, [rows]);
+
+  const stats = useMemo(() => {
+    const total = rows.length;
+    const compliant = rows.filter((r) => r.status === 'compliant').length;
+    const review = rows.filter((r) => r.status === 'review' || r.status === 'no_data').length;
+    const nonCompliant = rows.filter((r) => r.status === 'non_compliant').length;
+    return { total, compliant, review, nonCompliant };
+  }, [rows]);
 
   const setParam = (k: string, v: string) => {
     const next = new URLSearchParams(searchParams);
@@ -103,204 +80,217 @@ const WorkRestOverview: React.FC = () => {
     setSearchParams(next);
   };
 
-  const exportCSV = () => {
-    const csv = exportDepartmentCSV(filtered);
-    downloadCSV(csv, `wr-overview-${selectedVessel?.name ?? 'vessel'}-${year}-${String(month).padStart(2,'0')}.csv`);
+  const changeMonth = (delta: number) => {
+    let m = month + delta;
+    let y = year;
+    if (m < 1) { m = 12; y -= 1; }
+    if (m > 12) { m = 1; y += 1; }
+    const next = new URLSearchParams(searchParams);
+    next.set('year', String(y));
+    next.set('month', String(m));
+    setSearchParams(next);
   };
 
   return (
     <DashboardLayout>
       <div className="space-y-4">
-        <div className="flex items-center justify-between flex-wrap gap-3">
+        {/* Header */}
+        <div className="flex items-start justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-bold">Hours of Work & Rest — Overview</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Hours of Rest</h1>
             <p className="text-sm text-muted-foreground">
-              {selectedVessel?.name ?? 'No vessel selected'} · {MONTH_NAMES[month - 1]} {year}
+              {selectedVessel?.name ?? 'No vessel selected'} — Monthly compliance report
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={exportCSV}>
-              <Download className="h-4 w-4 mr-1" /> Export CSV
+            <Button variant="outline" size="sm">
+              <FileText className="h-4 w-4 mr-1.5" /> Summary PDF
+            </Button>
+            <Button variant="outline" size="sm">
+              <FileSpreadsheet className="h-4 w-4 mr-1.5" /> Summary Excel
+            </Button>
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4 mr-1.5" /> Export All Crew (PDF)
             </Button>
           </div>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Filter className="h-4 w-4" /> Filters
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-2 md:grid-cols-5 gap-3">
-            <div>
-              <label className="text-xs text-muted-foreground">Year</label>
-              <Input
-                type="number"
-                value={year}
-                onChange={(e) => setParam('year', e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Month</label>
-              <Select value={String(month)} onValueChange={(v) => setParam('month', v)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MONTH_NAMES.map((n, i) => (
-                    <SelectItem key={i} value={String(i + 1)}>
-                      {n}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Department</label>
-              <Select value={dept || 'all'} onValueChange={(v) => setParam('department', v === 'all' ? '' : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  {departments.map((d) => (
-                    <SelectItem key={d} value={d}>
-                      {d}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Status</label>
-              <Select value={statusFilter || 'all'} onValueChange={(v) => setParam('status', v === 'all' ? '' : v)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  {['draft','submitted','crew_signed','hod_reviewed','hod_signed','captain_reviewed','locked','reopened'].map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s.replace('_',' ')}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">Search crew</label>
-              <Input
-                value={search}
-                onChange={(e) => setParam('q', e.target.value)}
-                placeholder="Name…"
-              />
-            </div>
-          </CardContent>
-        </Card>
+        {/* Month nav */}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => changeMonth(-1)}>
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <Select value={String(month)} onValueChange={(v) => setParam('month', v)}>
+            <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {MONTH_NAMES.map((n, i) => (
+                <SelectItem key={i} value={String(i + 1)}>{n}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={String(year)} onValueChange={(v) => setParam('year', v)}>
+            <SelectTrigger className="w-[110px]"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {Array.from({ length: 5 }, (_, i) => today.getFullYear() - 2 + i).map((y) => (
+                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => changeMonth(1)}>
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+          <span className="ml-2 text-sm text-muted-foreground">
+            {MONTH_NAMES[month - 1]} {year}
+          </span>
+        </div>
 
+        {/* Stat cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <StatCard label="TOTAL CREW" value={stats.total} icon={<Users className="h-4 w-4" />} tone="default" />
+          <StatCard
+            label="COMPLIANT"
+            value={stats.compliant}
+            sub={stats.total ? `${Math.round((stats.compliant / stats.total) * 100)}% of crew` : undefined}
+            icon={<CheckCircle2 className="h-4 w-4" />}
+            tone="success"
+          />
+          <StatCard label="REQUIRES REVIEW" value={stats.review} icon={<AlertTriangle className="h-4 w-4" />} tone="warning" />
+          <StatCard label="NON-COMPLIANT" value={stats.nonCompliant} icon={<XCircle className="h-4 w-4" />} tone="danger" />
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          Click any crew member to view their individual monthly timesheet
+        </p>
+
+        {/* Matrix */}
         <Card>
           <CardContent className="p-0 overflow-x-auto">
             {loading ? (
               <div className="p-6 flex items-center gap-2 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" /> Loading…
               </div>
-            ) : filtered.length === 0 ? (
+            ) : rows.length === 0 ? (
               <div className="p-6 text-sm text-muted-foreground">
-                No submissions for this period yet.
+                No crew assigned to this vessel.
               </div>
             ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-muted/50 text-xs uppercase">
-                  <tr>
-                    <th className="text-left p-2">Crew</th>
-                    <th className="text-left p-2">Rank</th>
-                    <th className="text-left p-2">Dept</th>
-                    <th className="text-right p-2">Work (h)</th>
-                    <th className="text-right p-2">Rest (h)</th>
-                    <th className="text-center p-2">Crew sig</th>
-                    <th className="text-center p-2">HoD sig</th>
-                    <th className="text-right p-2">Open NCs</th>
-                    <th className="text-left p-2">Status</th>
-                    <th className="p-2" />
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-muted/40 border-b">
+                    <th className="text-left px-3 py-2 sticky left-0 bg-muted/40 z-10 min-w-[180px]">Crew Member</th>
+                    <th className="text-left px-2 py-2 min-w-[100px]">Compliance</th>
+                    {days.map((d) => (
+                      <th key={d} className="px-1 py-2 text-center font-medium text-muted-foreground min-w-[28px]">{d}</th>
+                    ))}
+                    <th className="text-right px-2 py-2 min-w-[64px]">Avg Rest</th>
+                    <th className="text-right px-2 py-2 min-w-[60px]">Logged</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((r) => (
-                    <tr key={r.crew_id} className="border-t hover:bg-muted/30">
-                      <td className="p-2 font-medium">{r.crew_name}</td>
-                      <td className="p-2 text-muted-foreground">{r.rank}</td>
-                      <td className="p-2 text-muted-foreground">{r.department}</td>
-                      <td className="p-2 text-right tabular-nums">{r.total_work.toFixed(1)}</td>
-                      <td className="p-2 text-right tabular-nums">{r.total_rest.toFixed(1)}</td>
-                      <td className="p-2 text-center">
-                        {r.crew_signed ? '✓' : <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="p-2 text-center">
-                        {r.hod_signed ? '✓' : <span className="text-muted-foreground">—</span>}
-                      </td>
-                      <td className="p-2 text-right">
-                        {r.open_ncs > 0 ? (
-                          <Badge className="bg-destructive/10 text-destructive border-destructive/30">
-                            {r.open_ncs}
-                          </Badge>
-                        ) : (
-                          0
-                        )}
-                      </td>
-                      <td className="p-2">
-                        <ComplianceBadge row={r} />
-                      </td>
-                      <td className="p-2 text-right">
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link
-                            to={`/crew/work-rest/${r.crew_id}?year=${year}&month=${month}`}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                      </td>
-                    </tr>
+                  {grouped.map(([dept, deptRows]) => (
+                    <React.Fragment key={dept}>
+                      <tr className="bg-muted/20 border-b">
+                        <td colSpan={days.length + 4} className="px-3 py-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground">
+                          {dept}
+                        </td>
+                      </tr>
+                      {deptRows.map((r) => (
+                        <tr key={r.crew_id} className="border-b hover:bg-muted/30 transition-colors">
+                          <td className="px-3 py-2 sticky left-0 bg-card z-10">
+                            <Link to={`/crew/work-rest/${r.crew_id}?year=${year}&month=${month}`} className="block">
+                              <div className="font-medium text-foreground hover:text-primary">{r.crew_name}</div>
+                              <div className="text-[10px] text-muted-foreground">{r.rank}</div>
+                            </Link>
+                          </td>
+                          <td className="px-2 py-2">
+                            <StatusBadge status={r.status} />
+                          </td>
+                          {days.map((d) => {
+                            const hours = r.rest_by_day[d];
+                            const compliant = r.compliant_by_day[d];
+                            return (
+                              <td key={d} className="p-0.5 text-center">
+                                <DayCell hours={hours} compliant={compliant} />
+                              </td>
+                            );
+                          })}
+                          <td className="px-2 py-2 text-right tabular-nums font-medium">
+                            {r.avg_rest != null ? `${r.avg_rest.toFixed(1)}h` : '—'}
+                          </td>
+                          <td className={cn('px-2 py-2 text-right tabular-nums font-medium',
+                            r.logged_pct >= 80 ? 'text-success' : r.logged_pct >= 40 ? 'text-warning' : 'text-muted-foreground'
+                          )}>
+                            {r.logged_pct}%
+                          </td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
             )}
           </CardContent>
         </Card>
-
-        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-          <Legend className="bg-success/15 text-success">Compliant</Legend>
-          <Legend className="bg-warning/15 text-warning">Warnings</Legend>
-          <Legend className="bg-destructive/15 text-destructive">Non-compliant</Legend>
-          <Legend className="bg-muted">Incomplete</Legend>
-        </div>
       </div>
     </DashboardLayout>
   );
 };
 
-const ComplianceBadge: React.FC<{ row: Row }> = ({ row }) => {
-  if (row.status === 'draft') return <Badge variant="outline">Incomplete</Badge>;
-  if (row.open_ncs > 0)
-    return (
-      <Badge className="bg-destructive/15 text-destructive border-destructive/40">
-        Non-compliant · {row.status.replace('_', ' ')}
-      </Badge>
-    );
-  if (row.is_compliant)
-    return (
-      <Badge className="bg-success/15 text-success border-success/40">
-        Compliant · {row.status.replace('_', ' ')}
-      </Badge>
-    );
+const StatCard: React.FC<{
+  label: string;
+  value: number;
+  sub?: string;
+  icon: React.ReactNode;
+  tone: 'default' | 'success' | 'warning' | 'danger';
+}> = ({ label, value, sub, icon, tone }) => {
+  const toneClass = {
+    default: 'border-border bg-card',
+    success: 'border-success/30 bg-success/5',
+    warning: 'border-warning/30 bg-warning/5',
+    danger: 'border-destructive/30 bg-destructive/5',
+  }[tone];
+  const iconClass = {
+    default: 'text-muted-foreground',
+    success: 'text-success',
+    warning: 'text-warning',
+    danger: 'text-destructive',
+  }[tone];
   return (
-    <Badge className="bg-warning/15 text-warning border-warning/40">
-      {row.status.replace('_', ' ')}
-    </Badge>
+    <div className={cn('rounded-lg border p-4', toneClass)}>
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px] font-semibold tracking-wider text-muted-foreground">{label}</span>
+        <span className={iconClass}>{icon}</span>
+      </div>
+      <div className="text-3xl font-bold tabular-nums">{value}</div>
+      {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
+    </div>
   );
 };
 
-const Legend: React.FC<React.PropsWithChildren<{ className?: string }>> = ({ children, className }) => (
-  <span className={`px-2 py-0.5 rounded ${className ?? ''}`}>{children}</span>
-);
+const StatusBadge: React.FC<{ status: VesselMonthCrewRow['status'] }> = ({ status }) => {
+  if (status === 'compliant') return <Badge className="bg-success/15 text-success border-success/30 hover:bg-success/15">Compliant</Badge>;
+  if (status === 'non_compliant') return <Badge className="bg-destructive/15 text-destructive border-destructive/30 hover:bg-destructive/15">Non-compliant</Badge>;
+  if (status === 'review') return <Badge className="bg-warning/15 text-warning border-warning/30 hover:bg-warning/15">Review</Badge>;
+  return <Badge variant="outline" className="text-muted-foreground">No data</Badge>;
+};
+
+const DayCell: React.FC<{ hours: number | null; compliant: boolean | null }> = ({ hours, compliant }) => {
+  if (hours == null) {
+    return <span className="block text-muted-foreground/50 text-[11px]">—</span>;
+  }
+  const formatted = hours % 1 === 0 ? hours.toFixed(0) : hours.toFixed(1);
+  if (compliant === false) {
+    return (
+      <span className="inline-flex items-center justify-center min-w-[26px] h-6 rounded bg-destructive text-destructive-foreground text-[11px] font-semibold tabular-nums">
+        {formatted}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center justify-center min-w-[26px] h-6 text-foreground text-[11px] tabular-nums">
+      {formatted}
+    </span>
+  );
+};
 
 export default WorkRestOverview;
