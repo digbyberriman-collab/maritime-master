@@ -7292,6 +7292,89 @@ export type Database = {
           },
         ]
       }
+      notification_subscriptions: {
+        Row: {
+          channels: Json
+          company_id: string
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          notification_type_key: string
+          updated_at: string
+          user_id: string | null
+          vessel_ids: string[]
+          vessel_scope: string
+        }
+        Insert: {
+          channels?: Json
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          notification_type_key: string
+          updated_at?: string
+          user_id?: string | null
+          vessel_ids?: string[]
+          vessel_scope?: string
+        }
+        Update: {
+          channels?: Json
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          notification_type_key?: string
+          updated_at?: string
+          user_id?: string | null
+          vessel_ids?: string[]
+          vessel_scope?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_subscriptions_notification_type_key_fkey"
+            columns: ["notification_type_key"]
+            isOneToOne: false
+            referencedRelation: "notification_types"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      notification_types: {
+        Row: {
+          cadence: string
+          category: string
+          created_at: string
+          default_enabled: boolean
+          description: string | null
+          key: string
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          cadence: string
+          category: string
+          created_at?: string
+          default_enabled?: boolean
+          description?: string | null
+          key: string
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          cadence?: string
+          category?: string
+          created_at?: string
+          default_enabled?: boolean
+          description?: string | null
+          key?: string
+          name?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
       permission_audit_log: {
         Row: {
           action_type: Database["public"]["Enums"]["audit_action_type"]
@@ -9523,6 +9606,41 @@ export type Database = {
           widget_id?: string
         }
         Relationships: []
+      }
+      user_notification_preferences: {
+        Row: {
+          created_at: string
+          id: string
+          in_app_enabled: boolean
+          notification_type_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          in_app_enabled?: boolean
+          notification_type_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          in_app_enabled?: boolean
+          notification_type_key?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_notification_preferences_notification_type_key_fkey"
+            columns: ["notification_type_key"]
+            isOneToOne: false
+            referencedRelation: "notification_types"
+            referencedColumns: ["key"]
+          },
+        ]
       }
       user_permission_overrides: {
         Row: {
