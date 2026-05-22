@@ -185,6 +185,13 @@ export const AppRoutes: React.FC = () => {
       {/* Crew */}
       <Route path="/crew" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CrewRoster /></React.Suspense></ProtectedRoute>} />
       <Route path="/crew/roster" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CrewRoster /></React.Suspense></ProtectedRoute>} />
+      <Route path="/crew/list" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/crew/pages/CrewList')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
       <Route path="/crew/certificates" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
