@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Pencil, ChevronUp, ChevronDown, Eye, EyeOff, RotateCcw, Maximize2, Minimize2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -23,6 +25,22 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ widgetDefs, children }) =
     loading,
   } = useDashboardLayout(widgetDefs);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Honor ?reset=1 in the URL: wipe saved layout so every widget is visible.
+  useEffect(() => {
+    if (loading) return;
+    if (searchParams.get('reset') !== '1') return;
+    (async () => {
+      await resetToDefaults();
+      const next = new URLSearchParams(searchParams);
+      next.delete('reset');
+      setSearchParams(next, { replace: true });
+      toast.success('Dashboard reset — all widgets restored');
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
+
   if (loading) return null;
 
   const widgetsToRender = editMode ? orderedWidgets : visibleWidgets;
@@ -32,17 +50,19 @@ const DashboardGrid: React.FC<DashboardGridProps> = ({ widgetDefs, children }) =
       {/* Top bar: edit toggle */}
       <div className="flex items-center justify-end gap-2">
         <div className="flex items-center gap-2">
-          {editMode && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-xs gap-1 text-muted-foreground"
-              onClick={resetToDefaults}
-            >
-              <RotateCcw className="w-3 h-3" />
-              Reset
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs gap-1 text-muted-foreground"
+            onClick={async () => {
+              await resetToDefaults();
+              toast.success('Dashboard reset — all widgets restored');
+            }}
+            title="Restore all widgets and default order"
+          >
+            <RotateCcw className="w-3 h-3" />
+            Reset
+          </Button>
           <Button
             variant={editMode ? 'default' : 'outline'}
             size="sm"
