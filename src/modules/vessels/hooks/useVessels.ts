@@ -17,6 +17,7 @@ export interface Vessel {
   status: string | null;
   created_at: string;
   updated_at: string;
+  particulars?: Record<string, string> | null;
 }
 
 export interface VesselFormData {
@@ -157,6 +158,35 @@ export const useVessels = () => {
     },
   });
 
+  const updateVesselParticulars = useMutation({
+    mutationFn: async ({ id, particulars }: { id: string; particulars: Record<string, string> }) => {
+      const { data, error } = await supabase
+        .from('vessels')
+        .update({ particulars })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vessels'] });
+      refreshVessels();
+      toast({
+        title: 'Saved',
+        description: 'Vessel particulars updated',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   return {
     vessels: vesselsQuery.data ?? [],
     isLoading: vesselsQuery.isLoading,
@@ -164,6 +194,7 @@ export const useVessels = () => {
     createVessel,
     updateVessel,
     deleteVessel,
+    updateVesselParticulars,
   };
 };
 

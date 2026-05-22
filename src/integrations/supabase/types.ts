@@ -9878,6 +9878,7 @@ export type Database = {
           name: string
           nearest_port_agent_contact: string | null
           operational_status: string | null
+          particulars: Json
           security_support_contact: string | null
           status: string | null
           updated_at: string
@@ -9915,6 +9916,7 @@ export type Database = {
           name: string
           nearest_port_agent_contact?: string | null
           operational_status?: string | null
+          particulars?: Json
           security_support_contact?: string | null
           status?: string | null
           updated_at?: string
@@ -9952,6 +9954,7 @@ export type Database = {
           name?: string
           nearest_port_agent_contact?: string | null
           operational_status?: string | null
+          particulars?: Json
           security_support_contact?: string | null
           status?: string | null
           updated_at?: string
