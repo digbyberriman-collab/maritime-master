@@ -36,6 +36,8 @@ const getStatusBadge = (status: string) => {
 };
 
 const Alerts: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const alertTab = searchParams.get('tab') || 'all';
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -105,7 +107,7 @@ const Alerts: React.FC = () => {
             <CardDescription>Alerts requiring attention across all vessels</CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="all">
+            <Tabs value={alertTab} onValueChange={(v) => setSearchParams({ tab: v })}>
               <TabsList>
                 <TabsTrigger value="all">All</TabsTrigger>
                 <TabsTrigger value="critical">Critical</TabsTrigger>
