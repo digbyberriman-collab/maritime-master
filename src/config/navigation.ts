@@ -143,13 +143,6 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     ],
   },
   {
-    id: 'checklists',
-    label: 'Checklists',
-    icon: CheckSquare,
-    path: '/checklists',
-    permissions: ['all'],
-  },
-  {
     id: 'flights-travel',
     label: 'Flights & Travel',
     icon: Plane,
