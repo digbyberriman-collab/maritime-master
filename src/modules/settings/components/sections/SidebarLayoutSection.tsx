@@ -106,7 +106,7 @@ const SkeletonRow: React.FC<{ depth?: number }> = ({ depth = 0 }) => (
 
 const SidebarLayoutSection: React.FC = () => {
   const { canAccessModule, loading, user } = useAuth();
-  const { order, setGroupOrder, moveInGroup, getGroupOrder, reset } = useSidebarOrder();
+  const { order, moveInGroup, getGroupOrder, reorderGroup, reset } = useSidebarOrder();
   const { toast } = useToast();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -122,26 +122,36 @@ const SidebarLayoutSection: React.FC = () => {
   }, [canAccessModule, order]);
 
   const handleDrop = (groupId: string, allIds: string[], targetId: string) => {
-    if (readOnly) {
-      setDraggingId(null); setOverId(null); setDragGroup(null);
+    const clear = () => {
+      setDraggingId(null);
+      setOverId(null);
+      setDragGroup(null);
+    };
+    if (readOnly || !draggingId || draggingId === targetId || dragGroup !== groupId) {
+      clear();
       return;
     }
-    if (!draggingId || draggingId === targetId || dragGroup !== groupId) {
-      setDraggingId(null); setOverId(null); setDragGroup(null);
-      return;
+    const movedId = draggingId;
+    let didChange = false;
+    reorderGroup(groupId, allIds, (base) => {
+      const from = base.indexOf(movedId);
+      const to = base.indexOf(targetId);
+      if (from === -1 || to === -1 || from === to) return null;
+      const next = [...base];
+      next.splice(to, 0, next.splice(from, 1)[0]);
+      didChange = true;
+      return next;
+    });
+    clear();
+    if (didChange) {
+      toast({
+        title: 'Sidebar order saved',
+        description:
+          groupId === SIDEBAR_ROOT
+            ? 'Module order updated across the app.'
+            : 'Sub-item order updated for this module.',
+      });
     }
-    const base = (getGroupOrder(groupId).length ? getGroupOrder(groupId).slice() : allIds.slice());
-    allIds.forEach((x) => { if (!base.includes(x)) base.push(x); });
-    const from = base.indexOf(draggingId);
-    const to = base.indexOf(targetId);
-    if (from === -1 || to === -1) {
-      setDraggingId(null); setOverId(null); setDragGroup(null);
-      return;
-    }
-    base.splice(to, 0, base.splice(from, 1)[0]);
-    setGroupOrder(groupId, base);
-    setDraggingId(null); setOverId(null); setDragGroup(null);
-    toast({ title: 'Sidebar order saved', description: 'Your new layout is active across the app.' });
   };
 
   const startDrag = (groupId: string, id: string) => {
