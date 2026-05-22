@@ -118,7 +118,7 @@ export const NAVIGATION_ITEMS: NavItem[] = [
   },
   {
     id: 'compliance',
-    label: 'Compliance',
+    label: 'ISM & Compliance',
     icon: Shield,
     path: '/compliance',
     permissions: ['all'],
@@ -126,6 +126,7 @@ export const NAVIGATION_ITEMS: NavItem[] = [
       { id: 'ism-code', label: 'ISM Code', path: '/compliance?tab=ism', icon: Shield },
       { id: 'isps', label: 'ISPS', path: '/compliance?tab=isps', icon: Anchor },
       { id: 'mlc', label: 'MLC', path: '/compliance?tab=mlc', icon: Users },
+      { id: 'marpol', label: 'MARPOL', path: '/compliance?tab=marpol', icon: Layers },
     ],
   },
   {
@@ -176,7 +177,7 @@ export const NAVIGATION_ITEMS: NavItem[] = [
   },
   {
     id: 'ism',
-    label: 'ISM',
+    label: 'ISM Operations',
     icon: Shield,
     path: '/ism',
     permissions: ['all'],
