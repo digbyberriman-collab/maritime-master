@@ -17,6 +17,7 @@ export interface Vessel {
   status: string | null;
   created_at: string;
   updated_at: string;
+  particulars?: Record<string, string> | null;
 }
 
 export interface VesselFormData {
