@@ -7,6 +7,7 @@ import {
   FileText,
   Loader2,
   Save,
+  Users,
 } from 'lucide-react';
 import { addMonths, format, subMonths } from 'date-fns';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
@@ -334,6 +335,13 @@ const MyWorkRestMonth: React.FC = () => {
             </Button>
             <Button variant="outline" size="sm" onClick={exportCSV}>
               <Download className="h-4 w-4 mr-1" /> CSV
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/crew/work-rest/overview')}
+            >
+              <Users className="h-4 w-4 mr-1" /> Fleet Overview
             </Button>
           </div>
         </div>
