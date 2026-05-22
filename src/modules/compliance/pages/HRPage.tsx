@@ -264,6 +264,8 @@ const HRTabContent: React.FC<HRTabContentProps> = ({ tab, isAuditMode = false })
 const HRPage: React.FC = () => {
   // In production, this would come from context/hook
   const isAuditMode = false;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const hrTab = searchParams.get('tab') || 'annual-evaluations';
 
   return (
     <DashboardLayout>
