@@ -21,6 +21,8 @@ import {
   Palette,
   Settings,
   MessageSquareWarning,
+  Ship,
+  Anchor,
 } from 'lucide-react';
 import {
   DropdownMenu,
