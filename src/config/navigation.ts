@@ -117,7 +117,6 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     ],
   },
   {
-    id: 'compliance',
     id: 'certificates',
     label: 'Certificates',
     icon: Award,
