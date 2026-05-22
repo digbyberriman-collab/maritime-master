@@ -11,6 +11,15 @@ import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/shared/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
+// A unified node type so root modules and sub-children render through the same
+// recursive branch component.
+type NavNode = {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  children?: NavNode[];
+};
+
 interface RowProps {
   id: string;
   label: string;
@@ -123,28 +132,37 @@ const SidebarLayoutSection: React.FC = () => {
   // Read-only when not signed in — preview the layout but no persistence value
   const readOnly = !loading && !user;
 
-  const rootItems: NavItem[] = useMemo(() => {
+  const rootItems: NavNode[] = useMemo(() => {
     const allowed = NAVIGATION_ITEMS.filter((item) => canAccessModule(item.id));
-    return applySidebarOrder(allowed, order);
+    return applySidebarOrder(allowed as NavNode[], order);
   }, [canAccessModule, order]);
 
-  // All parent modules (those with at least one accessible child) — used for
-  // expand-all / collapse-all so every nested group is reachable.
-  const expandableParents = useMemo(
-    () => rootItems.filter((i) => !!i.children?.length),
-    [rootItems]
-  );
+  // Walk the tree and collect every node id that has at least one child, so
+  // expand-all / collapse-all reaches every nested group at any depth.
+  const allParentIds = useMemo(() => {
+    const ids: string[] = [];
+    const walk = (nodes: NavNode[]) => {
+      nodes.forEach((n) => {
+        if (n.children?.length) {
+          ids.push(n.id);
+          walk(n.children);
+        }
+      });
+    };
+    walk(rootItems);
+    return ids;
+  }, [rootItems]);
+
   const allExpanded =
-    expandableParents.length > 0 &&
-    expandableParents.every((p) => expanded[p.id]);
+    allParentIds.length > 0 && allParentIds.every((id) => expanded[id]);
 
   const toggleAll = () => {
     if (allExpanded) {
       setExpanded({});
     } else {
       const next: Record<string, boolean> = {};
-      expandableParents.forEach((p) => {
-        next[p.id] = true;
+      allParentIds.forEach((id) => {
+        next[id] = true;
       });
       setExpanded(next);
     }
@@ -182,6 +200,71 @@ const SidebarLayoutSection: React.FC = () => {
       });
     }
   };
+
+  // Recursive renderer — supports unlimited nesting. Every level uses its
+  // parent's id as the persistence group, so each branch's order is stored
+  // independently in the same OrderMap consumed by the live sidebar.
+  const renderBranch = (
+    nodes: NavNode[],
+    groupId: string,
+    depth: number
+  ): React.ReactNode =>
+    nodes.map((node, idx) => {
+      const siblingIds = nodes.map((n) => n.id);
+      const hasChildren = !!node.children?.length;
+      const isExpanded = !!expanded[node.id];
+      const orderedChildren: NavNode[] = hasChildren
+        ? applySidebarOrder(node.children!, getGroupOrder(node.id))
+        : [];
+
+      return (
+        <React.Fragment key={node.id}>
+          <Row
+            id={node.id}
+            label={node.label}
+            icon={node.icon}
+            index={idx}
+            total={nodes.length}
+            depth={depth}
+            expandable={hasChildren}
+            expanded={isExpanded}
+            childCount={hasChildren ? orderedChildren.length : undefined}
+            onToggleExpand={() =>
+              setExpanded((p) => ({ ...p, [node.id]: !p[node.id] }))
+            }
+            draggingId={dragGroup === groupId ? draggingId : null}
+            overId={dragGroup === groupId ? overId : null}
+            onDragStart={(id) => startDrag(groupId, id)}
+            onDragEnd={() => {
+              setDraggingId(null);
+              setOverId(null);
+              setDragGroup(null);
+            }}
+            onDragOver={(id) => {
+              if (dragGroup === groupId && overId !== id) setOverId(id);
+            }}
+            onDrop={(id) => handleDrop(groupId, siblingIds, id)}
+            onMoveUp={() => handleMove(groupId, node.id, 'up', siblingIds)}
+            onMoveDown={() => handleMove(groupId, node.id, 'down', siblingIds)}
+            readOnly={readOnly}
+          />
+          {hasChildren && isExpanded && (
+            <div className="space-y-2">
+              {orderedChildren.length === 0 ? (
+                <div
+                  style={{ marginLeft: (depth + 1) * 20 }}
+                  className="text-xs text-muted-foreground px-3 py-2 rounded-md border border-dashed bg-muted/10"
+                >
+                  No accessible sub-items for your role.
+                </div>
+              ) : (
+                renderBranch(orderedChildren, node.id, depth + 1)
+              )}
+            </div>
+          )}
+        </React.Fragment>
+      );
+    });
 
   const startDrag = (groupId: string, id: string) => {
     if (readOnly) return;
@@ -295,72 +378,7 @@ const SidebarLayoutSection: React.FC = () => {
             </div>
           )}
 
-          {!loading && rootItems.map((item, index) => {
-            const rootIds = rootItems.map((i) => i.id);
-            const hasChildren = !!item.children?.length;
-            const isExpanded = expanded[item.id];
-            const orderedChildren: NavChild[] = hasChildren
-              ? applySidebarOrder(item.children!, getGroupOrder(item.id))
-              : [];
-            const childIds = orderedChildren.map((c) => c.id);
-
-            return (
-              <React.Fragment key={item.id}>
-                <Row
-                  id={item.id}
-                  label={item.label}
-                  icon={item.icon}
-                  index={index}
-                  total={rootItems.length}
-                  expandable={hasChildren}
-                  expanded={isExpanded}
-                  childCount={hasChildren ? orderedChildren.length : undefined}
-                  onToggleExpand={() => setExpanded((p) => ({ ...p, [item.id]: !p[item.id] }))}
-                  draggingId={dragGroup === SIDEBAR_ROOT ? draggingId : null}
-                  overId={dragGroup === SIDEBAR_ROOT ? overId : null}
-                  onDragStart={(id) => startDrag(SIDEBAR_ROOT, id)}
-                  onDragEnd={() => { setDraggingId(null); setOverId(null); setDragGroup(null); }}
-                  onDragOver={(id) => { if (dragGroup === SIDEBAR_ROOT && overId !== id) setOverId(id); }}
-                  onDrop={(id) => handleDrop(SIDEBAR_ROOT, rootIds, id)}
-                  onMoveUp={() => handleMove(SIDEBAR_ROOT, item.id, 'up', rootIds)}
-                  onMoveDown={() => handleMove(SIDEBAR_ROOT, item.id, 'down', rootIds)}
-                  readOnly={readOnly}
-                />
-                {hasChildren && isExpanded && (
-                  <div className="space-y-2">
-                    {orderedChildren.length === 0 && (
-                      <div
-                        style={{ marginLeft: 20 }}
-                        className="text-xs text-muted-foreground px-3 py-2 rounded-md border border-dashed bg-muted/10"
-                      >
-                        No accessible sub-items for your role.
-                      </div>
-                    )}
-                    {orderedChildren.map((child, ci) => (
-                      <Row
-                        key={child.id}
-                        id={child.id}
-                        label={child.label}
-                        icon={child.icon}
-                        index={ci}
-                        total={orderedChildren.length}
-                        depth={1}
-                        draggingId={dragGroup === item.id ? draggingId : null}
-                        overId={dragGroup === item.id ? overId : null}
-                        onDragStart={(id) => startDrag(item.id, id)}
-                        onDragEnd={() => { setDraggingId(null); setOverId(null); setDragGroup(null); }}
-                        onDragOver={(id) => { if (dragGroup === item.id && overId !== id) setOverId(id); }}
-                        onDrop={(id) => handleDrop(item.id, childIds, id)}
-                        onMoveUp={() => handleMove(item.id, child.id, 'up', childIds)}
-                        onMoveDown={() => handleMove(item.id, child.id, 'down', childIds)}
-                        readOnly={readOnly}
-                      />
-                    ))}
-                  </div>
-                )}
-              </React.Fragment>
-            );
-          })}
+          {!loading && rootItems.length > 0 && renderBranch(rootItems, SIDEBAR_ROOT, 0)}
         </CardContent>
       </Card>
     </div>
