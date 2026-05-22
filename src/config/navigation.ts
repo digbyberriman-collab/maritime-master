@@ -164,7 +164,7 @@ export const NAVIGATION_ITEMS: NavItem[] = [
   },
   {
     id: 'ism',
-    label: 'ISM & Compliance',
+    label: 'ISM',
     icon: Shield,
     path: '/ism',
     permissions: ['all'],
