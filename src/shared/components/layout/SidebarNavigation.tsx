@@ -57,7 +57,17 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
   });
 
   const toggleGroup = (groupId: string) => {
-    setOpenGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }));
+    setOpenGroups(prev => {
+      const wasOpen = prev[groupId];
+      // Accordion behavior: close all groups, then open the clicked one if it wasn't already open
+      const next: Record<string, boolean> = {};
+      visibleNavItems.forEach(item => {
+        if (item.children) {
+          next[item.id] = item.id === groupId ? !wasOpen : false;
+        }
+      });
+      return next;
+    });
   };
 
   const handleNavigate = (path: string) => {
