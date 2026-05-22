@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { format, differenceInDays, isBefore, addDays } from 'date-fns';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 
 interface CrewTask {
   id: string;
@@ -183,46 +185,43 @@ export default function CrewDashboard() {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">My Dashboard</h1>
-            <p className="text-muted-foreground">
+        <PageHeader
+          title="My Dashboard"
+          description={
+            <>
               Welcome back, {profile?.first_name || 'Crew Member'}
               {selectedVessel && ` • ${selectedVessel.name}`}
-            </p>
-          </div>
-        </div>
+            </>
+          }
+        />
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatGrid cols={4}>
           <StatCard
             label="Pending Tasks"
             value={taskCounts.pending}
-            icon={ClipboardCheck}
-            color="text-blue-600 bg-blue-100"
-            alert={taskCounts.overdue > 0}
+            icon={<ClipboardCheck className="w-4 h-4 text-sky-600" />}
+            tone={taskCounts.overdue > 0 ? 'danger' : 'default'}
           />
           <StatCard
             label="Overdue Items"
             value={taskCounts.overdue}
-            icon={AlertTriangle}
-            color="text-destructive bg-destructive/10"
+            tone="danger"
+            icon={<AlertTriangle className="w-4 h-4 text-destructive" />}
           />
           <StatCard
             label="Pending Signatures"
             value={pendingAcks}
-            icon={FileText}
-            color="text-yellow-600 bg-yellow-100"
+            tone="warning"
+            icon={<FileText className="w-4 h-4 text-amber-600" />}
           />
           <StatCard
             label="Expiring Certs"
             value={certCounts.expiring + certCounts.expired}
-            icon={Award}
-            color="text-orange-600 bg-orange-100"
-            alert={certCounts.expired > 0}
+            tone={certCounts.expired > 0 ? 'danger' : 'warning'}
+            icon={<Award className="w-4 h-4 text-orange-600" />}
           />
-        </div>
+        </StatGrid>
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

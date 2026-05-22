@@ -7,18 +7,18 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useFormTemplates } from '@/modules/ism/forms/hooks/useFormTemplates';
-import { 
-  ClipboardList, 
-  Plus, 
-  Search, 
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
+import {
+  ClipboardList,
+  Plus,
+  Search,
   FileCheck,
   Calendar,
-  Clock,
   CheckCircle2,
   ListChecks
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
 
 const ChecklistsPage: React.FC = () => {
   const navigate = useNavigate();
@@ -47,71 +47,44 @@ const ChecklistsPage: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <ClipboardList className="w-6 h-6 text-primary" />
-              </div>
-              <h1 className="text-2xl font-bold text-foreground">Checklists</h1>
-            </div>
-            <p className="text-muted-foreground">
-              Safety and operational checklists for vessel operations
-            </p>
-          </div>
-          <Button onClick={() => navigate('/ism/forms/templates/create', { state: { preselectedType: 'CHECKLIST' } })}>
-            <Plus className="w-4 h-4 mr-2" />
-            Create Checklist
-          </Button>
-        </div>
+        <PageHeader
+          icon={<ClipboardList className="w-6 h-6" />}
+          title="Checklists"
+          description="Safety and operational checklists for vessel operations"
+          actions={
+            <Button onClick={() => navigate('/ism/forms/templates/create', { state: { preselectedType: 'CHECKLIST' } })}>
+              <Plus className="w-4 h-4 mr-2" />
+              Create Checklist
+            </Button>
+          }
+        />
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Checklists</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{activeTemplates}</div>
-              <p className="text-xs text-muted-foreground">In use</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Templates</CardTitle>
-              <ListChecks className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalTemplates}</div>
-              <p className="text-xs text-muted-foreground">All checklists</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed Today</CardTitle>
-              <FileCheck className="h-4 w-4 text-purple-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">0</div>
-              <p className="text-xs text-muted-foreground">Submissions</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Scheduled</CardTitle>
-              <Calendar className="h-4 w-4 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">0</div>
-              <p className="text-xs text-muted-foreground">Due this week</p>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={4}>
+          <StatCard
+            label="Active Checklists"
+            value={activeTemplates}
+            icon={<CheckCircle2 className="w-4 h-4 text-green-500" />}
+            hint="In use"
+          />
+          <StatCard
+            label="Total Templates"
+            value={totalTemplates}
+            icon={<ListChecks className="w-4 h-4 text-blue-500" />}
+            hint="All checklists"
+          />
+          <StatCard
+            label="Completed Today"
+            value={0}
+            icon={<FileCheck className="w-4 h-4 text-purple-500" />}
+            hint="Submissions"
+          />
+          <StatCard
+            label="Scheduled"
+            value={0}
+            icon={<Calendar className="w-4 h-4 text-orange-500" />}
+            hint="Due this week"
+          />
+        </StatGrid>
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>

@@ -44,6 +44,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { PageHeader } from '@/shared/components/common/PageHeader';
+import { StatCard, StatGrid } from '@/shared/components/common/StatCard';
 
 const AcknowledgmentTracking: React.FC = () => {
   const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set());
@@ -108,87 +110,50 @@ const AcknowledgmentTracking: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <FileCheck className="w-6 h-6" />
-              Acknowledgment Tracking
-            </h1>
-            <p className="text-muted-foreground">
-              Monitor mandatory document acknowledgments across your fleet
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" disabled={selectedDocuments.size === 0}>
-              <Send className="w-4 h-4 mr-2" />
-              Send Bulk Reminder ({selectedDocuments.size})
-            </Button>
-            <Button variant="outline">
-              <Download className="w-4 h-4 mr-2" />
-              Export Report
-            </Button>
-          </div>
-        </div>
+        <PageHeader
+          icon={<FileCheck className="w-6 h-6" />}
+          title="Acknowledgment Tracking"
+          description="Monitor mandatory document acknowledgments across your fleet"
+          actions={
+            <>
+              <Button variant="outline" disabled={selectedDocuments.size === 0}>
+                <Send className="w-4 h-4 mr-2" />
+                Send Bulk Reminder ({selectedDocuments.size})
+              </Button>
+              <Button variant="outline">
+                <Download className="w-4 h-4 mr-2" />
+                Export Report
+              </Button>
+            </>
+          }
+        />
 
         {/* Summary Cards */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <FileCheck className="w-6 h-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{totalDocs}</p>
-                  <p className="text-sm text-muted-foreground">Total Mandatory Docs</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{fullyAcknowledged}</p>
-                  <p className="text-sm text-muted-foreground">Fully Acknowledged</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{partiallyAcknowledged}</p>
-                  <p className="text-sm text-muted-foreground">In Progress</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                  <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{notStarted}</p>
-                  <p className="text-sm text-muted-foreground">Not Started</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <StatGrid cols={4}>
+          <StatCard
+            label="Total Mandatory Docs"
+            value={totalDocs}
+            icon={<FileCheck className="w-4 h-4 text-primary" />}
+          />
+          <StatCard
+            label="Fully Acknowledged"
+            value={fullyAcknowledged}
+            tone="success"
+            icon={<CheckCircle className="w-4 h-4 text-emerald-600" />}
+          />
+          <StatCard
+            label="In Progress"
+            value={partiallyAcknowledged}
+            tone="warning"
+            icon={<Clock className="w-4 h-4 text-amber-600" />}
+          />
+          <StatCard
+            label="Not Started"
+            value={notStarted}
+            tone="danger"
+            icon={<AlertTriangle className="w-4 h-4 text-destructive" />}
+          />
+        </StatGrid>
 
         {/* Filters */}
         <Card>
@@ -241,7 +206,7 @@ const AcknowledgmentTracking: React.FC = () => {
         {/* Documents Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Mandatory Documents</CardTitle>
+            <CardTitle className="text-base">Mandatory Documents</CardTitle>
             <CardDescription>
               Track acknowledgment progress for all mandatory read documents
             </CardDescription>
