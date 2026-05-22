@@ -306,7 +306,7 @@ const SidebarLayoutSection: React.FC = () => {
             variant="outline"
             size="sm"
             onClick={toggleAll}
-            disabled={loading || expandableParents.length === 0}
+            disabled={loading || allParentIds.length === 0}
           >
             {allExpanded ? (
               <>
