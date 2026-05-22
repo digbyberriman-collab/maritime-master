@@ -114,6 +114,106 @@ export async function updateSubmissionStatus(
   return data as MonthlySubmission;
 }
 
+// ---------- Vessel month matrix ----------
+
+export interface VesselMonthCrewRow {
+  crew_id: string;
+  crew_name: string;
+  rank: string;
+  department: string;
+  /** rest hours keyed by day-of-month (1..31). Null when no entry. */
+  rest_by_day: Record<number, number | null>;
+  /** compliance flag keyed by day-of-month (1..31). */
+  compliant_by_day: Record<number, boolean | null>;
+  avg_rest: number | null;
+  logged_pct: number;
+  status: 'compliant' | 'review' | 'non_compliant' | 'no_data';
+}
+
+export async function listVesselMonthMatrix(opts: {
+  vesselId: string;
+  year: number;
+  month: number;
+}): Promise<VesselMonthCrewRow[]> {
+  // 1. crew currently assigned to vessel
+  const { data: assignments, error: aErr } = await sb
+    .from('crew_assignments')
+    .select('user_id, position')
+    .eq('vessel_id', opts.vesselId)
+    .eq('is_current', true);
+  if (aErr) throw aErr;
+  const userIds: string[] = (assignments || []).map((a: any) => a.user_id);
+  if (!userIds.length) return [];
+
+  const { data: profiles, error: pErr } = await sb
+    .from('profiles')
+    .select('user_id, first_name, last_name, rank, department')
+    .in('user_id', userIds);
+  if (pErr) throw pErr;
+
+  // 2. all daily records for vessel in month
+  const start = `${opts.year}-${String(opts.month).padStart(2, '0')}-01`;
+  const lastDay = new Date(opts.year, opts.month, 0).getDate();
+  const end = `${opts.year}-${String(opts.month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+  const { data: records, error: rErr } = await sb
+    .from('work_rest_records')
+    .select('crew_id, record_date, total_rest_minutes, is_compliant')
+    .eq('vessel_id', opts.vesselId)
+    .gte('record_date', start)
+    .lte('record_date', end);
+  if (rErr) throw rErr;
+
+  const byCrew = new Map<string, any[]>();
+  for (const r of records || []) {
+    if (!byCrew.has(r.crew_id)) byCrew.set(r.crew_id, []);
+    byCrew.get(r.crew_id)!.push(r);
+  }
+
+  const rows: VesselMonthCrewRow[] = (profiles || []).map((p: any) => {
+    const recs = byCrew.get(p.user_id) || [];
+    const rest_by_day: Record<number, number | null> = {};
+    const compliant_by_day: Record<number, boolean | null> = {};
+    for (let d = 1; d <= lastDay; d++) {
+      rest_by_day[d] = null;
+      compliant_by_day[d] = null;
+    }
+    let total = 0;
+    let count = 0;
+    let hasNonCompliant = false;
+    for (const r of recs) {
+      const d = Number(r.record_date.split('-')[2]);
+      const hours = (r.total_rest_minutes ?? 0) / 60;
+      rest_by_day[d] = hours;
+      compliant_by_day[d] = r.is_compliant;
+      total += hours;
+      count += 1;
+      if (r.is_compliant === false) hasNonCompliant = true;
+    }
+    const logged_pct = Math.round((count / lastDay) * 100);
+    const avg_rest = count > 0 ? total / count : null;
+    let status: VesselMonthCrewRow['status'] = 'no_data';
+    if (count === 0) status = 'no_data';
+    else if (hasNonCompliant) status = 'non_compliant';
+    else if (logged_pct < 50) status = 'review';
+    else status = 'compliant';
+
+    return {
+      crew_id: p.user_id,
+      crew_name: `${p.first_name ?? ''} ${p.last_name ?? ''}`.trim(),
+      rank: p.rank ?? '',
+      department: (p.department ?? 'OTHER').toUpperCase(),
+      rest_by_day,
+      compliant_by_day,
+      avg_rest,
+      logged_pct,
+      status,
+    };
+  });
+
+  return rows;
+}
+
 // ---------- Records & blocks ----------
 
 export async function loadMonthRecords(crewId: string, year: number, month: number) {
