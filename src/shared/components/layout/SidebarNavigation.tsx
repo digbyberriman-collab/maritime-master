@@ -15,13 +15,18 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
   const navigate = useNavigate();
   const location = useLocation();
   const { canAccessModule } = useAuth();
-  const { order } = useSidebarOrder();
+  const { order, getGroupOrder } = useSidebarOrder();
 
   // Filter navigation items based on user permissions, then apply custom user order
   const visibleNavItems = useMemo(() => {
     const allowed = NAVIGATION_ITEMS.filter(item => canAccessModule(item.id));
-    return applySidebarOrder(allowed, order);
-  }, [canAccessModule, order]);
+    const rootOrdered = applySidebarOrder(allowed, order);
+    // Also apply saved order to each item's children.
+    return rootOrdered.map((item) => {
+      if (!item.children?.length) return item;
+      return { ...item, children: applySidebarOrder(item.children, getGroupOrder(item.id)) };
+    });
+  }, [canAccessModule, order, getGroupOrder]);
 
   // Helper to check if a path (possibly with query params) matches the current location
   const matchesPath = (path: string): boolean => {
