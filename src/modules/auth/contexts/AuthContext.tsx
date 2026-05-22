@@ -191,6 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        setLoading(false);
 
         // Defer profile fetch with setTimeout
         if (session?.user) {
@@ -208,21 +209,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchProfile(session.user.id).then((p) => {
-          setProfile(p);
-          setLoading(false);
-        });
-        // Load RBAC permissions for existing session
-        loadPermissions();
-      } else {
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          fetchProfile(session.user.id).then(setProfile).catch(() => {});
+          loadPermissions();
+        }
+      })
+      .catch((err) => {
+        console.error('getSession failed:', err);
+      })
+      .finally(() => {
         setLoading(false);
-      }
-    });
+      });
 
     return () => subscription.unsubscribe();
   }, [loadPermissions, resetPermissions]);
