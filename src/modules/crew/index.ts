@@ -56,19 +56,15 @@ export type {
   CrewMemberLeave,
 } from './leaveConstants';
 
-// Components
+// Components — kept for cross-module reuse
 export { default as AdminPinModal } from './components/AdminPinModal';
 export { AssignTaskModal } from './components/AssignTaskModal';
 export { CrewAttachments } from './components/CrewAttachments';
 export { CrewAuditLog } from './components/CrewAuditLog';
 export { default as CrewCertificates } from './components/CrewCertificates';
 export { default as CrewFormModal } from './components/CrewFormModal';
-export { default as CrewProfileModal } from './components/CrewProfileModal';
-export { default as EditCrewModal } from './components/EditCrewModal';
-export { default as FullCrewEditModal } from './components/FullCrewEditModal';
 export { default as ImportCrewCSVModal } from './components/ImportCrewCSVModal';
-export { default as ReallocateVesselModal } from './components/ReallocateVesselModal';
-export { default as ResetAccountModal } from './components/ResetAccountModal';
-export { default as SignOffDialog } from './components/SignOffDialog';
-export { default as ToggleAccessModal } from './components/ToggleAccessModal';
-export { default as TransferCrewModal } from './components/TransferCrewModal';
+
+// New Crew List module (replaces the legacy CrewRoster modal stack)
+export { useCrewWithComputedStatus, computeCrewStatus } from './hooks/useCrewWithComputedStatus';
+export type { CrewMemberWithStatus, CrewStatusFlags, CertStatus, MedicalStatus } from './hooks/useCrewWithComputedStatus';

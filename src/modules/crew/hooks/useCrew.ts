@@ -47,6 +47,14 @@ export interface CrewMember {
     position: string;
     join_date: string;
   } | null;
+  // Certificates summary (populated by useCrew via the crew_certificates join).
+  // Used by `useCrewWithComputedStatus` to derive cert/expiry flags client-side.
+  crew_certificates?: Array<{
+    id: string;
+    certificate_type: string | null;
+    expiry_date: string | null;
+    status: string | null;
+  }>;
 }
 
 export interface CrewAssignment {
@@ -144,6 +152,24 @@ export const useCrew = (vesselFilter?: string) => {
       if (profilesError) throw profilesError;
       if (!profiles || profiles.length === 0) return [];
 
+      // Bulk-fetch crew certificates for status derivation in the new Crew List
+      // module. Joined in-memory below; keeps cert data optional for callers
+      // that don't need it (TanStack Query caches it under the same key).
+      const userIds = profiles.map((p) => p.user_id).filter(Boolean) as string[];
+      const { data: certs } = userIds.length
+        ? await supabase
+            .from('crew_certificates')
+            .select('id, user_id, certificate_type, expiry_date, status')
+            .in('user_id', userIds)
+        : { data: [] as Array<{ id: string; user_id: string; certificate_type: string | null; expiry_date: string | null; status: string | null }> };
+      const certsByUser = new Map<string, NonNullable<CrewMember['crew_certificates']>>();
+      for (const c of certs ?? []) {
+        if (!c.user_id) continue;
+        const arr = certsByUser.get(c.user_id) ?? [];
+        arr.push({ id: c.id, certificate_type: c.certificate_type, expiry_date: c.expiry_date, status: c.status });
+        certsByUser.set(c.user_id, arr);
+      }
+
       // Get current assignments with vessel details
       const { data: assignments, error: assignmentsError } = await supabase
         .from('crew_assignments')
@@ -220,6 +246,7 @@ export const useCrew = (vesselFilter?: string) => {
           last_login_at: p.last_login_at,
           invited_at: p.invited_at,
           is_imported: p.is_imported ?? false,
+          crew_certificates: certsByUser.get(p.user_id ?? '') ?? [],
           current_assignment: assignment
             ? {
                 id: assignment.id,
