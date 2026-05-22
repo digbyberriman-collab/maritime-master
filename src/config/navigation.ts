@@ -68,6 +68,19 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     permissions: ['all'],
   },
   {
+    id: 'alerts',
+    label: 'Alerts',
+    icon: Bell,
+    path: '/alerts',
+    permissions: ['DPA', 'Management', 'Captain'],
+    children: [
+      { id: 'alerts-all', label: 'All', path: '/alerts?tab=all', icon: Bell },
+      { id: 'alerts-critical', label: 'Critical', path: '/alerts?tab=critical', icon: AlertCircle },
+      { id: 'alerts-warning', label: 'Warnings', path: '/alerts?tab=warning', icon: AlertTriangle },
+      { id: 'alerts-info', label: 'Info', path: '/alerts?tab=info', icon: MessageSquare },
+    ],
+  },
+  {
     id: 'fleet-map',
     label: 'Fleet Map',
     icon: MapIcon,
@@ -240,19 +253,6 @@ export const NAVIGATION_ITEMS: NavItem[] = [
       { id: 'open-defects', label: 'Open Defects', path: '/maintenance/defects', icon: AlertTriangle },
       { id: 'critical-equipment', label: 'Critical Equipment', path: '/maintenance/critical', icon: Shield },
       { id: 'spare-parts', label: 'Spare Parts', path: '/maintenance/spares', icon: Package },
-    ],
-  },
-  {
-    id: 'alerts',
-    label: 'Alerts',
-    icon: Bell,
-    path: '/alerts',
-    permissions: ['DPA', 'Management', 'Captain'],
-    children: [
-      { id: 'alerts-all', label: 'All', path: '/alerts?tab=all', icon: Bell },
-      { id: 'alerts-critical', label: 'Critical', path: '/alerts?tab=critical', icon: AlertCircle },
-      { id: 'alerts-warning', label: 'Warnings', path: '/alerts?tab=warning', icon: AlertTriangle },
-      { id: 'alerts-info', label: 'Info', path: '/alerts?tab=info', icon: MessageSquare },
     ],
   },
   {
