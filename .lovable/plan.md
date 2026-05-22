@@ -1,106 +1,42 @@
-## Users & Access — list + member detail (wired to RBAC)
+## Tweak `UsersAccessDetailPage` to match screenshot — grouped + expandable Other Modules
 
-Builds the two pages from the screenshots and wires them to the existing RBAC tables (`rbac_user_roles`, `roles`, `role_permissions`, `user_permission_overrides`, `modules`, `profiles`).
+Refines the existing detail page (no schema or routing changes).
 
-The existing `/admin/users` (mock UserManagement) stays untouched. We add a new route group under `/users-access` so the screenshots' design ships cleanly without disturbing legacy code.
+### Visual tweaks
 
-### Routes
+- "Other Modules" header: subtitle text becomes `None = no access` (matches screenshot wording).
+- Module row: lift each row into its own bordered card (white background, rounded-md, subtle border) instead of stacked thin rows, so they match the screenshot's spacing.
+- Select trigger shows a colored dot before the label (● green for Read & Write, ● blue for Read Only, ● gray for No Access, ● amber for Admin).
+- "Set all to" placeholder = `Choose…`.
+- Access Preset dropdown items: show label + muted description on two lines (already implemented; verify rendering matches the screenshot's compact two-line layout).
 
-- `/users-access` — list page (default for the "Users & Access" sub-nav item)
-- `/users-access/:userId` — member detail page
-- Update `FleetSubNav` item from `/settings/users` → `/users-access`
+### Grouped + expandable Other Modules
 
-Both wrapped in `ProtectedRoute`. Access gated to roles with `settings.admin` (DPA / Superadmin / Fleet Manager) — non-admins get redirected to `/dashboard`.
+Replace the flat list with a two-tier structure:
 
-### Page 1 — `UsersAccessListPage`
+1. **Six top-level grouped rows** (always visible):
+   - Safety, Certificates, Technical, Vessel, Charter, Accounting
+   - Each group maps to a fixed set of underlying module keys (`lib/moduleGroups.ts`):
+     - Safety → `ism`, `erm`, `ptw`, `risk_assessments`, `sops`, `drills`, `incidents`, `investigations`, `capa`, `non_conformities`, `observations`
+     - Certificates → `vessel_certificates`
+     - Technical → `maintenance`
+     - Vessel → `vessels`, `fleet`, `dashboard`
+     - Charter → `meetings`, `reports`
+     - Accounting → `insurance`, `settings`, `audits_surveys`, `documents`
+   - Group-level `Select` value = highest permission across its modules (admin > edit > view > none); when "mixed", show "Mixed" disabled state with subtle warning color.
+   - Changing the group-level select applies the chosen permission to every module in the group (batch via existing `useApplyPreset`).
 
-Layout matches screenshot 1 (rows of crew with badges + module chips + Edit button on the right).
+2. **Expand chevron** on the right of each group row toggles a nested list of the underlying modules, each with its own `Select` (existing `ModulePermissionRow` behavior).
+   - Expanded rows are slightly indented and use the same per-row card style at a smaller scale.
 
-Data:
-- Source: `profiles` joined to `crew_assignments` (current) + `rbac_user_roles` + `roles` (one row per user, scoped to `current_user_company_id()`).
-- For each user, derive the **preset badge** from their highest role:
-  - `View Only` (gray) — only `view` perms across modules
-  - `Department Head` (green) — has `edit`/`admin` on department-scoped modules
-  - `Full Access` (green-solid) — has `admin` on HR + Medical
-  - `Custom` (amber) — mixed / per-module overrides exist
-- Module chips read from `get_user_permissions_full(p_user_id)` aggregated into 6 fixed groups: **Safety, Certs, Tech, Vessel, Charter, Acct** — render `R/W` (green) or `RO` (blue) or hide if no access.
+### Files to change
 
-Row UI:
-- Avatar circle + name + `active` status pill
-- Position (from `crew_assignments.position`)
-- Preset badge (color per above)
-- Module chips row (only ones with access)
-- `Login as` (only for Superadmin viewer, only for non-self rows) + `Edit` button → `/users-access/:userId`
-
-Top of page:
-- Title "Users & Access"
-- Search input (filters by name/position client-side)
-- Filters: status (active/inactive), preset, vessel (uses existing multi-vessel store)
-- "Add User" button (opens existing `AddUserModal`)
-
-### Page 2 — `UsersAccessDetailPage`
-
-Layout matches screenshot 2 (vessel selector at top, Back link, name + role badges, Crew Module Access card, Other Modules card with per-module R/W selects).
-
-Sections:
-
-1. **Header card** — name, `active` chip, role chip (from `roles.display_name`)
-2. **Crew Module Access** card
-   - Single `Select` "Access Preset" with options:
-     - View Only — "Can see crew list only"
-     - Department Head — "Manage crew, approve leave and hours of rest, …"
-     - Full Access — "Full access including medical records, employment, and all approvals"
-     - Custom — "Configure individual permissions manually" (auto-set when user diverges)
-   - Selecting a preset writes a batch of `user_permission_overrides` rows for crew-related modules (`crew`, `hr`, `crew_certificates`, `hours_of_rest`, `medical`) at the matching permission level.
-3. **Other Modules** card
-   - Header: "None = no access" + "Set all to:" `Select` (No Access / Read Only / Read & Write / Admin) applies to all rows.
-   - One row per module from `modules` table (excluding the crew-cluster handled above):
-     - Module name on the left
-     - `Select` on the right with options: `No Access` (gray), `Read Only` (blue), `Read & Write` (green), `Admin` (purple)
-   - Selecting writes/updates a `user_permission_overrides` row for `(user_id, module_key, permission)` and invalidates cache.
-
-Save behavior:
-- Each select change debounces 400ms then upserts via `user_permission_overrides` (`is_granted=true`, scope inherited from role, `granted_by=auth.uid()`).
-- Toast on success/failure.
-- After every write, call `log_permission_change(...)` for audit trail.
-
-### Hooks / files to add
-
-```
-src/modules/users-access/
-  pages/
-    UsersAccessListPage.tsx
-    UsersAccessDetailPage.tsx
-  components/
-    UserRow.tsx              // one list row
-    PresetBadge.tsx          // colored preset chip
-    ModulePermChip.tsx       // R/W or RO chip
-    AccessPresetSelect.tsx   // Crew Module Access dropdown
-    ModulePermissionRow.tsx  // module name + R/W select
-  hooks/
-    useUsersWithAccess.ts    // list query
-    useUserAccessDetail.ts   // detail query (perms + role)
-    useSavePermissionOverride.ts  // mutation
-    useApplyPreset.ts        // batch mutation for presets
-  lib/
-    presets.ts               // preset → module/permission matrix
-    derivePreset.ts          // infer preset from current perms
-```
-
-### Wiring
-
-- `src/routes/index.tsx`: add the two routes (lazy-loaded).
-- `src/modules/dashboard/components/fleet/FleetSubNav.tsx`: change `/settings/users` → `/users-access`.
-
-### Design tokens
-
-- Use semantic tokens only (`bg-card`, `text-muted-foreground`, `text-primary`, `bg-success/10`, etc.).
-- Preset/chip color variants live in `PresetBadge.tsx` and `ModulePermChip.tsx` using existing badge variants (no inline hex).
+- `src/modules/users-access/pages/UsersAccessDetailPage.tsx` — replace flat list with grouped renderer; restyle row cards; copy tweaks.
+- `src/modules/users-access/lib/moduleGroups.ts` (new) — `OTHER_MODULE_GROUPS` constant + helpers `groupLevelFor(perms, group)` and `applyGroup(group, level)`.
+- `src/modules/users-access/components/ModuleGroupRow.tsx` (new) — group row with chevron toggle, select, and expandable child list.
 
 ### Out of scope
 
-- No schema changes — `rbac_user_roles`, `roles`, `role_permissions`, `user_permission_overrides`, `modules` already exist.
-- No new RPCs.
-- Leaves existing `/admin/users` (UserManagement mock) and `/settings/permissions` intact.
-- No bulk role editing (checkboxes shown but actions land later).
-- No invite flow changes — reuses existing `AddUserModal`.
+- No DB / RPC changes.
+- List page unchanged.
+- No new save semantics — reuses `useSavePermissionOverride` and `useApplyPreset`.
