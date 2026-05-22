@@ -162,7 +162,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
   };
 
   return (
-    <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+    <nav className="flex-1 min-h-0 px-3 py-4 space-y-1 overflow-y-auto">
       {visibleNavItems.map((item) => renderNavItem(item))}
     </nav>
   );
