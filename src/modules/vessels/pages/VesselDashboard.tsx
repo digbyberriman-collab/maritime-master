@@ -28,6 +28,8 @@ import { AlertsTriagePanel } from '@/modules/red-room/components/AlertsTriagePan
 import { ComplianceSnapshot } from '@/modules/dashboard/components/ComplianceSnapshot';
 import { OperationsSnapshot } from '@/modules/dashboard/components/OperationsSnapshot';
 import { RecentActivityFeed } from '@/modules/dashboard/components/RecentActivityFeed';
+import { RecentActivityTable } from '@/modules/dashboard/components/RecentActivityTable';
+import TopModuleNav from '@/shared/components/layout/TopModuleNav';
 import { QuickActionsMenu } from '@/modules/dashboard/components/QuickActionsMenu';
 import { EmergencyContactsWidget } from '@/modules/emergency/components/EmergencyContactsWidget';
 import VesselProfileCard from '@/modules/vessels/components/VesselProfileCard';
@@ -98,6 +100,11 @@ const VesselDashboard: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
+        {/* Horizontal module shortcut nav (Sealogical-style) */}
+        <div className="-mx-4 lg:-mx-6 -mt-4 lg:-mt-6">
+          <TopModuleNav />
+        </div>
+
         {/* Enhanced Header with Fleet Filter */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <VesselHeader
