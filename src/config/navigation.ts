@@ -121,11 +121,14 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     permissions: ['all'],
     children: [
       { id: 'users', label: 'Users', path: '/crew/roster', icon: Users },
+      { id: 'my-dashboard', label: 'My Dashboard', path: '/crew/my-dashboard', icon: LayoutDashboard },
+      { id: 'vessel-calendar', label: 'Vessel Calendar', path: '/crew/calendar', icon: CalendarDays },
       { id: 'work-rest', label: 'Hours of Work & Rest', path: '/crew/work-rest', icon: Clock },
       { id: 'leave-planner', label: 'Leave Planner', path: '/crew/leave', icon: CalendarDays },
       { id: 'crew-admin', label: 'Crew Admin', path: '/crew/admin', icon: Briefcase },
       { id: 'leave-requests', label: 'Leave Requests', path: '/crew/leave/requests', icon: CalendarDays },
       { id: 'leave-calculator', label: 'Leave Calculator', path: '/crew/leave/calculator', icon: CalendarDays },
+      { id: 'doc-acknowledgements', label: 'Document Acknowledgements', path: '/crew/acknowledgements', icon: CheckSquare },
     ],
   },
   {
@@ -258,6 +261,18 @@ export const NAVIGATION_ITEMS: NavItem[] = [
       { id: 'open-defects', label: 'Open Defects', path: '/maintenance/defects', icon: AlertTriangle },
       { id: 'critical-equipment', label: 'Critical Equipment', path: '/maintenance/critical', icon: Shield },
       { id: 'spare-parts', label: 'Spare Parts', path: '/maintenance/spares', icon: Package },
+    ],
+  },
+  {
+    id: 'reports',
+    label: 'Reports',
+    icon: FileText,
+    path: '/reports',
+    permissions: ['DPA', 'Management', 'Captain'],
+    children: [
+      { id: 'incident-analytics', label: 'Incident Analytics', path: '/reports/incident-analytics', icon: AlertTriangle },
+      { id: 'drill-analytics', label: 'Drill Analytics', path: '/reports/drill-analytics', icon: Siren },
+      { id: 'capa-tracker', label: 'CAPA Tracker', path: '/reports/capa-tracker', icon: Clipboard },
     ],
   },
   {

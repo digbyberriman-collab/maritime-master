@@ -49,19 +49,14 @@ const HRPage = React.lazy(() => import('@/modules/compliance/pages/HRPage'));
 // ISM Pages - Lazy loaded for better code splitting
 const ERMPage = React.lazy(() => import('@/modules/ism/pages/ERMPage'));
 const ChecklistsPage = React.lazy(() => import('@/modules/ism/pages/ChecklistsPage'));
-const RiskAssessmentsPage = React.lazy(() => import('@/modules/ism/pages/RiskAssessmentsPage'));
 const SOPsPage = React.lazy(() => import('@/modules/ism/pages/SOPsPage'));
-const AuditsSurveysPage = React.lazy(() => import('@/modules/ism/pages/AuditsSurveysPage'));
 const CorrectiveActionsPage = React.lazy(() => import('@/modules/ism/pages/CorrectiveActionsPage'));
-const ISMDrillsPage = React.lazy(() => import('@/modules/ism/pages/DrillsPage'));
-const ISMIncidentsPage = React.lazy(() => import('@/modules/ism/pages/IncidentsPage'));
 const InvestigationsPage = React.lazy(() => import('@/modules/ism/pages/InvestigationsPage'));
 const MeetingsPage = React.lazy(() => import('@/modules/ism/pages/MeetingsPage'));
 const MiscellaneousPage = React.lazy(() => import('@/modules/ism/pages/MiscellaneousPage'));
 const NonConformitiesPage = React.lazy(() => import('@/modules/ism/pages/NonConformitiesPage'));
 const ObservationsPage = React.lazy(() => import('@/modules/ism/pages/ObservationsPage'));
 const PermitsToWorkPage = React.lazy(() => import('@/modules/ism/pages/PermitsToWorkPage'));
-const ISMTrainingPage = React.lazy(() => import('@/modules/ism/pages/TrainingPage'));
 
 // Document Sub-pages - lazy loaded
 const ReviewQueue = React.lazy(() => import('@/modules/documents/pages/ReviewQueue'));
@@ -461,21 +456,21 @@ export const AppRoutes: React.FC = () => {
       } />
       
       {/* ISM - 15 Flat Routes (Alphabetical) - All lazy loaded */}
-      <Route path="/ism/audits-surveys" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><AuditsSurveysPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/ism/audits-surveys" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Audits /></React.Suspense></ProtectedRoute>} />
       <Route path="/ism/checklists" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><ChecklistsPage /></React.Suspense></ProtectedRoute>} />
       <Route path="/ism/corrective-actions" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><CorrectiveActionsPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/ism/drills" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><ISMDrillsPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/ism/drills" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Drills /></React.Suspense></ProtectedRoute>} />
       <Route path="/ism/erm" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><ERMPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/ism/incidents" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><ISMIncidentsPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/ism/incidents" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Incidents /></React.Suspense></ProtectedRoute>} />
       <Route path="/ism/investigations" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><InvestigationsPage /></React.Suspense></ProtectedRoute>} />
       <Route path="/ism/meetings" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><MeetingsPage /></React.Suspense></ProtectedRoute>} />
       <Route path="/ism/miscellaneous" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><MiscellaneousPage /></React.Suspense></ProtectedRoute>} />
       <Route path="/ism/non-conformities" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><NonConformitiesPage /></React.Suspense></ProtectedRoute>} />
       <Route path="/ism/observations" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><ObservationsPage /></React.Suspense></ProtectedRoute>} />
       <Route path="/ism/permits-to-work" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><PermitsToWorkPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/ism/risk-assessments" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><RiskAssessmentsPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/ism/risk-assessments" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><RiskAssessments /></React.Suspense></ProtectedRoute>} />
       <Route path="/ism/sops" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><SOPsPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/ism/training" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><ISMTrainingPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/ism/training" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Training /></React.Suspense></ProtectedRoute>} />
 
       {/* ISM - Legacy redirect */}
       <Route path="/ism/capa" element={<Navigate to="/ism/corrective-actions" replace />} />
