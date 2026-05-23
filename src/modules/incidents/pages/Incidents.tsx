@@ -130,7 +130,7 @@ export default function Incidents() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Incidents & Near Misses</h1>
+            <h1 className="text-2xl font-bold text-foreground">Incidents & Near Misses</h1>
             <p className="text-muted-foreground">
               Report and track safety incidents across the fleet
             </p>

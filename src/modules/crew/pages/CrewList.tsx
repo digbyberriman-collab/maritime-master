@@ -8,7 +8,7 @@ const CrewList: React.FC = () => {
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Crew List</h1>
+          <h1 className="text-2xl font-bold text-foreground">Crew List</h1>
           <p className="text-muted-foreground">
             Operational crew roster — manage who is currently assigned, on board, or scheduled.
           </p>

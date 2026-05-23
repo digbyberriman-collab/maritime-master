@@ -479,7 +479,7 @@ const APIIntegrations: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">API Integrations</h1>
+            <h1 className="text-2xl font-bold text-foreground">API Integrations</h1>
             <p className="text-muted-foreground">
               Manage third-party API connections and system integrations
             </p>

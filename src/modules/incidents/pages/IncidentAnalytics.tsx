@@ -73,7 +73,7 @@ const IncidentAnalytics: React.FC = () => {
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Incident Analytics</h1>
+            <h1 className="text-2xl font-bold text-foreground">Incident Analytics</h1>
             <p className="text-muted-foreground">
               Trends, insights and performance metrics
             </p>
