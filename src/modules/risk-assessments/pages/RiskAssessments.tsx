@@ -23,8 +23,8 @@ const RiskAssessments = () => {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Risk Assessments & Work Permits</h1>
-            <p className="text-muted-foreground mt-1">
+            <h1 className="text-2xl font-bold text-foreground">Risk Assessments & Work Permits</h1>
+            <p className="text-muted-foreground">
               Manage risk assessments and control hazardous work activities
             </p>
           </div>

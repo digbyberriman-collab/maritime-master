@@ -163,7 +163,7 @@ const CompanyDetails: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Company Details</h1>
+            <h1 className="text-2xl font-bold text-foreground">Company Details</h1>
             <p className="text-muted-foreground">
               Company information and management contacts
             </p>

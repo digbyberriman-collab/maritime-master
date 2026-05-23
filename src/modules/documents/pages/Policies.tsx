@@ -328,7 +328,7 @@ const Policies: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Policies</h1>
+            <h1 className="text-2xl font-bold text-foreground">Policies</h1>
             <p className="text-muted-foreground">
               Company policies and guidelines with acknowledgment tracking
             </p>

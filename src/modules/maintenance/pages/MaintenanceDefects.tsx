@@ -446,7 +446,7 @@ const MaintenanceDefects: React.FC = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Maintenance Defects</h1>
+            <h1 className="text-2xl font-bold text-foreground">Maintenance Defects</h1>
             <p className="text-muted-foreground">
               Track and manage open defects across your fleet
             </p>
