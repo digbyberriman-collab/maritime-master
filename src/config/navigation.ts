@@ -121,7 +121,6 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     permissions: ['all'],
     children: [
       { id: 'users', label: 'Users', path: '/crew/roster', icon: Users },
-      { id: 'crew-list', label: 'Crew List', path: '/crew/list', icon: Users },
       { id: 'work-rest', label: 'Hours of Work & Rest', path: '/crew/work-rest', icon: Clock },
       { id: 'leave-planner', label: 'Leave Planner', path: '/crew/leave', icon: CalendarDays },
       { id: 'crew-admin', label: 'Crew Admin', path: '/crew/admin', icon: Briefcase },
@@ -194,6 +193,12 @@ export const NAVIGATION_ITEMS: NavItem[] = [
       { id: 'erm', label: 'Emergency Response Manual (ERM)', path: '/ism/erm', icon: AlertCircle },
       { id: 'sops', label: 'Standard Operating Procedures (SOPs)', path: '/ism/sops', icon: BookOpen },
       { id: 'miscellaneous', label: 'Miscellaneous ISM Forms', path: '/ism/miscellaneous', icon: FileText },
+      { id: 'forms-templates', label: 'Form Templates', path: '/ism/forms/templates', icon: FileText },
+      { id: 'forms-submissions', label: 'Form Submissions', path: '/ism/forms/submissions', icon: ClipboardList },
+      { id: 'forms-my-drafts', label: 'My Drafts', path: '/ism/forms/my-drafts', icon: ClipboardList },
+      { id: 'forms-pending', label: 'Pending Signatures', path: '/ism/forms/pending', icon: FileCheck },
+      { id: 'forms-schedules', label: 'Form Schedules', path: '/ism/forms/schedules', icon: CalendarDays },
+      { id: 'forms-archive', label: 'Forms Archive', path: '/ism/forms/archive', icon: Layers },
     ],
   },
   {
@@ -255,14 +260,19 @@ export const NAVIGATION_ITEMS: NavItem[] = [
       { id: 'spare-parts', label: 'Spare Parts', path: '/maintenance/spares', icon: Package },
     ],
   },
-];
-
-// Admin-only items (shown in Settings or separate admin section)
-export const ADMIN_NAV_ITEMS: NavChild[] = [
-  { id: 'user-management', label: 'User Management', path: '/admin/users', icon: Users },
-  { id: 'roles-permissions', label: 'Roles & Permissions', path: '/admin/roles', icon: Shield },
-  { id: 'fleet-groups', label: 'Fleet Groups', path: '/admin/fleet-groups', icon: Ship },
-  { id: 'alert-configuration', label: 'Alert Configuration', path: '/admin/alerts', icon: Bell },
-  { id: 'api-integrations', label: 'API Integrations', path: '/admin/integrations', icon: Wrench },
-  { id: 'feedback-admin', label: 'Feedback', path: '/admin/feedback', icon: MessageSquare },
+  {
+    id: 'admin',
+    label: 'Administration',
+    icon: Settings,
+    path: '/admin',
+    permissions: ['DPA', 'Management'],
+    children: [
+      { id: 'user-management', label: 'User Management', path: '/admin/users', icon: Users },
+      { id: 'roles-permissions', label: 'Roles & Permissions', path: '/admin/roles', icon: Shield },
+      { id: 'fleet-groups', label: 'Fleet Groups', path: '/admin/fleet-groups', icon: Ship },
+      { id: 'alert-configuration', label: 'Alert Configuration', path: '/admin/alerts', icon: Bell },
+      { id: 'api-integrations', label: 'API Integrations', path: '/admin/integrations', icon: Wrench },
+      { id: 'feedback-admin', label: 'Feedback', path: '/admin/feedback', icon: MessageSquare },
+    ],
+  },
 ];

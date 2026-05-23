@@ -100,7 +100,6 @@ const ISM_SMS = React.lazy(() => import('@/modules/documents/pages/ISM_SMS'));
 const Drawings = React.lazy(() => import('@/modules/documents/pages/Drawings'));
 
 // Crew Pages - lazy loaded
-const FlightsTravel = React.lazy(() => import('@/modules/crew/pages/FlightsTravel'));
 const LeavePlannerPage = React.lazy(() => import('@/modules/crew/pages/LeavePlannerPage'));
 const LeaveRequestsPage = React.lazy(() => import('@/modules/crew/pages/LeaveRequestsPage'));
 const LeaveCalculatorPage = React.lazy(() => import('@/modules/crew/pages/LeaveCalculatorPage'));
@@ -193,13 +192,7 @@ export const AppRoutes: React.FC = () => {
       {/* Crew */}
       <Route path="/crew" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CrewRoster /></React.Suspense></ProtectedRoute>} />
       <Route path="/crew/roster" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CrewRoster /></React.Suspense></ProtectedRoute>} />
-      <Route path="/crew/list" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/modules/crew/pages/CrewList')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
+      <Route path="/crew/list" element={<Navigate to="/crew/roster" replace />} />
       <Route path="/crew/certificates" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
@@ -207,11 +200,7 @@ export const AppRoutes: React.FC = () => {
           </React.Suspense>
         </ProtectedRoute>
       } />
-      <Route path="/crew/flights" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><FlightsTravel /></React.Suspense>
-        </ProtectedRoute>
-      } />
+      <Route path="/crew/flights" element={<Navigate to="/flights-travel" replace />} />
       <Route path="/crew/hours-of-rest" element={<Navigate to="/crew/work-rest" replace />} />
       <Route path="/crew/work-rest" element={
         <ProtectedRoute>
