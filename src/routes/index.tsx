@@ -589,6 +589,13 @@ export const AppRoutes: React.FC = () => {
           </React.Suspense>
         </ProtectedRoute>
       } />
+      <Route path="/development/courses-register" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/development/pages/CoursesRegister')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
       <Route path="/development/admin" element={
         <ProtectedRoute>
           <React.Suspense fallback={<LazyLoader />}>
