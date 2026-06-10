@@ -2994,6 +2994,7 @@ export type Database = {
           actual_accommodation_nightly_rate: number | null
           actual_accommodation_nights: number | null
           actual_accommodation_usd: number | null
+          actual_food_days: number | null
           actual_food_per_diem_usd: number | null
           actual_total_usd: number | null
           actual_travel_usd: number | null
@@ -3023,6 +3024,7 @@ export type Database = {
           actual_accommodation_nightly_rate?: number | null
           actual_accommodation_nights?: number | null
           actual_accommodation_usd?: number | null
+          actual_food_days?: number | null
           actual_food_per_diem_usd?: number | null
           actual_total_usd?: number | null
           actual_travel_usd?: number | null
@@ -3052,6 +3054,7 @@ export type Database = {
           actual_accommodation_nightly_rate?: number | null
           actual_accommodation_nights?: number | null
           actual_accommodation_usd?: number | null
+          actual_food_days?: number | null
           actual_food_per_diem_usd?: number | null
           actual_total_usd?: number | null
           actual_travel_usd?: number | null

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
+import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import { toast } from 'sonner';
 
 interface CreateApplicationInput {
@@ -21,7 +22,6 @@ interface CreateApplicationInput {
   estimated_accommodation_nights?: number;
   estimated_accommodation_nightly_rate?: number;
   estimated_food_per_diem_usd?: number;
-  estimated_total_usd?: number;
   is_custom_course?: boolean;
   leave_days_accrued?: number;
   neutral_days_accrued?: number;
@@ -29,30 +29,47 @@ interface CreateApplicationInput {
 
 export function useCreateApplication() {
   const { user, profile } = useAuth();
+  const { selectedVesselId, vessels } = useVessel();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: CreateApplicationInput) => {
       if (!user?.id || !profile?.company_id) throw new Error('Not authenticated');
 
-      // Get current vessel assignment
-      const { data: assignment } = await supabase
-        .from('crew_assignments')
-        .select('vessel_id')
-        .eq('user_id', user.id)
-        .eq('is_current', true)
-        .single();
+      let vesselId = selectedVesselId;
 
-      if (!assignment) throw new Error('No active vessel assignment found');
+      if (!vesselId) {
+        const { data: assignment, error: assignmentError } = await supabase
+          .from('crew_assignments')
+          .select('vessel_id')
+          .eq('user_id', user.id)
+          .eq('is_current', true)
+          .limit(1)
+          .maybeSingle();
+
+        if (assignmentError) throw assignmentError;
+        vesselId = assignment?.vessel_id ?? null;
+      }
+
+      if (!vesselId) {
+        const fallbackVessel = vessels.find((v) => v.name !== 'Fleet-Wide' && v.status !== 'Sold') ?? vessels[0];
+        vesselId = fallbackVessel?.id ?? null;
+      }
+
+      if (!vesselId) throw new Error('Select a vessel before creating an application');
+
+      const { estimated_total_usd: _ignoredTotal, ...applicationInput } = input as CreateApplicationInput & {
+        estimated_total_usd?: never;
+      };
 
       const { data, error } = await supabase
         .from('development_applications')
         .insert({
           crew_member_id: user.id,
           company_id: profile.company_id,
-          vessel_id: assignment.vessel_id,
+          vessel_id: vesselId,
           status: 'draft',
-          ...input,
+          ...applicationInput,
         })
         .select()
         .single();
@@ -63,6 +80,8 @@ export function useCreateApplication() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-development-applications'] });
       queryClient.invalidateQueries({ queryKey: ['my-development-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['development-applications-review'] });
+      queryClient.invalidateQueries({ queryKey: ['fleet-development-applications'] });
       toast.success('Application created');
     },
     onError: (err: Error) => toast.error(err.message),
@@ -76,13 +95,15 @@ export function useSubmitApplication() {
     mutationFn: async (applicationId: string) => {
       const { error } = await supabase
         .from('development_applications')
-        .update({ status: 'submitted', submitted_at: new Date().toISOString() })
+        .update({ status: 'hod_review', submitted_at: new Date().toISOString() })
         .eq('id', applicationId);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-development-applications'] });
       queryClient.invalidateQueries({ queryKey: ['my-development-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['development-applications-review'] });
+      queryClient.invalidateQueries({ queryKey: ['fleet-development-applications'] });
       toast.success('Application submitted for review');
     },
     onError: (err: Error) => toast.error(err.message),
@@ -151,7 +172,7 @@ interface SubmitExpenseInput {
   actual_accommodation_nights?: number;
   actual_accommodation_nightly_rate?: number;
   actual_food_per_diem_usd?: number;
-  actual_total_usd?: number;
+  actual_food_days?: number;
   is_split_payment?: boolean;
 }
 
@@ -163,10 +184,14 @@ export function useSubmitExpense() {
     mutationFn: async (input: SubmitExpenseInput) => {
       if (!user?.id || !profile?.company_id) throw new Error('Not authenticated');
 
+      const { actual_total_usd: _ignoredTotal, ...expenseInput } = input as SubmitExpenseInput & {
+        actual_total_usd?: never;
+      };
+
       const { data, error } = await supabase
         .from('development_expenses')
         .insert({
-          ...input,
+          ...expenseInput,
           crew_member_id: user.id,
           company_id: profile.company_id,
           status: 'submitted',
