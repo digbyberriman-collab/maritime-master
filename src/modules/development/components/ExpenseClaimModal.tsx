@@ -48,7 +48,7 @@ export default function ExpenseClaimModal({ open, onOpenChange, application }: P
       actual_accommodation_nights: nights || undefined,
       actual_accommodation_nightly_rate: nightlyRate || undefined,
       actual_food_per_diem_usd: parseFloat(form.actual_food_per_diem_usd) || undefined,
-      actual_total_usd: total || undefined,
+      actual_food_days: durationDays || undefined,
       is_split_payment: isSplitPayment,
     });
     onOpenChange(false);

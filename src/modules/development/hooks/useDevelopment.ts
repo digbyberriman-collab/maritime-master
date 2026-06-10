@@ -106,7 +106,11 @@ export function useMyApplications() {
 
       const { data, error } = await supabase
         .from('development_applications')
-        .select('*')
+        .select(`
+          *,
+          crew_member:profiles!development_applications_crew_member_id_fkey(first_name, last_name, email),
+          vessel:vessels!development_applications_vessel_id_fkey(name)
+        `)
         .eq('crew_member_id', user.id)
         .order('created_at', { ascending: false });
 

@@ -143,7 +143,7 @@ export default function MyDevelopment() {
                 ) : (
                   <div className="space-y-3">
                     {activeApps.map((app) => (
-                      <ApplicationCard key={app.id} application={app} />
+                      <ApplicationCard key={app.id} application={app} onView={() => setSelectedApp(app)} />
                     ))}
                   </div>
                 )}
@@ -321,7 +321,7 @@ function CategoryBadge({ category }: { category: DevCategory }) {
   );
 }
 
-function ApplicationCard({ application }: { application: any }) {
+function ApplicationCard({ application, onView }: { application: any; onView: () => void }) {
   const catConfig = CATEGORY_CONFIG[application.category as DevCategory];
   const statusConfig = APPLICATION_STATUS_CONFIG[application.status as ApplicationStatus];
   const currentStep = statusConfig?.step || 0;
@@ -336,9 +336,12 @@ function ApplicationCard({ application }: { application: any }) {
             <span className="text-xs text-muted-foreground">{application.application_number}</span>
           </div>
         </div>
-        {application.estimated_total_usd != null && (
-          <span className="text-sm font-medium">${application.estimated_total_usd.toLocaleString()}</span>
-        )}
+        <div className="flex items-center gap-2">
+          {application.estimated_total_usd != null && (
+            <span className="text-sm font-medium">${application.estimated_total_usd.toLocaleString()}</span>
+          )}
+          <Button variant="ghost" size="sm" onClick={onView}>View</Button>
+        </div>
       </div>
 
       {/* Approval Stepper */}
