@@ -49,17 +49,22 @@ export default function DevelopmentAdmin() {
 
   // Determine review capability
   const canReview = true; // Admin can review
-  const getReviewStage = (status: string): 'hod' | 'purser' | 'captain' | null => {
+  const getReviewStage = (app: any): 'hod' | 'purser' | 'captain' | null => {
+    const status = app?.status;
     if (status === 'submitted' || status === 'hod_review') return 'hod';
     if (status === 'purser_review') return 'purser';
     if (status === 'captain_review') return 'captain';
+    if (status === 'captain_purser_review') {
+      if (app?.captain_decision !== 'approved') return 'captain';
+      if (app?.purser_decision !== 'approved') return 'purser';
+    }
     return null;
   };
 
   // Stats
   const stats = useMemo(() => {
     const pending = applications.filter((a: any) =>
-      ['submitted', 'hod_review', 'purser_review', 'captain_review'].includes(a.status)
+      ['submitted', 'hod_review', 'purser_review', 'captain_review', 'captain_purser_review'].includes(a.status)
     ).length;
     const approved = applications.filter((a: any) =>
       ['approved', 'enrolled', 'completed', 'discretionary_approved'].includes(a.status)
@@ -245,8 +250,7 @@ export default function DevelopmentAdmin() {
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="submitted">Submitted</SelectItem>
                   <SelectItem value="hod_review">HOD Review</SelectItem>
-                  <SelectItem value="purser_review">Purser Review</SelectItem>
-                  <SelectItem value="captain_review">Captain Review</SelectItem>
+                  <SelectItem value="captain_purser_review">Captain &amp; Purser Review</SelectItem>
                   <SelectItem value="approved">Approved</SelectItem>
                   <SelectItem value="enrolled">Enrolled</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
@@ -363,7 +367,7 @@ export default function DevelopmentAdmin() {
         onOpenChange={(open) => !open && setSelectedApp(null)}
         application={selectedApp}
         canReview={canReview}
-        reviewStage={selectedApp ? getReviewStage(selectedApp.status) : null}
+        reviewStage={selectedApp ? getReviewStage(selectedApp) : null}
       />
     </DashboardLayout>
   );
