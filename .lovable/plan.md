@@ -1,74 +1,117 @@
-# Notifications + Users & Access refinements
 
-Three pages, all under existing Administration nav. Adapted to STORM (semantic tokens, existing components, our module taxonomy) — not pixel-matched to Sealogical.
+# Crew Training Module — Gap Analysis
 
-## 1. Notification Management (admin)
+Comparing the current `src/modules/development` implementation against `Sealogical_Crew_Training_Module_Feature_Specification.pdf` (June 2026). Status legend: **OK** = already matches, **GAP** = missing/wrong, **PARTIAL** = exists but needs change. No code changes are made in this step.
 
-New route: `/notification-management` (sidebar: Administration → Notification Management, bell icon).
+## 1. Information architecture & navigation
 
-Page layout:
-- Header: title "Notification Management", subtitle "Configure who receives notifications for each notification type"
-- Stat strip: 4 metric cards — Total types, Configured, No recipients, Unique emails
-- Filter chips row: `All types` + per-category counts (Safety, Certificates, Crew, Technical, Charter, Vessel, Reports) + `No recipients (n)` in destructive tone
-- "Subscribe Email" primary button (top-right) → modal to add an email recipient to one or more notification types
-- Body: grouped list by category. Each row shows: type name, cadence badge (`Realtime` / `Weekly` / `Daily`), recipient summary line (`peel@storm.com  All` or `No recipients` in muted/destructive), trailing email-count chip. Row click opens edit drawer.
+| Spec | Today | Status |
+|---|---|---|
+| Menu item **"Crew Training"** under Crew, gated like Hours of Rest (own view always; all-crew requires permission) | Module lives under `Crew Development` with `MyDevelopment`, `Applications`, `Catalogue`, `Admin`, `Courses Register` | PARTIAL — rename to "Crew Training", collapse to: *My Training*, *Crew Training* (gated all-crew view), *Course Catalogue*, *Fleet Settings* |
+| Each row in the all-crew view opens full application + approval history | `CoursesRegister` exists but is fleet-admin only; no per-row history yet | GAP |
+| Live reimbursement status per row (pending → calculated → 50% reimbursed → fully reimbursed) | Not displayed; current statuses are application-level only | GAP |
 
-Edit drawer (per type):
-- Recipients multi-select (company users + ad-hoc emails)
-- Vessel scope: `All vessels` or pick specific vessels
-- Save persists to new `notification_subscriptions` row(s)
+## 2. Approval workflow
 
-## 2. User Notifications (Inbox + Preferences)
+Spec: **Crew → HOD → Captain (or Purser acting for Captain) → Course → Completion → Reimbursement**.
 
-New route: `/notifications` (replaces the existing Alerts bell-link target; existing `/alerts` page kept). Tabs:
+| Spec | Today | Status |
+|---|---|---|
+| Single HOD step | `hod_review` exists | OK |
+| Single Captain/Purser step | `captain_review` exists | OK |
+| **No peer-review step** | `peer_review` exists in enum, hooks, UI, and config (`APPLICATION_STATUS_CONFIG`, `APPROVAL_STEPS`) | GAP — remove `peer_review` across enum, statuses, stages, UI |
+| Denials carry explanation + suggested alternative | Comments exist; "suggested alternative" field missing | GAP — add `suggested_alternative` text on decisions |
+| Notifications at every step | Not wired through `alerts`/notification system | GAP |
+| Pursers can act in Captain's place | No purser-as-captain delegation | GAP — allow Purser RBAC role to action Captain queue |
 
-- **Inbox** — chronological list of the current user's in-app notifications (reuse `alerts` query filtered to `assigned_to_user_id = me` or subscribed types). Mark read / mark all read.
-- **Preferences** — grouped toggles (Safety, Certificates, Charter, Crew, Technical, Vessel, Reports). Each row: type name + cadence badge + description + single toggle (in-app on/off). Helper banner: "Email delivery is configured by your administrator in Notification Management."
+## 3. Eligibility rules
 
-## 3. Users & Access detail — refinements
+Spec: permanent contract • 90 days served • probation passed • 30-day+ courses only after first employment anniversary • new permanent crew can apply for Professional/Extracurricular day one (reimbursement contingent on probation) • no reimbursement for courses before employment started.
 
-Apply the Sealogical pattern (screenshot 5) to existing `UsersAccessDetailPage` without breaking what we just built:
+| Today | Status |
+|---|---|
+| `ELIGIBILITY_MONTHS = 12` applied as a single gate in `MyDevelopment` | GAP — replace with: 90-day service check, probation check, 30-day-course anniversary check; warnings (not hard blocks) that approvers can override; persisted `discretionary_justification` already exists ✓ |
+| Contract type / probation fields read from profile | Not present | GAP — needs `profiles.contract_type`, `profiles.probation_end_date` (or fall back to contract_start + 90 days) |
 
-- Keep the Crew Module Access preset dropdown and the grouped + expandable Other Modules.
-- Add a new **Custom Permissions** card (shown only when preset = `Custom`) with two subsections:
-  - **VIEW PERMISSIONS** — checkboxes: see crew list, view/edit crew profiles, view scheduling, access leave records, view/edit medical info (with `Sensitive` badge), access employment records (`Sensitive`), view appraisals
-  - **APPROVAL PERMISSIONS** — checkboxes: conduct appraisals, approve leave / hours of rest / payroll / expenses, mark expenses paid, approve invoices, record invoice payments
-- Add **Department Scope** card below: checkboxes Deck, Engineering, Interior, Galley, Medical, Administration. Helper: "No departments selected = access to ALL departments." Yellow info banner styling using `bg-warning/10`.
+## 4. Course catalogue
 
-These map to fine-grained capability flags stored in `user_permission_overrides` (existing table) with new `module_key` values like `crew.view_medical`, `crew.approve_leave`, etc. Department scope persists via `restrictions` JSONB.
+| Spec | Today | Status |
+|---|---|---|
+| ~290 courses, seeded from March 2026 catalogue | 20 rows in `development_courses` | GAP — seed full catalogue, add `catalogue_number` ordering ✓ already exists |
+| Selecting a course auto-applies category, day-type, reimbursement terms | Category copied; day-type/reimbursement rules not derived | GAP |
+| "Course not listed" option lets crew propose new courses | `is_custom_course` exists on application | OK — needs review-side surfacing |
+| Stores renewal interval per course | `renewal_period` text column exists | OK (future renewal-alert engine deferred per spec) |
+| Catalogue manager in Fleet Settings (add/edit/recategorise/retire) | No admin UI | GAP |
 
-## Data model
+## 5. Policy / rules engine
 
-New table `notification_types` (seed): `key`, `name`, `category`, `cadence` (`realtime|daily|weekly`), `description`, `default_enabled`.
+Spec table (per category):
 
-New table `notification_subscriptions`: `id`, `company_id`, `notification_type_key`, `user_id` (nullable), `email` (nullable, for ad-hoc), `vessel_scope` (`all` | uuid[]), `channels` (`{in_app, email}` jsonb), `created_by`, timestamps. RLS scoped to `company_id` via `current_user_company_id()`; DPA/superadmin can write.
+```text
+                Inkfish Required   Mandatory     Professional   Extracurricular
+Fees            100% upfront       100% reimb.   100% reimb.    100% reimb.
+>$4,000         n/a                50/50 split   50/50 split    —
+Accom.          Vessel             $250/night    $250/night     none
+Flights         Vessel             Business      Business       none
+Course days     Working            Working       Neutral        no credit
+Travel days     Neutral            Neutral       Neutral        no credit
+Per diem        $50/day            —             —              —
+Clawback 12mo   Exempt             Exempt        Applies        Applies
+Initiated by    HOD/mgmt           Crew          Crew           Crew
+```
 
-New table `user_notification_preferences`: `user_id`, `notification_type_key`, `in_app_enabled` (bool). RLS: user can read/write own row.
+| Today | Status |
+|---|---|
+| Constants exist: `ACCOMMODATION_CAP_PER_NIGHT=250`, `FOOD_PER_DIEM_FLEET_ORGANISED=50`, `PROFESSIONAL_THRESHOLD=4000`, `CLAWBACK_MONTHS=12` | OK |
+| Category enum uses `fleet_organised` instead of `inkfish_required` | PARTIAL — rename label only ("Inkfish Required"); DB enum value can stay or be migrated |
+| Automatic reimbursement calculation (cap, split, per diem) | Partial in generated columns; needs rewrite to honour full matrix | GAP |
+| Constants are **admin-editable settings**, not hard-coded | All hard-coded | GAP — move to a `program_settings` table |
+| Online courses → neutral days at 1 day/8h, HOD-overridable | Not implemented | GAP |
+| One currency per application; USD for fleet reporting | Single-currency assumption today; no FX | GAP — add `application_currency`, store `*_local` and `*_usd` |
+| Estimate overruns flagged for explanation | Already required in `ExpenseClaimModal` | OK |
 
-Capability flags: extend `modules` seed with `crew.view_medical`, `crew.edit_medical`, `crew.view_appraisals`, `crew.conduct_appraisals`, `crew.approve_leave`, `crew.approve_hours_of_rest`, `crew.approve_payroll`, `crew.approve_expenses`, `crew.mark_expenses_paid`, `crew.approve_invoices`, `crew.record_invoice_payments`, `crew.access_employment_records`. These slot into the existing override RPC flow.
+## 6. Reimbursement / clawback
 
-## Files
+| Spec | Today | Status |
+|---|---|---|
+| Clawback watch-list (auto-tracked, 12-month window, Required/Mandatory exempt) | Constant only, no watch-list view | GAP — derived view in Fleet Settings |
+| App calculates what's owed; does **not** move money | Matches scope | OK |
+| Reimbursement payments stay in CrewMate/payroll | Matches scope | OK |
 
-New:
-- `src/modules/notifications-admin/pages/NotificationManagementPage.tsx`
-- `src/modules/notifications-admin/components/{StatStrip, CategoryFilterBar, NotificationTypeRow, SubscribeEmailDialog, EditSubscriptionDrawer}.tsx`
-- `src/modules/notifications-admin/hooks/{useNotificationTypes, useSubscriptions, useSaveSubscription}.ts`
-- `src/modules/notifications/pages/NotificationsPage.tsx` (Inbox + Preferences tabs)
-- `src/modules/notifications/components/{InboxList, PreferencesGroups, PreferenceRow}.tsx`
-- `src/modules/notifications/hooks/{useInbox, usePreferences, useSavePreference}.ts`
-- `src/modules/users-access/components/{CustomPermissionsCard, DepartmentScopeCard, CapabilityCheckbox}.tsx`
-- `src/modules/users-access/lib/capabilityCatalog.ts` (view/approval capability definitions)
-- `src/modules/users-access/hooks/useSaveCapability.ts`
-- Supabase migration: `notification_types`, `notification_subscriptions`, `user_notification_preferences`, modules seed additions, RLS policies.
+## 7. Leave-calendar integration
 
-Edited:
-- `src/routes/index.tsx` — add `/notification-management`, `/notifications` lazy routes
-- `src/modules/dashboard/components/fleet/FleetSubNav.tsx` — add "Notification Management" item (DPA/superadmin only)
-- `src/modules/users-access/pages/UsersAccessDetailPage.tsx` — render `CustomPermissionsCard` (when Custom preset) + `DepartmentScopeCard`
-- `src/shared/components/layout/Header.tsx` (or equivalent) — bell icon links to `/notifications`
+| Spec | Today | Status |
+|---|---|---|
+| Approved applications create training working-day, neutral-day and travel-day entries on the leave calendar | Not wired | GAP — on transition to `approved`, insert `crew_leave_entries` for course window and travel days |
+| Leave **balances** not auto-adjusted in v1 | Naturally matches | OK |
 
-## Out of scope
+## 8. Fleet Settings & reporting
 
-- Email sending pipeline (subscription rows are stored; existing alert/email engine wiring is a follow-up)
-- Changes to existing `/alerts` page or alert engine rules
-- Migrating older `NotificationsSection` settings (kept as-is)
+| Spec | Today | Status |
+|---|---|---|
+| Fleet-wide USD cost dashboard (vessel / dept / category / month; estimated vs actual) | `DevelopmentAdmin` has charts but not the full breakdown | PARTIAL — extend with vessel × dept × category × month grid + USD totals |
+| Monthly report (generated summary, CSV / print-to-PDF, "mark as reported" audit action) | Not present | GAP |
+| Program settings UI (caps, per diem, mileage, $4,000 threshold) | Not present | GAP |
+| Mileage rates default $0.70/mi, $0.44/km, editable | Not present | GAP |
+| Clawback watch-list | Not present | GAP |
+
+## 9. Out of scope (per spec, do **not** build now)
+
+- Payment movement (stays in CrewMate/payroll)
+- Auto leave-balance arithmetic
+- Shoreside HR-instead-of-Captain path
+- Structured per-crew development plans (tracker stays a document upload)
+- Renewal reminders engine
+- Standing CD-team logins
+
+## 10. Recommended refactor order (each its own deliverable)
+
+1. **Schema & catalogue**: drop `peer_review`, rename labels to "Inkfish Required", add `program_settings`, `application_currency`/local-amount columns, `suggested_alternative`, profile `probation_end_date`; seed full March 2026 catalogue.
+2. **Rules engine**: category-matrix calculator + eligibility checks (warnings, not blocks) + online-course neutral-day logic.
+3. **Application & approval flow**: 2-step HOD→Captain/Purser, alerts at each step, denial with alternative, leave-calendar entries on approve.
+4. **Crew Training view** (permission-gated all-crew page) with monthly grouping, filters, history, live reimbursement status.
+5. **Fleet Settings**: catalogue manager, USD cost dashboard, monthly report + "mark as reported", clawback watch-list, editable program settings.
+
+Each stage ships with visual proof before the next begins, matching the spec's "What done means" clause.
+
+Confirm the order (or reorder/cut) and I'll start with stage 1.
