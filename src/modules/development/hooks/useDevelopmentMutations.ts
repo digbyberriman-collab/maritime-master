@@ -112,7 +112,7 @@ export function useSubmitApplication() {
 
 interface ReviewInput {
   applicationId: string;
-  stage: 'hod' | 'peer' | 'captain';
+  stage: 'hod' | 'purser' | 'captain';
   decision: 'approved' | 'returned';
   comments?: string;
   isDiscretionary?: boolean;
@@ -128,7 +128,7 @@ export function useReviewApplication() {
       if (!user?.id) throw new Error('Not authenticated');
 
       const nextStatusMap: Record<string, Record<string, string>> = {
-        hod: { approved: 'peer_review', returned: 'returned' },
+        hod: { approved: 'purser_review', returned: 'returned' },
         peer: { approved: 'captain_review', returned: 'returned' },
         captain: { approved: 'approved', returned: 'returned' },
       };
@@ -228,7 +228,7 @@ export function useApplicationsForReview() {
           crew_member:profiles!development_applications_crew_member_id_fkey(first_name, last_name, email)
         `)
         .eq('company_id', profile.company_id)
-        .in('status', ['submitted', 'hod_review', 'peer_review', 'captain_review'])
+        .in('status', ['submitted', 'hod_review', 'purser_review', 'captain_review'])
         .order('submitted_at', { ascending: true });
 
       if (error) throw error;

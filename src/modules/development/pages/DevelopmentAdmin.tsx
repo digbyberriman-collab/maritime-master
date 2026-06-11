@@ -49,9 +49,9 @@ export default function DevelopmentAdmin() {
 
   // Determine review capability
   const canReview = true; // Admin can review
-  const getReviewStage = (status: string): 'hod' | 'peer' | 'captain' | null => {
+  const getReviewStage = (status: string): 'hod' | 'purser' | 'captain' | null => {
     if (status === 'submitted' || status === 'hod_review') return 'hod';
-    if (status === 'peer_review') return 'peer';
+    if (status === 'purser_review') return 'purser';
     if (status === 'captain_review') return 'captain';
     return null;
   };
@@ -59,7 +59,7 @@ export default function DevelopmentAdmin() {
   // Stats
   const stats = useMemo(() => {
     const pending = applications.filter((a: any) =>
-      ['submitted', 'hod_review', 'peer_review', 'captain_review'].includes(a.status)
+      ['submitted', 'hod_review', 'purser_review', 'captain_review'].includes(a.status)
     ).length;
     const approved = applications.filter((a: any) =>
       ['approved', 'enrolled', 'completed', 'discretionary_approved'].includes(a.status)
@@ -245,7 +245,7 @@ export default function DevelopmentAdmin() {
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="submitted">Submitted</SelectItem>
                   <SelectItem value="hod_review">HOD Review</SelectItem>
-                  <SelectItem value="peer_review">Peer Review</SelectItem>
+                  <SelectItem value="purser_review">Purser Review</SelectItem>
                   <SelectItem value="captain_review">Captain Review</SelectItem>
                   <SelectItem value="approved">Approved</SelectItem>
                   <SelectItem value="enrolled">Enrolled</SelectItem>

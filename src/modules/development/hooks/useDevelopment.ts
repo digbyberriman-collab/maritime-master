@@ -33,8 +33,8 @@ export interface DevelopmentApplication {
   course_end_date: string | null;
   hod_reviewer_id: string | null;
   hod_reviewed_at: string | null;
-  peer_reviewer_id: string | null;
-  peer_reviewed_at: string | null;
+  purser_reviewer_id: string | null;
+  purser_reviewed_at: string | null;
   captain_reviewer_id: string | null;
   captain_reviewed_at: string | null;
 }
@@ -159,7 +159,7 @@ export function useDevelopmentStats() {
         .from('development_applications')
         .select('id', { count: 'exact', head: true })
         .eq('crew_member_id', user.id)
-        .in('status', ['submitted', 'hod_review', 'peer_review', 'captain_review', 'approved', 'enrolled']);
+        .in('status', ['submitted', 'hod_review', 'purser_review', 'captain_review', 'approved', 'enrolled']);
 
       // Completed courses
       const { count: completedCourses } = await supabase

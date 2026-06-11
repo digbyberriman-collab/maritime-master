@@ -22,7 +22,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   application: any;
   canReview?: boolean;
-  reviewStage?: 'hod' | 'peer' | 'captain' | null;
+  reviewStage?: 'hod' | 'purser' | 'captain' | null;
 }
 
 export default function ApplicationDetailModal({ open, onOpenChange, application, canReview, reviewStage }: Props) {
@@ -160,7 +160,7 @@ export default function ApplicationDetailModal({ open, onOpenChange, application
         {/* Previous Reviews */}
         {[
           { stage: 'hod', label: 'HOD Review', reviewer: application.hod_reviewer_id, date: application.hod_reviewed_at, decision: application.hod_decision, comments: application.hod_comments },
-          { stage: 'peer', label: 'Peer Review', reviewer: application.peer_reviewer_id, date: application.peer_reviewed_at, decision: application.peer_decision, comments: application.peer_comments },
+          { stage: 'purser', label: 'Purser Review', reviewer: application.purser_reviewer_id, date: application.purser_reviewed_at, decision: application.purser_decision, comments: application.purser_comments },
           { stage: 'captain', label: 'Captain Review', reviewer: application.captain_reviewer_id, date: application.captain_reviewed_at, decision: application.captain_decision, comments: application.captain_comments },
         ].filter((r) => r.reviewer).map((review) => (
           <div key={review.stage} className="rounded-lg border p-3 space-y-1">
