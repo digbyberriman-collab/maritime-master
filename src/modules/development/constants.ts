@@ -6,7 +6,7 @@ export type ApplicationStatus = 'draft' | 'submitted' | 'hod_review' | 'purser_r
 export type ExpenseStatus = 'draft' | 'submitted' | 'under_review' | 'approved' | 'paid' | 'partially_paid' | 'rejected';
 
 export const CATEGORY_CONFIG: Record<DevCategory, { label: string; color: string; bgClass: string; textClass: string }> = {
-  fleet_organised: { label: 'Fleet Organised', color: 'hsl(var(--cyan))', bgClass: 'bg-cyan/10', textClass: 'text-cyan' },
+  fleet_organised: { label: 'Inkfish Required', color: 'hsl(var(--cyan))', bgClass: 'bg-cyan/10', textClass: 'text-cyan' },
   mandatory: { label: 'Mandatory', color: 'hsl(var(--amber))', bgClass: 'bg-amber/10', textClass: 'text-amber' },
   professional: { label: 'Professional', color: 'hsl(var(--info))', bgClass: 'bg-info/10', textClass: 'text-info' },
   extracurricular: { label: 'Extracurricular', color: 'hsl(var(--purple))', bgClass: 'bg-purple/10', textClass: 'text-purple' },
