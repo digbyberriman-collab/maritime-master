@@ -2542,17 +2542,25 @@ export type Database = {
       }
       development_applications: {
         Row: {
+          accommodation_local_amount: number | null
+          actual_accommodation_usd: number | null
+          actual_food_per_diem_usd: number | null
+          actual_travel_usd: number | null
+          actual_tuition_usd: number | null
+          application_currency: string
           application_number: string
           captain_comments: string | null
           captain_decision: string | null
           captain_reviewed_at: string | null
           captain_reviewer_id: string | null
           category: string
+          clawback_end_date: string | null
           company_id: string
           completed_at: string | null
           completion_certificate_url: string | null
           course_description: string | null
           course_duration_days: number | null
+          course_duration_hours: number | null
           course_end_date: string | null
           course_id: string | null
           course_location: string | null
@@ -2562,6 +2570,7 @@ export type Database = {
           course_url: string | null
           created_at: string | null
           crew_member_id: string
+          denial_reason: string | null
           discretionary_justification: string | null
           estimated_accommodation_nightly_rate: number | null
           estimated_accommodation_nights: number | null
@@ -2571,6 +2580,7 @@ export type Database = {
           estimated_travel_route: string | null
           estimated_travel_usd: number | null
           estimated_tuition_usd: number | null
+          exchange_rate_to_usd: number | null
           hod_comments: string | null
           hod_decision: string | null
           hod_reviewed_at: string | null
@@ -2578,31 +2588,45 @@ export type Database = {
           id: string
           is_custom_course: boolean | null
           is_discretionary: boolean | null
+          is_online_short: boolean | null
           leave_days_accrued: number | null
           neutral_days_accrued: number | null
-          peer_comments: string | null
-          peer_decision: string | null
-          peer_reviewed_at: string | null
-          peer_reviewer_id: string | null
+          purser_comments: string | null
+          purser_decision: string | null
+          purser_reviewed_at: string | null
+          purser_reviewer_id: string | null
           reimbursement_total_usd: number | null
+          reported_to_fleet_at: string | null
           status: string
           submitted_at: string | null
+          suggested_alternative_course_id: string | null
+          suggested_alternative_notes: string | null
+          travel_local_amount: number | null
+          tuition_local_amount: number | null
           updated_at: string | null
           upfront_payment_by_inkfish: number | null
           vessel_id: string
         }
         Insert: {
+          accommodation_local_amount?: number | null
+          actual_accommodation_usd?: number | null
+          actual_food_per_diem_usd?: number | null
+          actual_travel_usd?: number | null
+          actual_tuition_usd?: number | null
+          application_currency?: string
           application_number?: string
           captain_comments?: string | null
           captain_decision?: string | null
           captain_reviewed_at?: string | null
           captain_reviewer_id?: string | null
           category: string
+          clawback_end_date?: string | null
           company_id: string
           completed_at?: string | null
           completion_certificate_url?: string | null
           course_description?: string | null
           course_duration_days?: number | null
+          course_duration_hours?: number | null
           course_end_date?: string | null
           course_id?: string | null
           course_location?: string | null
@@ -2612,6 +2636,7 @@ export type Database = {
           course_url?: string | null
           created_at?: string | null
           crew_member_id: string
+          denial_reason?: string | null
           discretionary_justification?: string | null
           estimated_accommodation_nightly_rate?: number | null
           estimated_accommodation_nights?: number | null
@@ -2621,6 +2646,7 @@ export type Database = {
           estimated_travel_route?: string | null
           estimated_travel_usd?: number | null
           estimated_tuition_usd?: number | null
+          exchange_rate_to_usd?: number | null
           hod_comments?: string | null
           hod_decision?: string | null
           hod_reviewed_at?: string | null
@@ -2628,31 +2654,45 @@ export type Database = {
           id?: string
           is_custom_course?: boolean | null
           is_discretionary?: boolean | null
+          is_online_short?: boolean | null
           leave_days_accrued?: number | null
           neutral_days_accrued?: number | null
-          peer_comments?: string | null
-          peer_decision?: string | null
-          peer_reviewed_at?: string | null
-          peer_reviewer_id?: string | null
+          purser_comments?: string | null
+          purser_decision?: string | null
+          purser_reviewed_at?: string | null
+          purser_reviewer_id?: string | null
           reimbursement_total_usd?: number | null
+          reported_to_fleet_at?: string | null
           status?: string
           submitted_at?: string | null
+          suggested_alternative_course_id?: string | null
+          suggested_alternative_notes?: string | null
+          travel_local_amount?: number | null
+          tuition_local_amount?: number | null
           updated_at?: string | null
           upfront_payment_by_inkfish?: number | null
           vessel_id: string
         }
         Update: {
+          accommodation_local_amount?: number | null
+          actual_accommodation_usd?: number | null
+          actual_food_per_diem_usd?: number | null
+          actual_travel_usd?: number | null
+          actual_tuition_usd?: number | null
+          application_currency?: string
           application_number?: string
           captain_comments?: string | null
           captain_decision?: string | null
           captain_reviewed_at?: string | null
           captain_reviewer_id?: string | null
           category?: string
+          clawback_end_date?: string | null
           company_id?: string
           completed_at?: string | null
           completion_certificate_url?: string | null
           course_description?: string | null
           course_duration_days?: number | null
+          course_duration_hours?: number | null
           course_end_date?: string | null
           course_id?: string | null
           course_location?: string | null
@@ -2662,6 +2702,7 @@ export type Database = {
           course_url?: string | null
           created_at?: string | null
           crew_member_id?: string
+          denial_reason?: string | null
           discretionary_justification?: string | null
           estimated_accommodation_nightly_rate?: number | null
           estimated_accommodation_nights?: number | null
@@ -2671,6 +2712,7 @@ export type Database = {
           estimated_travel_route?: string | null
           estimated_travel_usd?: number | null
           estimated_tuition_usd?: number | null
+          exchange_rate_to_usd?: number | null
           hod_comments?: string | null
           hod_decision?: string | null
           hod_reviewed_at?: string | null
@@ -2678,15 +2720,21 @@ export type Database = {
           id?: string
           is_custom_course?: boolean | null
           is_discretionary?: boolean | null
+          is_online_short?: boolean | null
           leave_days_accrued?: number | null
           neutral_days_accrued?: number | null
-          peer_comments?: string | null
-          peer_decision?: string | null
-          peer_reviewed_at?: string | null
-          peer_reviewer_id?: string | null
+          purser_comments?: string | null
+          purser_decision?: string | null
+          purser_reviewed_at?: string | null
+          purser_reviewer_id?: string | null
           reimbursement_total_usd?: number | null
+          reported_to_fleet_at?: string | null
           status?: string
           submitted_at?: string | null
+          suggested_alternative_course_id?: string | null
+          suggested_alternative_notes?: string | null
+          travel_local_amount?: number | null
+          tuition_local_amount?: number | null
           updated_at?: string | null
           upfront_payment_by_inkfish?: number | null
           vessel_id?: string
@@ -2728,11 +2776,18 @@ export type Database = {
             referencedColumns: ["user_id"]
           },
           {
-            foreignKeyName: "development_applications_peer_reviewer_id_fkey"
-            columns: ["peer_reviewer_id"]
+            foreignKeyName: "development_applications_purser_reviewer_id_fkey"
+            columns: ["purser_reviewer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "development_applications_suggested_alternative_course_id_fkey"
+            columns: ["suggested_alternative_course_id"]
+            isOneToOne: false
+            referencedRelation: "development_courses"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "development_applications_vessel_id_fkey"
@@ -2867,6 +2922,7 @@ export type Database = {
           requires_fleet_doctor_agreement: boolean | null
           status: string
           sub_section: string | null
+          tags: string[] | null
           updated_at: string | null
         }
         Insert: {
@@ -2888,6 +2944,7 @@ export type Database = {
           requires_fleet_doctor_agreement?: boolean | null
           status?: string
           sub_section?: string | null
+          tags?: string[] | null
           updated_at?: string | null
         }
         Update: {
@@ -2909,6 +2966,7 @@ export type Database = {
           requires_fleet_doctor_agreement?: boolean | null
           status?: string
           sub_section?: string | null
+          tags?: string[] | null
           updated_at?: string | null
         }
         Relationships: [
@@ -7840,6 +7898,7 @@ export type Database = {
           phone: string | null
           position: string | null
           preferred_name: string | null
+          probation_end_date: string | null
           rank: string | null
           role: Database["public"]["Enums"]["user_role"]
           rotation: string | null
@@ -7884,6 +7943,7 @@ export type Database = {
           phone?: string | null
           position?: string | null
           preferred_name?: string | null
+          probation_end_date?: string | null
           rank?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           rotation?: string | null
@@ -7928,6 +7988,7 @@ export type Database = {
           phone?: string | null
           position?: string | null
           preferred_name?: string | null
+          probation_end_date?: string | null
           rank?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           rotation?: string | null
@@ -7951,6 +8012,62 @@ export type Database = {
             columns: ["imported_vessel_id"]
             isOneToOne: false
             referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      program_settings: {
+        Row: {
+          accommodation_cap_per_night_usd: number
+          anniversary_window_days: number
+          business_class_flights_allowed: boolean
+          clawback_months: number
+          company_id: string
+          created_at: string
+          eligibility_service_days: number
+          food_per_diem_usd: number
+          id: string
+          online_neutral_threshold_hours: number
+          probation_default_days: number
+          professional_split_threshold_usd: number
+          updated_at: string
+        }
+        Insert: {
+          accommodation_cap_per_night_usd?: number
+          anniversary_window_days?: number
+          business_class_flights_allowed?: boolean
+          clawback_months?: number
+          company_id: string
+          created_at?: string
+          eligibility_service_days?: number
+          food_per_diem_usd?: number
+          id?: string
+          online_neutral_threshold_hours?: number
+          probation_default_days?: number
+          professional_split_threshold_usd?: number
+          updated_at?: string
+        }
+        Update: {
+          accommodation_cap_per_night_usd?: number
+          anniversary_window_days?: number
+          business_class_flights_allowed?: boolean
+          clawback_months?: number
+          company_id?: string
+          created_at?: string
+          eligibility_service_days?: number
+          food_per_diem_usd?: number
+          id?: string
+          online_neutral_threshold_hours?: number
+          probation_default_days?: number
+          professional_split_threshold_usd?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "program_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
