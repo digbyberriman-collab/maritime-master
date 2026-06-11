@@ -200,8 +200,8 @@ export const usePermissionsStore = create<PermissionsState>((set, get) => ({
   hasRole: (roleName) => {
     const normalizedRole = roleName.toLowerCase().replace(/\s+/g, '_');
     return get().userRoles.some(ur =>
-      ur.role_name.toLowerCase() === normalizedRole ||
-      ur.role_display_name.toLowerCase().replace(/\s+/g, '_') === normalizedRole
+      ur.role_name?.toLowerCase() === normalizedRole ||
+      ur.role_display_name?.toLowerCase().replace(/\s+/g, '_') === normalizedRole
     );
   },
 
