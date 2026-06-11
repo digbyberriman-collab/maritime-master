@@ -31,6 +31,7 @@ export const DEFAULT_SETTINGS: ProgramSettings = {
   probation_default_days: 90,
   online_neutral_threshold_hours: 4,
   anniversary_window_days: 30,
+  business_class_flights_allowed: false,
 };
 
 // ---------- Category Matrix ----------
