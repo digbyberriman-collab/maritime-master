@@ -117,7 +117,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   
   // RBAC store integration
-  const { loadPermissions, reset: resetPermissions, isInitialized: rbacInitialized, canView } = usePermissionsStore();
+  const {
+    loadPermissions,
+    reset: resetPermissions,
+    isInitialized: rbacInitialized,
+    isLoading: rbacLoading,
+    canView,
+    hasRole: hasRBACRole,
+  } = usePermissionsStore();
 
   const userRole = profile?.role ?? null;
 
@@ -149,6 +156,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Check if user can access a specific module - uses RBAC when available, falls back to legacy
   const canAccessModule = useCallback((moduleId: string): boolean => {
+    if (!user) return false;
+
+    if (!rbacInitialized || rbacLoading) {
+      return true;
+    }
+
+    if (hasRBACRole('superadmin') || hasRBACRole('dpa') || hasRBACRole('fleet_master')) {
+      return true;
+    }
+
     // Try RBAC first if initialized
     if (rbacInitialized) {
       // Map navigation module IDs to RBAC module keys
@@ -167,6 +184,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         'insurance': 'insurance',
         'hr': 'hr',
         'reports': 'reports',
+        'development': 'training',
+        'itinerary': 'fleet',
+        'flights-travel': 'crew_roster',
       };
       
       const rbacKey = moduleKeyMap[moduleId] || moduleId;
@@ -183,7 +203,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!allowedRoles) return true;
     
     return allowedRoles.includes(userRole);
-  }, [userRole, rbacInitialized, canView]);
+  }, [user, userRole, rbacInitialized, rbacLoading, canView, hasRBACRole]);
 
   useEffect(() => {
     // Set up auth state listener FIRST
