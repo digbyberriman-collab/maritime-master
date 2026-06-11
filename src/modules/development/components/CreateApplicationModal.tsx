@@ -6,15 +6,15 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { AlertTriangle, DollarSign, Calendar, MapPin } from 'lucide-react';
+import { AlertTriangle, DollarSign, Calendar, MapPin, Info } from 'lucide-react';
 import { useCreateApplication, useSubmitApplication } from '@/modules/development/hooks/useDevelopmentMutations';
 import { type DevelopmentCourse } from '@/modules/development/hooks/useDevelopment';
+import { useProgramSettings } from '@/modules/development/hooks/useProgramSettings';
+import { useEligibilityContext } from '@/modules/development/hooks/useEligibility';
+import { calculateCosts, checkEligibility, DEFAULT_SETTINGS } from '@/modules/development/services/rulesEngine';
 import {
   CATEGORY_CONFIG,
   FORMAT_LABELS,
-  ACCOMMODATION_CAP_PER_NIGHT,
-  FOOD_PER_DIEM_FLEET_ORGANISED,
-  PROFESSIONAL_THRESHOLD,
   type DevCategory,
 } from '@/modules/development/constants';
 
@@ -27,6 +27,8 @@ interface Props {
 export default function CreateApplicationModal({ open, onOpenChange, course }: Props) {
   const createApp = useCreateApplication();
   const submitApp = useSubmitApplication();
+  const { data: settings = DEFAULT_SETTINGS } = useProgramSettings();
+  const { data: eligibilityCtx } = useEligibilityContext();
   const isCustom = !course;
 
   const [form, setForm] = useState({
@@ -43,29 +45,64 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
     estimated_travel_usd: '',
     estimated_travel_route: '',
     estimated_accommodation_nights: '',
-    estimated_accommodation_nightly_rate: String(ACCOMMODATION_CAP_PER_NIGHT),
-    estimated_food_per_diem_usd: String(FOOD_PER_DIEM_FLEET_ORGANISED),
+    estimated_accommodation_nightly_rate: String(settings.accommodation_cap_per_night_usd),
+    estimated_food_per_diem_usd: String(settings.food_per_diem_usd),
     leave_days_accrued: '0',
     neutral_days_accrued: '0',
   });
 
   const update = (field: string, value: string) => setForm((f) => ({ ...f, [field]: value }));
 
-  const tuition = parseFloat(form.estimated_tuition_usd) || 0;
-  const travel = parseFloat(form.estimated_travel_usd) || 0;
-  const nights = parseInt(form.estimated_accommodation_nights) || 0;
-  const nightlyRate = Math.min(parseFloat(form.estimated_accommodation_nightly_rate) || 0, ACCOMMODATION_CAP_PER_NIGHT);
-  const accommodation = nights * nightlyRate;
-  const durationDays = parseInt(form.course_duration_days) || 0;
-  const foodPerDiem = parseFloat(form.estimated_food_per_diem_usd) || 0;
-  const food = durationDays * foodPerDiem;
-  const total = tuition + travel + accommodation + food;
-
-  const isOver4k = total > PROFESSIONAL_THRESHOLD;
-  const isSplitPayment = course?.over_4k_rule && isOver4k;
-
   const courseName = isCustom ? form.custom_course_name : course.name;
   const courseCategory = isCustom ? form.custom_category : course.category;
+
+  const durationDays = parseInt(form.course_duration_days) || 0;
+  const nights = parseInt(form.estimated_accommodation_nights) || 0;
+
+  const breakdown = useMemo(
+    () =>
+      calculateCosts(
+        {
+          category: courseCategory,
+          format: course?.format ?? null,
+          durationDays,
+          tuitionUsd: parseFloat(form.estimated_tuition_usd) || 0,
+          travelUsd: parseFloat(form.estimated_travel_usd) || 0,
+          accommodationNights: nights,
+          accommodationNightlyRateUsd: parseFloat(form.estimated_accommodation_nightly_rate) || 0,
+          foodPerDiemUsd: parseFloat(form.estimated_food_per_diem_usd) || undefined,
+          over4kRule: course?.over_4k_rule,
+        },
+        settings,
+      ),
+    [courseCategory, course, durationDays, nights, form, settings],
+  );
+
+  const eligibilityWarnings = useMemo(
+    () =>
+      checkEligibility(
+        {
+          contractStartDate: eligibilityCtx?.contractStartDate,
+          probationEndDate: eligibilityCtx?.probationEndDate,
+          lastApprovedCourseEndDate: eligibilityCtx?.lastApprovedCourseEndDate,
+          courseStartDate: form.course_start_date || null,
+        },
+        settings,
+      ),
+    [eligibilityCtx, form.course_start_date, settings],
+  );
+
+  const tuition = breakdown.tuition;
+  const travel = breakdown.travel;
+  const accommodation = breakdown.accommodation;
+  const food = breakdown.food;
+  const total = breakdown.total;
+  const nightlyRate = Math.min(
+    parseFloat(form.estimated_accommodation_nightly_rate) || 0,
+    settings.accommodation_cap_per_night_usd,
+  );
+  const foodPerDiem = breakdown.perDiemUsed;
+  const isSplitPayment = breakdown.appliesSplitPayment;
 
   const handleSaveDraft = async () => {
     if (!courseName.trim()) return;
@@ -248,8 +285,13 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
             <Input type="number" value={form.estimated_accommodation_nights} onChange={(e) => update('estimated_accommodation_nights', e.target.value)} placeholder="0" />
           </div>
           <div className="space-y-2">
-            <Label>Nightly Rate (max ${ACCOMMODATION_CAP_PER_NIGHT})</Label>
-            <Input type="number" value={form.estimated_accommodation_nightly_rate} onChange={(e) => update('estimated_accommodation_nightly_rate', e.target.value)} max={ACCOMMODATION_CAP_PER_NIGHT} />
+            <Label>Nightly Rate (max ${settings.accommodation_cap_per_night_usd})</Label>
+            <Input
+              type="number"
+              value={form.estimated_accommodation_nightly_rate}
+              onChange={(e) => update('estimated_accommodation_nightly_rate', e.target.value)}
+              max={settings.accommodation_cap_per_night_usd}
+            />
           </div>
           <div className="space-y-2">
             <Label>Food Per Diem</Label>
@@ -258,6 +300,19 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
         </div>
 
         <Separator />
+
+        {/* Eligibility warnings */}
+        {eligibilityWarnings.length > 0 && (
+          <div className="rounded-lg border border-amber/30 bg-amber/5 p-3 space-y-1.5">
+            <div className="flex items-center gap-2 text-sm font-medium text-amber">
+              <Info className="h-4 w-4" />
+              Eligibility notes (informational — not blocking)
+            </div>
+            {eligibilityWarnings.map((w) => (
+              <div key={w.code} className="text-xs text-muted-foreground">• {w.message}</div>
+            ))}
+          </div>
+        )}
 
         {/* Leave Days */}
         <div className="grid grid-cols-2 gap-4">
@@ -292,9 +347,12 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
           {isSplitPayment && (
             <div className="flex items-center gap-2 text-amber text-sm mt-2">
               <AlertTriangle className="h-4 w-4" />
-              <span>Over $4,000 — 50/50 split payment applies (50% upfront, 50% on completion)</span>
+              <span>Over ${settings.professional_split_threshold_usd.toLocaleString()} — 50/50 split payment applies (50% upfront, 50% on completion)</span>
             </div>
           )}
+          {breakdown.notes.map((n, i) => (
+            <div key={i} className="text-xs text-muted-foreground mt-1">• {n}</div>
+          ))}
         </div>
 
         <div className="flex justify-end gap-2">
