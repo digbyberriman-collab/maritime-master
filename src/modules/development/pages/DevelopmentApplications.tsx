@@ -18,7 +18,7 @@ export default function DevelopmentApplications() {
   const [expenseApp, setExpenseApp] = useState<any>(null);
 
   const activeApps = applications.filter((a) =>
-    ['draft', 'submitted', 'hod_review', 'peer_review', 'captain_review', 'approved', 'enrolled'].includes(a.status)
+    ['draft', 'submitted', 'hod_review', 'purser_review', 'captain_review', 'approved', 'enrolled'].includes(a.status)
   );
   const completedApps = applications.filter((a) => a.status === 'completed');
   const returnedApps = applications.filter((a) => ['returned', 'cancelled'].includes(a.status));

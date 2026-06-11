@@ -159,7 +159,7 @@ export function useDevelopmentStats() {
         .from('development_applications')
         .select('id', { count: 'exact', head: true })
         .eq('crew_member_id', user.id)
-        .in('status', ['submitted', 'hod_review', 'peer_review', 'captain_review', 'approved', 'enrolled']);
+        .in('status', ['submitted', 'hod_review', 'purser_review', 'captain_review', 'approved', 'enrolled']);
 
       // Completed courses
       const { count: completedCourses } = await supabase

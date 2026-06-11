@@ -62,7 +62,7 @@ export default function MyDevelopment() {
   }, [profile, isAdmin]);
 
   const activeApps = applications.filter((a) =>
-    ['submitted', 'hod_review', 'peer_review', 'captain_review', 'approved', 'enrolled'].includes(a.status)
+    ['submitted', 'hod_review', 'purser_review', 'captain_review', 'approved', 'enrolled'].includes(a.status)
   );
 
   const completedApps = applications.filter((a) => a.status === 'completed');
