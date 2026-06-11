@@ -34,6 +34,7 @@ interface PermissionsState {
 
 // Role priority order (higher priority first)
 const ROLE_PRIORITY = [
+  'superadmin',
   'dpa', 
   'fleet_master', 
   'captain', 
@@ -46,6 +47,19 @@ const ROLE_PRIORITY = [
   'auditor',
   'employer_api'
 ];
+
+type RawPermission = {
+  module_key: string;
+  permission: PermissionLevel;
+  scope: ModulePermission['scope'];
+  restrictions: Record<string, boolean> | null;
+};
+
+const permissionIncludes = (actual: PermissionLevel, required: PermissionLevel) => {
+  if (actual === 'admin') return true;
+  if (actual === 'edit') return required === 'view' || required === 'edit';
+  return required === 'view';
+};
 
 export const usePermissionsStore = create<PermissionsState>((set, get) => ({
   permissions: [],
@@ -87,7 +101,7 @@ export const usePermissionsStore = create<PermissionsState>((set, get) => ({
         supabase.from('modules').select('*').eq('is_active', true).order('sort_order'),
         supabase.from('roles').select('*'),
         supabase.rpc('get_user_roles_full', { p_user_id: user.id }),
-        supabase.rpc('get_user_permissions_full', { p_user_id: user.id }),
+        supabase.rpc('get_user_rbac_permissions', { p_user_id: user.id }),
       ]);
 
       if (modulesRes.error) throw modulesRes.error;
@@ -101,17 +115,45 @@ export const usePermissionsStore = create<PermissionsState>((set, get) => ({
       // Determine primary role by priority
       const primaryRoleName = userRoles
         .map((ur) => ur.role_name)
-        .sort((a, b) => ROLE_PRIORITY.indexOf(a) - ROLE_PRIORITY.indexOf(b))[0];
+        .sort((a, b) => {
+          const aIndex = ROLE_PRIORITY.indexOf(a);
+          const bIndex = ROLE_PRIORITY.indexOf(b);
+          return (aIndex === -1 ? Number.MAX_SAFE_INTEGER : aIndex) -
+            (bIndex === -1 ? Number.MAX_SAFE_INTEGER : bIndex);
+        })[0];
       
       const primaryRole = (rolesRes.data as Role[])?.find(
         (r) => r.name === primaryRoleName
       ) ?? null;
 
+      const modules = (modulesRes.data ?? []) as Module[];
+      const moduleNames = new Map(modules.map((module) => [module.key, module.name]));
+      const permissionsByModule = new Map<string, ModulePermission>();
+
+      ((permissionsRes.data ?? []) as RawPermission[]).forEach((permissionRow) => {
+        const existing = permissionsByModule.get(permissionRow.module_key) ?? {
+          module_key: permissionRow.module_key,
+          module_name: moduleNames.get(permissionRow.module_key) ?? permissionRow.module_key,
+          can_view: false,
+          can_edit: false,
+          can_admin: false,
+          scope: permissionRow.scope,
+          restrictions: permissionRow.restrictions ?? {},
+        };
+
+        existing.can_view = existing.can_view || permissionIncludes(permissionRow.permission, 'view');
+        existing.can_edit = existing.can_edit || permissionIncludes(permissionRow.permission, 'edit');
+        existing.can_admin = existing.can_admin || permissionIncludes(permissionRow.permission, 'admin');
+        existing.scope = existing.scope ?? permissionRow.scope;
+        existing.restrictions = { ...(existing.restrictions ?? {}), ...(permissionRow.restrictions ?? {}) };
+        permissionsByModule.set(permissionRow.module_key, existing);
+      });
+
       set({
-        modules: (modulesRes.data ?? []) as Module[],
+        modules,
         roles: (rolesRes.data ?? []) as Role[],
         userRoles,
-        permissions: (permissionsRes.data ?? []) as ModulePermission[],
+        permissions: Array.from(permissionsByModule.values()),
         hasFleetAccess,
         primaryRole,
         isLoading: false,
@@ -136,8 +178,8 @@ export const usePermissionsStore = create<PermissionsState>((set, get) => ({
     if (!perm) return false;
     
     switch (permission) {
-      case 'view': return perm.can_view;
-      case 'edit': return perm.can_edit;
+      case 'view': return perm.can_view || perm.can_edit || perm.can_admin;
+      case 'edit': return perm.can_edit || perm.can_admin;
       case 'admin': return perm.can_admin;
       default: return false;
     }
@@ -150,13 +192,17 @@ export const usePermissionsStore = create<PermissionsState>((set, get) => ({
   getVisibleModules: () => {
     const { modules, permissions } = get();
     const viewableKeys = new Set(
-      permissions.filter(p => p.can_view).map(p => p.module_key)
+      permissions.filter(p => p.can_view || p.can_edit || p.can_admin).map(p => p.module_key)
     );
     return modules.filter(m => viewableKeys.has(m.key));
   },
 
   hasRole: (roleName) => {
-    return get().userRoles.some(ur => ur.role_name === roleName);
+    const normalizedRole = roleName.toLowerCase().replace(/\s+/g, '_');
+    return get().userRoles.some(ur =>
+      ur.role_name.toLowerCase() === normalizedRole ||
+      ur.role_display_name.toLowerCase().replace(/\s+/g, '_') === normalizedRole
+    );
   },
 
   getRestrictions: (moduleKey) => {
