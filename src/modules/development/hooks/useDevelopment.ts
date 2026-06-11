@@ -33,8 +33,8 @@ export interface DevelopmentApplication {
   course_end_date: string | null;
   hod_reviewer_id: string | null;
   hod_reviewed_at: string | null;
-  peer_reviewer_id: string | null;
-  peer_reviewed_at: string | null;
+  purser_reviewer_id: string | null;
+  purser_reviewed_at: string | null;
   captain_reviewer_id: string | null;
   captain_reviewed_at: string | null;
 }
