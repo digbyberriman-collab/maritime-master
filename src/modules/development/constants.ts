@@ -2,7 +2,19 @@
 
 export type DevCategory = 'fleet_organised' | 'mandatory' | 'professional' | 'extracurricular';
 export type DevFormat = 'in_person' | 'online' | 'onboard' | 'blended' | 'online_in_person';
-export type ApplicationStatus = 'draft' | 'submitted' | 'hod_review' | 'purser_review' | 'captain_review' | 'approved' | 'enrolled' | 'completed' | 'returned' | 'cancelled' | 'discretionary_approved';
+export type ApplicationStatus =
+  | 'draft'
+  | 'submitted'
+  | 'hod_review'
+  | 'purser_review'
+  | 'captain_review'
+  | 'captain_purser_review'
+  | 'approved'
+  | 'enrolled'
+  | 'completed'
+  | 'returned'
+  | 'cancelled'
+  | 'discretionary_approved';
 export type ExpenseStatus = 'draft' | 'submitted' | 'under_review' | 'approved' | 'paid' | 'partially_paid' | 'rejected';
 
 export const CATEGORY_CONFIG: Record<DevCategory, { label: string; color: string; bgClass: string; textClass: string }> = {
@@ -37,24 +49,35 @@ export const APPLICATION_STATUS_CONFIG: Record<ApplicationStatus, { label: strin
   submitted: { label: 'Submitted', step: 1, color: 'text-info' },
   hod_review: { label: 'HOD Review', step: 2, color: 'text-amber' },
   purser_review: { label: 'Purser Review', step: 3, color: 'text-amber' },
-  captain_review: { label: 'Captain Review', step: 4, color: 'text-amber' },
-  approved: { label: 'Approved', step: 5, color: 'text-success' },
-  enrolled: { label: 'Enrolled', step: 6, color: 'text-success' },
-  completed: { label: 'Completed', step: 7, color: 'text-success' },
+  captain_review: { label: 'Captain Review', step: 3, color: 'text-amber' },
+  captain_purser_review: { label: 'Captain & Purser Review', step: 3, color: 'text-amber' },
+  approved: { label: 'Approved', step: 4, color: 'text-success' },
+  enrolled: { label: 'Enrolled', step: 5, color: 'text-success' },
+  completed: { label: 'Completed', step: 6, color: 'text-success' },
   returned: { label: 'Returned', step: -1, color: 'text-destructive' },
   cancelled: { label: 'Cancelled', step: -1, color: 'text-muted-foreground' },
-  discretionary_approved: { label: 'Approved (Discretionary)', step: 5, color: 'text-success' },
+  discretionary_approved: { label: 'Approved (Discretionary)', step: 4, color: 'text-success' },
 };
 
 export const APPROVAL_STEPS = [
   'Submitted',
   'HOD Review',
-  'Purser Review',
-  'Captain Approval',
+  'Captain & Purser',
   'Approved',
   'Enrolled',
   'Completed',
 ];
+
+// ISO currency codes commonly used for crew course expenses
+export const APPLICATION_CURRENCIES = [
+  { code: 'USD', label: 'US Dollar' },
+  { code: 'EUR', label: 'Euro' },
+  { code: 'GBP', label: 'Pound Sterling' },
+  { code: 'AUD', label: 'Australian Dollar' },
+  { code: 'NZD', label: 'New Zealand Dollar' },
+  { code: 'CAD', label: 'Canadian Dollar' },
+  { code: 'CHF', label: 'Swiss Franc' },
+] as const;
 
 // Policy constants
 export const ACCOMMODATION_CAP_PER_NIGHT = 250;

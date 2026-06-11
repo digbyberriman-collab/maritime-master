@@ -25,6 +25,13 @@ interface CreateApplicationInput {
   is_custom_course?: boolean;
   leave_days_accrued?: number;
   neutral_days_accrued?: number;
+  application_currency?: string;
+  exchange_rate_to_usd?: number;
+  tuition_local_amount?: number;
+  travel_local_amount?: number;
+  accommodation_local_amount?: number;
+  course_duration_hours?: number;
+  is_online_short?: boolean;
 }
 
 export function useCreateApplication() {
@@ -127,24 +134,50 @@ export function useReviewApplication() {
     mutationFn: async (input: ReviewInput) => {
       if (!user?.id) throw new Error('Not authenticated');
 
-      const nextStatusMap: Record<string, Record<string, string>> = {
-        hod: { approved: 'purser_review', returned: 'returned' },
-        peer: { approved: 'captain_review', returned: 'returned' },
-        captain: { approved: 'approved', returned: 'returned' },
-      };
-
+      // Always record the reviewer's decision on their own field
       const updateFields: Record<string, unknown> = {
-        status: nextStatusMap[input.stage][input.decision],
         [`${input.stage}_reviewer_id`]: user.id,
         [`${input.stage}_reviewed_at`]: new Date().toISOString(),
         [`${input.stage}_decision`]: input.decision,
         [`${input.stage}_comments`]: input.comments || null,
       };
 
-      if (input.isDiscretionary && input.stage === 'captain') {
-        updateFields.is_discretionary = true;
-        updateFields.discretionary_justification = input.discretionaryJustification;
-        updateFields.status = 'discretionary_approved';
+      // Any returned decision short-circuits to 'returned'
+      if (input.decision === 'returned') {
+        updateFields.status = 'returned';
+      } else if (input.stage === 'hod') {
+        // HOD approval moves to parallel Captain + Purser review
+        updateFields.status = 'captain_purser_review';
+      } else {
+        // Captain or Purser approval — need to check if BOTH have approved
+        const { data: current, error: fetchErr } = await supabase
+          .from('development_applications')
+          .select('captain_decision, purser_decision')
+          .eq('id', input.applicationId)
+          .single();
+        if (fetchErr) throw fetchErr;
+
+        const captainOk =
+          input.stage === 'captain' ? true : current?.captain_decision === 'approved';
+        const pursorOk =
+          input.stage === 'purser' ? true : current?.purser_decision === 'approved';
+
+        if (captainOk && pursorOk) {
+          updateFields.status =
+            input.isDiscretionary && input.stage === 'captain'
+              ? 'discretionary_approved'
+              : 'approved';
+          if (input.isDiscretionary && input.stage === 'captain') {
+            updateFields.is_discretionary = true;
+            updateFields.discretionary_justification = input.discretionaryJustification;
+          }
+        } else {
+          updateFields.status = 'captain_purser_review';
+          if (input.isDiscretionary && input.stage === 'captain') {
+            updateFields.is_discretionary = true;
+            updateFields.discretionary_justification = input.discretionaryJustification;
+          }
+        }
       }
 
       const { error } = await supabase
@@ -228,7 +261,13 @@ export function useApplicationsForReview() {
           crew_member:profiles!development_applications_crew_member_id_fkey(first_name, last_name, email)
         `)
         .eq('company_id', profile.company_id)
-        .in('status', ['submitted', 'hod_review', 'purser_review', 'captain_review'])
+        .in('status', [
+          'submitted',
+          'hod_review',
+          'purser_review',
+          'captain_review',
+          'captain_purser_review',
+        ])
         .order('submitted_at', { ascending: true });
 
       if (error) throw error;
