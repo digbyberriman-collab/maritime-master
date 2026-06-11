@@ -112,7 +112,7 @@ export function useSubmitApplication() {
 
 interface ReviewInput {
   applicationId: string;
-  stage: 'hod' | 'peer' | 'captain';
+  stage: 'hod' | 'purser' | 'captain';
   decision: 'approved' | 'returned';
   comments?: string;
   isDiscretionary?: boolean;

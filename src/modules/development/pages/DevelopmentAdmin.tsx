@@ -49,9 +49,9 @@ export default function DevelopmentAdmin() {
 
   // Determine review capability
   const canReview = true; // Admin can review
-  const getReviewStage = (status: string): 'hod' | 'peer' | 'captain' | null => {
+  const getReviewStage = (status: string): 'hod' | 'purser' | 'captain' | null => {
     if (status === 'submitted' || status === 'hod_review') return 'hod';
-    if (status === 'purser_review') return 'peer';
+    if (status === 'purser_review') return 'purser';
     if (status === 'captain_review') return 'captain';
     return null;
   };
