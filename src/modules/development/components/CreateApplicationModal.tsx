@@ -15,6 +15,7 @@ import { calculateCosts, checkEligibility, DEFAULT_SETTINGS } from '@/modules/de
 import {
   CATEGORY_CONFIG,
   FORMAT_LABELS,
+  APPLICATION_CURRENCIES,
   type DevCategory,
 } from '@/modules/development/constants';
 
@@ -40,6 +41,7 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
     course_start_date: '',
     course_end_date: '',
     course_duration_days: '',
+    course_duration_hours: '',
     course_description: '',
     estimated_tuition_usd: '',
     estimated_travel_usd: '',
@@ -49,6 +51,11 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
     estimated_food_per_diem_usd: String(settings.food_per_diem_usd),
     leave_days_accrued: '0',
     neutral_days_accrued: '0',
+    application_currency: 'USD',
+    exchange_rate_to_usd: '1',
+    tuition_local_amount: '',
+    travel_local_amount: '',
+    accommodation_local_amount: '',
   });
 
   const update = (field: string, value: string) => setForm((f) => ({ ...f, [field]: value }));
@@ -57,7 +64,21 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
   const courseCategory = isCustom ? form.custom_category : course.category;
 
   const durationDays = parseInt(form.course_duration_days) || 0;
+  const durationHours = parseFloat(form.course_duration_hours) || undefined;
   const nights = parseInt(form.estimated_accommodation_nights) || 0;
+  const fx = parseFloat(form.exchange_rate_to_usd) || 1;
+  const isLocal = form.application_currency !== 'USD';
+
+  // If user entered local-currency amounts, derive USD equivalents
+  const tuitionUsdInput = isLocal && form.tuition_local_amount
+    ? String((parseFloat(form.tuition_local_amount) || 0) * fx)
+    : form.estimated_tuition_usd;
+  const travelUsdInput = isLocal && form.travel_local_amount
+    ? String((parseFloat(form.travel_local_amount) || 0) * fx)
+    : form.estimated_travel_usd;
+  const accomNightlyUsd = isLocal && form.accommodation_local_amount && nights > 0
+    ? ((parseFloat(form.accommodation_local_amount) || 0) * fx) / nights
+    : (parseFloat(form.estimated_accommodation_nightly_rate) || 0);
 
   const breakdown = useMemo(
     () =>
@@ -66,16 +87,17 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
           category: courseCategory,
           format: course?.format ?? null,
           durationDays,
-          tuitionUsd: parseFloat(form.estimated_tuition_usd) || 0,
-          travelUsd: parseFloat(form.estimated_travel_usd) || 0,
+          tuitionUsd: parseFloat(tuitionUsdInput) || 0,
+          travelUsd: parseFloat(travelUsdInput) || 0,
           accommodationNights: nights,
-          accommodationNightlyRateUsd: parseFloat(form.estimated_accommodation_nightly_rate) || 0,
+          accommodationNightlyRateUsd: accomNightlyUsd,
           foodPerDiemUsd: parseFloat(form.estimated_food_per_diem_usd) || undefined,
+          durationHours,
           over4kRule: course?.over_4k_rule,
         },
         settings,
       ),
-    [courseCategory, course, durationDays, nights, form, settings],
+    [courseCategory, course, durationDays, durationHours, nights, tuitionUsdInput, travelUsdInput, accomNightlyUsd, form.estimated_food_per_diem_usd, settings],
   );
 
   const eligibilityWarnings = useMemo(
@@ -117,6 +139,7 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
       course_start_date: form.course_start_date || undefined,
       course_end_date: form.course_end_date || undefined,
       course_duration_days: durationDays || undefined,
+      course_duration_hours: durationHours,
       estimated_tuition_usd: tuition || undefined,
       estimated_travel_usd: travel || undefined,
       estimated_travel_route: form.estimated_travel_route || undefined,
@@ -127,6 +150,12 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
       is_custom_course: isCustom,
       leave_days_accrued: parseInt(form.leave_days_accrued) || 0,
       neutral_days_accrued: parseInt(form.neutral_days_accrued) || 0,
+      application_currency: form.application_currency,
+      exchange_rate_to_usd: fx,
+      tuition_local_amount: parseFloat(form.tuition_local_amount) || undefined,
+      travel_local_amount: parseFloat(form.travel_local_amount) || undefined,
+      accommodation_local_amount: parseFloat(form.accommodation_local_amount) || undefined,
+      is_online_short: breakdown.isOnlineShort,
     });
     onOpenChange(false);
   };
@@ -144,6 +173,7 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
       course_start_date: form.course_start_date || undefined,
       course_end_date: form.course_end_date || undefined,
       course_duration_days: durationDays || undefined,
+      course_duration_hours: durationHours,
       estimated_tuition_usd: tuition || undefined,
       estimated_travel_usd: travel || undefined,
       estimated_travel_route: form.estimated_travel_route || undefined,
@@ -154,6 +184,12 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
       is_custom_course: isCustom,
       leave_days_accrued: parseInt(form.leave_days_accrued) || 0,
       neutral_days_accrued: parseInt(form.neutral_days_accrued) || 0,
+      application_currency: form.application_currency,
+      exchange_rate_to_usd: fx,
+      tuition_local_amount: parseFloat(form.tuition_local_amount) || undefined,
+      travel_local_amount: parseFloat(form.travel_local_amount) || undefined,
+      accommodation_local_amount: parseFloat(form.accommodation_local_amount) || undefined,
+      is_online_short: breakdown.isOnlineShort,
     });
     if (result?.id) {
       await submitApp.mutateAsync(result.id);
