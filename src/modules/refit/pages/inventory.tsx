@@ -23,7 +23,7 @@ export default function Page() {
 
     <SimpleModulePage<InventoryItem>
       config={{
-        table: "inventory_items",
+        table: "rf_inventory_items",
         title: "Inventory & Equipment",
         subtitle: "Spares, equipment, certificates, warranty, reorder levels",
         vesselScoped: true,

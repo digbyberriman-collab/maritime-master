@@ -29,7 +29,7 @@ export default function Page() {
 
     <SimpleModulePage<LogisticsItem>
       config={{
-        table: "logistics_items",
+        table: "rf_logistics_items",
         title: "Logistics",
         subtitle: "Crew & contractor travel, deliveries, dock movements, bookings",
         vesselScoped: true,

@@ -7,7 +7,7 @@ export default function Page() {
 
     <SimpleModulePage<Contractor>
       config={{
-        table: "contractors",
+        table: "rf_contractors",
         title: "Contractors & Suppliers",
         subtitle: "Companies engaged across the project — contracts, insurance, scope",
         vesselScoped: false,

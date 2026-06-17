@@ -9,7 +9,7 @@ export default function Page() {
 
     <SimpleModulePage<Risk>
       config={{
-        table: "risks",
+        table: "rf_risks",
         title: "Risk Register",
         subtitle: "Project risks scored on likelihood × impact, with mitigation and ownership",
         vesselScoped: true,

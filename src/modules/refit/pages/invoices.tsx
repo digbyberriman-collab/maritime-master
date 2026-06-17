@@ -7,7 +7,7 @@ export default function Page() {
 
     <SimpleModulePage<Invoice>
       config={{
-        table: "invoices",
+        table: "rf_invoices",
         title: "Invoices",
         subtitle: "Supplier invoices — track received, approved, disputed and paid",
         vesselScoped: true,

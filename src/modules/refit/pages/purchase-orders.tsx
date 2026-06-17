@@ -7,7 +7,7 @@ export default function Page() {
 
     <SimpleModulePage<PurchaseOrder>
       config={{
-        table: "purchase_orders",
+        table: "rf_purchase_orders",
         title: "Purchase Orders",
         subtitle: "Procurement commitments — submit, approve, track receipt",
         vesselScoped: true,

@@ -7,7 +7,7 @@ export default function Page() {
 
     <SimpleModulePage<Meeting>
       config={{
-        table: "meetings",
+        table: "rf_meetings",
         title: "Meetings",
         subtitle: "Coordination meetings with linked actions and minutes",
         vesselScoped: true,
