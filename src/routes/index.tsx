@@ -5,6 +5,7 @@ import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { PlaceholderPage } from '@/shared/components/common/PlaceholderPage';
 import { PLACEHOLDER_LEAVES } from '@/config/sitemap';
 import { newBuildRoutes } from '@/modules/new-build/routes';
+import { refitRoutes } from '@/modules/refit/routes';
 import { 
   Ship, Users, Award, Plane, Clock, CalendarDays,
   AlertTriangle, ClipboardList, BookOpen, Shield, FileCheck, Layers, LayoutGrid,
@@ -778,6 +779,9 @@ export const AppRoutes: React.FC = () => {
 
       {/* New Build module — sits before placeholders so it takes precedence. */}
       {newBuildRoutes}
+
+      {/* Refit module (ported from Ship Shape Command). */}
+      {refitRoutes}
 
       {/* Sitemap-driven placeholders: every Fleet/Vessel/Shoreside/Health/Yard/HRIS
           leaf that doesn't have a real page yet renders a Coming Soon screen.
