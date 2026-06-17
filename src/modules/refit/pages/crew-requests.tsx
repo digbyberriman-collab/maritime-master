@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus, Paperclip, FileText } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase as supabaseClient } from "@/integrations/supabase/client";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const supabase: any = supabaseClient;
 import { AppShell, PageHeader } from "@/modules/refit/components/AppShell";
 import { RequireAuth } from "@/modules/refit/components/RequireAuth";
 import { useAuth } from "@/modules/refit/lib/auth";

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase as supabaseClient } from "@/integrations/supabase/client";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const supabase: any = supabaseClient;
 import { useAuth } from "@/modules/refit/lib/auth";
 import { AppShell, PageHeader } from "@/modules/refit/components/AppShell";
 import { RequireAuth } from "@/modules/refit/components/RequireAuth";
