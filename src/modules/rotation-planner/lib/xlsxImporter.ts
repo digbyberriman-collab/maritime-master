@@ -43,6 +43,9 @@ export interface ImportPreview {
 
 function excelDate(v: unknown): string | undefined {
   if (!v) return undefined;
+  if (v instanceof Date && !isNaN(v.getTime())) {
+    return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}`;
+  }
   if (typeof v === 'number') {
     const d = XLSX.SSF.parse_date_code(v);
     if (!d) return undefined;
@@ -76,10 +79,56 @@ function classifyLocationStatus(name: string): FrpLocationStatus {
   return 'confirmed';
 }
 
+/** Carry-forward date builder for the Draak Timeline sheet:
+ * - Header row index 2 (3rd row): month markers in some columns (Date values).
+ * - Header row index 3 (4th row): day-of-month numbers (1..31) per column.
+ * Combines the most-recent month with each day to produce a per-column ISO date.
+ */
+function buildDateAxis(tl: XLSX.WorkSheet, range: XLSX.Range): Record<number, string> {
+  const dateForCol: Record<number, string> = {};
+  let curYear: number | null = null;
+  let curMonth: number | null = null;
+  let lastDay = 0;
+  for (let C = range.s.c + 1; C <= range.e.c; C++) {
+    const monthCell = tl[XLSX.utils.encode_cell({ r: 2, c: C })];
+    const mv = monthCell?.v;
+    if (mv instanceof Date && !isNaN(mv.getTime())) {
+      curYear = mv.getFullYear();
+      curMonth = mv.getMonth() + 1;
+    } else if (typeof mv === 'number') {
+      const d = XLSX.SSF.parse_date_code(mv);
+      if (d) {
+        curYear = d.y;
+        curMonth = d.m;
+      }
+    }
+    const dayCell = tl[XLSX.utils.encode_cell({ r: 3, c: C })];
+    const dv = dayCell?.v;
+    let day: number | null = null;
+    if (typeof dv === 'number' && dv >= 1 && dv <= 31) day = Math.round(dv);
+    else if (typeof dv === 'string' && /^\d{1,2}$/.test(dv.trim())) day = parseInt(dv.trim(), 10);
+    if (day && curYear && curMonth) {
+      // month rollover: if the day decreased significantly, advance the month
+      if (day < lastDay - 10) {
+        curMonth += 1;
+        if (curMonth > 12) { curMonth = 1; curYear += 1; }
+      }
+      lastDay = day;
+      dateForCol[C] = `${curYear}-${String(curMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    }
+  }
+  return dateForCol;
+}
+
+const DEPT_RE = /\b(BRIDGE|DECK|ENG(?:INEERING)?|INTERIOR|GALLEY|WELLNESS|SHORESIDE|DIVE|HOTEL|MANAGEMENT|MEDIA|STEW)\b.*DEPT\b/i;
+
 /**
- * Generic best-effort parser. The "Draak - Rotation Planner.xlsx" Timeline sheet
- * uses merged-cell colour ranges that XLSX can read via !merges; we map each
- * merged cell on rows >= 5 (after header rows) into a rotation.
+ * Parser calibrated to the "Draak - Rotation Planner.xlsx" workbook.
+ * - Timeline: weekly columns (Mon date in row 4) with crew names typed into cells.
+ *   Consecutive cells in the same row sharing the same crew text form one block.
+ *   Department headers (e.g. "BRIDGE DEPT") group the lanes that follow.
+ * - Monthly tabs (e.g. "Feb 26"): header row at index 2 with Name / Arrival / etc.
+ * - Also still handles legacy merged-cell layouts as a fallback.
  */
 export async function parsePlannerWorkbook(file: File, vesselNameDefault: string): Promise<ImportPreview> {
   const buf = await file.arrayBuffer();
@@ -96,22 +145,32 @@ export async function parsePlannerWorkbook(file: File, vesselNameDefault: string
     warnings.push('No Timeline sheet found');
   } else {
     const range = XLSX.utils.decode_range(tl['!ref'] ?? 'A1');
-    // Build a date column index from header rows (rows 3/4 in spreadsheet -> indices 2/3)
-    const dateForCol: Record<number, string> = {};
-    for (let R = 0; R <= Math.min(5, range.e.r); R++) {
-      for (let C = range.s.c + 1; C <= range.e.c; C++) {
-        const cell = tl[XLSX.utils.encode_cell({ r: R, c: C })];
-        const iso = excelDate(cell?.v);
-        if (iso) dateForCol[C] = iso;
-      }
-    }
+    const dateForCol = buildDateAxis(tl, range);
     const colCount = Object.keys(dateForCol).length;
     if (colCount === 0) warnings.push('Could not detect date columns in Timeline');
+    // Each column represents roughly a week (Mon..Sun); approximate the block end.
+    const colEndDate = (c: number): string => {
+      const start = dateForCol[c];
+      if (!start) return '';
+      // find the next column's date; use day-before as this column's end
+      let nextC = c + 1;
+      while (nextC <= range.e.c && !dateForCol[nextC]) nextC++;
+      const nextStart = dateForCol[nextC];
+      if (nextStart) {
+        const d = new Date(nextStart + 'T00:00:00Z');
+        d.setUTCDate(d.getUTCDate() - 1);
+        return d.toISOString().slice(0, 10);
+      }
+      // fall back: +6 days
+      const d = new Date(start + 'T00:00:00Z');
+      d.setUTCDate(d.getUTCDate() + 6);
+      return d.toISOString().slice(0, 10);
+    };
 
-    // Row 0 = vessel locations
+    // Vessel locations live in merged cells on rows 0–1 (if present)
     for (const m of tl['!merges'] ?? []) {
-      if (m.s.r === 0 && m.s.c > 0) {
-        const cell = tl[XLSX.utils.encode_cell({ r: 0, c: m.s.c })];
+      if (m.s.r <= 1 && m.s.c > 0) {
+        const cell = tl[XLSX.utils.encode_cell({ r: m.s.r, c: m.s.c })];
         const name = String(cell?.v ?? '').trim();
         const start = dateForCol[m.s.c];
         const end = dateForCol[m.e.c] ?? start;
@@ -127,28 +186,31 @@ export async function parsePlannerWorkbook(file: File, vesselNameDefault: string
       }
     }
 
-    // Detect lane label per row from column A
+    // Detect lane label per row from column A. Dept rows match "<NAME> DEPT".
     const laneLabelByRow: Record<number, { lane: string; dept: string | null; position: string | null }> = {};
     let currentDept: string | null = null;
     for (let R = 4; R <= range.e.r; R++) {
       const cell = tl[XLSX.utils.encode_cell({ r: R, c: range.s.c })];
       const v = String(cell?.v ?? '').trim();
-      if (!v) continue;
-      const looksDept = /^(deck|engineering|interior|galley|bridge|stew|management|hotel)/i.test(v);
-      if (looksDept) currentDept = v;
-      laneLabelByRow[R] = { lane: v, dept: currentDept, position: looksDept ? null : v };
+      if (!v || v === '.') continue;
+      const looksDept = DEPT_RE.test(v);
+      if (looksDept) {
+        currentDept = v.replace(/\s*DEPT\s*$/i, '').trim();
+        continue; // header row, no lane
+      }
+      laneLabelByRow[R] = { lane: v, dept: currentDept, position: v };
     }
 
-    // Merged ranges below row 0 = rotation blocks
+    // Pass 1: legacy merged-cell rotation blocks (if any).
+    const handledByMerge = new Set<string>();
     for (const m of tl['!merges'] ?? []) {
-      if (m.s.r < 4) continue;
-      if (m.s.c === range.s.c) continue;
+      if (m.s.r < 4 || m.s.c === range.s.c) continue;
+      const laneInfo = laneLabelByRow[m.s.r];
+      const start = dateForCol[m.s.c];
+      if (!laneInfo || !start) continue;
       const cell = tl[XLSX.utils.encode_cell({ r: m.s.r, c: m.s.c })];
       const label = String(cell?.v ?? '').trim();
-      const start = dateForCol[m.s.c];
-      const end = dateForCol[m.e.c] ?? start;
-      const laneInfo = laneLabelByRow[m.s.r];
-      if (!laneInfo || !start) continue;
+      const end = dateForCol[m.e.c] ? colEndDate(m.e.c) : colEndDate(m.s.c);
       rotations.push({
         vesselGuess: vesselNameDefault,
         laneLabel: laneInfo.lane,
@@ -156,35 +218,131 @@ export async function parsePlannerWorkbook(file: File, vesselNameDefault: string
         positionTitle: laneInfo.position,
         crewName: label || laneInfo.lane,
         start,
-        end: end ?? start,
+        end,
         rotationType: classifyRotation(label || laneInfo.lane),
-        notes: undefined,
       });
+      for (let c = m.s.c; c <= m.e.c; c++) handledByMerge.add(`${m.s.r}:${c}`);
+    }
+
+    // Pass 2: contiguous-cell rotation blocks (the Draak format).
+    const dateCols = Object.keys(dateForCol).map(Number).sort((a, b) => a - b);
+    const norm = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase();
+    for (const R of Object.keys(laneLabelByRow).map(Number)) {
+      const laneInfo = laneLabelByRow[R];
+      let runStart: number | null = null;
+      let runLabel = '';
+      const flush = (endCol: number) => {
+        if (runStart == null) return;
+        const startIso = dateForCol[runStart];
+        const endIso = colEndDate(endCol);
+        if (startIso && runLabel) {
+          rotations.push({
+            vesselGuess: vesselNameDefault,
+            laneLabel: laneInfo.lane,
+            department: laneInfo.dept,
+            positionTitle: laneInfo.position,
+            crewName: runLabel,
+            start: startIso,
+            end: endIso,
+            rotationType: classifyRotation(runLabel),
+          });
+        }
+        runStart = null;
+        runLabel = '';
+      };
+      for (const C of dateCols) {
+        if (handledByMerge.has(`${R}:${C}`)) { flush(C - 1); continue; }
+        const cell = tl[XLSX.utils.encode_cell({ r: R, c: C })];
+        const raw = cell?.v == null ? '' : String(cell.v).trim();
+        if (!raw) { flush(C - 1); continue; }
+        if (runStart != null && norm(raw) === norm(runLabel)) continue;
+        flush(C - 1);
+        runStart = C;
+        runLabel = raw;
+      }
+      flush(dateCols[dateCols.length - 1] ?? 0);
     }
   }
 
-  // ---- Monthly arrival/departure sheets ----
+  // ---- Monthly arrival/departure sheets (e.g. "Feb 26") ----
+  // Real header row is row index 2 (3rd row); titles often have trailing spaces.
+  const monthRe = /^[A-Za-z]{3,9}\s*'?\s*\d{2,4}$/;
+  const cleanName = (n: string) => n.replace(/[\n\r].*/s, '').replace(/\*+/g, '').trim();
+  const flightDateFromText = (txt: string, sheetName: string): string | undefined => {
+    // Match patterns like "10FEB on KL942 @19:50" or "1 DEC on ..."
+    const m = txt.match(/(\d{1,2})\s*(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)/i);
+    if (!m) return undefined;
+    const day = parseInt(m[1], 10);
+    const monthIdx = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(m[2].toLowerCase());
+    // Derive year from sheet name
+    const yMatch = sheetName.match(/(\d{2,4})/);
+    let year = yMatch ? parseInt(yMatch[1], 10) : new Date().getFullYear();
+    if (year < 100) year += 2000;
+    return `${year}-${String(monthIdx + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  };
+  const flightNumFromText = (txt: string): string | undefined => {
+    const m = txt.match(/\b([A-Z]{1,3}\s?\d{1,4}[A-Z]?)\b/);
+    return m ? m[1].replace(/\s/g, '') : undefined;
+  };
+
   for (const sname of wb.SheetNames) {
-    if (!/^[A-Za-z]{3,}\s*\d{2,4}$/.test(sname)) continue;
+    if (!monthRe.test(sname.trim())) continue;
     const sheet = wb.Sheets[sname];
-    const rows = XLSX.utils.sheet_to_json<any>(sheet, { defval: '', raw: false });
+    const ref = sheet['!ref'];
+    if (!ref) continue;
+    const range = XLSX.utils.decode_range(ref);
+    // Find header row by looking for "Name" in column A within the first 6 rows
+    let headerRow = -1;
+    for (let R = 0; R <= Math.min(5, range.e.r); R++) {
+      const v = String(sheet[XLSX.utils.encode_cell({ r: R, c: 0 })]?.v ?? '').trim().toLowerCase();
+      if (v === 'name') { headerRow = R; break; }
+    }
+    if (headerRow < 0) continue;
+    const headers: string[] = [];
+    for (let C = 0; C <= range.e.c; C++) {
+      headers[C] = String(sheet[XLSX.utils.encode_cell({ r: headerRow, c: C })]?.v ?? '').trim().toLowerCase();
+    }
+    const colOf = (...needles: string[]) =>
+      headers.findIndex((h) => needles.some((n) => h.includes(n)));
+    const cName = colOf('name');
+    const cArrival = colOf('arrival date', 'arrival ');
+    const cChange = colOf('change over', 'changeover');
+    const cAccom = colOf('accomodation', 'accommodation');
+    const cRoute = colOf('route');
+    const cSupp = colOf('flight supplier', 'supplier');
+    const cTransfer = colOf('transfer');
+    // Heuristic for direction: "ARRIVALS" / "DEPARTURES" banner in rows above header
     let direction: 'arrival' | 'departure' = 'arrival';
-    for (const r of rows) {
-      const keys = Object.keys(r).map((k) => k.toLowerCase());
-      if (keys.some((k) => k.includes('depart'))) direction = 'departure';
-      const name = r.Name || r.name || r['Crew'] || '';
+    for (let R = 0; R < headerRow; R++) {
+      const v = String(sheet[XLSX.utils.encode_cell({ r: R, c: 0 })]?.v ?? '').toLowerCase();
+      if (v.includes('departure')) { direction = 'departure'; break; }
+      if (v.includes('arrival')) { direction = 'arrival'; }
+    }
+    for (let R = headerRow + 1; R <= range.e.r; R++) {
+      const rawName = String(sheet[XLSX.utils.encode_cell({ r: R, c: cName })]?.v ?? '').trim();
+      if (!rawName) continue;
+      const name = cleanName(rawName);
       if (!name) continue;
+      // Banner row inside the table? Skip if it looks like "DEPARTURES - FEB 26"
+      if (/^(arrivals|departures)/i.test(name)) {
+        direction = name.toLowerCase().startsWith('depart') ? 'departure' : 'arrival';
+        continue;
+      }
+      const arrCell = cArrival >= 0 ? sheet[XLSX.utils.encode_cell({ r: R, c: cArrival })]?.v : undefined;
+      const arrText = arrCell == null ? '' : String(arrCell);
+      const flightDate = excelDate(arrCell) ?? flightDateFromText(arrText, sname);
+      const flightNumber = flightNumFromText(arrText);
       travel.push({
         vesselGuess: vesselNameDefault,
-        crewName: String(name),
+        crewName: name,
         direction,
-        flightDate: excelDate(r['Flight Date'] || r['Departure Date'] || r['Arrival Date']),
-        flightNumber: r['Flight'] || r['Flight Number'] || undefined,
-        changeoverDate: excelDate(r['Changeover Date']),
-        accommodation: r['Accommodation'] || undefined,
-        route: r['Route'] || undefined,
-        supplier: r['Flight Supplier'] || undefined,
-        transfer: r['Transfer'] || r['Transfer From Airport'] || undefined,
+        flightDate,
+        flightNumber,
+        changeoverDate: cChange >= 0 ? excelDate(sheet[XLSX.utils.encode_cell({ r: R, c: cChange })]?.v) : undefined,
+        accommodation: cAccom >= 0 ? String(sheet[XLSX.utils.encode_cell({ r: R, c: cAccom })]?.v ?? '').trim() || undefined : undefined,
+        route: cRoute >= 0 ? String(sheet[XLSX.utils.encode_cell({ r: R, c: cRoute })]?.v ?? '').trim() || undefined : undefined,
+        supplier: cSupp >= 0 ? String(sheet[XLSX.utils.encode_cell({ r: R, c: cSupp })]?.v ?? '').trim() || undefined : undefined,
+        transfer: cTransfer >= 0 ? String(sheet[XLSX.utils.encode_cell({ r: R, c: cTransfer })]?.v ?? '').trim() || undefined : undefined,
       });
     }
   }
@@ -192,5 +350,7 @@ export async function parsePlannerWorkbook(file: File, vesselNameDefault: string
   if (rotations.length === 0 && locations.length === 0 && travel.length === 0) {
     warnings.push('No recognisable rotation/location/travel rows found. The workbook may need manual mapping.');
   }
+  if (rotations.length > 0) warnings.push(`Parsed ${rotations.length} rotation blocks from Timeline`);
+  if (travel.length > 0) warnings.push(`Parsed ${travel.length} travel rows across monthly sheets`);
   return { rotations, locations, travel, warnings };
 }
