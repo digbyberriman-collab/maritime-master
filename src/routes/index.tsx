@@ -4,7 +4,7 @@ import ProtectedRoute from '@/shared/components/ProtectedRoute';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { PlaceholderPage } from '@/shared/components/common/PlaceholderPage';
 import { PLACEHOLDER_LEAVES } from '@/config/sitemap';
-// import { newBuildRoutes } from '@/modules/new-build/routes';
+import { newBuildRoutes } from '@/modules/new-build/routes';
 import { 
   Ship, Users, Award, Plane, Clock, CalendarDays,
   AlertTriangle, ClipboardList, BookOpen, Shield, FileCheck, Layers, LayoutGrid,
@@ -778,7 +778,7 @@ export const AppRoutes: React.FC = () => {
 
       {/* Catch-all - redirect to dashboard instead of 404 */}
       {/* New Build module — fully ported pages under /yard/new-build/* */}
-      {/* {newBuildRoutes} */}
+      {newBuildRoutes}
 
       {/* Sitemap-driven placeholders: every Fleet/Vessel/Shoreside/Health/Yard/HRIS
           leaf that doesn't have a real page yet renders a Coming Soon screen.
