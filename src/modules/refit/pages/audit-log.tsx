@@ -68,7 +68,7 @@ export default function AuditLogPage() {
           .select("id, display_name, email")
           .in("id", actorIds);
         const map: Record<string, { display_name: string | null; email: string }> = {};
-        (profs ?? []).forEach((p) => {
+        ((profs ?? []) as any[]).forEach((p: any) => {
           map[p.id] = { display_name: p.display_name, email: p.email };
         });
         setActors(map);
