@@ -34,10 +34,29 @@ export interface ParsedTravelRow {
   transfer?: string;
 }
 
+export interface ParsedCrewRow {
+  externalId?: string;
+  fullName: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  jobTitle?: string;
+  email?: string;
+  phone?: string;
+  nationality?: string;
+  dateOfBirth?: string;
+  passportNumber?: string;
+  passportExpiry?: string;
+  repatriationPort?: string;
+  homeAddress?: string;
+  gender?: string;
+}
+
 export interface ImportPreview {
   rotations: ParsedRotationRow[];
   locations: ParsedLocationRow[];
   travel: ParsedTravelRow[];
+  crew: ParsedCrewRow[];
   warnings: string[];
 }
 
@@ -137,6 +156,7 @@ export async function parsePlannerWorkbook(file: File, vesselNameDefault: string
   const rotations: ParsedRotationRow[] = [];
   const locations: ParsedLocationRow[] = [];
   const travel: ParsedTravelRow[] = [];
+  const crew: ParsedCrewRow[] = [];
 
   // ---- Timeline sheet ----
   const timelineName = wb.SheetNames.find((n) => /timeline/i.test(n)) ?? wb.SheetNames[0];
@@ -350,7 +370,82 @@ export async function parsePlannerWorkbook(file: File, vesselNameDefault: string
   if (rotations.length === 0 && locations.length === 0 && travel.length === 0) {
     warnings.push('No recognisable rotation/location/travel rows found. The workbook may need manual mapping.');
   }
+
+  // ---- Crew Data sheet ----
+  const crewSheetName = wb.SheetNames.find((n) => /^crew\s*data$/i.test(n));
+  if (crewSheetName) {
+    const cs = wb.Sheets[crewSheetName];
+    const ref = cs['!ref'];
+    if (ref) {
+      const range = XLSX.utils.decode_range(ref);
+      // Find header row containing "Full Name" or "FirstName"
+      let headerRow = -1;
+      for (let R = 0; R <= Math.min(5, range.e.r); R++) {
+        for (let C = 0; C <= Math.min(40, range.e.c); C++) {
+          const v = String(cs[XLSX.utils.encode_cell({ r: R, c: C })]?.v ?? '').trim().toLowerCase();
+          if (v === 'full name' || v === 'firstname' || v === 'jobtitle') { headerRow = R; break; }
+        }
+        if (headerRow >= 0) break;
+      }
+      if (headerRow >= 0) {
+        const headers: string[] = [];
+        for (let C = 0; C <= range.e.c; C++) {
+          headers[C] = String(cs[XLSX.utils.encode_cell({ r: headerRow, c: C })]?.v ?? '').trim().toLowerCase();
+        }
+        const col = (...needles: string[]) =>
+          headers.findIndex((h) => needles.some((n) => h === n || h.includes(n)));
+        const cId = col('id');
+        const cJob = col('jobtitle', 'job title');
+        const cFull = col('full name', 'fullname');
+        const cFirst = col('firstname', 'first name');
+        const cMiddle = col('middlename', 'middle name');
+        const cLast = col('lastname', 'last name');
+        const cEmail = col('email');
+        const cPhone = col('contact number', 'phone');
+        const cNat = col('nationality');
+        const cDob = col('dateofbirth', 'date of birth');
+        const cPass = col('passport #', 'passport number');
+        const cPassExp = col('passport expiry');
+        const cRepat = col('repatriation port', 'repatriation');
+        const cAddr = col('home address', 'residental address');
+        const cGender = col('gender');
+        for (let R = headerRow + 1; R <= range.e.r; R++) {
+          const get = (c: number) => c >= 0 ? cs[XLSX.utils.encode_cell({ r: R, c })]?.v : undefined;
+          const fullRaw = String(get(cFull) ?? '').trim();
+          const firstRaw = String(get(cFirst) ?? '').trim();
+          const lastRaw = String(get(cLast) ?? '').trim();
+          const fullName = fullRaw || [firstRaw, lastRaw].filter(Boolean).join(' ').trim();
+          if (!fullName) continue;
+          const idVal = get(cId);
+          crew.push({
+            externalId: idVal == null ? undefined : String(idVal).replace(/\.0$/, ''),
+            fullName,
+            firstName: firstRaw || undefined,
+            middleName: String(get(cMiddle) ?? '').trim() || undefined,
+            lastName: lastRaw || undefined,
+            jobTitle: String(get(cJob) ?? '').trim() || undefined,
+            email: String(get(cEmail) ?? '').trim() || undefined,
+            phone: (() => { const p = get(cPhone); return p == null ? undefined : String(p).trim() || undefined; })(),
+            nationality: String(get(cNat) ?? '').trim() || undefined,
+            dateOfBirth: excelDate(get(cDob)),
+            passportNumber: (() => { const p = get(cPass); return p == null ? undefined : String(p).trim() || undefined; })(),
+            passportExpiry: excelDate(get(cPassExp)),
+            repatriationPort: String(get(cRepat) ?? '').trim() || undefined,
+            homeAddress: String(get(cAddr) ?? '').trim() || undefined,
+            gender: String(get(cGender) ?? '').trim() || undefined,
+          });
+        }
+        if (crew.length === 0) warnings.push('Crew Data sheet found but no rows parsed');
+      } else {
+        warnings.push('Crew Data sheet found but no recognisable header row');
+      }
+    }
+  } else {
+    warnings.push('No "Crew Data" sheet found');
+  }
+
   if (rotations.length > 0) warnings.push(`Parsed ${rotations.length} rotation blocks from Timeline`);
   if (travel.length > 0) warnings.push(`Parsed ${travel.length} travel rows across monthly sheets`);
-  return { rotations, locations, travel, warnings };
+  if (crew.length > 0) warnings.push(`Parsed ${crew.length} crew records from Crew Data`);
+  return { rotations, locations, travel, crew, warnings };
 }

@@ -105,14 +105,44 @@ const ImportDialog: React.FC<Props> = ({ open, onClose, vessels, crew, lanes, on
       }));
       if (travelPayload.length) await (supabase as any).from('frp_travel_movements').insert(travelPayload);
 
+      // Crew Data → upsert into crew_import staging table
+      let crewImportedCount = 0;
+      if (preview.crew.length) {
+        const crewPayload = preview.crew.map((c) => ({
+          crew_id: c.externalId ? Number(c.externalId) || null : null,
+          vessel: vesselName,
+          first_name: c.firstName ?? null,
+          middle_name: c.middleName ?? null,
+          last_name: c.lastName ?? null,
+          full_legal_name: c.fullName,
+          personal_email: c.email ?? null,
+          cellular_phone: c.phone ?? null,
+          date_of_birth: c.dateOfBirth ?? null,
+          nationality: c.nationality ?? null,
+          role: c.jobTitle ?? null,
+          repatriation: c.repatriationPort ?? null,
+          imported_at: new Date().toISOString(),
+        }));
+        const { error: crewErr } = await (supabase as any).from('crew_import').insert(crewPayload);
+        if (crewErr) {
+          console.warn('crew_import insert failed', crewErr);
+        } else {
+          crewImportedCount = crewPayload.length;
+        }
+      }
+
       await (supabase as any).from('frp_import_batches').update({
         status: 'complete',
         summary: {
-          rotations: rotsPayload.length, locations: locsPayload.length, travel: travelPayload.length, warnings: preview.warnings,
+          rotations: rotsPayload.length, locations: locsPayload.length, travel: travelPayload.length,
+          crew: crewImportedCount, warnings: preview.warnings,
         },
       }).eq('id', batch.id);
 
-      toast({ title: 'Import complete', description: `${rotsPayload.length} rotations, ${locsPayload.length} locations, ${travelPayload.length} travel records.` });
+      toast({
+        title: 'Import complete',
+        description: `${rotsPayload.length} rotations, ${locsPayload.length} locations, ${travelPayload.length} travel, ${crewImportedCount} crew.`,
+      });
       onComplete();
       onClose();
     } catch (e: any) {
@@ -149,6 +179,7 @@ const ImportDialog: React.FC<Props> = ({ open, onClose, vessels, crew, lanes, on
               <div>Rotations: <b>{preview.rotations.length}</b></div>
               <div>Vessel locations: <b>{preview.locations.length}</b></div>
               <div>Travel records: <b>{preview.travel.length}</b></div>
+              <div>Crew records: <b>{preview.crew.length}</b></div>
               {preview.warnings.length > 0 && (
                 <div className="text-amber-600 mt-2">
                   {preview.warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
