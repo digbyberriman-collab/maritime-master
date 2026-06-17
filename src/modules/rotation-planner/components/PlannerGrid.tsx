@@ -131,6 +131,22 @@ const PlannerGrid: React.FC<Props> = ({
     onCreateAssignment(laneId, toISO(date), toISO(addDays(date, 6)));
   }, [viewStart, zoom, onCreateAssignment]);
 
+  // Mouse-wheel horizontal scrolling for the timeline.
+  // - Plain wheel (deltaY): scroll horizontally by ~1 week per tick.
+  // - Shift + wheel: jump by a whole month.
+  // - Trackpads that already emit deltaX (or hold ctrl for zoom) are left alone.
+  const onWheelTimeline = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    const el = parentRef.current;
+    if (!el) return;
+    if (e.ctrlKey) return; // let zoom-pinch / browser zoom pass through
+    // If the gesture is primarily horizontal already, let native handle it.
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    const dir = e.deltaY > 0 ? 1 : -1;
+    const step = e.shiftKey ? px * 30 : px * 7;
+    el.scrollLeft += dir * step;
+    e.preventDefault();
+  }, [px]);
+
   return (
     <div className="flex flex-1 min-h-0">
       {/* Left pinned column */}
@@ -163,6 +179,7 @@ const PlannerGrid: React.FC<Props> = ({
         className="flex-1 overflow-auto relative"
         onPointerMove={onGridPointerMove}
         onPointerUp={onGridPointerUp}
+        onWheel={onWheelTimeline}
       >
         <div style={{ width: totalWidth, height: virt.getTotalSize(), position: 'relative' }}>
           {virt.getVirtualItems().map((vi) => {
