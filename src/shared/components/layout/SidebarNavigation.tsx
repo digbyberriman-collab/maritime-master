@@ -81,14 +81,20 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ onNavigate }) => 
   const toggleGroup = useCallback((groupId: string) => {
     setOpenGroups(prev => {
       const wasOpen = prev[groupId];
-      // Accordion behavior: close all groups, then open the clicked one if it wasn't already open
-      const next: Record<string, boolean> = {};
-      visibleNavItems.forEach(item => {
-        if (item.children) {
-          next[item.id] = item.id === groupId ? !wasOpen : false;
-        }
-      });
-      return next;
+      // Accordion behavior applies ONLY to top-level groups (Fleet, Vessel, etc.).
+      // Nested children toggle independently so opening a sub-group doesn't
+      // collapse its parent or siblings.
+      const isTopLevel = visibleNavItems.some(item => item.id === groupId);
+      if (isTopLevel) {
+        const next: Record<string, boolean> = { ...prev };
+        visibleNavItems.forEach(item => {
+          if (item.children) {
+            next[item.id] = item.id === groupId ? !wasOpen : false;
+          }
+        });
+        return next;
+      }
+      return { ...prev, [groupId]: !wasOpen };
     });
   }, [visibleNavItems]);
 
