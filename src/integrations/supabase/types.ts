@@ -5723,6 +5723,449 @@ export type Database = {
           },
         ]
       }
+      frp_import_batches: {
+        Row: {
+          company_id: string
+          created_at: string
+          filename: string
+          id: string
+          imported_at: string
+          imported_by: string | null
+          notes: string | null
+          status: string
+          summary: Json | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          filename: string
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          notes?: string | null
+          status?: string
+          summary?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          filename?: string
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          notes?: string | null
+          status?: string
+          summary?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      frp_payroll_vessel_transfers: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          crew_name_raw: string | null
+          crew_user_id: string | null
+          from_vessel_id: string | null
+          id: string
+          notes: string | null
+          onboarding_transfer_date: string | null
+          payroll_transfer_date: string | null
+          position_title: string | null
+          source_import_id: string | null
+          status: string | null
+          to_vessel_id: string | null
+          travel_date: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          crew_name_raw?: string | null
+          crew_user_id?: string | null
+          from_vessel_id?: string | null
+          id?: string
+          notes?: string | null
+          onboarding_transfer_date?: string | null
+          payroll_transfer_date?: string | null
+          position_title?: string | null
+          source_import_id?: string | null
+          status?: string | null
+          to_vessel_id?: string | null
+          travel_date?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          crew_name_raw?: string | null
+          crew_user_id?: string | null
+          from_vessel_id?: string | null
+          id?: string
+          notes?: string | null
+          onboarding_transfer_date?: string | null
+          payroll_transfer_date?: string | null
+          position_title?: string | null
+          source_import_id?: string | null
+          status?: string | null
+          to_vessel_id?: string | null
+          travel_date?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "frp_payroll_vessel_transfers_from_vessel_id_fkey"
+            columns: ["from_vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "frp_payroll_vessel_transfers_to_vessel_id_fkey"
+            columns: ["to_vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      frp_planner_audit_log: {
+        Row: {
+          action: string
+          changed_at: string
+          changed_by: string | null
+          company_id: string
+          entity_id: string
+          entity_type: string
+          id: string
+          new_value: Json | null
+          old_value: Json | null
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          changed_by?: string | null
+          company_id: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          new_value?: Json | null
+          old_value?: Json | null
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          changed_by?: string | null
+          company_id?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          new_value?: Json | null
+          old_value?: Json | null
+        }
+        Relationships: []
+      }
+      frp_planner_lanes: {
+        Row: {
+          active: boolean
+          company_id: string
+          created_at: string
+          department: string | null
+          id: string
+          lane_label: string
+          lane_order: number
+          position_title: string | null
+          updated_at: string
+          vessel_id: string | null
+        }
+        Insert: {
+          active?: boolean
+          company_id: string
+          created_at?: string
+          department?: string | null
+          id?: string
+          lane_label: string
+          lane_order?: number
+          position_title?: string | null
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          active?: boolean
+          company_id?: string
+          created_at?: string
+          department?: string | null
+          id?: string
+          lane_label?: string
+          lane_order?: number
+          position_title?: string | null
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "frp_planner_lanes_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      frp_rotation_assignments: {
+        Row: {
+          colour: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          crew_name_raw: string | null
+          crew_user_id: string | null
+          end_date: string
+          id: string
+          label: string | null
+          lane_id: string | null
+          linked_leave_entry_id: string | null
+          linked_payroll_transfer_id: string | null
+          linked_travel_movement_id: string | null
+          notes: string | null
+          rotation_type: Database["public"]["Enums"]["frp_rotation_type"]
+          source_import_id: string | null
+          start_date: string
+          status: Database["public"]["Enums"]["frp_assignment_status"]
+          updated_at: string
+          updated_by: string | null
+          version: number
+          vessel_id: string | null
+        }
+        Insert: {
+          colour?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          crew_name_raw?: string | null
+          crew_user_id?: string | null
+          end_date: string
+          id?: string
+          label?: string | null
+          lane_id?: string | null
+          linked_leave_entry_id?: string | null
+          linked_payroll_transfer_id?: string | null
+          linked_travel_movement_id?: string | null
+          notes?: string | null
+          rotation_type?: Database["public"]["Enums"]["frp_rotation_type"]
+          source_import_id?: string | null
+          start_date: string
+          status?: Database["public"]["Enums"]["frp_assignment_status"]
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+          vessel_id?: string | null
+        }
+        Update: {
+          colour?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          crew_name_raw?: string | null
+          crew_user_id?: string | null
+          end_date?: string
+          id?: string
+          label?: string | null
+          lane_id?: string | null
+          linked_leave_entry_id?: string | null
+          linked_payroll_transfer_id?: string | null
+          linked_travel_movement_id?: string | null
+          notes?: string | null
+          rotation_type?: Database["public"]["Enums"]["frp_rotation_type"]
+          source_import_id?: string | null
+          start_date?: string
+          status?: Database["public"]["Enums"]["frp_assignment_status"]
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "frp_rotation_assignments_lane_id_fkey"
+            columns: ["lane_id"]
+            isOneToOne: false
+            referencedRelation: "frp_planner_lanes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "frp_rotation_assignments_linked_payroll_transfer_id_fkey"
+            columns: ["linked_payroll_transfer_id"]
+            isOneToOne: false
+            referencedRelation: "frp_payroll_vessel_transfers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "frp_rotation_assignments_linked_travel_movement_id_fkey"
+            columns: ["linked_travel_movement_id"]
+            isOneToOne: false
+            referencedRelation: "frp_travel_movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "frp_rotation_assignments_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      frp_travel_movements: {
+        Row: {
+          accommodation: string | null
+          changeover_date: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          crew_name_raw: string | null
+          crew_user_id: string | null
+          direction: Database["public"]["Enums"]["frp_travel_direction"]
+          flight_datetime: string | null
+          flight_number: string | null
+          flight_supplier: string | null
+          id: string
+          notes: string | null
+          pdf_link: string | null
+          process_complete: boolean
+          route: string | null
+          source_import_id: string | null
+          transfer_details: string | null
+          travel_letter_status: string | null
+          updated_at: string
+          updated_by: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          accommodation?: string | null
+          changeover_date?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          crew_name_raw?: string | null
+          crew_user_id?: string | null
+          direction: Database["public"]["Enums"]["frp_travel_direction"]
+          flight_datetime?: string | null
+          flight_number?: string | null
+          flight_supplier?: string | null
+          id?: string
+          notes?: string | null
+          pdf_link?: string | null
+          process_complete?: boolean
+          route?: string | null
+          source_import_id?: string | null
+          transfer_details?: string | null
+          travel_letter_status?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          accommodation?: string | null
+          changeover_date?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          crew_name_raw?: string | null
+          crew_user_id?: string | null
+          direction?: Database["public"]["Enums"]["frp_travel_direction"]
+          flight_datetime?: string | null
+          flight_number?: string | null
+          flight_supplier?: string | null
+          id?: string
+          notes?: string | null
+          pdf_link?: string | null
+          process_complete?: boolean
+          route?: string | null
+          source_import_id?: string | null
+          transfer_details?: string | null
+          travel_letter_status?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "frp_travel_movements_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      frp_vessel_locations: {
+        Row: {
+          colour: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          end_date: string
+          id: string
+          location_name: string
+          location_status: Database["public"]["Enums"]["frp_location_status"]
+          notes: string | null
+          source_import_id: string | null
+          start_date: string
+          updated_at: string
+          updated_by: string | null
+          vessel_id: string
+        }
+        Insert: {
+          colour?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          end_date: string
+          id?: string
+          location_name: string
+          location_status?: Database["public"]["Enums"]["frp_location_status"]
+          notes?: string | null
+          source_import_id?: string | null
+          start_date: string
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id: string
+        }
+        Update: {
+          colour?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string
+          id?: string
+          location_name?: string
+          location_status?: Database["public"]["Enums"]["frp_location_status"]
+          notes?: string | null
+          source_import_id?: string | null
+          start_date?: string
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "frp_vessel_locations_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gdpr_requests: {
         Row: {
           company_id: string
@@ -13273,6 +13716,7 @@ export type Database = {
       }
       can_user_assign_tasks: { Args: never; Returns: boolean }
       current_user_company_id: { Args: never; Returns: string }
+      frp_can_edit: { Args: { _user_id: string }; Returns: boolean }
       get_dashboard_alerts: {
         Args: {
           p_all_vessels?: boolean
@@ -13610,6 +14054,25 @@ export type Database = {
         | "advanced"
         | "technical"
         | "cave"
+      frp_assignment_status:
+        | "draft"
+        | "confirmed"
+        | "pending_approval"
+        | "conflict"
+        | "complete"
+      frp_location_status: "confirmed" | "estimated" | "tbc"
+      frp_rotation_type:
+        | "onboard"
+        | "leave"
+        | "travel"
+        | "standby"
+        | "yard"
+        | "wfh"
+        | "temp_cover"
+        | "training"
+        | "no_crew"
+        | "tbc"
+      frp_travel_direction: "arrival" | "departure"
       gdpr_lawful_basis:
         | "consent"
         | "contractual"
@@ -13891,6 +14354,27 @@ export const Constants = {
         "technical",
         "cave",
       ],
+      frp_assignment_status: [
+        "draft",
+        "confirmed",
+        "pending_approval",
+        "conflict",
+        "complete",
+      ],
+      frp_location_status: ["confirmed", "estimated", "tbc"],
+      frp_rotation_type: [
+        "onboard",
+        "leave",
+        "travel",
+        "standby",
+        "yard",
+        "wfh",
+        "temp_cover",
+        "training",
+        "no_crew",
+        "tbc",
+      ],
+      frp_travel_direction: ["arrival", "departure"],
       gdpr_lawful_basis: [
         "consent",
         "contractual",

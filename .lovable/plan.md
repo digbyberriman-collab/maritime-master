@@ -1,83 +1,75 @@
-# New Build Module — Integration Plan
+## Fleet Rotation Planner — Build Plan
 
-The uploaded `Yacht Build Management` zip is a complete standalone Lovable app: 28 pages, ~50 components, 4 edge functions, 30+ migrations, and ~25 DB tables. We will fold it into STORM's existing `Yard → New Build` sitemap section without disrupting anything else.
+A production-grade, Excel-like Gantt planner that replaces the "Draak - Rotation Planner.xlsx" workflow, scales fleet-wide, and links to the existing leave calendar.
 
-## Goals
+### Scope clarifications I'd like to confirm before building
 
-1. New Build becomes a fully functional sub-app under `/yard/new-build/*`.
-2. Reuses STORM's auth, layout, sidebar, design tokens — does **not** ship a second sidebar/login.
-3. Tables are namespaced so they cannot collide with existing STORM tables.
-4. Existing STORM routes/pages are untouched.
+1. **Leave source of truth** — the app already has `crew_leave_entries`, `crew_leave_requests`, `crew_leave_carryover`, `crew_leave_locked_months`, `leave_requests`. I will reuse `crew_leave_entries` (the calendar entries table) as the linked leave source. No new `leave_events` table. ✅ unless you say otherwise.
+2. **Crew master** — reuse `profiles` + `crew_assignments` (not a new `crew_members` table). Job title/department come from `profiles`/`crew_assignments`.
+3. **Vessels** — reuse `vessels`.
+4. **Where it lives in nav** — under **Crew → Rotation Planner** (new top-level page), with a shortcut from the existing Leave calendar. Confirm or move it under **Itinerary** or **Fleet**.
+5. **Spreadsheet import** — I'll deliver the UI + parser, but actual row mapping for "Draak - Rotation Planner.xlsx" needs the file uploaded so I can calibrate header/colour heuristics. Without the file I'll ship a generic XLSX importer with a review screen.
 
-## Scope mapping (source → STORM)
+### Database (new tables, namespaced `frp_*`)
 
-Source pages map to existing sitemap leaves:
+- `frp_planner_lanes` — vessel_id, department, position_title, lane_label, lane_order, active
+- `frp_rotation_assignments` — vessel_id, crew_user_id, lane_id, start_date, end_date, label, rotation_type (enum), status (enum), colour, notes, linked_leave_entry_id, linked_travel_movement_id, linked_payroll_transfer_id, source_import_id, version (optimistic lock), created_by, updated_by
+- `frp_vessel_locations` — vessel_id, start_date, end_date, location_name, location_status (confirmed/estimated/tbc), notes
+- `frp_travel_movements` — crew_user_id, vessel_id, direction (arrival/departure), flight_datetime, changeover_date, accommodation, route, flight_supplier, transfer_details, travel_letter_status, process_complete, pdf_link, notes
+- `frp_payroll_vessel_transfers` — crew_user_id, position_title, from_vessel_id, to_vessel_id, onboarding_transfer_date, payroll_transfer_date, travel_date, status, notes
+- `frp_planner_audit_log` — entity_type, entity_id, action, old_value (jsonb), new_value (jsonb), changed_by, changed_at
+- `frp_import_batches` — filename, imported_by, imported_at, status, summary (jsonb)
 
-```text
-Overview/Dashboard           → /yard/new-build/overview/dashboard
-Phases                       → /yard/new-build/overview/build-phases
-Requirements                 → /yard/new-build/overview/requirements
-Onboarding                   → /yard/new-build/overview/onboarding
-ChangeOrders                 → /yard/new-build/workflow/change-orders
-Decisions (RAID)             → /yard/new-build/workflow/raid-log
-Approvals                    → /yard/new-build/workflow/approvals
-Timeline (Gantt)             → /yard/new-build/workflow/schedule
-Areas                        → /yard/new-build/disciplines/areas
-Interior                     → /yard/new-build/disciplines/interior
-NavalArchitecture            → /yard/new-build/disciplines/naval-architecture
-Piping                       → /yard/new-build/disciplines/piping
-DeckPlan                     → /yard/new-build/disciplines/deck-plan
-Equipment                    → /yard/new-build/equipment/equipment
-PurchaseOrders               → /yard/new-build/equipment/purchase-orders
-Files                        → /yard/new-build/documents/files
-(Drawings via files filter)  → /yard/new-build/documents/drawings
-YardStandards                → /yard/new-build/documents/yard-standards
-Regulations                  → /yard/new-build/documents/regulations
-Locations                    → /yard/new-build/configuration/locations
-Rasci                        → /yard/new-build/configuration/rasci
-Suppliers                    → /yard/new-build/configuration/suppliers
-Contacts                     → /yard/new-build/configuration/contacts
-Import                       → /yard/new-build/configuration/import
-```
+Enums: `frp_rotation_type` (onboard, leave, travel, standby, yard, wfh, temp_cover, training, no_crew, tbc), `frp_assignment_status` (draft, confirmed, pending_approval, conflict, complete), `frp_location_status` (confirmed, estimated, tbc), `frp_travel_direction` (arrival, departure).
 
-Dropped: source `Login/Signup/Forgot/Reset/Index/NotFound/AppLayout/AppSidebar/AuthGuard` — STORM already provides these.
+RLS: scope by `company_id` via `current_user_company_id()`; edit limited to roles with `crew:edit` or `planner:edit`. GRANTs included per public-schema rules.
 
-## Phased implementation
+### Frontend
 
-### Phase A — Foundation (this turn)
-- Add module folder `src/modules/new-build/{pages,components,hooks,lib}`.
-- Copy source pages/components verbatim, strip out their `<AppLayout>` wrapper and any `useAuth/AuthGuard` calls (STORM's `ProtectedRoute` + `DashboardLayout` already wrap them via `routes/index.tsx`).
-- Rewrite imports: `@/contexts/ProjectContext` → local module context; `@/integrations/supabase/client` → STORM's existing client; `@/components/ui/*` → existing shadcn (already identical).
-- Wire all 24 leaf paths in `src/routes/index.tsx`, replacing the auto-generated PlaceholderWrapper for each.
-- Sitemap stays as-is; only `existing` props are added to the matching leaves so they point to the new pages.
+- **Path**: `/crew/rotation-planner`
+- **Stack**: React + TS + Tailwind, **@tanstack/react-virtual** for row/column virtualisation, **dnd-kit** for drag/resize, **date-fns** for math, TanStack Query for data.
+- **Layout**: sticky left lane columns (vessel / dept / position / crew / status), sticky top headers (month → week/day → vessel-location lane), virtualised main grid.
+- **Modules** under `src/modules/rotation-planner/`:
+  - `pages/RotationPlannerPage.tsx`
+  - `components/` — `PlannerGrid`, `LaneColumn`, `TimelineHeader`, `LocationLane`, `RotationBlock`, `BlockDetailDrawer`, `Toolbar`, `ZoomControls`, `FilterBar`, `LegendBar`, `ConflictBadge`, `ContextMenu`, `ImportDialog`, `ImportReview`, `ExportMenu`
+  - `hooks/` — `usePlannerData`, `useZoom`, `useSelection`, `useUndoRedo`, `useDragResize`, `useConflicts`, `useRealtime`
+  - `lib/` — `dateMath.ts`, `conflicts.ts`, `xlsxParser.ts` (SheetJS), `xlsxExporter.ts`, `pdfExporter.ts`
+  - `types.ts`, `constants.ts`
+- **Zoom levels**: day / week / fortnight / month / quarter / year + custom range + Today + jump-to.
+- **Interactions**: click-drag create, drag-move, edge-resize, vertical drag to switch lane, duplicate, split, delete, multi-select, copy/paste, undo/redo, keyboard shortcuts, snap-to-zoom.
+- **Detail drawer**: full assignment edit + linked leave / travel / payroll-transfer records + audit history.
+- **Conflict engine**: double-assignment, leave overlap (hard for approved, soft for pending), missing vessel location, missing payroll transfer at changeover, incomplete travel near changeover, gap detection. Red/amber outlines + toolbar badge + filter.
+- **Performance**: visible-range query (start..end + vessel filter), windowed rendering, optimistic mutations w/ rollback, `version` optimistic-lock check on save.
+- **Realtime**: Supabase channel on `frp_rotation_assignments` filtered by company_id; merge inbound, warn on conflicting local edits.
+- **Export**: filtered view → XLSX (SheetJS) and PDF (jsPDF + autotable); travel-list / conflicts / locations exports.
+- **Import**: upload XLSX → parse Timeline sheet (column A lanes, row 1 locations, merged colour ranges → assignments), monthly tabs (arrivals/departures → travel_movements), Crew Data (match to profiles), YCOLIVE Transfers, Test Flights → review screen with matched/unmatched/skipped → commit.
 
-### Phase B — Database
-- Squash the 30 source migrations into **one** STORM migration that creates tables under a `nb_` prefix (`nb_projects`, `nb_areas`, `nb_decisions`, `nb_files`, `nb_approvals`, `nb_suppliers`, `nb_build_phases`, `nb_milestones`, `nb_materials`, `nb_material_usages`, `nb_equipment`, `nb_purchase_orders`, `nb_change_orders`, `nb_requirements`, `nb_schedule_tasks`, `nb_regulations`, `nb_yard_standards`, `nb_drawings`, `nb_deck_views`, `nb_deck_rooms`, `nb_element_codes`, `nb_rasci_roles`, `nb_rasci_assignments`, `nb_vendor_contacts`, `nb_timeline_imports`). Avoids collisions with STORM's existing `suppliers`, `equipment`, `files`, etc.
-- Each table: `GRANT` to `authenticated` + `service_role`, `ENABLE RLS`, policies scoped to STORM's existing `company_id` + `has_role('DPA'|'Master'|'Shore')` for write, authenticated read.
-- Storage bucket `nb-files` (private) + `nb-material-swatches` (public).
-- Module page queries are updated to use the `nb_` table names.
+### Permissions
 
-### Phase C — Edge functions
-Port `detect-rooms`, `extract-yard-metadata`, `index-regulation`, `index-yard-standard` to `supabase/functions/nb-*`. Use Lovable AI Gateway (no new keys needed).
+- Admin / DPA / Fleet Manager: full edit + import + delete + export
+- Captain / Master: edit rotations + travel links on their vessel(s)
+- HOD: view + comment on own department
+- Crew: view own rotation + own leave only
+- Read-only role: view planner
 
-### Phase D — Polish
-- Project picker (Y727/Y728 etc.) lives in the New Build header, not the global STORM header.
-- Apply STORM design tokens (Storm blue `--brand-primary`), drop the source's `#2563EB` overrides.
-- Smoke test all 24 routes; verify build.
+Enforced server-side via RLS using existing `has_role` / `user_has_module_access`; client gates UI affordances.
 
-## Out of scope
+### Delivery order
 
-- No edits to STORM's existing tables, auth, RBAC, or sidebar component.
-- No data migration from the source app — tables start empty.
-- Source's separate login/signup/reset/forgot pages are not ported.
-- Cross-module data sharing (e.g., linking a New Build vessel to a STORM vessel record) is deferred.
+1. Migration (tables, enums, RLS, GRANTs, audit-log triggers, updated_at triggers).
+2. Types regen + data hooks (CRUD + visible-range query + realtime).
+3. Grid skeleton (virtualised, sticky headers, zoom, location lane).
+4. Block rendering + drag/resize/create/select/keyboard.
+5. Detail drawer + linked records.
+6. Conflict engine + filter bar + toolbar.
+7. Import flow (XLSX parser + review).
+8. Export (XLSX/PDF).
+9. Realtime + optimistic-lock save guard.
+10. Polish + empty/loading/error states + permissions gating.
 
-## Verification
+### Open questions
 
-After each phase: `bun run build`, then spot-check 3 routes in preview (one Overview, one Discipline, one Configuration page) for render + DB query success.
-
-## What I need from you to start
-
-1. **Confirm phase A scope** (pages + routing only, no DB yet) is the right starting point, or tell me to do A + B in one go.
-2. **Project model**: should New Build "projects" (Y727, Y728) be standalone records, or tied to STORM `vessels` rows where `status = 'New Build'`? Defaults to standalone unless you say otherwise.
-3. **Access**: who can use New Build — same DPA/Master/Shore RBAC as the rest of STORM, or open to all authenticated users like the source app?
+- **Nav placement**: Crew → Rotation Planner (default), or Itinerary, or Fleet?
+- **Leave table**: confirm `crew_leave_entries` is the right one to link (vs `crew_leave_requests` or `leave_requests`)?
+- **Upload the .xlsx?** Needed to calibrate the import parser to your exact layout. Without it I'll ship a generic parser + manual mapper.
+- **Scope cut for v1**: ship everything in one go, or land the grid + CRUD + leave-link + conflicts first, then import/export/realtime in a follow-up? (One-shot will be a very large change.)
