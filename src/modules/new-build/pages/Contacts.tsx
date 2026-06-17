@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useProject } from "@/contexts/ProjectContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
+import { useAuth } from "@/modules/auth/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -82,7 +82,7 @@ export default function Contacts() {
     if (!currentProject) return;
     setLoading(true);
     const { data, error } = await supabase
-      .from("contacts")
+      .from("nb_contacts")
       .select("*")
       .eq("project_id", currentProject.id)
       .order("is_key_contact", { ascending: false })
@@ -145,8 +145,8 @@ export default function Contacts() {
       created_by: user.id,
     };
     const { error } = editing
-      ? await supabase.from("contacts").update(payload).eq("id", editing.id)
-      : await supabase.from("contacts").insert(payload);
+      ? await supabase.from("nb_contacts").update(payload).eq("id", editing.id)
+      : await supabase.from("nb_contacts").insert(payload);
     if (error) toast.error(error.message);
     else {
       toast.success(editing ? "Contact updated" : "Contact added");
@@ -156,7 +156,7 @@ export default function Contacts() {
   };
 
   const remove = async (id: string) => {
-    const { error } = await supabase.from("contacts").delete().eq("id", id);
+    const { error } = await supabase.from("nb_contacts").delete().eq("id", id);
     if (error) toast.error(error.message);
     else {
       toast.success("Contact removed");

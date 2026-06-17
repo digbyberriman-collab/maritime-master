@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useProject } from "@/contexts/ProjectContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, MapPin, Target, Sofa } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 
 interface AreaForm {
   name: string;
@@ -38,7 +38,7 @@ export default function Areas() {
     queryFn: async () => {
       if (!projectId) return [];
       const { data, error } = await supabase
-        .from("areas")
+        .from("nb_areas")
         .select("*")
         .eq("project_id", projectId)
         .order("name");
@@ -61,10 +61,10 @@ export default function Areas() {
 
       if (editingId) {
         const { project_id: _, ...updatePayload } = payload;
-        const { error } = await supabase.from("areas").update(updatePayload).eq("id", editingId);
+        const { error } = await supabase.from("nb_areas").update(updatePayload).eq("id", editingId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("areas").insert(payload);
+        const { error } = await supabase.from("nb_areas").insert(payload);
         if (error) throw error;
       }
     },
@@ -80,7 +80,7 @@ export default function Areas() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("areas").delete().eq("id", id);
+      const { error } = await supabase.from("nb_areas").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {

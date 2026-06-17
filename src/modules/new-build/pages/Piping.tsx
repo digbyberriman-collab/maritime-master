@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useProject } from "@/contexts/ProjectContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,7 +16,7 @@ import {
   Popover, PopoverContent, PopoverTrigger,
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { PROGRESS_OPTIONS, progressMeta, yearColor, fmtWeek, YEAR_COLORS } from "@/lib/piping-utils";
 import {
   Download, Upload, Plus, Trash2, FileSpreadsheet, FileText, Settings as SettingsIcon,
@@ -82,12 +82,12 @@ export default function Piping() {
     if (!projectId) return;
     setLoading(true);
     const [b, m] = await Promise.all([
-      supabase.from("piping_blocks").select("*").eq("project_id", projectId).order("display_order"),
-      supabase.from("piping_milestones").select("*").eq("project_id", projectId).order("display_order"),
+      supabase.from("nb_piping_blocks").select("*").eq("project_id", projectId).order("display_order"),
+      supabase.from("nb_piping_milestones").select("*").eq("project_id", projectId).order("display_order"),
     ]);
     const blockIds = (b.data ?? []).map((x: any) => x.id);
     const p = blockIds.length
-      ? await supabase.from("piping_progress").select("*").in("block_id", blockIds)
+      ? await supabase.from("nb_piping_progress").select("*").in("block_id", blockIds)
       : { data: [] as any[] };
     setBlocks((b.data ?? []) as Block[]);
     setMilestones((m.data ?? []) as Milestone[]);
@@ -110,12 +110,12 @@ export default function Piping() {
     const existing = progressMap.get(`${block_id}:${milestone_id}`);
     if (existing) {
       const { data, error } = await supabase
-        .from("piping_progress").update(patch).eq("id", existing.id).select().single();
+        .from("nb_piping_progress").update(patch).eq("id", existing.id).select().single();
       if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
       setProgress((prev) => prev.map((p) => (p.id === data.id ? (data as Progress) : p)));
     } else {
       const { data, error } = await supabase
-        .from("piping_progress").insert({ block_id, milestone_id, progress_pct: 0, ...patch }).select().single();
+        .from("nb_piping_progress").insert({ block_id, milestone_id, progress_pct: 0, ...patch }).select().single();
       if (error) { toast({ title: "Save failed", description: error.message, variant: "destructive" }); return; }
       setProgress((prev) => [...prev, data as Progress]);
     }
@@ -495,7 +495,7 @@ function AddBlockDialog({ projectId, onCreated, nextOrder }: {
         <DialogFooter>
           <Button onClick={async () => {
             if (!zone || !code) return toast({ title: "Zone and block required", variant: "destructive" });
-            const { error } = await supabase.from("piping_blocks").insert({
+            const { error } = await supabase.from("nb_piping_blocks").insert({
               project_id: projectId, zone, block_code: code, sections: sections || null, display_order: nextOrder,
             });
             if (error) return toast({ title: "Failed", description: error.message, variant: "destructive" });
@@ -674,7 +674,7 @@ function ImportExport({ blocks, milestones, progressMap, projectId, onReload }: 
 
       let block = blocks.find((b) => b.zone === zone && b.block_code === code);
       if (!block) {
-        const { data } = await supabase.from("piping_blocks").insert({
+        const { data } = await supabase.from("nb_piping_blocks").insert({
           project_id: projectId, zone, block_code: code, sections, display_order: blocks.length + 1 + created,
         }).select().single();
         if (data) { block = data as Block; created++; }
@@ -687,7 +687,7 @@ function ImportExport({ blocks, milestones, progressMap, projectId, onReload }: 
         const aw = rest[base + 3]; const ay = rest[base + 4];
         const milestone = milestones[i];
         if (!milestone) continue;
-        await supabase.from("piping_progress").upsert({
+        await supabase.from("nb_piping_progress").upsert({
           block_id: block.id, milestone_id: milestone.id,
           planned_week: pw ? Number(pw) : null,
           planned_year: py ? Number(py) : null,
@@ -756,7 +756,7 @@ function SettingsTab({ milestones, projectId, onReload }: {
     if (milestones.some((m) => (m.code || "").toLowerCase() === finalCode.toLowerCase())) {
       return toast({ title: "Code already in use", description: `${finalCode} is taken.`, variant: "destructive" });
     }
-    const { error } = await supabase.from("piping_milestones").insert({
+    const { error } = await supabase.from("nb_piping_milestones").insert({
       project_id: projectId, name, code: finalCode, milestone_type: type,
       display_order: milestones.length + 1, tracks_percent: true,
     });
@@ -770,14 +770,14 @@ function SettingsTab({ milestones, projectId, onReload }: {
     if (milestones.some((m) => m.id !== id && (m.code || "").toLowerCase() === trimmed.toLowerCase())) {
       return toast({ title: "Code already in use", description: `${trimmed} is taken.`, variant: "destructive" });
     }
-    const { error } = await supabase.from("piping_milestones").update({ code: trimmed }).eq("id", id);
+    const { error } = await supabase.from("nb_piping_milestones").update({ code: trimmed }).eq("id", id);
     if (error) return toast({ title: "Failed", description: error.message, variant: "destructive" });
     onReload();
   }
 
   async function remove(id: string) {
     if (!confirm("Delete this milestone? All progress cells under it will also be removed.")) return;
-    const { error } = await supabase.from("piping_milestones").delete().eq("id", id);
+    const { error } = await supabase.from("nb_piping_milestones").delete().eq("id", id);
     if (error) return toast({ title: "Failed", description: error.message, variant: "destructive" });
     onReload();
   }

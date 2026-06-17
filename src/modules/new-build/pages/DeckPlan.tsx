@@ -5,7 +5,7 @@ import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
 import { supabase } from "@/integrations/supabase/client";
-import { useProject } from "@/contexts/ProjectContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -212,7 +212,7 @@ export default function DeckPlan() {
   const loadDecks = async () => {
     if (!currentProject) return;
     const { data } = await supabase
-      .from("deck_views")
+      .from("nb_deck_views")
       .select("*")
       .eq("project_id", currentProject.id)
       .order("display_order", { ascending: true })
@@ -230,7 +230,7 @@ export default function DeckPlan() {
     loadDecks();
     (async () => {
       const { data } = await supabase
-        .from("areas")
+        .from("nb_areas")
         .select("id,name")
         .eq("project_id", currentProject.id)
         .order("name");
@@ -264,7 +264,7 @@ export default function DeckPlan() {
     }
     const load = async () => {
       const { data } = await supabase
-        .from("deck_rooms")
+        .from("nb_deck_rooms")
         .select("*")
         .eq("deck_view_id", activeDeck.id);
       setRooms((data ?? []) as DeckRoom[]);
@@ -296,11 +296,11 @@ export default function DeckPlan() {
     setAreaDetail(null);
     try {
       const [decisionsRes, filesRes, approvalsRes, equipRes, matsRes] = await Promise.all([
-        supabase.from("decisions").select("id,title,status,item_type").eq("area_id", areaId).order("created_at", { ascending: false }).limit(20),
-        supabase.from("files").select("id,name,status").eq("area_id", areaId).order("created_at", { ascending: false }).limit(20),
-        supabase.from("approvals").select("id,status,file_id").limit(50),
-        supabase.from("equipment").select("id,name,status").eq("area_id", areaId).order("created_at", { ascending: false }).limit(20),
-        supabase.from("materials").select("id,name,selection_status").limit(100),
+        supabase.from("nb_decisions").select("id,title,status,item_type").eq("area_id", areaId).order("created_at", { ascending: false }).limit(20),
+        supabase.from("nb_files").select("id,name,status").eq("area_id", areaId).order("created_at", { ascending: false }).limit(20),
+        supabase.from("nb_approvals").select("id,status,file_id").limit(50),
+        supabase.from("nb_equipment").select("id,name,status").eq("area_id", areaId).order("created_at", { ascending: false }).limit(20),
+        supabase.from("nb_materials").select("id,name,selection_status").limit(100),
       ]);
 
       // Filter approvals to those linked to files in this area
@@ -314,7 +314,7 @@ export default function DeckPlan() {
 
       // Filter materials by area via material_usages
       const { data: usages } = await supabase
-        .from("material_usages")
+        .from("nb_material_usages")
         .select("material_id")
         .eq("area_id", areaId);
       const matIds = new Set((usages ?? []).map((u: any) => u.material_id));
@@ -377,7 +377,7 @@ export default function DeckPlan() {
       return;
     }
     const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from("deck_rooms").insert({
+    const { error } = await supabase.from("nb_deck_rooms").insert({
       deck_view_id: activeDeck.id,
       drawing_id: null,
       deck: activeDeck.label,
@@ -402,7 +402,7 @@ export default function DeckPlan() {
   };
 
   const deleteRoom = async (id: string) => {
-    const { error } = await supabase.from("deck_rooms").delete().eq("id", id);
+    const { error } = await supabase.from("nb_deck_rooms").delete().eq("id", id);
     if (error) toast.error(error.message);
     else toast.success("Marker deleted");
     setActiveRoom(null);
@@ -444,7 +444,7 @@ export default function DeckPlan() {
     const { data: { user } } = await supabase.auth.getUser();
     const cx = room.bbox_x + room.bbox_width / 2;
     const cy = room.bbox_y + room.bbox_height / 2;
-    const { error } = await supabase.from("deck_rooms").insert({
+    const { error } = await supabase.from("nb_deck_rooms").insert({
       deck_view_id: activeDeck.id,
       drawing_id: null,
       deck: activeDeck.label,
@@ -489,7 +489,7 @@ export default function DeckPlan() {
         created_by: user?.id,
       };
     });
-    const { error } = await supabase.from("deck_rooms").insert(rows);
+    const { error } = await supabase.from("nb_deck_rooms").insert(rows);
     if (error) {
       toast.error(error.message);
       return;
@@ -508,9 +508,9 @@ export default function DeckPlan() {
   const deleteDeck = async (deck: DeckView) => {
     if (!confirm(`Delete "${deck.label}"? This will also delete its hotspots.`))
       return;
-    await supabase.from("deck_rooms").delete().eq("deck_view_id", deck.id);
-    await supabase.storage.from("deck-plans").remove([deck.image_storage_path]);
-    const { error } = await supabase.from("deck_views").delete().eq("id", deck.id);
+    await supabase.from("nb_deck_rooms").delete().eq("deck_view_id", deck.id);
+    await supabase.storage.from("nb-deck-plans").remove([deck.image_storage_path]);
+    const { error } = await supabase.from("nb_deck_views").delete().eq("id", deck.id);
     if (error) {
       toast.error(error.message);
       return;
@@ -942,7 +942,7 @@ export default function DeckPlan() {
               onClick={async () => {
                 if (!editingRoom) return;
                 const { error } = await supabase
-                  .from("deck_rooms")
+                  .from("nb_deck_rooms")
                   .update({
                     label: editingRoom.label.trim(),
                     area_id: editingRoom.area_id,
@@ -1342,7 +1342,7 @@ function DeckCropperDialog({
       if (upErr) throw upErr;
 
       const { data: { user } } = await supabase.auth.getUser();
-      const { error: insErr } = await supabase.from("deck_views").insert({
+      const { error: insErr } = await supabase.from("nb_deck_views").insert({
         project_id: projectId,
         label: label.trim(),
         display_order: nextOrder,

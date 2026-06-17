@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useProject } from "@/contexts/ProjectContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
+import { useAuth } from "@/modules/auth/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import {
   Search,
   Plus,
@@ -209,7 +209,7 @@ export default function Regulations() {
         fileName = file.name;
         const path = `${projectId}/${Date.now()}-${file.name}`;
         const { error: uploadErr } = await supabase.storage
-          .from("regulations")
+          .from("nb_regulations")
           .upload(path, file);
         if (uploadErr) throw uploadErr;
         storagePath = path;
@@ -256,7 +256,7 @@ export default function Regulations() {
   const deleteMutation = useMutation({
     mutationFn: async (reg: Regulation) => {
       if (reg.storage_path) {
-        await supabase.storage.from("regulations").remove([reg.storage_path]);
+        await supabase.storage.from("nb_regulations").remove([reg.storage_path]);
       }
       const { error } = await supabase
         .from("regulations" as any)
@@ -295,7 +295,7 @@ export default function Regulations() {
   }, [projectId, queryClient, toast]);
 
   const getDownloadUrl = (storagePath: string) => {
-    const { data } = supabase.storage.from("regulations").getPublicUrl(storagePath);
+    const { data } = supabase.storage.from("nb_regulations").getPublicUrl(storagePath);
     return data.publicUrl;
   };
 

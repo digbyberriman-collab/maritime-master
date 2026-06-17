@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useProject } from "@/contexts/ProjectContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,7 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Trash2, Plus, Users } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 
 // ── Types ─────────────────────────────────────────────────────────────
 type DeckView = {
@@ -104,7 +104,7 @@ export default function ContractorDemarcation() {
     queryKey: ["deck-views-interior", projectId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("deck_views")
+        .from("nb_deck_views")
         .select("id,label,display_order,image_storage_path,image_width,image_height")
         .eq("project_id", projectId!)
         .order("display_order");
@@ -117,7 +117,7 @@ export default function ContractorDemarcation() {
   const { data: allRooms = [] } = useQuery({
     queryKey: ["deck-rooms-all", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("deck_rooms").select("*");
+      const { data, error } = await supabase.from("nb_deck_rooms").select("*");
       if (error) throw error;
       return data as DeckRoom[];
     },
@@ -128,7 +128,7 @@ export default function ContractorDemarcation() {
     queryKey: ["suppliers", projectId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("suppliers")
+        .from("nb_suppliers")
         .select("id,name,company")
         .eq("project_id", projectId!);
       if (error) throw error;
@@ -141,7 +141,7 @@ export default function ContractorDemarcation() {
     queryKey: ["contractor-assignments", projectId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("room_contractor_assignments")
+        .from("nb_room_contractor_assignments")
         .select("*")
         .eq("project_id", projectId!);
       if (error) throw error;
@@ -213,7 +213,7 @@ export default function ContractorDemarcation() {
   const saveAssignment = useMutation({
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("room_contractor_assignments").insert({
+      const { error } = await supabase.from("nb_room_contractor_assignments").insert({
         project_id: projectId!,
         room_id: selectedRoomId!,
         supplier_id: formSupplierId,
@@ -233,7 +233,7 @@ export default function ContractorDemarcation() {
 
   const deleteAssignment = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("room_contractor_assignments").delete().eq("id", id);
+      const { error } = await supabase.from("nb_room_contractor_assignments").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -244,7 +244,7 @@ export default function ContractorDemarcation() {
 
   const updateAssignment = useMutation({
     mutationFn: async ({ id, field, value }: { id: string; field: "produces_drawing" | "creates_detail_booklet" | "approves_drawing" | "defines_materials"; value: boolean }) => {
-      const { error } = await supabase.from("room_contractor_assignments").update({ [field]: value } as any).eq("id", id);
+      const { error } = await supabase.from("nb_room_contractor_assignments").update({ [field]: value } as any).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => refetchAssignments(),

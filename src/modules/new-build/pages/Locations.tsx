@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { useProject } from "@/contexts/ProjectContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Plus, Pencil, Trash2, Download, FileText, Ship } from "lucide-react";
-import { toast } from "@/hooks/use-toast";
+import { toast } from "@/components/ui/use-toast";
 import {
   zoneDefinitions,
   deckDefinitions,
@@ -49,7 +49,7 @@ export default function Locations() {
   const { data: zones = [] } = useQuery({
     queryKey: ["zones", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("zones").select("*").eq("project_id", projectId!).order("name");
+      const { data, error } = await supabase.from("nb_zones").select("*").eq("project_id", projectId!).order("name");
       if (error) throw error;
       return data;
     },
@@ -59,7 +59,7 @@ export default function Locations() {
   const { data: subzones = [] } = useQuery({
     queryKey: ["subzones", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("subzones").select("*, zones(name)").eq("project_id", projectId!).order("name");
+      const { data, error } = await supabase.from("nb_subzones").select("*, zones(name)").eq("project_id", projectId!).order("name");
       if (error) throw error;
       return data;
     },
@@ -69,7 +69,7 @@ export default function Locations() {
   const { data: decks = [] } = useQuery({
     queryKey: ["decks", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("decks").select("*, zones(name)").eq("project_id", projectId!).order("deck_number");
+      const { data, error } = await supabase.from("nb_decks").select("*, zones(name)").eq("project_id", projectId!).order("deck_number");
       if (error) throw error;
       return data;
     },
@@ -79,7 +79,7 @@ export default function Locations() {
   const { data: blocks = [] } = useQuery({
     queryKey: ["blocks", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("blocks").select("*, decks(name)").eq("project_id", projectId!).order("name");
+      const { data, error } = await supabase.from("nb_blocks").select("*, decks(name)").eq("project_id", projectId!).order("name");
       if (error) throw error;
       return data;
     },
@@ -89,7 +89,7 @@ export default function Locations() {
   const { data: locationAreas = [] } = useQuery({
     queryKey: ["location_areas", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("location_areas").select("*, blocks(name)").eq("project_id", projectId!).order("name");
+      const { data, error } = await supabase.from("nb_location_areas").select("*, blocks(name)").eq("project_id", projectId!).order("name");
       if (error) throw error;
       return data;
     },
@@ -99,7 +99,7 @@ export default function Locations() {
   const { data: sections = [] } = useQuery({
     queryKey: ["sections", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("sections").select("*, location_areas(name)").eq("project_id", projectId!).order("name");
+      const { data, error } = await supabase.from("nb_sections").select("*, location_areas(name)").eq("project_id", projectId!).order("name");
       if (error) throw error;
       return data;
     },

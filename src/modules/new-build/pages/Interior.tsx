@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useProject } from "@/contexts/ProjectContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,7 +52,7 @@ export default function Interior() {
     queryKey: ["interior-areas", projectId],
     queryFn: async () => {
       if (!projectId) return [];
-      const { data, error } = await supabase.from("areas").select("*").eq("project_id", projectId).eq("is_interior", true).order("name");
+      const { data, error } = await supabase.from("nb_areas").select("*").eq("project_id", projectId).eq("is_interior", true).order("name");
       if (error) throw error;
       return data;
     },
@@ -62,7 +62,7 @@ export default function Interior() {
   const { data: materials = [] } = useQuery({
     queryKey: ["materials", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("materials").select("id").eq("project_id", projectId!);
+      const { data, error } = await supabase.from("nb_materials").select("id").eq("project_id", projectId!);
       if (error) throw error;
       return data;
     },
@@ -72,7 +72,7 @@ export default function Interior() {
   const { data: scheduleTasks = [] } = useQuery({
     queryKey: ["schedule-tasks-interior", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("schedule_tasks").select("id,task_name").eq("project_id", projectId!);
+      const { data, error } = await supabase.from("nb_schedule_tasks").select("id,task_name").eq("project_id", projectId!);
       if (error) throw error;
       return data;
     },
@@ -89,7 +89,7 @@ export default function Interior() {
     queryKey: ["decisions-interior", projectId, interiorAreaIds.join(",")],
     queryFn: async () => {
       if (!projectId || interiorAreaIds.length === 0) return [];
-      const { data, error } = await supabase.from("decisions").select("id,item_type,raid_status").eq("project_id", projectId).in("area_id", interiorAreaIds);
+      const { data, error } = await supabase.from("nb_decisions").select("id,item_type,raid_status").eq("project_id", projectId).in("area_id", interiorAreaIds);
       if (error) throw error;
       return data;
     },
@@ -104,7 +104,7 @@ export default function Interior() {
   const { data: interiorDrawings = [] } = useQuery({
     queryKey: ["interior-drawings", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("interior_drawings").select("id").eq("project_id", projectId!);
+      const { data, error } = await supabase.from("nb_interior_drawings").select("id").eq("project_id", projectId!);
       if (error) throw error;
       return data;
     },

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useProject } from "@/contexts/ProjectContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -28,7 +28,7 @@ export default function InteriorApprovals() {
     queryKey: ["interior-areas", projectId],
     queryFn: async () => {
       if (!projectId) return [];
-      const { data, error } = await supabase.from("areas").select("*").eq("project_id", projectId).eq("is_interior", true).order("name");
+      const { data, error } = await supabase.from("nb_areas").select("*").eq("project_id", projectId).eq("is_interior", true).order("name");
       if (error) throw error;
       return data;
     },
@@ -40,7 +40,7 @@ export default function InteriorApprovals() {
   const { data: files = [] } = useQuery({
     queryKey: ["files", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("files").select("*").eq("project_id", projectId!);
+      const { data, error } = await supabase.from("nb_files").select("*").eq("project_id", projectId!);
       if (error) throw error;
       return data;
     },
@@ -53,7 +53,7 @@ export default function InteriorApprovals() {
     queryKey: ["approvals-interior", interiorFileIds.join(",")],
     queryFn: async () => {
       if (interiorFileIds.length === 0) return [];
-      const { data, error } = await supabase.from("approvals").select("*").in("file_id", interiorFileIds).order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("nb_approvals").select("*").in("file_id", interiorFileIds).order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -64,7 +64,7 @@ export default function InteriorApprovals() {
     queryKey: ["decisions-interior", projectId, interiorAreaIds.join(",")],
     queryFn: async () => {
       if (!projectId || interiorAreaIds.length === 0) return [];
-      const { data, error } = await supabase.from("decisions").select("*").eq("project_id", projectId).in("area_id", interiorAreaIds).order("created_at", { ascending: false });
+      const { data, error } = await supabase.from("nb_decisions").select("*").eq("project_id", projectId).in("area_id", interiorAreaIds).order("created_at", { ascending: false });
       if (error) throw error;
       return data;
     },
@@ -74,7 +74,7 @@ export default function InteriorApprovals() {
   const { data: interiorDrawings = [] } = useQuery({
     queryKey: ["interior-drawings", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("interior_drawings").select("*").eq("project_id", projectId!).order("deck_name").order("drawing_number");
+      const { data, error } = await supabase.from("nb_interior_drawings").select("*").eq("project_id", projectId!).order("deck_name").order("drawing_number");
       if (error) throw error;
       return data;
     },

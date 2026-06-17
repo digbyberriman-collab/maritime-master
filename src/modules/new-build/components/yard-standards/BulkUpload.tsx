@@ -19,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { Upload, Loader2, Sparkles, X, Check } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import {

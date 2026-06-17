@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useProject } from "@/contexts/ProjectContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -19,7 +19,7 @@ import {
   FlaskConical, Hammer, BookOpen, ArrowLeft, LayoutGrid, List, X, ZoomIn,
   ChevronRight, FolderOpen, Folder,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { Link } from "react-router-dom";
 
 // --- constants ---
@@ -155,7 +155,7 @@ export default function InteriorMaterials() {
     queryKey: ["interior-areas", projectId],
     queryFn: async () => {
       if (!projectId) return [];
-      const { data, error } = await supabase.from("areas").select("*").eq("project_id", projectId).eq("is_interior", true).order("name");
+      const { data, error } = await supabase.from("nb_areas").select("*").eq("project_id", projectId).eq("is_interior", true).order("name");
       if (error) throw error;
       return data;
     },
@@ -165,7 +165,7 @@ export default function InteriorMaterials() {
   const { data: suppliers = [] } = useQuery({
     queryKey: ["suppliers", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("suppliers").select("id,name,company").eq("project_id", projectId!);
+      const { data, error } = await supabase.from("nb_suppliers").select("id,name,company").eq("project_id", projectId!);
       if (error) throw error;
       return data;
     },
@@ -175,7 +175,7 @@ export default function InteriorMaterials() {
   const { data: materials = [] } = useQuery({
     queryKey: ["materials", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("materials").select("*").eq("project_id", projectId!).order("name");
+      const { data, error } = await supabase.from("nb_materials").select("*").eq("project_id", projectId!).order("name");
       if (error) throw error;
       return data;
     },
@@ -185,7 +185,7 @@ export default function InteriorMaterials() {
   const { data: usages = [] } = useQuery({
     queryKey: ["material-usages", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("material_usages").select("*");
+      const { data, error } = await supabase.from("nb_material_usages").select("*");
       if (error) throw error;
       return data;
     },
@@ -198,7 +198,7 @@ export default function InteriorMaterials() {
       const materialIds = (materials as any[]).map((m) => m.id);
       if (materialIds.length === 0) return [];
       const { data, error } = await supabase
-        .from("material_status_history")
+        .from("nb_material_status_history")
         .select("*")
         .in("material_id", materialIds)
         .order("changed_at", { ascending: false });
@@ -239,10 +239,10 @@ export default function InteriorMaterials() {
         photos: form.photos || [],
       };
       if (editingMaterialId) {
-        const { error } = await supabase.from("materials").update(payload).eq("id", editingMaterialId);
+        const { error } = await supabase.from("nb_materials").update(payload).eq("id", editingMaterialId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("materials").insert({ ...payload, created_by: user!.id });
+        const { error } = await supabase.from("nb_materials").insert({ ...payload, created_by: user!.id });
         if (error) throw error;
       }
     },
@@ -256,7 +256,7 @@ export default function InteriorMaterials() {
 
   const deleteMaterial = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("materials").delete().eq("id", id);
+      const { error } = await supabase.from("nb_materials").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -274,7 +274,7 @@ export default function InteriorMaterials() {
 
   const updateMaterialStatus = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const { error } = await supabase.from("materials").update({ selection_status: status }).eq("id", id);
+      const { error } = await supabase.from("nb_materials").update({ selection_status: status }).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["materials", projectId] }); qc.invalidateQueries({ queryKey: ["material-status-history", projectId] }); },
@@ -287,7 +287,7 @@ export default function InteriorMaterials() {
 
   const assignExistingChild = useMutation({
     mutationFn: async ({ materialId, parentId }: { materialId: string; parentId: string }) => {
-      const { error } = await supabase.from("materials").update({ parent_material_id: parentId }).eq("id", materialId);
+      const { error } = await supabase.from("nb_materials").update({ parent_material_id: parentId }).eq("id", materialId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -301,7 +301,7 @@ export default function InteriorMaterials() {
 
   const unassignChild = useMutation({
     mutationFn: async (materialId: string) => {
-      const { error } = await supabase.from("materials").update({ parent_material_id: null }).eq("id", materialId);
+      const { error } = await supabase.from("nb_materials").update({ parent_material_id: null }).eq("id", materialId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -455,7 +455,7 @@ export default function InteriorMaterials() {
   const bulkUpdateStatus = useMutation({
     mutationFn: async (status: string) => {
       const promises = selectedForCompare.map((id) =>
-        supabase.from("materials").update({ selection_status: status }).eq("id", id)
+        supabase.from("nb_materials").update({ selection_status: status }).eq("id", id)
       );
       const results = await Promise.all(promises);
       const err = results.find((r) => r.error);
@@ -495,7 +495,7 @@ export default function InteriorMaterials() {
     try {
       const ext = file.name.split(".").pop();
       const path = `${projectId}/${crypto.randomUUID()}.${ext}`;
-      const { error } = await supabase.storage.from("material-swatches").upload(path, file);
+      const { error } = await supabase.storage.from("nb-material-swatches").upload(path, file);
       if (error) throw error;
       setMaterialForm((f) => ({ ...f, swatch_storage_path: path }));
       toast({ title: "Swatch uploaded" });
@@ -510,7 +510,7 @@ export default function InteriorMaterials() {
     const path = materialForm.swatch_storage_path;
     if (!path) return;
     try {
-      await supabase.storage.from("material-swatches").remove([path]);
+      await supabase.storage.from("nb-material-swatches").remove([path]);
     } catch {}
     setMaterialForm((f) => ({ ...f, swatch_storage_path: "" }));
   };
@@ -523,7 +523,7 @@ export default function InteriorMaterials() {
       for (const file of Array.from(files)) {
         const ext = file.name.split(".").pop();
         const path = `${projectId}/${crypto.randomUUID()}.${ext}`;
-        const { error } = await supabase.storage.from("material-swatches").upload(path, file);
+        const { error } = await supabase.storage.from("nb-material-swatches").upload(path, file);
         if (error) throw error;
         uploaded.push(path);
       }
@@ -538,7 +538,7 @@ export default function InteriorMaterials() {
 
   const handleRemovePhoto = async (path: string) => {
     try {
-      await supabase.storage.from("material-swatches").remove([path]);
+      await supabase.storage.from("nb-material-swatches").remove([path]);
     } catch {}
     setMaterialForm((f) => ({ ...f, photos: (f.photos || []).filter((p) => p !== path) }));
   };
@@ -551,7 +551,7 @@ export default function InteriorMaterials() {
     });
   };
 
-  const swatchUrl = (path?: string | null) => path ? supabase.storage.from("material-swatches").getPublicUrl(path).data.publicUrl : null;
+  const swatchUrl = (path?: string | null) => path ? supabase.storage.from("nb-material-swatches").getPublicUrl(path).data.publicUrl : null;
 
   // usage dialog
   const [usageDialogMaterialId, setUsageDialogMaterialId] = useState<string | null>(null);
@@ -560,7 +560,7 @@ export default function InteriorMaterials() {
   const addUsage = useMutation({
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("material_usages").insert({
+      const { error } = await supabase.from("nb_material_usages").insert({
         material_id: usageDialogMaterialId!, area_id: usageForm.area_id || null,
         location_detail: usageForm.location_detail || null, quantity: usageForm.quantity ? Number(usageForm.quantity) : null,
         unit: usageForm.unit || null, notes: usageForm.notes || null, created_by: user!.id,
@@ -578,7 +578,7 @@ export default function InteriorMaterials() {
 
   const deleteUsage = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("material_usages").delete().eq("id", id);
+      const { error } = await supabase.from("nb_material_usages").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["material-usages", projectId] }),

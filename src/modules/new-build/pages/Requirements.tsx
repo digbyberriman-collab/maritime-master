@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
-import { useProject } from "@/contexts/ProjectContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
+import { useAuth } from "@/modules/auth/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import {
   ClipboardCheck, Plus, Trash2, ChevronDown, ChevronRight,
   Link2, Unlink, Upload, FileSpreadsheet, CheckCircle2, Circle,
@@ -63,7 +63,7 @@ export default function Requirements() {
     queryKey: ["requirements", projectId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("requirements")
+        .from("nb_requirements")
         .select("*")
         .eq("project_id", projectId!)
         .order("created_at", { ascending: true });
@@ -79,7 +79,7 @@ export default function Requirements() {
       const reqIds = requirements.map((r) => r.id);
       if (!reqIds.length) return [];
       const { data, error } = await supabase
-        .from("requirement_deliverables")
+        .from("nb_requirement_deliverables")
         .select("*")
         .in("requirement_id", reqIds);
       if (error) throw error;
@@ -91,7 +91,7 @@ export default function Requirements() {
   const { data: areas = [] } = useQuery({
     queryKey: ["areas", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("areas").select("*").eq("project_id", projectId!);
+      const { data, error } = await supabase.from("nb_areas").select("*").eq("project_id", projectId!);
       if (error) throw error;
       return data;
     },
@@ -101,7 +101,7 @@ export default function Requirements() {
   const { data: files = [] } = useQuery({
     queryKey: ["files", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("files").select("*").eq("project_id", projectId!);
+      const { data, error } = await supabase.from("nb_files").select("*").eq("project_id", projectId!);
       if (error) throw error;
       return data;
     },
@@ -111,7 +111,7 @@ export default function Requirements() {
   const { data: decisions = [] } = useQuery({
     queryKey: ["decisions", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("decisions").select("*").eq("project_id", projectId!);
+      const { data, error } = await supabase.from("nb_decisions").select("*").eq("project_id", projectId!);
       if (error) throw error;
       return data;
     },
@@ -123,7 +123,7 @@ export default function Requirements() {
     queryFn: async () => {
       const fileIds = files.map((f) => f.id);
       if (!fileIds.length) return [];
-      const { data, error } = await supabase.from("approvals").select("*").in("file_id", fileIds);
+      const { data, error } = await supabase.from("nb_approvals").select("*").in("file_id", fileIds);
       if (error) throw error;
       return data;
     },
@@ -142,10 +142,10 @@ export default function Requirements() {
         created_by: user!.id,
       };
       if (isEdit) {
-        const { error } = await supabase.from("requirements").update(payload).eq("id", editId!);
+        const { error } = await supabase.from("nb_requirements").update(payload).eq("id", editId!);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("requirements").insert(payload);
+        const { error } = await supabase.from("nb_requirements").insert(payload);
         if (error) throw error;
       }
     },
@@ -161,7 +161,7 @@ export default function Requirements() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("requirements").delete().eq("id", id);
+      const { error } = await supabase.from("nb_requirements").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -172,7 +172,7 @@ export default function Requirements() {
 
   const linkMutation = useMutation({
     mutationFn: async (p: { requirement_id: string; deliverable_type: string; deliverable_id: string }) => {
-      const { error } = await supabase.from("requirement_deliverables").insert({
+      const { error } = await supabase.from("nb_requirement_deliverables").insert({
         ...p,
         linked_by: user!.id,
       });
@@ -186,7 +186,7 @@ export default function Requirements() {
 
   const unlinkMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("requirement_deliverables").delete().eq("id", id);
+      const { error } = await supabase.from("nb_requirement_deliverables").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -200,7 +200,7 @@ export default function Requirements() {
       let count = 0;
       for (const row of importRows) {
         const areaMatch = areas.find((a) => a.name.toLowerCase() === row.area_id.toLowerCase());
-        const { error } = await supabase.from("requirements").insert({
+        const { error } = await supabase.from("nb_requirements").insert({
           title: row.title,
           description: row.description || null,
           area_id: areaMatch?.id || null,

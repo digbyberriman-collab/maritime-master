@@ -30,7 +30,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const fetchProjects = async () => {
-      const { data } = await supabase.from("projects").select("*").order("name");
+      const { data } = await supabase.from("nb_projects").select("*").order("name");
       if (data && data.length > 0) {
         setProjects(data);
         const saved = localStorage.getItem("currentProjectId");

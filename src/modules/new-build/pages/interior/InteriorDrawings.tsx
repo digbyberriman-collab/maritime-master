@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useProject } from "@/contexts/ProjectContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,7 +41,7 @@ export default function InteriorDrawings() {
   const { data: interiorDrawings = [] } = useQuery({
     queryKey: ["interior-drawings", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("interior_drawings").select("*").eq("project_id", projectId!).order("deck_name").order("drawing_number");
+      const { data, error } = await supabase.from("nb_interior_drawings").select("*").eq("project_id", projectId!).order("deck_name").order("drawing_number");
       if (error) throw error;
       return data;
     },

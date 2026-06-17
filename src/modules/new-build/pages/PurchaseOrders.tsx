@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useProject } from "@/contexts/ProjectContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
+import { useAuth } from "@/modules/auth/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -83,7 +83,7 @@ export default function PurchaseOrders() {
     queryKey: ["purchase_orders", projectId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("purchase_orders")
+        .from("nb_purchase_orders")
         .select("*")
         .eq("project_id", projectId!)
         .order("created_at", { ascending: false });
@@ -96,7 +96,7 @@ export default function PurchaseOrders() {
   const { data: suppliers = [] } = useQuery({
     queryKey: ["po_suppliers", projectId],
     queryFn: async () => {
-      const { data } = await supabase.from("suppliers").select("id,name,company").eq("project_id", projectId!);
+      const { data } = await supabase.from("nb_suppliers").select("id,name,company").eq("project_id", projectId!);
       return data || [];
     },
     enabled: !!projectId,
@@ -105,7 +105,7 @@ export default function PurchaseOrders() {
   const { data: areas = [] } = useQuery({
     queryKey: ["po_areas", projectId],
     queryFn: async () => {
-      const { data } = await supabase.from("areas").select("id,name").eq("project_id", projectId!);
+      const { data } = await supabase.from("nb_areas").select("id,name").eq("project_id", projectId!);
       return data || [];
     },
     enabled: !!projectId,
@@ -114,7 +114,7 @@ export default function PurchaseOrders() {
   const { data: equipment = [] } = useQuery({
     queryKey: ["po_equipment", projectId],
     queryFn: async () => {
-      const { data } = await supabase.from("equipment").select("id,name").eq("project_id", projectId!);
+      const { data } = await supabase.from("nb_equipment").select("id,name").eq("project_id", projectId!);
       return data || [];
     },
     enabled: !!projectId,
@@ -124,7 +124,7 @@ export default function PurchaseOrders() {
     queryKey: ["po_tasks", projectId],
     queryFn: async () => {
       const { data } = await supabase
-        .from("schedule_tasks")
+        .from("nb_schedule_tasks")
         .select("id,task_name,end_date,baseline_end_date")
         .eq("project_id", projectId!)
         .order("start_date");
@@ -223,17 +223,17 @@ export default function PurchaseOrders() {
     if (form.id) {
       const existing = pos.find((p: any) => p.id === form.id);
       oldStatus = existing?.status || null;
-      const { error } = await supabase.from("purchase_orders").update(payload).eq("id", form.id);
+      const { error } = await supabase.from("nb_purchase_orders").update(payload).eq("id", form.id);
       if (error) { toast.error(error.message); return; }
     } else {
-      const { error } = await supabase.from("purchase_orders").insert({ ...payload, created_by: user!.id });
+      const { error } = await supabase.from("nb_purchase_orders").insert({ ...payload, created_by: user!.id });
       if (error) { toast.error(error.message); return; }
     }
 
     // Log activity if status changed (or created)
     const poId = form.id;
     if (poId && oldStatus && oldStatus !== form.status) {
-      await supabase.from("purchase_order_activity").insert({
+      await supabase.from("nb_purchase_order_activity").insert({
         purchase_order_id: poId,
         activity_type: "status_change",
         from_status: oldStatus,
@@ -249,7 +249,7 @@ export default function PurchaseOrders() {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this purchase order?")) return;
-    const { error } = await supabase.from("purchase_orders").delete().eq("id", id);
+    const { error } = await supabase.from("nb_purchase_orders").delete().eq("id", id);
     if (error) { toast.error(error.message); return; }
     toast.success("Deleted");
     qc.invalidateQueries({ queryKey: ["purchase_orders", projectId] });
@@ -272,17 +272,17 @@ export default function PurchaseOrders() {
     // Preserve baseline if not yet set
     if (!task.baseline_end_date) updates.baseline_end_date = task.end_date;
 
-    const { error: tErr } = await supabase.from("schedule_tasks").update(updates).eq("id", po.schedule_task_id);
+    const { error: tErr } = await supabase.from("nb_schedule_tasks").update(updates).eq("id", po.schedule_task_id);
     if (tErr) { toast.error(tErr.message); return; }
 
-    const { error: pErr } = await supabase.from("purchase_orders").update({
+    const { error: pErr } = await supabase.from("nb_purchase_orders").update({
       delay_applied_to_schedule: true,
       delay_applied_days: delayDays,
       delay_applied_at: new Date().toISOString(),
     }).eq("id", po.id);
     if (pErr) { toast.error(pErr.message); return; }
 
-    await supabase.from("purchase_order_activity").insert({
+    await supabase.from("nb_purchase_order_activity").insert({
       purchase_order_id: po.id,
       activity_type: "delay_applied",
       comment: `Pushed linked task by ${delayDays} day(s)`,
@@ -299,18 +299,18 @@ export default function PurchaseOrders() {
     const task = tasks.find((t: any) => t.id === po.schedule_task_id);
     if (!task?.baseline_end_date) { toast.error("No baseline to revert to"); return; }
 
-    const { error: tErr } = await supabase.from("schedule_tasks").update({
+    const { error: tErr } = await supabase.from("nb_schedule_tasks").update({
       end_date: task.baseline_end_date,
     }).eq("id", po.schedule_task_id);
     if (tErr) { toast.error(tErr.message); return; }
 
-    await supabase.from("purchase_orders").update({
+    await supabase.from("nb_purchase_orders").update({
       delay_applied_to_schedule: false,
       delay_applied_days: null,
       delay_applied_at: null,
     }).eq("id", po.id);
 
-    await supabase.from("purchase_order_activity").insert({
+    await supabase.from("nb_purchase_order_activity").insert({
       purchase_order_id: po.id,
       activity_type: "delay_reverted",
       created_by: user!.id,

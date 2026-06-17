@@ -1,16 +1,16 @@
 import { useState } from "react";
-import { useProject } from "@/contexts/ProjectContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
+import { useAuth } from "@/modules/auth/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Check, FileSpreadsheet, CalendarDays } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { FileUploadZone } from "@/components/import/FileUploadZone";
-import { ColumnMapper, autoMapColumns, FieldDef } from "@/components/import/ColumnMapper";
-import { ImportPreview } from "@/components/import/ImportPreview";
+import { useToast } from "@/components/ui/use-toast";
+import { FileUploadZone } from "@/modules/new-build/components/import/FileUploadZone";
+import { ColumnMapper, autoMapColumns, FieldDef } from "@/modules/new-build/components/import/ColumnMapper";
+import { ImportPreview } from "@/modules/new-build/components/import/ImportPreview";
 
 type Step = "choose" | "upload" | "map" | "preview" | "done";
 type ImportTarget = "decisions" | "schedule";
@@ -121,7 +121,7 @@ export default function Import() {
           const pendingStatuses = ["current", "action", "question_asked"];
           const pending = pendingStatuses.includes(raidStatus);
 
-          const { error } = await supabase.from("decisions").insert({
+          const { error } = await supabase.from("nb_decisions").insert({
             title: row.title.trim(),
             item_type: itemType as any,
             raid_status: raidStatus as any,
@@ -145,7 +145,7 @@ export default function Import() {
         }
       } else {
         // Schedule tasks - first log the import
-        const { data: importLog } = await supabase.from("timeline_imports").insert({
+        const { data: importLog } = await supabase.from("nb_timeline_imports").insert({
           project_id: projectId,
           original_filename: fileName,
           imported_by: userId,
@@ -176,13 +176,13 @@ export default function Import() {
 
         // Update the import log with actual row count
         if (importId) {
-          await supabase.from("timeline_imports").update({ row_count: imported } as any).eq("id", importId);
+          await supabase.from("nb_timeline_imports").update({ row_count: imported } as any).eq("id", importId);
         }
       }
 
       // Log the import for decisions too
       if (target === "decisions") {
-        await supabase.from("timeline_imports").insert({
+        await supabase.from("nb_timeline_imports").insert({
           project_id: projectId,
           original_filename: fileName,
           imported_by: userId,

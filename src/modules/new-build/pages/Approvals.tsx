@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useProject } from "@/contexts/ProjectContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Plus, CheckCircle2, AlertCircle, Clock } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
 
 type ApprovalStatus = "pending" | "approved" | "changes_needed";
@@ -42,7 +42,7 @@ export default function Approvals() {
     queryFn: async () => {
       if (!projectId) return [];
       const { data, error } = await supabase
-        .from("approvals")
+        .from("nb_approvals")
         .select("*, files!approvals_file_id_fkey(name, version, project_id, status)")
         .order("created_at", { ascending: false });
       if (error) throw error;
@@ -58,7 +58,7 @@ export default function Approvals() {
     queryFn: async () => {
       if (!projectId) return [];
       const { data, error } = await supabase
-        .from("files")
+        .from("nb_files")
         .select("id, name, version, status")
         .eq("project_id", projectId)
         .in("status", ["draft", "review"])
@@ -72,9 +72,9 @@ export default function Approvals() {
   const submitMutation = useMutation({
     mutationFn: async (fileId: string) => {
       // Set file status to review
-      await supabase.from("files").update({ status: "review" }).eq("id", fileId);
+      await supabase.from("nb_files").update({ status: "review" }).eq("id", fileId);
       // Create approval record
-      const { error } = await supabase.from("approvals").insert({
+      const { error } = await supabase.from("nb_approvals").insert({
         file_id: fileId,
         submitted_by: placeholderUserId,
         status: "pending",
@@ -97,7 +97,7 @@ export default function Approvals() {
   const reviewMutation = useMutation({
     mutationFn: async ({ approvalId, status, comment }: { approvalId: string; status: ApprovalStatus; comment: string }) => {
       const { error } = await supabase
-        .from("approvals")
+        .from("nb_approvals")
         .update({
           status,
           comment: comment || null,
@@ -109,7 +109,7 @@ export default function Approvals() {
 
       // If approved, update file status
       if (status === "approved" && reviewingApproval?.file_id) {
-        await supabase.from("files").update({ status: "approved" }).eq("id", reviewingApproval.file_id);
+        await supabase.from("nb_files").update({ status: "approved" }).eq("id", reviewingApproval.file_id);
       }
     },
     onSuccess: () => {

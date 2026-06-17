@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from "react";
-import { useProject } from "@/contexts/ProjectContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -57,7 +57,7 @@ export default function Rasci() {
     queryFn: async () => {
       if (!projectId) return [];
       const { data, error } = await supabase
-        .from("element_codes")
+        .from("nb_element_codes")
         .select("id, code, name")
         .eq("project_id", projectId)
         .order("code");
@@ -72,7 +72,7 @@ export default function Rasci() {
     queryFn: async () => {
       if (!projectId) return [];
       const { data, error } = await supabase
-        .from("rasci_roles")
+        .from("nb_rasci_roles")
         .select("id, name, display_order")
         .eq("project_id", projectId)
         .order("display_order");
@@ -91,7 +91,7 @@ export default function Rasci() {
       const pageSize = 1000;
       while (true) {
         const { data, error } = await supabase
-          .from("rasci_assignments")
+          .from("nb_rasci_assignments")
           .select("element_code_id, rasci_role_id, assignment")
           .eq("project_id", projectId)
           .eq("phase", phase as any)
@@ -116,7 +116,7 @@ export default function Rasci() {
       const pageSize = 1000;
       while (true) {
         const { data, error } = await supabase
-          .from("rasci_assignments")
+          .from("nb_rasci_assignments")
           .select("element_code_id, rasci_role_id, assignment, phase")
           .eq("project_id", projectId)
           .range(from, from + pageSize - 1);

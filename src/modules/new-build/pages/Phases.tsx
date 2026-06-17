@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
-import { useProject } from "@/contexts/ProjectContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
+import { useAuth } from "@/modules/auth/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +17,7 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import {
   Flag, Plus, Calendar, CheckCircle2, Clock, Pause, Target,
   ChevronRight, Pencil, Trash2,
@@ -50,7 +50,7 @@ export default function Phases() {
     queryKey: ["build_phases", projectId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("build_phases")
+        .from("nb_build_phases")
         .select("*")
         .eq("project_id", projectId!)
         .order("display_order");
@@ -64,7 +64,7 @@ export default function Phases() {
     queryKey: ["milestones", projectId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("milestones")
+        .from("nb_milestones")
         .select("*")
         .eq("project_id", projectId!)
         .order("sort_order");
@@ -78,7 +78,7 @@ export default function Phases() {
     queryKey: ["phase_schedule_tasks", projectId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("schedule_tasks")
+        .from("nb_schedule_tasks")
         .select("id, task_name, start_date, end_date, percent_complete, phase_id")
         .eq("project_id", projectId!);
       if (error) throw error;
@@ -90,7 +90,7 @@ export default function Phases() {
   // ─── Mutations ───
   const updatePhase = useMutation({
     mutationFn: async ({ id, ...updates }: any) => {
-      const { error } = await supabase.from("build_phases").update(updates).eq("id", id);
+      const { error } = await supabase.from("nb_build_phases").update(updates).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -101,7 +101,7 @@ export default function Phases() {
 
   const createMilestone = useMutation({
     mutationFn: async (ms: any) => {
-      const { error } = await supabase.from("milestones").insert(ms);
+      const { error } = await supabase.from("nb_milestones").insert(ms);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -121,7 +121,7 @@ export default function Phases() {
         updates.actual_date = null;
         updates.completed_by = null;
       }
-      const { error } = await supabase.from("milestones").update(updates).eq("id", id);
+      const { error } = await supabase.from("nb_milestones").update(updates).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["milestones"] }),
@@ -129,7 +129,7 @@ export default function Phases() {
 
   const deleteMilestone = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("milestones").delete().eq("id", id);
+      const { error } = await supabase.from("nb_milestones").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -147,7 +147,7 @@ export default function Phases() {
       if (actual_date !== undefined) updates.actual_date = actual_date;
       if (is_completed !== undefined) updates.is_completed = is_completed;
       if (completed_by !== undefined) updates.completed_by = completed_by;
-      const { error } = await supabase.from("milestones").update(updates as any).eq("id", id);
+      const { error } = await supabase.from("nb_milestones").update(updates as any).eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {

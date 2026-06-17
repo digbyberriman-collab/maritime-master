@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Upload } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 

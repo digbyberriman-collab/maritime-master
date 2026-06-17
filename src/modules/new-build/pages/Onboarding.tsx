@@ -1,4 +1,4 @@
-import { useProject } from "@/contexts/ProjectContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 
 export default function Onboarding() {
   const { currentProject } = useProject();

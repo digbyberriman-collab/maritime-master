@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
-import { useProject } from "@/contexts/ProjectContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
+import { useAuth } from "@/modules/auth/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import {
   CalendarDays, List, ChevronLeft, ChevronRight, ChevronDown, ChevronRight as ChevronR,
   GanttChart as GanttIcon, Upload, CheckCircle2, Circle, Link2, Clock, AlertTriangle,
@@ -23,7 +23,7 @@ import {
   getISOWeek, getISOWeekYear, addWeeks, differenceInDays,
 } from "date-fns";
 import { appendix11Data, parseWeekDate } from "@/data/appendix11-data";
-import { GanttChart } from "@/components/schedule/GanttChart";
+import { GanttChart } from "@/modules/new-build/components/schedule/GanttChart";
 
 type ViewMode = "calendar" | "list";
 
@@ -63,7 +63,7 @@ export default function Timeline() {
     queryFn: async () => {
       if (!projectId) return [];
       const { data, error } = await supabase
-        .from("decisions")
+        .from("nb_decisions")
         .select("*, areas(name)")
         .eq("project_id", projectId)
         .not("date", "is", null)
@@ -79,7 +79,7 @@ export default function Timeline() {
     queryFn: async () => {
       if (!projectId) return [];
       const { data, error } = await supabase
-        .from("deliverable_schedule_items")
+        .from("nb_deliverable_schedule_items")
         .select("*")
         .eq("project_id", projectId)
         .order("chapter_number")
@@ -95,7 +95,7 @@ export default function Timeline() {
     queryFn: async () => {
       if (!projectId) return [];
       const { data, error } = await supabase
-        .from("requirements")
+        .from("nb_requirements")
         .select("id, title")
         .eq("project_id", projectId)
         .order("title");
@@ -124,7 +124,7 @@ export default function Timeline() {
       // Insert in batches of 50
       for (let i = 0; i < rows.length; i += 50) {
         const { error } = await supabase
-          .from("deliverable_schedule_items")
+          .from("nb_deliverable_schedule_items")
           .insert(rows.slice(i, i + 50));
         if (error) throw error;
       }
@@ -141,7 +141,7 @@ export default function Timeline() {
   const linkMutation = useMutation({
     mutationFn: async ({ itemId, reqId }: { itemId: string; reqId: string | null }) => {
       const { error } = await supabase
-        .from("deliverable_schedule_items")
+        .from("nb_deliverable_schedule_items")
         .update({ requirement_id: reqId })
         .eq("id", itemId);
       if (error) throw error;
@@ -156,7 +156,7 @@ export default function Timeline() {
   const toggleResolved = useMutation({
     mutationFn: async ({ id, resolved }: { id: string; resolved: boolean }) => {
       const { error } = await supabase
-        .from("deliverable_schedule_items")
+        .from("nb_deliverable_schedule_items")
         .update({ resolved })
         .eq("id", id);
       if (error) throw error;

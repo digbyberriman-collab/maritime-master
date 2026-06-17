@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useProject } from "@/contexts/ProjectContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
+import { useAuth } from "@/modules/auth/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,18 +9,18 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Plus, AlertTriangle, Shield, Lightbulb, HelpCircle, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import {
   RaidItemCard,
   type RaidItemType,
   type RaidStatus,
   raidStatusLabels,
-} from "@/components/raid/RaidItemCard";
+} from "@/modules/new-build/components/raid/RaidItemCard";
 import {
   RaidItemForm,
   type RaidFormData,
   emptyRaidForm,
-} from "@/components/raid/RaidItemForm";
+} from "@/modules/new-build/components/raid/RaidItemForm";
 
 const typeIcons: Record<string, typeof AlertTriangle> = {
   all: Search,
@@ -52,7 +52,7 @@ export default function Decisions() {
     queryFn: async () => {
       if (!projectId) return [];
       const { data, error } = await supabase
-        .from("decisions")
+        .from("nb_decisions")
         .select("*, areas(name)")
         .eq("project_id", projectId)
         .order("updated_at", { ascending: false });
@@ -67,7 +67,7 @@ export default function Decisions() {
     queryFn: async () => {
       if (!projectId) return [];
       const { data, error } = await supabase
-        .from("areas")
+        .from("nb_areas")
         .select("id, name")
         .eq("project_id", projectId)
         .order("name");
@@ -96,10 +96,10 @@ export default function Decisions() {
       };
       if (editingId) {
         const { created_by: _, project_id: __, ...updatePayload } = payload;
-        const { error } = await supabase.from("decisions").update(updatePayload).eq("id", editingId);
+        const { error } = await supabase.from("nb_decisions").update(updatePayload).eq("id", editingId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("decisions").insert(payload);
+        const { error } = await supabase.from("nb_decisions").insert(payload);
         if (error) throw error;
       }
     },
@@ -115,7 +115,7 @@ export default function Decisions() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("decisions").delete().eq("id", id);
+      const { error } = await supabase.from("nb_decisions").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -126,7 +126,7 @@ export default function Decisions() {
 
   const validateMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("decisions").update({
+      const { error } = await supabase.from("nb_decisions").update({
         pending_validation: false,
         validated_by: user!.id,
         validated_at: new Date().toISOString(),

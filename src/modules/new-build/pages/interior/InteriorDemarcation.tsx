@@ -1,7 +1,7 @@
-import { useProject } from "@/contexts/ProjectContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { ArrowLeft, Users } from "lucide-react";
 import { Link } from "react-router-dom";
-import ContractorDemarcation from "@/components/interior/ContractorDemarcation";
+import ContractorDemarcation from "@/modules/new-build/components/interior/ContractorDemarcation";
 
 export default function InteriorDemarcation() {
   const { currentProject } = useProject();

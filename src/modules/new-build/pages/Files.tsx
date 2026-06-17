@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useProject } from "@/contexts/ProjectContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Pencil, Trash2, ExternalLink, Copy } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { format } from "date-fns";
 
 type FileStatus = "draft" | "review" | "approved";
@@ -64,7 +64,7 @@ export default function Files() {
     queryFn: async () => {
       if (!projectId) return [];
       const { data, error } = await supabase
-        .from("files")
+        .from("nb_files")
         .select("*, areas(name)")
         .eq("project_id", projectId)
         .order("created_at", { ascending: false });
@@ -79,7 +79,7 @@ export default function Files() {
     queryFn: async () => {
       if (!projectId) return [];
       const { data, error } = await supabase
-        .from("areas")
+        .from("nb_areas")
         .select("id, name")
         .eq("project_id", projectId)
         .order("name");
@@ -93,7 +93,7 @@ export default function Files() {
     mutationFn: async (formData: FileForm) => {
       if (editingId) {
         const { error } = await supabase
-          .from("files")
+          .from("nb_files")
           .update({
             name: formData.name,
             external_url: formData.external_url || null,
@@ -104,7 +104,7 @@ export default function Files() {
           .eq("id", editingId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("files").insert({
+        const { error } = await supabase.from("nb_files").insert({
           name: formData.name,
           external_url: formData.external_url || null,
           area_id: formData.area_id || null,
@@ -128,7 +128,7 @@ export default function Files() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("files").delete().eq("id", id);
+      const { error } = await supabase.from("nb_files").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -139,7 +139,7 @@ export default function Files() {
 
   const newVersionMutation = useMutation({
     mutationFn: async (parentFile: any) => {
-      const { error } = await supabase.from("files").insert({
+      const { error } = await supabase.from("nb_files").insert({
         name: parentFile.name,
         external_url: parentFile.external_url || null,
         area_id: parentFile.area_id || null,

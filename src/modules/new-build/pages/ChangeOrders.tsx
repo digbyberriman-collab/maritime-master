@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
-import { useProject } from "@/contexts/ProjectContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
+import { useAuth } from "@/modules/auth/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import {
   Plus, Trash2, FileText, GitBranch, Link2, Unlink,
   DollarSign, Clock, ArrowRightLeft, MessageSquare,
@@ -83,7 +83,7 @@ export default function ChangeOrders() {
     queryKey: ["change_orders", projectId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("change_orders")
+        .from("nb_change_orders")
         .select("*")
         .eq("project_id", projectId!)
         .order("created_at", { ascending: false });
@@ -97,7 +97,7 @@ export default function ChangeOrders() {
     queryKey: ["change_order_activity", detailId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("change_order_activity")
+        .from("nb_change_order_activity")
         .select("*")
         .eq("change_order_id", detailId!)
         .order("created_at", { ascending: true });
@@ -112,7 +112,7 @@ export default function ChangeOrders() {
     queryFn: async () => {
       const coIds = changeOrders.map((co) => co.id);
       if (!coIds.length) return [];
-      const { data, error } = await supabase.from("change_order_deliverables").select("*").in("change_order_id", coIds);
+      const { data, error } = await supabase.from("nb_change_order_deliverables").select("*").in("change_order_id", coIds);
       if (error) throw error;
       return data;
     },
@@ -122,7 +122,7 @@ export default function ChangeOrders() {
   const { data: areas = [] } = useQuery({
     queryKey: ["areas", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("areas").select("*").eq("project_id", projectId!);
+      const { data, error } = await supabase.from("nb_areas").select("*").eq("project_id", projectId!);
       if (error) throw error;
       return data;
     },
@@ -132,7 +132,7 @@ export default function ChangeOrders() {
   const { data: files = [] } = useQuery({
     queryKey: ["files", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("files").select("*").eq("project_id", projectId!);
+      const { data, error } = await supabase.from("nb_files").select("*").eq("project_id", projectId!);
       if (error) throw error;
       return data;
     },
@@ -142,7 +142,7 @@ export default function ChangeOrders() {
   const { data: decisions = [] } = useQuery({
     queryKey: ["decisions", projectId],
     queryFn: async () => {
-      const { data, error } = await supabase.from("decisions").select("*").eq("project_id", projectId!);
+      const { data, error } = await supabase.from("nb_decisions").select("*").eq("project_id", projectId!);
       if (error) throw error;
       return data;
     },
@@ -178,11 +178,11 @@ export default function ChangeOrders() {
       if (isEdit) {
         // Get old status for activity log
         const old = changeOrders.find((co) => co.id === editId);
-        const { error } = await supabase.from("change_orders").update(payload).eq("id", editId!);
+        const { error } = await supabase.from("nb_change_orders").update(payload).eq("id", editId!);
         if (error) throw error;
         // Auto-log status change
         if (old && old.status !== form.status) {
-          await supabase.from("change_order_activity").insert({
+          await supabase.from("nb_change_order_activity").insert({
             change_order_id: editId!,
             activity_type: "status_change",
             from_status: old.status,
@@ -209,10 +209,10 @@ export default function ChangeOrders() {
           }
         }
       } else {
-        const { data, error } = await supabase.from("change_orders").insert(payload).select().single();
+        const { data, error } = await supabase.from("nb_change_orders").insert(payload).select().single();
         if (error) throw error;
         // Log creation
-        await supabase.from("change_order_activity").insert({
+        await supabase.from("nb_change_order_activity").insert({
           change_order_id: data.id,
           activity_type: "status_change",
           to_status: form.status,
@@ -234,7 +234,7 @@ export default function ChangeOrders() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("change_orders").delete().eq("id", id);
+      const { error } = await supabase.from("nb_change_orders").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -246,7 +246,7 @@ export default function ChangeOrders() {
 
   const commentMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("change_order_activity").insert({
+      const { error } = await supabase.from("nb_change_order_activity").insert({
         change_order_id: detailId!,
         activity_type: "comment",
         comment: comment,
@@ -263,7 +263,7 @@ export default function ChangeOrders() {
 
   const linkMutation = useMutation({
     mutationFn: async (p: { change_order_id: string; deliverable_type: string; deliverable_id: string }) => {
-      const { error } = await supabase.from("change_order_deliverables").insert({ ...p, linked_by: user!.id });
+      const { error } = await supabase.from("nb_change_order_deliverables").insert({ ...p, linked_by: user!.id });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -274,7 +274,7 @@ export default function ChangeOrders() {
 
   const unlinkMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("change_order_deliverables").delete().eq("id", id);
+      const { error } = await supabase.from("nb_change_order_deliverables").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {

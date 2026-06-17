@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
-import { useProject } from "@/contexts/ProjectContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
+import { useAuth } from "@/modules/auth/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import { Plus, Pencil, Trash2, Building2, Search, ChevronRight, Users, Package, ShoppingCart } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 
 interface SupplierForm {
   name: string;
@@ -46,7 +46,7 @@ export default function Suppliers() {
     queryFn: async () => {
       if (!projectId) return [];
       const { data, error } = await supabase
-        .from("suppliers")
+        .from("nb_suppliers")
         .select("*, areas(name)")
         .eq("project_id", projectId)
         .order("company", { ascending: true });
@@ -63,7 +63,7 @@ export default function Suppliers() {
       const supplierIds = suppliers.map((s) => s.id);
       if (supplierIds.length === 0) return [];
       const { data, error } = await supabase
-        .from("vendor_contacts")
+        .from("nb_vendor_contacts")
         .select("*")
         .in("supplier_id", supplierIds)
         .order("name");
@@ -78,7 +78,7 @@ export default function Suppliers() {
     queryFn: async () => {
       if (!projectId) return [];
       const { data, error } = await supabase
-        .from("purchase_orders")
+        .from("nb_purchase_orders")
         .select("id, po_number, description, amount, currency, status, supplier_id, order_date, promised_delivery_date")
         .eq("project_id", projectId)
         .order("po_number");
@@ -93,7 +93,7 @@ export default function Suppliers() {
     queryFn: async () => {
       if (!projectId) return [];
       const { data, error } = await supabase
-        .from("equipment")
+        .from("nb_equipment")
         .select("id, name, model_number, manufacturer, status, area_id, location_onboard")
         .eq("project_id", projectId)
         .order("name");
@@ -146,7 +146,7 @@ export default function Suppliers() {
     queryKey: ["areas", projectId],
     queryFn: async () => {
       if (!projectId) return [];
-      const { data, error } = await supabase.from("areas").select("id, name").eq("project_id", projectId).order("name");
+      const { data, error } = await supabase.from("nb_areas").select("id, name").eq("project_id", projectId).order("name");
       if (error) throw error;
       return data;
     },
@@ -189,10 +189,10 @@ export default function Suppliers() {
       };
       if (editingId) {
         const { created_by: _, project_id: __, ...updatePayload } = payload;
-        const { error } = await supabase.from("suppliers").update(updatePayload).eq("id", editingId);
+        const { error } = await supabase.from("nb_suppliers").update(updatePayload).eq("id", editingId);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("suppliers").insert(payload);
+        const { error } = await supabase.from("nb_suppliers").insert(payload);
         if (error) throw error;
       }
     },
@@ -208,7 +208,7 @@ export default function Suppliers() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("suppliers").delete().eq("id", id);
+      const { error } = await supabase.from("nb_suppliers").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {

@@ -1,9 +1,9 @@
 import { useState, useMemo } from "react";
-import { useProject } from "@/contexts/ProjectContext";
-import { useAuth } from "@/contexts/AuthContext";
+import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
+import { useAuth } from "@/modules/auth/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
+import { useToast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -76,7 +76,7 @@ export default function Equipment() {
     queryKey: ["equipment", projectId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("equipment")
+        .from("nb_equipment")
         .select("*")
         .eq("project_id", projectId!)
         .order("created_at", { ascending: false });
@@ -90,7 +90,7 @@ export default function Equipment() {
     queryKey: ["areas", projectId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("areas")
+        .from("nb_areas")
         .select("id, name")
         .eq("project_id", projectId!);
       if (error) throw error;
@@ -130,11 +130,11 @@ export default function Equipment() {
       }
 
       if (editId) {
-        const { error } = await supabase.from("equipment").update(payload).eq("id", editId);
+        const { error } = await supabase.from("nb_equipment").update(payload).eq("id", editId);
         if (error) throw error;
       } else {
         payload.created_by = user?.id;
-        const { error } = await supabase.from("equipment").insert(payload);
+        const { error } = await supabase.from("nb_equipment").insert(payload);
         if (error) throw error;
       }
     },
@@ -148,7 +148,7 @@ export default function Equipment() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("equipment").delete().eq("id", id);
+      const { error } = await supabase.from("nb_equipment").delete().eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
