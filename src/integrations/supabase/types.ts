@@ -7282,6 +7282,2627 @@ export type Database = {
           },
         ]
       }
+      nb_approvals: {
+        Row: {
+          approver_id: string | null
+          comment: string | null
+          company_id: string
+          created_at: string
+          file_id: string
+          id: string
+          resolved_at: string | null
+          status: Database["public"]["Enums"]["nb_approval_status"]
+          submitted_by: string | null
+        }
+        Insert: {
+          approver_id?: string | null
+          comment?: string | null
+          company_id?: string
+          created_at?: string
+          file_id: string
+          id?: string
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["nb_approval_status"]
+          submitted_by?: string | null
+        }
+        Update: {
+          approver_id?: string | null
+          comment?: string | null
+          company_id?: string
+          created_at?: string
+          file_id?: string
+          id?: string
+          resolved_at?: string | null
+          status?: Database["public"]["Enums"]["nb_approval_status"]
+          submitted_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_approvals_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "nb_files"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_areas: {
+        Row: {
+          company_id: string
+          created_at: string
+          current_focus: string | null
+          description: string | null
+          id: string
+          is_interior: boolean
+          name: string
+          priorities: string | null
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          current_focus?: string | null
+          description?: string | null
+          id?: string
+          is_interior?: boolean
+          name: string
+          priorities?: string | null
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          current_focus?: string | null
+          description?: string | null
+          id?: string
+          is_interior?: boolean
+          name?: string
+          priorities?: string | null
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_areas_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_blocks: {
+        Row: {
+          company_id: string
+          created_at: string
+          deck_id: string
+          description: string | null
+          id: string
+          name: string
+          number_of_components: number
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          deck_id: string
+          description?: string | null
+          id?: string
+          name: string
+          number_of_components?: number
+          project_id: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          deck_id?: string
+          description?: string | null
+          id?: string
+          name?: string
+          number_of_components?: number
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_blocks_deck_id_fkey"
+            columns: ["deck_id"]
+            isOneToOne: false
+            referencedRelation: "nb_decks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_blocks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_build_phases: {
+        Row: {
+          actual_end_date: string | null
+          actual_start_date: string | null
+          colour: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          display_order: number
+          id: string
+          name: string
+          planned_end_date: string | null
+          planned_start_date: string | null
+          project_id: string
+          status: Database["public"]["Enums"]["nb_build_phase_status"]
+          updated_at: string
+        }
+        Insert: {
+          actual_end_date?: string | null
+          actual_start_date?: string | null
+          colour?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_order?: number
+          id?: string
+          name: string
+          planned_end_date?: string | null
+          planned_start_date?: string | null
+          project_id: string
+          status?: Database["public"]["Enums"]["nb_build_phase_status"]
+          updated_at?: string
+        }
+        Update: {
+          actual_end_date?: string | null
+          actual_start_date?: string | null
+          colour?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          display_order?: number
+          id?: string
+          name?: string
+          planned_end_date?: string | null
+          planned_start_date?: string | null
+          project_id?: string
+          status?: Database["public"]["Enums"]["nb_build_phase_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_build_phases_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_change_order_activity: {
+        Row: {
+          activity_type: string
+          change_order_id: string
+          comment: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          from_status: string | null
+          id: string
+          to_status: string | null
+        }
+        Insert: {
+          activity_type: string
+          change_order_id: string
+          comment?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          from_status?: string | null
+          id?: string
+          to_status?: string | null
+        }
+        Update: {
+          activity_type?: string
+          change_order_id?: string
+          comment?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          from_status?: string | null
+          id?: string
+          to_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_change_order_activity_change_order_id_fkey"
+            columns: ["change_order_id"]
+            isOneToOne: false
+            referencedRelation: "nb_change_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_change_order_deliverables: {
+        Row: {
+          change_order_id: string
+          company_id: string
+          deliverable_id: string
+          deliverable_type: string
+          id: string
+          linked_at: string
+          linked_by: string | null
+        }
+        Insert: {
+          change_order_id: string
+          company_id?: string
+          deliverable_id: string
+          deliverable_type: string
+          id?: string
+          linked_at?: string
+          linked_by?: string | null
+        }
+        Update: {
+          change_order_id?: string
+          company_id?: string
+          deliverable_id?: string
+          deliverable_type?: string
+          id?: string
+          linked_at?: string
+          linked_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_change_order_deliverables_change_order_id_fkey"
+            columns: ["change_order_id"]
+            isOneToOne: false
+            referencedRelation: "nb_change_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_change_orders: {
+        Row: {
+          area_id: string | null
+          company_id: string
+          cost_impact: number | null
+          created_at: string
+          created_by: string | null
+          date_requested: string | null
+          description: string | null
+          id: string
+          project_id: string
+          requested_by_name: string | null
+          schedule_impact_days: number | null
+          status: Database["public"]["Enums"]["nb_change_order_status"]
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          area_id?: string | null
+          company_id?: string
+          cost_impact?: number | null
+          created_at?: string
+          created_by?: string | null
+          date_requested?: string | null
+          description?: string | null
+          id?: string
+          project_id: string
+          requested_by_name?: string | null
+          schedule_impact_days?: number | null
+          status?: Database["public"]["Enums"]["nb_change_order_status"]
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          area_id?: string | null
+          company_id?: string
+          cost_impact?: number | null
+          created_at?: string
+          created_by?: string | null
+          date_requested?: string | null
+          description?: string | null
+          id?: string
+          project_id?: string
+          requested_by_name?: string | null
+          schedule_impact_days?: number | null
+          status?: Database["public"]["Enums"]["nb_change_order_status"]
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_change_orders_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "nb_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_change_orders_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_contacts: {
+        Row: {
+          avatar_url: string | null
+          company: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          display_order: number
+          email: string | null
+          id: string
+          is_key_contact: boolean
+          key_topics: string[]
+          name: string
+          notes: string | null
+          phone: string | null
+          project_id: string
+          role: string | null
+          topics: string[]
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          company?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          email?: string | null
+          id?: string
+          is_key_contact?: boolean
+          key_topics?: string[]
+          name: string
+          notes?: string | null
+          phone?: string | null
+          project_id: string
+          role?: string | null
+          topics?: string[]
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          company?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          email?: string | null
+          id?: string
+          is_key_contact?: boolean
+          key_topics?: string[]
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          project_id?: string
+          role?: string | null
+          topics?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_contacts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_decisions: {
+        Row: {
+          area_id: string | null
+          assigned_owner: string | null
+          background: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          date: string | null
+          decision_text: string | null
+          file_links: Json | null
+          id: string
+          item_type: Database["public"]["Enums"]["nb_raid_item_type"]
+          mdal_number: string | null
+          notes: string | null
+          pending_validation: boolean
+          project_id: string
+          raid_status: Database["public"]["Enums"]["nb_raid_status"] | null
+          reasoning: string | null
+          reviewer_comment: string | null
+          source_reference: string | null
+          status: Database["public"]["Enums"]["nb_decision_status"]
+          supplier_id: string | null
+          tags: string | null
+          title: string
+          updated_at: string
+          validated_at: string | null
+          validated_by: string | null
+        }
+        Insert: {
+          area_id?: string | null
+          assigned_owner?: string | null
+          background?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          date?: string | null
+          decision_text?: string | null
+          file_links?: Json | null
+          id?: string
+          item_type?: Database["public"]["Enums"]["nb_raid_item_type"]
+          mdal_number?: string | null
+          notes?: string | null
+          pending_validation?: boolean
+          project_id: string
+          raid_status?: Database["public"]["Enums"]["nb_raid_status"] | null
+          reasoning?: string | null
+          reviewer_comment?: string | null
+          source_reference?: string | null
+          status?: Database["public"]["Enums"]["nb_decision_status"]
+          supplier_id?: string | null
+          tags?: string | null
+          title: string
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Update: {
+          area_id?: string | null
+          assigned_owner?: string | null
+          background?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          date?: string | null
+          decision_text?: string | null
+          file_links?: Json | null
+          id?: string
+          item_type?: Database["public"]["Enums"]["nb_raid_item_type"]
+          mdal_number?: string | null
+          notes?: string | null
+          pending_validation?: boolean
+          project_id?: string
+          raid_status?: Database["public"]["Enums"]["nb_raid_status"] | null
+          reasoning?: string | null
+          reviewer_comment?: string | null
+          source_reference?: string | null
+          status?: Database["public"]["Enums"]["nb_decision_status"]
+          supplier_id?: string | null
+          tags?: string | null
+          title?: string
+          updated_at?: string
+          validated_at?: string | null
+          validated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_decisions_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "nb_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_decisions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_decisions_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "nb_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_deck_rooms: {
+        Row: {
+          area_id: string | null
+          bbox_height: number | null
+          bbox_width: number | null
+          bbox_x: number | null
+          bbox_y: number | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          deck: string
+          deck_view_id: string | null
+          drawing_id: string | null
+          id: string
+          is_confirmed: boolean
+          label: string
+          notes: string | null
+          source: string
+          svg_polygon: string | null
+          updated_at: string
+        }
+        Insert: {
+          area_id?: string | null
+          bbox_height?: number | null
+          bbox_width?: number | null
+          bbox_x?: number | null
+          bbox_y?: number | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          deck: string
+          deck_view_id?: string | null
+          drawing_id?: string | null
+          id?: string
+          is_confirmed?: boolean
+          label: string
+          notes?: string | null
+          source?: string
+          svg_polygon?: string | null
+          updated_at?: string
+        }
+        Update: {
+          area_id?: string | null
+          bbox_height?: number | null
+          bbox_width?: number | null
+          bbox_x?: number | null
+          bbox_y?: number | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          deck?: string
+          deck_view_id?: string | null
+          drawing_id?: string | null
+          id?: string
+          is_confirmed?: boolean
+          label?: string
+          notes?: string | null
+          source?: string
+          svg_polygon?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_deck_rooms_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "nb_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_deck_rooms_deck_view_id_fkey"
+            columns: ["deck_view_id"]
+            isOneToOne: false
+            referencedRelation: "nb_deck_views"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_deck_rooms_drawing_id_fkey"
+            columns: ["drawing_id"]
+            isOneToOne: false
+            referencedRelation: "nb_drawings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_deck_views: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          display_order: number
+          drawing_id: string | null
+          id: string
+          image_height: number
+          image_storage_path: string
+          image_width: number
+          label: string
+          project_id: string
+          source_crop_height: number | null
+          source_crop_width: number | null
+          source_crop_x: number | null
+          source_crop_y: number | null
+          source_page_number: number | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          drawing_id?: string | null
+          id?: string
+          image_height: number
+          image_storage_path: string
+          image_width: number
+          label: string
+          project_id: string
+          source_crop_height?: number | null
+          source_crop_width?: number | null
+          source_crop_x?: number | null
+          source_crop_y?: number | null
+          source_page_number?: number | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          drawing_id?: string | null
+          id?: string
+          image_height?: number
+          image_storage_path?: string
+          image_width?: number
+          label?: string
+          project_id?: string
+          source_crop_height?: number | null
+          source_crop_width?: number | null
+          source_crop_x?: number | null
+          source_crop_y?: number | null
+          source_page_number?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_deck_views_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_decks: {
+        Row: {
+          company_id: string
+          created_at: string
+          deck_number: number | null
+          description: string | null
+          id: string
+          name: string
+          number_of_components: number
+          project_id: string
+          updated_at: string
+          zone_id: string | null
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          deck_number?: number | null
+          description?: string | null
+          id?: string
+          name: string
+          number_of_components?: number
+          project_id: string
+          updated_at?: string
+          zone_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          deck_number?: number | null
+          description?: string | null
+          id?: string
+          name?: string
+          number_of_components?: number
+          project_id?: string
+          updated_at?: string
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_decks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_decks_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "nb_zones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_deliverable_schedule_items: {
+        Row: {
+          builder_info_date: string | null
+          chapter_name: string
+          chapter_number: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          delivery_by_owner: string | null
+          description: string
+          id: string
+          owner_decision_date: string | null
+          project_id: string
+          requirement_id: string | null
+          resolved: boolean
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          builder_info_date?: string | null
+          chapter_name: string
+          chapter_number: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          delivery_by_owner?: string | null
+          description: string
+          id?: string
+          owner_decision_date?: string | null
+          project_id: string
+          requirement_id?: string | null
+          resolved?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          builder_info_date?: string | null
+          chapter_name?: string
+          chapter_number?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          delivery_by_owner?: string | null
+          description?: string
+          id?: string
+          owner_decision_date?: string | null
+          project_id?: string
+          requirement_id?: string | null
+          resolved?: boolean
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_deliverable_schedule_items_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_drawings: {
+        Row: {
+          company_id: string
+          created_at: string
+          drawing_number: string
+          drawing_type: string
+          drawn_by: string | null
+          drawn_date: string | null
+          id: string
+          imo: string | null
+          is_current: boolean
+          notes: string | null
+          page_height_pts: number | null
+          page_rotation: number
+          page_width_pts: number | null
+          project_id: string
+          revision: string
+          scale: string | null
+          status: string | null
+          storage_path: string | null
+          title: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          drawing_number: string
+          drawing_type?: string
+          drawn_by?: string | null
+          drawn_date?: string | null
+          id?: string
+          imo?: string | null
+          is_current?: boolean
+          notes?: string | null
+          page_height_pts?: number | null
+          page_rotation?: number
+          page_width_pts?: number | null
+          project_id: string
+          revision: string
+          scale?: string | null
+          status?: string | null
+          storage_path?: string | null
+          title: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          drawing_number?: string
+          drawing_type?: string
+          drawn_by?: string | null
+          drawn_date?: string | null
+          id?: string
+          imo?: string | null
+          is_current?: boolean
+          notes?: string | null
+          page_height_pts?: number | null
+          page_rotation?: number
+          page_width_pts?: number | null
+          project_id?: string
+          revision?: string
+          scale?: string | null
+          status?: string | null
+          storage_path?: string | null
+          title?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_drawings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_element_codes: {
+        Row: {
+          code: string
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_element_codes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_equipment: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          area_id: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          delivery_date: string | null
+          delivery_notes: string | null
+          description: string | null
+          id: string
+          location_onboard: string | null
+          manufacturer: string | null
+          model_number: string | null
+          name: string
+          notes: string | null
+          project_id: string
+          status: Database["public"]["Enums"]["nb_equipment_status"]
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          area_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          delivery_date?: string | null
+          delivery_notes?: string | null
+          description?: string | null
+          id?: string
+          location_onboard?: string | null
+          manufacturer?: string | null
+          model_number?: string | null
+          name: string
+          notes?: string | null
+          project_id: string
+          status?: Database["public"]["Enums"]["nb_equipment_status"]
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          area_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          delivery_date?: string | null
+          delivery_notes?: string | null
+          description?: string | null
+          id?: string
+          location_onboard?: string | null
+          manufacturer?: string | null
+          model_number?: string | null
+          name?: string
+          notes?: string | null
+          project_id?: string
+          status?: Database["public"]["Enums"]["nb_equipment_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_equipment_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "nb_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_equipment_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_files: {
+        Row: {
+          area_id: string | null
+          company_id: string
+          created_at: string
+          external_url: string | null
+          id: string
+          name: string
+          notes: string | null
+          parent_file_id: string | null
+          project_id: string
+          status: Database["public"]["Enums"]["nb_file_status"]
+          storage_path: string | null
+          uploaded_by: string | null
+          version: number
+        }
+        Insert: {
+          area_id?: string | null
+          company_id?: string
+          created_at?: string
+          external_url?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          parent_file_id?: string | null
+          project_id: string
+          status?: Database["public"]["Enums"]["nb_file_status"]
+          storage_path?: string | null
+          uploaded_by?: string | null
+          version?: number
+        }
+        Update: {
+          area_id?: string | null
+          company_id?: string
+          created_at?: string
+          external_url?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          parent_file_id?: string | null
+          project_id?: string
+          status?: Database["public"]["Enums"]["nb_file_status"]
+          storage_path?: string | null
+          uploaded_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_files_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "nb_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_files_parent_file_id_fkey"
+            columns: ["parent_file_id"]
+            isOneToOne: false
+            referencedRelation: "nb_files"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_files_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_interior_drawings: {
+        Row: {
+          approval_doc_phase_1: string | null
+          approval_doc_phase_2: string | null
+          approval_doc_phase_3: string | null
+          approval_doc_phase_4_5: string | null
+          company_id: string
+          created_at: string
+          deck_name: string | null
+          deliverables_materials: string | null
+          delivery_phase_1: string | null
+          delivery_phase_2: string | null
+          delivery_phase_3: string | null
+          design_level: string | null
+          drawing_number: string
+          id: string
+          project_id: string
+          rev_a: string | null
+          rev_b: string | null
+          rev_c: string | null
+          rev_d: string | null
+          rev_e: string | null
+          rev_f: string | null
+          rev_g: string | null
+          rev_h: string | null
+          room_name: string
+          updated_at: string
+        }
+        Insert: {
+          approval_doc_phase_1?: string | null
+          approval_doc_phase_2?: string | null
+          approval_doc_phase_3?: string | null
+          approval_doc_phase_4_5?: string | null
+          company_id?: string
+          created_at?: string
+          deck_name?: string | null
+          deliverables_materials?: string | null
+          delivery_phase_1?: string | null
+          delivery_phase_2?: string | null
+          delivery_phase_3?: string | null
+          design_level?: string | null
+          drawing_number: string
+          id?: string
+          project_id: string
+          rev_a?: string | null
+          rev_b?: string | null
+          rev_c?: string | null
+          rev_d?: string | null
+          rev_e?: string | null
+          rev_f?: string | null
+          rev_g?: string | null
+          rev_h?: string | null
+          room_name: string
+          updated_at?: string
+        }
+        Update: {
+          approval_doc_phase_1?: string | null
+          approval_doc_phase_2?: string | null
+          approval_doc_phase_3?: string | null
+          approval_doc_phase_4_5?: string | null
+          company_id?: string
+          created_at?: string
+          deck_name?: string | null
+          deliverables_materials?: string | null
+          delivery_phase_1?: string | null
+          delivery_phase_2?: string | null
+          delivery_phase_3?: string | null
+          design_level?: string | null
+          drawing_number?: string
+          id?: string
+          project_id?: string
+          rev_a?: string | null
+          rev_b?: string | null
+          rev_c?: string | null
+          rev_d?: string | null
+          rev_e?: string | null
+          rev_f?: string | null
+          rev_g?: string | null
+          rev_h?: string | null
+          room_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_interior_drawings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_location_areas: {
+        Row: {
+          area_code: string | null
+          block_id: string | null
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          number_of_components: number
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          area_code?: string | null
+          block_id?: string | null
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          number_of_components?: number
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          area_code?: string | null
+          block_id?: string | null
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          number_of_components?: number
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_location_areas_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: false
+            referencedRelation: "nb_blocks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_location_areas_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_material_status_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          company_id: string
+          from_status: string | null
+          id: string
+          material_id: string
+          to_status: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          company_id?: string
+          from_status?: string | null
+          id?: string
+          material_id: string
+          to_status: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          company_id?: string
+          from_status?: string | null
+          id?: string
+          material_id?: string
+          to_status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_material_status_history_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "nb_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_material_usages: {
+        Row: {
+          area_id: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          location_detail: string | null
+          material_id: string
+          notes: string | null
+          quantity: number | null
+          unit: string | null
+        }
+        Insert: {
+          area_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location_detail?: string | null
+          material_id: string
+          notes?: string | null
+          quantity?: number | null
+          unit?: string | null
+        }
+        Update: {
+          area_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          location_detail?: string | null
+          material_id?: string
+          notes?: string | null
+          quantity?: number | null
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_material_usages_material_id_fkey"
+            columns: ["material_id"]
+            isOneToOne: false
+            referencedRelation: "nb_materials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_materials: {
+        Row: {
+          acoustic_properties: string | null
+          applications: string | null
+          brand: string | null
+          category: string | null
+          certificate_file_id: string | null
+          certificate_url: string | null
+          colour: string | null
+          company_id: string
+          corrosion_resistance: string | null
+          created_at: string
+          created_by: string | null
+          customizability: string | null
+          description: string | null
+          dimension: string | null
+          finish: string | null
+          fire_rating: string | null
+          fire_resistance: string | null
+          format: string | null
+          id: string
+          imo_certified: boolean
+          maintenance: string | null
+          meeting_notes: string | null
+          name: string
+          notes: string | null
+          parent_material_id: string | null
+          photos: string[]
+          project_id: string
+          proposed_by: string | null
+          scratch_resistance: string | null
+          selection_status: string
+          shock_resistance: string | null
+          spec_sheet_file_id: string | null
+          spec_sheet_url: string | null
+          stain_resistance: string | null
+          supplier_id: string | null
+          supplier_name: string | null
+          swatch_storage_path: string | null
+          updated_at: string
+          uv_resistance: string | null
+          water_resistance: string | null
+          weight: string | null
+        }
+        Insert: {
+          acoustic_properties?: string | null
+          applications?: string | null
+          brand?: string | null
+          category?: string | null
+          certificate_file_id?: string | null
+          certificate_url?: string | null
+          colour?: string | null
+          company_id?: string
+          corrosion_resistance?: string | null
+          created_at?: string
+          created_by?: string | null
+          customizability?: string | null
+          description?: string | null
+          dimension?: string | null
+          finish?: string | null
+          fire_rating?: string | null
+          fire_resistance?: string | null
+          format?: string | null
+          id?: string
+          imo_certified?: boolean
+          maintenance?: string | null
+          meeting_notes?: string | null
+          name: string
+          notes?: string | null
+          parent_material_id?: string | null
+          photos?: string[]
+          project_id: string
+          proposed_by?: string | null
+          scratch_resistance?: string | null
+          selection_status?: string
+          shock_resistance?: string | null
+          spec_sheet_file_id?: string | null
+          spec_sheet_url?: string | null
+          stain_resistance?: string | null
+          supplier_id?: string | null
+          supplier_name?: string | null
+          swatch_storage_path?: string | null
+          updated_at?: string
+          uv_resistance?: string | null
+          water_resistance?: string | null
+          weight?: string | null
+        }
+        Update: {
+          acoustic_properties?: string | null
+          applications?: string | null
+          brand?: string | null
+          category?: string | null
+          certificate_file_id?: string | null
+          certificate_url?: string | null
+          colour?: string | null
+          company_id?: string
+          corrosion_resistance?: string | null
+          created_at?: string
+          created_by?: string | null
+          customizability?: string | null
+          description?: string | null
+          dimension?: string | null
+          finish?: string | null
+          fire_rating?: string | null
+          fire_resistance?: string | null
+          format?: string | null
+          id?: string
+          imo_certified?: boolean
+          maintenance?: string | null
+          meeting_notes?: string | null
+          name?: string
+          notes?: string | null
+          parent_material_id?: string | null
+          photos?: string[]
+          project_id?: string
+          proposed_by?: string | null
+          scratch_resistance?: string | null
+          selection_status?: string
+          shock_resistance?: string | null
+          spec_sheet_file_id?: string | null
+          spec_sheet_url?: string | null
+          stain_resistance?: string | null
+          supplier_id?: string | null
+          supplier_name?: string | null
+          swatch_storage_path?: string | null
+          updated_at?: string
+          uv_resistance?: string | null
+          water_resistance?: string | null
+          weight?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_materials_parent_material_id_fkey"
+            columns: ["parent_material_id"]
+            isOneToOne: false
+            referencedRelation: "nb_materials"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_materials_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_milestones: {
+        Row: {
+          actual_date: string | null
+          company_id: string
+          completed_by: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_completed: boolean
+          name: string
+          phase_id: string | null
+          project_id: string
+          sort_order: number
+          target_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          actual_date?: string | null
+          company_id?: string
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_completed?: boolean
+          name: string
+          phase_id?: string | null
+          project_id: string
+          sort_order?: number
+          target_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          actual_date?: string | null
+          company_id?: string
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_completed?: boolean
+          name?: string
+          phase_id?: string | null
+          project_id?: string
+          sort_order?: number
+          target_date?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_milestones_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "nb_build_phases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_milestones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_piping_blocks: {
+        Row: {
+          block_code: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          display_order: number
+          friday_week: number | null
+          friday_year: number | null
+          id: string
+          monday_week: number | null
+          monday_year: number | null
+          notes: string | null
+          project_id: string
+          sections: string | null
+          updated_at: string
+          zone: string
+        }
+        Insert: {
+          block_code: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          friday_week?: number | null
+          friday_year?: number | null
+          id?: string
+          monday_week?: number | null
+          monday_year?: number | null
+          notes?: string | null
+          project_id: string
+          sections?: string | null
+          updated_at?: string
+          zone: string
+        }
+        Update: {
+          block_code?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          friday_week?: number | null
+          friday_year?: number | null
+          id?: string
+          monday_week?: number | null
+          monday_year?: number | null
+          notes?: string | null
+          project_id?: string
+          sections?: string | null
+          updated_at?: string
+          zone?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_piping_blocks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_piping_milestones: {
+        Row: {
+          code: string | null
+          company_id: string
+          created_at: string
+          display_order: number
+          has_date_markers: boolean
+          id: string
+          milestone_type: string
+          name: string
+          project_id: string
+          short_label: string | null
+          tracks_percent: boolean
+          updated_at: string
+        }
+        Insert: {
+          code?: string | null
+          company_id?: string
+          created_at?: string
+          display_order?: number
+          has_date_markers?: boolean
+          id?: string
+          milestone_type?: string
+          name: string
+          project_id: string
+          short_label?: string | null
+          tracks_percent?: boolean
+          updated_at?: string
+        }
+        Update: {
+          code?: string | null
+          company_id?: string
+          created_at?: string
+          display_order?: number
+          has_date_markers?: boolean
+          id?: string
+          milestone_type?: string
+          name?: string
+          project_id?: string
+          short_label?: string | null
+          tracks_percent?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_piping_milestones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_piping_progress: {
+        Row: {
+          achieved_week: number | null
+          achieved_year: number | null
+          block_id: string
+          company_id: string
+          created_at: string
+          id: string
+          milestone_id: string
+          notes: string | null
+          planned_week: number | null
+          planned_year: number | null
+          progress_pct: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          achieved_week?: number | null
+          achieved_year?: number | null
+          block_id: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          milestone_id: string
+          notes?: string | null
+          planned_week?: number | null
+          planned_year?: number | null
+          progress_pct?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          achieved_week?: number | null
+          achieved_year?: number | null
+          block_id?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          milestone_id?: string
+          notes?: string | null
+          planned_week?: number | null
+          planned_year?: number | null
+          progress_pct?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_piping_progress_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: false
+            referencedRelation: "nb_piping_blocks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_piping_progress_milestone_id_fkey"
+            columns: ["milestone_id"]
+            isOneToOne: false
+            referencedRelation: "nb_piping_milestones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_projects: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      nb_purchase_order_activity: {
+        Row: {
+          activity_type: string
+          comment: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          from_status: string | null
+          id: string
+          purchase_order_id: string
+          to_status: string | null
+        }
+        Insert: {
+          activity_type: string
+          comment?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          from_status?: string | null
+          id?: string
+          purchase_order_id: string
+          to_status?: string | null
+        }
+        Update: {
+          activity_type?: string
+          comment?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          from_status?: string | null
+          id?: string
+          purchase_order_id?: string
+          to_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_purchase_order_activity_purchase_order_id_fkey"
+            columns: ["purchase_order_id"]
+            isOneToOne: false
+            referencedRelation: "nb_purchase_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_purchase_orders: {
+        Row: {
+          actual_delivery_date: string | null
+          amount: number | null
+          area_id: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          delay_applied_at: string | null
+          delay_applied_days: number | null
+          delay_applied_to_schedule: boolean
+          description: string | null
+          equipment_id: string | null
+          id: string
+          notes: string | null
+          order_date: string | null
+          po_number: string
+          project_id: string
+          promised_delivery_date: string | null
+          schedule_task_id: string | null
+          status: Database["public"]["Enums"]["nb_po_status"]
+          supplier_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          actual_delivery_date?: string | null
+          amount?: number | null
+          area_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          delay_applied_at?: string | null
+          delay_applied_days?: number | null
+          delay_applied_to_schedule?: boolean
+          description?: string | null
+          equipment_id?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string | null
+          po_number: string
+          project_id: string
+          promised_delivery_date?: string | null
+          schedule_task_id?: string | null
+          status?: Database["public"]["Enums"]["nb_po_status"]
+          supplier_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          actual_delivery_date?: string | null
+          amount?: number | null
+          area_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          delay_applied_at?: string | null
+          delay_applied_days?: number | null
+          delay_applied_to_schedule?: boolean
+          description?: string | null
+          equipment_id?: string | null
+          id?: string
+          notes?: string | null
+          order_date?: string | null
+          po_number?: string
+          project_id?: string
+          promised_delivery_date?: string | null
+          schedule_task_id?: string | null
+          status?: Database["public"]["Enums"]["nb_po_status"]
+          supplier_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_purchase_orders_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_rasci_assignments: {
+        Row: {
+          assignment: Database["public"]["Enums"]["nb_rasci_value"]
+          company_id: string
+          created_at: string
+          element_code_id: string
+          id: string
+          phase: Database["public"]["Enums"]["nb_rasci_phase"]
+          project_id: string
+          rasci_role_id: string
+          updated_at: string
+        }
+        Insert: {
+          assignment: Database["public"]["Enums"]["nb_rasci_value"]
+          company_id?: string
+          created_at?: string
+          element_code_id: string
+          id?: string
+          phase: Database["public"]["Enums"]["nb_rasci_phase"]
+          project_id: string
+          rasci_role_id: string
+          updated_at?: string
+        }
+        Update: {
+          assignment?: Database["public"]["Enums"]["nb_rasci_value"]
+          company_id?: string
+          created_at?: string
+          element_code_id?: string
+          id?: string
+          phase?: Database["public"]["Enums"]["nb_rasci_phase"]
+          project_id?: string
+          rasci_role_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_rasci_assignments_element_code_id_fkey"
+            columns: ["element_code_id"]
+            isOneToOne: false
+            referencedRelation: "nb_element_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_rasci_assignments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_rasci_assignments_rasci_role_id_fkey"
+            columns: ["rasci_role_id"]
+            isOneToOne: false
+            referencedRelation: "nb_rasci_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_rasci_roles: {
+        Row: {
+          company_id: string
+          created_at: string
+          display_order: number
+          id: string
+          name: string
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          name: string
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          display_order?: number
+          id?: string
+          name?: string
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_rasci_roles_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_regulations: {
+        Row: {
+          category: string
+          company_id: string
+          content_indexed_at: string | null
+          content_text: string | null
+          created_at: string
+          description: string | null
+          external_url: string | null
+          file_name: string | null
+          id: string
+          project_id: string
+          reference_number: string | null
+          search_vector: unknown
+          source: string | null
+          storage_path: string | null
+          tags: string | null
+          title: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          category?: string
+          company_id?: string
+          content_indexed_at?: string | null
+          content_text?: string | null
+          created_at?: string
+          description?: string | null
+          external_url?: string | null
+          file_name?: string | null
+          id?: string
+          project_id: string
+          reference_number?: string | null
+          search_vector?: unknown
+          source?: string | null
+          storage_path?: string | null
+          tags?: string | null
+          title: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          content_indexed_at?: string | null
+          content_text?: string | null
+          created_at?: string
+          description?: string | null
+          external_url?: string | null
+          file_name?: string | null
+          id?: string
+          project_id?: string
+          reference_number?: string | null
+          search_vector?: unknown
+          source?: string | null
+          storage_path?: string | null
+          tags?: string | null
+          title?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_regulations_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_requirement_deliverables: {
+        Row: {
+          company_id: string
+          deliverable_id: string
+          deliverable_type: string
+          id: string
+          linked_at: string
+          linked_by: string | null
+          requirement_id: string
+        }
+        Insert: {
+          company_id?: string
+          deliverable_id: string
+          deliverable_type: string
+          id?: string
+          linked_at?: string
+          linked_by?: string | null
+          requirement_id: string
+        }
+        Update: {
+          company_id?: string
+          deliverable_id?: string
+          deliverable_type?: string
+          id?: string
+          linked_at?: string
+          linked_by?: string | null
+          requirement_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_requirement_deliverables_requirement_id_fkey"
+            columns: ["requirement_id"]
+            isOneToOne: false
+            referencedRelation: "nb_requirements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_requirements: {
+        Row: {
+          area_id: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          priority: Database["public"]["Enums"]["nb_requirement_priority"]
+          project_id: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          area_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["nb_requirement_priority"]
+          project_id: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          area_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["nb_requirement_priority"]
+          project_id?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_requirements_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "nb_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_requirements_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_room_contractor_assignments: {
+        Row: {
+          approves_drawing: boolean
+          company_id: string
+          created_at: string
+          created_by: string | null
+          creates_detail_booklet: boolean
+          defines_materials: boolean
+          id: string
+          produces_drawing: boolean
+          project_id: string
+          room_id: string
+          scope_notes: string | null
+          supplier_id: string
+          updated_at: string
+        }
+        Insert: {
+          approves_drawing?: boolean
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          creates_detail_booklet?: boolean
+          defines_materials?: boolean
+          id?: string
+          produces_drawing?: boolean
+          project_id: string
+          room_id: string
+          scope_notes?: string | null
+          supplier_id: string
+          updated_at?: string
+        }
+        Update: {
+          approves_drawing?: boolean
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          creates_detail_booklet?: boolean
+          defines_materials?: boolean
+          id?: string
+          produces_drawing?: boolean
+          project_id?: string
+          room_id?: string
+          scope_notes?: string | null
+          supplier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_room_contractor_assignments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_room_contractor_assignments_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "nb_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_schedule_tasks: {
+        Row: {
+          baseline_end_date: string | null
+          baseline_start_date: string | null
+          company_id: string
+          created_at: string
+          duration_days: number | null
+          end_date: string | null
+          id: string
+          import_id: string | null
+          notes: string | null
+          outline_level: number | null
+          percent_complete: number | null
+          phase_id: string | null
+          predecessors: string | null
+          project_id: string
+          resource_names: string | null
+          start_date: string | null
+          task_name: string
+          updated_at: string
+          wbs: string | null
+        }
+        Insert: {
+          baseline_end_date?: string | null
+          baseline_start_date?: string | null
+          company_id?: string
+          created_at?: string
+          duration_days?: number | null
+          end_date?: string | null
+          id?: string
+          import_id?: string | null
+          notes?: string | null
+          outline_level?: number | null
+          percent_complete?: number | null
+          phase_id?: string | null
+          predecessors?: string | null
+          project_id: string
+          resource_names?: string | null
+          start_date?: string | null
+          task_name: string
+          updated_at?: string
+          wbs?: string | null
+        }
+        Update: {
+          baseline_end_date?: string | null
+          baseline_start_date?: string | null
+          company_id?: string
+          created_at?: string
+          duration_days?: number | null
+          end_date?: string | null
+          id?: string
+          import_id?: string | null
+          notes?: string | null
+          outline_level?: number | null
+          percent_complete?: number | null
+          phase_id?: string | null
+          predecessors?: string | null
+          project_id?: string
+          resource_names?: string | null
+          start_date?: string | null
+          task_name?: string
+          updated_at?: string
+          wbs?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_schedule_tasks_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "nb_timeline_imports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_schedule_tasks_phase_id_fkey"
+            columns: ["phase_id"]
+            isOneToOne: false
+            referencedRelation: "nb_build_phases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_schedule_tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_sections: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          location_area_id: string | null
+          name: string
+          project_id: string
+          section_code: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          location_area_id?: string | null
+          name: string
+          project_id: string
+          section_code?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          location_area_id?: string | null
+          name?: string
+          project_id?: string
+          section_code?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_sections_location_area_id_fkey"
+            columns: ["location_area_id"]
+            isOneToOne: false
+            referencedRelation: "nb_location_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_sections_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_subzones: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          project_id: string
+          updated_at: string
+          zone_id: string
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          project_id: string
+          updated_at?: string
+          zone_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          project_id?: string
+          updated_at?: string
+          zone_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_subzones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_subzones_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "nb_zones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_suppliers: {
+        Row: {
+          area_id: string | null
+          company: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          notes: string | null
+          project_id: string
+          role: string | null
+          why_involved: string | null
+        }
+        Insert: {
+          area_id?: string | null
+          company?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          project_id: string
+          role?: string | null
+          why_involved?: string | null
+        }
+        Update: {
+          area_id?: string | null
+          company?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          project_id?: string
+          role?: string | null
+          why_involved?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_suppliers_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "nb_areas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nb_suppliers_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_timeline_imports: {
+        Row: {
+          company_id: string
+          id: string
+          imported_at: string
+          imported_by: string | null
+          original_filename: string
+          project_id: string
+          row_count: number | null
+        }
+        Insert: {
+          company_id?: string
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          original_filename: string
+          project_id: string
+          row_count?: number | null
+        }
+        Update: {
+          company_id?: string
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          original_filename?: string
+          project_id?: string
+          row_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_timeline_imports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_vendor_contacts: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          role: string | null
+          supplier_id: string
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          role?: string | null
+          supplier_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          role?: string | null
+          supplier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_vendor_contacts_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "nb_suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_yard_standards: {
+        Row: {
+          category: string
+          company_id: string
+          content_indexed_at: string | null
+          content_text: string | null
+          created_at: string
+          description: string | null
+          doc_type_code: string | null
+          document_number: string | null
+          element_code: string | null
+          external_url: string | null
+          file_name: string | null
+          id: string
+          material_code: string | null
+          project_id: string
+          revision: string | null
+          search_vector: unknown
+          seq_code: string | null
+          sheet_number: string | null
+          storage_path: string | null
+          tags: string | null
+          title: string
+          updated_at: string
+          uploaded_by: string | null
+        }
+        Insert: {
+          category?: string
+          company_id?: string
+          content_indexed_at?: string | null
+          content_text?: string | null
+          created_at?: string
+          description?: string | null
+          doc_type_code?: string | null
+          document_number?: string | null
+          element_code?: string | null
+          external_url?: string | null
+          file_name?: string | null
+          id?: string
+          material_code?: string | null
+          project_id: string
+          revision?: string | null
+          search_vector?: unknown
+          seq_code?: string | null
+          sheet_number?: string | null
+          storage_path?: string | null
+          tags?: string | null
+          title: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          content_indexed_at?: string | null
+          content_text?: string | null
+          created_at?: string
+          description?: string | null
+          doc_type_code?: string | null
+          document_number?: string | null
+          element_code?: string | null
+          external_url?: string | null
+          file_name?: string | null
+          id?: string
+          material_code?: string | null
+          project_id?: string
+          revision?: string | null
+          search_vector?: unknown
+          seq_code?: string | null
+          sheet_number?: string | null
+          storage_path?: string | null
+          tags?: string | null
+          title?: string
+          updated_at?: string
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_yard_standards_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nb_zones: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          number_of_components: number
+          project_id: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          number_of_components?: number
+          project_id: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          number_of_components?: number
+          project_id?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nb_zones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "nb_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_logs: {
         Row: {
           body_preview: string | null
@@ -11016,6 +13637,58 @@ export type Database = {
         | "postponed"
         | "cancelled"
         | "completed"
+      nb_approval_status: "pending" | "approved" | "changes_needed"
+      nb_build_phase_status: "planned" | "active" | "completed" | "on_hold"
+      nb_change_order_status:
+        | "draft"
+        | "submitted"
+        | "under_review"
+        | "approved"
+        | "in_progress"
+        | "completed"
+        | "rejected"
+      nb_decision_status: "idea" | "active" | "final" | "changed"
+      nb_equipment_status:
+        | "proposed"
+        | "approved"
+        | "ordered"
+        | "shipped"
+        | "delivered"
+        | "installed"
+      nb_file_status: "draft" | "review" | "approved"
+      nb_po_status:
+        | "draft"
+        | "reviewed"
+        | "issued"
+        | "delivered"
+        | "closed"
+        | "cancelled"
+      nb_raid_item_type:
+        | "decision"
+        | "assumption"
+        | "risk"
+        | "issue"
+        | "key_project_risk"
+      nb_raid_status:
+        | "current"
+        | "accepted"
+        | "closed"
+        | "superseded"
+        | "action"
+        | "rejected"
+        | "question_asked"
+      nb_rasci_phase:
+        | "design"
+        | "specify"
+        | "engineering"
+        | "purchase"
+        | "produce"
+        | "deliver"
+        | "install"
+        | "commission"
+        | "handover"
+      nb_rasci_value: "responsible" | "support" | "consulted" | "informed"
+      nb_requirement_priority: "low" | "medium" | "high" | "critical"
       owner_visited_status: "yes" | "no" | "unknown"
       permission_level: "view" | "edit" | "admin"
       record_lifecycle_status:
@@ -11248,6 +13921,64 @@ export const Constants = {
         "cancelled",
         "completed",
       ],
+      nb_approval_status: ["pending", "approved", "changes_needed"],
+      nb_build_phase_status: ["planned", "active", "completed", "on_hold"],
+      nb_change_order_status: [
+        "draft",
+        "submitted",
+        "under_review",
+        "approved",
+        "in_progress",
+        "completed",
+        "rejected",
+      ],
+      nb_decision_status: ["idea", "active", "final", "changed"],
+      nb_equipment_status: [
+        "proposed",
+        "approved",
+        "ordered",
+        "shipped",
+        "delivered",
+        "installed",
+      ],
+      nb_file_status: ["draft", "review", "approved"],
+      nb_po_status: [
+        "draft",
+        "reviewed",
+        "issued",
+        "delivered",
+        "closed",
+        "cancelled",
+      ],
+      nb_raid_item_type: [
+        "decision",
+        "assumption",
+        "risk",
+        "issue",
+        "key_project_risk",
+      ],
+      nb_raid_status: [
+        "current",
+        "accepted",
+        "closed",
+        "superseded",
+        "action",
+        "rejected",
+        "question_asked",
+      ],
+      nb_rasci_phase: [
+        "design",
+        "specify",
+        "engineering",
+        "purchase",
+        "produce",
+        "deliver",
+        "install",
+        "commission",
+        "handover",
+      ],
+      nb_rasci_value: ["responsible", "support", "consulted", "informed"],
+      nb_requirement_priority: ["low", "medium", "high", "critical"],
       owner_visited_status: ["yes", "no", "unknown"],
       permission_level: ["view", "edit", "admin"],
       record_lifecycle_status: [
