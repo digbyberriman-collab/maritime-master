@@ -34,7 +34,7 @@ export default function SnagsPage() {
       .select("id, reference, title, severity, category, status, location")
       .order("reference")
       .then(({ data }) => {
-        if (data) setRows(data);
+        if (data) setRows(data as any);
       });
   }, [user]);
 

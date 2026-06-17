@@ -40,7 +40,7 @@ export default function WorksPage() {
       .select("id, reference, title, area, trade, priority, status, quoted_amount, accepted_amount")
       .order("reference")
       .then(({ data }) => {
-        if (data) setRows(data);
+        if (data) setRows(data as any);
       });
   }, [user]);
 
