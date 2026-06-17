@@ -4,6 +4,10 @@ import ProtectedRoute from '@/shared/components/ProtectedRoute';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { PlaceholderPage } from '@/shared/components/common/PlaceholderPage';
 import { PLACEHOLDER_LEAVES } from '@/config/sitemap';
+// New Build module is ported under src/modules/new-build/* but not yet wired
+// here — importing its routes currently blanks the app shell. Re-enable
+// after diagnosing the module-load crash.
+// import { newBuildRoutes } from '@/modules/new-build/routes';
 import { 
   Ship, Users, Award, Plane, Clock, CalendarDays,
   AlertTriangle, ClipboardList, BookOpen, Shield, FileCheck, Layers, LayoutGrid,
@@ -776,6 +780,10 @@ export const AppRoutes: React.FC = () => {
       } />
 
       {/* Catch-all - redirect to dashboard instead of 404 */}
+      {/* New Build module routes intentionally disabled until the
+          module-load crash is resolved. */}
+      {/* {newBuildRoutes} */}
+
       {/* Sitemap-driven placeholders: every Fleet/Vessel/Shoreside/Health/Yard/HRIS
           leaf that doesn't have a real page yet renders a Coming Soon screen.
           Explicit routes above take precedence because they're listed first. */}

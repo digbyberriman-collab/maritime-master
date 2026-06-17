@@ -1,57 +1,83 @@
-## Goal
+# New Build Module — Integration Plan
 
-Make the sidebar mirror the Inkfleet sitemap exactly (6 top-level sections, hundreds of leaf items, nested up to 4 deep) and ensure every entry resolves to a working route — existing pages stay, missing ones render a "Coming Soon" placeholder so nothing 404s.
+The uploaded `Yacht Build Management` zip is a complete standalone Lovable app: 28 pages, ~50 components, 4 edge functions, 30+ migrations, and ~25 DB tables. We will fold it into STORM's existing `Yard → New Build` sitemap section without disrupting anything else.
 
-## Top-level sections to build (from the sitemap)
+## Goals
 
-1. **Fleet** — 13 items (Dashboard, Scheduler, Tracker, Reports, Calendar, Rotation Planner, Documents, Checklists, Vessels, Users & Access, Notification Management, Support Tickets, Account)
-2. **Vessel** — 8 grouped modules: Crew (10), Safety (18, incl. Standing Orders & SOPs sub-groups), Certificates (12), Technical (8), Charter (3), Accounting (7), Vessel (9), Departments (Crew Departments × ~10 with 6-tab sub-pattern + Galley/Dive specials; Management/Office × 8 incl. HR sub-group)
-3. **Shoreside** — 8 items (Embrace, Lungfish, Bonefish, InkWELL, MedINK, Crew Concierge, Cosmic Frontier Labs, Dark Ocean)
-4. **Health & Wellness** — Medical (10 + Personnel Medical Data sub-group of 8), Spa (5), Nutrition (5), Physio (5), Personal Training (Trainer mode + Athlete mode, ~20 leaves)
-5. **Yard** — Refit (8 groups, ~40 leaves), New Build (6 groups, ~24 leaves)
-6. **HRIS** — 9 items incl. Employee Records (5), Compensation (4), Performance (4), Recruitment (4), plus 4 leaves
+1. New Build becomes a fully functional sub-app under `/yard/new-build/*`.
+2. Reuses STORM's auth, layout, sidebar, design tokens — does **not** ship a second sidebar/login.
+3. Tables are namespaced so they cannot collide with existing STORM tables.
+4. Existing STORM routes/pages are untouched.
 
-Total ≈ 260 unique leaf paths.
+## Scope mapping (source → STORM)
 
-## Approach
+Source pages map to existing sitemap leaves:
 
-### 1. Navigation config (`src/config/navigation.ts`)
-
-Replace `NAVIGATION_ITEMS` with a section-grouped structure. Introduce an optional `section` field on `NavItem` (`'fleet' | 'vessel' | 'shoreside' | 'health' | 'yard' | 'hris'`) so `SidebarNavigation` can render section headers between groups. Reuse existing paths where the live page already exists; otherwise generate a stable path under the section root, e.g. `/fleet/scheduler`, `/vessel/safety/permit-to-work`, `/yard/refit/workflow/change-orders`.
-
-All entries `permissions: ['all']` for now — your superadmin role already bypasses. We can tighten later.
-
-### 2. Route registration (`src/routes/index.tsx`)
-
-Add a generated catch-all block of placeholder routes from a single source-of-truth array (the same one navigation imports). Keep all current explicit routes untouched. For each leaf in the sitemap that doesn't already match an explicit route, register:
-
-```tsx
-<Route path={path} element={<ProtectedRoute><PlaceholderWrapper title={label} /></ProtectedRoute>} />
+```text
+Overview/Dashboard           → /yard/new-build/overview/dashboard
+Phases                       → /yard/new-build/overview/build-phases
+Requirements                 → /yard/new-build/overview/requirements
+Onboarding                   → /yard/new-build/overview/onboarding
+ChangeOrders                 → /yard/new-build/workflow/change-orders
+Decisions (RAID)             → /yard/new-build/workflow/raid-log
+Approvals                    → /yard/new-build/workflow/approvals
+Timeline (Gantt)             → /yard/new-build/workflow/schedule
+Areas                        → /yard/new-build/disciplines/areas
+Interior                     → /yard/new-build/disciplines/interior
+NavalArchitecture            → /yard/new-build/disciplines/naval-architecture
+Piping                       → /yard/new-build/disciplines/piping
+DeckPlan                     → /yard/new-build/disciplines/deck-plan
+Equipment                    → /yard/new-build/equipment/equipment
+PurchaseOrders               → /yard/new-build/equipment/purchase-orders
+Files                        → /yard/new-build/documents/files
+(Drawings via files filter)  → /yard/new-build/documents/drawings
+YardStandards                → /yard/new-build/documents/yard-standards
+Regulations                  → /yard/new-build/documents/regulations
+Locations                    → /yard/new-build/configuration/locations
+Rasci                        → /yard/new-build/configuration/rasci
+Suppliers                    → /yard/new-build/configuration/suppliers
+Contacts                     → /yard/new-build/configuration/contacts
+Import                       → /yard/new-build/configuration/import
 ```
 
-This way new pages built later can simply replace the placeholder by adding an earlier explicit route.
+Dropped: source `Login/Signup/Forgot/Reset/Index/NotFound/AppLayout/AppSidebar/AuthGuard` — STORM already provides these.
 
-### 3. Placeholder source of truth
+## Phased implementation
 
-New file `src/config/sitemap.ts` exports `SITEMAP_LEAVES: { path, label, section }[]` derived from the sitemap above. `navigation.ts` and `routes/index.tsx` both consume it — no drift.
+### Phase A — Foundation (this turn)
+- Add module folder `src/modules/new-build/{pages,components,hooks,lib}`.
+- Copy source pages/components verbatim, strip out their `<AppLayout>` wrapper and any `useAuth/AuthGuard` calls (STORM's `ProtectedRoute` + `DashboardLayout` already wrap them via `routes/index.tsx`).
+- Rewrite imports: `@/contexts/ProjectContext` → local module context; `@/integrations/supabase/client` → STORM's existing client; `@/components/ui/*` → existing shadcn (already identical).
+- Wire all 24 leaf paths in `src/routes/index.tsx`, replacing the auto-generated PlaceholderWrapper for each.
+- Sitemap stays as-is; only `existing` props are added to the matching leaves so they point to the new pages.
 
-### 4. Sidebar rendering (`src/shared/components/layout/SidebarNavigation.tsx`)
+### Phase B — Database
+- Squash the 30 source migrations into **one** STORM migration that creates tables under a `nb_` prefix (`nb_projects`, `nb_areas`, `nb_decisions`, `nb_files`, `nb_approvals`, `nb_suppliers`, `nb_build_phases`, `nb_milestones`, `nb_materials`, `nb_material_usages`, `nb_equipment`, `nb_purchase_orders`, `nb_change_orders`, `nb_requirements`, `nb_schedule_tasks`, `nb_regulations`, `nb_yard_standards`, `nb_drawings`, `nb_deck_views`, `nb_deck_rooms`, `nb_element_codes`, `nb_rasci_roles`, `nb_rasci_assignments`, `nb_vendor_contacts`, `nb_timeline_imports`). Avoids collisions with STORM's existing `suppliers`, `equipment`, `files`, etc.
+- Each table: `GRANT` to `authenticated` + `service_role`, `ENABLE RLS`, policies scoped to STORM's existing `company_id` + `has_role('DPA'|'Master'|'Shore')` for write, authenticated read.
+- Storage bucket `nb-files` (private) + `nb-material-swatches` (public).
+- Module page queries are updated to use the `nb_` table names.
 
-Minor patch: render a small uppercase section header (`FLEET`, `VESSEL`, …) before the first item of each section. No other layout changes; existing collapsible/active-state logic continues to work for arbitrarily deep `children`.
+### Phase C — Edge functions
+Port `detect-rooms`, `extract-yard-metadata`, `index-regulation`, `index-yard-standard` to `supabase/functions/nb-*`. Use Lovable AI Gateway (no new keys needed).
 
-### 5. Cross-links (e.g. Spa → Health & Wellness › Spa)
+### Phase D — Polish
+- Project picker (Y727/Y728 etc.) lives in the New Build header, not the global STORM header.
+- Apply STORM design tokens (Storm blue `--brand-primary`), drop the source's `#2563EB` overrides.
+- Smoke test all 24 routes; verify build.
 
-The sitemap marks several items as cross-links (Spa, Medical under Crew Departments, Nutrition ↔ Galley, Fleet Rotation Planner ⇄ Vessel Rotation Planner). I'll model these as plain nav children that point at the canonical path (no duplicate route), with an `aria-label` noting the cross-link.
+## Out of scope
 
-## Out of scope (call out)
-
-- No new business logic, no DB changes, no permission edits.
-- No restyle of placeholder pages beyond the existing `PlaceholderPage` component.
-- Existing routes/pages keep their current paths even if the sitemap implies a slightly different label; only the label/grouping changes in the sidebar.
+- No edits to STORM's existing tables, auth, RBAC, or sidebar component.
+- No data migration from the source app — tables start empty.
+- Source's separate login/signup/reset/forgot pages are not ported.
+- Cross-module data sharing (e.g., linking a New Build vessel to a STORM vessel record) is deferred.
 
 ## Verification
 
-- Build passes (harness runs it automatically).
-- Spot-check 3 routes in the preview: one Fleet leaf, one deep Vessel › Departments › Galley leaf, one Yard › Refit leaf — all render either the real page or the placeholder, no 404.
+After each phase: `bun run build`, then spot-check 3 routes in preview (one Overview, one Discipline, one Configuration page) for render + DB query success.
 
-Confirm and I'll execute.
+## What I need from you to start
+
+1. **Confirm phase A scope** (pages + routing only, no DB yet) is the right starting point, or tell me to do A + B in one go.
+2. **Project model**: should New Build "projects" (Y727, Y728) be standalone records, or tied to STORM `vessels` rows where `status = 'New Build'`? Defaults to standalone unless you say otherwise.
+3. **Access**: who can use New Build — same DPA/Master/Shore RBAC as the rest of STORM, or open to all authenticated users like the source app?
