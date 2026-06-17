@@ -49,7 +49,7 @@ export default function DrawingsPage() {
       .is("archived_at", null)
       .order("reference");
     if (error) setError(error.message);
-    setItems((data as Drawing[]) ?? []);
+    setItems((data as unknown as Drawing[]) ?? []);
   };
   useEffect(() => {
     load();

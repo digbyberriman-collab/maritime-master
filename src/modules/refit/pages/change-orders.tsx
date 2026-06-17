@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { Plus, Paperclip, History, FileText, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { AppShell, PageHeader } from "@/modules/refit/components/AppShell";
@@ -82,7 +83,7 @@ export default function ChangeOrdersPage() {
       .is("archived_at", null)
       .order("created_at", { ascending: false });
     if (error) setError(error.message);
-    setItems((data as ChangeOrder[]) ?? []);
+    setItems((data as unknown as ChangeOrder[]) ?? []);
   };
 
   useEffect(() => {
@@ -110,7 +111,7 @@ export default function ChangeOrdersPage() {
           action={
             <div className="flex gap-2 items-center">
               <Link
-                to="/approvals"
+                to="/yard/refit/approvals"
                 className="px-3 py-2 bg-white border border-black/10 rounded-sm text-sm hover:bg-secondary"
               >
                 Approvals
@@ -601,7 +602,7 @@ function ChangeOrderDetailDrawer({
       .select("*")
       .eq("change_order_id", coId)
       .order("version", { ascending: false });
-    setAttachments((data as ChangeOrderAttachment[]) ?? []);
+    setAttachments((data as unknown as ChangeOrderAttachment[]) ?? []);
   };
 
   useEffect(() => {
@@ -619,8 +620,8 @@ function ChangeOrderDetailDrawer({
       ]);
       if (coRes.error) setErr(coRes.error.message);
       setCo((coRes.data as ChangeOrder) ?? null);
-      setApprovals((apRes.data as ChangeOrderApproval[]) ?? []);
-      setComments((cmRes.data as Comment[]) ?? []);
+      setApprovals((apRes.data as unknown as ChangeOrderApproval[]) ?? []);
+      setComments((cmRes.data as unknown as Comment[]) ?? []);
       await loadAttachments(id);
     })();
   }, [id]);
@@ -680,7 +681,7 @@ function ChangeOrderDetailDrawer({
       .from("rf_change_order_approvals" as any)
       .select("*")
       .eq("change_order_id", co.id);
-    const list = (latest as ChangeOrderApproval[]) ?? [];
+    const list = (latest as unknown as ChangeOrderApproval[]) ?? [];
     const required = co.required_stages.filter((s) => list.some((l) => l.stage === s));
     const allApproved = required.every(
       (s) => list.find((l) => l.stage === s)?.decision === "approved",
@@ -739,7 +740,7 @@ function ChangeOrderDetailDrawer({
       .eq("parent_type", "change_order")
       .eq("parent_id", co.id)
       .order("created_at");
-    setComments((data as Comment[]) ?? []);
+    setComments((data as unknown as Comment[]) ?? []);
     setBusy(false);
   };
 

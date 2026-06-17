@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { AppShell, PageHeader } from "@/modules/refit/components/AppShell";
 import { RequireAuth } from "@/modules/refit/components/RequireAuth";
 import { useAuth } from "@/modules/refit/lib/auth";
@@ -233,13 +234,13 @@ export default function Dashboard() {
           action={
             <div className="flex gap-2">
               <Link
-                to="/approvals"
+                to="/yard/refit/approvals"
                 className="px-3 py-2 bg-white border border-black/10 rounded-sm text-sm hover:bg-secondary"
               >
                 Approvals ({pendingApprovals})
               </Link>
               <Link
-                to="/change-orders"
+                to="/yard/refit/change-orders"
                 className="px-3 py-2 bg-navy text-white rounded-sm text-sm hover:opacity-90"
               >
                 Change Orders
@@ -298,7 +299,7 @@ export default function Dashboard() {
           <Section
             title="Next 5 Milestones"
             action={
-              <Link to="/schedule" className="text-[11px] text-ocean">
+              <Link to="/yard/refit/schedule" className="text-[11px] text-ocean">
                 View schedule →
               </Link>
             }
@@ -353,7 +354,7 @@ export default function Dashboard() {
           <Section
             title="Top Risks"
             action={
-              <Link to="/risks" className="text-[11px] text-ocean">
+              <Link to="/yard/refit/risks" className="text-[11px] text-ocean">
                 Risk register →
               </Link>
             }
@@ -382,7 +383,7 @@ export default function Dashboard() {
           <Section
             title="Change Orders by Status"
             action={
-              <Link to="/change-orders" className="text-[11px] text-ocean">
+              <Link to="/yard/refit/change-orders" className="text-[11px] text-ocean">
                 View all →
               </Link>
             }
@@ -410,7 +411,7 @@ export default function Dashboard() {
           <Section
             title="Crew Requests by Status"
             action={
-              <Link to="/crew-requests" className="text-[11px] text-ocean">
+              <Link to="/yard/refit/crew-requests" className="text-[11px] text-ocean">
                 View all →
               </Link>
             }
@@ -435,7 +436,7 @@ export default function Dashboard() {
           <Section
             title="Upcoming Logistics"
             action={
-              <Link to="/logistics" className="text-[11px] text-ocean">
+              <Link to="/yard/refit/logistics" className="text-[11px] text-ocean">
                 View all →
               </Link>
             }

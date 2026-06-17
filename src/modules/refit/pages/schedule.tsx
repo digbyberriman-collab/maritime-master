@@ -54,8 +54,8 @@ export default function SchedulePage() {
       db.from("rf_schedule_items" as any).select("*").eq("vessel_id", activeVesselId).order("baseline_start"),
     ]);
     if (m.error) setError(m.error.message);
-    setMilestones((m.data as Milestone[]) ?? []);
-    setTasks((s.data as ScheduleItem[]) ?? []);
+    setMilestones((m.data as unknown as Milestone[]) ?? []);
+    setTasks((s.data as unknown as ScheduleItem[]) ?? []);
   };
   useEffect(() => {
     load();

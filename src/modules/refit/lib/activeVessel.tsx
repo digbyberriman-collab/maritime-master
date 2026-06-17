@@ -30,7 +30,7 @@ export function ActiveVesselProvider({ children }: { children: ReactNode }) {
       .from("rf_vessels" as any)
       .select("id, name, hull_number")
       .order("name", { ascending: true });
-    const list = (data ?? []) as Vessel[];
+    const list = (data ?? []) as unknown as Vessel[];
     setVessels(list);
     // Resolve active id: stored value if still valid, else first vessel
     const stored = typeof window !== "undefined" ? window.localStorage.getItem(STORAGE_KEY) : null;

@@ -52,7 +52,7 @@ export default function ApprovalsPage() {
       .eq("vessel_id", activeVesselId)
       .order("submitted_at", { ascending: false });
     if (error) setError(error.message);
-    setItems((data as Pending[]) ?? []);
+    setItems((data as unknown as Pending[]) ?? []);
   };
   useEffect(() => {
     load();

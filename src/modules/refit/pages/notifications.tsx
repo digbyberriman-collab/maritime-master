@@ -28,7 +28,7 @@ export default function NotificationsPage() {
     if (filter === "unread") q = q.eq("read", false);
     const { data, error } = await q;
     if (error) setError(error.message);
-    setItems((data as Notification[]) ?? []);
+    setItems((data as unknown as Notification[]) ?? []);
   };
 
   useEffect(() => {

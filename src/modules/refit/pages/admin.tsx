@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { AppShell, PageHeader } from "@/modules/refit/components/AppShell";
 import { RequireAuth } from "@/modules/refit/components/RequireAuth";
 import { useAuth, ROLE_LABEL, type AppRole } from "@/modules/refit/lib/auth";
@@ -30,7 +31,7 @@ export default function AdminPage() {
       <AppShell>
         <div className="p-8 text-sm">
           <PageHeader title="Admin" subtitle="You do not have access to this section." />
-          <Link to="/" className="text-ocean">
+          <Link to="/yard/refit" className="text-ocean">
             ← Back to dashboard
           </Link>
         </div>
@@ -69,8 +70,8 @@ function UsersAndRolesSection() {
     ]);
     if (p.error) setError(p.error.message);
     if (r.error) setError(r.error.message);
-    setProfiles((p.data as Profile[]) ?? []);
-    setUserRoles((r.data as UserRole[]) ?? []);
+    setProfiles((p.data as unknown as Profile[]) ?? []);
+    setUserRoles((r.data as unknown as UserRole[]) ?? []);
   };
   useEffect(() => {
     load();
@@ -89,7 +90,7 @@ function UsersAndRolesSection() {
     load();
   };
 
-  const allRoles = Object.keys(ROLE_LABEL) as AppRole[];
+  const allRoles = Object.keys(ROLE_LABEL) as unknown as AppRole[];
 
   return (
     <Section title="Users & roles">
@@ -179,7 +180,7 @@ function DepartmentsSection() {
       .is("archived_at", null)
       .order("code");
     if (error) setError(error.message);
-    setItems((data as Department[]) ?? []);
+    setItems((data as unknown as Department[]) ?? []);
   };
   useEffect(() => {
     load();
@@ -247,7 +248,7 @@ function CostCodesSection() {
       .is("archived_at", null)
       .order("code");
     if (error) setError(error.message);
-    setItems((data as CostCode[]) ?? []);
+    setItems((data as unknown as CostCode[]) ?? []);
   };
   useEffect(() => {
     load();

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/modules/refit/lib/auth";
 import { AppShell, PageHeader } from "@/modules/refit/components/AppShell";
@@ -37,7 +38,7 @@ export default function LoginDiagnosticsPage() {
         .limit(200);
       if (cancelled) return;
       if (error) setError(error.message);
-      else setRows((data ?? []) as DiagRow[]);
+      else setRows((data ?? []) as unknown as DiagRow[]);
     })();
     return () => {
       cancelled = true;

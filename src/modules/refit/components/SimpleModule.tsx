@@ -103,7 +103,7 @@ function SimpleModuleInner<T extends { id: string }>({
       });
     const { data, error } = await q;
     if (error) setError(error.message);
-    setItems((data as T[]) ?? []);
+    setItems((data as unknown as T[]) ?? []);
   };
 
   useEffect(() => {

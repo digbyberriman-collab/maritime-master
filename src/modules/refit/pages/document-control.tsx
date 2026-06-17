@@ -64,7 +64,7 @@ export default function DocumentControl() {
       .is("archived_at", null)
       .order("name");
     if (error) setError(error.message);
-    setItems((data as Doc[]) ?? []);
+    setItems((data as unknown as Doc[]) ?? []);
   };
   useEffect(() => {
     load();

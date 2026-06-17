@@ -84,7 +84,7 @@ export function useAuth() {
 
   const fetchRoles = async (uid: string) => {
     const { data } = await supabase.from("user_roles").select("role").eq("user_id", uid);
-    setRoles(((data ?? []) as { role: AppRole }[]).map((r) => r.role));
+    setRoles(((data ?? []) as unknown as { role: AppRole }[]).map((r) => r.role));
   };
 
   useEffect(() => {

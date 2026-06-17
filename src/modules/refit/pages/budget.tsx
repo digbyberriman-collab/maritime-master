@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { AppShell, PageHeader } from "@/modules/refit/components/AppShell";
 import { RequireAuth } from "@/modules/refit/components/RequireAuth";
 import { useActiveVessel } from "@/modules/refit/lib/activeVessel";
@@ -85,7 +86,7 @@ export default function BudgetPage() {
             <div className="flex gap-2">
               {can(roles, "po.create") && (
                 <Link
-                  to="/purchase-orders"
+                  to="/yard/refit/purchase-orders"
                   className="px-3 py-2 bg-white border border-black/10 rounded-sm text-sm hover:bg-secondary"
                 >
                   Purchase orders
@@ -93,7 +94,7 @@ export default function BudgetPage() {
               )}
               {can(roles, "invoice.manage") && (
                 <Link
-                  to="/invoices"
+                  to="/yard/refit/invoices"
                   className="px-3 py-2 bg-navy text-white rounded-sm text-sm hover:opacity-90"
                 >
                   Invoices
@@ -138,7 +139,7 @@ export default function BudgetPage() {
           <Section
             title="Recent Purchase Orders"
             action={
-              <Link to="/purchase-orders" className="text-[11px] text-ocean">
+              <Link to="/yard/refit/purchase-orders" className="text-[11px] text-ocean">
                 View all →
               </Link>
             }
@@ -180,7 +181,7 @@ export default function BudgetPage() {
           <Section
             title="Recent Invoices"
             action={
-              <Link to="/invoices" className="text-[11px] text-ocean">
+              <Link to="/yard/refit/invoices" className="text-[11px] text-ocean">
                 View all →
               </Link>
             }

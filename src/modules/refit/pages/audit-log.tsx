@@ -54,7 +54,7 @@ export default function AuditLogPage() {
         setLoading(false);
         return;
       }
-      const list = (data ?? []) as AuditRow[];
+      const list = (data ?? []) as unknown as AuditRow[];
       setRows(list);
 
       const actorIds = Array.from(

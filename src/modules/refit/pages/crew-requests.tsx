@@ -72,7 +72,7 @@ export default function CrewRequestsPage() {
       .is("archived_at", null)
       .order("created_at", { ascending: false });
     if (error) setError(error.message);
-    setItems((data as CrewRequest[]) ?? []);
+    setItems((data as unknown as CrewRequest[]) ?? []);
   };
   useEffect(() => {
     load();
@@ -466,7 +466,7 @@ function CrewRequestDetailDrawer({
           .order("created_at"),
       ]);
       setR((rr.data as CrewRequest) ?? null);
-      setComments((cr.data as Comment[]) ?? []);
+      setComments((cr.data as unknown as Comment[]) ?? []);
     })();
   }, [id]);
 
@@ -498,7 +498,7 @@ function CrewRequestDetailDrawer({
       .eq("parent_type", "crew_request")
       .eq("parent_id", r.id)
       .order("created_at");
-    setComments((data as Comment[]) ?? []);
+    setComments((data as unknown as Comment[]) ?? []);
     setBusy(false);
   };
 

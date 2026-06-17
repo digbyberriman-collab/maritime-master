@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import type { AppRole } from "@/modules/refit/lib/auth";
 
 interface Account {
@@ -233,7 +234,7 @@ function LoginHelpPage() {
               <span className="mt-0.5 size-1.5 rounded-full bg-ocean shrink-0" />
               <span>
                 If you get stuck on <em>"Verifying session…"</em>, open{" "}
-                <Link to="/session-diagnostics" className="underline text-navy">
+                <Link to="/yard/refit/session-diagnostics" className="underline text-navy">
                   Session Diagnostics
                 </Link>{" "}
                 to troubleshoot.
