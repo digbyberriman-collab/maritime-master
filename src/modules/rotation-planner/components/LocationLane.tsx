@@ -1,6 +1,5 @@
 import React from 'react';
 import type { VesselLocation, ZoomLevel } from '../types';
-import type { VesselLocation as VL } from '../types';
 import { ZOOM_PX_PER_DAY, LOCATION_LANE_HEIGHT } from '../constants';
 import { differenceInCalendarDays, fromISO } from '../lib/dateMath';
 
