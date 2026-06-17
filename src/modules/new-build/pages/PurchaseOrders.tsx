@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/modules/new-build/lib/supabase";
 import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { useAuth } from "@/modules/auth/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

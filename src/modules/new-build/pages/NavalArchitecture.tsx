@@ -25,7 +25,7 @@ import {
   hullWeight,
   freeboard,
   navalArchDocuments,
-} from "@/data/naval-architecture-data";
+} from "@/modules/new-build/data/naval-architecture-data";
 // ── Glossary of naval architecture terms ──
 const glossary: Record<string, string> = {
   "LOA": "Length Overall — the maximum length of the vessel from bow to stern.",

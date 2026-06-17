@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/modules/new-build/lib/supabase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
-import { PROGRESS_OPTIONS, progressMeta, yearColor, fmtWeek, YEAR_COLORS } from "@/lib/piping-utils";
+import { PROGRESS_OPTIONS, progressMeta, yearColor, fmtWeek, YEAR_COLORS } from "@/modules/new-build/lib/piping-utils";
 import {
   Download, Upload, Plus, Trash2, FileSpreadsheet, FileText, Settings as SettingsIcon,
 } from "lucide-react";

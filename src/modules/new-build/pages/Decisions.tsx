@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { useAuth } from "@/modules/auth/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/modules/new-build/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";

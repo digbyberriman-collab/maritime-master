@@ -1,6 +1,6 @@
 import { useState, useCallback } from "react";
 import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/modules/new-build/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,7 @@ import {
   getSubzonesForDeck,
   zoneDefinitionDocument,
   type ZoneDefinition,
-} from "@/data/zone-definition-data";
+} from "@/modules/new-build/data/zone-definition-data";
 
 type LocationTab = "zone-plan" | "zones" | "subzones" | "decks" | "blocks" | "areas" | "sections";
 

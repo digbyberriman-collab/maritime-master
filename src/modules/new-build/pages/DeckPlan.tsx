@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
-import "@/lib/pdfjs-setup";
+import "@/modules/new-build/lib/pdfjs-setup";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/modules/new-build/lib/supabase";
 import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

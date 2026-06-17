@@ -1,9 +1,9 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { Document, Page } from "react-pdf";
-import "@/lib/pdfjs-setup";
+import "@/modules/new-build/lib/pdfjs-setup";
 import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { useAuth } from "@/modules/auth/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/modules/new-build/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,7 +56,7 @@ import {
   parseYardStandardNumber,
   getMaterialLabel,
   getDocTypeLabel,
-} from "@/lib/yard-standard-naming";
+} from "@/modules/new-build/lib/yard-standard-naming";
 
 const CATEGORIES = [
   "General",

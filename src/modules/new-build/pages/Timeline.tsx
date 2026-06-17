@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from "react";
 import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { useAuth } from "@/modules/auth/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/modules/new-build/lib/supabase";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,7 +22,7 @@ import {
   format, startOfMonth, endOfMonth, isSameMonth, addMonths, subMonths, parseISO,
   getISOWeek, getISOWeekYear, addWeeks, differenceInDays,
 } from "date-fns";
-import { appendix11Data, parseWeekDate } from "@/data/appendix11-data";
+import { appendix11Data, parseWeekDate } from "@/modules/new-build/data/appendix11-data";
 import { GanttChart } from "@/modules/new-build/components/schedule/GanttChart";
 
 type ViewMode = "calendar" | "list";

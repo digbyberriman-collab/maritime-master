@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/modules/new-build/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +27,7 @@ import {
   MATERIAL_CODES,
   DOC_TYPE_CODES,
   type ParsedYardStandard,
-} from "@/lib/yard-standard-naming";
+} from "@/modules/new-build/lib/yard-standard-naming";
 
 const CATEGORIES = [
   "General", "100 Build Standards", "Structural", "Outfitting", "Mechanical", "Electrical",
