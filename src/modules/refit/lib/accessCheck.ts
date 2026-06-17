@@ -71,7 +71,7 @@ export async function runAccessCheck(role: AppRole | null): Promise<AccessCheckR
     CORE_TABLES.map(async (table): Promise<AccessProbe> => {
       const expected = expectedForRole(table, role);
       try {
-        const { data, error, count } = await supabase
+        const { data, error, count } = await (supabase as any)
           .from(table)
           .select("*", { count: "exact", head: true })
           .limit(1);
