@@ -267,6 +267,13 @@ export const AppRoutes: React.FC = () => {
           <React.Suspense fallback={<LazyLoader />}><LeaveCalculatorPage /></React.Suspense>
         </ProtectedRoute>
       } />
+      <Route path="/crew/rotation-planner" element={
+        <ProtectedRoute>
+          <React.Suspense fallback={<LazyLoader />}>
+            {React.createElement(React.lazy(() => import('@/modules/rotation-planner/pages/RotationPlannerPage')))}
+          </React.Suspense>
+        </ProtectedRoute>
+      } />
       <Route path="/crew/tasks" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>

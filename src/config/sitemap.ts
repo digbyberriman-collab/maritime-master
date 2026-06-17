@@ -91,7 +91,7 @@ const vesselCrew: NavChild[] = [
   L('Crew Compliance', vCrew, { icon: ClipboardCheck }),
   L('Leave', vCrew, { existing: '/crew/leave', icon: CalendarDays }),
   L('Crewing', vCrew, { icon: Users }),
-  L('Rotation Planner', vCrew, { icon: Network }),
+  L('Rotation Planner', vCrew, { existing: '/crew/rotation-planner', icon: Network }),
   L('Hours of Rest', vCrew, { existing: '/crew/work-rest', icon: Clock }),
   L('Crew Training', vCrew, { existing: '/development/crew-training', icon: GraduationCap }),
   L('Familiarisation Forms', vCrew, { icon: FileCheck }),
