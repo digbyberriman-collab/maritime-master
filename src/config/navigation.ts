@@ -1,68 +1,17 @@
 import {
-  LayoutDashboard,
-  Map as MapIcon,
-  Ship,
-  Users,
-  FileText,
-  Shield,
-  Award,
-  Wrench,
-  Bell,
-  Settings,
-  LayoutGrid,
-  Building2,
-  Phone,
-  Plane,
-  Clock,
-  CalendarDays,
-  CheckSquare,
-  Siren,
-  GraduationCap,
-  MessageSquare,
-  AlertCircle,
-  Search,
-  Clipboard,
-  Eye,
-  AlertTriangle,
-  ClipboardList,
-  BookOpen,
-  FileCheck,
-  Layers,
-  Package,
-  HardHat,
-  XCircle,
-  Umbrella,
-  Briefcase,
-  Compass,
-  GanttChart,
-  Lightbulb,
-  PauseCircle,
-  Anchor,
+  Users, Shield, Ship, Wrench, Bell, MessageSquare,
   type LucideIcon,
 } from 'lucide-react';
+import type { NavChild, NavItem } from './navigation-types';
 
-// Child for nested navigation. May itself contain further children for
-// arbitrarily deep menus; the sidebar layout editor renders recursively so
-// every level can be expanded and reordered.
-export interface NavChild {
-  id: string;
-  label: string;
-  path: string;
-  icon: LucideIcon;
-  children?: NavChild[];
-}
+export type { NavChild, NavItem };
 
-export interface NavItem {
-  id: string;
-  label: string;
-  icon: LucideIcon;
-  path: string;
-  permissions: string[];
-  children?: NavChild[];
-  defaultOpen?: boolean;
-}
+// Full sitemap-derived sidebar tree lives in ./sitemap.
+export { NAVIGATION_ITEMS, PLACEHOLDER_LEAVES } from './sitemap';
+export type { SitemapLeaf } from './sitemap';
 
-export const NAVIGATION_ITEMS: NavItem[] = [
+// Kept for any legacy imports (unused by the sitemap-driven sidebar).
+export const LEGACY_NAVIGATION_ITEMS: NavItem[] = [
   {
     id: 'dashboard',
     label: 'Dashboard',
