@@ -129,29 +129,14 @@ const CriticalEquipment = React.lazy(() => import('@/modules/maintenance/pages/C
 // Vessel Pages - lazy loaded
 const CompanyDetails = React.lazy(() => import('@/modules/vessels/pages/CompanyDetails'));
 
+// Workspace pages for sitemap placeholders
+const WorkspacePage = React.lazy(() => import('@/modules/workspace/pages/WorkspacePage'));
+
 // Loading spinner for lazy components
 const LazyLoader = () => (
   <div className="flex items-center justify-center min-h-[400px]">
     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
   </div>
-);
-
-// Placeholder wrapper with layout
-const PlaceholderWrapper: React.FC<{ 
-  title: string; 
-  description?: string;
-  features?: string[];
-  icon?: React.ReactNode;
-}> = ({ title, description, features, icon }) => (
-  <DashboardLayout>
-    <PlaceholderPage 
-      title={title} 
-      description={description}
-      features={features} 
-      icon={icon}
-      expectedRelease="Phase 2" 
-    />
-  </DashboardLayout>
 );
 
 export const AppRoutes: React.FC = () => {
@@ -689,6 +674,8 @@ export const AppRoutes: React.FC = () => {
       <Route path="/risk-assessments/new" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><RiskAssessmentForm /></React.Suspense></ProtectedRoute>} />
       <Route path="/documents/safety-versioning" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><SafetyDocumentVersioning /></React.Suspense></ProtectedRoute>} />
       <Route path="/settings/account-details" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><AccountDetailsPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/account" element={<Navigate to="/settings/account-details" replace />} />
+      <Route path="/admin/notifications" element={<Navigate to="/settings/notifications" replace />} />
       <Route path="/reports" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
@@ -790,16 +777,16 @@ export const AppRoutes: React.FC = () => {
       {/* Refit module (ported from Ship Shape Command). */}
       {refitRoutes}
 
-      {/* Sitemap-driven placeholders: every Fleet/Vessel/Shoreside/Health/Yard/HRIS
-          leaf that doesn't have a real page yet renders a Coming Soon screen.
-          Explicit routes above take precedence because they're listed first. */}
+      {/* Sitemap-driven workspace pages for areas without dedicated module routes. */}
       {PLACEHOLDER_LEAVES.map((leaf) => (
         <Route
           key={leaf.path}
           path={leaf.path}
           element={
             <ProtectedRoute>
-              <PlaceholderWrapper title={leaf.label} />
+              <React.Suspense fallback={<LazyLoader />}>
+                <WorkspacePage title={leaf.label} path={leaf.path} />
+              </React.Suspense>
             </ProtectedRoute>
           }
         />
