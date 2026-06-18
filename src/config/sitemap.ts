@@ -22,6 +22,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { NavItem, NavChild } from './navigation-types';
+import { IMPLEMENTED_ROUTE_PATHS } from './implementedRoutes';
 
 const def: LucideIcon = CircleDot;
 
@@ -67,18 +68,18 @@ function G(
 const FLEET_BASE = '/fleet';
 const fleetChildren: NavChild[] = [
   L('Fleet Dashboard', FLEET_BASE, { existing: '/dashboard', icon: LayoutDashboard }),
-  L('Fleet Scheduler', FLEET_BASE, { icon: CalendarDays }),
+  L('Fleet Scheduler', FLEET_BASE, { existing: '/itinerary/planning', icon: CalendarDays }),
   L('Fleet Tracker', FLEET_BASE, { existing: '/fleet-map', icon: MapIcon }),
-  L('Fleet Reports', FLEET_BASE, { icon: ClipboardList }),
+  L('Fleet Reports', FLEET_BASE, { existing: '/reports', icon: ClipboardList }),
   L('Fleet Calendar', FLEET_BASE, { existing: '/itinerary/timeline', icon: Calendar }),
-  L('Fleet Rotation Planner', FLEET_BASE, { icon: Network }),
+  L('Fleet Rotation Planner', FLEET_BASE, { existing: '/crew/rotation-planner', icon: Network }),
   L('Fleet Documents', FLEET_BASE, { existing: '/documents', icon: FileText }),
   L('Fleet Checklists', FLEET_BASE, { existing: '/ism/checklists', icon: CheckSquare }),
   L('Vessels', FLEET_BASE, { existing: '/vessels/dashboard', icon: Ship }),
   L('Users & Access', FLEET_BASE, { existing: '/admin/users', icon: Users }),
-  L('Notification Management', FLEET_BASE, { existing: '/admin/notifications', icon: Bell }),
-  L('Support Tickets', FLEET_BASE, { icon: LifeBuoy }),
-  L('Account', FLEET_BASE, { existing: '/account', icon: Settings }),
+  L('Notification Management', FLEET_BASE, { existing: '/settings/notifications', icon: Bell }),
+  L('Support Tickets', FLEET_BASE, { existing: '/admin/feedback', icon: LifeBuoy }),
+  L('Account', FLEET_BASE, { existing: '/settings/account-details', icon: Settings }),
 ];
 
 // ─── VESSEL ───────────────────────────────────────────────────────────────
@@ -88,15 +89,15 @@ const V = '/vessel';
 const vCrew = `${V}/crew`;
 const vesselCrew: NavChild[] = [
   L('Crew List', vCrew, { existing: '/crew/list', icon: Users }),
-  L('Crew Compliance', vCrew, { icon: ClipboardCheck }),
+  L('Crew Compliance', vCrew, { existing: '/crew/certificates', icon: ClipboardCheck }),
   L('Leave', vCrew, { existing: '/crew/leave', icon: CalendarDays }),
-  L('Crewing', vCrew, { icon: Users }),
+  L('Crewing', vCrew, { existing: '/crew/list', icon: Users }),
   L('Rotation Planner', vCrew, { existing: '/crew/rotation-planner', icon: Network }),
   L('Hours of Rest', vCrew, { existing: '/crew/work-rest', icon: Clock }),
   L('Crew Training', vCrew, { existing: '/development/crew-training', icon: GraduationCap }),
-  L('Familiarisation Forms', vCrew, { icon: FileCheck }),
-  L('Performance Appraisals', vCrew, { icon: ClipboardList }),
-  L('Employment History', vCrew, { icon: ScrollText }),
+  L('Familiarisation Forms', vCrew, { existing: '/training', icon: FileCheck }),
+  L('Performance Appraisals', vCrew, { existing: '/hr?tab=annual-evaluations', icon: ClipboardList }),
+  L('Employment History', vCrew, { existing: '/crew/list', icon: ScrollText }),
 ];
 
 // Safety
@@ -104,50 +105,50 @@ const vSafety = `${V}/safety`;
 const sopBase = `${vSafety}/sops`;
 const standingBase = `${vSafety}/standing-orders`;
 const vesselSafety: NavChild[] = [
-  L('SMS Summary', vSafety, { icon: Shield }),
+  L('SMS Summary', vSafety, { existing: '/documents/ism-sms', icon: Shield }),
   L('Drills', vSafety, { existing: '/ism/drills', icon: Siren }),
   L('Permit to Work', vSafety, { existing: '/ism/permits-to-work', icon: HardHat }),
   L('SMS Forms', vSafety, { existing: '/ism/miscellaneous', icon: FileText }),
   L('Checklists', vSafety, { existing: '/ism/checklists', icon: CheckSquare }),
   L('Risk Assessments', vSafety, { existing: '/ism/risk-assessments', icon: AlertTriangle }),
-  L('Vessel Specific Manuals', vSafety, { icon: BookOpen }),
-  L('Crew Duties & Responsibilities', vSafety, { icon: ClipboardList }),
+  L('Vessel Specific Manuals', vSafety, { existing: '/documents/manuals', icon: BookOpen }),
+  L('Crew Duties & Responsibilities', vSafety, { existing: '/documents/procedures', icon: ClipboardList }),
   G('Standing Orders', vSafety, [
-    L("Master's Standing Orders", standingBase),
-    L("Chief Engineer's Standing Orders", standingBase),
+    L("Master's Standing Orders", standingBase, { existing: '/documents/policies' }),
+    L("Chief Engineer's Standing Orders", standingBase, { existing: '/documents/policies' }),
   ], { icon: ScrollText, slug: 'standing-orders' }),
-  L('Muster List', vSafety, { icon: ListChecks }),
-  L('Safety Management Manual', vSafety, { icon: BookMarked }),
-  L('Safety Documents', vSafety, { icon: FileText }),
+  L('Muster List', vSafety, { existing: '/ism/checklists', icon: ListChecks }),
+  L('Safety Management Manual', vSafety, { existing: '/documents/ism-sms', icon: BookMarked }),
+  L('Safety Documents', vSafety, { existing: '/documents', icon: FileText }),
   G('SOPs', vSafety, [
-    L('Bridge SOPs', sopBase),
-    L('Deck SOPs', sopBase),
-    L('Engineering SOPs', sopBase),
-    L('Galley SOPs', sopBase),
-    L('Interior SOPs', sopBase),
-    L('Medic SOPs', sopBase),
+    L('Bridge SOPs', sopBase, { existing: '/ism/sops' }),
+    L('Deck SOPs', sopBase, { existing: '/ism/sops' }),
+    L('Engineering SOPs', sopBase, { existing: '/ism/sops' }),
+    L('Galley SOPs', sopBase, { existing: '/ism/sops' }),
+    L('Interior SOPs', sopBase, { existing: '/ism/sops' }),
+    L('Medic SOPs', sopBase, { existing: '/ism/sops' }),
   ], { icon: BookOpen, slug: 'sops' }),
-  L('Pollution', vSafety, { icon: Waves }),
+  L('Pollution', vSafety, { existing: '/compliance', icon: Waves }),
   L('Emergency Response', vSafety, { existing: '/ism/erm', icon: AlertCircle }),
-  L('Flag Policy & Advice', vSafety, { icon: Globe }),
+  L('Flag Policy & Advice', vSafety, { existing: '/documents/policies', icon: Globe }),
   L('Agent Information', vSafety, { icon: Phone }),
-  L('NTVRP / OPA 90', vSafety, { icon: Shield }),
+  L('NTVRP / OPA 90', vSafety, { existing: '/compliance', icon: Shield }),
 ];
 
 // Certificates
 const vCerts = `${V}/certificates`;
 const vesselCertificates: NavChild[] = [
-  L('Status Summary', vCerts, { icon: LayoutGrid }),
-  L('Registration', vCerts, { icon: FileCheck }),
-  L('Class / Tonnage / Loadline', vCerts, { icon: Layers }),
-  L('Safety', vCerts, { icon: Shield }),
-  L('Security', vCerts, { icon: Anchor }),
-  L('Maritime Labour Compliance', vCerts, { icon: Users }),
-  L('Environment', vCerts, { icon: Waves }),
-  L('Radio', vCerts, { icon: Headphones }),
-  L('Insurance', vCerts, { icon: Umbrella }),
-  L('Fiscal', vCerts, { icon: Receipt }),
-  L('LSA / FFE / Medical', vCerts, { icon: LifeBuoy }),
+  L('Status Summary', vCerts, { existing: '/certificates', icon: LayoutGrid }),
+  L('Registration', vCerts, { existing: '/certificates/vessel', icon: FileCheck }),
+  L('Class / Tonnage / Loadline', vCerts, { existing: '/certificates/vessel', icon: Layers }),
+  L('Safety', vCerts, { existing: '/certificates/vessel', icon: Shield }),
+  L('Security', vCerts, { existing: '/certificates/vessel', icon: Anchor }),
+  L('Maritime Labour Compliance', vCerts, { existing: '/compliance', icon: Users }),
+  L('Environment', vCerts, { existing: '/certificates/vessel', icon: Waves }),
+  L('Radio', vCerts, { existing: '/certificates/vessel', icon: Headphones }),
+  L('Insurance', vCerts, { existing: '/insurance', icon: Umbrella }),
+  L('Fiscal', vCerts, { existing: '/certificates/vessel', icon: Receipt }),
+  L('LSA / FFE / Medical', vCerts, { existing: '/certificates/vessel', icon: LifeBuoy }),
   L('Fleet Certificates', vCerts, { existing: '/certificates', icon: Award }),
 ];
 
@@ -155,13 +156,13 @@ const vesselCertificates: NavChild[] = [
 const vTech = `${V}/technical`;
 const vesselTechnical: NavChild[] = [
   L('Maintenance Summary', vTech, { existing: '/maintenance/dashboard', icon: LayoutGrid }),
-  L('Tasks', vTech, { icon: ClipboardList }),
-  L('Operational Checklists', vTech, { icon: CheckSquare }),
+  L('Tasks', vTech, { existing: '/crew/tasks', icon: ClipboardList }),
+  L('Operational Checklists', vTech, { existing: '/ism/checklists', icon: CheckSquare }),
   L('Equipment', vTech, { existing: '/maintenance/critical', icon: Wrench }),
-  L('Inventory', vTech, { icon: Package }),
+  L('Inventory', vTech, { existing: '/maintenance/spares', icon: Package }),
   L('Purchase Orders', vTech, { icon: Receipt }),
   L('Maintenance Periods', vTech, { icon: Calendar }),
-  L('Surveys', vTech, { icon: ClipboardCheck }),
+  L('Surveys', vTech, { existing: '/ism/audits-surveys', icon: ClipboardCheck }),
 ];
 
 // Charter
@@ -179,22 +180,22 @@ const vesselAccounting: NavChild[] = [
   L('Expenses', vAcct, { icon: Banknote }),
   L('Invoices', vAcct, { icon: Receipt }),
   L('APA Management', vAcct, { icon: FileText }),
-  L('Payroll', vAcct, { icon: Banknote }),
+  L('Payroll', vAcct, { existing: '/hr?tab=salaries-compensation', icon: Banknote }),
   L('Gratuities', vAcct, { icon: Sparkles }),
-  L('Budgets & Reporting', vAcct, { icon: ClipboardList }),
+  L('Budgets & Reporting', vAcct, { existing: '/reports', icon: ClipboardList }),
 ];
 
 // Vessel (general)
 const vVessel = `${V}/general`;
 const vesselVessel: NavChild[] = [
   L('Movement Reports', vVessel, { icon: FileText }),
-  L('Movement Checklists', vVessel, { icon: CheckSquare }),
+  L('Movement Checklists', vVessel, { existing: '/ism/checklists', icon: CheckSquare }),
   L('Vessel Details', vVessel, { existing: '/vessels/list', icon: Ship }),
   L('Communications', vVessel, { icon: MessageSquare }),
   L('Emergency Contact', vVessel, { existing: '/vessels/emergency-details', icon: Phone }),
   L('Management Company', vVessel, { existing: '/vessels/company-details', icon: Building2 }),
-  L('Flag & Class', vVessel, { icon: Globe }),
-  L('Insurance', vVessel, { icon: Umbrella }),
+  L('Flag & Class', vVessel, { existing: '/vessels/list', icon: Globe }),
+  L('Insurance', vVessel, { existing: '/insurance', icon: Umbrella }),
   L('Billing', vVessel, { icon: Receipt }),
 ];
 
@@ -202,10 +203,10 @@ const vesselVessel: NavChild[] = [
 const vDept = `${V}/departments`;
 const standardDept6 = (base: string): NavChild[] => [
   L('Handover / Notes', base, { icon: FileText }),
-  L('Work Lists / Job Cards', base, { icon: ClipboardList }),
-  L('Rotas & Watchkeeping', base, { icon: Clock }),
-  L('Inventory & Equipment', base, { icon: Package }),
-  L('Checklists', base, { icon: CheckSquare }),
+  L('Work Lists / Job Cards', base, { existing: '/maintenance/defects', icon: ClipboardList }),
+  L('Rotas & Watchkeeping', base, { existing: '/crew/work-rest', icon: Clock }),
+  L('Inventory & Equipment', base, { existing: '/maintenance/spares', icon: Package }),
+  L('Checklists', base, { existing: '/checklists', icon: CheckSquare }),
   L('Notes / Reference', base, { icon: BookOpen }),
 ];
 
@@ -219,7 +220,7 @@ const galleyChildren: NavChild[] = [
   L('Galley Logs', galleyBase, { icon: FileText }),
   L('Chef Handover', galleyBase, { icon: ClipboardList }),
   L('Provisioning', galleyBase, { icon: Truck }),
-  L('Galley SOPs', galleyBase, { icon: BookOpen }),
+  L('Galley SOPs', galleyBase, { existing: '/ism/sops', icon: BookOpen }),
   L('Recipe Library', galleyBase, { icon: BookMarked }),
   L('Projects', galleyBase, { icon: Layers }),
   L('Rotation Schedule', galleyBase, { icon: Network }),
@@ -242,7 +243,7 @@ const diveChildren: NavChild[] = [
     L('Emergency Contacts', `${diveBase}/emergency`),
   ], { icon: AlertCircle, slug: 'emergency' }),
   G('Dive Tools', diveBase, [
-    L('Equipment Register', `${diveBase}/tools`),
+    L('Equipment Register', `${diveBase}/tools`, { existing: '/maintenance/critical' }),
     L('Servicing & Tests', `${diveBase}/tools`),
     L('Spares', `${diveBase}/tools`),
   ], { icon: Wrench, slug: 'tools' }),
@@ -267,19 +268,19 @@ const managementOffice: NavChild[] = [
   G('HR', mgmtBase, [
     L('Contracts & Employment', hrSubBase, { existing: '/hr?tab=contracts-employment' }),
     L('Salaries & Compensation', hrSubBase, { existing: '/hr?tab=salaries-compensation' }),
-    L('Payroll', hrSubBase),
+    L('Payroll', hrSubBase, { existing: '/hr?tab=salaries-compensation' }),
     L('Annual Evaluations', hrSubBase, { existing: '/hr?tab=annual-evaluations' }),
     L('Annual Reviews', hrSubBase, { existing: '/hr?tab=annual-reviews' }),
     L('Pay Reviews', hrSubBase, { existing: '/hr?tab=pay-reviews' }),
     L('End of Rotation', hrSubBase, { existing: '/hr?tab=end-of-rotation' }),
   ], { icon: Briefcase, slug: 'hr' }),
   L('Management Company', mgmtBase, { existing: '/vessels/company-details', icon: Building2 }),
-  L('DPA / ISM Office', mgmtBase, { icon: Shield }),
+  L('DPA / ISM Office', mgmtBase, { existing: '/dpa-dashboard', icon: Shield }),
   L('Procurement', mgmtBase, { icon: Truck }),
-  L('Finance / Accounts', mgmtBase, { icon: Banknote }),
+  L('Finance / Accounts', mgmtBase, { existing: '/hr?tab=salaries-compensation', icon: Banknote }),
   L('Legal', mgmtBase, { icon: ScrollText }),
-  L('Insurance', mgmtBase, { icon: Umbrella }),
-  L('Crewing & Recruitment', mgmtBase, { icon: Users }),
+  L('Insurance', mgmtBase, { existing: '/insurance', icon: Umbrella }),
+  L('Crewing & Recruitment', mgmtBase, { existing: '/crew/list', icon: Users }),
 ];
 
 const vesselDepartments: NavChild[] = [
@@ -417,58 +418,58 @@ const refitProjects = `${refitBase}/projects`;
 const refitAccount = `${refitBase}/account`;
 const yardRefit: NavChild[] = [
   G('Overview', refitBase, [
-    L('Dashboard', `${refitOverview}/dashboard`, { icon: LayoutGrid }),
-    L('Approvals Centre', `${refitOverview}/approvals`),
-    L('Notifications', `${refitOverview}/notifications`),
-    L('Search', `${refitOverview}/search`),
+    L('Dashboard', refitOverview, { icon: LayoutGrid, slug: 'dashboard' }),
+    L('Approvals Centre', refitOverview, { slug: 'approvals' }),
+    L('Notifications', refitOverview, { slug: 'notifications' }),
+    L('Search', refitOverview, { slug: 'search' }),
   ], { icon: LayoutGrid, slug: 'overview' }),
   G('Workflow', refitBase, [
-    L('Change Orders', `${refitWorkflow}/change-orders`),
-    L('Crew Requests', `${refitWorkflow}/crew-requests`),
-    L('Snags & Warranty', `${refitWorkflow}/snags`),
-    L('Works Orders', `${refitWorkflow}/works`),
-    L('Meetings', `${refitWorkflow}/meetings`),
-    L('Risk Register', `${refitWorkflow}/risks`),
+    L('Change Orders', refitWorkflow, { slug: 'change-orders' }),
+    L('Crew Requests', refitWorkflow, { slug: 'crew-requests' }),
+    L('Snags & Warranty', refitWorkflow, { slug: 'snags' }),
+    L('Works Orders', refitWorkflow, { slug: 'works' }),
+    L('Meetings', refitWorkflow, { slug: 'meetings' }),
+    L('Risk Register', refitWorkflow, { slug: 'risks' }),
   ], { icon: Network, slug: 'workflow' }),
   G('Project', refitBase, [
-    L('Schedule', `${refitProject}/schedule`),
-    L('Logistics', `${refitProject}/logistics`),
-    L('Inventory & Equipment', `${refitProject}/inventory`),
-    L('Contractors', `${refitProject}/contractors`),
-    L('Suppliers', `${refitProject}/suppliers`),
+    L('Schedule', refitProject, { slug: 'schedule' }),
+    L('Logistics', refitProject, { slug: 'logistics' }),
+    L('Inventory & Equipment', refitProject, { slug: 'inventory' }),
+    L('Contractors', refitProject, { slug: 'contractors' }),
+    L('Suppliers', refitProject, { slug: 'suppliers' }),
   ], { icon: ClipboardList, slug: 'project' }),
   G('Documents', refitBase, [
-    L('Drawings & Plans', `${refitDocs}/drawings`),
-    L('Document Control', `${refitDocs}/document-control`),
-    L('Files', `${refitDocs}/files`),
+    L('Drawings & Plans', refitDocs, { slug: 'drawings' }),
+    L('Document Control', refitDocs, { slug: 'document-control' }),
+    L('Files', refitDocs, { slug: 'files' }),
   ], { icon: FileText, slug: 'documents' }),
   G('Finance', refitBase, [
-    L('Budget', `${refitFinance}/budget`),
-    L('Purchase Orders', `${refitFinance}/purchase-orders`),
-    L('Invoices', `${refitFinance}/invoices`),
+    L('Budget', refitFinance, { slug: 'budget' }),
+    L('Purchase Orders', refitFinance, { slug: 'purchase-orders' }),
+    L('Invoices', refitFinance, { slug: 'invoices' }),
   ], { icon: Banknote, slug: 'finance' }),
   G('Compliance', refitBase, [
-    L('Compliance', `${refitCompliance}/compliance`),
-    L('Crew & Certification', `${refitCompliance}/crew`),
-    L('Audit Log', `${refitCompliance}/audit-log`),
-    L('Reporting', `${refitCompliance}/reporting`),
+    L('Compliance', refitCompliance, { slug: 'compliance' }),
+    L('Crew & Certification', refitCompliance, { slug: 'crew' }),
+    L('Audit Log', refitCompliance, { slug: 'audit-log' }),
+    L('Reporting', refitCompliance, { slug: 'reporting' }),
   ], { icon: Shield, slug: 'compliance' }),
   G('Refit / Projects', refitBase, [
-    L('Refit Periods', refitProjects),
-    L('Work Packages / Scopes', refitProjects),
-    L('Defect & Snag Lists', refitProjects),
-    L('Contractors & Subcontractors', refitProjects),
-    L('Refit Inventory', refitProjects),
-    L('Project Documents & Drawings', refitProjects),
+    L('Refit Periods', refitProjects, { existing: '/yard/refit/project/schedule', slug: 'refit-periods' }),
+    L('Work Packages / Scopes', refitProjects, { existing: '/yard/refit/workflow/works', slug: 'work-packages-scopes' }),
+    L('Defect & Snag Lists', refitProjects, { existing: '/yard/refit/workflow/snags', slug: 'defect-and-snag-lists' }),
+    L('Contractors & Subcontractors', refitProjects, { existing: '/yard/refit/project/contractors', slug: 'contractors-and-subcontractors' }),
+    L('Refit Inventory', refitProjects, { existing: '/yard/refit/project/inventory', slug: 'refit-inventory' }),
+    L('Project Documents & Drawings', refitProjects, { existing: '/yard/refit/documents/files', slug: 'project-documents-and-drawings' }),
   ], { icon: Hammer, slug: 'projects' }),
   G('Account & Admin', refitBase, [
-    L('Access Profile', `${refitAccount}/access`),
-    L('Communications', `${refitAccount}/communications`),
-    L('Diagnostics', `${refitAccount}/diagnostics`),
-    L('Access Check', `${refitAccount}/access-check`),
-    L('Admin & Settings', `${refitAccount}/admin`),
-    L('Import & API', `${refitAccount}/import`),
-    L('Login Diagnostics', `${refitAccount}/login-diagnostics`),
+    L('Access Profile', refitAccount, { slug: 'access' }),
+    L('Communications', refitAccount, { slug: 'communications' }),
+    L('Diagnostics', refitAccount, { slug: 'diagnostics' }),
+    L('Access Check', refitAccount, { slug: 'access-check' }),
+    L('Admin & Settings', refitAccount, { slug: 'admin' }),
+    L('Import & API', refitAccount, { slug: 'import' }),
+    L('Login Diagnostics', refitAccount, { slug: 'login-diagnostics' }),
   ], { icon: Settings, slug: 'account' }),
 ];
 
@@ -532,34 +533,34 @@ const hrisRecruit = `${HR}/recruitment`;
 const hrisChildren: NavChild[] = [
   L('HR Dashboard', HR, { existing: '/hr', icon: LayoutGrid }),
   G('Employee Records', HR, [
-    L('Personal Details', hrisEmpRec),
+    L('Personal Details', hrisEmpRec, { existing: '/crew/list' }),
     L('Contracts & Employment', hrisEmpRec, { existing: '/hr?tab=contracts-employment' }),
-    L('Documents & Certificates', hrisEmpRec),
-    L('Next of Kin / Emergency', hrisEmpRec),
-    L('Employment History', hrisEmpRec),
+    L('Documents & Certificates', hrisEmpRec, { existing: '/crew/certificates' }),
+    L('Next of Kin / Emergency', hrisEmpRec, { existing: '/crew/list' }),
+    L('Employment History', hrisEmpRec, { existing: '/crew/list' }),
   ], { icon: Users, slug: 'employee-records' }),
   G('Compensation', HR, [
     L('Salaries & Compensation', hrisComp, { existing: '/hr?tab=salaries-compensation' }),
-    L('Payroll', hrisComp),
+    L('Payroll', hrisComp, { existing: '/hr?tab=salaries-compensation' }),
     L('Gratuities', hrisComp),
     L('Pay Reviews', hrisComp, { existing: '/hr?tab=pay-reviews' }),
   ], { icon: Banknote, slug: 'compensation' }),
   G('Performance', HR, [
     L('Annual Evaluations', hrisPerf, { existing: '/hr?tab=annual-evaluations' }),
     L('Annual Reviews', hrisPerf, { existing: '/hr?tab=annual-reviews' }),
-    L('Objectives & PDPs', hrisPerf),
+    L('Objectives & PDPs', hrisPerf, { existing: '/development/my' }),
     L('End of Rotation', hrisPerf, { existing: '/hr?tab=end-of-rotation' }),
   ], { icon: ClipboardCheck, slug: 'performance' }),
   G('Recruitment', HR, [
     L('Vacancies', hrisRecruit),
     L('Candidates', hrisRecruit),
     L('Onboarding', hrisRecruit),
-    L('Crewing & Recruitment', hrisRecruit),
+    L('Crewing & Recruitment', hrisRecruit, { existing: '/crew/list' }),
   ], { icon: Search, slug: 'recruitment' }),
   L('Leave & Rotation', HR, { existing: '/crew/leave', icon: CalendarDays }),
   L('Training & Development', HR, { existing: '/development', icon: GraduationCap }),
-  L('Compliance & Right to Work', HR, { icon: Shield }),
-  L('Reporting & Analytics', HR, { icon: ClipboardList }),
+  L('Compliance & Right to Work', HR, { existing: '/compliance', icon: Shield }),
+  L('Reporting & Analytics', HR, { existing: '/reports', icon: ClipboardList }),
 ];
 
 // ─── TOP-LEVEL ────────────────────────────────────────────────────────────
@@ -612,6 +613,7 @@ export const PLACEHOLDER_LEAVES: SitemapLeaf[] = (() => {
   for (const leaf of _allLeaves) {
     if (!PLACEHOLDER_PREFIXES.some((p) => leaf.path.startsWith(p))) continue;
     if (seen.has(leaf.path)) continue;
+    if (IMPLEMENTED_ROUTE_PATHS.has(leaf.path)) continue;
     seen.add(leaf.path);
     out.push(leaf);
   }
