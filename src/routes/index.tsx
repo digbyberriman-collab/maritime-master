@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 
 // Main Pages - Keep critical path pages sync, lazy load the rest
-import Index from '@/shared/pages/Index';
 import Auth from '@/modules/auth/pages/Auth';
 import ResetPassword from '@/modules/auth/pages/ResetPassword';
 import Dashboard from '@/modules/dashboard/pages/Dashboard';
@@ -158,7 +157,7 @@ export const AppRoutes: React.FC = () => {
   return (
     <Routes>
       {/* Public Routes */}
-      <Route path="/" element={<Index />} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
       <Route path="/index" element={<Navigate to="/dashboard" replace />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/reset-password" element={<ResetPassword />} />
