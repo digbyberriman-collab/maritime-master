@@ -12,13 +12,14 @@ interface Props {
   conflicts?: ConflictInfo[];
   selected?: boolean;
   crewName?: string;
+  height?: number;
   onPointerDownMove: (e: React.PointerEvent, a: RotationAssignment) => void;
   onPointerDownResize: (e: React.PointerEvent, a: RotationAssignment, side: 'left' | 'right') => void;
   onClick: (a: RotationAssignment, mode: 'single' | 'toggle' | 'range') => void;
 }
 
 const RotationBlock: React.FC<Props> = ({
-  assignment, viewStart, zoom, top, conflicts, selected, crewName,
+  assignment, viewStart, zoom, top, height, conflicts, selected, crewName,
   onPointerDownMove, onPointerDownResize, onClick,
 }) => {
   const px = ZOOM_PX_PER_DAY[zoom];
@@ -52,7 +53,7 @@ const RotationBlock: React.FC<Props> = ({
         !hasHard && hasSoft && 'outline outline-2 outline-amber-500',
       )}
       style={{
-        left, width, top: top + 4, height: LANE_HEIGHT - 8,
+        left, width, top: top + 4, height: height ?? LANE_HEIGHT - 8,
         background: baseColour,
         opacity: assignment.status === 'draft' ? 0.7 : 1,
       }}

@@ -57,13 +57,30 @@ const PlannerGrid: React.FC<Props> = ({
     return m;
   }, [lanes]);
 
+  /**
+   * Group by lane and pack overlapping blocks into sub-rows, so a double
+   * booking shows as two stacked bars instead of one hiding the other.
+   */
   const assignmentsByLane = useMemo(() => {
-    const m = new Map<string, RotationAssignment[]>();
+    const grouped = new Map<string, RotationAssignment[]>();
     for (const a of assignments) {
       if (!a.lane_id) continue;
-      const arr = m.get(a.lane_id) ?? [];
+      const arr = grouped.get(a.lane_id) ?? [];
       arr.push(a);
-      m.set(a.lane_id, arr);
+      grouped.set(a.lane_id, arr);
+    }
+    const m = new Map<string, { rows: { a: RotationAssignment; row: number }[]; rowCount: number }>();
+    for (const [laneId, list] of grouped) {
+      const sorted = [...list].sort((x, y) => x.start_date.localeCompare(y.start_date));
+      const rowEnds: string[] = [];
+      const rows: { a: RotationAssignment; row: number }[] = [];
+      for (const a of sorted) {
+        let row = rowEnds.findIndex((end) => end < a.start_date);
+        if (row === -1) { row = rowEnds.length; rowEnds.push(a.end_date); }
+        else rowEnds[row] = a.end_date;
+        rows.push({ a, row });
+      }
+      m.set(laneId, { rows, rowCount: Math.max(1, rowEnds.length) });
     }
     return m;
   }, [assignments]);
@@ -295,7 +312,10 @@ const PlannerGrid: React.FC<Props> = ({
         <div style={{ width: totalWidth, height: virt.getTotalSize(), position: 'relative' }}>
           {virt.getVirtualItems().map((vi) => {
             const lane = lanes[vi.index];
-            const laneAssignments = assignmentsByLane.get(lane.id) ?? [];
+            const packed = assignmentsByLane.get(lane.id);
+            const laneAssignments = packed?.rows ?? [];
+            const rowCount = packed?.rowCount ?? 1;
+            const rowHeight = (LANE_HEIGHT - 8) / rowCount;
             return (
               <div
                 key={lane.id}
@@ -304,7 +324,7 @@ const PlannerGrid: React.FC<Props> = ({
                 style={{ top: vi.start, height: vi.size, width: totalWidth }}
               >
                 {/* Leave overlay markers for assigned crew */}
-                {laneAssignments[0]?.crew_user_id && (leaveByCrew.get(laneAssignments[0].crew_user_id!) ?? []).map((l) => {
+                {laneAssignments[0]?.a.crew_user_id && (leaveByCrew.get(laneAssignments[0].a.crew_user_id!) ?? []).map((l) => {
                   const dDate = fromISO(l.date);
                   const off = differenceInCalendarDays(dDate, viewStart) * px;
                   if (off < -px || off > totalWidth) return null;
@@ -315,15 +335,17 @@ const PlannerGrid: React.FC<Props> = ({
                       style={{ left: off, top: 2, width: Math.max(2, px), height: LANE_HEIGHT - 4, background: c }} />
                   );
                 })}
-                {laneAssignments.map((a) => {
+                {laneAssignments.map(({ a, row }) => {
                   const ghost = ghostFor(a);
+                  const top = row * rowHeight;
                   return (
                     <React.Fragment key={a.id}>
                       <RotationBlock
                         assignment={a}
                         viewStart={viewStart}
                         zoom={zoom}
-                        top={0}
+                        top={top}
+                        height={rowHeight - 2}
                         conflicts={conflictsById.get(a.id)}
                         selected={selectedIds.has(a.id)}
                         crewName={crewName(a.crew_user_id)}
@@ -334,7 +356,7 @@ const PlannerGrid: React.FC<Props> = ({
                       {ghost && (
                         <div
                           className="absolute pointer-events-none rounded-md border-2 border-primary/70 bg-primary/10"
-                          style={{ left: ghost.left, width: ghost.width, top: 4, height: LANE_HEIGHT - 8 }}
+                          style={{ left: ghost.left, width: ghost.width, top: top + 4, height: rowHeight - 2 }}
                         />
                       )}
                     </React.Fragment>
