@@ -18,7 +18,7 @@ const LIMIT = 60;
 export function usePlannerHistory() {
   const past = useRef<HistoryCommand[]>([]);
   const future = useRef<HistoryCommand[]>([]);
-  const [, bump] = useState(0);
+  const [tick, bump] = useState(0);
   const [busy, setBusy] = useState(false);
   const touch = useCallback(() => bump((n) => n + 1), []);
 
@@ -76,5 +76,5 @@ export function usePlannerHistory() {
     canRedo: future.current.length > 0,
     undoLabel: past.current[past.current.length - 1]?.label ?? null,
     redoLabel: future.current[0]?.label ?? null,
-  }), [run, undo, redo, clear, busy]);
+  }), [run, undo, redo, clear, busy, tick]);
 }
