@@ -22,6 +22,7 @@ interface Props {
   conflictCount: number;
   onImport: () => void;
   onExport: () => void;
+  onExportPdf: () => void;
   onCreate: () => void;
   canEdit?: boolean;
 }
