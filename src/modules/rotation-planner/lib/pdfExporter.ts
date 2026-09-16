@@ -119,7 +119,7 @@ export function exportPlannerToPDF(opts: PdfExportOptions) {
 
   const generatedAt = format(new Date(), 'd MMM yyyy HH:mm');
   let pageNo = 0;
-  const totalPages = dateSlices.length * rowSlices.length + (includeSchedule && assignments.length ? 1 : 0);
+  
 
   const drawHeader = (slice: { start: Date; end: Date }, partLabel: string) => {
     doc.setFont('helvetica', 'bold');
@@ -240,7 +240,7 @@ export function exportPlannerToPDF(opts: PdfExportOptions) {
     });
     doc.setFontSize(7);
     doc.setTextColor(148, 163, 184);
-    doc.text(`Page ${pageNo} of ${totalPages}`, pageW - MARGIN, pageH - MARGIN, { align: 'right' });
+    
   };
 
   dateSlices.forEach((slice, si) => {
@@ -400,6 +400,16 @@ export function exportPlannerToPDF(opts: PdfExportOptions) {
       doc.line(MARGIN, y + 4, pageW - MARGIN, y + 4);
       y += 13;
     });
+  }
+
+  // Stamp page numbers once the real page count is known
+  const pageCount = doc.getNumberOfPages();
+  for (let p = 1; p <= pageCount; p += 1) {
+    doc.setPage(p);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 184);
+    doc.text(`Page ${p} of ${pageCount}`, pageW - MARGIN, pageH - MARGIN, { align: 'right' });
   }
 
   doc.save(`fleet-rotation-planner_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
