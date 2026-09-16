@@ -108,6 +108,7 @@ function buildDateAxis(tl: XLSX.WorkSheet, range: XLSX.Range): Record<number, st
   let curYear: number | null = null;
   let curMonth: number | null = null;
   let lastDay = 0;
+  let prevIso: string | null = null;
   for (let C = range.s.c + 1; C <= range.e.c; C++) {
     const monthCell = tl[XLSX.utils.encode_cell({ r: 2, c: C })];
     const mv = monthCell?.v;
@@ -133,11 +134,24 @@ function buildDateAxis(tl: XLSX.WorkSheet, range: XLSX.Range): Record<number, st
         if (curMonth > 12) { curMonth = 1; curYear += 1; }
       }
       lastDay = day;
-      dateForCol[C] = `${curYear}-${String(curMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      // The timeline axis must move forward. Some header cells carry a stale year,
+      // so roll the year forward until the column is after the previous one.
+      let year = curYear;
+      let iso = `${year}-${String(curMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      let guard = 0;
+      while (prevIso && iso <= prevIso && guard < 12) {
+        year += 1;
+        iso = `${year}-${String(curMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        guard++;
+      }
+      curYear = year;
+      prevIso = iso;
+      dateForCol[C] = iso;
     }
   }
   return dateForCol;
 }
+
 
 const DEPT_RE = /\b(BRIDGE|DECK|ENG(?:INEERING)?|INTERIOR|GALLEY|WELLNESS|SHORESIDE|DIVE|HOTEL|MANAGEMENT|MEDIA|STEW)\b.*DEPT\b/i;
 
