@@ -102,7 +102,7 @@ const ConflictPanel: React.FC<Props> = ({
   const grouped = useMemo(() => {
     const m = new Map<string, ConflictItem[]>();
     for (const it of items) {
-      const key = it.crewId ? crewName(it.crewId) || 'Unnamed crew' : 'Unassigned';
+      const key = it.crewLabel || (it.crewId ? crewName(it.crewId) || 'Unnamed crew' : 'Unassigned');
       const arr = m.get(key) ?? [];
       arr.push(it);
       m.set(key, arr);

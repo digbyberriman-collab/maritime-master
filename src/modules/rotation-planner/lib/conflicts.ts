@@ -1,6 +1,16 @@
 import type { RotationAssignment, LeaveOverlayEntry, ConflictInfo } from '../types';
 import { LEAVE_CODE_TO_TYPE } from '../constants';
 
+/**
+ * Blocks are grouped by linked crew account when present, and otherwise by the
+ * imported crew name — spreadsheet imports often carry names without accounts.
+ */
+export function crewKeyOf(a: RotationAssignment): string | null {
+  if (a.crew_user_id) return a.crew_user_id;
+  const raw = (a.crew_name_raw ?? '').trim().toLowerCase();
+  return raw ? `name:${raw}` : null;
+}
+
 function rangesOverlap(a1: string, a2: string, b1: string, b2: string) {
   return a1 <= b2 && b1 <= a2;
 }
@@ -18,8 +28,9 @@ export function detectConflicts(
 
   const byCrew: Record<string, RotationAssignment[]> = {};
   for (const a of assignments) {
-    if (!a.crew_user_id) continue;
-    (byCrew[a.crew_user_id] ||= []).push(a);
+    const key = crewKeyOf(a);
+    if (!key) continue;
+    (byCrew[key] ||= []).push(a);
   }
   for (const list of Object.values(byCrew)) {
     for (let i = 0; i < list.length; i++) {
@@ -55,6 +66,8 @@ export interface ConflictItem {
   primaryId: string;
   otherId: string | null;
   crewId: string | null;
+  /** Set when the block only carries an imported crew name, not an account. */
+  crewLabel?: string | null;
   reason: string;
   overlapStart: string;
   overlapEnd: string;
@@ -77,11 +90,12 @@ export function buildConflictItems(
 
   const byCrew: Record<string, RotationAssignment[]> = {};
   for (const a of assignments) {
-    if (!a.crew_user_id) continue;
-    (byCrew[a.crew_user_id] ||= []).push(a);
+    const key = crewKeyOf(a);
+    if (!key) continue;
+    (byCrew[key] ||= []).push(a);
   }
 
-  for (const [crewId, list] of Object.entries(byCrew)) {
+  for (const [crewKey, list] of Object.entries(byCrew)) {
     const sorted = [...list].sort((x, y) => x.start_date.localeCompare(y.start_date));
     for (let i = 0; i < sorted.length; i++) {
       for (let j = i + 1; j < sorted.length; j++) {
@@ -94,7 +108,10 @@ export function buildConflictItems(
           severity: 'hard',
           primaryId: b.id,
           otherId: a.id,
-          crewId,
+          crewId: crewKey.startsWith('name:') ? null : crewKey,
+          crewLabel: crewKey.startsWith('name:')
+            ? (b.crew_name_raw ?? a.crew_name_raw ?? 'Unnamed crew')
+            : null,
           reason: 'Double-booked: two assignments cover the same days',
           overlapStart: maxISO(a.start_date, b.start_date),
           overlapEnd: minISO(a.end_date, b.end_date),
@@ -119,6 +136,7 @@ export function buildConflictItems(
       primaryId: a.id,
       otherId: null,
       crewId: a.crew_user_id,
+      crewLabel: null,
       reason: days.length === 1
         ? `Crew is on approved leave on ${days[0]}`
         : `Crew is on approved leave for ${days.length} days in this block`,
