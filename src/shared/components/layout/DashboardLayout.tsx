@@ -6,8 +6,11 @@ import { canManageBranding } from '@/shared/hooks/useBranding';
 import InkfishFooter from '@/shared/components/layout/InkfishFooter';
 import InkfishWatermark from '@/shared/components/InkfishWatermark';
 import GlobalHeaderControls from '@/shared/components/layout/GlobalHeaderControls';
-import AdaptiveActionBar from '@/shared/components/layout/AdaptiveActionBar';
 import SidebarNavigation from '@/shared/components/layout/SidebarNavigation';
+import ModuleTopNav from '@/shared/components/layout/ModuleTopNav';
+import FloatingQuickActions from '@/shared/components/layout/FloatingQuickActions';
+import { NAVIGATION_ITEMS, type NavChild } from '@/config/navigation';
+import { resolveModuleForPath } from '@/shared/lib/moduleNavigation';
 import { DashboardFilterProvider } from '@/modules/dashboard/contexts/DashboardFilterContext';
 import FeedbackPanel from '@/modules/feedback/components/FeedbackPanel';
 import FeedbackResolvedToast from '@/modules/feedback/components/FeedbackResolvedToast';
@@ -21,8 +24,6 @@ import {
   Palette,
   Settings,
   MessageSquareWarning,
-  Ship,
-  Anchor,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -34,7 +35,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
-import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -46,7 +46,22 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
-  const { selectedVessel, isAllVessels } = useVessel();
+  const activeModule = React.useMemo(() => resolveModuleForPath(location.pathname), [location.pathname]);
+
+  const firstLeafPath = React.useCallback((children?: NavChild[]): string | null => {
+    for (const child of children ?? []) {
+      const nested = firstLeafPath(child.children);
+      if (nested) return nested;
+      if (!child.children?.length) return child.path;
+    }
+    return null;
+  }, []);
+
+  const handleModuleChange = React.useCallback((moduleId: string) => {
+    const module = NAVIGATION_ITEMS.find((item) => item.id === moduleId);
+    const destination = firstLeafPath(module?.children) ?? module?.path;
+    if (destination) navigate(destination);
+  }, [firstLeafPath, navigate]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -117,7 +132,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           </div>
 
           {/* Navigation */}
-          <SidebarNavigation onNavigate={() => setSidebarOpen(false)} />
+          <SidebarNavigation moduleId={activeModule?.id ?? null} onNavigate={() => setSidebarOpen(false)} />
 
           {/* Bottom-pinned group: Report an Issue, Settings, User profile.
               mt-auto keeps it anchored to the bottom regardless of nav length;
@@ -170,7 +185,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       {/* Main content - z-10 to be above watermark */}
       <div className="flex-1 flex flex-col min-w-0 relative z-10">
         {/* Top navbar */}
-        <header className="h-16 bg-card border-b border-border flex items-center justify-between gap-2 px-4 lg:px-6 shadow-navbar relative z-20">
+        <header className="min-h-16 bg-card border-b border-border flex items-center gap-2 px-3 lg:px-5 py-2 shadow-navbar relative z-20">
           {/* Mobile menu button */}
           <button
             onClick={() => setSidebarOpen(true)}
@@ -179,13 +194,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
             <Menu className="w-5 h-5" />
           </button>
 
-          {/* Frequently Used Quick Actions Bar */}
-          <div className="hidden sm:block flex-1 mx-2">
-            <AdaptiveActionBar />
-          </div>
-
-          {/* Spacer for mobile */}
-          <div className="flex-1 sm:hidden" />
+          <ModuleTopNav activeModuleId={activeModule?.id ?? null} onModuleChange={handleModuleChange} />
 
           {/* Client logo (desktop only) */}
           {clientLogoUrl && (
@@ -200,32 +209,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
 
           {/* Right-side chip cluster (Sealogical-style pill controls) */}
           <div className="flex items-center gap-2">
-            {/* Vessel chip */}
-            <Button
-              variant="outline"
-              size="sm"
-              className="hidden md:inline-flex rounded-full h-8 gap-2"
-              onClick={() => navigate('/vessels/dashboard')}
-            >
-              <Ship className="w-4 h-4" />
-              <span className="text-sm">
-                {isAllVessels ? 'All Vessels' : selectedVessel?.name || 'Vessel'}
-              </span>
-            </Button>
-
-            {/* Fleet chip */}
-            <Button
-              variant="outline"
-              size="sm"
-              className="hidden md:inline-flex rounded-full h-8 gap-2"
-              onClick={() => navigate('/fleet-map')}
-            >
-              <Anchor className="w-4 h-4" />
-              <span className="text-sm">Fleet</span>
-            </Button>
-
             {/* Global Header Controls (multi-vessel filter + bell) */}
-            <GlobalHeaderControls />
+            <GlobalHeaderControls className="hidden sm:flex" />
 
             {/* Role chip */}
             {profile?.role && (
@@ -281,6 +266,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         <main className="flex-1 p-4 lg:p-6 overflow-auto">
           {children}
         </main>
+
+        <FloatingQuickActions />
 
         {/* Inkfish ownership watermark - persistent, unaffected by client branding */}
         <InkfishFooter />
