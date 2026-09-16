@@ -1,75 +1,51 @@
-## Fleet Rotation Planner — Build Plan
+# Module navigation aesthetic update
 
-A production-grade, Excel-like Gantt planner that replaces the "Draak - Rotation Planner.xlsx" workflow, scales fleet-wide, and links to the existing leave calendar.
+## Goal
+Reframe the application navigation around six access-controlled modules: **Fleet, Vessel, Shoreside, Health & Wellness, Yard, and HRIS**.
 
-### Scope clarifications I'd like to confirm before building
+## What will change
 
-1. **Leave source of truth** — the app already has `crew_leave_entries`, `crew_leave_requests`, `crew_leave_carryover`, `crew_leave_locked_months`, `leave_requests`. I will reuse `crew_leave_entries` (the calendar entries table) as the linked leave source. No new `leave_events` table. ✅ unless you say otherwise.
-2. **Crew master** — reuse `profiles` + `crew_assignments` (not a new `crew_members` table). Job title/department come from `profiles`/`crew_assignments`.
-3. **Vessels** — reuse `vessels`.
-4. **Where it lives in nav** — under **Crew → Rotation Planner** (new top-level page), with a shortcut from the existing Leave calendar. Confirm or move it under **Itinerary** or **Fleet**.
-5. **Spreadsheet import** — I'll deliver the UI + parser, but actual row mapping for "Draak - Rotation Planner.xlsx" needs the file uploaded so I can calibrate header/colour heuristics. Without the file I'll ship a generic XLSX importer with a review screen.
+### Top module slider
+- Move the six current top-level sections out of the blue left panel and into a horizontal sliding bar in the main header.
+- Give the selected module a clearly animated blue highlight that slides between items rather than behaving like separate static buttons.
+- Keep the full labels, including “Health & Wellness,” without crowding or overlap.
+- Derive the selected module from the current page address so deep links highlight the correct module automatically.
+- Hide modules the signed-in person cannot access; do not show disabled or locked placeholders.
+- On phones and narrow tablets, retain the same bar as a horizontally swipeable row and automatically bring the selected module into view.
 
-### Database (new tables, namespaced `frp_*`)
+### Contextual blue folder panel
+- Show only the selected module’s folders and nested subfolders in the left blue panel.
+- Preserve the full expandable tree, active-page highlighting, saved folder ordering, and existing page destinations.
+- Keep nested folders independently expandable while retaining clear hierarchy and indentation.
+- When viewing the home dashboard, replace the module tree with useful dashboard shortcuts and recent/pinned destinations.
+- Keep STORM branding, Settings, Report an Issue, and the signed-in profile anchored in the panel.
 
-- `frp_planner_lanes` — vessel_id, department, position_title, lane_label, lane_order, active
-- `frp_rotation_assignments` — vessel_id, crew_user_id, lane_id, start_date, end_date, label, rotation_type (enum), status (enum), colour, notes, linked_leave_entry_id, linked_travel_movement_id, linked_payroll_transfer_id, source_import_id, version (optimistic lock), created_by, updated_by
-- `frp_vessel_locations` — vessel_id, start_date, end_date, location_name, location_status (confirmed/estimated/tbc), notes
-- `frp_travel_movements` — crew_user_id, vessel_id, direction (arrival/departure), flight_datetime, changeover_date, accommodation, route, flight_supplier, transfer_details, travel_letter_status, process_complete, pdf_link, notes
-- `frp_payroll_vessel_transfers` — crew_user_id, position_title, from_vessel_id, to_vessel_id, onboarding_transfer_date, payroll_transfer_date, travel_date, status, notes
-- `frp_planner_audit_log` — entity_type, entity_id, action, old_value (jsonb), new_value (jsonb), changed_by, changed_at
-- `frp_import_batches` — filename, imported_by, imported_at, status, summary (jsonb)
+### Header and quick actions
+- Replace the current quick-actions area in the header with the module slider.
+- Move existing pinned and suggested quick actions into a compact floating action menu, available without competing with module navigation.
+- Retain vessel selection, notifications, role information, account menu, and client branding in a balanced secondary area.
 
-Enums: `frp_rotation_type` (onboard, leave, travel, standby, yard, wfh, temp_cover, training, no_crew, tbc), `frp_assignment_status` (draft, confirmed, pending_approval, conflict, complete), `frp_location_status` (confirmed, estimated, tbc), `frp_travel_direction` (arrival, departure).
+### Access behaviour
+- Use the existing permission system as the source for both module visibility and folder visibility.
+- Ensure changing access updates both navigation areas consistently, with no hidden module reachable through a stale visible link.
+- Preserve direct route protection; this change will not weaken page-level access checks.
 
-RLS: scope by `company_id` via `current_user_company_id()`; edit limited to roles with `crew:edit` or `planner:edit`. GRANTs included per public-schema rules.
+## Responsive and interaction details
+- Desktop: fixed-width blue folder panel plus a full-width module slider in the header.
+- Mobile: off-canvas blue folder panel, swipeable module slider, and a persistent control to reopen the panel.
+- Use restrained motion for the sliding active indicator and panel content transition, respecting reduced-motion settings.
+- Preserve keyboard navigation, focus visibility, labels, and touch-sized controls.
 
-### Frontend
+## Technical approach
+- Split the current navigation rendering into a top-level module selector and a module-scoped folder tree, both sourced from the existing sitemap.
+- Add a shared route-to-module resolver so header selection and sidebar contents cannot drift apart.
+- Extend module access mapping for the six top-level module IDs where necessary, while retaining privileged-role behaviour.
+- Convert the adaptive action bar into a floating menu without changing its pinned shortcuts or usage-based suggestions.
+- Keep styling on the existing semantic design tokens and maritime blue system.
 
-- **Path**: `/crew/rotation-planner`
-- **Stack**: React + TS + Tailwind, **@tanstack/react-virtual** for row/column virtualisation, **dnd-kit** for drag/resize, **date-fns** for math, TanStack Query for data.
-- **Layout**: sticky left lane columns (vessel / dept / position / crew / status), sticky top headers (month → week/day → vessel-location lane), virtualised main grid.
-- **Modules** under `src/modules/rotation-planner/`:
-  - `pages/RotationPlannerPage.tsx`
-  - `components/` — `PlannerGrid`, `LaneColumn`, `TimelineHeader`, `LocationLane`, `RotationBlock`, `BlockDetailDrawer`, `Toolbar`, `ZoomControls`, `FilterBar`, `LegendBar`, `ConflictBadge`, `ContextMenu`, `ImportDialog`, `ImportReview`, `ExportMenu`
-  - `hooks/` — `usePlannerData`, `useZoom`, `useSelection`, `useUndoRedo`, `useDragResize`, `useConflicts`, `useRealtime`
-  - `lib/` — `dateMath.ts`, `conflicts.ts`, `xlsxParser.ts` (SheetJS), `xlsxExporter.ts`, `pdfExporter.ts`
-  - `types.ts`, `constants.ts`
-- **Zoom levels**: day / week / fortnight / month / quarter / year + custom range + Today + jump-to.
-- **Interactions**: click-drag create, drag-move, edge-resize, vertical drag to switch lane, duplicate, split, delete, multi-select, copy/paste, undo/redo, keyboard shortcuts, snap-to-zoom.
-- **Detail drawer**: full assignment edit + linked leave / travel / payroll-transfer records + audit history.
-- **Conflict engine**: double-assignment, leave overlap (hard for approved, soft for pending), missing vessel location, missing payroll transfer at changeover, incomplete travel near changeover, gap detection. Red/amber outlines + toolbar badge + filter.
-- **Performance**: visible-range query (start..end + vessel filter), windowed rendering, optimistic mutations w/ rollback, `version` optimistic-lock check on save.
-- **Realtime**: Supabase channel on `frp_rotation_assignments` filtered by company_id; merge inbound, warn on conflicting local edits.
-- **Export**: filtered view → XLSX (SheetJS) and PDF (jsPDF + autotable); travel-list / conflicts / locations exports.
-- **Import**: upload XLSX → parse Timeline sheet (column A lanes, row 1 locations, merged colour ranges → assignments), monthly tabs (arrivals/departures → travel_movements), Crew Data (match to profiles), YCOLIVE Transfers, Test Flights → review screen with matched/unmatched/skipped → commit.
-
-### Permissions
-
-- Admin / DPA / Fleet Manager: full edit + import + delete + export
-- Captain / Master: edit rotations + travel links on their vessel(s)
-- HOD: view + comment on own department
-- Crew: view own rotation + own leave only
-- Read-only role: view planner
-
-Enforced server-side via RLS using existing `has_role` / `user_has_module_access`; client gates UI affordances.
-
-### Delivery order
-
-1. Migration (tables, enums, RLS, GRANTs, audit-log triggers, updated_at triggers).
-2. Types regen + data hooks (CRUD + visible-range query + realtime).
-3. Grid skeleton (virtualised, sticky headers, zoom, location lane).
-4. Block rendering + drag/resize/create/select/keyboard.
-5. Detail drawer + linked records.
-6. Conflict engine + filter bar + toolbar.
-7. Import flow (XLSX parser + review).
-8. Export (XLSX/PDF).
-9. Realtime + optimistic-lock save guard.
-10. Polish + empty/loading/error states + permissions gating.
-
-### Open questions
-
-- **Nav placement**: Crew → Rotation Planner (default), or Itinerary, or Fleet?
-- **Leave table**: confirm `crew_leave_entries` is the right one to link (vs `crew_leave_requests` or `leave_requests`)?
-- **Upload the .xlsx?** Needed to calibrate the import parser to your exact layout. Without it I'll ship a generic parser + manual mapper.
-- **Scope cut for v1**: ship everything in one go, or land the grid + CRUD + leave-link + conflicts first, then import/export/realtime in a follow-up? (One-shot will be a very large change.)
+## Verification
+- Check every visible module switches the slider highlight and replaces the left folder tree correctly.
+- Open representative nested and placeholder pages from all six modules and confirm the active state survives refresh and direct links.
+- Verify restricted modules disappear for lower-access accounts while authorised modules remain usable.
+- Verify dashboard shortcuts, floating actions, mobile swipe navigation, folder-panel opening, keyboard navigation, and desktop layout.
+- Confirm the application compiles cleanly and has no preview runtime errors.
