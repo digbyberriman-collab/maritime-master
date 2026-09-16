@@ -22,11 +22,12 @@ interface Props {
   vessels: VesselLite[];
   crew: CrewLite[];
   conflicts?: ConflictInfo[];
+  canEdit?: boolean;
 }
 
 const BlockDetailDrawer: React.FC<Props> = ({
   assignment, open, onClose, onSave, onDelete, onDuplicate, onSplit,
-  lanes, vessels, crew, conflicts,
+  lanes, vessels, crew, conflicts, canEdit = true,
 }) => {
   const [form, setForm] = useState<Partial<RotationAssignment>>({});
   useEffect(() => { setForm(assignment ?? {}); }, [assignment]);
