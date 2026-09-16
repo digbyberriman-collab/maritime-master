@@ -93,7 +93,19 @@ const Toolbar: React.FC<Props> = ({
           </span>
         )}
         {canEdit && <Button size="sm" variant="outline" onClick={onImport}><Upload className="h-4 w-4 mr-1" />Import</Button>}
-        <Button size="sm" variant="outline" onClick={onExport}><Download className="h-4 w-4 mr-1" />Export</Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="outline"><Download className="h-4 w-4 mr-1" />Export</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onExportPdf}>
+              <FileText className="h-4 w-4 mr-2" />PDF (timeline view)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onExport}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />Excel (data)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         {canEdit && <Button size="sm" onClick={onCreate}><Plus className="h-4 w-4 mr-1" />New</Button>}
       </div>
     </div>
