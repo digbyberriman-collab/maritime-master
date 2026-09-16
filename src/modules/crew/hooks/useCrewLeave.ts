@@ -539,6 +539,7 @@ export function useCrewLeave(year: number, month: number, options: CrewLeaveOpti
 
   const toggleMonthLock = useCallback(
     async (m: number) => {
+      if (!canEdit) { denyEdit(); return; }
       if (!companyId) return;
 
       const existing = lockedMonths.find((lm) => lm.month === m && lm.year === year);
@@ -584,7 +585,7 @@ export function useCrewLeave(year: number, month: number, options: CrewLeaveOpti
         }
       }
     },
-    [companyId, effectiveVesselId, year, lockedMonths, profile?.user_id, actor],
+    [companyId, effectiveVesselId, year, lockedMonths, profile?.user_id, actor, canEdit, denyEdit],
   );
 
   /* ---------- assembled crew leave data ---------- */
@@ -724,7 +725,8 @@ export function useCrewLeave(year: number, month: number, options: CrewLeaveOpti
     bulkFill,
     undo,
     toggleMonthLock,
-    canUndo: undoStack.length > 0,
+    canUndo: canEdit && undoStack.length > 0,
+    canEdit,
     refresh: loadAll,
     effectiveVesselId,
     policy,
