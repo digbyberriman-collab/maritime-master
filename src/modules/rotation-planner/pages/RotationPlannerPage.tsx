@@ -13,6 +13,7 @@ import { useVesselsLite, useCrewLite } from '../hooks/useVesselsAndCrew';
 import { ZOOM_PX_PER_DAY, HEADER_HEIGHT, LOCATION_LANE_HEIGHT, LEFT_COL_WIDTH } from '../constants';
 import { detectConflicts } from '../lib/conflicts';
 import { exportPlannerToXLSX } from '../lib/xlsxExporter';
+import { exportPlannerToPDF } from '../lib/pdfExporter';
 import type { PlannerFilters, RotationAssignment, ZoomLevel } from '../types';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -117,6 +118,37 @@ const RotationPlannerPage: React.FC = () => {
     });
   }, [visibleAssignments, planner.locations, vesselName, crewName, laneName]);
 
+  const filterSummary = useMemo(() => {
+    const parts: string[] = [];
+    parts.push(filters.vesselIds.length ? filters.vesselIds.map(vesselName).join(', ') : 'All vessels');
+    if (filters.search) parts.push(`search “${filters.search}”`);
+    if (filters.conflictsOnly) parts.push('conflicts only');
+    if (filters.departments.length) parts.push(`departments: ${filters.departments.join(', ')}`);
+    if (filters.rotationTypes.length) parts.push(`types: ${filters.rotationTypes.join(', ')}`);
+    if (filters.statuses.length) parts.push(`status: ${filters.statuses.join(', ')}`);
+    return parts.join(' · ');
+  }, [filters, vesselName]);
+
+  const onExportPdf = useCallback(() => {
+    if (!visibleAssignments.length && !planner.locations.length) {
+      toast({ title: 'Nothing to export', description: 'No rotations match the current view.' });
+      return;
+    }
+    try {
+      exportPlannerToPDF({
+        assignments: visibleAssignments,
+        locations: planner.locations,
+        lanes: planner.lanes,
+        viewStart, viewEnd, zoom,
+        vesselName, crewName,
+        filterSummary,
+      });
+      toast({ title: 'PDF exported', description: 'The timeline view was saved to your downloads.' });
+    } catch (e: any) {
+      toast({ title: 'PDF export failed', description: e?.message ?? 'Unknown error', variant: 'destructive' });
+    }
+  }, [visibleAssignments, planner.locations, planner.lanes, viewStart, viewEnd, zoom, vesselName, crewName, filterSummary]);
+
   return (
     <DashboardLayout>
       <div className="flex flex-col h-[calc(100vh-8rem)]">
@@ -130,6 +162,7 @@ const RotationPlannerPage: React.FC = () => {
           conflictCount={conflictsById.size}
           onImport={() => setImportOpen(true)}
           onExport={onExport}
+          onExportPdf={onExportPdf}
           onCreate={onCreateBlank}
           canEdit={canEdit}
         />

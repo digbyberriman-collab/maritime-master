@@ -2,7 +2,8 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, CalendarDays, Upload, Download, AlertTriangle, Plus, Eye } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { ChevronLeft, ChevronRight, ZoomIn, ZoomOut, CalendarDays, Upload, Download, AlertTriangle, Plus, Eye, FileText, FileSpreadsheet } from 'lucide-react';
 import { format } from 'date-fns';
 import type { ZoomLevel, PlannerFilters } from '../types';
 import { ZOOM_ORDER } from '../constants';
@@ -21,13 +22,14 @@ interface Props {
   conflictCount: number;
   onImport: () => void;
   onExport: () => void;
+  onExportPdf: () => void;
   onCreate: () => void;
   canEdit?: boolean;
 }
 
 const Toolbar: React.FC<Props> = ({
   zoom, setZoom, viewStart, viewEnd, onToday, onShift,
-  filters, setFilters, vessels, conflictCount, onImport, onExport, onCreate, canEdit = true,
+  filters, setFilters, vessels, conflictCount, onImport, onExport, onExportPdf, onCreate, canEdit = true,
 }) => {
   const zoomIdx = ZOOM_ORDER.indexOf(zoom);
   const zoomIn = () => zoomIdx > 0 && setZoom(ZOOM_ORDER[zoomIdx - 1]);
@@ -93,7 +95,19 @@ const Toolbar: React.FC<Props> = ({
           </span>
         )}
         {canEdit && <Button size="sm" variant="outline" onClick={onImport}><Upload className="h-4 w-4 mr-1" />Import</Button>}
-        <Button size="sm" variant="outline" onClick={onExport}><Download className="h-4 w-4 mr-1" />Export</Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button size="sm" variant="outline"><Download className="h-4 w-4 mr-1" />Export</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onExportPdf}>
+              <FileText className="h-4 w-4 mr-2" />PDF (timeline view)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onExport}>
+              <FileSpreadsheet className="h-4 w-4 mr-2" />Excel (data)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         {canEdit && <Button size="sm" onClick={onCreate}><Plus className="h-4 w-4 mr-1" />New</Button>}
       </div>
     </div>
