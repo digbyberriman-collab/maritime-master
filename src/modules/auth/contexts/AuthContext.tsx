@@ -171,6 +171,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Map navigation module IDs to RBAC module keys
       const moduleKeyMap: Record<string, string> = {
         'dashboard': 'dashboard',
+        'fleet': 'fleet',
+        'vessel': 'vessels',
+        'shoreside': 'reports',
+        'health': 'hr',
+        'yard': 'maintenance',
+        'hris': 'hr',
         'fleet-map': 'fleet',
         'vessels': 'vessels',
         'crew': 'crew_roster',
