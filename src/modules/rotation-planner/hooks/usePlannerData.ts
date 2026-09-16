@@ -122,6 +122,33 @@ export function usePlannerData(win: PlannerWindow) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['frp', 'assignments'] }),
   });
 
+  /** Batch upsert — used by multi-select edits, paste and undo/redo. */
+  const upsertManyAssignments = useMutation({
+    mutationFn: async (rows: (Partial<RotationAssignment> & { id?: string })[]) => {
+      if (!rows.length) return [] as RotationAssignment[];
+      const payload = rows.map((r) => {
+        const row: any = { ...r, updated_by: user?.id ?? null };
+        if (!r.created_by) row.created_by = user?.id ?? null;
+        return row;
+      });
+      const { data, error } = await (supabase as any)
+        .from('frp_rotation_assignments').upsert(payload).select();
+      if (error) throw error;
+      return (data ?? []) as RotationAssignment[];
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['frp', 'assignments'] }),
+  });
+
+  const deleteManyAssignments = useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (!ids.length) return;
+      const { error } = await (supabase as any)
+        .from('frp_rotation_assignments').delete().in('id', ids);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['frp', 'assignments'] }),
+  });
+
   const upsertLocation = useMutation({
     mutationFn: async (row: Partial<VesselLocation> & { id?: string }) => {
       const payload: any = { ...row, updated_by: user?.id ?? null };
@@ -154,5 +181,8 @@ export function usePlannerData(win: PlannerWindow) {
     loading,
     error: lanesQ.error || assignmentsQ.error || locationsQ.error,
     upsertAssignment, deleteAssignment, upsertLocation, upsertLane,
-  }), [lanesQ, assignmentsQ, locationsQ, leaveQ, travelQ, payrollQ, loading, upsertAssignment, deleteAssignment, upsertLocation, upsertLane]);
+    upsertManyAssignments, deleteManyAssignments,
+  }), [lanesQ, assignmentsQ, locationsQ, leaveQ, travelQ, payrollQ, loading,
+    upsertAssignment, deleteAssignment, upsertLocation, upsertLane,
+    upsertManyAssignments, deleteManyAssignments]);
 }
