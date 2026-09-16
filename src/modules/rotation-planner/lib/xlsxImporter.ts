@@ -408,7 +408,7 @@ export async function parsePlannerWorkbook(file: File, vesselNameDefault: string
       }
       const arrCell = cArrival >= 0 ? sheet[XLSX.utils.encode_cell({ r: R, c: cArrival })]?.v : undefined;
       const arrText = arrCell == null ? '' : String(arrCell);
-      const flightDate = excelDate(arrCell) ?? flightDateFromText(arrText, sname);
+      const flightDate = monthSheetDate(arrCell, sname);
       const flightNumber = flightNumFromText(arrText);
       travel.push({
         vesselGuess: vesselNameDefault,
@@ -416,7 +416,7 @@ export async function parsePlannerWorkbook(file: File, vesselNameDefault: string
         direction,
         flightDate,
         flightNumber,
-        changeoverDate: cChange >= 0 ? excelDate(sheet[XLSX.utils.encode_cell({ r: R, c: cChange })]?.v) : undefined,
+        changeoverDate: cChange >= 0 ? monthSheetDate(sheet[XLSX.utils.encode_cell({ r: R, c: cChange })]?.v, sname) : undefined,
         accommodation: cAccom >= 0 ? String(sheet[XLSX.utils.encode_cell({ r: R, c: cAccom })]?.v ?? '').trim() || undefined : undefined,
         route: cRoute >= 0 ? String(sheet[XLSX.utils.encode_cell({ r: R, c: cRoute })]?.v ?? '').trim() || undefined : undefined,
         supplier: cSupp >= 0 ? String(sheet[XLSX.utils.encode_cell({ r: R, c: cSupp })]?.v ?? '').trim() || undefined : undefined,
