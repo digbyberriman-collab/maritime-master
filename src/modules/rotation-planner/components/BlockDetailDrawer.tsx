@@ -40,7 +40,7 @@ const BlockDetailDrawer: React.FC<Props> = ({
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent className="w-[480px] sm:max-w-[480px] overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>Rotation block</SheetTitle>
+          <SheetTitle>Rotation block{!canEdit && <span className="ml-2 text-xs font-normal text-muted-foreground">· view only</span>}</SheetTitle>
         </SheetHeader>
 
         {conflicts && conflicts.length > 0 && (
@@ -53,22 +53,22 @@ const BlockDetailDrawer: React.FC<Props> = ({
         <div className="space-y-3 mt-4 text-sm">
           <div>
             <Label>Label</Label>
-            <Input value={form.label ?? ''} onChange={(e) => update('label', e.target.value)} />
+            <Input disabled={!canEdit} value={form.label ?? ''} onChange={(e) => update('label', e.target.value)} />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label>Start</Label>
-              <Input type="date" value={form.start_date ?? ''} onChange={(e) => update('start_date', e.target.value)} />
+              <Input disabled={!canEdit} type="date" value={form.start_date ?? ''} onChange={(e) => update('start_date', e.target.value)} />
             </div>
             <div>
               <Label>End</Label>
-              <Input type="date" value={form.end_date ?? ''} onChange={(e) => update('end_date', e.target.value)} />
+              <Input disabled={!canEdit} type="date" value={form.end_date ?? ''} onChange={(e) => update('end_date', e.target.value)} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <Label>Type</Label>
-              <Select value={form.rotation_type ?? 'onboard'} onValueChange={(v) => update('rotation_type', v)}>
+              <Select disabled={!canEdit} value={form.rotation_type ?? 'onboard'} onValueChange={(v) => update('rotation_type', v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(ROTATION_TYPE_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
@@ -77,7 +77,7 @@ const BlockDetailDrawer: React.FC<Props> = ({
             </div>
             <div>
               <Label>Status</Label>
-              <Select value={form.status ?? 'draft'} onValueChange={(v) => update('status', v)}>
+              <Select disabled={!canEdit} value={form.status ?? 'draft'} onValueChange={(v) => update('status', v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(STATUS_LABELS).map(([k, v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
@@ -88,7 +88,7 @@ const BlockDetailDrawer: React.FC<Props> = ({
 
           <div>
             <Label>Vessel</Label>
-            <Select value={form.vessel_id ?? ''} onValueChange={(v) => update('vessel_id', v)}>
+            <Select disabled={!canEdit} value={form.vessel_id ?? ''} onValueChange={(v) => update('vessel_id', v)}>
               <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
               <SelectContent>
                 {vessels.map((v) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
@@ -98,7 +98,7 @@ const BlockDetailDrawer: React.FC<Props> = ({
 
           <div>
             <Label>Lane / role</Label>
-            <Select value={form.lane_id ?? ''} onValueChange={(v) => update('lane_id', v)}>
+            <Select disabled={!canEdit} value={form.lane_id ?? ''} onValueChange={(v) => update('lane_id', v)}>
               <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
               <SelectContent>
                 {lanes.filter((l) => !form.vessel_id || l.vessel_id === form.vessel_id).map((l) => (
@@ -110,7 +110,7 @@ const BlockDetailDrawer: React.FC<Props> = ({
 
           <div>
             <Label>Crew member</Label>
-            <Select value={form.crew_user_id ?? ''} onValueChange={(v) => update('crew_user_id', v)}>
+            <Select disabled={!canEdit} value={form.crew_user_id ?? ''} onValueChange={(v) => update('crew_user_id', v)}>
               <SelectTrigger><SelectValue placeholder="Unassigned" /></SelectTrigger>
               <SelectContent>
                 {crew.map((c) => (
@@ -125,22 +125,22 @@ const BlockDetailDrawer: React.FC<Props> = ({
 
           <div>
             <Label>Colour</Label>
-            <Input type="color" value={form.colour ?? '#16a34a'} onChange={(e) => update('colour', e.target.value)} className="h-9 w-16 p-1" />
+            <Input disabled={!canEdit} type="color" value={form.colour ?? '#16a34a'} onChange={(e) => update('colour', e.target.value)} className="h-9 w-16 p-1" />
           </div>
 
           <div>
             <Label>Notes</Label>
-            <Textarea rows={3} value={form.notes ?? ''} onChange={(e) => update('notes', e.target.value)} />
+            <Textarea disabled={!canEdit} rows={3} value={form.notes ?? ''} onChange={(e) => update('notes', e.target.value)} />
           </div>
         </div>
 
         <SheetFooter className="mt-4 gap-2 flex-row flex-wrap">
-          {onDuplicate && <Button variant="outline" size="sm" onClick={() => onDuplicate(assignment)}><Copy className="h-4 w-4 mr-1" />Duplicate</Button>}
-          {onSplit && <Button variant="outline" size="sm" onClick={() => onSplit(assignment)}><Scissors className="h-4 w-4 mr-1" />Split</Button>}
-          <Button variant="destructive" size="sm" onClick={() => { onDelete(assignment.id); onClose(); }}><Trash2 className="h-4 w-4 mr-1" />Delete</Button>
+          {canEdit && onDuplicate && <Button variant="outline" size="sm" onClick={() => onDuplicate(assignment)}><Copy className="h-4 w-4 mr-1" />Duplicate</Button>}
+          {canEdit && onSplit && <Button variant="outline" size="sm" onClick={() => onSplit(assignment)}><Scissors className="h-4 w-4 mr-1" />Split</Button>}
+          {canEdit && <Button variant="destructive" size="sm" onClick={() => { onDelete(assignment.id); onClose(); }}><Trash2 className="h-4 w-4 mr-1" />Delete</Button>}
           <div className="ml-auto flex gap-2">
-            <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
-            <Button size="sm" onClick={() => { onSave({ ...form, id: assignment.id }); onClose(); }}>Save</Button>
+            <Button variant="ghost" size="sm" onClick={onClose}>{canEdit ? 'Cancel' : 'Close'}</Button>
+            {canEdit && <Button size="sm" onClick={() => { onSave({ ...form, id: assignment.id }); onClose(); }}>Save</Button>}
           </div>
         </SheetFooter>
       </SheetContent>
