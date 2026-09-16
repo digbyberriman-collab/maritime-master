@@ -109,10 +109,12 @@ const ImportDialog: React.FC<Props> = ({ open, onClose, vessels, crew, lanes, on
       let crewImportedCount = 0;
       let crewSynced: { inserted: number; updated: number } | null = null;
       if (preview.crew.length) {
-        const crewPayload = preview.crew.map((c) => ({
+        const crewPayload = preview.crew.map((c, i) => ({
+          airtable_id: `frp-${vesselId}-${c.externalId ?? c.fullName?.toLowerCase().replace(/[^a-z0-9]+/g, '-') ?? i}`,
           crew_id: c.externalId ? Number(c.externalId) || null : null,
           vessel: vesselName,
           first_name: c.firstName ?? null,
+
           middle_name: c.middleName ?? null,
           last_name: c.lastName ?? null,
           full_legal_name: c.fullName,
