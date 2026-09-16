@@ -8,6 +8,7 @@ import PlannerGrid from '../components/PlannerGrid';
 import BlockDetailDrawer from '../components/BlockDetailDrawer';
 import ImportDialog from '../components/ImportDialog';
 import { usePlannerData } from '../hooks/usePlannerData';
+import { usePlannerPermissions } from '../hooks/usePlannerPermissions';
 import { useVesselsLite, useCrewLite } from '../hooks/useVesselsAndCrew';
 import { ZOOM_PX_PER_DAY, HEADER_HEIGHT, LOCATION_LANE_HEIGHT, LEFT_COL_WIDTH } from '../constants';
 import { detectConflicts } from '../lib/conflicts';
@@ -25,6 +26,7 @@ const defaultFilters: PlannerFilters = {
 
 const RotationPlannerPage: React.FC = () => {
   const { user } = useAuth();
+  const { canEdit } = usePlannerPermissions();
   const [zoom, setZoom] = useState<ZoomLevel>('week');
   const [anchor, setAnchor] = useState<Date>(new Date());
   const [filters, setFilters] = useState<PlannerFilters>(defaultFilters);
@@ -85,12 +87,14 @@ const RotationPlannerPage: React.FC = () => {
   const selected = useMemo(() => planner.assignments.find((a) => a.id === selectedId) ?? null, [planner.assignments, selectedId]);
 
   const onUpdate = useCallback((a: RotationAssignment, changes: Partial<RotationAssignment>) => {
+    if (!canEdit) { toast({ title: 'View-only access', description: 'You cannot change rotations.', variant: 'destructive' }); return; }
     planner.upsertAssignment.mutate({ id: a.id, ...changes }, {
       onError: (e: any) => toast({ title: 'Save failed', description: e.message, variant: 'destructive' }),
     });
-  }, [planner]);
+  }, [planner, canEdit]);
 
   const onCreate = useCallback((laneId: string, start_date: string, end_date: string) => {
+    if (!canEdit) { toast({ title: 'View-only access', description: 'You cannot create rotations.', variant: 'destructive' }); return; }
     if (!companyId) { toast({ title: 'No company context yet', variant: 'destructive' }); return; }
     const lane = planner.lanes.find((l) => l.id === laneId);
     planner.upsertAssignment.mutate({
@@ -98,7 +102,7 @@ const RotationPlannerPage: React.FC = () => {
       start_date, end_date, rotation_type: 'onboard', status: 'draft',
       label: 'New rotation',
     } as any);
-  }, [companyId, planner]);
+  }, [companyId, planner, canEdit]);
 
   const onCreateBlank = useCallback(() => {
     if (planner.lanes.length === 0) return;
@@ -127,6 +131,7 @@ const RotationPlannerPage: React.FC = () => {
           onImport={() => setImportOpen(true)}
           onExport={onExport}
           onCreate={onCreateBlank}
+          canEdit={canEdit}
         />
 
         {/* Sticky top: timeline header + location lane */}
@@ -154,7 +159,7 @@ const RotationPlannerPage: React.FC = () => {
           <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
             <div>No lanes configured yet.</div>
             <div>Import the existing spreadsheet, or create lanes per vessel/department/role.</div>
-            <button className="text-primary underline" onClick={() => setImportOpen(true)}>Import XLSX</button>
+            {canEdit && <button className="text-primary underline" onClick={() => setImportOpen(true)}>Import XLSX</button>}
           </div>
         ) : (
           <PlannerGrid
@@ -168,6 +173,7 @@ const RotationPlannerPage: React.FC = () => {
             onUpdateAssignment={onUpdate}
             onCreateAssignment={onCreate}
             selectedId={selectedId}
+            canEdit={canEdit}
           />
         )}
 
@@ -181,10 +187,11 @@ const RotationPlannerPage: React.FC = () => {
           vessels={vesselsQ.data ?? []}
           crew={crewQ.data ?? []}
           conflicts={selected ? conflictsById.get(selected.id) : undefined}
+          canEdit={canEdit}
         />
 
         <ImportDialog
-          open={importOpen}
+          open={importOpen && canEdit}
           onClose={() => setImportOpen(false)}
           vessels={vesselsQ.data ?? []}
           crew={crewQ.data ?? []}

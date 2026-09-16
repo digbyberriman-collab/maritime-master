@@ -23,6 +23,7 @@ import {
   type LeaveEntryLite,
 } from '@/modules/crew/services/leaveCalculator';
 import { logLeaveAudit } from '@/modules/crew/services/leaveAudit';
+import { useCrewEditAccess } from '@/shared/hooks/useCrewEditAccess';
 
 export interface CrewLeaveOptions {
   /** When true, ignore the VesselContext vessel filter and load fleet-wide. */
@@ -51,6 +52,12 @@ interface RichCrewProfile extends CrewProfileLite {
 export function useCrewLeave(year: number, month: number, options: CrewLeaveOptions = {}) {
   const { profile, user } = useAuth();
   const { selectedVesselId, isAllVessels, canAccessAllVessels } = useVessel();
+  // Only Captain / HoD / Purser / DPA / Fleet Master / Superadmin (or crew-module
+  // editors) may change leave; everyone else gets a read-only calendar.
+  const { canEdit } = useCrewEditAccess();
+  const denyEdit = useCallback(() => {
+    toast.error('You have view-only access to the leave calendar.');
+  }, []);
 
   const companyId = profile?.company_id;
   const { fleetWide, departmentScope } = options;
@@ -306,6 +313,7 @@ export function useCrewLeave(year: number, month: number, options: CrewLeaveOpti
 
   const setEntry = useCallback(
     async (crewId: string, date: string, statusCode: string | null) => {
+      if (!canEdit) { denyEdit(); return; }
       if (!companyId) return;
       const d = new Date(date);
       if (isMonthLocked(d.getMonth() + 1)) {
@@ -413,11 +421,12 @@ export function useCrewLeave(year: number, month: number, options: CrewLeaveOpti
         }
       }
     },
-    [companyId, effectiveVesselId, crewProfiles, entries, isMonthLocked, actor],
+    [companyId, effectiveVesselId, crewProfiles, entries, isMonthLocked, actor, canEdit, denyEdit],
   );
 
   const bulkFill = useCallback(
     async (crewId: string, startDate: string, endDate: string, statusCode: string) => {
+      if (!canEdit) { denyEdit(); return; }
       if (!companyId) return;
       const start = new Date(startDate);
       const end = new Date(endDate);
@@ -476,10 +485,11 @@ export function useCrewLeave(year: number, month: number, options: CrewLeaveOpti
       }
       toast.success(`Filled ${validDays.length} days with ${statusCode}`);
     },
-    [companyId, effectiveVesselId, crewProfiles, isMonthLocked, loadMonthEntries, loadYearEntries, actor],
+    [companyId, effectiveVesselId, crewProfiles, isMonthLocked, loadMonthEntries, loadYearEntries, actor, canEdit, denyEdit],
   );
 
   const undo = useCallback(async () => {
+    if (!canEdit) { denyEdit(); return; }
     setUndoStack((prev) => {
       if (prev.length === 0) return prev;
       const last = prev[prev.length - 1];
@@ -525,10 +535,11 @@ export function useCrewLeave(year: number, month: number, options: CrewLeaveOpti
       })();
       return remaining;
     });
-  }, [companyId, crewProfiles, effectiveVesselId, loadMonthEntries, loadYearEntries]);
+  }, [companyId, crewProfiles, effectiveVesselId, loadMonthEntries, loadYearEntries, canEdit, denyEdit]);
 
   const toggleMonthLock = useCallback(
     async (m: number) => {
+      if (!canEdit) { denyEdit(); return; }
       if (!companyId) return;
 
       const existing = lockedMonths.find((lm) => lm.month === m && lm.year === year);
@@ -574,7 +585,7 @@ export function useCrewLeave(year: number, month: number, options: CrewLeaveOpti
         }
       }
     },
-    [companyId, effectiveVesselId, year, lockedMonths, profile?.user_id, actor],
+    [companyId, effectiveVesselId, year, lockedMonths, profile?.user_id, actor, canEdit, denyEdit],
   );
 
   /* ---------- assembled crew leave data ---------- */
@@ -714,7 +725,8 @@ export function useCrewLeave(year: number, month: number, options: CrewLeaveOpti
     bulkFill,
     undo,
     toggleMonthLock,
-    canUndo: undoStack.length > 0,
+    canUndo: canEdit && undoStack.length > 0,
+    canEdit,
     refresh: loadAll,
     effectiveVesselId,
     policy,

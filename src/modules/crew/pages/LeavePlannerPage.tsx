@@ -64,6 +64,7 @@ export default function LeavePlannerPage() {
     undo,
     toggleMonthLock,
     canUndo,
+    canEdit,
     effectiveVesselId,
   } = useCrewLeave(year, month, {
     fleetWide: fleetView && canAccessAllVessels,
@@ -294,6 +295,9 @@ export default function LeavePlannerPage() {
                 Fleet View
               </Button>
             )}
+            {!canEdit && (
+              <span className="text-xs text-muted-foreground px-1" title="You have view-only access to leave records">View only</span>
+            )}
             <Button variant="outline" size="sm" onClick={exportCsv}>
               <Download className="w-4 h-4 mr-1" /> Export CSV
             </Button>
@@ -358,6 +362,7 @@ export default function LeavePlannerPage() {
             <>
               <div className="w-px h-6 bg-border" />
               <Button
+                disabled={!canEdit}
                 variant={bulkMode ? 'default' : 'outline'}
                 size="sm"
                 className="h-8 text-xs"
@@ -384,7 +389,7 @@ export default function LeavePlannerPage() {
                 </Select>
               )}
               <div className="w-px h-6 bg-border" />
-              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={() => toggleMonthLock(month)}>
+              <Button variant="outline" size="sm" className="h-8 text-xs" disabled={!canEdit} onClick={() => toggleMonthLock(month)}>
                 {locked ? <Unlock className="w-3 h-3 mr-1" /> : <Lock className="w-3 h-3 mr-1" />}
                 {locked ? 'Unlock' : 'Lock'} Month
               </Button>
@@ -659,6 +664,7 @@ export default function LeavePlannerPage() {
                     key={m}
                     variant={isLocked ? 'default' : 'outline'}
                     size="sm"
+                    disabled={!canEdit}
                     className={cn('h-7 text-[10px] px-2', isLocked && 'bg-muted-foreground')}
                     onClick={() => toggleMonthLock(m)}
                   >

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
+import { useCrewEditAccess } from '@/shared/hooks/useCrewEditAccess';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import {
   LEAVE_STATUS_CODES, STATUS_CODE_MAP, type CrewLeaveRequest,
@@ -42,6 +43,8 @@ interface CrewOption {
   vessel_name: string | null;
 }
 
+// Legacy profile.role fallback; the authoritative gate is the role-based
+// crew edit access check below (Captain / HoD / Purser / DPA / Fleet Master / Superadmin).
 const APPROVE_ROLES = ['dpa', 'shore_management', 'master', 'chief_engineer', 'chief_officer'];
 
 const csvEscape = (v: any): string => {
@@ -57,7 +60,8 @@ export default function LeaveRequestsPage() {
   const companyId = profile?.company_id;
   const navigate = useNavigate();
 
-  const canApprove = APPROVE_ROLES.includes(profile?.role || '');
+  const { canEdit: canEditCrewRecords } = useCrewEditAccess();
+  const canApprove = canEditCrewRecords || APPROVE_ROLES.includes(profile?.role || '');
   const actor = user && profile ? { user_id: user.id, email: profile.email, role: profile.role } : null;
 
   const [requests, setRequests] = useState<(CrewLeaveRequest & {

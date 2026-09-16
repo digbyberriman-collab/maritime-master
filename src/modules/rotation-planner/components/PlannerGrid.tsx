@@ -21,13 +21,14 @@ interface Props {
   onUpdateAssignment: (a: RotationAssignment, changes: Partial<RotationAssignment>) => void;
   onCreateAssignment: (laneId: string, startDate: string, endDate: string) => void;
   selectedId?: string;
+  canEdit?: boolean;
 }
 
 const PlannerGrid: React.FC<Props> = ({
   lanes, assignments, leave, conflictsById,
   viewStart, zoom, totalWidth,
   vesselName, crewName,
-  onSelectAssignment, onUpdateAssignment, onCreateAssignment, selectedId,
+  onSelectAssignment, onUpdateAssignment, onCreateAssignment, selectedId, canEdit = true,
 }) => {
   const parentRef = useRef<HTMLDivElement>(null);
   const px = ZOOM_PX_PER_DAY[zoom];
@@ -76,14 +77,16 @@ const PlannerGrid: React.FC<Props> = ({
   const [previewBox, setPreviewBox] = useState<{ left: number; top: number; width: number } | null>(null);
 
   const onPointerDownMove = useCallback((e: React.PointerEvent, a: RotationAssignment) => {
+    if (!canEdit) return;
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     dragRef.current = { type: 'move', assignment: a, startX: e.clientX, origStart: a.start_date, origEnd: a.end_date };
-  }, []);
+  }, [canEdit]);
 
   const onPointerDownResize = useCallback((e: React.PointerEvent, a: RotationAssignment, side: 'left' | 'right') => {
+    if (!canEdit) return;
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
     dragRef.current = { type: side === 'left' ? 'resize-left' : 'resize-right', assignment: a, startX: e.clientX, origStart: a.start_date, origEnd: a.end_date };
-  }, []);
+  }, [canEdit]);
 
   const onGridPointerMove = useCallback((e: React.PointerEvent) => {
     const d = dragRef.current;
@@ -125,11 +128,12 @@ const PlannerGrid: React.FC<Props> = ({
   }, [px, onUpdateAssignment]);
 
   const onLaneDoubleClick = useCallback((laneId: string, e: React.MouseEvent<HTMLDivElement>) => {
+    if (!canEdit) return;
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const date = dateAtX(viewStart, x, zoom);
     onCreateAssignment(laneId, toISO(date), toISO(addDays(date, 6)));
-  }, [viewStart, zoom, onCreateAssignment]);
+  }, [viewStart, zoom, onCreateAssignment, canEdit]);
 
   // Mouse-wheel horizontal scrolling for the timeline.
   // - Plain wheel (deltaY): scroll horizontally by ~1 week per tick.
