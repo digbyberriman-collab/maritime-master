@@ -219,9 +219,10 @@ const RotationPlannerPage: React.FC = () => {
           return new Set([...prev, ...ids.slice(lo, hi + 1)]);
         }
       }
+      // Clicking an already-solely-selected block opens its details.
+      if (prev.size === 1 && prev.has(a.id)) setDetailId(a.id);
       return new Set([a.id]);
     });
-    if (mode === 'single') setDetailId(a.id);
     lastClickedRef.current = a.id;
   }, [orderedVisible]);
 
