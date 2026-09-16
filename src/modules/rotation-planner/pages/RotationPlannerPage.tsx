@@ -204,6 +204,9 @@ const RotationPlannerPage: React.FC = () => {
 
   // ---- selection -----------------------------------------------------------
   const onSelectAssignment = useCallback((a: RotationAssignment, mode: 'single' | 'toggle' | 'range') => {
+    // Clicking a block that is already the only selection opens its details,
+    // so plain clicks can be used freely for building a multi-selection.
+    const soleSelected = selectedIds.size === 1 && selectedIds.has(a.id);
     setSelectedIds((prev) => {
       if (mode === 'toggle') {
         const next = new Set(prev);
@@ -219,12 +222,11 @@ const RotationPlannerPage: React.FC = () => {
           return new Set([...prev, ...ids.slice(lo, hi + 1)]);
         }
       }
-      // Clicking an already-solely-selected block opens its details.
-      if (prev.size === 1 && prev.has(a.id)) setDetailId(a.id);
       return new Set([a.id]);
     });
+    if (mode === 'single' && soleSelected) setDetailId(a.id);
     lastClickedRef.current = a.id;
-  }, [orderedVisible]);
+  }, [orderedVisible, selectedIds]);
 
   const onMarqueeSelect = useCallback((ids: string[], additive: boolean) => {
     setSelectedIds((prev) => additive ? new Set([...prev, ...ids]) : new Set(ids));
