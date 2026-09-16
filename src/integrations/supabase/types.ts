@@ -13717,6 +13717,8 @@ export type Database = {
       can_user_assign_tasks: { Args: never; Returns: boolean }
       current_user_company_id: { Args: never; Returns: string }
       frp_can_edit: { Args: { _user_id: string }; Returns: boolean }
+      frp_can_view: { Args: { _user_id: string }; Returns: boolean }
+      frp_planner_access: { Args: never; Returns: Json }
       get_dashboard_alerts: {
         Args: {
           p_all_vessels?: boolean
