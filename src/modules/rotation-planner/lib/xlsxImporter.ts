@@ -103,24 +103,49 @@ function classifyLocationStatus(name: string): FrpLocationStatus {
  * - Header row index 3 (4th row): day-of-month numbers (1..31) per column.
  * Combines the most-recent month with each day to produce a per-column ISO date.
  */
+const MONTH_NAMES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+/** Reads a month marker such as "Sep-23", "September - 27" or "Jan 2025". */
+function parseMonthMarker(cell: XLSX.CellObject | undefined): { year: number; month: number } | null {
+  if (!cell) return null;
+  const text = String((cell as any).w ?? '').trim() || (typeof cell.v === 'string' ? cell.v.trim() : '');
+  const m = text.match(/^([A-Za-z]{3,9})\s*[-–/\s]\s*(\d{2,4})$/);
+  if (m) {
+    const idx = MONTH_NAMES.indexOf(m[1].slice(0, 3).toLowerCase());
+    if (idx >= 0) {
+      let year = parseInt(m[2], 10);
+      if (year < 100) year += 2000;
+      return { year, month: idx + 1 };
+    }
+  }
+  const v = cell.v;
+  if (v instanceof Date && !isNaN(v.getTime())) return { year: v.getFullYear(), month: v.getMonth() + 1 };
+  if (typeof v === 'number') {
+    const d = XLSX.SSF.parse_date_code(v);
+    if (d) return { year: d.y, month: d.m };
+  }
+  return null;
+}
+
 function buildDateAxis(tl: XLSX.WorkSheet, range: XLSX.Range): Record<number, string> {
   const dateForCol: Record<number, string> = {};
   let curYear: number | null = null;
   let curMonth: number | null = null;
   let lastDay = 0;
   for (let C = range.s.c + 1; C <= range.e.c; C++) {
-    const monthCell = tl[XLSX.utils.encode_cell({ r: 2, c: C })];
-    const mv = monthCell?.v;
-    if (mv instanceof Date && !isNaN(mv.getTime())) {
-      curYear = mv.getFullYear();
-      curMonth = mv.getMonth() + 1;
-    } else if (typeof mv === 'number') {
-      const d = XLSX.SSF.parse_date_code(mv);
-      if (d) {
-        curYear = d.y;
-        curMonth = d.m;
+    const marker = parseMonthMarker(tl[XLSX.utils.encode_cell({ r: 2, c: C })]);
+    if (marker) {
+      let { year, month } = marker;
+      // Guard against typo'd year labels (e.g. "Jan-14" between Dec-25 and Feb-26):
+      // the month axis only ever moves forward.
+      if (curYear != null && curMonth != null && (year < curYear || (year === curYear && month < curMonth))) {
+        year = month <= curMonth ? curYear + 1 : curYear;
       }
+      curYear = year;
+      curMonth = month;
+      lastDay = 0;
     }
+
     const dayCell = tl[XLSX.utils.encode_cell({ r: 3, c: C })];
     const dv = dayCell?.v;
     let day: number | null = null;
@@ -137,7 +162,9 @@ function buildDateAxis(tl: XLSX.WorkSheet, range: XLSX.Range): Record<number, st
     }
   }
   return dateForCol;
+
 }
+
 
 const DEPT_RE = /\b(BRIDGE|DECK|ENG(?:INEERING)?|INTERIOR|GALLEY|WELLNESS|SHORESIDE|DIVE|HOTEL|MANAGEMENT|MEDIA|STEW)\b.*DEPT\b/i;
 
@@ -304,6 +331,37 @@ export async function parsePlannerWorkbook(file: File, vesselNameDefault: string
     const m = txt.match(/\b([A-Z]{1,3}\s?\d{1,4}[A-Z]?)\b/);
     return m ? m[1].replace(/\s/g, '') : undefined;
   };
+  const sheetYearOf = (sheetName: string): number => {
+    const y = sheetName.match(/(\d{2,4})/);
+    let year = y ? parseInt(y[1], 10) : new Date().getFullYear();
+    if (year < 100) year += 2000;
+    return year;
+  };
+  const sheetMonthOf = (sheetName: string): number | null => {
+    const m = sheetName.trim().slice(0, 3).toLowerCase();
+    const idx = MONTH_NAMES.indexOf(m);
+    return idx >= 0 ? idx + 1 : null;
+  };
+  /** Reads a date cell on a monthly tab, rejecting values that fall outside that month's year. */
+  const monthSheetDate = (value: unknown, sheetName: string): string | undefined => {
+    const year = sheetYearOf(sheetName);
+    const inRange = (iso?: string) => !!iso && Math.abs(parseInt(iso.slice(0, 4), 10) - year) <= 1;
+    const direct = excelDate(value);
+    if (inRange(direct)) return direct;
+    const text = value == null ? '' : String(value);
+    const fromText = flightDateFromText(text, sheetName);
+    if (inRange(fromText)) return fromText;
+    const month = sheetMonthOf(sheetName);
+    const dayOnly = text.trim().match(/^(\d{1,2})$/);
+    if (month && dayOnly) {
+      const day = parseInt(dayOnly[1], 10);
+      if (day >= 1 && day <= 31) {
+        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      }
+    }
+    return undefined;
+  };
+
 
   for (const sname of wb.SheetNames) {
     if (!monthRe.test(sname.trim())) continue;
@@ -350,7 +408,7 @@ export async function parsePlannerWorkbook(file: File, vesselNameDefault: string
       }
       const arrCell = cArrival >= 0 ? sheet[XLSX.utils.encode_cell({ r: R, c: cArrival })]?.v : undefined;
       const arrText = arrCell == null ? '' : String(arrCell);
-      const flightDate = excelDate(arrCell) ?? flightDateFromText(arrText, sname);
+      const flightDate = monthSheetDate(arrCell, sname);
       const flightNumber = flightNumFromText(arrText);
       travel.push({
         vesselGuess: vesselNameDefault,
@@ -358,7 +416,7 @@ export async function parsePlannerWorkbook(file: File, vesselNameDefault: string
         direction,
         flightDate,
         flightNumber,
-        changeoverDate: cChange >= 0 ? excelDate(sheet[XLSX.utils.encode_cell({ r: R, c: cChange })]?.v) : undefined,
+        changeoverDate: cChange >= 0 ? monthSheetDate(sheet[XLSX.utils.encode_cell({ r: R, c: cChange })]?.v, sname) : undefined,
         accommodation: cAccom >= 0 ? String(sheet[XLSX.utils.encode_cell({ r: R, c: cAccom })]?.v ?? '').trim() || undefined : undefined,
         route: cRoute >= 0 ? String(sheet[XLSX.utils.encode_cell({ r: R, c: cRoute })]?.v ?? '').trim() || undefined : undefined,
         supplier: cSupp >= 0 ? String(sheet[XLSX.utils.encode_cell({ r: R, c: cSupp })]?.v ?? '').trim() || undefined : undefined,
