@@ -109,27 +109,33 @@ const ImportDialog: React.FC<Props> = ({ open, onClose, vessels, crew, lanes, on
       let crewImportedCount = 0;
       let crewSynced: { inserted: number; updated: number } | null = null;
       if (preview.crew.length) {
-        const crewPayload = preview.crew.map((c, i) => ({
-          airtable_id: `frp-${vesselId}-${c.externalId ?? c.fullName?.toLowerCase().replace(/[^a-z0-9]+/g, '-') ?? i}`,
-          crew_id: c.externalId ? Number(c.externalId) || null : null,
-          vessel: vesselName,
-          first_name: c.firstName ?? null,
-
-          middle_name: c.middleName ?? null,
-          last_name: c.lastName ?? null,
-          full_legal_name: c.fullName,
-          personal_email: c.email ?? null,
-          cellular_phone: c.phone ?? null,
-          date_of_birth: c.dateOfBirth ?? null,
-          nationality: c.nationality ?? null,
-          role: c.jobTitle ?? null,
-          repatriation: c.repatriationPort ?? null,
-          imported_at: new Date().toISOString(),
-        }));
-        const { error: crewErr } = await (supabase as any).from('crew_import').insert(crewPayload);
+        const byKey = new Map<string, any>();
+        preview.crew.forEach((c, i) => {
+          const key = `frp-${vesselId}-${c.externalId ?? c.fullName?.toLowerCase().replace(/[^a-z0-9]+/g, '-') ?? i}`;
+          byKey.set(key, {
+            airtable_id: key,
+            crew_id: c.externalId ? Number(c.externalId) || null : null,
+            vessel: vesselName,
+            first_name: c.firstName ?? null,
+            middle_name: c.middleName ?? null,
+            last_name: c.lastName ?? null,
+            full_legal_name: c.fullName,
+            personal_email: c.email ?? null,
+            cellular_phone: c.phone ?? null,
+            date_of_birth: c.dateOfBirth ?? null,
+            nationality: c.nationality ?? null,
+            role: c.jobTitle ?? null,
+            repatriation: c.repatriationPort ?? null,
+            imported_at: new Date().toISOString(),
+          });
+        });
+        const crewPayload = Array.from(byKey.values());
+        const { error: crewErr } = await (supabase as any)
+          .from('crew_import').upsert(crewPayload, { onConflict: 'airtable_id' });
         if (crewErr) {
-          console.warn('crew_import insert failed', crewErr);
+          console.warn('crew_import upsert failed', crewErr);
           toast({ title: 'Crew staging failed', description: crewErr.message, variant: 'destructive' });
+
         } else {
           crewImportedCount = crewPayload.length;
           const { data: syncData, error: syncErr } = await (supabase as any)
