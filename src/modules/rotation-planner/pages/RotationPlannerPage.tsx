@@ -12,7 +12,7 @@ import { usePlannerData } from '../hooks/usePlannerData';
 import { usePlannerPermissions } from '../hooks/usePlannerPermissions';
 import { usePlannerHistory } from '../hooks/usePlannerHistory';
 import { useVesselsLite, useCrewLite } from '../hooks/useVesselsAndCrew';
-import { ZOOM_PX_PER_DAY, LOCATION_LANE_HEIGHT, LEFT_COL_WIDTH } from '../constants';
+import { ZOOM_PX_PER_DAY, LEFT_COL_WIDTH } from '../constants';
 import { detectConflicts, buildConflictItems } from '../lib/conflicts';
 import { exportPlannerToXLSX } from '../lib/xlsxExporter';
 import { exportPlannerToPDF } from '../lib/pdfExporter';
@@ -275,12 +275,8 @@ const RotationPlannerPage: React.FC = () => {
         notes: c.notes,
       } as Partial<RotationAssignment>;
     });
-    void applyUpdatesFreeNoop();
     void applyInserts(rows, `Paste ${rows.length} block${rows.length > 1 ? 's' : ''}`);
   }, [requireEdit, clipboard, companyId, planner.lanes, applyInserts]);
-
-  // no-op kept out of the way so paste stays a single history entry
-  const applyUpdatesFreeNoop = async () => {};
 
   const onDeleteSelection = useCallback(() => {
     const ids = [...selectedIds];
@@ -513,7 +509,14 @@ const RotationPlannerPage: React.FC = () => {
           assignment={detail}
           open={!!detail}
           onClose={() => setDetailId(undefined)}
-          onSave={(a) => { const { id, ...rest } = a as any; if (id) void applyUpdates([{ id, ...rest }], 'Edit block'); }}
+          onSave={(a) => {
+            const src = a as any;
+            if (!src.id) return;
+            const fields = ['label', 'start_date', 'end_date', 'rotation_type', 'status', 'vessel_id', 'lane_id', 'crew_user_id', 'colour', 'notes'];
+            const patch: any = { id: src.id };
+            for (const f of fields) if (f in src) patch[f] = src[f] ?? null;
+            void applyUpdates([patch], 'Edit block');
+          }}
           onDelete={(id) => void applyDeletes([id], 'Delete block')}
           onDuplicate={onDuplicate}
           onSplit={onSplit}
