@@ -29,7 +29,7 @@ interface Props {
 
 const Toolbar: React.FC<Props> = ({
   zoom, setZoom, viewStart, viewEnd, onToday, onShift,
-  filters, setFilters, vessels, conflictCount, onImport, onExport, onCreate, canEdit = true,
+  filters, setFilters, vessels, conflictCount, onImport, onExport, onExportPdf, onCreate, canEdit = true,
 }) => {
   const zoomIdx = ZOOM_ORDER.indexOf(zoom);
   const zoomIn = () => zoomIdx > 0 && setZoom(ZOOM_ORDER[zoomIdx - 1]);
