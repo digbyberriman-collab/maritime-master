@@ -103,24 +103,41 @@ function classifyLocationStatus(name: string): FrpLocationStatus {
  * - Header row index 3 (4th row): day-of-month numbers (1..31) per column.
  * Combines the most-recent month with each day to produce a per-column ISO date.
  */
+const MONTH_NAMES = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+
+/** Reads a month marker such as "Sep-23", "September - 27" or "Jan 2025". */
+function parseMonthMarker(cell: XLSX.CellObject | undefined): { year: number; month: number } | null {
+  if (!cell) return null;
+  const text = String((cell as any).w ?? '').trim() || (typeof cell.v === 'string' ? cell.v.trim() : '');
+  const m = text.match(/^([A-Za-z]{3,9})\s*[-–/\s]\s*(\d{2,4})$/);
+  if (m) {
+    const idx = MONTH_NAMES.indexOf(m[1].slice(0, 3).toLowerCase());
+    if (idx >= 0) {
+      let year = parseInt(m[2], 10);
+      if (year < 100) year += 2000;
+      return { year, month: idx + 1 };
+    }
+  }
+  const v = cell.v;
+  if (v instanceof Date && !isNaN(v.getTime())) return { year: v.getFullYear(), month: v.getMonth() + 1 };
+  if (typeof v === 'number') {
+    const d = XLSX.SSF.parse_date_code(v);
+    if (d) return { year: d.y, month: d.m };
+  }
+  return null;
+}
+
 function buildDateAxis(tl: XLSX.WorkSheet, range: XLSX.Range): Record<number, string> {
   const dateForCol: Record<number, string> = {};
   let curYear: number | null = null;
   let curMonth: number | null = null;
   let lastDay = 0;
-  let prevIso: string | null = null;
   for (let C = range.s.c + 1; C <= range.e.c; C++) {
-    const monthCell = tl[XLSX.utils.encode_cell({ r: 2, c: C })];
-    const mv = monthCell?.v;
-    if (mv instanceof Date && !isNaN(mv.getTime())) {
-      curYear = mv.getFullYear();
-      curMonth = mv.getMonth() + 1;
-    } else if (typeof mv === 'number') {
-      const d = XLSX.SSF.parse_date_code(mv);
-      if (d) {
-        curYear = d.y;
-        curMonth = d.m;
-      }
+    const marker = parseMonthMarker(tl[XLSX.utils.encode_cell({ r: 2, c: C })]);
+    if (marker) {
+      curYear = marker.year;
+      curMonth = marker.month;
+      lastDay = 0;
     }
     const dayCell = tl[XLSX.utils.encode_cell({ r: 3, c: C })];
     const dv = dayCell?.v;
@@ -134,22 +151,11 @@ function buildDateAxis(tl: XLSX.WorkSheet, range: XLSX.Range): Record<number, st
         if (curMonth > 12) { curMonth = 1; curYear += 1; }
       }
       lastDay = day;
-      // The timeline axis must move forward. Some header cells carry a stale year,
-      // so roll the year forward until the column is after the previous one.
-      let year = curYear;
-      let iso = `${year}-${String(curMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      let guard = 0;
-      while (prevIso && iso <= prevIso && guard < 12) {
-        year += 1;
-        iso = `${year}-${String(curMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        guard++;
-      }
-      curYear = year;
-      prevIso = iso;
-      dateForCol[C] = iso;
+      dateForCol[C] = `${curYear}-${String(curMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     }
   }
   return dateForCol;
+
 }
 
 
