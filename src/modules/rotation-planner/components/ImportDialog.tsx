@@ -105,8 +105,9 @@ const ImportDialog: React.FC<Props> = ({ open, onClose, vessels, crew, lanes, on
       }));
       if (travelPayload.length) await (supabase as any).from('frp_travel_movements').insert(travelPayload);
 
-      // Crew Data → upsert into crew_import staging table
+      // Crew Data → stage into crew_import, then sync into the crew roster
       let crewImportedCount = 0;
+      let crewSynced: { inserted: number; updated: number } | null = null;
       if (preview.crew.length) {
         const crewPayload = preview.crew.map((c) => ({
           crew_id: c.externalId ? Number(c.externalId) || null : null,
@@ -126,10 +127,19 @@ const ImportDialog: React.FC<Props> = ({ open, onClose, vessels, crew, lanes, on
         const { error: crewErr } = await (supabase as any).from('crew_import').insert(crewPayload);
         if (crewErr) {
           console.warn('crew_import insert failed', crewErr);
+          toast({ title: 'Crew staging failed', description: crewErr.message, variant: 'destructive' });
         } else {
           crewImportedCount = crewPayload.length;
+          const { data: syncData, error: syncErr } = await (supabase as any)
+            .rpc('sync_crew_import_to_profiles', { p_company_id: company_id });
+          if (syncErr) {
+            toast({ title: 'Crew sync failed', description: syncErr.message, variant: 'destructive' });
+          } else {
+            crewSynced = { inserted: syncData?.inserted ?? 0, updated: syncData?.updated ?? 0 };
+          }
         }
       }
+
 
       await (supabase as any).from('frp_import_batches').update({
         status: 'complete',
