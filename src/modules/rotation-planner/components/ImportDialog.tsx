@@ -105,44 +105,64 @@ const ImportDialog: React.FC<Props> = ({ open, onClose, vessels, crew, lanes, on
       }));
       if (travelPayload.length) await (supabase as any).from('frp_travel_movements').insert(travelPayload);
 
-      // Crew Data → upsert into crew_import staging table
+      // Crew Data → stage into crew_import, then sync into the crew roster
       let crewImportedCount = 0;
+      let crewSynced: { inserted: number; updated: number } | null = null;
       if (preview.crew.length) {
-        const crewPayload = preview.crew.map((c) => ({
-          crew_id: c.externalId ? Number(c.externalId) || null : null,
-          vessel: vesselName,
-          first_name: c.firstName ?? null,
-          middle_name: c.middleName ?? null,
-          last_name: c.lastName ?? null,
-          full_legal_name: c.fullName,
-          personal_email: c.email ?? null,
-          cellular_phone: c.phone ?? null,
-          date_of_birth: c.dateOfBirth ?? null,
-          nationality: c.nationality ?? null,
-          role: c.jobTitle ?? null,
-          repatriation: c.repatriationPort ?? null,
-          imported_at: new Date().toISOString(),
-        }));
-        const { error: crewErr } = await (supabase as any).from('crew_import').insert(crewPayload);
+        const byKey = new Map<string, any>();
+        preview.crew.forEach((c, i) => {
+          const key = `frp-${vesselId}-${c.externalId ?? c.fullName?.toLowerCase().replace(/[^a-z0-9]+/g, '-') ?? i}`;
+          byKey.set(key, {
+            airtable_id: key,
+            crew_id: c.externalId ? Number(c.externalId) || null : null,
+            vessel: vesselName,
+            first_name: c.firstName ?? null,
+            middle_name: c.middleName ?? null,
+            last_name: c.lastName ?? null,
+            full_legal_name: c.fullName,
+            personal_email: c.email ?? null,
+            cellular_phone: c.phone ?? null,
+            date_of_birth: c.dateOfBirth ?? null,
+            nationality: c.nationality ?? null,
+            role: c.jobTitle ?? null,
+            repatriation: c.repatriationPort ?? null,
+            imported_at: new Date().toISOString(),
+          });
+        });
+        const crewPayload = Array.from(byKey.values());
+        const { error: crewErr } = await (supabase as any)
+          .from('crew_import').upsert(crewPayload, { onConflict: 'airtable_id' });
         if (crewErr) {
-          console.warn('crew_import insert failed', crewErr);
+          console.warn('crew_import upsert failed', crewErr);
+          toast({ title: 'Crew staging failed', description: crewErr.message, variant: 'destructive' });
+
         } else {
           crewImportedCount = crewPayload.length;
+          const { data: syncData, error: syncErr } = await (supabase as any)
+            .rpc('sync_crew_import_to_profiles', { p_company_id: company_id });
+          if (syncErr) {
+            toast({ title: 'Crew sync failed', description: syncErr.message, variant: 'destructive' });
+          } else {
+            crewSynced = { inserted: syncData?.inserted ?? 0, updated: syncData?.updated ?? 0 };
+          }
         }
       }
+
 
       await (supabase as any).from('frp_import_batches').update({
         status: 'complete',
         summary: {
           rotations: rotsPayload.length, locations: locsPayload.length, travel: travelPayload.length,
-          crew: crewImportedCount, warnings: preview.warnings,
+          crew: crewImportedCount, crew_synced: crewSynced, warnings: preview.warnings,
         },
       }).eq('id', batch.id);
 
       toast({
         title: 'Import complete',
-        description: `${rotsPayload.length} rotations, ${locsPayload.length} locations, ${travelPayload.length} travel, ${crewImportedCount} crew.`,
+        description: `${rotsPayload.length} rotations, ${locsPayload.length} locations, ${travelPayload.length} travel, ${crewImportedCount} crew`
+          + (crewSynced ? ` (${crewSynced.inserted} added to crew list, ${crewSynced.updated} updated).` : '.'),
       });
+
       onComplete();
       onClose();
     } catch (e: any) {
