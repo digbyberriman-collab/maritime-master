@@ -13969,6 +13969,10 @@ export type Database = {
         Args: { p_alert_id: string; p_reason?: string; p_snooze_hours?: number }
         Returns: Json
       }
+      sync_crew_import_to_profiles: {
+        Args: { p_company_id?: string }
+        Returns: Json
+      }
       update_emergency_contacts: {
         Args: {
           p_change_summary?: string
