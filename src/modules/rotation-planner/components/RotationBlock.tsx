@@ -11,13 +11,15 @@ interface Props {
   top: number;
   conflicts?: ConflictInfo[];
   selected?: boolean;
+  crewName?: string;
+  height?: number;
   onPointerDownMove: (e: React.PointerEvent, a: RotationAssignment) => void;
   onPointerDownResize: (e: React.PointerEvent, a: RotationAssignment, side: 'left' | 'right') => void;
-  onClick: (a: RotationAssignment, e: React.MouseEvent) => void;
+  onClick: (a: RotationAssignment, mode: 'single' | 'toggle' | 'range') => void;
 }
 
 const RotationBlock: React.FC<Props> = ({
-  assignment, viewStart, zoom, top, conflicts, selected,
+  assignment, viewStart, zoom, top, height, conflicts, selected, crewName,
   onPointerDownMove, onPointerDownResize, onClick,
 }) => {
   const px = ZOOM_PX_PER_DAY[zoom];
@@ -32,21 +34,26 @@ const RotationBlock: React.FC<Props> = ({
     <div
       role="button"
       tabIndex={0}
-      onClick={(e) => onClick(assignment, e)}
+      data-block="1"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick(assignment, e.shiftKey ? 'range' : (e.metaKey || e.ctrlKey) ? 'toggle' : 'single');
+      }}
       onPointerDown={(e) => {
+        e.stopPropagation();
         const target = e.target as HTMLElement;
         if (target.dataset.resize) return;
         onPointerDownMove(e, assignment);
       }}
-      title={`${ROTATION_TYPE_LABELS[assignment.rotation_type]} • ${assignment.label ?? ''}\n${assignment.start_date} → ${assignment.end_date}${conflicts?.length ? '\n⚠ ' + conflicts.map(c => c.reason).join('; ') : ''}`}
+      title={`${ROTATION_TYPE_LABELS[assignment.rotation_type]} • ${assignment.label ?? ''}${crewName ? `\n${crewName}` : ''}\n${assignment.start_date} → ${assignment.end_date}${conflicts?.length ? '\n⚠ ' + conflicts.map(c => c.reason).join('; ') : ''}`}
       className={cn(
         'absolute rounded-md text-[11px] text-white truncate cursor-grab active:cursor-grabbing select-none shadow-sm flex items-center px-1.5',
-        selected && 'ring-2 ring-primary ring-offset-1',
+        selected && 'ring-2 ring-primary ring-offset-1 z-10',
         hasHard && 'outline outline-2 outline-destructive',
         !hasHard && hasSoft && 'outline outline-2 outline-amber-500',
       )}
       style={{
-        left, width, top: top + 4, height: LANE_HEIGHT - 8,
+        left, width, top: top + 4, height: height ?? LANE_HEIGHT - 8,
         background: baseColour,
         opacity: assignment.status === 'draft' ? 0.7 : 1,
       }}
@@ -57,7 +64,9 @@ const RotationBlock: React.FC<Props> = ({
         onPointerDown={(e) => { e.stopPropagation(); onPointerDownResize(e, assignment, 'left'); }}
         className="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize"
       />
-      <span className="truncate">{assignment.label || ROTATION_TYPE_LABELS[assignment.rotation_type]}</span>
+      <span className="truncate pointer-events-none">
+        {assignment.label || crewName || ROTATION_TYPE_LABELS[assignment.rotation_type]}
+      </span>
       {/* Right resize handle */}
       <div
         data-resize="right"

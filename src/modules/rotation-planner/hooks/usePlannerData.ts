@@ -122,6 +122,48 @@ export function usePlannerData(win: PlannerWindow) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['frp', 'assignments'] }),
   });
 
+  /** Batch insert of complete rows — paste, duplicate and undo-of-delete. */
+  const insertManyAssignments = useMutation({
+    mutationFn: async (rows: Partial<RotationAssignment>[]) => {
+      if (!rows.length) return [] as RotationAssignment[];
+      const payload = rows.map((r) => {
+        const row: any = { ...r, created_by: user?.id ?? null, updated_by: user?.id ?? null };
+        delete row.created_at; delete row.updated_at; delete row.version;
+        return row;
+      });
+      const { data, error } = await (supabase as any)
+        .from('frp_rotation_assignments').insert(payload).select();
+      if (error) throw error;
+      return (data ?? []) as RotationAssignment[];
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['frp', 'assignments'] }),
+  });
+
+  /** Batch partial update by id — multi-select moves, resizes and conflict fixes. */
+  const updateManyAssignments = useMutation({
+    mutationFn: async (rows: (Partial<RotationAssignment> & { id: string })[]) => {
+      for (const r of rows) {
+        const { id, ...rest } = r;
+        const { error } = await (supabase as any)
+          .from('frp_rotation_assignments')
+          .update({ ...rest, updated_by: user?.id ?? null })
+          .eq('id', id);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['frp', 'assignments'] }),
+  });
+
+  const deleteManyAssignments = useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (!ids.length) return;
+      const { error } = await (supabase as any)
+        .from('frp_rotation_assignments').delete().in('id', ids);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['frp', 'assignments'] }),
+  });
+
   const upsertLocation = useMutation({
     mutationFn: async (row: Partial<VesselLocation> & { id?: string }) => {
       const payload: any = { ...row, updated_by: user?.id ?? null };
@@ -154,5 +196,8 @@ export function usePlannerData(win: PlannerWindow) {
     loading,
     error: lanesQ.error || assignmentsQ.error || locationsQ.error,
     upsertAssignment, deleteAssignment, upsertLocation, upsertLane,
-  }), [lanesQ, assignmentsQ, locationsQ, leaveQ, travelQ, payrollQ, loading, upsertAssignment, deleteAssignment, upsertLocation, upsertLane]);
+    insertManyAssignments, updateManyAssignments, deleteManyAssignments,
+  }), [lanesQ, assignmentsQ, locationsQ, leaveQ, travelQ, payrollQ, loading,
+    upsertAssignment, deleteAssignment, upsertLocation, upsertLane,
+    insertManyAssignments, updateManyAssignments, deleteManyAssignments]);
 }
