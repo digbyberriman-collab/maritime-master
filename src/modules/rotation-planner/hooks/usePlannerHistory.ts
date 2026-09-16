@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 export interface HistoryCommand {
   label: string;
@@ -16,64 +16,65 @@ const LIMIT = 60;
  * deletes, moves and pastes — including multi-block operations.
  */
 export function usePlannerHistory() {
-  const [past, setPast] = useState<HistoryCommand[]>([]);
-  const [future, setFuture] = useState<HistoryCommand[]>([]);
+  const past = useRef<HistoryCommand[]>([]);
+  const future = useRef<HistoryCommand[]>([]);
+  const [, bump] = useState(0);
   const [busy, setBusy] = useState(false);
+  const touch = useCallback(() => bump((n) => n + 1), []);
 
   const run = useCallback(async (cmd: HistoryCommand) => {
     setBusy(true);
     try {
       await cmd.apply();
-      setPast((p) => [...p, cmd].slice(-LIMIT));
-      setFuture([]);
+      past.current = [...past.current, cmd].slice(-LIMIT);
+      future.current = [];
+      touch();
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [touch]);
 
   const undo = useCallback(async (): Promise<string | null> => {
-    let cmd: HistoryCommand | undefined;
-    setPast((p) => { cmd = p[p.length - 1]; return cmd ? p.slice(0, -1) : p; });
-    // setPast's updater runs synchronously in React 18 batching for this call path,
-    // but read from the latest state defensively:
+    const cmd = past.current[past.current.length - 1];
     if (!cmd) return null;
     setBusy(true);
     try {
       await cmd.revert();
-      setFuture((f) => [cmd as HistoryCommand, ...f].slice(0, LIMIT));
+      past.current = past.current.slice(0, -1);
+      future.current = [cmd, ...future.current].slice(0, LIMIT);
+      touch();
       return cmd.label;
-    } catch (e) {
-      setPast((p) => [...p, cmd as HistoryCommand]);
-      throw e;
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [touch]);
 
   const redo = useCallback(async (): Promise<string | null> => {
-    let cmd: HistoryCommand | undefined;
-    setFuture((f) => { cmd = f[0]; return cmd ? f.slice(1) : f; });
+    const cmd = future.current[0];
     if (!cmd) return null;
     setBusy(true);
     try {
       await cmd.apply();
-      setPast((p) => [...p, cmd as HistoryCommand].slice(-LIMIT));
+      future.current = future.current.slice(1);
+      past.current = [...past.current, cmd].slice(-LIMIT);
+      touch();
       return cmd.label;
-    } catch (e) {
-      setFuture((f) => [cmd as HistoryCommand, ...f]);
-      throw e;
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [touch]);
 
-  const clear = useCallback(() => { setPast([]); setFuture([]); }, []);
+  const clear = useCallback(() => {
+    past.current = [];
+    future.current = [];
+    touch();
+  }, [touch]);
 
   return useMemo(() => ({
     run, undo, redo, clear, busy,
-    canUndo: past.length > 0,
-    canRedo: future.length > 0,
-    undoLabel: past[past.length - 1]?.label ?? null,
-    redoLabel: future[0]?.label ?? null,
-  }), [run, undo, redo, clear, busy, past, future]);
+    canUndo: past.current.length > 0,
+    canRedo: future.current.length > 0,
+    undoLabel: past.current[past.current.length - 1]?.label ?? null,
+    redoLabel: future.current[0]?.label ?? null,
+  }), [run, undo, redo, clear, busy]);
 }
