@@ -37,7 +37,7 @@ const ModuleTopNav: React.FC<ModuleTopNavProps> = ({ activeModuleId, onModuleCha
 
   return (
     <nav aria-label="Modules" className="min-w-0 flex-1">
-      <div ref={railRef} className="relative flex items-center gap-1 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory">
+      <div ref={railRef} className="relative flex w-full items-center gap-1 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden snap-x snap-mandatory">
         <span
           aria-hidden="true"
           className={cn(
@@ -57,7 +57,7 @@ const ModuleTopNav: React.FC<ModuleTopNavProps> = ({ activeModuleId, onModuleCha
               onClick={() => onModuleChange(module.id)}
               aria-pressed={active}
               className={cn(
-                'relative z-10 flex h-10 shrink-0 snap-start items-center gap-2 rounded-md px-3 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                'relative z-10 flex h-10 min-w-[9.5rem] flex-1 snap-start items-center justify-center gap-2 whitespace-nowrap rounded-md px-2 text-sm font-semibold transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                 active ? 'text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               )}
             >
