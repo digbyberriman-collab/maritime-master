@@ -13,6 +13,7 @@ import { useVesselsLite, useCrewLite } from '../hooks/useVesselsAndCrew';
 import { ZOOM_PX_PER_DAY, HEADER_HEIGHT, LOCATION_LANE_HEIGHT, LEFT_COL_WIDTH } from '../constants';
 import { detectConflicts } from '../lib/conflicts';
 import { exportPlannerToXLSX } from '../lib/xlsxExporter';
+import { exportPlannerToPDF } from '../lib/pdfExporter';
 import type { PlannerFilters, RotationAssignment, ZoomLevel } from '../types';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -161,6 +162,7 @@ const RotationPlannerPage: React.FC = () => {
           conflictCount={conflictsById.size}
           onImport={() => setImportOpen(true)}
           onExport={onExport}
+          onExportPdf={onExportPdf}
           onCreate={onCreateBlank}
           canEdit={canEdit}
         />
