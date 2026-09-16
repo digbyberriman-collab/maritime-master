@@ -126,8 +126,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
                 STORM
               </Link>
               <button
+                type="button"
                 onClick={() => setSidebarOpen(false)}
                 className="lg:hidden text-sidebar-foreground"
+                aria-label="Close folder panel"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -196,8 +198,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
         <header className="min-h-16 bg-card border-b border-border flex items-center gap-2 px-3 lg:px-5 py-2 shadow-navbar relative z-20">
           {/* Mobile menu button */}
           <button
+            type="button"
             onClick={() => setSidebarOpen(true)}
             className="lg:hidden p-2 text-foreground"
+            aria-label="Open folder panel"
           >
             <Menu className="w-5 h-5" />
           </button>
