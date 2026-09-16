@@ -29,7 +29,6 @@ import { ComplianceSnapshot } from '@/modules/dashboard/components/ComplianceSna
 import { OperationsSnapshot } from '@/modules/dashboard/components/OperationsSnapshot';
 import { RecentActivityFeed } from '@/modules/dashboard/components/RecentActivityFeed';
 import { RecentActivityTable } from '@/modules/dashboard/components/RecentActivityTable';
-import TopModuleNav from '@/shared/components/layout/TopModuleNav';
 import { QuickActionsMenu } from '@/modules/dashboard/components/QuickActionsMenu';
 import { EmergencyContactsWidget } from '@/modules/emergency/components/EmergencyContactsWidget';
 import VesselProfileCard from '@/modules/vessels/components/VesselProfileCard';
@@ -126,11 +125,6 @@ const VesselDashboard: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
-        {/* Horizontal module shortcut nav (Sealogical-style) */}
-        <div className="-mx-4 lg:-mx-6 -mt-4 lg:-mt-6">
-          <TopModuleNav />
-        </div>
-
         {/* View toggle: Vessel vs Fleet */}
         {canAccessAllVessels && (
           <div className="inline-flex rounded-md border bg-card p-0.5 shadow-sm">
