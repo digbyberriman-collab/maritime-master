@@ -196,8 +196,8 @@ export function usePlannerData(win: PlannerWindow) {
     loading,
     error: lanesQ.error || assignmentsQ.error || locationsQ.error,
     upsertAssignment, deleteAssignment, upsertLocation, upsertLane,
-    upsertManyAssignments, deleteManyAssignments,
+    insertManyAssignments, updateManyAssignments, deleteManyAssignments,
   }), [lanesQ, assignmentsQ, locationsQ, leaveQ, travelQ, payrollQ, loading,
     upsertAssignment, deleteAssignment, upsertLocation, upsertLane,
-    upsertManyAssignments, deleteManyAssignments]);
+    insertManyAssignments, updateManyAssignments, deleteManyAssignments]);
 }
