@@ -145,14 +145,16 @@ const ImportDialog: React.FC<Props> = ({ open, onClose, vessels, crew, lanes, on
         status: 'complete',
         summary: {
           rotations: rotsPayload.length, locations: locsPayload.length, travel: travelPayload.length,
-          crew: crewImportedCount, warnings: preview.warnings,
+          crew: crewImportedCount, crew_synced: crewSynced, warnings: preview.warnings,
         },
       }).eq('id', batch.id);
 
       toast({
         title: 'Import complete',
-        description: `${rotsPayload.length} rotations, ${locsPayload.length} locations, ${travelPayload.length} travel, ${crewImportedCount} crew.`,
+        description: `${rotsPayload.length} rotations, ${locsPayload.length} locations, ${travelPayload.length} travel, ${crewImportedCount} crew`
+          + (crewSynced ? ` (${crewSynced.inserted} added to crew list, ${crewSynced.updated} updated).` : '.'),
       });
+
       onComplete();
       onClose();
     } catch (e: any) {
