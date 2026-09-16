@@ -1,3 +1,3 @@
 # Current work
 
-- [ ] Restore and verify the authenticated home page at `/`.
+- [x] Restore and verify the authenticated home page at `/`.
