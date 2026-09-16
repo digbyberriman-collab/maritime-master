@@ -1,6 +1,5 @@
 import React from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useBrandingContext } from '@/shared/contexts/BrandingContext';
 import InkfishFooter from '@/shared/components/layout/InkfishFooter';
 import InkfishWatermark from '@/shared/components/InkfishWatermark';
@@ -14,7 +13,6 @@ import { resolveModuleForPath } from '@/shared/lib/moduleNavigation';
 import { DashboardFilterProvider } from '@/modules/dashboard/contexts/DashboardFilterContext';
 import FeedbackPanel from '@/modules/feedback/components/FeedbackPanel';
 import FeedbackResolvedToast from '@/modules/feedback/components/FeedbackResolvedToast';
-import { useFeedbackStore } from '@/modules/feedback/store/feedbackStore';
 import { Menu, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -23,7 +21,6 @@ interface DashboardLayoutProps {
 }
 
 const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
-  const { profile } = useAuth();
   const { clientDisplayName, clientLogoUrl } = useBrandingContext();
   const navigate = useNavigate();
   const location = useLocation();
