@@ -331,6 +331,37 @@ export async function parsePlannerWorkbook(file: File, vesselNameDefault: string
     const m = txt.match(/\b([A-Z]{1,3}\s?\d{1,4}[A-Z]?)\b/);
     return m ? m[1].replace(/\s/g, '') : undefined;
   };
+  const sheetYearOf = (sheetName: string): number => {
+    const y = sheetName.match(/(\d{2,4})/);
+    let year = y ? parseInt(y[1], 10) : new Date().getFullYear();
+    if (year < 100) year += 2000;
+    return year;
+  };
+  const sheetMonthOf = (sheetName: string): number | null => {
+    const m = sheetName.trim().slice(0, 3).toLowerCase();
+    const idx = MONTH_NAMES.indexOf(m);
+    return idx >= 0 ? idx + 1 : null;
+  };
+  /** Reads a date cell on a monthly tab, rejecting values that fall outside that month's year. */
+  const monthSheetDate = (value: unknown, sheetName: string): string | undefined => {
+    const year = sheetYearOf(sheetName);
+    const inRange = (iso?: string) => !!iso && Math.abs(parseInt(iso.slice(0, 4), 10) - year) <= 1;
+    const direct = excelDate(value);
+    if (inRange(direct)) return direct;
+    const text = value == null ? '' : String(value);
+    const fromText = flightDateFromText(text, sheetName);
+    if (inRange(fromText)) return fromText;
+    const month = sheetMonthOf(sheetName);
+    const dayOnly = text.trim().match(/^(\d{1,2})$/);
+    if (month && dayOnly) {
+      const day = parseInt(dayOnly[1], 10);
+      if (day >= 1 && day <= 31) {
+        return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      }
+    }
+    return undefined;
+  };
+
 
   for (const sname of wb.SheetNames) {
     if (!monthRe.test(sname.trim())) continue;
