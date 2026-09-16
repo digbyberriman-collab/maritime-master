@@ -54,6 +54,15 @@ const textColourFor = (hex: string): [number, number, number] => {
   return luminance > 0.6 ? [17, 24, 39] : [255, 255, 255];
 };
 
+/** Truncates to a single line with an ellipsis so labels never wrap out of a block. */
+const fitText = (doc: jsPDF, text: string, maxW: number): string => {
+  if (!text) return '';
+  if (doc.getTextWidth(text) <= maxW) return text;
+  let s = text;
+  while (s.length > 1 && doc.getTextWidth(s + '…') > maxW) s = s.slice(0, -1);
+  return s.length > 1 ? s.trimEnd() + '…' : '';
+};
+
 const blockColour = (a: RotationAssignment) =>
   a.colour || ROTATION_TYPE_COLOURS[a.rotation_type] || '#9ca3af';
 
@@ -155,7 +164,7 @@ export function exportPlannerToPDF(opts: PdfExportOptions) {
       doc.rect(x, axisY, w, 15, 'F');
       doc.setTextColor(30, 41, 59);
       doc.setFont('helvetica', 'bold');
-      if (w > 26) doc.text(format(m, w > 52 ? 'MMM yyyy' : 'MMM'), x + 2, axisY + 11, { maxWidth: w - 3 });
+      if (w > 26) doc.text(fitText(doc, format(m, w > 52 ? 'MMM yyyy' : 'MMM'), w - 3), x + 2, axisY + 11);
       // Month separator down the grid
       doc.setDrawColor(148, 163, 184);
       doc.setLineWidth(0.6);
@@ -211,7 +220,7 @@ export function exportPlannerToPDF(opts: PdfExportOptions) {
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(6.5);
           doc.setTextColor(...textColourFor(colour));
-          doc.text(l.location_name, x + 2, y + LOC_H / 2 + 2.2, { maxWidth: w - 3 });
+          doc.text(fitText(doc, l.location_name, w - 4), x + 2, y + LOC_H / 2 + 2.2);
         }
       });
 
@@ -267,12 +276,12 @@ export function exportPlannerToPDF(opts: PdfExportOptions) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(7.5);
         doc.setTextColor(17, 24, 39);
-        doc.text(row.label, MARGIN + 2, y + 9, { maxWidth: LABEL_W - 6 });
+        doc.text(fitText(doc, row.label, LABEL_W - 6), MARGIN + 2, y + 9);
         if (row.sub) {
           doc.setFont('helvetica', 'normal');
           doc.setFontSize(6);
           doc.setTextColor(107, 114, 128);
-          doc.text(row.sub, MARGIN + 2, y + 17, { maxWidth: LABEL_W - 6 });
+          doc.text(fitText(doc, row.sub, LABEL_W - 6), MARGIN + 2, y + 17);
         }
         doc.setDrawColor(226, 232, 240);
         doc.setLineWidth(0.3);
@@ -305,7 +314,7 @@ export function exportPlannerToPDF(opts: PdfExportOptions) {
               doc.setFont('helvetica', 'normal');
               doc.setFontSize(6.2);
               doc.setTextColor(...textColourFor(colour));
-              doc.text(text, x + 2, y + ROW_H / 2 + 2, { maxWidth: w - 3 });
+              doc.text(fitText(doc, text, w - 4), x + 2, y + ROW_H / 2 + 2);
             }
           });
       });
@@ -391,7 +400,7 @@ export function exportPlannerToPDF(opts: PdfExportOptions) {
           doc.rect(x + 2, y - 6, 8, 8, 'F');
         } else {
           doc.setTextColor(31, 41, 55);
-          doc.text(values[c.key], x + 2, y, { maxWidth: c.w - 4 });
+          doc.text(fitText(doc, values[c.key], c.w - 5), x + 2, y);
         }
         x += c.w;
       });
