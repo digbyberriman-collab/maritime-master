@@ -64,7 +64,14 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
   }, [children, containsCurrentPath, moduleId]);
 
   const go = (path: string) => {
-    navigate(path);
+    if (moduleId) {
+      const [pathname, query = ''] = path.split('?');
+      const params = new URLSearchParams(query);
+      params.set('module', moduleId);
+      navigate(`${pathname}?${params.toString()}`);
+    } else {
+      navigate(path);
+    }
     onNavigate?.();
   };
 

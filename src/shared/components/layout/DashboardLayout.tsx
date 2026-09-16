@@ -46,7 +46,10 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
-  const activeModule = React.useMemo(() => resolveModuleForPath(location.pathname), [location.pathname]);
+  const activeModule = React.useMemo(() => {
+    const requestedModule = new URLSearchParams(location.search).get('module');
+    return NAVIGATION_ITEMS.find((item) => item.id === requestedModule) ?? resolveModuleForPath(location.pathname);
+  }, [location.pathname, location.search]);
 
   const firstLeafPath = React.useCallback((children?: NavChild[]): string | null => {
     for (const child of children ?? []) {
@@ -60,7 +63,12 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
   const handleModuleChange = React.useCallback((moduleId: string) => {
     const module = NAVIGATION_ITEMS.find((item) => item.id === moduleId);
     const destination = firstLeafPath(module?.children) ?? module?.path;
-    if (destination) navigate(destination);
+    if (destination) {
+      const [pathname, query = ''] = destination.split('?');
+      const params = new URLSearchParams(query);
+      params.set('module', moduleId);
+      navigate(`${pathname}?${params.toString()}`);
+    }
   }, [firstLeafPath, navigate]);
 
   const handleSignOut = async () => {
