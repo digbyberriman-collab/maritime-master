@@ -157,8 +157,8 @@ export const AppRoutes: React.FC = () => {
   return (
     <Routes>
       {/* Public Routes */}
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      <Route path="/index" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/index" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/reset-password" element={<ResetPassword />} />
 
