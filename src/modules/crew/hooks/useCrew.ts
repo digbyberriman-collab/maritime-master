@@ -33,6 +33,14 @@ export interface CrewMember {
   passport_number?: string | null;
   passport_expiry?: string | null;
   visa_status?: string | null;
+  // Personnel classification — one database for crew, contractors and shoreside staff
+  personnel_type?: string | null;
+  place_of_birth?: string | null;
+  passport_country?: string | null;
+  seamans_book_number?: string | null;
+  embarkation_port?: string | null;
+  office_location?: string | null;
+  job_title?: string | null;
   // Account status fields
   account_status?: string | null;
   last_login_at?: string | null;
