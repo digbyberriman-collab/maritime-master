@@ -33,7 +33,7 @@ const buffer = (e: EntryView): LineBuffer => ({
 });
 
 const handlers = () => ({
-  onChange: vi.fn(), onSave: vi.fn(), onRevert: vi.fn(), onDiscard: vi.fn(), onAttest: vi.fn(), onCorrect: vi.fn(), onOpenEntry: vi.fn(), onViewPage: vi.fn(),
+  onChange: vi.fn(), onSave: vi.fn(), onRevert: vi.fn(), onDiscard: vi.fn(), onDelete: vi.fn(), onAttest: vi.fn(), onCorrect: vi.fn(), onOpenEntry: vi.fn(), onViewPage: vi.fn(),
 });
 
 const renderSheet = (props: Partial<React.ComponentProps<typeof RuledSheet>> = {}) => {

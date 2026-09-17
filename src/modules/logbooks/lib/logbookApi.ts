@@ -196,6 +196,14 @@ export async function saveLine(input: LineInput): Promise<EntryRow> {
   return data as unknown as EntryRow;
 }
 
+/** Ids among `entryIds` that already have a linked correction, in this or any continuation volume. */
+export async function fetchCorrectedIds(entryIds: string[]): Promise<string[]> {
+  if (entryIds.length === 0) return [];
+  const { data, error } = await supabase.from('logbook_entries').select('amended_from_id').in('amended_from_id', entryIds);
+  fail(error);
+  return (data ?? []).map((row) => row.amended_from_id).filter((id): id is string => Boolean(id));
+}
+
 export async function deleteDraft(id: string): Promise<void> {
   const { error } = await supabase.from('logbook_entries').delete().eq('id', id).eq('status', 'draft');
   fail(error);

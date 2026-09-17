@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  closeVolume, deleteDraft, fetchLegacyEntries, fetchLogbooks, fetchPages, fetchVolumeEntries, fetchVolumes, openVolume, saveLine, sealPage, signEntry,
+  closeVolume, deleteDraft, fetchCorrectedIds, fetchLegacyEntries, fetchLogbooks, fetchPages, fetchVolumeEntries, fetchVolumes, openVolume, saveLine, sealPage, signEntry,
   type LineInput, type OpenVolumeInput, type SignKind,
 } from '../lib/logbookApi';
 import type { LogbookBook } from '../lib/catalog';
@@ -45,6 +45,14 @@ export function useLogbookWorkspace(vesselId: string | null, book: LogbookBook |
     queryFn: () => fetchLegacyEntries(logbookRow!.id),
   });
 
+  // Corrections of a closed volume's records live in its continuation, so the
+  // current volume's entries alone cannot show which records are already corrected.
+  const correctionsQuery = useQuery({
+    queryKey: ['logbook-corrections-of', volume?.id],
+    enabled: !!volume && volume.status !== 'open' && !!entriesQuery.data,
+    queryFn: () => fetchCorrectedIds((entriesQuery.data ?? []).map((e) => e.id)),
+  });
+
   const invalidateAll = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ['logbook-volume-entries'] }),
@@ -53,6 +61,7 @@ export function useLogbookWorkspace(vesselId: string | null, book: LogbookBook |
       queryClient.invalidateQueries({ queryKey: ['logbook-entry-counts', vesselId] }),
       queryClient.invalidateQueries({ queryKey: ['logbook-vessel-entries', vesselId] }),
       queryClient.invalidateQueries({ queryKey: ['logbooks', vesselId] }),
+      queryClient.invalidateQueries({ queryKey: ['logbook-corrections-of'] }),
     ]);
   };
 
@@ -81,7 +90,9 @@ export function useLogbookWorkspace(vesselId: string | null, book: LogbookBook |
     pages: pagesQuery.data ?? [],
     logbookRow,
     legacyEntries: legacyQuery.data ?? [],
-    isLoading: volumesQuery.isLoading || (!!volume && (entriesQuery.isLoading || pagesQuery.isLoading)),
+    /** Records of this volume already corrected elsewhere (continuation volumes). */
+    correctedElsewhere: correctionsQuery.data ?? [],
+    isLoading: volumesQuery.isLoading || logbooksQuery.isLoading || (!!volume && (entriesQuery.isLoading || pagesQuery.isLoading)),
     refetch: invalidateAll,
     save, discard, sign, seal, open, close,
   };

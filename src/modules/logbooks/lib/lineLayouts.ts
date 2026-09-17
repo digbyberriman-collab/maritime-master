@@ -73,9 +73,17 @@ export function lineFields(definitions: TemplateField[], values: Record<string, 
   return fields;
 }
 
-/** Merely opening a row must not round a captured time down to the minute. */
+/** True when a datetime-local value (with or without seconds) matches the start of an ISO timestamp. */
+export const timeMatches = (value: string, original?: string | null): boolean => Boolean(original && original.slice(0, value.length) === value);
+
+/**
+ * Merely opening a row must not round a captured time down to the minute.
+ * datetime-local values carry minutes only, or seconds when the browser or a captured
+ * sample supplied them; both must produce a valid UTC ISO timestamp.
+ */
 export function eventTime(value: string, original?: string | null): string {
-  return original && original.slice(0, 16) === value ? original : `${value}:00Z`;
+  if (timeMatches(value, original)) return original!;
+  return value.length === 16 ? `${value}:00Z` : `${value}Z`;
 }
 
 /** Formats an item code such as C_11 for display as C.11. */

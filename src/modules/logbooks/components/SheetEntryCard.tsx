@@ -28,6 +28,8 @@ export interface SheetEntryCardProps {
   onSave: (id: string) => void;
   onRevert: (id: string) => void;
   onDiscard: (id: string) => void;
+  /** Delete a saved draft of the current user. */
+  onDelete: (id: string) => void;
   onAttest: (entry: EntryView, kind: SignKind, witness?: { name: string; capacity: string }) => void;
   onCorrect: (entry: EntryView) => void;
   onOpenEntry: (id: string) => void;
@@ -46,7 +48,7 @@ const statusLabel = (entry: EntryView | null) => {
 /** One daily readings sheet: the vessel's grid layout plus the same save, sign, correct and history controls as a ruled line. */
 const SheetEntryCard: React.FC<SheetEntryCardProps> = ({
   template, entry, buffer, number, highlighted, capacity, userId, busy, error, canCorrect, canManageAttachments,
-  onChange, onSave, onRevert, onDiscard, onAttest, onCorrect, onOpenEntry, onViewPage,
+  onChange, onSave, onRevert, onDiscard, onDelete, onAttest, onCorrect, onOpenEntry, onViewPage,
 }) => {
   const id = buffer?.id ?? entry!.id;
   const [open, setOpen] = React.useState(Boolean(buffer) || highlighted);
@@ -121,7 +123,10 @@ const SheetEntryCard: React.FC<SheetEntryCardProps> = ({
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <Button type="button" size="sm" className="h-7 px-3 text-xs" disabled={!buffer.dirty || busy} onClick={() => onSave(id)}>Save sheet</Button>
                 {buffer.existingId ? (
-                  buffer.dirty && <button type="button" className="text-primary hover:underline" onClick={() => onRevert(id)}>Revert unsaved edits</button>
+                  <>
+                    {buffer.dirty && <button type="button" className="text-primary hover:underline" onClick={() => onRevert(id)}>Revert unsaved edits</button>}
+                    <button type="button" className="text-destructive hover:underline" disabled={busy} onClick={() => onDelete(id)}>Delete draft sheet</button>
+                  </>
                 ) : (
                   <button type="button" className="text-primary hover:underline" onClick={() => onDiscard(id)}>Remove unsaved sheet</button>
                 )}

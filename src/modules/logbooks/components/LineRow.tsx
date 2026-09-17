@@ -6,7 +6,7 @@ import CellField from './CellField';
 import SignatureCell from './SignatureCell';
 import LineHistory from './LineHistory';
 import type { SheetColumn } from '../lib/lineLayouts';
-import { itemCode, lineFields } from '../lib/lineLayouts';
+import { itemCode, lineFields, timeMatches } from '../lib/lineLayouts';
 import { completion, fieldRequired } from '../lib/formRules';
 import type { EntryView } from '../lib/types';
 import type { LineBuffer } from '../hooks/useWorkingCopies';
@@ -30,6 +30,8 @@ export interface LineRowProps {
   onSave: (id: string) => void;
   onRevert: (id: string) => void;
   onDiscard: (id: string) => void;
+  /** Delete a saved draft of the current user. */
+  onDelete: (id: string) => void;
   onAttest: (entry: EntryView, kind: SignKind, witness?: { name: string; capacity: string }) => void;
   onCorrect: (entry: EntryView) => void;
   onOpenEntry: (id: string) => void;
@@ -49,7 +51,7 @@ const statusLabel = (entry: EntryView | null) => {
 /** One ruled line: the main row of cells plus the under-row with notes, evidence and actions. */
 const LineRow: React.FC<LineRowProps> = ({
   entry, buffer, number, columns, highlighted, capacity, userId, busy, error, canCorrect, canManageAttachments,
-  onChange, onSave, onRevert, onDiscard, onAttest, onCorrect, onOpenEntry, onViewPage,
+  onChange, onSave, onRevert, onDiscard, onDelete, onAttest, onCorrect, onOpenEntry, onViewPage,
 }) => {
   const id = buffer?.id ?? entry!.id;
   const schema = buffer?.schema ?? entry?.schema_snapshot ?? { fields: [] };
@@ -62,7 +64,7 @@ const LineRow: React.FC<LineRowProps> = ({
   const sourceChanged = React.useMemo(() => {
     if (!buffer?.sample) return false;
     const changedField = buffer.schema.fields.some((f) => f.telemetry && String(buffer.fields[f.key] ?? '') !== String(buffer.sample!.values[f.telemetry] ?? ''));
-    return changedField || buffer.occurredAt !== buffer.sample.observed_at.slice(0, 16);
+    return changedField || !timeMatches(buffer.occurredAt, buffer.sample.observed_at);
   }, [buffer]);
 
   React.useEffect(() => {
@@ -225,7 +227,10 @@ const LineRow: React.FC<LineRowProps> = ({
                 <div className="flex flex-wrap items-center gap-2">
                   <Button type="button" size="sm" className="h-7 px-3 text-xs" disabled={!buffer.dirty || busy} onClick={() => onSave(id)}>Save line</Button>
                   {buffer.existingId ? (
-                    buffer.dirty && <button type="button" className="text-primary hover:underline" onClick={() => onRevert(id)}>Revert unsaved edits</button>
+                    <>
+                      {buffer.dirty && <button type="button" className="text-primary hover:underline" onClick={() => onRevert(id)}>Revert unsaved edits</button>}
+                      <button type="button" className="text-destructive hover:underline" disabled={busy} onClick={() => onDelete(id)}>Delete draft line</button>
+                    </>
                   ) : (
                     <button type="button" className="text-primary hover:underline" onClick={() => onDiscard(id)}>Remove unsaved line</button>
                   )}

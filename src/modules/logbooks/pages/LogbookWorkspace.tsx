@@ -206,9 +206,9 @@ const LogbookWorkspace: React.FC = () => {
 
   const saveLine = React.useCallback(async (id: string) => {
     const b = copies.get(id) ?? buffers[id];
-    if (!b || !ws.logbookRow) return;
+    if (!b) return;
     const target = ws.allVolumes.find((v) => v.id === b.volumeId) ?? volume;
-    if (!target) return;
+    if (!target) { setErrors((e) => ({ ...e, [id]: 'The volume for this line is no longer available.' })); return; }
     if (!b.occurredAt) { setErrors((e) => ({ ...e, [id]: 'Enter the event time.' })); return; }
     if (b.correctsId && !b.existingId && !b.correctionReason.trim()) { setErrors((e) => ({ ...e, [id]: 'Correction reason is required.' })); return; }
     const revision = JSON.stringify(b);
@@ -216,7 +216,7 @@ const LogbookWorkspace: React.FC = () => {
     await withBusy(id, async () => {
       try {
         const savedRow = await ws.save.mutateAsync({
-          id: b.existingId ?? undefined, expectedVersion: b.version, logbookId: ws.logbookRow!.id, companyId: target.company_id, vesselId: target.vessel_id,
+          id: b.existingId ?? undefined, expectedVersion: b.version, logbookId: target.logbook_id, companyId: target.company_id, vesselId: target.vessel_id,
           volumeId: target.id, sectionId: b.sectionId, entryAt: eventTime(b.occurredAt, b.originalTime), data: lineFields(b.schema.fields, b.fields),
           remarks: b.notes.trim() || null, sourceSampleId: b.sample?.id ?? null, overrideReason: b.overrideReason.trim() || null,
           amendedFromId: b.existingId ? undefined : b.correctsId, amendmentReason: b.existingId ? undefined : b.correctionReason.trim() || null,
@@ -236,7 +236,7 @@ const LogbookWorkspace: React.FC = () => {
         toast({ title: 'Could not save line', description: (error as Error).message, variant: 'destructive' });
       }
     });
-  }, [buffers, copies, volume, ws.allVolumes, ws.logbookRow, ws.save, toast]);
+  }, [buffers, copies, volume, ws.allVolumes, ws.save, toast]);
 
   /**
    * Add a new line (or a correction of `existing`, or a draft from `sample`).
@@ -280,6 +280,22 @@ const LogbookWorkspace: React.FC = () => {
     setErrors((e) => { if (!e[id]) return e; const n = { ...e }; delete n[id]; return n; });
   }, [copies, buffers]);
 
+  /** Remove a saved draft line of the current user; signed records can only be corrected. */
+  const deleteLine = React.useCallback(async (id: string) => {
+    if (!window.confirm('Delete this draft? It has not been signed and will leave no record.')) return;
+    await withBusy(id, async () => {
+      try {
+        await ws.discard.mutateAsync(id);
+        copies.remove(id);
+        setErrors((e) => { if (!e[id]) return e; const n = { ...e }; delete n[id]; return n; });
+        toast({ title: 'Draft deleted' });
+      } catch (error) {
+        setErrors((e) => ({ ...e, [id]: (error as Error).message }));
+        toast({ title: 'Could not delete draft', description: (error as Error).message, variant: 'destructive' });
+      }
+    });
+  }, [copies, ws.discard, toast]);
+
   const attest = React.useCallback(async (entry: EntryView, kind: SignKind, witness?: { name: string; capacity: string }) => {
     if (own(entry) && copies.store[entry.id]?.dirty) { toast({ title: 'Save your changes before signing.', variant: 'destructive' }); return; }
     await withBusy(entry.id, async () => {
@@ -297,6 +313,8 @@ const LogbookWorkspace: React.FC = () => {
 
   const correct = React.useCallback((entry: EntryView) => {
     if (!volume) return;
+    const pending = copies.list.find((b) => b.correctsId === entry.id && !b.existingId);
+    if (pending) { setHighlighted(pending.id); scrollToLine(pending.id); return; }
     if (volume.status === 'closed') {
       const continuation = ws.allVolumes.find((v) => v.continuation_of === volume.id && v.status === 'open');
       if (!continuation) { toast({ title: 'Open a continuation volume before correcting this closed book.', variant: 'destructive' }); return; }
@@ -304,11 +322,18 @@ const LogbookWorkspace: React.FC = () => {
       return;
     }
     addLine(entry, null);
-  }, [volume, ws.allVolumes, addLine, toast]);
+  }, [volume, ws.allVolumes, copies.list, addLine, toast]);
 
+  /** Records that already have a correction: saved in this volume, saved in a continuation, or unsaved in this tab. */
+  const corrected = React.useMemo(() => {
+    const ids = new Set<string>(ws.correctedElsewhere);
+    for (const e of ws.entries) if (e.amended_from_id) ids.add(e.amended_from_id);
+    for (const b of copies.list) if (b.correctsId && !b.existingId) ids.add(b.correctsId);
+    return ids;
+  }, [ws.correctedElsewhere, ws.entries, copies.list]);
   const canCorrectEntry = React.useCallback((e: EntryView) =>
-    e.status !== 'draft' && !e.superseded_by_id && !ws.entries.some((x) => x.amended_from_id === e.id) && actor.canWrite(book, section) && !legacy,
-  [ws.entries, actor, book, section, legacy]);
+    e.status !== 'draft' && !e.superseded_by_id && !corrected.has(e.id) && actor.canWrite(book, section) && !legacy,
+  [corrected, actor, book, section, legacy]);
 
   // ── Automatic readings on open ────────────────────────────────────────────
   const fresh = freshReading(samples, book.sensor);
@@ -444,7 +469,7 @@ const LogbookWorkspace: React.FC = () => {
               capacity={actor.capacity} userId={actor.userId} canManageAttachments={editable || actor.isMaster}
               canCorrectEntry={canCorrectEntry} onWriteOnLine={() => addLine(null, null)}
               onChange={onChange} onSave={(id) => void saveLine(id)} onRevert={(id) => { copies.remove(id); toast({ title: 'Loaded the saved sheet; unsaved edits reverted.' }); }}
-              onDiscard={(id) => copies.remove(id)} onAttest={(e, k, w) => void attest(e, k, w)} onCorrect={correct}
+              onDiscard={(id) => copies.remove(id)} onDelete={(id) => void deleteLine(id)} onAttest={(e, k, w) => void attest(e, k, w)} onCorrect={correct}
               onOpenEntry={(id) => void openEntry(id)} onViewPage={(id) => { setPageView(id); setProposal(null); }}
             />
           ) : (
@@ -454,7 +479,7 @@ const LogbookWorkspace: React.FC = () => {
               capacity={actor.capacity} userId={actor.userId} canManageAttachments={editable || actor.isMaster}
               canCorrectEntry={canCorrectEntry} onWriteOnLine={() => addLine(null, null)}
               onChange={onChange} onSave={(id) => void saveLine(id)} onRevert={(id) => { copies.remove(id); toast({ title: 'Loaded the saved line; unsaved edits reverted.' }); }}
-              onDiscard={(id) => copies.remove(id)} onAttest={(e, k, w) => void attest(e, k, w)} onCorrect={correct}
+              onDiscard={(id) => copies.remove(id)} onDelete={(id) => void deleteLine(id)} onAttest={(e, k, w) => void attest(e, k, w)} onCorrect={correct}
               onOpenEntry={(id) => void openEntry(id)} onViewPage={(id) => { setPageView(id); setProposal(null); }}
             />
           )}

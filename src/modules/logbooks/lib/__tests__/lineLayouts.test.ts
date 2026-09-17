@@ -46,5 +46,10 @@ describe('row payloads', () => {
     expect(lineFields([...fields], { quantity: '0', blank: '', notes: 'First line\nSecond line' })).toEqual({ quantity: 0, notes: 'First line\nSecond line' });
     expect(eventTime('2026-09-15T14:05', '2026-09-15T14:05:32.781Z')).toBe('2026-09-15T14:05:32.781Z');
     expect(eventTime('2026-09-15T14:04', '2026-09-15T14:05:32.781Z')).toBe('2026-09-15T14:04:00Z');
+    // datetime-local values that carry seconds must not gain a second ":00".
+    expect(eventTime('2026-09-15T14:05:32', '2026-09-15T14:05:32.781Z')).toBe('2026-09-15T14:05:32.781Z');
+    expect(eventTime('2026-09-15T14:05:45', '2026-09-15T14:05:32.781Z')).toBe('2026-09-15T14:05:45Z');
+    expect(eventTime('2026-09-15T14:05:45', null)).toBe('2026-09-15T14:05:45Z');
+    expect(() => new Date(eventTime('2026-09-15T14:05:45', null)).toISOString()).not.toThrow();
   });
 });
