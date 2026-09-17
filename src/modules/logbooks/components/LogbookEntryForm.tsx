@@ -46,7 +46,7 @@ const toLocalInputValue = (iso: string) => {
 };
 
 const LogbookEntryForm: React.FC<Props> = ({
-  open, onOpenChange, definition, entry, defaultDate, saving,
+  open, onOpenChange, definition, sheet, entry, defaultDate, saving,
   logbookId, companyId, vesselId, canManageAttachments, onSubmit, onDelete,
 }) => {
   const [entryAt, setEntryAt] = React.useState('');
@@ -99,16 +99,26 @@ const LogbookEntryForm: React.FC<Props> = ({
       setError('Enter the date and time of the entry.');
       return;
     }
-    if (!summary.trim()) {
+    const sheetSummary = sheet ? `${sheet.title} — ${new Date(entryAt).toLocaleDateString()}` : '';
+    const finalSummary = summary.trim() || sheetSummary;
+    if (!finalSummary) {
       setError('Add a short summary of the entry.');
       return;
     }
     const cleanedDetails: Record<string, unknown> = {};
-    definition.fields.forEach((field) => {
-      const value = details[field.key];
-      if (value === undefined || value === '') return;
-      cleanedDetails[field.key] = field.type === 'number' ? Number(value) : value;
-    });
+    if (sheet) {
+      // Sheet readings keep their raw text so paired values such as "28 / 34" survive.
+      Object.entries(details).forEach(([key, value]) => {
+        if (value !== undefined && value !== '') cleanedDetails[key] = value;
+      });
+    } else {
+      definition.fields.forEach((field) => {
+        const value = details[field.key];
+        if (value === undefined || value === '') return;
+        cleanedDetails[field.key] = field.type === 'number' ? Number(value) : value;
+      });
+    }
+
 
     onSubmit({
       entry_at: new Date(entryAt).toISOString(),
