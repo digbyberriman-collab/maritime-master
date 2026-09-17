@@ -7395,6 +7395,8 @@ export type Database = {
           status: Database["public"]["Enums"]["logbook_entry_status"]
           summary: string | null
           updated_at: string
+          updated_by: string | null
+          updated_by_name: string | null
           version: number
           vessel_id: string
           watch_period: string | null
@@ -7422,6 +7424,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["logbook_entry_status"]
           summary?: string | null
           updated_at?: string
+          updated_by?: string | null
+          updated_by_name?: string | null
           version?: number
           vessel_id: string
           watch_period?: string | null
@@ -7449,6 +7453,8 @@ export type Database = {
           status?: Database["public"]["Enums"]["logbook_entry_status"]
           summary?: string | null
           updated_at?: string
+          updated_by?: string | null
+          updated_by_name?: string | null
           version?: number
           vessel_id?: string
           watch_period?: string | null
@@ -7476,6 +7482,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      logbook_entry_audit: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_name: string | null
+          changed_fields: string[] | null
+          company_id: string
+          created_at: string
+          entry_id: string
+          id: string
+          logbook_id: string | null
+          new_values: Json | null
+          old_values: Json | null
+          vessel_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_name?: string | null
+          changed_fields?: string[] | null
+          company_id: string
+          created_at?: string
+          entry_id: string
+          id?: string
+          logbook_id?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          vessel_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_name?: string | null
+          changed_fields?: string[] | null
+          company_id?: string
+          created_at?: string
+          entry_id?: string
+          id?: string
+          logbook_id?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          vessel_id?: string | null
+        }
+        Relationships: []
       }
       logbooks: {
         Row: {
@@ -14215,6 +14266,7 @@ export type Database = {
         }
         Returns: string
       }
+      logbook_actor_name: { Args: { _user_id: string }; Returns: string }
       snooze_alert: {
         Args: { p_alert_id: string; p_reason?: string; p_snooze_hours?: number }
         Returns: Json
