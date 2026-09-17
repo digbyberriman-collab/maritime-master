@@ -57,41 +57,16 @@ const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate }) =
     onNavigate?.();
   };
 
-  const syncActiveVessel = (ids: string[]) => {
-    if (ids.length === 1) {
-      setSelectedVesselById(ids[0]);
-    } else if (!selectedVessel || !ids.includes(selectedVessel.id)) {
-      if (ids[0]) setSelectedVesselById(ids[0]);
-    }
-  };
-
-  const toggleVessel = (vesselId: string) => {
-    const selected = selectedVesselIds.includes(vesselId);
-    let next = selectedVesselIds;
-    if (selected && selectedVesselIds.length > 1) {
-      next = selectedVesselIds.filter((id) => id !== vesselId);
-    } else if (!selected) {
-      next = [...selectedVesselIds, vesselId];
-    }
-    setSelectedVesselIds(next);
-    syncActiveVessel(next);
-  };
-
   const selectOnly = (vesselId: string) => {
-    setSelectedVesselIds([vesselId]);
     setSelectedVesselById(vesselId);
+    setSelectedVesselIds([vesselId]);
   };
 
-  const toggleAll = () => {
-    if (allSelected) {
-      const firstVessel = vessels[0];
-      if (firstVessel) selectOnly(firstVessel.id);
-      return;
-    }
+  const selectAll = () => {
     const all = vessels.map((vessel) => vessel.id);
-    setSelectedVesselIds(all);
-    syncActiveVessel(all);
+    if (all.length > 0) setSelectedVesselIds(all);
   };
+
 
 
   const handleSignOut = async () => {
