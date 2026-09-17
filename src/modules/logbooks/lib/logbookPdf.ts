@@ -4,6 +4,10 @@ import { format } from 'date-fns';
 import { createPDFTemplate, getContentStartY, type PDFBranding } from '@/lib/pdf/pdfTemplate';
 import type { LogbookDefinition } from '@/modules/logbooks/lib/logbookDefinitions';
 import type { LogbookEntry } from '@/modules/logbooks/hooks/useLogbook';
+import {
+  BALANCE_COLUMNS, computeDifference, computePresentRob, sheetKey,
+  type SheetTemplate,
+} from '@/modules/logbooks/lib/dagonEngineLog';
 
 export interface BuildLogbookPdfArgs {
   definition: LogbookDefinition;
@@ -13,6 +17,8 @@ export interface BuildLogbookPdfArgs {
   entries: LogbookEntry[];
   /** Print the flexible per-type detail fields and full remarks under each entry. */
   includeDetails?: boolean;
+  /** Vessel-specific daily sheet; each entry is printed as its own readings sheet. */
+  sheet?: SheetTemplate;
   branding?: PDFBranding | null;
 }
 
