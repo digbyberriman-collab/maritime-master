@@ -362,6 +362,7 @@ const LogbookDetail: React.FC = () => {
         open={formOpen}
         onOpenChange={setFormOpen}
         definition={definition}
+        sheet={sheet}
         entry={editing}
         defaultDate={dayForNew}
         saving={createEntry.isPending || updateEntry.isPending}
@@ -388,6 +389,7 @@ const LogbookDetail: React.FC = () => {
         open={exportOpen}
         onOpenChange={setExportOpen}
         definition={definition}
+        sheet={sheet}
         logbookId={logbook?.id ?? null}
         vesselName={selectedVessel?.name ?? null}
         month={month}
