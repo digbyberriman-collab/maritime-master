@@ -14266,10 +14266,18 @@ export type Database = {
         }
         Returns: boolean
       }
+      hr_can_admin: { Args: { _user_id: string }; Returns: boolean }
+      hr_can_edit: { Args: { _user_id: string }; Returns: boolean }
+      hr_can_view: { Args: { _user_id: string }; Returns: boolean }
+      hr_can_write_crew_record: {
+        Args: { _subject_user_id: string }
+        Returns: boolean
+      }
       initialize_vessel_emergency_from_defaults: {
         Args: { p_company_id: string; p_vessel_id: string }
         Returns: string
       }
+      legacy_profile_role: { Args: { _user_id: string }; Returns: string }
       log_permission_change: {
         Args: {
           p_action_type: Database["public"]["Enums"]["audit_action_type"]
