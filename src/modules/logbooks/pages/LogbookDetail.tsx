@@ -4,7 +4,7 @@ import {
   addMonths, endOfMonth, format, isSameDay, isSameMonth, startOfMonth, startOfWeek,
 } from 'date-fns';
 import {
-  ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, FileDown, List, PenLine, Plus, Trash2,
+  ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, FileDown, List, Lock, PenLine, Plus, Trash2,
 } from 'lucide-react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -113,7 +113,8 @@ const LogbookDetail: React.FC = () => {
   };
 
   const canEditEntry = (entry: LogbookEntry) =>
-    canSign || (entry.recorded_by === currentUserId && entry.status === 'draft');
+    entry.status !== 'finalized'
+    && (canSign || (entry.recorded_by === currentUserId && entry.status === 'draft'));
 
   return (
     <DashboardLayout>
@@ -286,10 +287,18 @@ const LogbookDetail: React.FC = () => {
                       </TableCell>
                       <TableCell>
                         <Badge variant={STATUS_VARIANT[entry.status] ?? 'secondary'}>
-                          {entry.status === 'signed' && entry.signed_by_name
-                            ? `Signed — ${entry.signed_by_name}`
-                            : entry.status}
+                          {statusLabel(entry)}
                         </Badge>
+                        {entry.signed_at && (
+                          <span className="mt-1 block text-xs text-muted-foreground">
+                            Signed off {format(new Date(entry.signed_at), 'dd MMM yyyy HH:mm')}
+                          </span>
+                        )}
+                        {entry.finalized_at && (
+                          <span className="block text-xs text-muted-foreground">
+                            Finalised {format(new Date(entry.finalized_at), 'dd MMM yyyy HH:mm')}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
@@ -298,9 +307,27 @@ const LogbookDetail: React.FC = () => {
                               <PenLine className="h-4 w-4" />
                             </Button>
                           )}
-                          {canSign && entry.status !== 'signed' && (
+                          {canSign && entry.status !== 'signed' && entry.status !== 'finalized' && (
                             <Button variant="outline" size="sm" onClick={() => signEntry.mutate(entry.id)}>
-                              Sign
+                              Sign off
+                            </Button>
+                          )}
+                          {canSign && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={entry.status !== 'signed' || finalizeEntry.isPending}
+                              title={
+                                entry.status === 'finalized'
+                                  ? 'Already finalised'
+                                  : entry.status === 'signed'
+                                    ? 'Lock this entry'
+                                    : 'Sign off the entry before finalising it'
+                              }
+                              onClick={() => finalizeEntry.mutate(entry)}
+                            >
+                              <Lock className="mr-1 h-3.5 w-3.5" />
+                              {entry.status === 'finalized' ? 'Finalised' : 'Finalise'}
                             </Button>
                           )}
                           {canEditEntry(entry) && (
