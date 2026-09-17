@@ -66,6 +66,13 @@ const baseProfile: Tables<'profiles'> = {
   leave_accrual_method: null,
   leaving_date: null,
   watch_pattern: null,
+  embarkation_port: null,
+  job_title: null,
+  office_location: null,
+  passport_country: null,
+  personnel_type: 'crew',
+  place_of_birth: null,
+  seamans_book_number: null,
 };
 
 describe('profileToFormValues', () => {
