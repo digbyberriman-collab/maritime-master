@@ -10,6 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import type { LogbookDefinition } from '@/modules/logbooks/lib/logbookDefinitions';
+import LogbookAttachments from '@/modules/logbooks/components/LogbookAttachments';
 import type { LogbookEntry, LogbookEntryInput } from '@/modules/logbooks/hooks/useLogbook';
 
 const WATCH_PERIODS = [
