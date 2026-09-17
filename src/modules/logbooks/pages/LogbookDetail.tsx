@@ -315,7 +315,10 @@ const LogbookDetail: React.FC = () => {
           if (editing) {
             updateEntry.mutate({ id: editing.id, input }, { onSuccess: () => setFormOpen(false) });
           } else {
-            createEntry.mutate(input, { onSuccess: () => setFormOpen(false) });
+            createEntry.mutate(input, {
+              // Keep the dialog open on the saved entry so files can be attached straight away.
+              onSuccess: (created) => setEditing(created as unknown as LogbookEntry),
+            });
           }
         }}
       />
