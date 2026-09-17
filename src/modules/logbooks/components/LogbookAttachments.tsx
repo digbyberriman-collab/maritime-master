@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  ALLOWED_TYPES_MESSAGE,
   MAX_ATTACHMENT_BYTES,
+  isAllowedAttachmentType,
   useLogbookAttachments, type LogbookAttachment,
 } from '@/modules/logbooks/hooks/useLogbookAttachments';
 
