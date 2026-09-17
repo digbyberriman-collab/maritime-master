@@ -239,6 +239,15 @@ const LogbookEntryForm: React.FC<Props> = ({
             />
           </div>
 
+          <LogbookAttachments
+            entryId={entry?.id ?? null}
+            logbookId={entry?.logbook_id ?? logbookId ?? null}
+            companyId={entry?.company_id ?? companyId ?? null}
+            vesselId={entry?.vessel_id ?? vesselId ?? null}
+            canManage={canManageAttachments ?? true}
+          />
+
+
           {error && <p className="text-sm text-destructive">{error}</p>}
 
           <DialogFooter>
