@@ -7298,6 +7298,168 @@ export type Database = {
           },
         ]
       }
+      logbook_entries: {
+        Row: {
+          amended_from_id: string | null
+          amendment_reason: string | null
+          company_id: string
+          created_at: string
+          data: Json
+          entry_at: string
+          entry_date: string
+          id: string
+          latitude: number | null
+          logbook_id: string
+          longitude: number | null
+          page_number: number | null
+          position_text: string | null
+          recorded_by: string | null
+          recorded_by_name: string | null
+          remarks: string | null
+          signed_at: string | null
+          signed_by: string | null
+          signed_by_name: string | null
+          status: Database["public"]["Enums"]["logbook_entry_status"]
+          summary: string | null
+          updated_at: string
+          version: number
+          vessel_id: string
+          watch_period: string | null
+        }
+        Insert: {
+          amended_from_id?: string | null
+          amendment_reason?: string | null
+          company_id: string
+          created_at?: string
+          data?: Json
+          entry_at?: string
+          entry_date?: string
+          id?: string
+          latitude?: number | null
+          logbook_id: string
+          longitude?: number | null
+          page_number?: number | null
+          position_text?: string | null
+          recorded_by?: string | null
+          recorded_by_name?: string | null
+          remarks?: string | null
+          signed_at?: string | null
+          signed_by?: string | null
+          signed_by_name?: string | null
+          status?: Database["public"]["Enums"]["logbook_entry_status"]
+          summary?: string | null
+          updated_at?: string
+          version?: number
+          vessel_id: string
+          watch_period?: string | null
+        }
+        Update: {
+          amended_from_id?: string | null
+          amendment_reason?: string | null
+          company_id?: string
+          created_at?: string
+          data?: Json
+          entry_at?: string
+          entry_date?: string
+          id?: string
+          latitude?: number | null
+          logbook_id?: string
+          longitude?: number | null
+          page_number?: number | null
+          position_text?: string | null
+          recorded_by?: string | null
+          recorded_by_name?: string | null
+          remarks?: string | null
+          signed_at?: string | null
+          signed_by?: string | null
+          signed_by_name?: string | null
+          status?: Database["public"]["Enums"]["logbook_entry_status"]
+          summary?: string | null
+          updated_at?: string
+          version?: number
+          vessel_id?: string
+          watch_period?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logbook_entries_amended_from_id_fkey"
+            columns: ["amended_from_id"]
+            isOneToOne: false
+            referencedRelation: "logbook_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logbook_entries_logbook_id_fkey"
+            columns: ["logbook_id"]
+            isOneToOne: false
+            referencedRelation: "logbooks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logbook_entries_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      logbooks: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          current_page: number
+          description: string | null
+          id: string
+          is_active: boolean
+          is_statutory: boolean
+          last_entry_at: string | null
+          logbook_type: Database["public"]["Enums"]["logbook_type"]
+          name: string
+          updated_at: string
+          vessel_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          current_page?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_statutory?: boolean
+          last_entry_at?: string | null
+          logbook_type: Database["public"]["Enums"]["logbook_type"]
+          name: string
+          updated_at?: string
+          vessel_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          current_page?: number
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_statutory?: boolean
+          last_entry_at?: string | null
+          logbook_type?: Database["public"]["Enums"]["logbook_type"]
+          name?: string
+          updated_at?: string
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logbooks_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       login_history: {
         Row: {
           created_at: string | null
@@ -14119,6 +14281,16 @@ export type Database = {
         | "postponed"
         | "cancelled"
         | "completed"
+      logbook_entry_status: "draft" | "submitted" | "signed" | "amended"
+      logbook_type:
+        | "deck_log"
+        | "engine_log"
+        | "bell_book"
+        | "radio_log"
+        | "oil_record_book"
+        | "garbage_record_book"
+        | "ballast_water_record"
+        | "visitor_log"
       nb_approval_status: "pending" | "approved" | "changes_needed"
       nb_build_phase_status: "planned" | "active" | "completed" | "on_hold"
       nb_change_order_status:
@@ -14423,6 +14595,17 @@ export const Constants = {
         "postponed",
         "cancelled",
         "completed",
+      ],
+      logbook_entry_status: ["draft", "submitted", "signed", "amended"],
+      logbook_type: [
+        "deck_log",
+        "engine_log",
+        "bell_book",
+        "radio_log",
+        "oil_record_book",
+        "garbage_record_book",
+        "ballast_water_record",
+        "visitor_log",
       ],
       nb_approval_status: ["pending", "approved", "changes_needed"],
       nb_build_phase_status: ["planned", "active", "completed", "on_hold"],
