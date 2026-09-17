@@ -99,7 +99,11 @@ const LogbookAttachments: React.FC<Props> = ({
             onClick={() => inputRef.current?.click()}
             disabled={uploadFiles.isPending}
           >
-            <Upload className="mr-1 h-4 w-4" />
+            {uploadFiles.isPending ? (
+              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+            ) : (
+              <Upload className="mr-1 h-4 w-4" />
+            )}
             {uploadFiles.isPending ? 'Uploading...' : 'Add files'}
           </Button>
         )}
@@ -123,6 +127,41 @@ const LogbookAttachments: React.FC<Props> = ({
         <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {sizeError}
         </p>
+      )}
+
+      {uploads.length > 0 && (
+        <ul className="space-y-2" aria-live="polite">
+          {uploads.map((upload) => (
+            <li
+              key={upload.key}
+              className="space-y-1 rounded-md bg-muted/50 px-3 py-2"
+            >
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <span className="flex min-w-0 items-center gap-2">
+                  {upload.status === 'done' ? (
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />
+                  ) : upload.status === 'error' ? (
+                    <XCircle className="h-4 w-4 shrink-0 text-destructive" />
+                  ) : (
+                    <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
+                  )}
+                  <span className="truncate">{upload.name}</span>
+                </span>
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {upload.status === 'uploading' && `${upload.progress}%`}
+                  {upload.status === 'saving' && 'Saving...'}
+                  {upload.status === 'done' && 'Attached'}
+                  {upload.status === 'error' && 'Failed'}
+                </span>
+              </div>
+              {upload.status === 'error' ? (
+                <p className="text-xs text-destructive">{upload.error}</p>
+              ) : (
+                <Progress value={upload.progress} className="h-1.5" />
+              )}
+            </li>
+          ))}
+        </ul>
       )}
 
       {isLoading ? (
