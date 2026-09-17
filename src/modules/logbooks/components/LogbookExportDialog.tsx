@@ -14,11 +14,14 @@ import { useBrandingContext } from '@/shared/contexts/BrandingContext';
 import type { LogbookDefinition } from '@/modules/logbooks/lib/logbookDefinitions';
 import type { LogbookEntry } from '@/modules/logbooks/hooks/useLogbook';
 import { buildLogbookPdf, logbookPdfFileName } from '@/modules/logbooks/lib/logbookPdf';
+import type { SheetTemplate } from '@/modules/logbooks/lib/dagonEngineLog';
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   definition: LogbookDefinition;
+  /** Vessel-specific readings sheet, printed one sheet per entry. */
+  sheet?: SheetTemplate;
   logbookId: string | null;
   vesselName?: string | null;
   /** Month currently shown in the logbook, used as the default range. */
