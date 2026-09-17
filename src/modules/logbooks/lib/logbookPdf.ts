@@ -73,13 +73,125 @@ const detailLines = (definition: LogbookDefinition, entry: LogbookEntry): string
     .filter((line): line is string => line !== null);
 };
 
+/** Prints one vessel-specific readings sheet per entry, matching the paper layout. */
+const buildSheetPdf = (
+  { definition, vesselName, from, to, entries, branding }: BuildLogbookPdfArgs,
+  sheet: SheetTemplate,
+): jsPDF => {
+  const title = `${sheet.title} — ${format(from, 'dd MMM yyyy')} to ${format(to, 'dd MMM yyyy')}`;
+  const doc = createPDFTemplate({ title, branding: branding ?? undefined, orientation: 'portrait' });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const startY = getContentStartY(Boolean(branding?.clientDisplayName));
+
+  if (entries.length === 0) {
+    doc.setFontSize(10);
+    doc.setTextColor('#6b7280');
+    doc.text('No entries were recorded in this period.', margin, startY + 4);
+    return doc;
+  }
+
+  entries.forEach((entry, index) => {
+    if (index > 0) doc.addPage();
+    const data = (entry.data ?? {}) as Record<string, unknown>;
+    let y = startY;
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor('#374151');
+    doc.text(
+      [
+        `Vessel: ${vesselName ?? '—'}`,
+        `Date: ${dt(entry.entry_at)}`,
+        `Status: ${statusLabel(entry)}`,
+      ].join('    |    '),
+      margin, y,
+    );
+    y += 5;
+    const header = sheet.headerFields
+      .map((field) => `${field.label}: ${String(data[`header.${field.key}`] ?? '—')}`)
+      .join('    |    ');
+    doc.text(header, margin, y);
+    y += 4;
+    doc.setFontSize(7);
+    doc.setTextColor('#6b7280');
+    doc.text(sheet.units, margin, y);
+    y += 4;
+
+    sheet.sections.forEach((section) => {
+      const columns = section.kind === 'balance' ? BALANCE_COLUMNS : section.columns;
+      const extraLabel = section.kind === 'computed'
+        ? section.resultLabel
+        : section.kind === 'balance' ? 'Present ROB' : null;
+      const body = section.rows.map((sheetRow) => {
+        const cells = columns.map((column) => {
+          const value = data[sheetKey(section.id, sheetRow.key, column.key)];
+          return value === null || value === undefined || value === '' ? '' : String(value);
+        });
+        if (section.kind === 'computed') cells.push(computeDifference(data, section.id, sheetRow.key));
+        if (section.kind === 'balance') cells.push(computePresentRob(data, section.id, sheetRow.key));
+        return [sheetRow.label, ...cells];
+      });
+
+      autoTable(doc, {
+        ...TABLE_STYLE,
+        startY: y,
+        styles: { ...TABLE_STYLE.styles, fontSize: 7, cellPadding: 1.2, halign: 'center' },
+        columnStyles: { 0: { cellWidth: 52, halign: 'left' } },
+        head: [[section.title, ...columns.map((column) => column.label), ...(extraLabel ? [extraLabel] : [])]],
+        body,
+      });
+      y = tableEnd(doc, y) + 3;
+      if (y > pageHeight - 40) {
+        doc.addPage();
+        y = startY;
+      }
+    });
+
+    if (entry.remarks) {
+      autoTable(doc, {
+        ...TABLE_STYLE,
+        startY: y,
+        styles: { ...TABLE_STYLE.styles, fontSize: 7 },
+        head: [['Comments / Remarks']],
+        body: [[entry.remarks]],
+      });
+      y = tableEnd(doc, y) + 6;
+    }
+
+    if (y > pageHeight - 30) {
+      doc.addPage();
+      y = startY;
+    }
+    doc.setDrawColor('#9ca3af');
+    doc.setLineWidth(0.3);
+    doc.line(margin, y + 8, margin + 70, y + 8);
+    doc.line(pageWidth - margin - 70, y + 8, pageWidth - margin, y + 8);
+    doc.setFontSize(7);
+    doc.setTextColor('#6b7280');
+    doc.text(
+      `UMS Duty Engineer: ${String(data['signature.ums_engineer'] ?? '')}`,
+      margin, y + 12,
+    );
+    doc.text(
+      `Chief Engineer: ${String(data['signature.chief_engineer'] ?? '')}`,
+      pageWidth - margin - 70, y + 12,
+    );
+    doc.text(definition.label, pageWidth / 2, pageHeight - 10, { align: 'center' });
+  });
+
+  return doc;
+};
+
 /**
  * Builds the printable logbook report for a date range.
  * The caller decides whether to save, print or upload the document.
  */
-export const buildLogbookPdf = ({
-  definition, vesselName, from, to, entries, includeDetails = true, branding,
-}: BuildLogbookPdfArgs): jsPDF => {
+export const buildLogbookPdf = (args: BuildLogbookPdfArgs): jsPDF => {
+  const {
+    definition, vesselName, from, to, entries, includeDetails = true, sheet, branding,
+  } = args;
+  if (sheet) return buildSheetPdf(args, sheet);
   const title = `${definition.label} — ${format(from, 'dd MMM yyyy')} to ${format(to, 'dd MMM yyyy')}`;
   const doc = createPDFTemplate({ title, branding: branding ?? undefined, orientation: 'landscape' });
   const pageWidth = doc.internal.pageSize.getWidth();
