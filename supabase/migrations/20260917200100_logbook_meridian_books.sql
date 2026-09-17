@@ -717,6 +717,9 @@ BEGIN
       IF v_entry.data ? 'startTime' AND v_entry.data ? 'endTime' AND (v_entry.data ->> 'endTime') < (v_entry.data ->> 'startTime') THEN
         RAISE EXCEPTION 'Finish time must be on or after start time.';
       END IF;
+      IF v_entry.data ? 'validFrom' AND v_entry.data ? 'validTo' AND (v_entry.data ->> 'validTo') < (v_entry.data ->> 'validFrom') THEN
+        RAISE EXCEPTION 'Finish time must be on or after start time.';
+      END IF;
     ELSIF COALESCE(btrim(v_entry.summary), '') = '' THEN
       RAISE EXCEPTION 'A summary is required before signing.';
     END IF;

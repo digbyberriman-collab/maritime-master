@@ -79,9 +79,13 @@ export function registryFromVessel(vessel: { name: string; imo_number: string | 
   return fields;
 }
 
-/** Default flag profile from the vessel's registered flag state. */
+/** Default flag profile from the vessel's registered flag state. Only UK / Red Ensign registries map to MCA. */
 export function profileForFlag(flagState: string | null | undefined): 'CISR' | 'MCA' {
-  const flag = (flagState ?? '').toLowerCase();
-  if (flag.includes('united kingdom') || flag.includes('uk') || flag.includes('british') || flag.includes('red ensign')) return 'MCA';
-  return 'CISR';
+  const flag = (flagState ?? '').toLowerCase().trim();
+  if (!flag) return 'CISR';
+  const tokens = flag.split(/[^a-z]+/).filter(Boolean);
+  const phrase = tokens.join(' ');
+  const uk = ['united kingdom', 'great britain', 'red ensign', 'british'].some((p) => phrase.includes(p))
+    || tokens.includes('uk') || tokens.includes('gb') || tokens.includes('gbr');
+  return uk ? 'MCA' : 'CISR';
 }

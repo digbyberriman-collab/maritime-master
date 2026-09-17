@@ -31,6 +31,9 @@ const RuledSheet: React.FC<Props> = ({
 }) => {
   const total = rows.length + newRows.length;
   const blanks = fixed ? 0 : total ? 1 : 3;
+  // Saved lines keep their stored number; unsaved and blank lines continue after the section's last line.
+  const lastLine = rows.reduce((max, entry) => Math.max(max, entry.line_number ?? 0), 0);
+  const nextLine = Math.max(lastLine, rows.length) + 1;
   const wide = columns.length > 8;
   return (
     <div className="space-y-1">
@@ -60,7 +63,7 @@ const RuledSheet: React.FC<Props> = ({
               key={entry.id}
               entry={entry}
               buffer={buffers[entry.id] ?? null}
-              number={i + 1}
+              number={entry.line_number ?? i + 1}
               columns={columns}
               highlighted={highlightedId === entry.id}
               busy={busyIds.has(entry.id)}
@@ -74,7 +77,7 @@ const RuledSheet: React.FC<Props> = ({
               key={buffer.id}
               entry={null}
               buffer={buffer}
-              number={rows.length + i + 1}
+              number={nextLine + i}
               columns={columns}
               highlighted={highlightedId === buffer.id}
               busy={busyIds.has(buffer.id)}
@@ -87,7 +90,7 @@ const RuledSheet: React.FC<Props> = ({
             <tbody>
               {Array.from({ length: blanks }, (_, i) => (
                 <tr key={i} className="h-11 border-b border-dashed border-border">
-                  <th scope="row" className="sticky left-0 z-10 border-r border-border bg-card px-2 py-2 text-left font-mono text-sm text-muted-foreground">{String(total + i + 1).padStart(2, '0')}</th>
+                  <th scope="row" className="sticky left-0 z-10 border-r border-border bg-card px-2 py-2 text-left font-mono text-sm text-muted-foreground">{String(nextLine + newRows.length + i).padStart(2, '0')}</th>
                   {columns.map((col, index) => (
                     <td key={col.key} className={cn('border-r border-border px-2 py-2 align-top', col.kind === 'signatures' && 'lg:sticky lg:right-0 lg:bg-card')}>
                       {index === 0 && i === 0 && editable ? (

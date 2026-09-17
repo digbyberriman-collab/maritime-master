@@ -35,6 +35,10 @@ describe('registry cover population', () => {
   it('derives the default flag profile from the vessel flag', () => {
     expect(profileForFlag('Cayman Islands')).toBe('CISR');
     expect(profileForFlag('United Kingdom')).toBe('MCA');
+    expect(profileForFlag('UK')).toBe('MCA');
+    expect(profileForFlag('British Virgin Islands')).toBe('MCA');
+    expect(profileForFlag('Ukraine')).toBe('CISR');
+    expect(profileForFlag('Turkey')).toBe('CISR');
     expect(profileForFlag(null)).toBe('CISR');
   });
 });
