@@ -85,32 +85,6 @@ const InkfishFooter: React.FC = () => {
         </div>
       </footer>
 
-      {/* How-to Guides */}
-      <Dialog open={dialog === 'guides'} onOpenChange={(o) => !o && setDialog(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>How-to Guides</DialogTitle>
-            <DialogDescription>
-              Quick walkthroughs for the most common tasks.
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="max-h-[60vh] pr-4">
-            <div className="space-y-5">
-              {HOW_TO_GUIDES.map((guide) => (
-                <div key={guide.title}>
-                  <h3 className="text-sm font-semibold text-foreground">{guide.title}</h3>
-                  <ol className="mt-1 list-decimal list-inside space-y-0.5 text-sm text-muted-foreground">
-                    {guide.steps.map((step, i) => (
-                      <li key={i}>{step}</li>
-                    ))}
-                  </ol>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
-
       {/* Privacy Policy */}
       <Dialog open={dialog === 'privacy'} onOpenChange={(o) => !o && setDialog(null)}>
         <DialogContent className="max-w-lg">

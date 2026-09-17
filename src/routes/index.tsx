@@ -51,6 +51,7 @@ const Settings = React.lazy(() => import('@/modules/settings/pages/Settings'));
 const NotFound = React.lazy(() => import('@/shared/pages/NotFound'));
 const InsurancePage = React.lazy(() => import('@/modules/compliance/pages/InsurancePage'));
 const HRPage = React.lazy(() => import('@/modules/compliance/pages/HRPage'));
+const HowToGuidesPage = React.lazy(() => import('@/modules/help/pages/HowToGuidesPage'));
 
 // ISM Pages - Lazy loaded for better code splitting
 const ERMPage = React.lazy(() => import('@/modules/ism/pages/ERMPage'));
