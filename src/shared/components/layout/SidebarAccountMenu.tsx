@@ -57,41 +57,16 @@ const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate }) =
     onNavigate?.();
   };
 
-  const syncActiveVessel = (ids: string[]) => {
-    if (ids.length === 1) {
-      setSelectedVesselById(ids[0]);
-    } else if (!selectedVessel || !ids.includes(selectedVessel.id)) {
-      if (ids[0]) setSelectedVesselById(ids[0]);
-    }
-  };
-
-  const toggleVessel = (vesselId: string) => {
-    const selected = selectedVesselIds.includes(vesselId);
-    let next = selectedVesselIds;
-    if (selected && selectedVesselIds.length > 1) {
-      next = selectedVesselIds.filter((id) => id !== vesselId);
-    } else if (!selected) {
-      next = [...selectedVesselIds, vesselId];
-    }
-    setSelectedVesselIds(next);
-    syncActiveVessel(next);
-  };
-
   const selectOnly = (vesselId: string) => {
-    setSelectedVesselIds([vesselId]);
     setSelectedVesselById(vesselId);
+    setSelectedVesselIds([vesselId]);
   };
 
-  const toggleAll = () => {
-    if (allSelected) {
-      const firstVessel = vessels[0];
-      if (firstVessel) selectOnly(firstVessel.id);
-      return;
-    }
+  const selectAll = () => {
     const all = vessels.map((vessel) => vessel.id);
-    setSelectedVesselIds(all);
-    syncActiveVessel(all);
+    if (all.length > 0) setSelectedVesselIds(all);
   };
+
 
 
   const handleSignOut = async () => {
@@ -130,33 +105,25 @@ const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate }) =
                 <Ship className="h-4 w-4" />
                 Vessel scope
               </DropdownMenuLabel>
-              <DropdownMenuCheckboxItem checked={allSelected} onCheckedChange={toggleAll} onSelect={(event) => event.preventDefault()}>
+              <DropdownMenuCheckboxItem
+                checked={allSelected}
+                onCheckedChange={selectAll}
+                onSelect={(event) => event.preventDefault()}
+              >
                 All vessels
               </DropdownMenuCheckboxItem>
               {vessels.map((vessel) => (
                 <DropdownMenuCheckboxItem
                   key={vessel.id}
-                  checked={selectedVesselIds.includes(vessel.id)}
-                  onCheckedChange={() => toggleVessel(vessel.id)}
+                  checked={!allSelected && selectedVessel?.id === vessel.id}
+                  onCheckedChange={() => selectOnly(vessel.id)}
                   onSelect={(event) => event.preventDefault()}
                   className="pr-2"
                 >
-                  <span className="flex w-full items-center justify-between gap-2">
-                    <span className="truncate">{vessel.name}</span>
-                    <button
-                      type="button"
-                      onClick={(event) => { event.preventDefault(); event.stopPropagation(); selectOnly(vessel.id); }}
-                      className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
-                        selectedVessel?.id === vessel.id
-                          ? 'bg-primary/15 text-primary'
-                          : 'text-muted-foreground hover:bg-accent'
-                      }`}
-                    >
-                      {selectedVessel?.id === vessel.id ? 'Active' : 'Only'}
-                    </button>
-                  </span>
+                  <span className="truncate">{vessel.name}</span>
                 </DropdownMenuCheckboxItem>
               ))}
+
 
               <DropdownMenuSeparator />
             </>

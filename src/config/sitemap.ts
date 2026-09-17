@@ -201,6 +201,11 @@ const vesselLogbooks: NavChild[] = [
   L('All Logbooks', vLog, { existing: `${V}/logbooks/list`, icon: BookOpen }),
   L('Deck Log', vLog, { icon: Anchor }),
   L('Engine Log', vLog, { icon: Wrench }),
+  L('DAGON Engine Room Log', vLog, {
+    icon: Wrench,
+    slug: 'engine-log-dagon',
+    existing: '/vessel/logbooks/engine-log?vessel=dagon',
+  }),
   L('Bell Book', vLog, { icon: Bell }),
   L('Radio Log', vLog, { icon: MessageSquare }),
   L('Oil Record Book', vLog, { icon: Beaker }),
@@ -641,11 +646,17 @@ collectLeaves(NAVIGATION_ITEMS, _allLeaves, _groupPaths);
 /** Unique placeholder leaves (only paths under our synthesized section roots).
  *  A path that is a group elsewhere in the tree is not a placeholder: it gets
  *  a section redirect instead (see SECTION_REDIRECTS). */
+/** Leaves handled by real routes elsewhere (dynamic route params, ported
+ *  modules) must never be turned into Coming Soon placeholders — static
+ *  placeholder paths outrank dynamic routes in React Router's ranking. */
+const IMPLEMENTED_PREFIXES = ['/vessel/logbooks/'];
+
 export const PLACEHOLDER_LEAVES: SitemapLeaf[] = (() => {
   const seen = new Set<string>();
   const out: SitemapLeaf[] = [];
   for (const leaf of _allLeaves) {
     if (!PLACEHOLDER_PREFIXES.some((p) => leaf.path.startsWith(p))) continue;
+    if (IMPLEMENTED_PREFIXES.some((p) => leaf.path.startsWith(p))) continue;
     if (seen.has(leaf.path)) continue;
     if (_groupPaths.has(leaf.path.split('?')[0])) continue;
     seen.add(leaf.path);
@@ -653,6 +664,7 @@ export const PLACEHOLDER_LEAVES: SitemapLeaf[] = (() => {
   }
   return out;
 })();
+
 // ─── Section / group redirects ───────────────────────────────────────────
 // `/hris`, `/hris/employee-records`, … have no page of their own. Each one
 // redirects to its first real (non-cross-link) leaf so bookmarks and typed

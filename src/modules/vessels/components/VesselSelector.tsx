@@ -45,22 +45,17 @@ export const VesselSelector: React.FC<VesselSelectorProps> = ({ className }) => 
 
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedVesselIds, setSelectedVesselIds] = useState<Set<string>>(new Set());
   const [severityFilters, setSeverityFilters] = useState<Set<string>>(
     new Set(['red', 'orange', 'yellow', 'green'])
   );
   const [fleetGroups, setFleetGroups] = useState<Set<string>>(new Set());
 
-  // Initialize selected vessels when opening
-  React.useEffect(() => {
-    if (open) {
-      if (isAllVessels) {
-        setSelectedVesselIds(new Set(vessels.map(v => v.id)));
-      } else if (selectedVessel) {
-        setSelectedVesselIds(new Set([selectedVessel.id]));
-      }
-    }
-  }, [open, isAllVessels, selectedVessel, vessels]);
+  // Selection is derived from VesselContext, never held locally, so the popover
+  // always shows the scope the rest of the app is using.
+  const selectedVesselIds = useMemo(() => {
+    if (isAllVessels) return new Set(vessels.map(v => v.id));
+    return new Set(selectedVessel ? [selectedVessel.id] : []);
+  }, [isAllVessels, selectedVessel, vessels]);
 
   // Filter vessels by search query
   const filteredVessels = useMemo(() => {
@@ -83,34 +78,12 @@ export const VesselSelector: React.FC<VesselSelectorProps> = ({ className }) => 
   }, []);
 
   const handleSelectAll = () => {
-    setSelectedVesselIds(new Set(vessels.map(v => v.id)));
-  };
-
-  const handleSelectNone = () => {
-    setSelectedVesselIds(new Set());
+    if (canAccessAllVessels) setAllVessels();
   };
 
   const handleVesselToggle = (vesselId: string) => {
-    const newSet = new Set(selectedVesselIds);
-    if (newSet.has(vesselId)) {
-      newSet.delete(vesselId);
-    } else {
-      newSet.add(vesselId);
-    }
-    setSelectedVesselIds(newSet);
-
-    // Update context based on selection
-    if (newSet.size === vessels.length && canAccessAllVessels) {
-      setAllVessels();
-    } else if (newSet.size === 1) {
-      const [id] = newSet;
-      setSelectedVesselById(id);
-    } else if (newSet.size === 0) {
-      // Keep at least one selected or all
-      if (canAccessAllVessels) {
-        setAllVessels();
-      }
-    }
+    setSelectedVesselById(vesselId);
+    setOpen(false);
   };
 
   const handleSeverityToggle = (severity: string) => {
@@ -232,12 +205,6 @@ export const VesselSelector: React.FC<VesselSelectorProps> = ({ className }) => 
                   className="text-xs text-primary hover:underline"
                 >
                   All
-                </button>
-                <button
-                  onClick={handleSelectNone}
-                  className="text-xs text-muted-foreground hover:text-foreground hover:underline"
-                >
-                  None
                 </button>
               </div>
             </div>
