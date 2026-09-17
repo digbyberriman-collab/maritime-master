@@ -47,6 +47,11 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
     );
 $$;
 
+-- Created after the blanket lock-down migration, so lock it down explicitly:
+-- signed-in sessions and the service role only, never anonymous probing.
+REVOKE ALL ON FUNCTION public.rbac_company_permission(uuid, text, public.permission_level) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.rbac_company_permission(uuid, text, public.permission_level) TO authenticated, service_role;
+
 CREATE OR REPLACE FUNCTION public.hr_can_admin(_user_id uuid)
 RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
@@ -125,6 +130,7 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+REVOKE ALL ON FUNCTION public.profiles_guard_privileged_columns() FROM PUBLIC, anon, authenticated;
 DROP TRIGGER IF EXISTS trg_profiles_guard_privileged_columns ON public.profiles;
 CREATE TRIGGER trg_profiles_guard_privileged_columns
   BEFORE UPDATE ON public.profiles
