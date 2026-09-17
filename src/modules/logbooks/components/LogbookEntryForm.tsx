@@ -23,6 +23,10 @@ interface Props {
   entry?: LogbookEntry | null;
   defaultDate?: Date | null;
   saving?: boolean;
+  logbookId?: string | null;
+  companyId?: string | null;
+  vesselId?: string | null;
+  canManageAttachments?: boolean;
   onSubmit: (input: LogbookEntryInput) => void;
 }
 
