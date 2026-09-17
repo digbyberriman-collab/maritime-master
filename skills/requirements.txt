@@ -1,0 +1,2 @@
+yt-dlp>=2024.0.0
+notebooklm-py[browser]>=0.3.0
