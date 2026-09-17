@@ -7,7 +7,11 @@ import type { Json, Tables, TablesInsert } from '@/integrations/supabase/types';
  * detail view and the PDF export.
  */
 
-export type PerformanceReviewRow = Tables<'performance_reviews'>;
+/**
+ * Welfare notes live in `performance_review_welfare_notes` (senior-only), and
+ * are merged onto the review row when the reader is allowed to see them.
+ */
+export type PerformanceReviewRow = Tables<'performance_reviews'> & { welfare_notes?: string | null };
 export type ReviewCycleRow = Tables<'performance_review_cycles'>;
 export type CompetencyRow = Tables<'performance_competencies'>;
 
