@@ -26,11 +26,17 @@ import { Loader2 } from 'lucide-react';
 
 const currentYear = new Date().getFullYear();
 
-const optionalNumber = z
-  .union([z.coerce.number(), z.literal(''), z.null()])
-  .transform((v) => (v === '' || v === null || Number.isNaN(v) ? null : (v as number)))
-  .nullable()
-  .optional();
+const blankToNull = (v: unknown) =>
+  v === '' || v === null || v === undefined || (typeof v === 'string' && v.trim() === '') ? null : v;
+
+const optionalNumber = z.preprocess(
+  blankToNull,
+  z.coerce
+    .number()
+    .transform((v) => (Number.isNaN(v) ? null : v))
+    .nullable()
+    .optional(),
+);
 
 const vesselSchema = z.object({
   name: z.string().min(1, 'Vessel name is required').max(120),
