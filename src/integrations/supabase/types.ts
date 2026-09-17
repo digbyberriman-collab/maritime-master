@@ -9052,6 +9052,9 @@ export type Database = {
           data: Json
           entry_at: string
           entry_date: string
+          finalized_at: string | null
+          finalized_by: string | null
+          finalized_by_name: string | null
           id: string
           latitude: number | null
           logbook_id: string
@@ -9081,6 +9084,9 @@ export type Database = {
           data?: Json
           entry_at?: string
           entry_date?: string
+          finalized_at?: string | null
+          finalized_by?: string | null
+          finalized_by_name?: string | null
           id?: string
           latitude?: number | null
           logbook_id: string
@@ -9110,6 +9116,9 @@ export type Database = {
           data?: Json
           entry_at?: string
           entry_date?: string
+          finalized_at?: string | null
+          finalized_by?: string | null
+          finalized_by_name?: string | null
           id?: string
           latitude?: number | null
           logbook_id?: string
@@ -17646,7 +17655,12 @@ export type Database = {
         | "postponed"
         | "cancelled"
         | "completed"
-      logbook_entry_status: "draft" | "submitted" | "signed" | "amended"
+      logbook_entry_status:
+        | "draft"
+        | "submitted"
+        | "signed"
+        | "amended"
+        | "finalized"
       logbook_type:
         | "deck_log"
         | "engine_log"
@@ -17961,7 +17975,13 @@ export const Constants = {
         "cancelled",
         "completed",
       ],
-      logbook_entry_status: ["draft", "submitted", "signed", "amended"],
+      logbook_entry_status: [
+        "draft",
+        "submitted",
+        "signed",
+        "amended",
+        "finalized",
+      ],
       logbook_type: [
         "deck_log",
         "engine_log",
