@@ -4,7 +4,7 @@ import {
   addMonths, endOfMonth, format, isSameDay, isSameMonth, startOfMonth, startOfWeek,
 } from 'date-fns';
 import {
-  ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, List, PenLine, Plus, Trash2,
+  ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, FileDown, List, PenLine, Plus, Trash2,
 } from 'lucide-react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,7 @@ import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import { getLogbookBySlug } from '@/modules/logbooks/lib/logbookDefinitions';
 import { useLogbook, type LogbookEntry } from '@/modules/logbooks/hooks/useLogbook';
 import LogbookEntryForm from '@/modules/logbooks/components/LogbookEntryForm';
+import LogbookExportDialog from '@/modules/logbooks/components/LogbookExportDialog';
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
   draft: 'secondary',
@@ -43,6 +44,7 @@ const LogbookDetail: React.FC = () => {
   const [editing, setEditing] = React.useState<LogbookEntry | null>(null);
   const [dayForNew, setDayForNew] = React.useState<Date | null>(null);
   const [pendingDelete, setPendingDelete] = React.useState<LogbookEntry | null>(null);
+  const [exportOpen, setExportOpen] = React.useState(false);
 
   const {
     logbook, entries, isLoading, canSign, currentUserId, hasVessel,
@@ -141,6 +143,9 @@ const LogbookDetail: React.FC = () => {
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
+            <Button variant="outline" onClick={() => setExportOpen(true)} disabled={!hasVessel}>
+              <FileDown className="mr-1 h-4 w-4" /> Export PDF
+            </Button>
             <Button onClick={() => openNew()} disabled={!hasVessel}>
               <Plus className="mr-1 h-4 w-4" /> New entry
             </Button>
@@ -337,6 +342,15 @@ const LogbookDetail: React.FC = () => {
           }
         }}
         onDelete={editing && canEditEntry(editing) ? (entry) => setPendingDelete(entry) : undefined}
+      />
+
+      <LogbookExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        definition={definition}
+        logbookId={logbook?.id ?? null}
+        vesselName={selectedVessel?.name ?? null}
+        month={month}
       />
 
       <AlertDialog
