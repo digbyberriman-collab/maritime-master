@@ -40,7 +40,7 @@ const LogbookDetail: React.FC = () => {
   const [dayForNew, setDayForNew] = React.useState<Date | null>(null);
 
   const {
-    entries, isLoading, canSign, currentUserId, hasVessel,
+    logbook, entries, isLoading, canSign, currentUserId, hasVessel,
     createEntry, updateEntry, signEntry, deleteEntry,
   } = useLogbook(definition, month);
 
@@ -305,11 +305,20 @@ const LogbookDetail: React.FC = () => {
         entry={editing}
         defaultDate={dayForNew}
         saving={createEntry.isPending || updateEntry.isPending}
+        logbookId={logbook?.id ?? null}
+        companyId={logbook?.company_id ?? null}
+        vesselId={logbook?.vessel_id ?? selectedVessel?.id ?? null}
+        canManageAttachments={
+          canSign || !editing || editing.recorded_by === currentUserId
+        }
         onSubmit={(input) => {
           if (editing) {
             updateEntry.mutate({ id: editing.id, input }, { onSuccess: () => setFormOpen(false) });
           } else {
-            createEntry.mutate(input, { onSuccess: () => setFormOpen(false) });
+            createEntry.mutate(input, {
+              // Keep the dialog open on the saved entry so files can be attached straight away.
+              onSuccess: (created) => setEditing(created as unknown as LogbookEntry),
+            });
           }
         }}
       />

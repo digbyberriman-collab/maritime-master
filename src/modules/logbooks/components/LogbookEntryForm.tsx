@@ -10,6 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import type { LogbookDefinition } from '@/modules/logbooks/lib/logbookDefinitions';
+import LogbookAttachments from '@/modules/logbooks/components/LogbookAttachments';
 import type { LogbookEntry, LogbookEntryInput } from '@/modules/logbooks/hooks/useLogbook';
 
 const WATCH_PERIODS = [
@@ -23,6 +24,10 @@ interface Props {
   entry?: LogbookEntry | null;
   defaultDate?: Date | null;
   saving?: boolean;
+  logbookId?: string | null;
+  companyId?: string | null;
+  vesselId?: string | null;
+  canManageAttachments?: boolean;
   onSubmit: (input: LogbookEntryInput) => void;
 }
 
@@ -33,7 +38,8 @@ const toLocalInputValue = (iso: string) => {
 };
 
 const LogbookEntryForm: React.FC<Props> = ({
-  open, onOpenChange, definition, entry, defaultDate, saving, onSubmit,
+  open, onOpenChange, definition, entry, defaultDate, saving,
+  logbookId, companyId, vesselId, canManageAttachments, onSubmit,
 }) => {
   const [entryAt, setEntryAt] = React.useState('');
   const [watchPeriod, setWatchPeriod] = React.useState<string>('');
@@ -234,6 +240,15 @@ const LogbookEntryForm: React.FC<Props> = ({
               placeholder="Full narrative, actions taken, names involved"
             />
           </div>
+
+          <LogbookAttachments
+            entryId={entry?.id ?? null}
+            logbookId={entry?.logbook_id ?? logbookId ?? null}
+            companyId={entry?.company_id ?? companyId ?? null}
+            vesselId={entry?.vessel_id ?? vesselId ?? null}
+            canManage={canManageAttachments ?? true}
+          />
+
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
