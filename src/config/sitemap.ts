@@ -589,6 +589,7 @@ export const NAVIGATION_ITEMS: NavItem[] = [
       G('Charter',      V, vesselCharter,     { icon: Compass,    slug: 'charter' }),
       G('Accounting',   V, vesselAccounting,  { icon: Banknote,   slug: 'accounting' }),
       G('Vessel',       V, vesselVessel,      { icon: Ship,       slug: 'general' }),
+      G('Electronic Logbooks', V, vesselLogbooks, { icon: BookOpen, slug: 'logbooks' }),
       G('Departments',  V, vesselDepartments, { icon: Building,   slug: 'departments' }),
     ],
   },
