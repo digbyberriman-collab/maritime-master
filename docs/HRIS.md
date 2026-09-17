@@ -50,7 +50,7 @@ Migrations, in order (all under `supabase/migrations`):
 6. `20260917130000_hris_phase3_performance.sql`: competencies, review cycles, `performance_reviews`, `crew_objectives`, `disciplinary_records`, `incident_involved_persons`, `hr_performance_due_items` view, subject RPCs.
 7. `20260917140000_hris_phase4_recruitment_onboarding_rtw.sql`: `vacancies`, `candidates`, applications, interviews, `recruitment_hire_candidate`, onboarding templates/records/items, `crew_work_authorisations`, `hr_generate_alerts`.
 8. `20260917150000_hris_phase5_retention.sql`: `hr_archive_due_records`, `hr_anonymize_profile`, `hr_record_access_log`, crew gratuity visibility.
-9. `20260917180000_hris_review_fixes.sql`: RBAC view permission in `hr_can_view`, privileged-column guard on `profiles`, tenant-scoped hire / onboarding RPCs, sweeper functions restricted to cron and service role, imported-crew handling in `hr_anonymize_profile`, same-day compensation changes.
+9. `20260917180000_hris_review_fixes.sql`: scope-aware RBAC checks in the `hr_can_*` / `payroll_can_*` helpers (`rbac_company_permission`), privileged-column guard on `profiles`, tenant-scoped hire / onboarding RPCs, expiry sweepers restricted to cron, admin/editor guards on archive and alert generation, imported-crew handling in `hr_anonymize_profile`, same-day compensation changes.
 
 Money is stored as integer minor units with an ISO-4217 code. Every HR record is registered in `hr_record_metadata` by trigger with a retention end date from `data_retention_policies`.
 

@@ -1,28 +1,106 @@
 -- =================================================================
 -- HRIS: review fixes (authorisation and data-integrity hardening)
 -- =================================================================
--- 1. hr_can_view honours custom RBAC 'hr' view permissions (mirrors hrAccess.ts)
+-- 1. HR / finance helpers honour custom RBAC permissions but never a
+--    self-scoped grant (mirrors hrAccess.ts / payrollAccess.ts)
 -- 2. profiles: HR editors cannot change privileged columns (role,
 --    account_status, company_id, user_id) unless they are HR admins
 -- 3. recruitment_hire_candidate is tenant-scoped
 -- 4. onboarding_start requires HR edit rights in the profile's company
--- 5. sweeper functions are not callable by end users; hr_archive_due_records
---    is additionally scoped to the caller's company when a user runs it
+-- 5. expiry sweepers are cron-only; hr_archive_due_records and
+--    hr_generate_alerts require an HR admin / editor and are scoped to the
+--    caller's company when a signed-in user runs them
 -- 6. hr_anonymize_profile handles imported crew (no login) correctly
 -- 7. same-day compensation changes no longer trip crew_compensation_dates_chk
 -- =================================================================
 
 -- ---------------------------------------------------------------
--- 1. hr_can_view: include RBAC module permission
+-- 1. RBAC module permissions, excluding self-scoped grants
 -- ---------------------------------------------------------------
+-- user_has_module_access() ignores role_permissions.scope, so a grant that
+-- only entitles a user to their own record would count as company-wide.
+-- The HR / finance helpers use this scope-aware variant instead; it mirrors
+-- resolveHrAccess / resolvePayrollAccess (scope === 'self' never grants).
+CREATE OR REPLACE FUNCTION public.rbac_company_permission(
+  _user_id uuid,
+  _module_key text,
+  _required public.permission_level
+)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT
+    NOT EXISTS (
+      SELECT 1 FROM public.user_permission_overrides upo
+      WHERE upo.user_id = _user_id AND upo.module_key = _module_key
+        AND upo.is_granted = false
+        AND (upo.valid_until IS NULL OR upo.valid_until > now())
+    )
+    AND EXISTS (
+      SELECT 1 FROM public.get_user_rbac_permissions(_user_id) gup
+      WHERE gup.module_key = _module_key
+        AND gup.scope IS DISTINCT FROM 'self'::public.role_scope_type
+        AND (
+          gup.permission = _required
+          OR (_required = 'view' AND gup.permission IN ('view', 'edit', 'admin'))
+          OR (_required = 'edit' AND gup.permission IN ('edit', 'admin'))
+        )
+    );
+$$;
+
+CREATE OR REPLACE FUNCTION public.hr_can_admin(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT
+    public.has_any_role(_user_id, ARRAY['superadmin','dpa']::app_role[])
+    OR public.rbac_company_permission(_user_id, 'hr', 'admin')
+    OR public.legacy_profile_role(_user_id) IN ('dpa', 'shore_management');
+$$;
+
+CREATE OR REPLACE FUNCTION public.hr_can_edit(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT
+    public.hr_can_admin(_user_id)
+    OR public.has_any_role(_user_id, ARRAY['fleet_master','captain','purser']::app_role[])
+    OR public.rbac_company_permission(_user_id, 'hr', 'edit')
+    OR public.legacy_profile_role(_user_id) = 'master';
+$$;
+
 CREATE OR REPLACE FUNCTION public.hr_can_view(_user_id uuid)
 RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT
     public.hr_can_edit(_user_id)
     OR public.has_any_role(_user_id, ARRAY['chief_officer','chief_engineer','hod']::app_role[])
-    OR public.user_has_module_access(_user_id, 'hr', 'view')
+    OR public.rbac_company_permission(_user_id, 'hr', 'view')
     OR public.legacy_profile_role(_user_id) IN ('chief_officer', 'chief_engineer');
+$$;
+
+CREATE OR REPLACE FUNCTION public.payroll_can_admin(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT
+    public.has_any_role(_user_id, ARRAY['superadmin','dpa']::app_role[])
+    OR public.rbac_company_permission(_user_id, 'finance', 'admin')
+    OR public.legacy_profile_role(_user_id) IN ('dpa', 'shore_management');
+$$;
+
+CREATE OR REPLACE FUNCTION public.payroll_can_edit(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT
+    public.payroll_can_admin(_user_id)
+    OR public.has_any_role(_user_id, ARRAY['purser']::app_role[])
+    OR public.rbac_company_permission(_user_id, 'finance', 'edit');
+$$;
+
+CREATE OR REPLACE FUNCTION public.payroll_can_view(_user_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT
+    public.payroll_can_edit(_user_id)
+    OR public.has_any_role(_user_id, ARRAY['fleet_master']::app_role[])
+    OR public.rbac_company_permission(_user_id, 'finance', 'view');
 $$;
 
 -- ---------------------------------------------------------------
@@ -177,7 +255,7 @@ END;
 $$;
 
 -- ---------------------------------------------------------------
--- 5. Sweeper functions: cron / service-role only
+-- 5. Sweeper functions
 -- ---------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.hr_archive_due_records(p_company_id uuid DEFAULT NULL)
 RETURNS integer
@@ -205,10 +283,81 @@ BEGIN
 END;
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.hr_archive_due_records(uuid) FROM PUBLIC, anon, authenticated;
+-- The two argument-less expiry sweepers have no caller guard and are only
+-- ever run by cron / the sweeper edge function.
 REVOKE EXECUTE ON FUNCTION public.hr_expire_overrun_contracts() FROM PUBLIC, anon, authenticated;
 REVOKE EXECUTE ON FUNCTION public.hr_expire_disciplinary_records() FROM PUBLIC, anon, authenticated;
-REVOKE EXECUTE ON FUNCTION public.hr_generate_alerts(uuid) FROM PUBLIC, anon, authenticated;
+
+-- hr_generate_alerts stays callable by signed-in HR editors (the Right to
+-- Work "Refresh alerts now" action) behind the same guard as the archive.
+CREATE OR REPLACE FUNCTION public.hr_generate_alerts(p_company_id uuid DEFAULT NULL)
+RETURNS integer
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  item RECORD;
+  v_count integer := 0;
+  v_severity public.alert_severity;
+  v_alert_type text;
+  v_title text;
+  v_existing uuid;
+BEGIN
+  -- "Refresh alerts now" in Right to Work runs this with the user's session:
+  -- HR editors only, and only for their own company. Cron / the service
+  -- role (no auth.uid()) sweep every company.
+  IF auth.uid() IS NOT NULL THEN
+    IF NOT public.hr_can_edit(auth.uid()) THEN RAISE EXCEPTION 'Not allowed'; END IF;
+    p_company_id := public.get_user_company_id(auth.uid());
+    IF p_company_id IS NULL THEN RETURN 0; END IF;
+  END IF;
+  FOR item IN
+    SELECT e.item_type, e.record_id, e.company_id, e.profile_id, e.user_id, e.crew_name, e.vessel_id, e.label, e.due_date, e.days_remaining
+    FROM public.hr_expiry_items e
+    WHERE (p_company_id IS NULL OR e.company_id = p_company_id) AND e.days_remaining <= 90
+    UNION ALL
+    SELECT d.item_type, d.record_id, d.company_id, d.profile_id, d.user_id, d.crew_name, d.vessel_id, d.label, d.due_date, d.days_remaining
+    FROM public.hr_performance_due_items d
+    WHERE (p_company_id IS NULL OR d.company_id = p_company_id) AND d.days_remaining <= 14
+  LOOP
+    v_severity := CASE WHEN item.days_remaining < 0 THEN 'RED' WHEN item.days_remaining <= 30 THEN 'ORANGE' ELSE 'YELLOW' END;
+    v_alert_type := 'hr_' || item.item_type;
+    v_title := CASE
+      WHEN item.days_remaining < 0 THEN item.crew_name || ': ' || item.label || ' overdue by ' || ABS(item.days_remaining) || ' days'
+      ELSE item.crew_name || ': ' || item.label || ' due in ' || item.days_remaining || ' days' END;
+
+    SELECT id INTO v_existing FROM public.alerts
+    WHERE company_id = item.company_id AND alert_type = v_alert_type AND related_entity_id = item.record_id::text
+      AND status IN ('OPEN', 'ACKNOWLEDGED', 'SNOOZED', 'ESCALATED')
+    LIMIT 1;
+
+    IF v_existing IS NOT NULL THEN
+      UPDATE public.alerts SET title = v_title, severity_color = v_severity, due_at = item.due_date::timestamptz,
+        metadata = jsonb_build_object('item_type', item.item_type, 'profile_id', item.profile_id, 'days_remaining', item.days_remaining),
+        updated_at = now()
+      WHERE id = v_existing;
+    ELSE
+      INSERT INTO public.alerts (company_id, vessel_id, alert_type, title, description, severity_color, status, source_module,
+        related_entity_type, related_entity_id, due_at, owner_role, metadata)
+      VALUES (item.company_id, item.vessel_id, v_alert_type, v_title,
+        'HR item for ' || item.crew_name || ' (' || item.label || ') due ' || to_char(item.due_date, 'DD Mon YYYY'),
+        v_severity, 'OPEN', 'hris', item.item_type, item.record_id::text, item.due_date::timestamptz, 'DPA',
+        jsonb_build_object('item_type', item.item_type, 'profile_id', item.profile_id, 'days_remaining', item.days_remaining));
+      v_count := v_count + 1;
+    END IF;
+  END LOOP;
+
+  -- Auto-resolve HR alerts whose item is no longer due (renewed / completed).
+  UPDATE public.alerts a SET status = 'AUTO_DISMISSED', resolved_at = now(), updated_at = now()
+  WHERE a.source_module = 'hris' AND a.status IN ('OPEN', 'ACKNOWLEDGED', 'SNOOZED', 'ESCALATED')
+    AND (p_company_id IS NULL OR a.company_id = p_company_id)
+    AND NOT EXISTS (
+      SELECT 1 FROM public.hr_expiry_items e WHERE e.record_id::text = a.related_entity_id AND e.days_remaining <= 90
+      UNION ALL
+      SELECT 1 FROM public.hr_performance_due_items d WHERE d.record_id::text = a.related_entity_id AND d.days_remaining <= 14
+    );
+
+  RETURN v_count;
+END;
+$$;
 
 -- ---------------------------------------------------------------
 -- 6. hr_anonymize_profile: imported crew handling
