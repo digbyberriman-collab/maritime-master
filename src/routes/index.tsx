@@ -28,6 +28,7 @@ const NewPermissionsPage = React.lazy(() => import('@/modules/settings/pages/Per
 // Lazy loaded pages
 const Vessels = React.lazy(() => import('@/modules/vessels/pages/Vessels'));
 const LogbookList = React.lazy(() => import('@/modules/logbooks/pages/LogbookList'));
+const LogbookDetail = React.lazy(() => import('@/modules/logbooks/pages/LogbookDetail'));
 const VesselDashboard = React.lazy(() => import('@/modules/vessels/pages/VesselDashboard'));
 const CrewRoster = React.lazy(() => import('@/modules/crew/pages/CrewRoster'));
 const Documents = React.lazy(() => import('@/modules/documents/pages/Documents'));
@@ -173,6 +174,8 @@ export const AppRoutes: React.FC = () => {
       {/* Electronic Logbooks */}
       <Route path="/vessel/logbooks" element={<Navigate to="/vessel/logbooks/list" replace />} />
       <Route path="/vessel/logbooks/list" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookList /></React.Suspense></ProtectedRoute>} />
+      <Route path="/vessel/logbooks/:logbookSlug" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookDetail /></React.Suspense></ProtectedRoute>} />
+
 
       {/* Vessels */}
       <Route path="/vessels" element={<Navigate to="/vessels/dashboard" replace />} />
