@@ -281,3 +281,22 @@ Audit-mode provider reading `audit_mode_sessions` and `hr_audit_access_grants`; 
 - **Verified by execution:** `resolveModuleForPath('/hr')` → `vessel`; `'/crew/leave'` → `vessel`; `'/development'`, `'/development/my'`, `'/hris'`, `'/hris/employee-records'` → `hris`.
 - **Verified by reading:** `profiles` UPDATE policy (4.1), `documents` bucket policy vs upload paths (4.2), `update-familiarization` column names vs table (4.3), `ProtectedRoute` auth-only (4.4), `HRPage.tsx:326` `setSearchParams` (4.5), leave calculator ternary and straddle logic (5.2).
 - Sub-agent line references were spot-checked, not exhaustively re-verified. Treat any single line number as approximate to within a few lines; file names and claims were confirmed.
+
+---
+
+## Build status (2026-09-17)
+
+The build order above was executed on branch `claude/eloquent-goodall-mk8hwj`. Every HRIS leaf is now a real page; nothing under `/hris/*` renders a placeholder.
+
+| Phase | Status | Where |
+|---|---|---|
+| 0 Substrate | Done | Commit `b5be97d`: HR permission helpers, profile update policy, storage paths, familiarisation trigger, module gating, navigation, tooling, CI |
+| 1 Employee Records | Done | Commit `dd3e8ef`: five pages, `crew_contracts`, `crew_next_of_kin`, employment history, leave calculator fixes |
+| 2 Compensation | Done | Salaries, Compensation Settings, Payroll (runs, adjustments, approval, payslips), Gratuities, Pay Reviews; SQL engines `payroll_calculate_run` / `gratuity_calculate_pool` with a tested TypeScript mirror |
+| 3 Performance | Done | Reviews (three types, self-assessment, sign-off, acknowledgement, PDF), Objectives & PDPs, Disciplinary (restricted, view-audited); welfare notes moved to an editor-only side table |
+| 4 Recruitment, Onboarding, RTW, Reporting | Done | Vacancies, Candidates (pipeline, interviews, hire → profile + contract + onboarding), Onboarding (readiness + induction checklist), Compliance & Right to Work (matrix, work authorisations, alert refresh), Reporting & Analytics (11 reports, CSV/PDF) |
+| 5 GDPR / retention | Done (automation) | HR dashboard Data governance tab (policies vs live counts, archive due, GDPR export), `hr_archive_due_records`, `hr_anonymize_profile`, `hr_generate_alerts`, `hr-daily-sweeper` edge function |
+
+Verification on the final commit: `tsc` clean, `eslint` 0 errors, 608 unit tests passing across 36 files, production build succeeds. The HRIS module is 210 files under `src/modules/hris`. Full module map, access model and go-live checklist: `docs/HRIS.md`.
+
+**Not verifiable from this environment:** the app was not run against a live Supabase project (no credentials here). The eight new migrations under `supabase/migrations/20260917*` and the two edge functions must be applied and deployed, and `src/integrations/supabase/types.ts` regenerated, before the pages can be exercised end to end. See the go-live checklist in `docs/HRIS.md`.

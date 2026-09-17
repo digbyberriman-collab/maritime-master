@@ -680,7 +680,7 @@ export function useOnboardingMutations() {
   const uploadEvidence = useMutation({
     mutationFn: async ({ item, file, crewUserId }: { item: OnboardingItemRow; file: File; crewUserId: string }): Promise<OnboardingItemRow> => {
       if (!companyId) throw new Error('No company on the current profile');
-      const uploaded = await uploadCrewDocument({ file, companyId, crewUserId, kind: 'attachments' });
+      const uploaded = await uploadCrewDocument({ file, companyId, crewUserId, kind: 'onboarding' });
       const { data, error } = await supabase.from('onboarding_items').update({ evidence_path: uploaded.path }).eq('id', item.id).select('*').single();
       if (error) throw error;
       if (item.evidence_path && item.evidence_path !== uploaded.path) {

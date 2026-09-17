@@ -25,7 +25,8 @@ export type CrewDocumentKind =
   | 'disciplinary'
   | 'payslips'
   | 'right-to-work'
-  | 'recruitment';
+  | 'recruitment'
+  | 'onboarding';
 
 export interface UploadCrewDocumentArgs {
   file: File;

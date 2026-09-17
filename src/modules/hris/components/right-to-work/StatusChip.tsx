@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { formatDate } from '@/modules/hris/lib/format';
 import { COMPLIANCE_LABELS, type ComplianceStatus, type MatrixCell } from '@/modules/hris/lib/rightToWork';
 
-export const STATUS_CHIP_CLASS: Record<ComplianceStatus, string> = {
+const STATUS_CHIP_CLASS: Record<ComplianceStatus, string> = {
   expired: 'bg-destructive/10 text-destructive border-destructive/20',
   critical: 'bg-orange-500/10 text-orange-600 border-orange-500/20 dark:text-orange-400',
   warning: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20 dark:text-yellow-400',

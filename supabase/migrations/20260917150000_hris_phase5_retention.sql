@@ -279,3 +279,34 @@ END $$;
 -- Interview lookups by interviewer and by company/status/time.
 CREATE INDEX IF NOT EXISTS idx_interviews_interviewers ON public.interviews USING gin (interviewer_profile_ids);
 CREATE INDEX IF NOT EXISTS idx_interviews_company_status_time ON public.interviews (company_id, status, scheduled_at);
+
+-- ---------------------------------------------------------------
+-- Onboarding items join the alert sweep (overdue induction tasks).
+-- ---------------------------------------------------------------
+CREATE OR REPLACE VIEW public.hr_performance_due_items
+WITH (security_invoker = true) AS
+  SELECT 'review'::text AS item_type, r.id AS record_id, r.company_id, r.profile_id, p.user_id,
+         p.first_name || ' ' || p.last_name AS crew_name, r.vessel_id,
+         r.review_type AS label, r.status, r.due_date, (r.due_date - CURRENT_DATE) AS days_remaining
+  FROM public.performance_reviews r JOIN public.profiles p ON p.id = r.profile_id
+  WHERE r.status NOT IN ('completed', 'cancelled') AND r.due_date IS NOT NULL
+UNION ALL
+  SELECT 'objective', o.id, o.company_id, o.profile_id, p.user_id,
+         p.first_name || ' ' || p.last_name, NULL::uuid,
+         o.title, o.status, o.target_date, (o.target_date - CURRENT_DATE)
+  FROM public.crew_objectives o JOIN public.profiles p ON p.id = o.profile_id
+  WHERE o.status IN ('not_started', 'in_progress') AND o.target_date IS NOT NULL
+UNION ALL
+  SELECT 'warning', d.id, d.company_id, d.profile_id, p.user_id,
+         p.first_name || ' ' || p.last_name, d.vessel_id,
+         d.stage, d.status, d.expiry_date, (d.expiry_date - CURRENT_DATE)
+  FROM public.disciplinary_records d JOIN public.profiles p ON p.id = d.profile_id
+  WHERE d.status IN ('open', 'closed') AND d.expiry_date IS NOT NULL
+UNION ALL
+  SELECT 'onboarding_item', i.id, i.company_id, rec.profile_id, p.user_id,
+         p.first_name || ' ' || p.last_name, rec.vessel_id,
+         i.section || ': ' || i.title, CASE WHEN i.completed THEN 'completed' ELSE 'open' END, i.due_date, (i.due_date - CURRENT_DATE)
+  FROM public.onboarding_items i
+  JOIN public.onboarding_records rec ON rec.id = i.record_id
+  JOIN public.profiles p ON p.id = rec.profile_id
+  WHERE NOT i.completed AND i.required AND rec.status IN ('not_started', 'in_progress') AND i.due_date IS NOT NULL;
