@@ -201,6 +201,11 @@ const vesselLogbooks: NavChild[] = [
   L('All Logbooks', vLog, { existing: `${V}/logbooks/list`, icon: BookOpen }),
   L('Deck Log', vLog, { icon: Anchor }),
   L('Engine Log', vLog, { icon: Wrench }),
+  L('DAGON Engine Room Log', vLog, {
+    icon: Wrench,
+    slug: 'engine-log-dagon',
+    existing: '/vessel/logbooks/engine-log?vessel=dagon',
+  }),
   L('Bell Book', vLog, { icon: Bell }),
   L('Radio Log', vLog, { icon: MessageSquare }),
   L('Oil Record Book', vLog, { icon: Beaker }),
