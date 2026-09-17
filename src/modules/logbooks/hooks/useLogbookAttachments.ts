@@ -87,6 +87,9 @@ export const useLogbookAttachments = ({ entryId, logbookId, companyId, vesselId 
         if (file.size > MAX_ATTACHMENT_BYTES) {
           throw new Error(`"${file.name}" is larger than the 25 MB limit.`);
         }
+        if (!isAllowedAttachmentType(file)) {
+          throw new Error(`"${file.name}" is not a supported file type. ${ALLOWED_TYPES_MESSAGE}`);
+        }
         const path = `${companyId}/${entryId}/${Date.now()}-${safeName(file.name)}`;
         const { error: uploadError } = await supabase.storage
           .from(BUCKET)
