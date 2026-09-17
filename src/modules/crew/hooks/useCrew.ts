@@ -34,6 +34,14 @@ export interface CrewMember {
   passport_number?: string | null;
   passport_expiry?: string | null;
   visa_status?: string | null;
+  // Personnel classification — one database for crew, contractors and shoreside staff
+  personnel_type?: string | null;
+  place_of_birth?: string | null;
+  passport_country?: string | null;
+  seamans_book_number?: string | null;
+  embarkation_port?: string | null;
+  office_location?: string | null;
+  job_title?: string | null;
   // Account status fields
   account_status?: string | null;
   last_login_at?: string | null;
@@ -272,6 +280,13 @@ export const useCrew = (vesselFilter?: string) => {
           passport_number: p.passport_number,
           passport_expiry: p.passport_expiry,
           visa_status: p.visa_status,
+          personnel_type: (p as any).personnel_type ?? 'crew',
+          place_of_birth: (p as any).place_of_birth,
+          passport_country: (p as any).passport_country,
+          seamans_book_number: (p as any).seamans_book_number,
+          embarkation_port: (p as any).embarkation_port,
+          office_location: (p as any).office_location,
+          job_title: (p as any).job_title,
           account_status: p.account_status,
           last_login_at: p.last_login_at,
           invited_at: p.invited_at,

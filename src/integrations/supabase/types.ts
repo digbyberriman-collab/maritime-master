@@ -13811,6 +13811,7 @@ export type Database = {
           date_of_birth: string | null
           department: string | null
           email: string
+          embarkation_port: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
           employment_start_date: string | null
@@ -13824,21 +13825,27 @@ export type Database = {
           invitation_token_expires: string | null
           invited_at: string | null
           is_imported: boolean
+          job_title: string | null
           last_invited_at: string | null
           last_login_at: string | null
           last_name: string
           medical_expiry: string | null
           nationality: string | null
           notes: string | null
+          office_location: string | null
+          passport_country: string | null
           passport_expiry: string | null
           passport_number: string | null
+          personnel_type: string
           phone: string | null
+          place_of_birth: string | null
           position: string | null
           preferred_name: string | null
           probation_end_date: string | null
           rank: string | null
           role: Database["public"]["Enums"]["user_role"]
           rotation: string | null
+          seamans_book_number: string | null
           status: string | null
           updated_at: string
           updated_by: string | null
@@ -13868,6 +13875,7 @@ export type Database = {
           date_of_birth?: string | null
           department?: string | null
           email: string
+          embarkation_port?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           employment_start_date?: string | null
@@ -13881,21 +13889,27 @@ export type Database = {
           invitation_token_expires?: string | null
           invited_at?: string | null
           is_imported?: boolean
+          job_title?: string | null
           last_invited_at?: string | null
           last_login_at?: string | null
           last_name: string
           medical_expiry?: string | null
           nationality?: string | null
           notes?: string | null
+          office_location?: string | null
+          passport_country?: string | null
           passport_expiry?: string | null
           passport_number?: string | null
+          personnel_type?: string
           phone?: string | null
+          place_of_birth?: string | null
           position?: string | null
           preferred_name?: string | null
           probation_end_date?: string | null
           rank?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           rotation?: string | null
+          seamans_book_number?: string | null
           status?: string | null
           updated_at?: string
           updated_by?: string | null
@@ -13925,6 +13939,7 @@ export type Database = {
           date_of_birth?: string | null
           department?: string | null
           email?: string
+          embarkation_port?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           employment_start_date?: string | null
@@ -13938,21 +13953,27 @@ export type Database = {
           invitation_token_expires?: string | null
           invited_at?: string | null
           is_imported?: boolean
+          job_title?: string | null
           last_invited_at?: string | null
           last_login_at?: string | null
           last_name?: string
           medical_expiry?: string | null
           nationality?: string | null
           notes?: string | null
+          office_location?: string | null
+          passport_country?: string | null
           passport_expiry?: string | null
           passport_number?: string | null
+          personnel_type?: string
           phone?: string | null
+          place_of_birth?: string | null
           position?: string | null
           preferred_name?: string | null
           probation_end_date?: string | null
           rank?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           rotation?: string | null
+          seamans_book_number?: string | null
           status?: string | null
           updated_at?: string
           updated_by?: string | null
