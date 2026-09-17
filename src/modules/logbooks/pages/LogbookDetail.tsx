@@ -30,6 +30,17 @@ const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
   submitted: 'outline',
   signed: 'default',
   amended: 'outline',
+  finalized: 'default',
+};
+
+const statusLabel = (entry: LogbookEntry) => {
+  if (entry.status === 'finalized') {
+    return entry.finalized_by_name ? `Finalised — ${entry.finalized_by_name}` : 'Finalised';
+  }
+  if (entry.status === 'signed' && entry.signed_by_name) {
+    return `Signed — ${entry.signed_by_name}`;
+  }
+  return entry.status;
 };
 
 const LogbookDetail: React.FC = () => {
@@ -48,7 +59,7 @@ const LogbookDetail: React.FC = () => {
 
   const {
     logbook, entries, isLoading, canSign, currentUserId, hasVessel,
-    createEntry, updateEntry, signEntry, deleteEntry,
+    createEntry, updateEntry, signEntry, finalizeEntry, deleteEntry,
   } = useLogbook(definition, month);
 
   if (!definition) {
