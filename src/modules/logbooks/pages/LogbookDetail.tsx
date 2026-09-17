@@ -213,15 +213,36 @@ const LogbookDetail: React.FC = () => {
           </div>
         </div>
 
-        {!hasVessel && (
+        {vesselsLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        ) : vessels.length === 0 ? (
           <Card>
-            <CardContent className="py-6 text-sm text-muted-foreground">
-              Select a vessel from the menu in the lower left to view or add logbook entries.
+            <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+              <Ship className="h-8 w-8 text-muted-foreground" />
+              <p className="text-sm font-medium text-foreground">No vessels available</p>
+              <p className="max-w-md text-sm text-muted-foreground">
+                Logbook entries are recorded against a vessel. Add a vessel to your fleet, or ask your
+                administrator for access, then come back to this page.
+              </p>
+              <Button variant="outline" className="mt-2" onClick={() => navigate('/vessels')}>
+                Go to vessels
+              </Button>
             </CardContent>
           </Card>
-        )}
-
-        {isLoading ? (
+        ) : !hasVessel ? (
+          <Card>
+            <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+              <Ship className="h-8 w-8 text-muted-foreground" />
+              <p className="text-sm font-medium text-foreground">No vessel selected</p>
+              <p className="max-w-md text-sm text-muted-foreground">
+                Choose a vessel from the dropdown above to view or add logbook entries.
+              </p>
+            </CardContent>
+          </Card>
+        ) : isLoading ? (
           <div className="space-y-3">
             <Skeleton className="h-8 w-48" />
             <Skeleton className="h-64 w-full" />
