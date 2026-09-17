@@ -7298,6 +7298,79 @@ export type Database = {
           },
         ]
       }
+      logbook_attachments: {
+        Row: {
+          company_id: string
+          created_at: string
+          description: string | null
+          entry_id: string
+          file_name: string
+          file_size: number | null
+          id: string
+          logbook_id: string
+          mime_type: string | null
+          storage_path: string
+          updated_at: string
+          uploaded_by: string | null
+          uploaded_by_name: string | null
+          vessel_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          description?: string | null
+          entry_id: string
+          file_name: string
+          file_size?: number | null
+          id?: string
+          logbook_id: string
+          mime_type?: string | null
+          storage_path: string
+          updated_at?: string
+          uploaded_by?: string | null
+          uploaded_by_name?: string | null
+          vessel_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          entry_id?: string
+          file_name?: string
+          file_size?: number | null
+          id?: string
+          logbook_id?: string
+          mime_type?: string | null
+          storage_path?: string
+          updated_at?: string
+          uploaded_by?: string | null
+          uploaded_by_name?: string | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logbook_attachments_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "logbook_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logbook_attachments_logbook_id_fkey"
+            columns: ["logbook_id"]
+            isOneToOne: false
+            referencedRelation: "logbooks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logbook_attachments_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       logbook_entries: {
         Row: {
           amended_from_id: string | null
