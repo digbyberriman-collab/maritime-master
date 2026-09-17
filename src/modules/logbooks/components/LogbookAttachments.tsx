@@ -38,6 +38,7 @@ const LogbookAttachments: React.FC<Props> = ({
     attachments, isLoading, uploadFiles, removeAttachment, openAttachment, currentUserId,
   } = useLogbookAttachments({ entryId, logbookId, companyId, vesselId });
   const [sizeError, setSizeError] = React.useState<string | null>(null);
+  const [typeError, setTypeError] = React.useState<string | null>(null);
 
   if (!entryId) {
     return (
@@ -50,7 +51,20 @@ const LogbookAttachments: React.FC<Props> = ({
   const handleFiles = (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
     const files = Array.from(fileList);
-    const oversized = files.filter((file) => file.size > MAX_ATTACHMENT_BYTES);
+
+    const unsupported = files.filter((file) => !isAllowedAttachmentType(file));
+    if (unsupported.length > 0) {
+      const names = unsupported.map((file) => `"${file.name}"`).join(', ');
+      setTypeError(
+        `${names} ${unsupported.length > 1 ? 'are' : 'is'} not a supported file type${unsupported.length > 1 ? 's' : ''}. ${ALLOWED_TYPES_MESSAGE}`,
+      );
+    } else {
+      setTypeError(null);
+    }
+
+    const oversized = files
+      .filter((file) => isAllowedAttachmentType(file))
+      .filter((file) => file.size > MAX_ATTACHMENT_BYTES);
     if (oversized.length > 0) {
       const names = oversized
         .map((file) => `"${file.name}" (${formatSize(file.size)})`)
@@ -61,7 +75,10 @@ const LogbookAttachments: React.FC<Props> = ({
     } else {
       setSizeError(null);
     }
-    const allowed = files.filter((file) => file.size <= MAX_ATTACHMENT_BYTES);
+
+    const allowed = files
+      .filter((file) => isAllowedAttachmentType(file))
+      .filter((file) => file.size <= MAX_ATTACHMENT_BYTES);
     if (allowed.length > 0) uploadFiles.mutate(allowed);
     if (inputRef.current) inputRef.current.value = '';
   };
