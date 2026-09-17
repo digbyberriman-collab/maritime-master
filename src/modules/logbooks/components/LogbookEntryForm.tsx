@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select';
 import type { LogbookDefinition } from '@/modules/logbooks/lib/logbookDefinitions';
 import LogbookAttachments from '@/modules/logbooks/components/LogbookAttachments';
+import LogbookEntryHistory from '@/modules/logbooks/components/LogbookEntryHistory';
 import type { LogbookEntry, LogbookEntryInput } from '@/modules/logbooks/hooks/useLogbook';
 
 const WATCH_PERIODS = [
