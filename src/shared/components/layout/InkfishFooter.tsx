@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { LifeBuoy, BookOpen, Mail } from 'lucide-react';
 import inkfishLogo from '@/assets/inkfish-logo.png';
 import {
@@ -16,64 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-type FooterDialog = 'guides' | 'privacy' | 'terms' | null;
-
-const HOW_TO_GUIDES: { title: string; steps: string[] }[] = [
-  {
-    title: 'Add a crew member',
-    steps: [
-      'Open the HRIS module from the top bar and choose Crew List.',
-      'Click "Add crew member" and fill in their details — only the name is required to start.',
-      'Assign them to a vessel and department, then save.',
-      'Use the record dialog later to add documents, contracts and emergency contacts.',
-    ],
-  },
-  {
-    title: 'Log an electronic logbook entry',
-    steps: [
-      'Open the Vessel module and choose Logbooks.',
-      'Pick the logbook (e.g. Deck Log) for the selected vessel.',
-      'Click a day on the calendar to add an entry, then save it as a draft.',
-      'A senior officer can then sign it off and finalise it.',
-    ],
-  },
-  {
-    title: 'Plan crew rotations',
-    steps: [
-      'Open HRIS and choose Rotation Planner.',
-      'Drag on a crew lane to create a rotation block; drag edges to resize.',
-      'Use the filters to focus on a vessel or department, and zoom for the month view.',
-      'Conflicts are flagged automatically — open the conflict panel to resolve them.',
-    ],
-  },
-  {
-    title: 'Record an incident or near miss',
-    steps: [
-      'Open the Vessel module and choose Incidents.',
-      'Click "Report incident" and follow the step-by-step report.',
-      'Attach photos or documents, then submit for review.',
-      'Track corrective actions (CAPAs) from the incident record.',
-    ],
-  },
-  {
-    title: 'Upload a crew or vessel certificate',
-    steps: [
-      'Open HRIS > Crew List and open the crew member, or Vessel > Vessel Details.',
-      'Go to the Certificates section and click "Add certificate".',
-      'Choose the type, enter the expiry date and attach the scan (PDF or image).',
-      'Expiry alerts are raised automatically at 90, 60, 30 and 7 days.',
-    ],
-  },
-  {
-    title: 'Export reports to PDF',
-    steps: [
-      'Most list pages have an Export or PDF button in the toolbar.',
-      'Logbooks: open a logbook and click "Export PDF" to pick a date range.',
-      'Crew List: use "Crew list PDF" for the official IMO FAL Form 5.',
-      'Rotation Planner: use Export to PDF for a colour planner view.',
-    ],
-  },
-];
+type FooterDialog = 'privacy' | 'terms' | null;
 
 const linkClass =
   'text-xs text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap';
@@ -107,9 +51,11 @@ const InkfishFooter: React.FC = () => {
                 Help
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" side="top">
-                <DropdownMenuItem onClick={() => setDialog('guides')}>
-                  <BookOpen className="h-4 w-4 mr-2" />
-                  How-to Guides
+                <DropdownMenuItem asChild>
+                  <Link to="/help/how-to-guides">
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    How-to Guides
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <a href="mailto:SOS@INK.FISH">
@@ -138,32 +84,6 @@ const InkfishFooter: React.FC = () => {
           </p>
         </div>
       </footer>
-
-      {/* How-to Guides */}
-      <Dialog open={dialog === 'guides'} onOpenChange={(o) => !o && setDialog(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>How-to Guides</DialogTitle>
-            <DialogDescription>
-              Quick walkthroughs for the most common tasks.
-            </DialogDescription>
-          </DialogHeader>
-          <ScrollArea className="max-h-[60vh] pr-4">
-            <div className="space-y-5">
-              {HOW_TO_GUIDES.map((guide) => (
-                <div key={guide.title}>
-                  <h3 className="text-sm font-semibold text-foreground">{guide.title}</h3>
-                  <ol className="mt-1 list-decimal list-inside space-y-0.5 text-sm text-muted-foreground">
-                    {guide.steps.map((step, i) => (
-                      <li key={i}>{step}</li>
-                    ))}
-                  </ol>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-        </DialogContent>
-      </Dialog>
 
       {/* Privacy Policy */}
       <Dialog open={dialog === 'privacy'} onOpenChange={(o) => !o && setDialog(null)}>
