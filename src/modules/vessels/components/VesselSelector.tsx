@@ -206,12 +206,6 @@ export const VesselSelector: React.FC<VesselSelectorProps> = ({ className }) => 
                 >
                   All
                 </button>
-                <button
-                  onClick={handleSelectNone}
-                  className="text-xs text-muted-foreground hover:text-foreground hover:underline"
-                >
-                  None
-                </button>
               </div>
             </div>
             <div className="space-y-1 max-h-[360px] overflow-y-auto">
