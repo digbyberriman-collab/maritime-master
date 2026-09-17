@@ -95,9 +95,9 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       setVessels(vesselsData);
 
-      // Restore previous selection from sessionStorage
-      const savedIsAllVessels = sessionStorage.getItem(STORAGE_KEY_ALL_VESSELS) === 'true';
-      const savedVesselId = sessionStorage.getItem(STORAGE_KEY_VESSEL_ID);
+      // Restore previous selection from localStorage
+      const savedIsAllVessels = localStorage.getItem(STORAGE_KEY_ALL_VESSELS) === 'true';
+      const savedVesselId = localStorage.getItem(STORAGE_KEY_VESSEL_ID);
 
       if (savedIsAllVessels && canAccessAllVessels) {
         setIsAllVessels(true);
@@ -137,19 +137,19 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, [profile, loadVessels]);
 
-  // Persist selected vessel to sessionStorage
+  // Persist selected vessel to localStorage
   useEffect(() => {
     if (selectedVessel) {
-      sessionStorage.setItem(STORAGE_KEY_VESSEL_ID, selectedVessel.id);
-      sessionStorage.setItem(STORAGE_KEY_ALL_VESSELS, 'false');
+      localStorage.setItem(STORAGE_KEY_VESSEL_ID, selectedVessel.id);
+      localStorage.setItem(STORAGE_KEY_ALL_VESSELS, 'false');
     }
   }, [selectedVessel]);
 
   // Persist \"All Vessels\" selection
   useEffect(() => {
     if (isAllVessels) {
-      sessionStorage.setItem(STORAGE_KEY_ALL_VESSELS, 'true');
-      sessionStorage.removeItem(STORAGE_KEY_VESSEL_ID);
+      localStorage.setItem(STORAGE_KEY_ALL_VESSELS, 'true');
+      localStorage.removeItem(STORAGE_KEY_VESSEL_ID);
     }
   }, [isAllVessels]);
 
