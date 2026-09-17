@@ -53,7 +53,7 @@ const LogbookDetail: React.FC = () => {
   const { logbookSlug } = useParams<{ logbookSlug: string }>();
   const navigate = useNavigate();
   const definition = getLogbookBySlug(logbookSlug);
-  const { selectedVessel, vessels, setSelectedVesselById } = useVessel();
+  const { selectedVessel, vessels, setSelectedVesselById, loading: vesselsLoading } = useVessel();
   const [searchParams, setSearchParams] = useSearchParams();
   const sheet = getSheetTemplate(logbookSlug, selectedVessel?.name);
 
