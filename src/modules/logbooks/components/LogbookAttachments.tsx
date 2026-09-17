@@ -111,6 +111,12 @@ const LogbookAttachments: React.FC<Props> = ({
         />
       </div>
 
+      {typeError && (
+        <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {typeError}
+        </p>
+      )}
+
       {sizeError && (
         <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {sizeError}
@@ -121,7 +127,7 @@ const LogbookAttachments: React.FC<Props> = ({
         <Skeleton className="h-10 w-full" />
       ) : attachments.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No files attached. Photos, scanned receipts and PDFs up to 25 MB each are supported.
+          No files attached. PDFs and images (photos and scans) up to 25 MB each are supported.
         </p>
       ) : (
         <ul className="space-y-2">
