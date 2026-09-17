@@ -49,8 +49,9 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { downloadCrewDocument } from '@/lib/storage/crewDocuments';
 import { hasPermission, Permission } from '@/modules/auth/lib/permissions';
-import { 
-  useCrewCertificates, 
+import { useHrAccess } from '@/modules/auth/hooks/useHrAccess';
+import {
+  useCrewCertificates,
   uploadCertificateFile,
   MARITIME_CERTIFICATE_TYPES,
   type CrewCertificate,
@@ -90,11 +91,17 @@ const CrewCertificates: React.FC<CrewCertificatesProps> = ({ crewId, crewVesselI
   });
 
   const userRole = profile?.role || null;
-  const canEdit = hasPermission(userRole, Permission.EDIT_CREW_CERTIFICATES, {
-    targetUserId: crewId,
-    currentUserId: user?.id,
-    targetVesselId: crewVesselId,
-  });
+  const hrAccess = useHrAccess();
+  // Legacy role check (crew module) OR RBAC HR editor (HRIS) OR the crew
+  // member managing their own certificates. RLS makes the final decision.
+  const canEdit =
+    hasPermission(userRole, Permission.EDIT_CREW_CERTIFICATES, {
+      targetUserId: crewId,
+      currentUserId: user?.id,
+      targetVesselId: crewVesselId,
+    }) ||
+    (!hrAccess.loading && hrAccess.canEdit) ||
+    (Boolean(user?.id) && user?.id === crewId);
 
   const getStatusBadge = (status: string) => {
     switch (status) {

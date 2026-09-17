@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { hasPermission, Permission } from '@/modules/auth/lib/permissions';
-import { 
-  useCrewAttachments, 
+import { useHrAccess } from '@/modules/auth/hooks/useHrAccess';
+import {
+  useCrewAttachments,
   CrewAttachment, 
   AttachmentFormData, 
   ATTACHMENT_TYPES,
@@ -65,11 +66,17 @@ export const CrewAttachments: React.FC<CrewAttachmentsProps> = ({ crewId, crewVe
     file: null
   });
 
-  const canEdit = hasPermission(profile?.role, Permission.EDIT_CREW_ATTACHMENTS, {
-    targetUserId: crewId,
-    currentUserId: user?.id,
-    targetVesselId: crewVesselId
-  });
+  const hrAccess = useHrAccess();
+  // Legacy role check (crew module) OR RBAC HR editor (HRIS) OR the crew
+  // member managing their own attachments. RLS makes the final decision.
+  const canEdit =
+    hasPermission(profile?.role, Permission.EDIT_CREW_ATTACHMENTS, {
+      targetUserId: crewId,
+      currentUserId: user?.id,
+      targetVesselId: crewVesselId
+    }) ||
+    (!hrAccess.loading && hrAccess.canEdit) ||
+    (Boolean(user?.id) && user?.id === crewId);
 
   const getFileIcon = (mimeType: string) => {
     if (mimeType?.startsWith('image/')) {

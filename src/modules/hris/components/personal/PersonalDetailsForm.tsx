@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
+import { badgeVariants } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { TablesUpdate } from '@/integrations/supabase/types';
 import { RANKS, NATIONALITIES } from '@/modules/crew/constants';
@@ -313,12 +313,16 @@ function renderControl(def: FieldDef, field: ControllerRenderProps<ProfileFormVa
   }
 }
 
+/**
+ * Rendered as a <span> (not the div-based Badge) because in edit mode it sits
+ * inside FormDescription, which is a <p> and cannot contain block elements.
+ */
 const ExpiryBadge: React.FC<{ value: string }> = ({ value }) => {
   const tone = expiryTone(value);
   return (
-    <Badge variant="outline" className={cn('text-[10px] font-normal', toneClass[tone])}>
+    <span className={cn(badgeVariants({ variant: 'outline' }), 'text-[10px] font-normal', toneClass[tone])}>
       {expiryLabel(value)}
-    </Badge>
+    </span>
   );
 };
 

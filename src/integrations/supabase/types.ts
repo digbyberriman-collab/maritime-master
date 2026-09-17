@@ -13814,10 +13814,8 @@ export type Database = {
           embarkation_port: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
-          employment_start_date: string | null
           first_name: string
           gender: string | null
-          hod_user_id: string | null
           id: string
           imported_vessel_id: string | null
           invitation_count: number | null
@@ -13878,10 +13876,8 @@ export type Database = {
           embarkation_port?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
-          employment_start_date?: string | null
           first_name: string
           gender?: string | null
-          hod_user_id?: string | null
           id?: string
           imported_vessel_id?: string | null
           invitation_count?: number | null
@@ -13942,10 +13938,8 @@ export type Database = {
           embarkation_port?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
-          employment_start_date?: string | null
           first_name?: string
           gender?: string | null
-          hod_user_id?: string | null
           id?: string
           imported_vessel_id?: string | null
           invitation_count?: number | null
