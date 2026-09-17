@@ -11,6 +11,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -48,7 +52,7 @@ const LogbookDetail: React.FC = () => {
   const { logbookSlug } = useParams<{ logbookSlug: string }>();
   const navigate = useNavigate();
   const definition = getLogbookBySlug(logbookSlug);
-  const { selectedVessel } = useVessel();
+  const { selectedVessel, vessels, setSelectedVesselById } = useVessel();
   const sheet = getSheetTemplate(logbookSlug, selectedVessel?.name);
 
   const [month, setMonth] = React.useState(() => startOfMonth(new Date()));
@@ -140,6 +144,22 @@ const LogbookDetail: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {vessels.length > 0 && (
+              <Select
+                value={selectedVessel?.id ?? ''}
+                onValueChange={(value) => setSelectedVesselById(value)}
+              >
+                <SelectTrigger className="w-[13rem]" aria-label="Select vessel">
+                  <SelectValue placeholder="Select vessel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {vessels.map((vessel) => (
+                    <SelectItem key={vessel.id} value={vessel.id}>{vessel.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
             <Tabs value={view} onValueChange={(value) => setView(value as 'month' | 'records')}>
               <TabsList>
                 <TabsTrigger value="month"><CalendarDays className="mr-1 h-4 w-4" /> Month</TabsTrigger>

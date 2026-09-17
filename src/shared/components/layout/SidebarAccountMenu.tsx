@@ -35,7 +35,7 @@ interface SidebarAccountMenuProps {
 
 const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate }) => {
   const { profile, signOut } = useAuth();
-  const { vessels, loading } = useVessel();
+  const { vessels, loading, selectedVessel, setSelectedVesselById } = useVessel();
   const { selectedVesselIds, setSelectedVesselIds } = useDashboardFilter();
   const { brandColor } = useBrandingContext();
   const { setPanelOpen } = useFeedbackStore();
