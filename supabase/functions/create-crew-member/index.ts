@@ -107,7 +107,7 @@ serve(async (req: Request) => {
       emailDomain.endsWith('.example') ||
       emailDomain.endsWith('.invalid') ||
       emailDomain.endsWith('.localhost') ||
-      /^test[\.\-_]?crew@/i.test(normalizedEmailEarly);
+      /^test[.\-_]?crew@/i.test(normalizedEmailEarly);
     if (looksFake) {
       return new Response(
         JSON.stringify({

@@ -5,6 +5,11 @@ import { cn } from '@/lib/utils';
 import { NAVIGATION_ITEMS, type NavChild } from '@/config/navigation';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useSidebarOrder, applySidebarOrder } from '@/shared/hooks/useSidebarOrder';
+import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
+import { useHrAccess } from '@/modules/auth/hooks/useHrAccess';
+import { hrAccessSatisfies } from '@/modules/auth/lib/hrAccess';
+import { usePayrollAccess } from '@/modules/auth/hooks/usePayrollAccess';
+import { payrollAccessSatisfies } from '@/modules/auth/lib/payrollAccess';
 
 interface SidebarNavigationProps {
   moduleId: string | null;
@@ -15,25 +20,50 @@ const DASHBOARD_LINKS = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { label: 'Fleet Tracker', path: '/fleet-map', icon: Map },
   { label: 'Alerts', path: '/alerts', icon: Bell },
-  { label: 'Fleet Calendar', path: '/calendar', icon: Calendar },
-  { label: 'Fleet Reports', path: '/analytics', icon: FileBarChart },
+  { label: 'Fleet Calendar', path: '/crew/calendar', icon: Calendar },
+  { label: 'Fleet Reports', path: '/reports', icon: FileBarChart },
 ];
 
 const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavigate }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { map } = useSidebarOrder();
+  const hasPermission = usePermissionsStore((s) => s.hasPermission);
+  const rbacInitialized = usePermissionsStore((s) => s.isInitialized);
+  const hrAccess = useHrAccess();
+  const payrollAccess = usePayrollAccess();
   const selectedModule = NAVIGATION_ITEMS.find((item) => item.id === moduleId) ?? null;
+
+  // Leaf-level gating: entries with a moduleKey are hidden unless the user
+  // holds minPermission on that RBAC module. HR uses the dedicated resolver so
+  // legacy-role users are handled the same way the database handles them.
+  const canShow = useCallback((item: NavChild): boolean => {
+    if (!item.moduleKey) return true;
+    const required = item.minPermission ?? 'view';
+    if (item.moduleKey === 'hr') {
+      if (hrAccess.loading) return false;
+      return hrAccessSatisfies(hrAccess, required);
+    }
+    if (item.moduleKey === 'finance') {
+      if (payrollAccess.loading) return false;
+      return payrollAccessSatisfies(payrollAccess, required);
+    }
+    if (!rbacInitialized) return true;
+    return hasPermission(item.moduleKey, required);
+  }, [hrAccess, payrollAccess, hasPermission, rbacInitialized]);
 
   const children = useMemo(() => {
     if (!selectedModule?.children) return [];
     const orderDeep = (items: NavChild[], parentId: string): NavChild[] =>
-      applySidebarOrder(items, map[parentId]).map((item) => ({
-        ...item,
-        children: item.children?.length ? orderDeep(item.children, item.id) : item.children,
-      }));
+      applySidebarOrder(items, map[parentId])
+        .filter(canShow)
+        .map((item) => ({
+          ...item,
+          children: item.children?.length ? orderDeep(item.children, item.id) : item.children,
+        }))
+        .filter((item) => !item.children || item.children.length > 0);
     return orderDeep(selectedModule.children, selectedModule.id);
-  }, [selectedModule, map]);
+  }, [selectedModule, map, canShow]);
 
   const matchesPath = useCallback((path: string) => {
     const [pathname, queryString] = path.split('?');

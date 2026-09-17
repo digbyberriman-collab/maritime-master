@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useToast } from '@/shared/hooks/use-toast';
+import { removeCrewDocument, uploadCrewDocument } from '@/lib/storage/crewDocuments';
 
 export interface CrewAttachment {
   id: string;
@@ -92,19 +93,16 @@ export const useCrewAttachments = (userId: string) => {
         throw new Error('File size exceeds 25MB limit');
       }
 
-      // Upload file to storage
-      const fileExt = formData.file.name.split('.').pop();
-      const filePath = `attachments/${userId}/${Date.now()}.${fileExt}`;
+      if (!profile.company_id) throw new Error('Your profile has no company; cannot upload files');
 
-      const { error: uploadError } = await supabase.storage
-        .from('documents')
-        .upload(filePath, formData.file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('documents')
-        .getPublicUrl(filePath);
+      // Upload to the private documents bucket under the company prefix.
+      // file_url stores the object path; reads use signed URLs.
+      const uploaded = await uploadCrewDocument({
+        file: formData.file,
+        companyId: profile.company_id,
+        crewUserId: userId,
+        kind: 'attachments',
+      });
 
       // Create database record
       const { data, error: dbError } = await supabase
@@ -113,7 +111,7 @@ export const useCrewAttachments = (userId: string) => {
           user_id: userId,
           attachment_type: formData.attachment_type,
           file_name: formData.file.name,
-          file_url: urlData.publicUrl,
+          file_url: uploaded.path,
           file_size: formData.file.size,
           mime_type: formData.file.type,
           description: formData.description || null,
@@ -162,9 +160,12 @@ export const useCrewAttachments = (userId: string) => {
     mutationFn: async (attachment: CrewAttachment) => {
       if (!profile?.user_id) throw new Error('Not authenticated');
 
-      // Delete from storage
-      const filePath = `attachments/${userId}/${attachment.file_url.split('/').pop()}`;
-      await supabase.storage.from('documents').remove([filePath]);
+      // Delete from storage (tolerates legacy public URLs and new object paths)
+      try {
+        await removeCrewDocument(attachment.file_url);
+      } catch (storageError) {
+        console.warn('Attachment file could not be removed from storage:', storageError);
+      }
 
       // Delete database record
       const { error } = await supabase

@@ -14,9 +14,10 @@ export default defineConfig({
       reporter: ["text", "text-summary", "html"],
       include: [
         "src/lib/**/*.ts",
-        "src/store/**/*.ts",
-        "src/contexts/**/*.tsx",
-        "src/components/auth/**/*.tsx",
+        "src/shared/**/*.{ts,tsx}",
+        "src/modules/**/{lib,services,store,hooks,contexts}/**/*.{ts,tsx}",
+        "src/modules/auth/components/**/*.tsx",
+        "src/config/**/*.ts",
       ],
       exclude: [
         "src/**/*.test.{ts,tsx}",

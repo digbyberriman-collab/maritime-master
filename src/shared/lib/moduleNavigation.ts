@@ -5,6 +5,8 @@ export type ModuleNavigationItem = NavItem;
 const pathnameOf = (path: string) => path.split('?')[0] || '/';
 
 function pathScore(item: NavItem | NavChild, pathname: string): number {
+  // Cross-links point at pages owned by another module and must not claim them.
+  if ('crossLink' in item && item.crossLink) return -1;
   const itemPath = pathnameOf(item.path);
   let score = pathname === itemPath ? itemPath.length + 1000 : pathname.startsWith(`${itemPath}/`) ? itemPath.length : -1;
 

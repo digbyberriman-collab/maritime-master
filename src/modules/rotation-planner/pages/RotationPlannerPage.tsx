@@ -210,7 +210,7 @@ const RotationPlannerPage: React.FC = () => {
     setSelectedIds((prev) => {
       if (mode === 'toggle') {
         const next = new Set(prev);
-        next.has(a.id) ? next.delete(a.id) : next.add(a.id);
+        if (next.has(a.id)) next.delete(a.id); else next.add(a.id);
         return next;
       }
       if (mode === 'range' && lastClickedRef.current) {
@@ -352,7 +352,7 @@ const RotationPlannerPage: React.FC = () => {
       const mod = e.metaKey || e.ctrlKey;
       if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault();
-        e.shiftKey ? void onRedo() : void onUndo();
+        if (e.shiftKey) void onRedo(); else void onUndo();
         return;
       }
       if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); void onRedo(); return; }

@@ -205,7 +205,8 @@ const CrewRoster: React.FC = () => {
     setIsDeactivateDialogOpen(true);
   };
 
-  const confirmSignOff = async (data: { assignmentId: string; leaveDate: string }) => {
+  const confirmSignOff = async (data: { assignmentId: string; leaveDate: string; reason: string; notes?: string }) => {
+    // Reason and notes are persisted on the assignment (end_reason / notes).
     await signOffCrew.mutateAsync(data);
     setIsSignOffDialogOpen(false);
     setSelectedCrew(null);

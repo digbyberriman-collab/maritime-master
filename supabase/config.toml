@@ -74,3 +74,6 @@ verify_jwt = false
 
 [functions.ai-route-planner]
 verify_jwt = false
+
+[functions.hr-daily-sweeper]
+verify_jwt = false

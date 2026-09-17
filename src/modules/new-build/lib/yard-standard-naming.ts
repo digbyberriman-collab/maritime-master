@@ -66,7 +66,7 @@ export function parseYardStandardNumber(filename: string): ParsedYardStandard | 
   // Pattern 2: Project form – Y719-S-323-04-001-01
   const projectPattern = /^[YP]\w{2,4}-([SCBD])-(\d{3})-(\d{2})-(\d{3})-(\d{2})([A-Z])?$/i;
 
-  let match = name.match(libraryPattern) || name.match(projectPattern);
+  const match = name.match(libraryPattern) || name.match(projectPattern);
 
   if (!match) return null;
 

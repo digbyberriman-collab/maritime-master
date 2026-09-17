@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useToast } from '@/shared/hooks/use-toast';
 import type { Database } from '@/integrations/supabase/types';
+import { uploadCrewDocument } from '@/lib/storage/crewDocuments';
 
 type CrewCertificateRow = Database['public']['Tables']['crew_certificates']['Row'];
 type CrewCertificateInsert = Database['public']['Tables']['crew_certificates']['Insert'];
@@ -349,28 +350,13 @@ export const useCrewCertificates = (userId: string) => {
   };
 };
 
-// Upload certificate file
+// Upload certificate file. Returns the storage object path in `url`
+// (the `documents` bucket is private; reads use signed URLs).
 export const uploadCertificateFile = async (
-  file: File, 
-  userId: string
+  file: File,
+  userId: string,
+  companyId: string,
 ): Promise<{ url: string; name: string; size: number }> => {
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${Date.now()}.${fileExt}`;
-  const filePath = `certificates/${userId}/${fileName}`;
-
-  const { error: uploadError } = await supabase.storage
-    .from('documents')
-    .upload(filePath, file);
-
-  if (uploadError) throw uploadError;
-
-  const { data } = supabase.storage
-    .from('documents')
-    .getPublicUrl(filePath);
-
-  return {
-    url: data.publicUrl,
-    name: file.name,
-    size: file.size,
-  };
+  const uploaded = await uploadCrewDocument({ file, companyId, crewUserId: userId, kind: 'certificates' });
+  return { url: uploaded.path, name: uploaded.name, size: uploaded.size };
 };

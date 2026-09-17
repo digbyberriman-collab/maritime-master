@@ -47,6 +47,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
+import { downloadCrewDocument } from '@/lib/storage/crewDocuments';
 import { hasPermission, Permission } from '@/modules/auth/lib/permissions';
 import { 
   useCrewCertificates, 
@@ -211,7 +212,8 @@ const CrewCertificates: React.FC<CrewCertificatesProps> = ({ crewId, crewVesselI
 
       // Upload file if provided
       if (formData.file) {
-        fileData = await uploadCertificateFile(formData.file, crewId);
+        if (!profile?.company_id) throw new Error('Your profile has no company; cannot upload files');
+        fileData = await uploadCertificateFile(formData.file, crewId, profile.company_id);
       }
 
       const certificateData: CrewCertificateFormData = {
@@ -263,16 +265,7 @@ const CrewCertificates: React.FC<CrewCertificatesProps> = ({ crewId, crewVesselI
     if (!certificate.file_url) return;
 
     try {
-      const response = await fetch(certificate.file_url);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = certificate.file_name || 'certificate.pdf';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      await downloadCrewDocument(certificate.file_url, certificate.file_name || 'certificate.pdf');
     } catch (error) {
       console.error('Error downloading certificate:', error);
       toast({

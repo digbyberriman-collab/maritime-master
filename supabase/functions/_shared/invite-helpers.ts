@@ -19,7 +19,7 @@ export function isFakeEmail(email: string): boolean {
       domain.endsWith('.invalid') || domain.endsWith('.localhost')) {
     return true;
   }
-  if (/^test[\.\-_]?crew@/i.test(normalized)) return true;
+  if (/^test[.\-_]?crew@/i.test(normalized)) return true;
   return false;
 }
 
