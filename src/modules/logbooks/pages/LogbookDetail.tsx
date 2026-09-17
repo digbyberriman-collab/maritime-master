@@ -40,7 +40,7 @@ const LogbookDetail: React.FC = () => {
   const [dayForNew, setDayForNew] = React.useState<Date | null>(null);
 
   const {
-    entries, isLoading, canSign, currentUserId, hasVessel,
+    logbook, entries, isLoading, canSign, currentUserId, hasVessel,
     createEntry, updateEntry, signEntry, deleteEntry,
   } = useLogbook(definition, month);
 
