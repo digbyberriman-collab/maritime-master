@@ -301,7 +301,7 @@ const LogbookDetail: React.FC = () => {
                   ))}
                   {entries.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                         No entries recorded in {format(month, 'MMMM yyyy')}.
                       </TableCell>
                     </TableRow>
