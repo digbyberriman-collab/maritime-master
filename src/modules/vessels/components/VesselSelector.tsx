@@ -78,34 +78,12 @@ export const VesselSelector: React.FC<VesselSelectorProps> = ({ className }) => 
   }, []);
 
   const handleSelectAll = () => {
-    setSelectedVesselIds(new Set(vessels.map(v => v.id)));
-  };
-
-  const handleSelectNone = () => {
-    setSelectedVesselIds(new Set());
+    if (canAccessAllVessels) setAllVessels();
   };
 
   const handleVesselToggle = (vesselId: string) => {
-    const newSet = new Set(selectedVesselIds);
-    if (newSet.has(vesselId)) {
-      newSet.delete(vesselId);
-    } else {
-      newSet.add(vesselId);
-    }
-    setSelectedVesselIds(newSet);
-
-    // Update context based on selection
-    if (newSet.size === vessels.length && canAccessAllVessels) {
-      setAllVessels();
-    } else if (newSet.size === 1) {
-      const [id] = newSet;
-      setSelectedVesselById(id);
-    } else if (newSet.size === 0) {
-      // Keep at least one selected or all
-      if (canAccessAllVessels) {
-        setAllVessels();
-      }
-    }
+    setSelectedVesselById(vesselId);
+    setOpen(false);
   };
 
   const handleSeverityToggle = (severity: string) => {
