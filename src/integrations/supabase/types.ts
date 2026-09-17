@@ -17464,6 +17464,10 @@ export type Database = {
         Returns: string
       }
       logbook_actor_name: { Args: { _user_id: string }; Returns: string }
+      logbook_attachment_path_allowed: {
+        Args: { _name: string }
+        Returns: boolean
+      }
       my_profile_id: { Args: never; Returns: string }
       onboarding_recompute: {
         Args: { p_record_id: string }
