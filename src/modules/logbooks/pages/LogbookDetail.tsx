@@ -235,6 +235,7 @@ const LogbookDetail: React.FC = () => {
                     <TableHead>Watch</TableHead>
                     <TableHead>Summary</TableHead>
                     <TableHead>Recorded by</TableHead>
+                    <TableHead>Last updated</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
