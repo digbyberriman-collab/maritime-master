@@ -17,6 +17,7 @@ import VolumeOpenDialog from '../components/VolumeOpenDialog';
 import VolumeCoverDialog from '../components/VolumeCoverDialog';
 import CloseVolumeDialog from '../components/CloseVolumeDialog';
 import PrintBook from '../components/PrintBook';
+import LogbookExportDialog from '../components/LogbookExportDialog';
 import { LOGBOOK_BOOKS, getBook, getBookBySlug, type LogbookBook } from '../lib/catalog';
 import { bookColumns, eventTime, lineFields } from '../lib/lineLayouts';
 import { freshReading, particularsFromVolume, profileForFlag } from '../lib/registryRules';
@@ -72,7 +73,7 @@ const LogbookWorkspace: React.FC = () => {
   const [highlighted, setHighlighted] = React.useState<string | null>(null);
   const [busyIds, setBusyIds] = React.useState<Set<string>>(new Set());
   const [errors, setErrors] = React.useState<Record<string, string>>({});
-  const [dialog, setDialog] = React.useState<'open' | 'continue' | 'cover' | 'close' | null>(null);
+  const [dialog, setDialog] = React.useState<'open' | 'continue' | 'cover' | 'close' | 'export' | null>(null);
   const [printing, setPrinting] = React.useState(false);
   const [pageError, setPageError] = React.useState<string | null>(null);
   const [tick, setTick] = React.useState(0);
@@ -378,7 +379,7 @@ const LogbookWorkspace: React.FC = () => {
           registry={registry.forProfile(profile)} isMaster={actor.isMaster} autoReadings={prefs.autoReadings}
           onAutoReadingsChange={(v) => { prefs.setAutoReadings(v); openedFor.current = ''; }} readingStatus={readingStatus}
           onOpenVolume={() => setDialog('open')} onContinueVolume={() => setDialog('continue')} onShowCover={() => setDialog('cover')}
-          onCloseVolume={() => setDialog('close')} onPrint={() => setPrinting(true)}
+          onCloseVolume={() => setDialog('close')} onPrint={() => setDialog('export')}
         />
 
         <section className="space-y-3 rounded-lg border border-border bg-card p-3 sm:p-4">
@@ -440,6 +441,12 @@ const LogbookWorkspace: React.FC = () => {
         autoReadings={prefs.autoReadings} onAutoReadingsChange={prefs.setAutoReadings} saving={ws.open.isPending} onSubmit={openVolume}
       />
       <VolumeCoverDialog open={dialog === 'cover'} onOpenChange={(o) => !o && setDialog(null)} volume={volume} />
+      {volume && (
+        <LogbookExportDialog
+          open={dialog === 'export'} onOpenChange={(o) => !o && setDialog(null)} book={book} volume={volume} section={section}
+          entries={ws.entries} vesselName={selectedVessel.name} onPrintBook={() => setPrinting(true)}
+        />
+      )}
       <CloseVolumeDialog open={dialog === 'close'} onOpenChange={(o) => !o && setDialog(null)} volume={volume} saving={ws.close.isPending} onSubmit={closeVolume} />
     </DashboardLayout>
   );

@@ -5,7 +5,7 @@
 import type { TemplateField, TemplateSection } from './templates';
 
 export type FlagProfileId = 'CISR' | 'MCA';
-export type EntryStatus = 'draft' | 'submitted' | 'signed' | 'verified' | 'amended';
+export type EntryStatus = 'draft' | 'submitted' | 'signed' | 'verified' | 'amended' | 'finalized';
 export type SignatureKind = 'author' | 'countersign' | 'verify' | 'acknowledge' | 'attested';
 
 export interface LogbookRow {

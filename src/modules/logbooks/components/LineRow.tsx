@@ -42,6 +42,7 @@ const statusLabel = (entry: EntryView | null) => {
   if (entry.status === 'draft') return 'Draft';
   if (entry.page_id) return 'Signed page';
   if (entry.status === 'verified') return 'Master reviewed';
+  if (entry.status === 'finalized') return 'Finalised';
   return 'Signed';
 };
 

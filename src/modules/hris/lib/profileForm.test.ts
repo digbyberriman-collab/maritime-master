@@ -12,7 +12,8 @@ import {
   withStoredOption,
 } from './profileForm';
 
-const baseProfile: Tables<'profiles'> = {
+// Only the columns these helpers read are set; the rest default to null.
+const baseProfile = {
   id: 'p1',
   user_id: null,
   company_id: 'c1',
@@ -66,7 +67,8 @@ const baseProfile: Tables<'profiles'> = {
   leave_accrual_method: null,
   leaving_date: null,
   watch_pattern: null,
-};
+} as unknown as Tables<'profiles'>;
+
 
 describe('profileToFormValues', () => {
   it('maps nulls to empty strings and trims date-times to calendar dates', () => {
