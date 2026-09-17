@@ -436,7 +436,7 @@ export function useHrGovernance() {
       if (error) throw error;
       const n = data?.length ?? 0;
       if (n > 0) {
-        await supabase.from('audit_logs').insert({
+        const { error: auditError } = await supabase.from('audit_logs').insert({
           entity_type: 'hr_record_metadata',
           entity_id: companyId,
           action: 'ARCHIVE',
@@ -445,6 +445,7 @@ export function useHrGovernance() {
           actor_role: profile?.role ?? null,
           new_values: { archived: n, retention_end_date_lte: today },
         });
+        if (auditError) console.warn('hr_record_metadata archive audit log failed', auditError);
       }
       return n;
     },

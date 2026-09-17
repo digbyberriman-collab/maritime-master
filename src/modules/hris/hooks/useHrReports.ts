@@ -106,7 +106,9 @@ export interface HrReportData {
  * plus every aggregation, with the vessel / department / date filters applied
  * client-side so changing a filter never refetches.
  */
-export function useHrReports(filters: ReportFilters, today = new Date()) {
+export function useHrReports(filters: ReportFilters, todayOverride?: Date) {
+  // Stable "now" so the aggregations only recompute when data or filters change.
+  const today = useMemo(() => todayOverride ?? new Date(), [todayOverride]);
   const { profile } = useAuth();
   const access = useHrAccess();
   const companyId = profile?.company_id ?? null;

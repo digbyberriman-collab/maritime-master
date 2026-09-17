@@ -62,7 +62,8 @@ import {
 import { AcknowledgeDialog } from './AcknowledgeDialog';
 import { ReviewEvidenceTab } from './ReviewEvidenceTab';
 import { ReviewFollowUpTab, type Recommendations } from './ReviewFollowUpTab';
-import { ReviewFormDialog, type ReviewFormValues } from './ReviewFormDialog';
+import { ReviewFormDialog } from './ReviewFormDialog';
+import type { ReviewFormValues } from '@/modules/hris/lib/reviewForm';
 import { ReviewNarrativeTab, type NarrativeField, type NarrativeValues } from './ReviewNarrativeTab';
 import { ReviewRatingsGrid } from './ReviewRatingsGrid';
 import { ReviewSignaturesTab } from './ReviewSignaturesTab';

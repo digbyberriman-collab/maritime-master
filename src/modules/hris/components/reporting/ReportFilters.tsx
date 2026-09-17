@@ -21,7 +21,7 @@ export const ReportFilters: React.FC<ReportFiltersProps> = ({ value, onChange, v
   const set = (patch: Partial<Filters>) => onChange({ ...value, ...patch });
   const dirty = JSON.stringify(value) !== JSON.stringify(defaultReportFilters());
   return (
-    <div className="flex flex-col gap-3 rounded-lg border bg-card p-3 md:flex-row md:flex-wrap md:items-end">
+    <div className="flex w-full flex-col gap-3 rounded-lg border bg-card p-3 md:flex-row md:flex-wrap md:items-end">
       <div className="min-w-[180px] flex-1 space-y-1">
         <Label className="text-xs text-muted-foreground">Vessel</Label>
         <Select value={value.vesselId ?? ALL} onValueChange={(v) => set({ vesselId: v === ALL ? null : v })}>

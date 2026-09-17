@@ -27,7 +27,7 @@ export interface CompanyContract extends CrewContract {
 }
 
 export type HrExpiryItem = Tables<'hr_expiry_items'>;
-export type HrExpiryItemType = 'contract' | 'probation' | 'passport' | 'medical' | 'certificate';
+export type HrExpiryItemType = 'contract' | 'probation' | 'passport' | 'visa' | 'medical' | 'certificate' | 'work_authorisation';
 
 export interface CompanyVessel {
   id: string;

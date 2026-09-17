@@ -13,10 +13,11 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { CrewPicker } from '@/modules/hris/components/CrewPicker';
 import { useHrCrewDirectory } from '@/modules/hris/hooks/useHrCrewDirectory';
-import { useIncidentsForPicker } from '@/modules/hris/hooks/useDisciplinary';
+import { useDisciplinaryRecords, useIncidentsForPicker } from '@/modules/hris/hooks/useDisciplinary';
 import type { CompanyVessel } from '@/modules/hris/hooks/useCrewContracts';
 import { formatDate, humanise } from '@/modules/hris/lib/format';
 import {
+  DEFAULT_DISCIPLINARY_FILTERS,
   DEFAULT_EXPIRY_MONTHS,
   DISCIPLINARY_CATEGORIES,
   DISCIPLINARY_SEVERITIES,
@@ -45,7 +46,7 @@ interface CaseFormDialogProps {
   /** Whether the subject can be changed (locked when opened from a crew file). */
   lockSubject?: boolean;
   vessels: CompanyVessel[];
-  /** Existing records for the subject, used for the escalation suggestion. */
+  /** Existing records for the subject, used for the escalation suggestion. Fetched for the chosen subject when omitted. */
   existingRecords?: DisciplinaryRecordRow[];
   onSubmit: (values: CaseFormValues) => Promise<void>;
   isPending?: boolean;
@@ -66,7 +67,7 @@ export const CaseFormDialog: React.FC<CaseFormDialogProps> = ({
   defaults,
   lockSubject,
   vessels,
-  existingRecords = [],
+  existingRecords,
   onSubmit,
   isPending,
 }) => {
@@ -98,6 +99,12 @@ export const CaseFormDialog: React.FC<CaseFormDialogProps> = ({
 
   const { incidents } = useIncidentsForPicker(subjectId || null);
   const subject = useMemo(() => directory.all.find((e) => e.id === subjectId) ?? null, [directory.all, subjectId]);
+  const subjectFilters = useMemo(() => ({ ...DEFAULT_DISCIPLINARY_FILTERS, crewId: subjectId || 'all' }), [subjectId]);
+  const subjectRecords = useDisciplinaryRecords(subjectFilters, { enabled: open && !existingRecords && Boolean(subjectId) });
+  const priorRecords = useMemo(
+    () => (existingRecords ?? subjectRecords.all).filter((r) => r.id !== record?.id),
+    [existingRecords, subjectRecords.all, record?.id],
+  );
 
   // Default the vessel from the subject's assignment when nothing is chosen yet.
   useEffect(() => {
@@ -111,8 +118,8 @@ export const CaseFormDialog: React.FC<CaseFormDialogProps> = ({
     form.setValue('expiry_date', suggested ?? '', { shouldValidate: false });
   }, [stage, outcomeDate, incidentDate, form]);
 
-  const liveWarnings = useMemo(() => countLiveWarnings(existingRecords.filter((r) => r.id !== record?.id)), [existingRecords, record?.id]);
-  const suggestedStage = useMemo(() => suggestNextStage(existingRecords.filter((r) => r.id !== record?.id), severity), [existingRecords, record?.id, severity]);
+  const liveWarnings = useMemo(() => countLiveWarnings(priorRecords), [priorRecords]);
+  const suggestedStage = useMemo(() => suggestNextStage(priorRecords, severity), [priorRecords, severity]);
   const suggestedExpiry = defaultExpiryDate(stage, outcomeDate || incidentDate);
   const stageMonths = DEFAULT_EXPIRY_MONTHS[stage];
 

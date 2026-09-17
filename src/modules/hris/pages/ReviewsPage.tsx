@@ -17,7 +17,8 @@ import { ReviewsOverview } from '@/modules/hris/components/reviews/ReviewsOvervi
 import { ReviewCyclesPanel } from '@/modules/hris/components/reviews/ReviewCyclesPanel';
 import { ReviewsTable } from '@/modules/hris/components/reviews/ReviewsTable';
 import { ReviewDetail } from '@/modules/hris/components/reviews/ReviewDetail';
-import { ReviewFormDialog, type ReviewFormValues } from '@/modules/hris/components/reviews/ReviewFormDialog';
+import { ReviewFormDialog } from '@/modules/hris/components/reviews/ReviewFormDialog';
+import type { ReviewFormValues } from '@/modules/hris/lib/reviewForm';
 
 const REVIEW_PARAM = 'review';
 

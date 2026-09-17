@@ -196,3 +196,41 @@ $$;
 DROP TRIGGER IF EXISTS trg_payroll_lines_guard ON public.payroll_lines;
 CREATE TRIGGER trg_payroll_lines_guard BEFORE UPDATE ON public.payroll_lines
   FOR EACH ROW EXECUTE FUNCTION public.payroll_lines_guard();
+
+-- ---------------------------------------------------------------
+-- Audit log visibility for the newer HR entity types.
+-- ---------------------------------------------------------------
+DROP POLICY IF EXISTS "HR can view crew audit logs" ON public.audit_logs;
+CREATE POLICY "HR can view crew audit logs"
+  ON public.audit_logs FOR SELECT
+  USING (
+    public.hr_can_view(auth.uid())
+    AND entity_type IN (
+      'crew_profile', 'profile', 'crew_member', 'crew_assignment', 'crew_contract', 'crew_next_of_kin',
+      'crew_certificate', 'crew_attachment', 'performance_review', 'crew_objective', 'disciplinary_record',
+      'crew_compensation', 'pay_review', 'payroll_run', 'payroll_line', 'gratuity_pool', 'gratuity_distribution',
+      'hr_record_metadata', 'vacancy', 'candidate', 'candidate_application', 'onboarding_record', 'onboarding_item',
+      'crew_work_authorisation', 'pay_grade', 'pay_period', 'fx_rate', 'hr_company_settings'
+    )
+    AND (
+      EXISTS (
+        SELECT 1 FROM public.profiles p
+        WHERE (p.id::text = audit_logs.entity_id OR p.user_id::text = audit_logs.entity_id)
+          AND p.company_id = public.get_user_company_id(auth.uid())
+      )
+      OR EXISTS (
+        SELECT 1 FROM public.crew_assignments ca
+        JOIN public.profiles p ON p.user_id = ca.user_id
+        WHERE ca.id::text = audit_logs.entity_id AND p.company_id = public.get_user_company_id(auth.uid())
+      )
+      OR EXISTS (
+        SELECT 1 FROM public.hr_record_metadata m
+        WHERE m.record_id::text = audit_logs.entity_id AND m.company_id = public.get_user_company_id(auth.uid())
+      )
+      -- Entities without a metadata row: scope by the actor's company.
+      OR EXISTS (
+        SELECT 1 FROM public.profiles a
+        WHERE a.user_id = audit_logs.actor_user_id AND a.company_id = public.get_user_company_id(auth.uid())
+      )
+    )
+  );

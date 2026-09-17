@@ -160,7 +160,7 @@ const ObjectivesPage: React.FC = () => {
         defaults={reviewId ? { review_id: reviewId } : undefined}
         crewName={formState.open ? formState.crewName : undefined}
         crewUserId={formState.open ? formState.crewUserId : null}
-        canPickOwner={canEdit}
+        canPickOwner={canEdit || (formState.open && !formState.objective)}
         onSubmit={handleSubmit}
         isPending={mutations.create.isPending || mutations.update.isPending}
       />
