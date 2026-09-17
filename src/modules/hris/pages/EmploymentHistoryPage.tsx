@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
-import { Download, History, UserRound, UserX } from 'lucide-react';
+import { Download, History, Info, UserRound, UserX } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { HrisPageHeader } from '@/modules/hris/components/HrisPageHeader';
@@ -56,6 +57,13 @@ const EmploymentHistoryPage: React.FC = () => {
     ? 'Your vessel assignments, contracts and sea-service record.'
     : 'Vessel assignments, contracts, rank changes and sea-service totals per crew member.';
 
+  // Imported crew without a login cannot have crew_assignments (those hang off
+  // auth users), but HR may already have recorded contracts against their
+  // profile. Show those rather than an empty state.
+  const loaded = Boolean(profileId) && !history.isLoading && Boolean(history.profile);
+  const contractsOnly = loaded && !history.hasAccount && history.contracts.length > 0;
+  const nothingToShow = loaded && !history.hasAccount && history.contracts.length === 0;
+
   return (
     <div className="space-y-6">
       <HrisPageHeader
@@ -92,12 +100,24 @@ const EmploymentHistoryPage: React.FC = () => {
         <EmptyState icon={UserX} title="Could not load employment history" description={history.error instanceof Error ? history.error.message : 'Please try again.'} />
       ) : !history.isLoading && !history.profile ? (
         <EmptyState icon={UserX} title="Crew member not found" description="This profile does not exist or you do not have access to it." />
-      ) : !history.isLoading && !history.hasAccount ? (
+      ) : nothingToShow ? (
         <EmptyState
           icon={UserX}
           title={`${crewName ?? 'This crew member'} has no account yet`}
           description="Employment history starts once the crew member has accepted their invitation and has a login. Imported crew without an account have no vessel assignments to show."
         />
+      ) : contractsOnly ? (
+        <>
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertTitle>{crewName ?? 'This crew member'} has no account yet</AlertTitle>
+            <AlertDescription>
+              Showing contract history only. Vessel assignments and sea-service totals will appear once they have accepted their invitation and have a login.
+            </AlertDescription>
+          </Alert>
+          <ServiceSummary summary={history.summary} isLoading={history.isLoading} />
+          <Timeline events={history.timeline} isLoading={history.isLoading} todayIso={isoDay(history.today)} />
+        </>
       ) : (
         <>
           <ServiceSummary summary={history.summary} isLoading={history.isLoading} />
