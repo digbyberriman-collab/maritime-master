@@ -235,6 +235,7 @@ const LogbookDetail: React.FC = () => {
                     <TableHead>Watch</TableHead>
                     <TableHead>Summary</TableHead>
                     <TableHead>Recorded by</TableHead>
+                    <TableHead>Last updated</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -252,7 +253,16 @@ const LogbookDetail: React.FC = () => {
                           <span className="block truncate text-xs text-muted-foreground">{entry.remarks}</span>
                         )}
                       </TableCell>
-                      <TableCell>{entry.recorded_by_name ?? '—'}</TableCell>
+                      <TableCell>
+                        <span className="block">{entry.recorded_by_name ?? '—'}</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {format(new Date(entry.created_at), 'dd MMM yyyy HH:mm')}
+                        </span>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                        {format(new Date(entry.updated_at), 'dd MMM yyyy HH:mm')}
+                        {entry.updated_by_name ? ` — ${entry.updated_by_name}` : ''}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={STATUS_VARIANT[entry.status] ?? 'secondary'}>
                           {entry.status === 'signed' && entry.signed_by_name

@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select';
 import type { LogbookDefinition } from '@/modules/logbooks/lib/logbookDefinitions';
 import LogbookAttachments from '@/modules/logbooks/components/LogbookAttachments';
+import LogbookEntryHistory from '@/modules/logbooks/components/LogbookEntryHistory';
 import type { LogbookEntry, LogbookEntryInput } from '@/modules/logbooks/hooks/useLogbook';
 
 const WATCH_PERIODS = [
@@ -248,6 +249,16 @@ const LogbookEntryForm: React.FC<Props> = ({
             vesselId={entry?.vessel_id ?? vesselId ?? null}
             canManage={canManageAttachments ?? true}
           />
+
+          <LogbookEntryHistory
+            entryId={entry?.id ?? null}
+            createdAt={entry?.created_at ?? null}
+            createdByName={entry?.recorded_by_name ?? null}
+            updatedAt={entry?.updated_at ?? null}
+            updatedByName={entry?.updated_by_name ?? null}
+          />
+
+
 
 
           {error && <p className="text-sm text-destructive">{error}</p>}
