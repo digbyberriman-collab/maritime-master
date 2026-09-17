@@ -120,7 +120,7 @@ const LogbookList: React.FC = () => {
             const opened = !!stat;
             return (
               <Card
-                key={book.path ?? book.slug}
+                key={book.slug}
                 role="button"
                 tabIndex={0}
                 onClick={() => navigate(`/vessel/logbooks/${book.slug}`)}
