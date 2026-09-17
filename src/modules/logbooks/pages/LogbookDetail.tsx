@@ -143,6 +143,9 @@ const LogbookDetail: React.FC = () => {
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
+            <Button variant="outline" onClick={() => setExportOpen(true)} disabled={!hasVessel}>
+              <FileDown className="mr-1 h-4 w-4" /> Export PDF
+            </Button>
             <Button onClick={() => openNew()} disabled={!hasVessel}>
               <Plus className="mr-1 h-4 w-4" /> New entry
             </Button>
