@@ -2541,6 +2541,1342 @@ export type Database = {
           },
         ]
       }
+      performance_competencies: {
+        Row: {
+          company_id: string
+          created_at: string
+          department: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          department?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          department?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_competencies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      performance_review_cycles: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          due_date: string
+          id: string
+          name: string
+          notes: string | null
+          period_end: string
+          period_start: string
+          review_type: string
+          status: string
+          updated_at: string
+          vessel_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          due_date: string
+          id?: string
+          name: string
+          notes?: string | null
+          period_end: string
+          period_start: string
+          review_type?: string
+          status?: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          due_date?: string
+          id?: string
+          name?: string
+          notes?: string | null
+          period_end?: string
+          period_start?: string
+          review_type?: string
+          status?: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_review_cycles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_review_cycles_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      performance_reviews: {
+        Row: {
+          career_aspirations: string | null
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          cycle_id: string | null
+          development_areas: string | null
+          document_path: string | null
+          due_date: string | null
+          employee_acknowledged_at: string | null
+          employee_comments: string | null
+          follow_up_actions: Json
+          id: string
+          next_review_date: string | null
+          overall_rating: number | null
+          period_end: string | null
+          period_start: string | null
+          profile_id: string
+          ratings: Json
+          recommend_pay_review: boolean | null
+          recommend_promotion: boolean | null
+          retain: boolean | null
+          review_type: string
+          reviewer_comments: string | null
+          reviewer_profile_id: string | null
+          reviewer_signed_at: string | null
+          self_assessment_submitted_at: string | null
+          self_ratings: Json
+          status: string
+          strengths: string | null
+          submitted_at: string | null
+          summary: string | null
+          training_needs: string | null
+          updated_at: string
+          updated_by: string | null
+          vessel_id: string | null
+          welfare_notes: string | null
+        }
+        Insert: {
+          career_aspirations?: string | null
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          cycle_id?: string | null
+          development_areas?: string | null
+          document_path?: string | null
+          due_date?: string | null
+          employee_acknowledged_at?: string | null
+          employee_comments?: string | null
+          follow_up_actions?: Json
+          id?: string
+          next_review_date?: string | null
+          overall_rating?: number | null
+          period_end?: string | null
+          period_start?: string | null
+          profile_id: string
+          ratings?: Json
+          recommend_pay_review?: boolean | null
+          recommend_promotion?: boolean | null
+          retain?: boolean | null
+          review_type?: string
+          reviewer_comments?: string | null
+          reviewer_profile_id?: string | null
+          reviewer_signed_at?: string | null
+          self_assessment_submitted_at?: string | null
+          self_ratings?: Json
+          status?: string
+          strengths?: string | null
+          submitted_at?: string | null
+          summary?: string | null
+          training_needs?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+          welfare_notes?: string | null
+        }
+        Update: {
+          career_aspirations?: string | null
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          cycle_id?: string | null
+          development_areas?: string | null
+          document_path?: string | null
+          due_date?: string | null
+          employee_acknowledged_at?: string | null
+          employee_comments?: string | null
+          follow_up_actions?: Json
+          id?: string
+          next_review_date?: string | null
+          overall_rating?: number | null
+          period_end?: string | null
+          period_start?: string | null
+          profile_id?: string
+          ratings?: Json
+          recommend_pay_review?: boolean | null
+          recommend_promotion?: boolean | null
+          retain?: boolean | null
+          review_type?: string
+          reviewer_comments?: string | null
+          reviewer_profile_id?: string | null
+          reviewer_signed_at?: string | null
+          self_assessment_submitted_at?: string | null
+          self_ratings?: Json
+          status?: string
+          strengths?: string | null
+          submitted_at?: string | null
+          summary?: string | null
+          training_needs?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+          welfare_notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_reviews_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_reviews_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_reviews_reviewer_profile_id_fkey"
+            columns: ["reviewer_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_reviews_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "performance_review_cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_reviews_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crew_objectives: {
+        Row: {
+          category: string
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          linked_application_id: string | null
+          linked_course_id: string | null
+          measure: string | null
+          notes: string | null
+          owner_profile_id: string | null
+          profile_id: string
+          progress_pct: number
+          review_id: string | null
+          status: string
+          target_date: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+          weight: number
+        }
+        Insert: {
+          category?: string
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          linked_application_id?: string | null
+          linked_course_id?: string | null
+          measure?: string | null
+          notes?: string | null
+          owner_profile_id?: string | null
+          profile_id: string
+          progress_pct?: number
+          review_id?: string | null
+          status?: string
+          target_date?: string | null
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+          weight?: number
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          linked_application_id?: string | null
+          linked_course_id?: string | null
+          measure?: string | null
+          notes?: string | null
+          owner_profile_id?: string | null
+          profile_id?: string
+          progress_pct?: number
+          review_id?: string | null
+          status?: string
+          target_date?: string | null
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_objectives_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_objectives_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_objectives_owner_profile_id_fkey"
+            columns: ["owner_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_objectives_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "performance_reviews"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_objectives_linked_course_id_fkey"
+            columns: ["linked_course_id"]
+            isOneToOne: false
+            referencedRelation: "development_courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_objectives_linked_application_id_fkey"
+            columns: ["linked_application_id"]
+            isOneToOne: false
+            referencedRelation: "development_applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crew_objective_updates: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string
+          objective_id: string
+          progress_pct: number | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note: string
+          objective_id: string
+          progress_pct?: number | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string
+          objective_id?: string
+          progress_pct?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_objective_updates_objective_id_fkey"
+            columns: ["objective_id"]
+            isOneToOne: false
+            referencedRelation: "crew_objectives"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      incident_involved_persons: {
+        Row: {
+          created_at: string
+          id: string
+          incident_id: string
+          involvement: string
+          notes: string | null
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          incident_id: string
+          involvement?: string
+          notes?: string | null
+          profile_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          incident_id?: string
+          involvement?: string
+          notes?: string | null
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "incident_involved_persons_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "incident_involved_persons_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      disciplinary_records: {
+        Row: {
+          acknowledged_by_crew_at: string | null
+          appeal_notes: string | null
+          appeal_status: string
+          category: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string
+          document_name: string | null
+          document_path: string | null
+          expiry_date: string | null
+          id: string
+          incident_date: string
+          incident_id: string | null
+          investigation_notes: string | null
+          issued_by_profile_id: string | null
+          outcome: string | null
+          outcome_date: string | null
+          profile_id: string
+          severity: string
+          stage: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+          vessel_id: string | null
+          witness_statements: string | null
+        }
+        Insert: {
+          acknowledged_by_crew_at?: string | null
+          appeal_notes?: string | null
+          appeal_status?: string
+          category?: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description: string
+          document_name?: string | null
+          document_path?: string | null
+          expiry_date?: string | null
+          id?: string
+          incident_date?: string
+          incident_id?: string | null
+          investigation_notes?: string | null
+          issued_by_profile_id?: string | null
+          outcome?: string | null
+          outcome_date?: string | null
+          profile_id: string
+          severity?: string
+          stage?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+          witness_statements?: string | null
+        }
+        Update: {
+          acknowledged_by_crew_at?: string | null
+          appeal_notes?: string | null
+          appeal_status?: string
+          category?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          document_name?: string | null
+          document_path?: string | null
+          expiry_date?: string | null
+          id?: string
+          incident_date?: string
+          incident_id?: string | null
+          investigation_notes?: string | null
+          issued_by_profile_id?: string | null
+          outcome?: string | null
+          outcome_date?: string | null
+          profile_id?: string
+          severity?: string
+          stage?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+          witness_statements?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "disciplinary_records_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "disciplinary_records_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "disciplinary_records_issued_by_profile_id_fkey"
+            columns: ["issued_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "disciplinary_records_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "disciplinary_records_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vacancies: {
+        Row: {
+          closed_at: string | null
+          company_id: string
+          contract_type: string
+          created_at: string
+          created_by: string | null
+          department: string | null
+          description: string | null
+          end_date: string | null
+          filled_at: string | null
+          headcount: number
+          hiring_manager_profile_id: string | null
+          id: string
+          notes: string | null
+          opened_at: string | null
+          pay_grade_id: string | null
+          priority: string
+          rank: string | null
+          reference: string | null
+          replaces_profile_id: string | null
+          required_certificates: string[]
+          requirements: string | null
+          rotation_pattern: string | null
+          salary_currency: string | null
+          salary_max_minor: number | null
+          salary_min_minor: number | null
+          start_date: string | null
+          status: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          closed_at?: string | null
+          company_id: string
+          contract_type?: string
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          description?: string | null
+          end_date?: string | null
+          filled_at?: string | null
+          headcount?: number
+          hiring_manager_profile_id?: string | null
+          id?: string
+          notes?: string | null
+          opened_at?: string | null
+          pay_grade_id?: string | null
+          priority?: string
+          rank?: string | null
+          reference?: string | null
+          replaces_profile_id?: string | null
+          required_certificates?: string[]
+          requirements?: string | null
+          rotation_pattern?: string | null
+          salary_currency?: string | null
+          salary_max_minor?: number | null
+          salary_min_minor?: number | null
+          start_date?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          closed_at?: string | null
+          company_id?: string
+          contract_type?: string
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          description?: string | null
+          end_date?: string | null
+          filled_at?: string | null
+          headcount?: number
+          hiring_manager_profile_id?: string | null
+          id?: string
+          notes?: string | null
+          opened_at?: string | null
+          pay_grade_id?: string | null
+          priority?: string
+          rank?: string | null
+          reference?: string | null
+          replaces_profile_id?: string | null
+          required_certificates?: string[]
+          requirements?: string | null
+          rotation_pattern?: string | null
+          salary_currency?: string | null
+          salary_max_minor?: number | null
+          salary_min_minor?: number | null
+          start_date?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vacancies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vacancies_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vacancies_pay_grade_id_fkey"
+            columns: ["pay_grade_id"]
+            isOneToOne: false
+            referencedRelation: "pay_grades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vacancies_hiring_manager_profile_id_fkey"
+            columns: ["hiring_manager_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vacancies_replaces_profile_id_fkey"
+            columns: ["replaces_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      candidates: {
+        Row: {
+          agency_name: string | null
+          available_from: string | null
+          certificates: string[]
+          company_id: string
+          created_at: string
+          created_by: string | null
+          current_location: string | null
+          cv_name: string | null
+          cv_path: string | null
+          date_of_birth: string | null
+          department: string | null
+          email: string | null
+          first_name: string
+          gdpr_consent_at: string | null
+          gdpr_retention_until: string | null
+          hired_profile_id: string | null
+          home_airport: string | null
+          id: string
+          languages: string[]
+          last_name: string
+          linkedin_url: string | null
+          nationality: string | null
+          notes: string | null
+          phone: string | null
+          preferred_name: string | null
+          rank: string | null
+          rating: number | null
+          referred_by_profile_id: string | null
+          salary_expectation_currency: string | null
+          salary_expectation_minor: number | null
+          source: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+          years_experience: number | null
+        }
+        Insert: {
+          agency_name?: string | null
+          available_from?: string | null
+          certificates?: string[]
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          current_location?: string | null
+          cv_name?: string | null
+          cv_path?: string | null
+          date_of_birth?: string | null
+          department?: string | null
+          email?: string | null
+          first_name: string
+          gdpr_consent_at?: string | null
+          gdpr_retention_until?: string | null
+          hired_profile_id?: string | null
+          home_airport?: string | null
+          id?: string
+          languages?: string[]
+          last_name: string
+          linkedin_url?: string | null
+          nationality?: string | null
+          notes?: string | null
+          phone?: string | null
+          preferred_name?: string | null
+          rank?: string | null
+          rating?: number | null
+          referred_by_profile_id?: string | null
+          salary_expectation_currency?: string | null
+          salary_expectation_minor?: number | null
+          source?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          years_experience?: number | null
+        }
+        Update: {
+          agency_name?: string | null
+          available_from?: string | null
+          certificates?: string[]
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          current_location?: string | null
+          cv_name?: string | null
+          cv_path?: string | null
+          date_of_birth?: string | null
+          department?: string | null
+          email?: string | null
+          first_name?: string
+          gdpr_consent_at?: string | null
+          gdpr_retention_until?: string | null
+          hired_profile_id?: string | null
+          home_airport?: string | null
+          id?: string
+          languages?: string[]
+          last_name?: string
+          linkedin_url?: string | null
+          nationality?: string | null
+          notes?: string | null
+          phone?: string | null
+          preferred_name?: string | null
+          rank?: string | null
+          rating?: number | null
+          referred_by_profile_id?: string | null
+          salary_expectation_currency?: string | null
+          salary_expectation_minor?: number | null
+          source?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          years_experience?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidates_hired_profile_id_fkey"
+            columns: ["hired_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidates_referred_by_profile_id_fkey"
+            columns: ["referred_by_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      candidate_applications: {
+        Row: {
+          applied_at: string
+          candidate_id: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          offer_accepted_at: string | null
+          offer_base_minor: number | null
+          offer_currency: string | null
+          offer_sent_at: string | null
+          offer_start_date: string | null
+          rating: number | null
+          rejection_reason: string | null
+          stage: string
+          stage_changed_at: string
+          updated_at: string
+          updated_by: string | null
+          vacancy_id: string
+        }
+        Insert: {
+          applied_at?: string
+          candidate_id: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          offer_accepted_at?: string | null
+          offer_base_minor?: number | null
+          offer_currency?: string | null
+          offer_sent_at?: string | null
+          offer_start_date?: string | null
+          rating?: number | null
+          rejection_reason?: string | null
+          stage?: string
+          stage_changed_at?: string
+          updated_at?: string
+          updated_by?: string | null
+          vacancy_id: string
+        }
+        Update: {
+          applied_at?: string
+          candidate_id?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          offer_accepted_at?: string | null
+          offer_base_minor?: number | null
+          offer_currency?: string | null
+          offer_sent_at?: string | null
+          offer_start_date?: string | null
+          rating?: number | null
+          rejection_reason?: string | null
+          stage?: string
+          stage_changed_at?: string
+          updated_at?: string
+          updated_by?: string | null
+          vacancy_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "candidate_applications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_applications_vacancy_id_fkey"
+            columns: ["vacancy_id"]
+            isOneToOne: false
+            referencedRelation: "vacancies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidate_applications_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      application_events: {
+        Row: {
+          application_id: string
+          body: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          event_type: string
+          from_stage: string | null
+          id: string
+          to_stage: string | null
+        }
+        Insert: {
+          application_id: string
+          body?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          event_type?: string
+          from_stage?: string | null
+          id?: string
+          to_stage?: string | null
+        }
+        Update: {
+          application_id?: string
+          body?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          event_type?: string
+          from_stage?: string | null
+          id?: string
+          to_stage?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_events_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "candidate_applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      interviews: {
+        Row: {
+          application_id: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          duration_minutes: number
+          feedback: string | null
+          format: string
+          id: string
+          interviewer_profile_ids: string[]
+          location: string | null
+          outcome: string | null
+          scheduled_at: string
+          scorecard: Json
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          application_id: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          duration_minutes?: number
+          feedback?: string | null
+          format?: string
+          id?: string
+          interviewer_profile_ids?: string[]
+          location?: string | null
+          outcome?: string | null
+          scheduled_at: string
+          scorecard?: Json
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          application_id?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          duration_minutes?: number
+          feedback?: string | null
+          format?: string
+          id?: string
+          interviewer_profile_ids?: string[]
+          location?: string | null
+          outcome?: string | null
+          scheduled_at?: string
+          scorecard?: Json
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "interviews_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "candidate_applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_templates: {
+        Row: {
+          applicable_departments: string[]
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          is_default: boolean
+          name: string
+          sections: Json
+          updated_at: string
+          vessel_id: string | null
+        }
+        Insert: {
+          applicable_departments?: string[]
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name: string
+          sections?: Json
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          applicable_departments?: string[]
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          is_default?: boolean
+          name?: string
+          sections?: Json
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_templates_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_records: {
+        Row: {
+          buddy_profile_id: string | null
+          company_id: string
+          completed_at: string | null
+          completion_pct: number
+          created_at: string
+          created_by: string | null
+          id: string
+          notes: string | null
+          profile_id: string
+          start_date: string
+          status: string
+          template_id: string | null
+          updated_at: string
+          vessel_id: string | null
+        }
+        Insert: {
+          buddy_profile_id?: string | null
+          company_id: string
+          completed_at?: string | null
+          completion_pct?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          profile_id: string
+          start_date: string
+          status?: string
+          template_id?: string | null
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          buddy_profile_id?: string | null
+          company_id?: string
+          completed_at?: string | null
+          completion_pct?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          profile_id?: string
+          start_date?: string
+          status?: string
+          template_id?: string | null
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_records_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_records_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_records_buddy_profile_id_fkey"
+            columns: ["buddy_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_records_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_records_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_items: {
+        Row: {
+          company_id: string
+          completed: boolean
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          due_date: string | null
+          evidence_path: string | null
+          id: string
+          notes: string | null
+          owner: string
+          record_id: string
+          required: boolean
+          section: string
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          completed?: boolean
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          due_date?: string | null
+          evidence_path?: string | null
+          id?: string
+          notes?: string | null
+          owner?: string
+          record_id: string
+          required?: boolean
+          section: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          completed?: boolean
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          due_date?: string | null
+          evidence_path?: string | null
+          id?: string
+          notes?: string | null
+          owner?: string
+          record_id?: string
+          required?: boolean
+          section?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_items_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crew_work_authorisations: {
+        Row: {
+          authorisation_type: string
+          company_id: string
+          country: string
+          created_at: string
+          created_by: string | null
+          document_name: string | null
+          document_path: string | null
+          entries: string | null
+          expiry_date: string | null
+          id: string
+          issued_date: string | null
+          notes: string | null
+          profile_id: string
+          reference_number: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          authorisation_type?: string
+          company_id: string
+          country: string
+          created_at?: string
+          created_by?: string | null
+          document_name?: string | null
+          document_path?: string | null
+          entries?: string | null
+          expiry_date?: string | null
+          id?: string
+          issued_date?: string | null
+          notes?: string | null
+          profile_id: string
+          reference_number?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          authorisation_type?: string
+          company_id?: string
+          country?: string
+          created_at?: string
+          created_by?: string | null
+          document_name?: string | null
+          document_path?: string | null
+          entries?: string | null
+          expiry_date?: string | null
+          id?: string
+          issued_date?: string | null
+          notes?: string | null
+          profile_id?: string
+          reference_number?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_work_authorisations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_work_authorisations_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crew_import: {
         Row: {
           airtable_id: string
@@ -14803,6 +16139,43 @@ export type Database = {
       }
     }
     Views: {
+      hr_performance_due_items: {
+        Row: {
+          company_id: string | null
+          crew_name: string | null
+          days_remaining: number | null
+          due_date: string | null
+          item_type: string | null
+          label: string | null
+          profile_id: string | null
+          record_id: string | null
+          status: string | null
+          user_id: string | null
+          vessel_id: string | null
+        }
+        Relationships: []
+      }
+      disciplinary_records_self: {
+        Row: {
+          acknowledged_by_crew_at: string | null
+          appeal_status: string | null
+          category: string | null
+          company_id: string | null
+          created_at: string | null
+          description: string | null
+          expiry_date: string | null
+          id: string | null
+          incident_date: string | null
+          outcome: string | null
+          outcome_date: string | null
+          profile_id: string | null
+          severity: string | null
+          stage: string | null
+          status: string | null
+          vessel_id: string | null
+        }
+        Relationships: []
+      }
       hr_expiry_items: {
         Row: {
           company_id: string | null
@@ -14954,6 +16327,54 @@ export type Database = {
       }
     }
     Functions: {
+      hr_archive_due_records: {
+        Args: { p_company_id?: string | null }
+        Returns: number
+      }
+      hr_anonymize_profile: {
+        Args: { p_profile_id: string; p_reason?: string | null }
+        Returns: undefined
+      }
+      hr_record_access_log: {
+        Args: { p_record_type: string; p_record_id: string; p_profile_id: string; p_context?: string | null }
+        Returns: undefined
+      }
+      recruitment_hire_candidate: {
+        Args: { p_application_id: string; p_start_date: string; p_vessel_id?: string | null }
+        Returns: string
+      }
+      onboarding_start: {
+        Args: { p_profile_id: string; p_vessel_id: string | null; p_start_date: string; p_template_id?: string | null }
+        Returns: string | null
+      }
+      onboarding_recompute: {
+        Args: { p_record_id: string }
+        Returns: undefined
+      }
+      hr_generate_alerts: {
+        Args: { p_company_id?: string | null }
+        Returns: number
+      }
+      hr_expire_overrun_contracts: {
+        Args: Record<string, never>
+        Returns: number
+      }
+      hr_expire_disciplinary_records: {
+        Args: Record<string, never>
+        Returns: number
+      }
+      performance_review_submit_self_assessment: {
+        Args: { p_review_id: string; p_self_ratings: Json; p_employee_comments: string | null }
+        Returns: undefined
+      }
+      performance_review_acknowledge: {
+        Args: { p_review_id: string; p_employee_comments?: string | null }
+        Returns: undefined
+      }
+      disciplinary_record_acknowledge: {
+        Args: { p_record_id: string }
+        Returns: undefined
+      }
       hr_days_onboard: {
         Args: { p_profile_id: string; p_start: string; p_end: string; p_vessel_id?: string | null; p_unpaid_codes?: string[] }
         Returns: {

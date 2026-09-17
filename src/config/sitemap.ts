@@ -556,11 +556,11 @@ const hrisChildren: NavChild[] = [
     L('Compensation Settings', hrisComp, { moduleKey: 'finance', minPermission: 'admin', icon: Settings }),
   ], { icon: Banknote, slug: 'compensation', moduleKey: 'finance' }),
   G('Performance', HR, [
-    L('Annual Evaluations', hrisPerf, { existing: '/hr?tab=annual-evaluations', ...hrView }),
-    L('Annual Reviews', hrisPerf, { existing: '/hr?tab=annual-reviews', ...hrView }),
+    L('Annual Evaluations', hrisPerf, hrView),
+    L('Annual Reviews', hrisPerf, hrView),
+    L('End of Rotation', hrisPerf, hrView),
     L('Objectives & PDPs', hrisPerf, hrView),
-    L('End of Rotation', hrisPerf, { existing: '/hr?tab=end-of-rotation', ...hrView }),
-    L('Disciplinary Matters', hrisPerf, { existing: '/hr?tab=disciplinary-matters', ...hrEdit }),
+    L('Disciplinary Matters', hrisPerf, hrEdit),
   ], { icon: ClipboardCheck, slug: 'performance', ...hrView }),
   G('Recruitment', HR, [
     L('Vacancies', hrisRecruit, hrView),
