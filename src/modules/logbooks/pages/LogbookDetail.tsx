@@ -44,6 +44,7 @@ const LogbookDetail: React.FC = () => {
   const [editing, setEditing] = React.useState<LogbookEntry | null>(null);
   const [dayForNew, setDayForNew] = React.useState<Date | null>(null);
   const [pendingDelete, setPendingDelete] = React.useState<LogbookEntry | null>(null);
+  const [exportOpen, setExportOpen] = React.useState(false);
 
   const {
     logbook, entries, isLoading, canSign, currentUserId, hasVessel,
