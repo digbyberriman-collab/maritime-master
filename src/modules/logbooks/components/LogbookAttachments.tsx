@@ -106,7 +106,7 @@ const LogbookAttachments: React.FC<Props> = ({
           type="file"
           multiple
           className="hidden"
-          accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
+          accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png,.gif,.webp,.bmp,.heic,.heif,.svg"
           onChange={(event) => handleFiles(event.target.files)}
         />
       </div>
