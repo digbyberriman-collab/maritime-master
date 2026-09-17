@@ -53,7 +53,24 @@ const LogbookDetail: React.FC = () => {
   const navigate = useNavigate();
   const definition = getLogbookBySlug(logbookSlug);
   const { selectedVessel, vessels, setSelectedVesselById } = useVessel();
+  const [searchParams, setSearchParams] = useSearchParams();
   const sheet = getSheetTemplate(logbookSlug, selectedVessel?.name);
+
+  // Deep-link support: ?vessel=<name> activates the matching vessel (e.g. ?vessel=dagon).
+  React.useEffect(() => {
+    const wanted = searchParams.get('vessel');
+    if (!wanted || vessels.length === 0) return;
+    const needle = wanted.toLowerCase();
+    const match = vessels.find((v) => v.name?.toLowerCase().includes(needle));
+    if (match && match.id !== selectedVessel?.id) {
+      setSelectedVesselById(match.id);
+    }
+    if (match) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('vessel');
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, vessels, selectedVessel?.id, setSelectedVesselById, setSearchParams]);
 
   const [month, setMonth] = React.useState(() => startOfMonth(new Date()));
   const [view, setView] = React.useState<'month' | 'records'>('month');
