@@ -184,6 +184,20 @@ const vesselAccounting: NavChild[] = [
   L('Budgets & Reporting', vAcct, { icon: ClipboardList }),
 ];
 
+// Electronic Logbooks
+const vLog = `${V}/logbooks`;
+const vesselLogbooks: NavChild[] = [
+  L('All Logbooks', vLog, { existing: `${V}/logbooks/list`, icon: BookOpen }),
+  L('Deck Log', vLog, { icon: Anchor }),
+  L('Engine Log', vLog, { icon: Wrench }),
+  L('Bell Book', vLog, { icon: Bell }),
+  L('Radio Log', vLog, { icon: MessageSquare }),
+  L('Oil Record Book', vLog, { icon: Beaker }),
+  L('Garbage Record Book', vLog, { icon: Package }),
+  L('Ballast Water Record', vLog, { icon: Waves }),
+  L('Visitor & Guest Log', vLog, { icon: Users, slug: 'visitor-log' }),
+];
+
 // Vessel (general)
 const vVessel = `${V}/general`;
 const vesselVessel: NavChild[] = [
