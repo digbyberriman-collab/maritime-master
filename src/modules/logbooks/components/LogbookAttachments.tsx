@@ -92,6 +92,12 @@ const LogbookAttachments: React.FC<Props> = ({
         />
       </div>
 
+      {sizeError && (
+        <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {sizeError}
+        </p>
+      )}
+
       {isLoading ? (
         <Skeleton className="h-10 w-full" />
       ) : attachments.length === 0 ? (
