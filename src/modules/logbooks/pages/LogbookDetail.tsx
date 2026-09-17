@@ -4,7 +4,8 @@ import {
   addMonths, endOfMonth, format, isSameDay, isSameMonth, startOfMonth, startOfWeek,
 } from 'date-fns';
 import {
-  ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, FileDown, List, Lock, PenLine, Plus, Trash2,
+  ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, FileDown, List, Loader2, Lock, PenLine, Plus,
+  Ship, Trash2,
 } from 'lucide-react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -52,7 +53,7 @@ const LogbookDetail: React.FC = () => {
   const { logbookSlug } = useParams<{ logbookSlug: string }>();
   const navigate = useNavigate();
   const definition = getLogbookBySlug(logbookSlug);
-  const { selectedVessel, vessels, setSelectedVesselById } = useVessel();
+  const { selectedVessel, vessels, setSelectedVesselById, loading: vesselsLoading } = useVessel();
   const [searchParams, setSearchParams] = useSearchParams();
   const sheet = getSheetTemplate(logbookSlug, selectedVessel?.name);
 
@@ -161,18 +162,28 @@ const LogbookDetail: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {vessels.length > 0 && (
+            {vesselsLoading ? (
+              <div className="flex h-10 w-[13rem] items-center gap-2 rounded-md border border-border px-3 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading vessels…
+              </div>
+            ) : (
               <Select
                 value={selectedVessel?.id ?? ''}
                 onValueChange={(value) => setSelectedVesselById(value)}
+                disabled={vessels.length === 0}
               >
                 <SelectTrigger className="w-[13rem]" aria-label="Select vessel">
-                  <SelectValue placeholder="Select vessel" />
+                  <SelectValue placeholder={vessels.length === 0 ? 'No vessels available' : 'Select vessel'} />
                 </SelectTrigger>
                 <SelectContent>
-                  {vessels.map((vessel) => (
-                    <SelectItem key={vessel.id} value={vessel.id}>{vessel.name}</SelectItem>
-                  ))}
+                  {vessels.length === 0 ? (
+                    <div className="px-2 py-3 text-sm text-muted-foreground">No vessels available</div>
+                  ) : (
+                    vessels.map((vessel) => (
+                      <SelectItem key={vessel.id} value={vessel.id}>{vessel.name}</SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             )}
@@ -203,15 +214,36 @@ const LogbookDetail: React.FC = () => {
           </div>
         </div>
 
-        {!hasVessel && (
+        {vesselsLoading ? (
+          <div className="space-y-3">
+            <Skeleton className="h-8 w-48" />
+            <Skeleton className="h-64 w-full" />
+          </div>
+        ) : vessels.length === 0 ? (
           <Card>
-            <CardContent className="py-6 text-sm text-muted-foreground">
-              Select a vessel from the menu in the lower left to view or add logbook entries.
+            <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+              <Ship className="h-8 w-8 text-muted-foreground" />
+              <p className="text-sm font-medium text-foreground">No vessels available</p>
+              <p className="max-w-md text-sm text-muted-foreground">
+                Logbook entries are recorded against a vessel. Add a vessel to your fleet, or ask your
+                administrator for access, then come back to this page.
+              </p>
+              <Button variant="outline" className="mt-2" onClick={() => navigate('/vessels')}>
+                Go to vessels
+              </Button>
             </CardContent>
           </Card>
-        )}
-
-        {isLoading ? (
+        ) : !hasVessel ? (
+          <Card>
+            <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+              <Ship className="h-8 w-8 text-muted-foreground" />
+              <p className="text-sm font-medium text-foreground">No vessel selected</p>
+              <p className="max-w-md text-sm text-muted-foreground">
+                Choose a vessel from the dropdown above to view or add logbook entries.
+              </p>
+            </CardContent>
+          </Card>
+        ) : isLoading ? (
           <div className="space-y-3">
             <Skeleton className="h-8 w-48" />
             <Skeleton className="h-64 w-full" />
