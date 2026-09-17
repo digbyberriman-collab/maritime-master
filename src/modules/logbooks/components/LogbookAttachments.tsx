@@ -151,17 +151,28 @@ const LogbookAttachments: React.FC<Props> = ({
                     {formatSize(attachment.file_size)}
                   </span>
                 </button>
-                {canRemove && (
+                <div className="flex shrink-0 items-center gap-1">
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    aria-label={`Remove ${attachment.file_name}`}
-                    onClick={() => removeAttachment.mutate(attachment)}
+                    aria-label={`Download ${attachment.file_name}`}
+                    onClick={() => downloadAttachment(attachment)}
                   >
-                    <Trash2 className="h-4 w-4 text-destructive" />
+                    <Download className="h-4 w-4" />
                   </Button>
-                )}
+                  {canRemove && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label={`Remove ${attachment.file_name}`}
+                      onClick={() => removeAttachment.mutate(attachment)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  )}
+                </div>
               </li>
             );
           })}
