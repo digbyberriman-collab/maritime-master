@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { toast } from '@/hooks/use-toast';
+import { toast } from '@/shared/hooks/use-toast';
 import type { CrewMember } from '@/modules/crew/hooks/useCrew';
 import type { Vessel } from '@/modules/vessels/contexts/VesselContext';
 import { buildOfficialCrewListPdf } from '@/modules/crew/lib/crewListPdf';
