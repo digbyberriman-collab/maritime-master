@@ -11,6 +11,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import type { LogbookDefinition } from '@/modules/logbooks/lib/logbookDefinitions';
+import type { SheetTemplate } from '@/modules/logbooks/lib/dagonEngineLog';
+import LogbookSheetForm from '@/modules/logbooks/components/LogbookSheetForm';
 import LogbookAttachments from '@/modules/logbooks/components/LogbookAttachments';
 import LogbookEntryHistory from '@/modules/logbooks/components/LogbookEntryHistory';
 import type { LogbookEntry, LogbookEntryInput } from '@/modules/logbooks/hooks/useLogbook';
@@ -23,6 +25,8 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   definition: LogbookDefinition;
+  /** Vessel-specific daily readings sheet, used instead of the generic fields. */
+  sheet?: SheetTemplate;
   entry?: LogbookEntry | null;
   defaultDate?: Date | null;
   saving?: boolean;
@@ -42,7 +46,7 @@ const toLocalInputValue = (iso: string) => {
 };
 
 const LogbookEntryForm: React.FC<Props> = ({
-  open, onOpenChange, definition, entry, defaultDate, saving,
+  open, onOpenChange, definition, sheet, entry, defaultDate, saving,
   logbookId, companyId, vesselId, canManageAttachments, onSubmit, onDelete,
 }) => {
   const [entryAt, setEntryAt] = React.useState('');
@@ -95,21 +99,31 @@ const LogbookEntryForm: React.FC<Props> = ({
       setError('Enter the date and time of the entry.');
       return;
     }
-    if (!summary.trim()) {
+    const sheetSummary = sheet ? `${sheet.title} — ${new Date(entryAt).toLocaleDateString()}` : '';
+    const finalSummary = summary.trim() || sheetSummary;
+    if (!finalSummary) {
       setError('Add a short summary of the entry.');
       return;
     }
     const cleanedDetails: Record<string, unknown> = {};
-    definition.fields.forEach((field) => {
-      const value = details[field.key];
-      if (value === undefined || value === '') return;
-      cleanedDetails[field.key] = field.type === 'number' ? Number(value) : value;
-    });
+    if (sheet) {
+      // Sheet readings keep their raw text so paired values such as "28 / 34" survive.
+      Object.entries(details).forEach(([key, value]) => {
+        if (value !== undefined && value !== '') cleanedDetails[key] = value;
+      });
+    } else {
+      definition.fields.forEach((field) => {
+        const value = details[field.key];
+        if (value === undefined || value === '') return;
+        cleanedDetails[field.key] = field.type === 'number' ? Number(value) : value;
+      });
+    }
+
 
     onSubmit({
       entry_at: new Date(entryAt).toISOString(),
       watch_period: watchPeriod || null,
-      summary: summary.trim(),
+      summary: finalSummary,
       remarks: remarks.trim() || null,
       position_text: positionText.trim() || null,
       latitude: latitude === '' ? null : Number(latitude),
@@ -164,7 +178,15 @@ const LogbookEntryForm: React.FC<Props> = ({
             />
           </div>
 
-          {definition.fields.length > 0 && (
+          {sheet && (
+            <LogbookSheetForm
+              template={sheet}
+              values={details}
+              onChange={(key, value) => setDetails((prev) => ({ ...prev, [key]: value }))}
+            />
+          )}
+
+          {!sheet && definition.fields.length > 0 && (
             <div className="space-y-3 rounded-md border border-border p-4">
               <p className="text-sm font-semibold text-foreground">{definition.label} details</p>
               <div className="grid gap-4 sm:grid-cols-2">
