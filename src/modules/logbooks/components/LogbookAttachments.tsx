@@ -35,7 +35,8 @@ const LogbookAttachments: React.FC<Props> = ({
 }) => {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const {
-    attachments, isLoading, uploadFiles, removeAttachment, openAttachment, currentUserId,
+    attachments, isLoading, uploadFiles, removeAttachment, openAttachment, downloadAttachment,
+    currentUserId,
   } = useLogbookAttachments({ entryId, logbookId, companyId, vesselId });
   const [sizeError, setSizeError] = React.useState<string | null>(null);
   const [typeError, setTypeError] = React.useState<string | null>(null);
