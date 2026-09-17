@@ -15,6 +15,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import { getLogbookBySlug } from '@/modules/logbooks/lib/logbookDefinitions';
 import { useLogbook, type LogbookEntry } from '@/modules/logbooks/hooks/useLogbook';
