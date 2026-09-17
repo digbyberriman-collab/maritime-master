@@ -344,6 +344,15 @@ const LogbookDetail: React.FC = () => {
         onDelete={editing && canEditEntry(editing) ? (entry) => setPendingDelete(entry) : undefined}
       />
 
+      <LogbookExportDialog
+        open={exportOpen}
+        onOpenChange={setExportOpen}
+        definition={definition}
+        logbookId={logbook?.id ?? null}
+        vesselName={selectedVessel?.name ?? null}
+        month={month}
+      />
+
       <AlertDialog
         open={pendingDelete !== null}
         onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
