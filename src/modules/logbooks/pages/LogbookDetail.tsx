@@ -290,7 +290,7 @@ const LogbookDetail: React.FC = () => {
                           {canEditEntry(entry) && (
                             <Button
                               variant="ghost" size="icon" aria-label="Delete entry"
-                              onClick={() => deleteEntry.mutate(entry.id)}
+                              onClick={() => setPendingDelete(entry)}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
