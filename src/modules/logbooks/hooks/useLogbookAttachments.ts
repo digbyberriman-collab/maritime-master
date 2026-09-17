@@ -144,19 +144,42 @@ export const useLogbookAttachments = ({ entryId, logbookId, companyId, vesselId 
     },
   });
 
-  const openAttachment = async (attachment: LogbookAttachment) => {
+  const createSignedLink = async (
+    attachment: LogbookAttachment,
+    download: boolean,
+  ): Promise<string | null> => {
     const { data, error } = await supabase.storage
       .from(BUCKET)
-      .createSignedUrl(attachment.storage_path, 60 * 10);
+      .createSignedUrl(attachment.storage_path, 60 * 10, {
+        download: download ? attachment.file_name : false,
+      });
     if (error || !data?.signedUrl) {
       toast({
         title: 'Could not open file',
         description: error?.message ?? 'The file link could not be created.',
         variant: 'destructive',
       });
-      return;
+      return null;
     }
-    window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
+    return data.signedUrl;
+  };
+
+  const openAttachment = async (attachment: LogbookAttachment) => {
+    const url = await createSignedLink(attachment, false);
+    if (!url) return;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const downloadAttachment = async (attachment: LogbookAttachment) => {
+    const url = await createSignedLink(attachment, true);
+    if (!url) return;
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = attachment.file_name;
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
   };
 
   return {
@@ -165,6 +188,7 @@ export const useLogbookAttachments = ({ entryId, logbookId, companyId, vesselId 
     uploadFiles,
     removeAttachment,
     openAttachment,
+    downloadAttachment,
     currentUserId: user?.id ?? null,
   };
 };
