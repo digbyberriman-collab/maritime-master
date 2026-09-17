@@ -24,9 +24,6 @@ interface HireDialogProps {
   isPending?: boolean;
 }
 
-/** Deep link to the new crew member's HRIS record. */
-export const personalDetailsLink = (profileId: string): string => `${HRIS_PATHS.personalDetails}?crew=${encodeURIComponent(profileId)}&module=hris`;
-
 /**
  * Confirms start date and vessel, runs the hire RPC (crew profile + draft
  * contract + onboarding) and then links to the new Personal Details record.

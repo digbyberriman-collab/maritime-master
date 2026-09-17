@@ -275,3 +275,7 @@ BEGIN
     ALTER TABLE public.performance_reviews DROP COLUMN welfare_notes;
   END IF;
 END $$;
+
+-- Interview lookups by interviewer and by company/status/time.
+CREATE INDEX IF NOT EXISTS idx_interviews_interviewers ON public.interviews USING gin (interviewer_profile_ids);
+CREATE INDEX IF NOT EXISTS idx_interviews_company_status_time ON public.interviews (company_id, status, scheduled_at);
