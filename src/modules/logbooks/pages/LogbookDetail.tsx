@@ -24,6 +24,7 @@ import { getLogbookBySlug } from '@/modules/logbooks/lib/logbookDefinitions';
 import { useLogbook, type LogbookEntry } from '@/modules/logbooks/hooks/useLogbook';
 import LogbookEntryForm from '@/modules/logbooks/components/LogbookEntryForm';
 import LogbookExportDialog from '@/modules/logbooks/components/LogbookExportDialog';
+import { getSheetTemplate } from '@/modules/logbooks/lib/dagonEngineLog';
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
   draft: 'secondary',
@@ -48,6 +49,7 @@ const LogbookDetail: React.FC = () => {
   const navigate = useNavigate();
   const definition = getLogbookBySlug(logbookSlug);
   const { selectedVessel } = useVessel();
+  const sheet = getSheetTemplate(logbookSlug, selectedVessel?.name);
 
   const [month, setMonth] = React.useState(() => startOfMonth(new Date()));
   const [view, setView] = React.useState<'month' | 'records'>('month');
