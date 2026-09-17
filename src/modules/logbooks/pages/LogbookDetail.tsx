@@ -4,7 +4,7 @@ import {
   addMonths, endOfMonth, format, isSameDay, isSameMonth, startOfMonth, startOfWeek,
 } from 'date-fns';
 import {
-  ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, List, PenLine, Plus, Trash2,
+  ArrowLeft, CalendarDays, ChevronLeft, ChevronRight, FileDown, List, PenLine, Plus, Trash2,
 } from 'lucide-react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
