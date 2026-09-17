@@ -42,7 +42,7 @@ const toLocalInputValue = (iso: string) => {
 
 const LogbookEntryForm: React.FC<Props> = ({
   open, onOpenChange, definition, entry, defaultDate, saving,
-  logbookId, companyId, vesselId, canManageAttachments, onSubmit,
+  logbookId, companyId, vesselId, canManageAttachments, onSubmit, onDelete,
 }) => {
   const [entryAt, setEntryAt] = React.useState('');
   const [watchPeriod, setWatchPeriod] = React.useState<string>('');
