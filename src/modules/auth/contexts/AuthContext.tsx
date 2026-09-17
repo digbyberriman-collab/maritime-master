@@ -177,7 +177,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hrPermission,
         legacyRole: userRole,
       });
-      return access.canView;
+      // Self-service crew may enter the module; individual routes that must
+      // never render for them declare an explicit hrLevel / payrollLevel.
+      return access.level !== 'none';
     }
 
     if (!rbacInitialized || rbacLoading) {

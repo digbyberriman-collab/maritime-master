@@ -44,21 +44,6 @@ const LogbookDetail: React.FC = () => {
     createEntry, updateEntry, signEntry, deleteEntry,
   } = useLogbook(definition, month);
 
-  if (!definition) {
-    return (
-      <DashboardLayout>
-        <div className="space-y-4 p-1">
-          <h1 className="text-2xl font-bold text-foreground">Logbook not found</h1>
-          <Button asChild variant="outline">
-            <Link to="/vessel/logbooks/list">Back to all logbooks</Link>
-          </Button>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  const Icon = definition.icon;
-
   const entriesByDay = React.useMemo(() => {
     const map = new Map<string, LogbookEntry[]>();
     entries.forEach((entry) => {
@@ -81,6 +66,21 @@ const LogbookDetail: React.FC = () => {
     }
     return days;
   }, [month]);
+
+  if (!definition) {
+    return (
+      <DashboardLayout>
+        <div className="space-y-4 p-1">
+          <h1 className="text-2xl font-bold text-foreground">Logbook not found</h1>
+          <Button asChild variant="outline">
+            <Link to="/vessel/logbooks/list">Back to all logbooks</Link>
+          </Button>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  const Icon = definition.icon;
 
   const openNew = (day?: Date) => {
     setEditing(null);
