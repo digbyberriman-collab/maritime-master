@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, Image as ImageIcon, Paperclip, Trash2, Upload } from 'lucide-react';
+import { Download, FileText, Image as ImageIcon, Paperclip, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
