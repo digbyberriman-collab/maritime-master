@@ -263,13 +263,27 @@ const LogbookEntryForm: React.FC<Props> = ({
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? 'Saving...' : entry ? 'Save changes' : 'Add entry'}
-            </Button>
+          <DialogFooter className="gap-2 sm:justify-between">
+            <div>
+              {entry && onDelete && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => onDelete(entry)}
+                >
+                  <Trash2 className="mr-1 h-4 w-4" /> Delete entry
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? 'Saving...' : entry ? 'Save changes' : 'Add entry'}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>
