@@ -7,6 +7,24 @@ import { toast } from '@/shared/hooks/use-toast';
 const BUCKET = 'logbook-attachments';
 export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 
+const ALLOWED_MIME_PREFIXES = ['image/'];
+const ALLOWED_MIME_TYPES = ['application/pdf'];
+// Extensions for browsers that report an empty file.type (rare, but possible).
+const ALLOWED_EXTENSIONS = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic', '.heif', '.svg'];
+
+export const isAllowedAttachmentType = (file: File): boolean => {
+  if (file.type) {
+    return (
+      ALLOWED_MIME_TYPES.includes(file.type) ||
+      ALLOWED_MIME_PREFIXES.some((prefix) => file.type.startsWith(prefix))
+    );
+  }
+  const extension = file.name.slice(file.name.lastIndexOf('.')).toLowerCase();
+  return ALLOWED_EXTENSIONS.includes(extension);
+};
+
+export const ALLOWED_TYPES_MESSAGE = 'Only PDF and image files (photos and scans) can be attached.';
+
 export interface LogbookAttachment {
   id: string;
   entry_id: string;
@@ -68,6 +86,9 @@ export const useLogbookAttachments = ({ entryId, logbookId, companyId, vesselId 
       for (const file of files) {
         if (file.size > MAX_ATTACHMENT_BYTES) {
           throw new Error(`"${file.name}" is larger than the 25 MB limit.`);
+        }
+        if (!isAllowedAttachmentType(file)) {
+          throw new Error(`"${file.name}" is not a supported file type. ${ALLOWED_TYPES_MESSAGE}`);
         }
         const path = `${companyId}/${entryId}/${Date.now()}-${safeName(file.name)}`;
         const { error: uploadError } = await supabase.storage

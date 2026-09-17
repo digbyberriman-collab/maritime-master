@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  ALLOWED_TYPES_MESSAGE,
   MAX_ATTACHMENT_BYTES,
+  isAllowedAttachmentType,
   useLogbookAttachments, type LogbookAttachment,
 } from '@/modules/logbooks/hooks/useLogbookAttachments';
 
@@ -36,6 +38,7 @@ const LogbookAttachments: React.FC<Props> = ({
     attachments, isLoading, uploadFiles, removeAttachment, openAttachment, currentUserId,
   } = useLogbookAttachments({ entryId, logbookId, companyId, vesselId });
   const [sizeError, setSizeError] = React.useState<string | null>(null);
+  const [typeError, setTypeError] = React.useState<string | null>(null);
 
   if (!entryId) {
     return (
@@ -48,7 +51,20 @@ const LogbookAttachments: React.FC<Props> = ({
   const handleFiles = (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
     const files = Array.from(fileList);
-    const oversized = files.filter((file) => file.size > MAX_ATTACHMENT_BYTES);
+
+    const unsupported = files.filter((file) => !isAllowedAttachmentType(file));
+    if (unsupported.length > 0) {
+      const names = unsupported.map((file) => `"${file.name}"`).join(', ');
+      setTypeError(
+        `${names} ${unsupported.length > 1 ? 'are' : 'is'} not a supported file type${unsupported.length > 1 ? 's' : ''}. ${ALLOWED_TYPES_MESSAGE}`,
+      );
+    } else {
+      setTypeError(null);
+    }
+
+    const oversized = files
+      .filter((file) => isAllowedAttachmentType(file))
+      .filter((file) => file.size > MAX_ATTACHMENT_BYTES);
     if (oversized.length > 0) {
       const names = oversized
         .map((file) => `"${file.name}" (${formatSize(file.size)})`)
@@ -59,7 +75,10 @@ const LogbookAttachments: React.FC<Props> = ({
     } else {
       setSizeError(null);
     }
-    const allowed = files.filter((file) => file.size <= MAX_ATTACHMENT_BYTES);
+
+    const allowed = files
+      .filter((file) => isAllowedAttachmentType(file))
+      .filter((file) => file.size <= MAX_ATTACHMENT_BYTES);
     if (allowed.length > 0) uploadFiles.mutate(allowed);
     if (inputRef.current) inputRef.current.value = '';
   };
@@ -87,10 +106,16 @@ const LogbookAttachments: React.FC<Props> = ({
           type="file"
           multiple
           className="hidden"
-          accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.txt"
+          accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png,.gif,.webp,.bmp,.heic,.heif,.svg"
           onChange={(event) => handleFiles(event.target.files)}
         />
       </div>
+
+      {typeError && (
+        <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {typeError}
+        </p>
+      )}
 
       {sizeError && (
         <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -102,7 +127,7 @@ const LogbookAttachments: React.FC<Props> = ({
         <Skeleton className="h-10 w-full" />
       ) : attachments.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No files attached. Photos, scanned receipts and PDFs up to 25 MB each are supported.
+          No files attached. PDFs and images (photos and scans) up to 25 MB each are supported.
         </p>
       ) : (
         <ul className="space-y-2">
