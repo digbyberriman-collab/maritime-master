@@ -249,6 +249,16 @@ const LogbookEntryForm: React.FC<Props> = ({
             canManage={canManageAttachments ?? true}
           />
 
+          <LogbookEntryHistory
+            entryId={entry?.id ?? null}
+            createdAt={entry?.created_at ?? null}
+            createdByName={entry?.recorded_by_name ?? null}
+            updatedAt={entry?.updated_at ?? null}
+            updatedByName={entry?.updated_by_name ?? null}
+          />
+
+
+
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
