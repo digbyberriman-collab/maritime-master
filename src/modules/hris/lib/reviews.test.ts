@@ -18,6 +18,7 @@ import {
   stepIndex,
   DEFAULT_REVIEW_FILTERS,
   NEXT_STATUS,
+  NO_VESSEL_FILTER,
   REVIEW_TYPES,
   type CompetencyRating,
   type PerformanceReviewRow,
@@ -257,6 +258,7 @@ describe('filterReviews / sortReviews', () => {
     expect(filterReviews(rows, { ...DEFAULT_REVIEW_FILTERS, status: 'all' })).toHaveLength(3);
     expect(filterReviews(rows, { ...DEFAULT_REVIEW_FILTERS, type: 'end_of_rotation' }).map((r) => r.id)).toEqual(['b']);
     expect(filterReviews(rows, { ...DEFAULT_REVIEW_FILTERS, vesselId: 'v1' }).map((r) => r.id)).toEqual(['b']);
+    expect(filterReviews(rows, { ...DEFAULT_REVIEW_FILTERS, vesselId: NO_VESSEL_FILTER }).map((r) => r.id)).toEqual(['c']);
     expect(filterReviews(rows, { ...DEFAULT_REVIEW_FILTERS, cycleId: 'cy1' }).map((r) => r.id)).toEqual(['c']);
     expect(filterReviews(rows, { ...DEFAULT_REVIEW_FILTERS, search: 'bob' }).map((r) => r.id)).toEqual(['c']);
     expect(filterReviews(rows, { ...DEFAULT_REVIEW_FILTERS, search: 'draak' }).map((r) => r.id)).toEqual(['b']);

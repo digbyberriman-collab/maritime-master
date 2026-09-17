@@ -143,3 +143,56 @@ CREATE POLICY "gratuity_distributions_select" ON public.gratuity_distributions
       )
     )
   );
+
+-- ---------------------------------------------------------------
+-- Payroll: crew can see the run / period context of their own paid
+-- payslips; line money columns are frozen once a run is submitted.
+-- ---------------------------------------------------------------
+DROP POLICY IF EXISTS "payroll_runs_select" ON public.payroll_runs;
+CREATE POLICY "payroll_runs_select" ON public.payroll_runs
+  FOR SELECT USING (
+    public.user_belongs_to_company(auth.uid(), company_id)
+    AND (
+      public.payroll_can_view(auth.uid())
+      OR (status = 'paid' AND EXISTS (
+        SELECT 1 FROM public.payroll_lines pl
+        WHERE pl.run_id = payroll_runs.id AND pl.profile_id = public.my_profile_id() AND pl.status = 'paid'))
+    )
+  );
+
+DROP POLICY IF EXISTS "pay_periods_select" ON public.pay_periods;
+CREATE POLICY "pay_periods_select" ON public.pay_periods
+  FOR SELECT USING (
+    public.user_belongs_to_company(auth.uid(), company_id)
+    AND (
+      public.payroll_can_view(auth.uid())
+      OR EXISTS (
+        SELECT 1 FROM public.payroll_runs r JOIN public.payroll_lines pl ON pl.run_id = r.id
+        WHERE r.pay_period_id = pay_periods.id AND pl.profile_id = public.my_profile_id() AND pl.status = 'paid')
+    )
+  );
+
+CREATE OR REPLACE FUNCTION public.payroll_lines_guard()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_status text;
+BEGIN
+  SELECT status INTO v_status FROM public.payroll_runs WHERE id = NEW.run_id;
+  IF v_status NOT IN ('draft', 'calculated') AND (
+       NEW.other_earnings_minor IS DISTINCT FROM OLD.other_earnings_minor
+    OR NEW.deductions_minor IS DISTINCT FROM OLD.deductions_minor
+    OR NEW.gross_minor IS DISTINCT FROM OLD.gross_minor
+    OR NEW.net_minor IS DISTINCT FROM OLD.net_minor
+    OR NEW.prorated_base_minor IS DISTINCT FROM OLD.prorated_base_minor
+    OR NEW.allowances_minor IS DISTINCT FROM OLD.allowances_minor
+    OR NEW.gratuity_minor IS DISTINCT FROM OLD.gratuity_minor
+    OR (NEW.status IS DISTINCT FROM OLD.status AND NEW.status <> 'paid')
+  ) THEN
+    RAISE EXCEPTION 'Payroll lines cannot be adjusted once the run is %', v_status;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+DROP TRIGGER IF EXISTS trg_payroll_lines_guard ON public.payroll_lines;
+CREATE TRIGGER trg_payroll_lines_guard BEFORE UPDATE ON public.payroll_lines
+  FOR EACH ROW EXECUTE FUNCTION public.payroll_lines_guard();

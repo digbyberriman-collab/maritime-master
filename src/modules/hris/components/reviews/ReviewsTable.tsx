@@ -120,8 +120,8 @@ export const ReviewsTable: React.FC<ReviewsTableProps> = ({ reviews, isLoading, 
                 <TableCell className="text-center font-medium">{r.overall_rating ?? '—'}</TableCell>
                 <TableCell><ReviewStatusBadge status={r.status} /></TableCell>
                 <TableCell className="whitespace-nowrap">
-                  <span className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
-                    {rowAction?.(r)}
+                  <span className="flex items-center justify-end gap-2">
+                    {rowAction && <span onClick={(e) => e.stopPropagation()}>{rowAction(r)}</span>}
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </span>
                 </TableCell>

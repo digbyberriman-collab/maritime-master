@@ -345,9 +345,13 @@ export const buildBulkDrafts = (cycle: CycleForDrafts, crewIds: string[], option
 // Filtering & KPIs
 // ---------------------------------------------------------------------------
 
+/** Sentinel for "no vessel" in vessel selects (Radix rejects empty-string values). */
+export const NO_VESSEL_FILTER = 'none';
+
 export interface ReviewFilters {
   type: ReviewType | 'all';
   status: ReviewStatus | 'all' | 'open';
+  /** Vessel id, 'all', or NO_VESSEL_FILTER for unassigned. */
   vesselId: string | 'all';
   cycleId: string | 'all';
   crewId: string | null;
@@ -370,7 +374,9 @@ export const filterReviews = <T extends ReviewListItem>(reviews: T[], filters: R
     if (filters.status === 'open') {
       if (isTerminalStatus(r.status)) return false;
     } else if (filters.status !== 'all' && r.status !== filters.status) return false;
-    if (filters.vesselId !== 'all' && (r.vessel_id ?? '') !== filters.vesselId) return false;
+    if (filters.vesselId === NO_VESSEL_FILTER) {
+      if (r.vessel_id) return false;
+    } else if (filters.vesselId !== 'all' && r.vessel_id !== filters.vesselId) return false;
     if (filters.cycleId !== 'all' && (r.cycle_id ?? '') !== filters.cycleId) return false;
     if (filters.crewId && r.profile_id !== filters.crewId) return false;
     if (search) {

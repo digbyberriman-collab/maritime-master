@@ -16327,6 +16327,10 @@ export type Database = {
       }
     }
     Functions: {
+      hr_company_settings_for: {
+        Args: { p_company_id: string }
+        Returns: Database['public']['Tables']['hr_company_settings']['Row']
+      }
       hr_archive_due_records: {
         Args: { p_company_id?: string | null }
         Returns: number
