@@ -161,18 +161,28 @@ const LogbookDetail: React.FC = () => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {vessels.length > 0 && (
+            {vesselsLoading ? (
+              <div className="flex h-10 w-[13rem] items-center gap-2 rounded-md border border-border px-3 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading vessels…
+              </div>
+            ) : (
               <Select
                 value={selectedVessel?.id ?? ''}
                 onValueChange={(value) => setSelectedVesselById(value)}
+                disabled={vessels.length === 0}
               >
                 <SelectTrigger className="w-[13rem]" aria-label="Select vessel">
-                  <SelectValue placeholder="Select vessel" />
+                  <SelectValue placeholder={vessels.length === 0 ? 'No vessels available' : 'Select vessel'} />
                 </SelectTrigger>
                 <SelectContent>
-                  {vessels.map((vessel) => (
-                    <SelectItem key={vessel.id} value={vessel.id}>{vessel.name}</SelectItem>
-                  ))}
+                  {vessels.length === 0 ? (
+                    <div className="px-2 py-3 text-sm text-muted-foreground">No vessels available</div>
+                  ) : (
+                    vessels.map((vessel) => (
+                      <SelectItem key={vessel.id} value={vessel.id}>{vessel.name}</SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             )}
