@@ -315,14 +315,16 @@ const LogbookWorkspace: React.FC = () => {
   React.useEffect(() => {
     const key = `${book.id}:${profile}:${volume?.id ?? ''}:${prefs.autoReadings}`;
     if (openedFor.current === key) return;
+    // Only mark this book/volume as handled once its entries are loaded, so an open during loading is not skipped.
+    if (ws.isLoading || actor.loading) return;
     openedFor.current = key;
-    if (!prefs.autoReadings || !book.sensor || !volume || volume.status !== 'open' || !actor.canWrite(book, section) || !fresh || ws.isLoading) return;
+    if (!prefs.autoReadings || !book.sensor || !volume || volume.status !== 'open' || !fresh) return;
     const targetId = book.id === 'deck' ? 'watch' : 'round';
     const target = sections.find((x) => x.id === targetId);
     if (!target || !actor.canWrite(book, target)) return;
     addLine(null, fresh, { automatic: true, section: target });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [book.id, profile, volume?.id, prefs.autoReadings, section.id, ws.isLoading, fresh?.id, tick]);
+  }, [book.id, profile, volume?.id, prefs.autoReadings, ws.isLoading, actor.loading, fresh?.id, tick]);
 
   // ── Pages ─────────────────────────────────────────────────────────────────
   const preparePage = () => {

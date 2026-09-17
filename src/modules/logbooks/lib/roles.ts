@@ -30,7 +30,7 @@ export const CAPACITY_LABELS: Record<ActorCapacity, string> = {
   master: 'Master', officer: 'Deck officer', engineer: 'Engineer', steward: 'Crew witness', ...EXTERNAL_CAPACITY_LABELS,
 };
 
-/** Resolve the crew capacity for a set of role names. The strongest capacity wins. */
+/** Resolve the crew capacity for a set of RBAC role names. The strongest capacity wins. */
 export function capacityFor(roles: Array<string | null | undefined>): CrewCapacity | null {
   const set = new Set(roles.filter((role): role is string => Boolean(role)));
   const has = (list: string[]) => list.some((role) => set.has(role));
@@ -46,8 +46,12 @@ export function capacityFor(roles: Array<string | null | undefined>): CrewCapaci
  * to a capacity; the legacy profile role is only a fallback.
  */
 export function resolveCapacity(rbacRoles: Array<string | null | undefined>, legacyRole: string | null | undefined): CrewCapacity | null {
-  return capacityFor(rbacRoles) ?? capacityFor([legacyRole]);
+  return capacityFor(rbacRoles) ?? legacyCapacity(legacyRole);
 }
+
+/** The legacy profiles.role values the database maps; anything else has no capacity. */
+const LEGACY_CAPACITY: Record<string, CrewCapacity> = { master: 'master', chief_officer: 'officer', chief_engineer: 'engineer', crew: 'steward' };
+export const legacyCapacity = (role: string | null | undefined): CrewCapacity | null => (role ? LEGACY_CAPACITY[role] ?? null : null);
 
 export const isMaster = (capacity: ActorCapacity | null | undefined) => capacity === 'master';
 
@@ -55,9 +59,9 @@ export const isMaster = (capacity: ActorCapacity | null | undefined) => capacity
 export const canWriteBook = (capacity: ActorCapacity | null | undefined, book: LogbookBook | undefined) =>
   Boolean(capacity && book && (capacity === 'master' || book.roles.includes(capacity)));
 
-/** Whether the capacity may author lines in this section (sections may restrict authorship further). */
+/** Whether the capacity may author lines in this section (sections may restrict authorship further; the Master is exempt, as in the database). */
 export const canWriteSection = (capacity: ActorCapacity | null | undefined, section: TemplateSection | undefined) =>
-  Boolean(capacity && section && (!section.roles || section.roles.includes(capacity)));
+  Boolean(capacity && section && (capacity === 'master' || !section.roles || section.roles.includes(capacity)));
 
 export const canWrite = (capacity: ActorCapacity | null | undefined, book: LogbookBook | undefined, section: TemplateSection | undefined) =>
   canWriteBook(capacity, book) && canWriteSection(capacity, section);

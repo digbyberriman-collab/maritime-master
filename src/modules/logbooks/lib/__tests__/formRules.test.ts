@@ -79,6 +79,17 @@ describe('role mapping', () => {
     expect(resolveCapacity([], 'master')).toBe('master');
     expect(resolveCapacity(['dpa'], 'chief_engineer')).toBe('engineer');
     expect(resolveCapacity(['dpa'], 'dpa')).toBeNull();
+    // Legacy profile values the database does not map carry no capacity.
+    expect(resolveCapacity([], 'captain')).toBeNull();
+    expect(resolveCapacity([], 'purser')).toBeNull();
+  });
+
+  it('exempts the Master from section role lists, as the database does', () => {
+    const orders = LOGBOOK_BOOKS.find((b) => b.id === 'orders')!;
+    const restricted = { ...orders.sections[0], roles: ['engineer' as const] };
+    expect(canWrite('master', orders, restricted)).toBe(true);
+    expect(canWrite('engineer', orders, restricted)).toBe(true);
+    expect(canWrite('officer', orders, restricted)).toBe(false);
   });
 
   it('lets the Master write everywhere and restricts sections by author role', () => {
