@@ -28,6 +28,15 @@ reviewed statements by authenticated users, not advanced electronic signatures.*
 | `supabase/migrations/20260917200000_logbook_meridian_enums.sql` | New `logbook_type` values and the `verified` entry status |
 | `supabase/migrations/20260917200100_logbook_meridian_books.sql` | Volumes, signatures, pages, registries, samples, entry extensions, guards and RPCs |
 
+Vessel-specific readings sheets (`lib/vesselSheets.ts`, `lib/dagonEngineLog.ts`,
+`components/SheetEntryCard.tsx`): the M/Y DAGON engine-room daily log is added
+to the Engine book template as an extra section when a volume is opened for a
+vessel whose name contains "DAGON". Each sheet is one entry whose cells are
+stored under `${sectionId}.${rowKey}.${columnKey}` keys, exactly as the original
+form saved them, so it rides the same drafts, signatures, page review, audit
+trail and PDF export as every other line. Running-hour differences and present
+ROB are calculated on screen and in the printed sheet.
+
 Routes: `/vessel/logbooks` (workspace, defaults to the last opened book),
 `/vessel/logbooks/:slug`, `/registry`, `/review`, `/records`, `/connections`,
 `/assurance`. `/vessel/logbooks/list` redirects to the workspace.

@@ -46,6 +46,8 @@ export interface TemplateSection {
   operationCode?: string;
   acknowledgement?: boolean;
   itemGroup?: string;
+  /** Vessel-specific readings sheet rendered as a grid instead of ruled columns (see vesselSheets.ts). */
+  sheet?: string;
 }
 
 export type SourceKey = 'cisr' | 'official' | 'garbage' | 'oil' | 'oil2' | 'cargo' | 'ballast' | 'radio' | 'ihm' | 'annexVI' | 'bio';

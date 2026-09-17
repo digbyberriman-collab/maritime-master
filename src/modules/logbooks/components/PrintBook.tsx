@@ -6,6 +6,8 @@ import type { EntryView, PageRow, VolumeRow } from '../lib/types';
 import type { TemplateSection } from '../lib/templates';
 import { bookColumns, itemCode } from '../lib/lineLayouts';
 import { stamp } from '../lib/format';
+import { sheetSummaryLines } from '../lib/dagonEngineLog';
+import { sheetForSection } from '../lib/vesselSheets';
 
 interface Props {
   book: LogbookBook;
@@ -20,8 +22,11 @@ const val = (v: unknown) => (v === undefined || v === null || v === '' ? '—' :
 const signatureText = (e: EntryView) =>
   e.signatures.filter((s) => s.kind !== 'acknowledge').map((s) => `${s.kind === 'attested' ? `${s.witness_name} (${s.witness_capacity}) attested by ${s.actor_name}` : s.actor_name} · ${s.kind} · ${stamp(s.signed_at)}`).join('\n') || 'Unsigned';
 
-const fieldsText = (e: EntryView) =>
-  (e.schema_snapshot?.fields ?? []).map((f) => `${f.item ? `${itemCode(f.item)} ` : ''}${f.label}: ${val(e.data[f.key])}`).join('\n');
+const fieldsText = (e: EntryView) => {
+  const sheet = sheetForSection(e.schema_snapshot);
+  if (sheet) return sheetSummaryLines(sheet, e.data).join('\n');
+  return (e.schema_snapshot?.fields ?? []).map((f) => `${f.item ? `${itemCode(f.item)} ` : ''}${f.label}: ${val(e.data[f.key])}`).join('\n');
+};
 
 /** Section-specific record tables, following the source book column layouts. */
 function recordGrid(book: LogbookBook, section: TemplateSection, records: EntryView[]): { headings: string[]; rows: string[][] } {
@@ -82,10 +87,11 @@ const EntryDetail: React.FC<{ entry: EntryView }> = ({ entry }) => (
     {entry.amended_from_id && <p>Correction of {entry.amended_from_id} · {entry.amendment_reason}</p>}
     {entry.superseded_by_id && <p>Superseded by linked correction {entry.superseded_by_id}</p>}
     <dl className="grid grid-cols-2 gap-x-3">
-      {(entry.schema_snapshot?.fields ?? []).map((f) => (
+      {(sheetForSection(entry.schema_snapshot) ? [] : entry.schema_snapshot?.fields ?? []).map((f) => (
         <div key={f.key}><dt className="inline font-semibold">{f.item ? `${itemCode(f.item)} · ` : ''}{f.label}: </dt><dd className="inline whitespace-pre-wrap">{val(entry.data[f.key])}</dd></div>
       ))}
     </dl>
+    {sheetForSection(entry.schema_snapshot) && <pre className="whitespace-pre-wrap font-sans">{fieldsText(entry)}</pre>}
     {entry.remarks && <p><strong>Remarks:</strong> {entry.remarks}</p>}
     {entry.source_snapshot && <p>Captured source · {entry.source_snapshot.source} · {stamp(entry.source_snapshot.observed_at, true)} · {entry.override_reason ?? 'Captured readings retained.'}</p>}
     {entry.signatures.map((s) => (

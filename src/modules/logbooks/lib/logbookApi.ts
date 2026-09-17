@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { LogbookBook } from './catalog';
 import { referenceFor } from './catalog';
 import { templateRevision } from './templates';
+import { vesselSheetSections } from './vesselSheets';
 import type {
   AuditRow, EntryRow, EntryView, FlagProfileId, LogbookRow, PageRow, RegistryRow, RegistrySource, SampleRow, SignatureRow, VolumeRow, VolumeTemplate,
 } from './types';
@@ -50,6 +51,8 @@ export async function fetchVolumes(vesselId: string, bookId?: string): Promise<V
 export interface OpenVolumeInput {
   companyId: string;
   vesselId: string;
+  /** Used to attach vessel-specific readings sheets (e.g. the DAGON engine-room log) to the volume template. */
+  vesselName?: string | null;
   book: LogbookBook;
   profile: FlagProfileId;
   label: string;
@@ -58,8 +61,12 @@ export interface OpenVolumeInput {
   continuationOf: string | null;
 }
 
-export function buildTemplate(book: LogbookBook): VolumeTemplate {
-  return { revision: templateRevision, title: book.title, basis: book.basis, roles: book.roles, sections: book.sections, reference: referenceFor(book) };
+export function buildTemplate(book: LogbookBook, vesselName?: string | null): VolumeTemplate {
+  return {
+    revision: templateRevision, title: book.title, basis: book.basis, roles: book.roles,
+    sections: [...book.sections, ...vesselSheetSections(book.slug, vesselName)],
+    reference: referenceFor(book),
+  };
 }
 
 export async function openVolume(input: OpenVolumeInput): Promise<VolumeRow> {
@@ -74,7 +81,7 @@ export async function openVolume(input: OpenVolumeInput): Promise<VolumeRow> {
       flag_profile: input.profile,
       label: input.label,
       template_revision: templateRevision,
-      template: buildTemplate(input.book) as unknown as Json,
+      template: buildTemplate(input.book, input.vesselName) as unknown as Json,
       cover_fields: input.book.coverFields as unknown as Json,
       particulars: input.particulars as Json,
       registry_source: (input.registrySource ?? null) as Json,

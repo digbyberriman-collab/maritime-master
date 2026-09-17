@@ -12,6 +12,7 @@ import BookMasthead from '../components/BookMasthead';
 import BookToolbar from '../components/BookToolbar';
 import SectionTabs from '../components/SectionTabs';
 import RuledSheet from '../components/RuledSheet';
+import SheetEntries from '../components/SheetEntries';
 import PageReviewFooter from '../components/PageReviewFooter';
 import VolumeOpenDialog from '../components/VolumeOpenDialog';
 import VolumeCoverDialog from '../components/VolumeCoverDialog';
@@ -22,6 +23,7 @@ import { LOGBOOK_BOOKS, getBook, getBookBySlug, type LogbookBook } from '../lib/
 import { bookColumns, eventTime, lineFields } from '../lib/lineLayouts';
 import { freshReading, particularsFromVolume, profileForFlag } from '../lib/registryRules';
 import { fetchEntry, type SignKind } from '../lib/logbookApi';
+import { sheetForSection } from '../lib/vesselSheets';
 import { stamp } from '../lib/format';
 import type { EntryView, FlagProfileId, SampleRow, VolumeRow } from '../lib/types';
 import type { TemplateSection } from '../lib/templates';
@@ -114,6 +116,7 @@ const LogbookWorkspace: React.FC = () => {
   const fixed = Boolean(fixedPage || reviewing);
   const editable = Boolean(volume?.status === 'open' && !legacy && actor.canWrite(book, section));
   const columns = React.useMemo(() => bookColumns(book.id, section), [book.id, section]);
+  const sheet = sheetForSection(section);
 
   const own = React.useCallback((e: EntryView) => e.status === 'draft' && e.recorded_by === actor.userId, [actor.userId]);
 
@@ -343,7 +346,7 @@ const LogbookWorkspace: React.FC = () => {
   // ── Volumes ───────────────────────────────────────────────────────────────
   const openVolume = async (input: { label: string; particulars: Record<string, unknown>; registrySource: VolumeRow['registry_source']; continuationOf: string | null }) => {
     if (!actor.companyId || !actor.vesselId) throw new Error('Select a vessel first.');
-    const created = await ws.open.mutateAsync({ companyId: actor.companyId, vesselId: actor.vesselId, book, profile, ...input });
+    const created = await ws.open.mutateAsync({ companyId: actor.companyId, vesselId: actor.vesselId, vesselName: selectedVessel?.name, book, profile, ...input });
     setVolumeId(created.id); setSectionId(''); setDialog(null); openedFor.current = '';
     toast({ title: 'Volume opened', description: 'Saved registry details are fixed in its cover.' });
   };
@@ -411,7 +414,7 @@ const LogbookWorkspace: React.FC = () => {
                   {reviewing && <option value="review">Page review · unsigned</option>}
                 </select>
               </label>
-              {editable && !fixed && <Button type="button" size="sm" onClick={() => addLine(null, null)}><Plus className="mr-1 h-4 w-4" /> Add line</Button>}
+              {editable && !fixed && <Button type="button" size="sm" onClick={() => addLine(null, null)}><Plus className="mr-1 h-4 w-4" /> {sheet ? 'New sheet' : 'Add line'}</Button>}
             </div>
           </header>
           {section.help && <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">Instructions for this section</summary><p className="mt-1">{section.help}</p></details>}
@@ -423,6 +426,16 @@ const LogbookWorkspace: React.FC = () => {
 
           {ws.isLoading ? (
             <div className="space-y-2"><Skeleton className="h-8 w-full" /><Skeleton className="h-40 w-full" /></div>
+          ) : sheet ? (
+            <SheetEntries
+              template={sheet} rows={visible} buffers={buffers} newRows={newRows}
+              highlightedId={highlighted} busyIds={busyIds} errors={errors} editable={editable && !fixed} fixed={fixed}
+              capacity={actor.capacity} userId={actor.userId} canManageAttachments={editable || actor.isMaster}
+              canCorrectEntry={canCorrectEntry} onWriteOnLine={() => addLine(null, null)}
+              onChange={onChange} onSave={(id) => void saveLine(id)} onRevert={(id) => { copies.remove(id); toast({ title: 'Loaded the saved sheet; unsaved edits reverted.' }); }}
+              onDiscard={(id) => copies.remove(id)} onAttest={(e, k, w) => void attest(e, k, w)} onCorrect={correct}
+              onOpenEntry={(id) => void openEntry(id)} onViewPage={(id) => { setPageView(id); setProposal(null); }}
+            />
           ) : (
             <RuledSheet
               book={book} section={section} columns={columns} rows={visible} buffers={buffers} newRows={newRows} allEntries={ws.entries}
