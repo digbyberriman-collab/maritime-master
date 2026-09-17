@@ -23,6 +23,7 @@ import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import { getLogbookBySlug } from '@/modules/logbooks/lib/logbookDefinitions';
 import { useLogbook, type LogbookEntry } from '@/modules/logbooks/hooks/useLogbook';
 import LogbookEntryForm from '@/modules/logbooks/components/LogbookEntryForm';
+import LogbookExportDialog from '@/modules/logbooks/components/LogbookExportDialog';
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
   draft: 'secondary',
