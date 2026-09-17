@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useHrAccess } from '@/modules/auth/hooks/useHrAccess';
+import { usePayrollAccess } from '@/modules/auth/hooks/usePayrollAccess';
 
 /**
  * Lightweight crew directory for HRIS pickers and lists. One row per
@@ -38,11 +39,14 @@ export const HR_CREW_DIRECTORY_KEY = ['hris', 'crew-directory'] as const;
 export function useHrCrewDirectory(options: { includeInactive?: boolean } = {}) {
   const { profile } = useAuth();
   const access = useHrAccess();
+  const payroll = usePayrollAccess();
   const companyId = profile?.company_id ?? null;
+  // HR viewers and finance viewers both need the full company list.
+  const canListCompany = access.canView || payroll.canView;
 
   const query = useQuery({
-    queryKey: [...HR_CREW_DIRECTORY_KEY, companyId, access.level],
-    enabled: Boolean(companyId) && !access.loading,
+    queryKey: [...HR_CREW_DIRECTORY_KEY, companyId, access.level, payroll.level],
+    enabled: Boolean(companyId) && !access.loading && !payroll.loading,
     staleTime: 60_000,
     queryFn: async (): Promise<HrCrewDirectoryEntry[]> => {
       // Self-service users only ever see themselves.
@@ -52,7 +56,7 @@ export function useHrCrewDirectory(options: { includeInactive?: boolean } = {}) 
         .eq('company_id', companyId as string)
         .order('last_name')
         .order('first_name');
-      if (!access.canView) {
+      if (!canListCompany) {
         profilesQuery = profilesQuery.eq('id', profile?.id ?? '');
       }
       const { data: profiles, error } = await profilesQuery;

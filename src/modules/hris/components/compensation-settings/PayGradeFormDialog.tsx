@@ -45,7 +45,11 @@ const PresetOrCustom: React.FC<{
 }> = ({ value, onChange, options, placeholder }) => {
   const isPreset = value === '' || options.includes(value);
   const [custom, setCustom] = React.useState(!isPreset);
-  useEffect(() => setCustom(!isPreset), [isPreset, value]);
+  // A value outside the list (e.g. from an edited row) always shows the input;
+  // an empty value never hides it, so "Custom…" can be chosen before typing.
+  useEffect(() => {
+    if (!isPreset) setCustom(true);
+  }, [isPreset]);
   return (
     <div className="space-y-2">
       <Select

@@ -31,6 +31,7 @@ import {
   formValuesToCompanySettingsPayload,
   formValuesToFxRatePayload,
   formValuesToPayGradePayload,
+  settingsExist,
   type CompanySettingsFormValues,
   type FxRateFormValues,
   type FxRateRow,
@@ -96,7 +97,7 @@ const CompensationSettingsPage: React.FC = () => {
 
   const saveSettings = async (values: CompanySettingsFormValues) => {
     await settingsMutations.upsert.mutateAsync({
-      previous: settingsQuery.settings?.updated_by ? settingsQuery.settings : null,
+      previous: settingsExist(settingsQuery.settings) ? settingsQuery.settings : null,
       payload: formValuesToCompanySettingsPayload(values),
     });
   };

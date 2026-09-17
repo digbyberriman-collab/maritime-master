@@ -811,6 +811,12 @@ export const companySettingsFormSchema = z.object({
 });
 export type CompanySettingsFormValues = z.infer<typeof companySettingsFormSchema>;
 
+/** `updated_at` of the placeholder row returned before the company has saved settings. */
+export const UNSAVED_SETTINGS_AT = new Date(0).toISOString();
+
+export const settingsExist = (row: Pick<HrCompanySettingsRow, 'updated_at'> | null | undefined): boolean =>
+  Boolean(row && row.updated_at !== UNSAVED_SETTINGS_AT);
+
 /** Defaults matching the table defaults, used before the row exists. */
 export const defaultCompanySettings = (companyId: string): HrCompanySettingsRow => ({
   company_id: companyId,
@@ -825,7 +831,7 @@ export const defaultCompanySettings = (companyId: string): HrCompanySettingsRow 
   rounding_minor: 1,
   payslip_footer: null,
   updated_by: null,
-  updated_at: new Date(0).toISOString(),
+  updated_at: UNSAVED_SETTINGS_AT,
 });
 
 const asEnum = <T extends readonly string[]>(options: T, value: string, fallback: T[number]): T[number] =>

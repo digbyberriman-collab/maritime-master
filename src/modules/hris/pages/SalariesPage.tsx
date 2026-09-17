@@ -101,9 +101,10 @@ const SalariesPage: React.FC = () => {
     return { currency: settings?.default_currency ?? 'EUR', pay_grade_id: grade?.id ?? '' };
   }, [grades, entry?.rank, settings?.default_currency]);
 
+  const currentCurrency = comp.current?.currency ?? null;
   const newBankDefaults = useMemo<Partial<BankDetailFormValues>>(
-    () => ({ account_holder: entry?.fullName ?? '', currency: comp.current?.currency ?? settings?.default_currency ?? '', is_primary: bank.accounts.length === 0 }),
-    [entry?.fullName, comp.current?.currency, settings?.default_currency, bank.accounts.length],
+    () => ({ account_holder: entry?.fullName ?? '', currency: currentCurrency ?? settings?.default_currency ?? '', is_primary: bank.accounts.length === 0 }),
+    [entry?.fullName, currentCurrency, settings?.default_currency, bank.accounts.length],
   );
 
   const submitComp = async (values: CompensationFormValues) => {

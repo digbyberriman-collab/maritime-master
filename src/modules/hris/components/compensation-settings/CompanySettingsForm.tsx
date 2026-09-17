@@ -22,6 +22,7 @@ import {
   ROUNDING_OPTIONS,
   companySettingsFormSchema,
   companySettingsToFormValues,
+  settingsExist,
   type CompanySettingsFormValues,
   type HrCompanySettingsRow,
 } from '@/modules/hris/lib/compensation';
@@ -260,7 +261,7 @@ export const CompanySettingsForm: React.FC<CompanySettingsFormProps> = ({ settin
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-muted-foreground">
-            {settings.updated_by ? `Last saved ${formatDateTime(settings.updated_at)}` : 'Using table defaults — not saved yet.'}
+            {settingsExist(settings) ? `Last saved ${formatDateTime(settings.updated_at)}` : 'Using table defaults — not saved yet.'}
           </p>
           {canEdit && (
             <Button type="submit" disabled={isPending || !form.formState.isDirty}>

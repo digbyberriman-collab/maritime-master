@@ -556,10 +556,15 @@ const currency = z
 /** "a, b, c" or newline-separated → trimmed unique list. */
 export const splitList = (value: string | null | undefined): string[] => {
   const seen = new Set<string>();
-  return (value ?? '')
-    .split(/[\n,;]+/)
-    .map((s) => s.trim())
-    .filter((s) => s && !seen.has(s.toLowerCase()) && (seen.add(s.toLowerCase()), true));
+  const out: string[] = [];
+  for (const raw of (value ?? '').split(/[\n,;]+/)) {
+    const s = raw.trim();
+    const key = s.toLowerCase();
+    if (!s || seen.has(key)) continue;
+    seen.add(key);
+    out.push(s);
+  }
+  return out;
 };
 
 export const joinList = (values: readonly string[] | null | undefined): string => (values ?? []).join(', ');
