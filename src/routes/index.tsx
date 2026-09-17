@@ -179,6 +179,7 @@ export const AppRoutes: React.FC = () => {
 
       {/* Help & Legal */}
       <Route path="/help/how-to-guides" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><HowToGuidesPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/help/support" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><SupportPage /></React.Suspense></ProtectedRoute>} />
       <Route path="/legal/privacy-policy" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><PrivacyPolicyPage /></React.Suspense></ProtectedRoute>} />
       <Route path="/legal/terms-of-service" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><TermsOfServicePage /></React.Suspense></ProtectedRoute>} />
 

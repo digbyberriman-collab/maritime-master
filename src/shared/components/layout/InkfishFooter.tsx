@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { LifeBuoy, BookOpen, Mail } from 'lucide-react';
+import { LifeBuoy, BookOpen, Mail, Ticket } from 'lucide-react';
 import inkfishLogo from '@/assets/inkfish-logo.png';
 import {
   DropdownMenu,
