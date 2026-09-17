@@ -1,6 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { PanelLeftClose, PanelLeftOpen, Plus } from 'lucide-react';
+import { Loader2, PanelLeftClose, PanelLeftOpen, Plus, Ship } from 'lucide-react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -61,7 +61,7 @@ const LogbookWorkspace: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { selectedVessel, vessels, setSelectedVesselById } = useVessel();
+  const { selectedVessel, vessels, setSelectedVesselById, loading: vesselsLoading } = useVessel();
   const actor = useLogbookActor();
   const prefs = useLogbookPreferences(actor.userId);
 
@@ -396,19 +396,40 @@ const LogbookWorkspace: React.FC = () => {
     toast({ title: 'Volume closed', description: 'Its records remain available.' });
   };
 
-  const vesselPicker = vessels.length > 0 ? (
-    <Select value={selectedVessel?.id ?? ''} onValueChange={(value) => setSelectedVesselById(value)}>
-      <SelectTrigger className="h-9 w-[13rem]" aria-label="Select vessel"><SelectValue placeholder="Select vessel" /></SelectTrigger>
+  const vesselPicker = vesselsLoading ? (
+    <div className="flex h-9 w-[13rem] items-center gap-2 rounded-md border border-border px-3 text-sm text-muted-foreground">
+      <Loader2 className="h-4 w-4 animate-spin" /> Loading vessels…
+    </div>
+  ) : (
+    <Select value={selectedVessel?.id ?? ''} onValueChange={(value) => setSelectedVesselById(value)} disabled={vessels.length === 0}>
+      <SelectTrigger className="h-9 w-[13rem]" aria-label="Select vessel"><SelectValue placeholder={vessels.length === 0 ? 'No vessels available' : 'Select vessel'} /></SelectTrigger>
       <SelectContent>{vessels.map((v) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
     </Select>
-  ) : null;
+  );
 
   if (!selectedVessel) {
     return (
       <DashboardLayout>
         <div className="space-y-4 p-1">
           <h1 className="text-2xl font-bold text-foreground">Logbooks</h1>
-          <Card><CardContent className="flex flex-wrap items-center gap-3 py-6 text-sm text-muted-foreground">Select a vessel to open its logbooks. {vesselPicker}</CardContent></Card>
+          {vesselsLoading ? (
+            <div className="space-y-3"><Skeleton className="h-8 w-48" /><Skeleton className="h-64 w-full" /></div>
+          ) : (
+            <Card>
+              <CardContent className="flex flex-col items-center gap-2 py-12 text-center">
+                <Ship className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm font-medium text-foreground">{vessels.length === 0 ? 'No vessels available' : 'No vessel selected'}</p>
+                <p className="max-w-md text-sm text-muted-foreground">
+                  {vessels.length === 0
+                    ? 'Logbooks are kept against a vessel. Add a vessel to your fleet, or ask your administrator for access, then come back to this page.'
+                    : 'Choose a vessel to open its logbooks.'}
+                </p>
+                {vessels.length === 0
+                  ? <Button variant="outline" className="mt-2" onClick={() => navigate('/vessels')}>Go to vessels</Button>
+                  : <div className="mt-2">{vesselPicker}</div>}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </DashboardLayout>
     );
