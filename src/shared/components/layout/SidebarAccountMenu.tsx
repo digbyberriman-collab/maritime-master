@@ -139,10 +139,25 @@ const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate }) =
                   checked={selectedVesselIds.includes(vessel.id)}
                   onCheckedChange={() => toggleVessel(vessel.id)}
                   onSelect={(event) => event.preventDefault()}
+                  className="pr-2"
                 >
-                  <span className="truncate">{vessel.name}</span>
+                  <span className="flex w-full items-center justify-between gap-2">
+                    <span className="truncate">{vessel.name}</span>
+                    <button
+                      type="button"
+                      onClick={(event) => { event.preventDefault(); event.stopPropagation(); selectOnly(vessel.id); }}
+                      className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+                        selectedVessel?.id === vessel.id
+                          ? 'bg-primary/15 text-primary'
+                          : 'text-muted-foreground hover:bg-accent'
+                      }`}
+                    >
+                      {selectedVessel?.id === vessel.id ? 'Active' : 'Only'}
+                    </button>
+                  </span>
                 </DropdownMenuCheckboxItem>
               ))}
+
               <DropdownMenuSeparator />
             </>
           )}
