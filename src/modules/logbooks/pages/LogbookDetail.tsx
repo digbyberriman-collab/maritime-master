@@ -15,6 +15,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import { getLogbookBySlug } from '@/modules/logbooks/lib/logbookDefinitions';
 import { useLogbook, type LogbookEntry } from '@/modules/logbooks/hooks/useLogbook';
@@ -38,6 +42,7 @@ const LogbookDetail: React.FC = () => {
   const [formOpen, setFormOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<LogbookEntry | null>(null);
   const [dayForNew, setDayForNew] = React.useState<Date | null>(null);
+  const [pendingDelete, setPendingDelete] = React.useState<LogbookEntry | null>(null);
 
   const {
     logbook, entries, isLoading, canSign, currentUserId, hasVessel,
@@ -285,7 +290,7 @@ const LogbookDetail: React.FC = () => {
                           {canEditEntry(entry) && (
                             <Button
                               variant="ghost" size="icon" aria-label="Delete entry"
-                              onClick={() => deleteEntry.mutate(entry.id)}
+                              onClick={() => setPendingDelete(entry)}
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
@@ -296,7 +301,7 @@ const LogbookDetail: React.FC = () => {
                   ))}
                   {entries.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                      <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
                         No entries recorded in {format(month, 'MMMM yyyy')}.
                       </TableCell>
                     </TableRow>
@@ -331,7 +336,47 @@ const LogbookDetail: React.FC = () => {
             });
           }
         }}
+        onDelete={editing && canEditEntry(editing) ? (entry) => setPendingDelete(entry) : undefined}
       />
+
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this logbook entry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete
+                ? `${format(new Date(pendingDelete.entry_at), 'dd MMM yyyy HH:mm')} — ${pendingDelete.summary ?? 'No summary'}. `
+                : ''}
+              The entry, its attachments and its history will be removed permanently.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep entry</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                const target = pendingDelete;
+                if (!target) return;
+                deleteEntry.mutate(target.id, {
+                  onSuccess: () => {
+                    setPendingDelete(null);
+                    // Close the editor too when the deleted entry was open in it.
+                    if (editing?.id === target.id) {
+                      setEditing(null);
+                      setFormOpen(false);
+                    }
+                  },
+                });
+              }}
+            >
+              Delete entry
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 };
