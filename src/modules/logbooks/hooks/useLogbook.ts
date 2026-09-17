@@ -6,7 +6,7 @@ import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import { toast } from '@/shared/hooks/use-toast';
 import type { LogbookDefinition } from '@/modules/logbooks/lib/logbookDefinitions';
 
-export type LogbookEntryStatus = 'draft' | 'submitted' | 'signed' | 'amended';
+export type LogbookEntryStatus = 'draft' | 'submitted' | 'signed' | 'amended' | 'finalized';
 
 export interface LogbookRecord {
   id: string;
@@ -41,6 +41,9 @@ export interface LogbookEntry {
   signed_by: string | null;
   signed_by_name: string | null;
   signed_at: string | null;
+  finalized_by: string | null;
+  finalized_by_name: string | null;
+  finalized_at: string | null;
   updated_by: string | null;
   updated_by_name: string | null;
   created_at: string;
@@ -240,6 +243,32 @@ export const useLogbook = (definition: LogbookDefinition | undefined, month: Dat
     },
   });
 
+  /** Finalising locks the entry; it is only permitted once the entry is signed off. */
+  const finalizeEntry = useMutation({
+    mutationFn: async (entry: LogbookEntry) => {
+      if (entry.status !== 'signed' || !entry.signed_by || !entry.signed_at) {
+        throw new Error('This entry must be signed off before it can be finalised.');
+      }
+      const { error } = await supabase
+        .from('logbook_entries')
+        .update({
+          status: 'finalized',
+          finalized_by: user?.id ?? null,
+          finalized_by_name: recorderName,
+          finalized_at: new Date().toISOString(),
+        } as never)
+        .eq('id', entry.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidateEntries();
+      toast({ title: 'Entry finalised', description: 'The entry is now locked against further changes.' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Could not finalise entry', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const deleteEntry = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from('logbook_entries').delete().eq('id', id);
@@ -264,6 +293,7 @@ export const useLogbook = (definition: LogbookDefinition | undefined, month: Dat
     createEntry,
     updateEntry,
     signEntry,
+    finalizeEntry,
     deleteEntry,
   };
 };
