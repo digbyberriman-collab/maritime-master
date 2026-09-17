@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,6 +31,8 @@ interface Props {
   vesselId?: string | null;
   canManageAttachments?: boolean;
   onSubmit: (input: LogbookEntryInput) => void;
+  /** Omitted when the reader is not allowed to remove this entry. */
+  onDelete?: (entry: LogbookEntry) => void;
 }
 
 const toLocalInputValue = (iso: string) => {
@@ -40,7 +43,7 @@ const toLocalInputValue = (iso: string) => {
 
 const LogbookEntryForm: React.FC<Props> = ({
   open, onOpenChange, definition, entry, defaultDate, saving,
-  logbookId, companyId, vesselId, canManageAttachments, onSubmit,
+  logbookId, companyId, vesselId, canManageAttachments, onSubmit, onDelete,
 }) => {
   const [entryAt, setEntryAt] = React.useState('');
   const [watchPeriod, setWatchPeriod] = React.useState<string>('');
@@ -263,13 +266,27 @@ const LogbookEntryForm: React.FC<Props> = ({
 
           {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button type="submit" disabled={saving}>
-              {saving ? 'Saving...' : entry ? 'Save changes' : 'Add entry'}
-            </Button>
+          <DialogFooter className="gap-2 sm:justify-between">
+            <div>
+              {entry && onDelete && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-destructive hover:text-destructive"
+                  onClick={() => onDelete(entry)}
+                >
+                  <Trash2 className="mr-1 h-4 w-4" /> Delete entry
+                </Button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? 'Saving...' : entry ? 'Save changes' : 'Add entry'}
+              </Button>
+            </div>
           </DialogFooter>
         </form>
       </DialogContent>

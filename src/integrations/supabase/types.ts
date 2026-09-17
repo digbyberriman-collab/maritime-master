@@ -13392,11 +13392,25 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "performance_review_welfare_notes_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "performance_review_welfare_notes_review_id_fkey"
             columns: ["review_id"]
             isOneToOne: true
             referencedRelation: "performance_reviews"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_review_welfare_notes_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -13438,7 +13452,6 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           vessel_id: string | null
-          welfare_notes: string | null
         }
         Insert: {
           career_aspirations?: string | null
@@ -13477,7 +13490,6 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           vessel_id?: string | null
-          welfare_notes?: string | null
         }
         Update: {
           career_aspirations?: string | null
@@ -13516,7 +13528,6 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           vessel_id?: string | null
-          welfare_notes?: string | null
         }
         Relationships: [
           {
@@ -14001,6 +14012,7 @@ export type Database = {
         Row: {
           account_status: string | null
           airtable_id: string | null
+          annual_leave_entitlement: number | null
           avatar_url: string | null
           cabin: string | null
           company_id: string | null
@@ -14014,6 +14026,7 @@ export type Database = {
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
           employment_start_date: string | null
+          employment_status: string | null
           first_name: string
           gender: string | null
           hod_user_id: string | null
@@ -14025,9 +14038,12 @@ export type Database = {
           invited_at: string | null
           is_imported: boolean
           job_title: string | null
+          joining_date: string | null
           last_invited_at: string | null
           last_login_at: string | null
           last_name: string
+          leave_accrual_method: string | null
+          leaving_date: string | null
           medical_expiry: string | null
           nationality: string | null
           notes: string | null
@@ -14044,6 +14060,7 @@ export type Database = {
           rank: string | null
           role: Database["public"]["Enums"]["user_role"]
           rotation: string | null
+          rotation_pattern: string | null
           seamans_book_number: string | null
           status: string | null
           updated_at: string
@@ -14052,17 +14069,12 @@ export type Database = {
           version: number | null
           visa_expiry: string | null
           visa_status: string | null
-          annual_leave_entitlement: number | null
-          employment_status: string | null
-          joining_date: string | null
-          leave_accrual_method: string | null
-          leaving_date: string | null
-          rotation_pattern: string | null
           watch_pattern: string | null
         }
         Insert: {
           account_status?: string | null
           airtable_id?: string | null
+          annual_leave_entitlement?: number | null
           avatar_url?: string | null
           cabin?: string | null
           company_id?: string | null
@@ -14076,6 +14088,7 @@ export type Database = {
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           employment_start_date?: string | null
+          employment_status?: string | null
           first_name: string
           gender?: string | null
           hod_user_id?: string | null
@@ -14087,9 +14100,12 @@ export type Database = {
           invited_at?: string | null
           is_imported?: boolean
           job_title?: string | null
+          joining_date?: string | null
           last_invited_at?: string | null
           last_login_at?: string | null
           last_name: string
+          leave_accrual_method?: string | null
+          leaving_date?: string | null
           medical_expiry?: string | null
           nationality?: string | null
           notes?: string | null
@@ -14106,6 +14122,7 @@ export type Database = {
           rank?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           rotation?: string | null
+          rotation_pattern?: string | null
           seamans_book_number?: string | null
           status?: string | null
           updated_at?: string
@@ -14114,17 +14131,12 @@ export type Database = {
           version?: number | null
           visa_expiry?: string | null
           visa_status?: string | null
-          annual_leave_entitlement?: number | null
-          employment_status?: string | null
-          joining_date?: string | null
-          leave_accrual_method?: string | null
-          leaving_date?: string | null
-          rotation_pattern?: string | null
           watch_pattern?: string | null
         }
         Update: {
           account_status?: string | null
           airtable_id?: string | null
+          annual_leave_entitlement?: number | null
           avatar_url?: string | null
           cabin?: string | null
           company_id?: string | null
@@ -14138,6 +14150,7 @@ export type Database = {
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
           employment_start_date?: string | null
+          employment_status?: string | null
           first_name?: string
           gender?: string | null
           hod_user_id?: string | null
@@ -14149,9 +14162,12 @@ export type Database = {
           invited_at?: string | null
           is_imported?: boolean
           job_title?: string | null
+          joining_date?: string | null
           last_invited_at?: string | null
           last_login_at?: string | null
           last_name?: string
+          leave_accrual_method?: string | null
+          leaving_date?: string | null
           medical_expiry?: string | null
           nationality?: string | null
           notes?: string | null
@@ -14168,6 +14184,7 @@ export type Database = {
           rank?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           rotation?: string | null
+          rotation_pattern?: string | null
           seamans_book_number?: string | null
           status?: string | null
           updated_at?: string
@@ -14176,12 +14193,6 @@ export type Database = {
           version?: number | null
           visa_expiry?: string | null
           visa_status?: string | null
-          annual_leave_entitlement?: number | null
-          employment_status?: string | null
-          joining_date?: string | null
-          leave_accrual_method?: string | null
-          leaving_date?: string | null
-          rotation_pattern?: string | null
           watch_pattern?: string | null
         }
         Relationships: [
@@ -17350,13 +17361,13 @@ export type Database = {
         }
         Returns: boolean
       }
-      hr_archive_due_records: {
-        Args: { p_company_id?: string | null }
-        Returns: number
-      }
       hr_anonymize_profile: {
-        Args: { p_profile_id: string; p_reason?: string | null }
+        Args: { p_profile_id: string; p_reason?: string }
         Returns: undefined
+      }
+      hr_archive_due_records: {
+        Args: { p_company_id?: string }
+        Returns: number
       }
       hr_can_admin: { Args: { _user_id: string }; Returns: boolean }
       hr_can_edit: { Args: { _user_id: string }; Returns: boolean }
@@ -17411,7 +17422,12 @@ export type Database = {
       hr_expire_overrun_contracts: { Args: never; Returns: number }
       hr_generate_alerts: { Args: { p_company_id?: string }; Returns: number }
       hr_record_access_log: {
-        Args: { p_record_type: string; p_record_id: string; p_profile_id: string; p_context?: string | null }
+        Args: {
+          p_context?: string
+          p_profile_id: string
+          p_record_id: string
+          p_record_type: string
+        }
         Returns: undefined
       }
       hr_register_record: {
