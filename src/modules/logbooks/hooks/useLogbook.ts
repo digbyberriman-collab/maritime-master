@@ -41,6 +41,8 @@ export interface LogbookEntry {
   signed_by: string | null;
   signed_by_name: string | null;
   signed_at: string | null;
+  updated_by: string | null;
+  updated_by_name: string | null;
   created_at: string;
   updated_at: string;
 }
