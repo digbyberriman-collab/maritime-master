@@ -1,7 +1,8 @@
 import React from 'react';
-import { Download, FileText, Image as ImageIcon, Paperclip, Trash2, Upload } from 'lucide-react';
+import { CheckCircle2, Download, FileText, Image as ImageIcon, Loader2, Paperclip, Trash2, Upload, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   ALLOWED_TYPES_MESSAGE,
@@ -35,7 +36,7 @@ const LogbookAttachments: React.FC<Props> = ({
 }) => {
   const inputRef = React.useRef<HTMLInputElement>(null);
   const {
-    attachments, isLoading, uploadFiles, removeAttachment, openAttachment, downloadAttachment,
+    attachments, isLoading, uploads, uploadFiles, removeAttachment, openAttachment, downloadAttachment,
     currentUserId,
   } = useLogbookAttachments({ entryId, logbookId, companyId, vesselId });
   const [sizeError, setSizeError] = React.useState<string | null>(null);
