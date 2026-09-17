@@ -198,15 +198,12 @@ const vesselAccounting: NavChild[] = [
 // Electronic Logbooks
 const vLog = `${V}/logbooks`;
 const vesselLogbooks: NavChild[] = [
-  L('All Logbooks', vLog, { existing: `${V}/logbooks/list`, icon: BookOpen }),
-  L('Deck Log', vLog, { icon: Anchor }),
-  L('Engine Log', vLog, { icon: Wrench }),
-  L('Bell Book', vLog, { icon: Bell }),
-  L('Radio Log', vLog, { icon: MessageSquare }),
-  L('Oil Record Book', vLog, { icon: Beaker }),
-  L('Garbage Record Book', vLog, { icon: Package }),
-  L('Ballast Water Record', vLog, { icon: Waves }),
-  L('Visitor & Guest Log', vLog, { icon: Users, slug: 'visitor-log' }),
+  L('Logbooks', vLog, { existing: vLog, icon: BookOpen }),
+  L('Review & Sign-off', vLog, { existing: `${vLog}/review`, icon: ClipboardCheck }),
+  L('Vessel Registry', vLog, { existing: `${vLog}/registry`, icon: Ship }),
+  L('Records & Exports', vLog, { existing: `${vLog}/records`, icon: FileText }),
+  L('Connections', vLog, { existing: `${vLog}/connections`, icon: Cpu }),
+  L('Assurance', vLog, { existing: `${vLog}/assurance`, icon: Shield }),
 ];
 
 // Vessel (general)

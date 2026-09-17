@@ -29,8 +29,12 @@ const NewPermissionsPage = React.lazy(() => import('@/modules/settings/pages/Per
 
 // Lazy loaded pages
 const Vessels = React.lazy(() => import('@/modules/vessels/pages/Vessels'));
-const LogbookList = React.lazy(() => import('@/modules/logbooks/pages/LogbookList'));
-const LogbookDetail = React.lazy(() => import('@/modules/logbooks/pages/LogbookDetail'));
+const LogbookWorkspace = React.lazy(() => import('@/modules/logbooks/pages/LogbookWorkspace'));
+const LogbookRegistry = React.lazy(() => import('@/modules/logbooks/pages/LogbookRegistry'));
+const LogbookReview = React.lazy(() => import('@/modules/logbooks/pages/LogbookReview'));
+const LogbookRecords = React.lazy(() => import('@/modules/logbooks/pages/LogbookRecords'));
+const LogbookConnections = React.lazy(() => import('@/modules/logbooks/pages/LogbookConnections'));
+const LogbookAssurance = React.lazy(() => import('@/modules/logbooks/pages/LogbookAssurance'));
 const VesselDashboard = React.lazy(() => import('@/modules/vessels/pages/VesselDashboard'));
 const CrewRoster = React.lazy(() => import('@/modules/crew/pages/CrewRoster'));
 const Documents = React.lazy(() => import('@/modules/documents/pages/Documents'));
@@ -174,9 +178,14 @@ export const AppRoutes: React.FC = () => {
       <Route path="/fleet-map" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><FleetMap /></React.Suspense></ProtectedRoute>} />
 
       {/* Electronic Logbooks */}
-      <Route path="/vessel/logbooks" element={<Navigate to="/vessel/logbooks/list" replace />} />
-      <Route path="/vessel/logbooks/list" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookList /></React.Suspense></ProtectedRoute>} />
-      <Route path="/vessel/logbooks/:logbookSlug" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookDetail /></React.Suspense></ProtectedRoute>} />
+      <Route path="/vessel/logbooks" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookWorkspace /></React.Suspense></ProtectedRoute>} />
+      <Route path="/vessel/logbooks/list" element={<Navigate to="/vessel/logbooks" replace />} />
+      <Route path="/vessel/logbooks/registry" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookRegistry /></React.Suspense></ProtectedRoute>} />
+      <Route path="/vessel/logbooks/review" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookReview /></React.Suspense></ProtectedRoute>} />
+      <Route path="/vessel/logbooks/records" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookRecords /></React.Suspense></ProtectedRoute>} />
+      <Route path="/vessel/logbooks/connections" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookConnections /></React.Suspense></ProtectedRoute>} />
+      <Route path="/vessel/logbooks/assurance" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookAssurance /></React.Suspense></ProtectedRoute>} />
+      <Route path="/vessel/logbooks/:logbookSlug" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookWorkspace /></React.Suspense></ProtectedRoute>} />
 
 
       {/* Vessels */}

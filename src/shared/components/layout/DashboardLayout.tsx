@@ -18,9 +18,11 @@ import { cn } from '@/lib/utils';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
+  /** Keep the sidebar off-canvas at desktop widths so the page can use the full width (e.g. wide logbook sheets). */
+  collapseSidebar?: boolean;
 }
 
-const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
+const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSidebar = false }) => {
   const { clientDisplayName, clientLogoUrl } = useBrandingContext();
   const navigate = useNavigate();
   const location = useLocation();
@@ -59,7 +61,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-foreground/50 z-40 lg:hidden"
+          className={cn('fixed inset-0 bg-foreground/50 z-40', !collapseSidebar && 'lg:hidden')}
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -67,7 +69,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
       {/* Sidebar - z-10 to be above watermark */}
       <aside
         className={cn(
-          'fixed lg:static inset-y-0 left-0 z-50 w-64 bg-sidebar transform transition-transform duration-200 ease-in-out lg:translate-x-0',
+          'fixed inset-y-0 left-0 z-50 w-64 bg-sidebar transform transition-transform duration-200 ease-in-out',
+          !collapseSidebar && 'lg:static lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
@@ -91,7 +94,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
               <button
                 type="button"
                 onClick={() => setSidebarOpen(false)}
-                className="lg:hidden text-sidebar-foreground"
+                className={cn('text-sidebar-foreground', !collapseSidebar && 'lg:hidden')}
                 aria-label="Close folder panel"
               >
                 <X className="w-5 h-5" />
@@ -121,7 +124,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) => {
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="lg:hidden p-2 text-foreground"
+            className={cn('p-2 text-foreground', !collapseSidebar && 'lg:hidden')}
             aria-label="Open folder panel"
           >
             <Menu className="w-5 h-5" />
