@@ -51,9 +51,11 @@ const InkfishFooter: React.FC = () => {
                 Help
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" side="top">
-                <DropdownMenuItem onClick={() => setDialog('guides')}>
-                  <BookOpen className="h-4 w-4 mr-2" />
-                  How-to Guides
+                <DropdownMenuItem asChild>
+                  <Link to="/help/how-to-guides">
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    How-to Guides
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <a href="mailto:SOS@INK.FISH">
