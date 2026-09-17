@@ -84,7 +84,7 @@ const LogbookWorkspace: React.FC = () => {
   const ws = useLogbookWorkspace(actor.vesselId, book, profile, volumeId);
   const { counts } = useBookCounts(actor.vesselId);
   const registry = useLogbookRegistry(actor.vesselId);
-  const { samples } = useLogbookSamples(actor.vesselId, actor.companyId);
+  const { samples, isLoading: samplesLoading } = useLogbookSamples(actor.vesselId, actor.companyId);
   const copies = useWorkingCopies(actor.userId, (message) => toast({ title: message, variant: 'destructive' }));
 
   React.useEffect(() => {
@@ -358,8 +358,10 @@ const LogbookWorkspace: React.FC = () => {
   React.useEffect(() => {
     const key = `${book.id}:${profile}:${volume?.id ?? ''}:${prefs.autoReadings}`;
     if (openedFor.current === key) return;
-    // Only mark this book/volume as handled once its entries are loaded, so an open during loading is not skipped.
-    if (ws.isLoading || actor.loading) return;
+    // Only mark this book/volume as handled once its entries, the actor and the captured
+    // samples are loaded, so an open during loading is not skipped and a sample that
+    // arrives moments after the entries still creates the draft.
+    if (ws.isLoading || actor.loading || samplesLoading) return;
     openedFor.current = key;
     if (!prefs.autoReadings || !book.sensor || !volume || volume.status !== 'open' || !fresh) return;
     const targetId = book.id === 'deck' ? 'watch' : 'round';
@@ -367,7 +369,7 @@ const LogbookWorkspace: React.FC = () => {
     if (!target || !actor.canWrite(book, target)) return;
     addLine(null, fresh, { automatic: true, section: target });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [book.id, profile, volume?.id, prefs.autoReadings, ws.isLoading, actor.loading, fresh?.id, tick]);
+  }, [book.id, profile, volume?.id, prefs.autoReadings, ws.isLoading, actor.loading, samplesLoading, fresh?.id, tick]);
 
   // ── Pages ─────────────────────────────────────────────────────────────────
   const preparePage = () => {
