@@ -6,6 +6,7 @@ import { PlaceholderPage } from '@/shared/components/common/PlaceholderPage';
 import { PLACEHOLDER_LEAVES, SECTION_REDIRECTS } from '@/config/sitemap';
 import ModuleRoute from '@/shared/components/ModuleRoute';
 import { newBuildRoutes } from '@/modules/new-build/routes';
+import { hrisRoutes } from '@/modules/hris/routes';
 import { refitRoutes } from '@/modules/refit/routes';
 import { 
   Ship, Users, Award, Plane, Clock, CalendarDays,
@@ -786,6 +787,9 @@ export const AppRoutes: React.FC = () => {
 
       {/* New Build module — sits before placeholders so it takes precedence. */}
       {newBuildRoutes}
+
+      {/* HRIS module — before placeholders so real pages take precedence. */}
+      {hrisRoutes}
 
       {/* Refit module (ported from Ship Shape Command). */}
       {refitRoutes}

@@ -1188,6 +1188,10 @@ export type Database = {
       }
       crew_assignments: {
         Row: {
+          end_reason: string | null
+          notes: string | null
+          rank: string | null
+          updated_by: string | null
           assignment_type: string | null
           created_at: string
           created_by: string | null
@@ -1204,6 +1208,10 @@ export type Database = {
           vessel_id: string
         }
         Insert: {
+          end_reason?: string | null
+          notes?: string | null
+          rank?: string | null
+          updated_by?: string | null
           assignment_type?: string | null
           created_at?: string
           created_by?: string | null
@@ -1220,6 +1228,10 @@ export type Database = {
           vessel_id: string
         }
         Update: {
+          end_reason?: string | null
+          notes?: string | null
+          rank?: string | null
+          updated_by?: string | null
           assignment_type?: string | null
           created_at?: string
           created_by?: string | null
@@ -1436,6 +1448,157 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vessels"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      crew_contracts: {
+        Row: {
+          base_wage_minor: number | null
+          company_id: string
+          contract_number: string | null
+          contract_type: string
+          created_at: string
+          created_by: string | null
+          department: string | null
+          document_name: string | null
+          document_path: string | null
+          end_date: string | null
+          flag_state: string | null
+          governing_law: string | null
+          id: string
+          notes: string | null
+          notice_period_days: number | null
+          position: string | null
+          probation_end_date: string | null
+          profile_id: string
+          rank: string | null
+          rotation_pattern: string | null
+          sea_reference: string | null
+          signed_by_company_at: string | null
+          signed_by_crew_at: string | null
+          start_date: string
+          status: string
+          supersedes_contract_id: string | null
+          terminated_at: string | null
+          termination_reason: string | null
+          updated_at: string
+          updated_by: string | null
+          vessel_id: string | null
+          wage_currency: string | null
+          wage_frequency: string | null
+        }
+        Insert: {
+          base_wage_minor?: number | null
+          company_id: string
+          contract_number?: string | null
+          contract_type?: string
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          document_name?: string | null
+          document_path?: string | null
+          end_date?: string | null
+          flag_state?: string | null
+          governing_law?: string | null
+          id?: string
+          notes?: string | null
+          notice_period_days?: number | null
+          position?: string | null
+          probation_end_date?: string | null
+          profile_id: string
+          rank?: string | null
+          rotation_pattern?: string | null
+          sea_reference?: string | null
+          signed_by_company_at?: string | null
+          signed_by_crew_at?: string | null
+          start_date: string
+          status?: string
+          supersedes_contract_id?: string | null
+          terminated_at?: string | null
+          termination_reason?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+          wage_currency?: string | null
+          wage_frequency?: string | null
+        }
+        Update: {
+          base_wage_minor?: number | null
+          company_id?: string
+          contract_number?: string | null
+          contract_type?: string
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          document_name?: string | null
+          document_path?: string | null
+          end_date?: string | null
+          flag_state?: string | null
+          governing_law?: string | null
+          id?: string
+          notes?: string | null
+          notice_period_days?: number | null
+          position?: string | null
+          probation_end_date?: string | null
+          profile_id?: string
+          rank?: string | null
+          rotation_pattern?: string | null
+          sea_reference?: string | null
+          signed_by_company_at?: string | null
+          signed_by_crew_at?: string | null
+          start_date?: string
+          status?: string
+          supersedes_contract_id?: string | null
+          terminated_at?: string | null
+          termination_reason?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+          wage_currency?: string | null
+          wage_frequency?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_contracts_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_contracts_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_contracts_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_contracts_supersedes_contract_id_fkey"
+            columns: ["supersedes_contract_id"]
+            isOneToOne: false
+            referencedRelation: "crew_contracts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_contracts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_contracts_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -1802,6 +1965,110 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "vessels"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      crew_next_of_kin: {
+        Row: {
+          address_line1: string | null
+          address_line2: string | null
+          city: string | null
+          company_id: string
+          consent_obtained_at: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          full_name: string
+          id: string
+          is_emergency_contact: boolean
+          is_primary: boolean
+          language: string | null
+          notes: string | null
+          phone_primary: string | null
+          phone_secondary: string | null
+          postal_code: string | null
+          profile_id: string
+          relationship: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          address_line1?: string | null
+          address_line2?: string | null
+          city?: string | null
+          company_id: string
+          consent_obtained_at?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          full_name: string
+          id?: string
+          is_emergency_contact?: boolean
+          is_primary?: boolean
+          language?: string | null
+          notes?: string | null
+          phone_primary?: string | null
+          phone_secondary?: string | null
+          postal_code?: string | null
+          profile_id: string
+          relationship: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          address_line1?: string | null
+          address_line2?: string | null
+          city?: string | null
+          company_id?: string
+          consent_obtained_at?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          full_name?: string
+          id?: string
+          is_emergency_contact?: boolean
+          is_primary?: boolean
+          language?: string | null
+          notes?: string | null
+          phone_primary?: string | null
+          phone_secondary?: string | null
+          postal_code?: string | null
+          profile_id?: string
+          relationship?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_next_of_kin_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_next_of_kin_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_next_of_kin_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_next_of_kin_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -6392,6 +6659,7 @@ export type Database = {
       }
       hr_record_metadata: {
         Row: {
+          profile_id: string | null
           anonymized_at: string | null
           anonymized_by: string | null
           archived_at: string | null
@@ -6410,10 +6678,11 @@ export type Database = {
           retention_start_date: string
           source_table: string
           updated_at: string | null
-          user_id: string
+          user_id: string | null
           version: number | null
         }
         Insert: {
+          profile_id?: string | null
           anonymized_at?: string | null
           anonymized_by?: string | null
           archived_at?: string | null
@@ -6436,6 +6705,7 @@ export type Database = {
           version?: number | null
         }
         Update: {
+          profile_id?: string | null
           anonymized_at?: string | null
           anonymized_by?: string | null
           archived_at?: string | null
@@ -10929,6 +11199,15 @@ export type Database = {
       }
       profiles: {
         Row: {
+          annual_leave_entitlement: number | null
+          employment_start_date: string | null
+          employment_status: string | null
+          hod_user_id: string | null
+          joining_date: string | null
+          leave_accrual_method: string | null
+          leaving_date: string | null
+          rotation_pattern: string | null
+          watch_pattern: string | null
           account_status: string | null
           airtable_id: string | null
           avatar_url: string | null
@@ -10974,6 +11253,15 @@ export type Database = {
           visa_status: string | null
         }
         Insert: {
+          annual_leave_entitlement?: number | null
+          employment_start_date?: string | null
+          employment_status?: string | null
+          hod_user_id?: string | null
+          joining_date?: string | null
+          leave_accrual_method?: string | null
+          leaving_date?: string | null
+          rotation_pattern?: string | null
+          watch_pattern?: string | null
           account_status?: string | null
           airtable_id?: string | null
           avatar_url?: string | null
@@ -11019,6 +11307,15 @@ export type Database = {
           visa_status?: string | null
         }
         Update: {
+          annual_leave_entitlement?: number | null
+          employment_start_date?: string | null
+          employment_status?: string | null
+          hod_user_id?: string | null
+          joining_date?: string | null
+          leave_accrual_method?: string | null
+          leaving_date?: string | null
+          rotation_pattern?: string | null
+          watch_pattern?: string | null
           account_status?: string | null
           airtable_id?: string | null
           avatar_url?: string | null
@@ -13564,6 +13861,21 @@ export type Database = {
       }
     }
     Views: {
+      hr_expiry_items: {
+        Row: {
+          company_id: string | null
+          crew_name: string | null
+          days_remaining: number | null
+          due_date: string | null
+          item_type: string | null
+          label: string | null
+          profile_id: string | null
+          record_id: string | null
+          user_id: string | null
+          vessel_id: string | null
+        }
+        Relationships: []
+      }
       crew_import_active: {
         Row: {
           airtable_id: string | null
