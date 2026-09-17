@@ -3,7 +3,8 @@ import { PieChart } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { SimpleBarChart, seriesColor } from '@/modules/hris/components/reporting/charts';
+import { SimpleBarChart } from '@/modules/hris/components/reporting/charts';
+import { seriesColor } from '@/modules/hris/components/reporting/chartColors';
 import type { MixPoint } from '@/modules/hris/lib/reports';
 
 interface HeadcountBreakdownProps {

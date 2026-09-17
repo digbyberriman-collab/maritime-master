@@ -21,7 +21,7 @@ export interface ReportCardProps {
 /** A report: title, chart, and an "Export CSV" of the exact rows the chart shows. */
 export const ReportCard: React.FC<ReportCardProps> = ({ icon: Icon, title, description, csv, isLoading, aside, children }) => {
   const exportCsv = () => {
-    downloadTextFile(`﻿${toCsv(csv.headers, csv.rows)}`, `hr-${fileSlug(title)}.csv`);
+    downloadTextFile(`\uFEFF${toCsv(csv.headers, csv.rows)}`, `hr-${fileSlug(title)}.csv`);
   };
   return (
     <Card className="bg-card">

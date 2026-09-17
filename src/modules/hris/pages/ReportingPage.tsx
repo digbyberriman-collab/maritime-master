@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { BarChart3, CalendarClock, ClipboardCheck, Download, FileSignature, FileWarning, Globe2, Layers, LifeBuoy, Palmtree, Printer, TrendingUp, UserPlus, Users } from 'lucide-react';
+import { BarChart3, ClipboardCheck, Download, FileSignature, FileWarning, Globe2, Layers, LifeBuoy, Palmtree, Printer, TrendingUp, UserPlus, Users } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -7,7 +7,8 @@ import { useBrandingContext } from '@/shared/contexts/BrandingContext';
 import { HrisPageHeader } from '@/modules/hris/components/HrisPageHeader';
 import { ReportCard } from '@/modules/hris/components/reporting/ReportCard';
 import { ReportFilters } from '@/modules/hris/components/reporting/ReportFilters';
-import { SimpleBarChart, SimpleLineChart, seriesColor } from '@/modules/hris/components/reporting/charts';
+import { SimpleBarChart, SimpleLineChart } from '@/modules/hris/components/reporting/charts';
+import { seriesColor } from '@/modules/hris/components/reporting/chartColors';
 import { defaultReportFilters, useHrReports, type ReportFilters as Filters } from '@/modules/hris/hooks/useHrReports';
 import { humanise } from '@/modules/hris/lib/format';
 import { downloadTextFile, forecastTypes, sectionsToCsv, type ForecastPoint } from '@/modules/hris/lib/reports';
@@ -36,7 +37,7 @@ const ReportingPage: React.FC = () => {
       { title: `HR reports — ${scopeLabel}`, headers: ['Key figure', 'Value'], rows: data.kpis.map((k) => [k.label, k.value]) },
       ...sections,
     ]);
-    downloadTextFile(`﻿${csv}`, `hr-reports-${stamp}.csv`);
+    downloadTextFile(`\uFEFF${csv}`, `hr-reports-${stamp}.csv`);
   };
 
   const printSummary = () => {
@@ -170,14 +171,6 @@ const ReportingPage: React.FC = () => {
           <SimpleBarChart data={data?.onboarding.map((p) => ({ label: humanise(p.name), count: p.count })) ?? []} xKey="label" series={[{ key: 'count', label: 'Records', color: seriesColor(4) }]} emptyMessage="No familiarisation records" />
         </ReportCard>
 
-        <div className="hidden xl:block">
-          <div className="flex h-full items-center justify-center rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-            <div>
-              <CalendarClock className="mx-auto mb-2 h-5 w-5" />
-              Scope: {scopeLabel}
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

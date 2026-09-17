@@ -302,6 +302,30 @@ export function useUpcomingJoiners(window: JoinerWindow = DEFAULT_JOINER_WINDOW)
   };
 }
 
+/** Open onboarding records where the current user is the buddy (self-service view). */
+export function useBuddyRecords() {
+  const { profile } = useAuth();
+  const myProfileId = profile?.id ?? null;
+  const query = useQuery({
+    queryKey: [...ONBOARDING_KEY, 'buddy', myProfileId],
+    enabled: Boolean(myProfileId),
+    queryFn: async (): Promise<{ record: OnboardingRecordRow; crew_name: string; profile_id: string }[]> => {
+      const { data, error } = await supabase
+        .from('onboarding_records')
+        .select('*, profiles!onboarding_records_profile_id_fkey(user_id, first_name, last_name, preferred_name)')
+        .eq('buddy_profile_id', myProfileId as string)
+        .in('status', ['not_started', 'in_progress'])
+        .order('start_date', { ascending: false });
+      if (error) throw error;
+      return (data ?? []).map((raw) => {
+        const { profiles, ...rest } = raw as unknown as OnboardingRecordRow & { profiles: ProfileJoin };
+        return { record: rest, crew_name: crewName(profiles), profile_id: rest.profile_id };
+      });
+    },
+  });
+  return { ...query, records: query.data ?? [] };
+}
+
 // ---------------------------------------------------------------------------
 // Single crew member
 // ---------------------------------------------------------------------------

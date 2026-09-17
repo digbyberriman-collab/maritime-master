@@ -96,7 +96,7 @@ const fetchRecords = async (companyId: string, profileId: string | null): Promis
  * Disciplinary records for HR editors: company-wide, or scoped to a crew
  * member with `filters.crewId`. Other filters apply client-side.
  */
-export function useDisciplinaryRecords(filters: DisciplinaryFilters) {
+export function useDisciplinaryRecords(filters: DisciplinaryFilters, options: { enabled?: boolean } = {}) {
   const { profile } = useAuth();
   const access = useHrAccess();
   const companyId = profile?.company_id ?? null;
@@ -104,7 +104,7 @@ export function useDisciplinaryRecords(filters: DisciplinaryFilters) {
 
   const query = useQuery({
     queryKey: [...DISCIPLINARY_KEY, 'list', companyId, scopedProfile],
-    enabled: Boolean(companyId) && !access.loading && access.canEdit,
+    enabled: Boolean(companyId) && !access.loading && access.canEdit && options.enabled !== false,
     queryFn: () => fetchRecords(companyId as string, scopedProfile),
   });
 

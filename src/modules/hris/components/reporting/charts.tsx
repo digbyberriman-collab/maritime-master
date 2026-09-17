@@ -1,22 +1,9 @@
 import React from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
-/**
- * Small, theme-aware Recharts wrappers shared by the HR dashboard and the
- * Reporting page. Colours come from the shadcn tokens where one exists and
- * from a fixed hue set (legible in dark mode) for extra series.
- */
-export const CHART_COLORS = [
-  'hsl(var(--primary))',
-  'hsl(160 60% 45%)',
-  'hsl(38 92% 50%)',
-  'hsl(280 65% 60%)',
-  'hsl(199 89% 48%)',
-  'hsl(var(--destructive))',
-  'hsl(var(--muted-foreground))',
-] as const;
+import { seriesColor } from './chartColors';
 
-export const seriesColor = (index: number): string => CHART_COLORS[index % CHART_COLORS.length];
+/** Small, theme-aware Recharts wrappers shared by the HR dashboard and the Reporting page. */
 
 export interface ChartSeries {
   key: string;
