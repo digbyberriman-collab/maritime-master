@@ -4,8 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  MAX_ATTACHMENT_BYTES,
   useLogbookAttachments, type LogbookAttachment,
 } from '@/modules/logbooks/hooks/useLogbookAttachments';
+
+const MAX_ATTACHMENT_MB = MAX_ATTACHMENT_BYTES / (1024 * 1024);
 
 interface Props {
   entryId: string | null;
