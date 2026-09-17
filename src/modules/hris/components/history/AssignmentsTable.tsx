@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
-import { formatDate } from '@/modules/hris/lib/format';
+import { formatDate, humanise } from '@/modules/hris/lib/format';
 import { assignmentDays, END_REASONS, isoDay, type AssignmentPatch, type AssignmentRecord } from '@/modules/hris/lib/employmentHistory';
 
 interface AssignmentsTableProps {
@@ -42,7 +42,13 @@ const toDraft = (a: AssignmentRecord): Draft => ({
   notes: a.notes ?? '',
 });
 
-const reasonLabel = (value: string | null): string => END_REASONS.find((r) => r.value === value)?.label ?? (value ?? '—');
+const isPresetReason = (value: string | null): boolean => END_REASONS.some((r) => r.value === value);
+
+/** Preset reasons use their label; legacy / free-text values (e.g. "promotion") are humanised like the timeline does. */
+const reasonLabel = (value: string | null): string => {
+  if (!value) return '—';
+  return END_REASONS.find((r) => r.value === value)?.label ?? humanise(value);
+};
 
 /**
  * One row per crew_assignments record, newest first, with inline editing
@@ -168,6 +174,10 @@ export const AssignmentsTable: React.FC<AssignmentsTableProps> = ({ assignments,
                               </SelectTrigger>
                               <SelectContent className="bg-popover">
                                 <SelectItem value={NONE}>—</SelectItem>
+                                {/* Keep a legacy / free-text reason selectable so editing another field does not silently drop it. */}
+                                {a.end_reason && !isPresetReason(a.end_reason) && (
+                                  <SelectItem value={a.end_reason}>{reasonLabel(a.end_reason)}</SelectItem>
+                                )}
                                 {END_REASONS.map((r) => (
                                   <SelectItem key={r.value} value={r.value}>
                                     {r.label}
