@@ -305,6 +305,12 @@ const LogbookDetail: React.FC = () => {
         entry={editing}
         defaultDate={dayForNew}
         saving={createEntry.isPending || updateEntry.isPending}
+        logbookId={logbook?.id ?? null}
+        companyId={logbook?.company_id ?? null}
+        vesselId={logbook?.vessel_id ?? selectedVessel?.id ?? null}
+        canManageAttachments={
+          canSign || !editing || editing.recorded_by === currentUserId
+        }
         onSubmit={(input) => {
           if (editing) {
             updateEntry.mutate({ id: editing.id, input }, { onSuccess: () => setFormOpen(false) });
