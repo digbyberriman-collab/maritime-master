@@ -45,22 +45,17 @@ export const VesselSelector: React.FC<VesselSelectorProps> = ({ className }) => 
 
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedVesselIds, setSelectedVesselIds] = useState<Set<string>>(new Set());
   const [severityFilters, setSeverityFilters] = useState<Set<string>>(
     new Set(['red', 'orange', 'yellow', 'green'])
   );
   const [fleetGroups, setFleetGroups] = useState<Set<string>>(new Set());
 
-  // Initialize selected vessels when opening
-  React.useEffect(() => {
-    if (open) {
-      if (isAllVessels) {
-        setSelectedVesselIds(new Set(vessels.map(v => v.id)));
-      } else if (selectedVessel) {
-        setSelectedVesselIds(new Set([selectedVessel.id]));
-      }
-    }
-  }, [open, isAllVessels, selectedVessel, vessels]);
+  // Selection is derived from VesselContext, never held locally, so the popover
+  // always shows the scope the rest of the app is using.
+  const selectedVesselIds = useMemo(() => {
+    if (isAllVessels) return new Set(vessels.map(v => v.id));
+    return new Set(selectedVessel ? [selectedVessel.id] : []);
+  }, [isAllVessels, selectedVessel, vessels]);
 
   // Filter vessels by search query
   const filteredVessels = useMemo(() => {

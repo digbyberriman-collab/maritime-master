@@ -102,7 +102,7 @@ const DashboardVesselFilter: React.FC<DashboardVesselFilterProps> = ({
             return (
               <button
                 key={vessel.id}
-                onClick={() => handleToggleVessel(vessel.id)}
+                onClick={() => handleSelectVessel(vessel.id)}
                 className={cn(
                   'w-full flex items-center gap-2 px-2 py-1.5 rounded text-sm transition-colors',
                   isSelected
