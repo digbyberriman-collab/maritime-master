@@ -15884,6 +15884,62 @@ export type Database = {
           },
         ]
       }
+      support_tickets: {
+        Row: {
+          category: string
+          company_id: string
+          created_at: string
+          description: string
+          id: string
+          priority: string
+          reference: string
+          reporter_email: string
+          reporter_id: string
+          reporter_name: string
+          status: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          company_id: string
+          created_at?: string
+          description: string
+          id?: string
+          priority?: string
+          reference: string
+          reporter_email?: string
+          reporter_id: string
+          reporter_name?: string
+          status?: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          priority?: string
+          reference?: string
+          reporter_email?: string
+          reporter_id?: string
+          reporter_name?: string
+          status?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       training_courses: {
         Row: {
           applicable_ranks: string[] | null

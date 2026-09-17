@@ -56,6 +56,7 @@ const NotFound = React.lazy(() => import('@/shared/pages/NotFound'));
 const InsurancePage = React.lazy(() => import('@/modules/compliance/pages/InsurancePage'));
 const HRPage = React.lazy(() => import('@/modules/compliance/pages/HRPage'));
 const HowToGuidesPage = React.lazy(() => import('@/modules/help/pages/HowToGuidesPage'));
+const SupportPage = React.lazy(() => import('@/modules/help/pages/SupportPage'));
 const PrivacyPolicyPage = React.lazy(() => import('@/modules/help/pages/PrivacyPolicyPage'));
 const TermsOfServicePage = React.lazy(() => import('@/modules/help/pages/TermsOfServicePage'));
 
@@ -182,6 +183,7 @@ export const AppRoutes: React.FC = () => {
 
       {/* Help & Legal */}
       <Route path="/help/how-to-guides" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><HowToGuidesPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/help/support" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><SupportPage /></React.Suspense></ProtectedRoute>} />
       <Route path="/legal/privacy-policy" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><PrivacyPolicyPage /></React.Suspense></ProtectedRoute>} />
       <Route path="/legal/terms-of-service" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><TermsOfServicePage /></React.Suspense></ProtectedRoute>} />
 

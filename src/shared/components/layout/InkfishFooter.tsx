@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { LifeBuoy, BookOpen, Mail } from 'lucide-react';
+import { LifeBuoy, BookOpen, Mail, Ticket } from 'lucide-react';
 import inkfishLogo from '@/assets/inkfish-logo.png';
 import {
   DropdownMenu,
@@ -53,9 +53,26 @@ const InkfishFooter: React.FC = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <a href="mailto:SOS@INK.FISH" className={linkClass}>
-            Support
-          </a>
+          <DropdownMenu>
+            <DropdownMenuTrigger className={`${linkClass} flex items-center gap-1 outline-none`}>
+              <Mail className="h-3.5 w-3.5" />
+              Support
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" side="top">
+              <DropdownMenuItem asChild>
+                <Link to="/help/support">
+                  <Ticket className="h-4 w-4 mr-2" />
+                  Submit a ticket
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a href="mailto:SOS@INK.FISH">
+                  <Mail className="h-4 w-4 mr-2" />
+                  Contact support (SOS@INK.FISH)
+                </a>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Link to="/legal/privacy-policy" className={linkClass}>
             Privacy Policy
           </Link>

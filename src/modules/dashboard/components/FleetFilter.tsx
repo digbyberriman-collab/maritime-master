@@ -1,6 +1,6 @@
 import React from 'react';
 import { Ship } from 'lucide-react';
-import { useDashboardStore } from '@/modules/dashboard/store/dashboardStore';
+import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import {
   Select,
   SelectContent,
@@ -9,25 +9,30 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+/**
+ * FleetFilter is bound to VesselContext (the single source of truth for the
+ * active vessel scope) so changing it here updates every module.
+ */
 export const FleetFilter: React.FC = () => {
-  const { 
-    selectedVesselId, 
-    isAllVessels, 
-    userVessels, 
-    canViewAllVessels,
-    setSelectedVessel,
+  const {
+    vessels,
+    selectedVesselId,
+    isAllVessels,
+    canAccessAllVessels,
+    setSelectedVesselById,
     setAllVessels,
-  } = useDashboardStore();
+    loading,
+  } = useVessel();
 
-  if (!canViewAllVessels) return null;
+  if (loading || vessels.length === 0) return null;
 
   const currentValue = isAllVessels ? 'all' : selectedVesselId || '';
 
   function handleChange(value: string) {
     if (value === 'all') {
-      setAllVessels(true);
+      setAllVessels();
     } else {
-      setSelectedVessel(value);
+      setSelectedVesselById(value);
     }
   }
 
@@ -39,10 +44,8 @@ export const FleetFilter: React.FC = () => {
           <SelectValue placeholder="Select vessel" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">
-            All Vessels
-          </SelectItem>
-          {userVessels.map(vessel => (
+          {canAccessAllVessels && <SelectItem value="all">All Vessels</SelectItem>}
+          {vessels.map(vessel => (
             <SelectItem key={vessel.id} value={vessel.id}>
               {vessel.name}
             </SelectItem>

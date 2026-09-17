@@ -93,6 +93,20 @@ const LogbookWorkspace: React.FC = () => {
 
   React.useEffect(() => { const t = setInterval(() => setTick((n) => n + 1), 5000); return () => clearInterval(t); }, []);
 
+  // Deep link from the sidebar: /vessel/logbooks/<slug>?vessel=<name> selects the matching vessel (e.g. ?vessel=dagon).
+  React.useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const wanted = params.get('vessel');
+    if (!wanted || vessels.length === 0) return;
+    const needle = wanted.toLowerCase();
+    const match = vessels.find((v) => v.name?.toLowerCase().includes(needle));
+    if (match && match.id !== selectedVessel?.id) setSelectedVesselById(match.id);
+    params.delete('vessel');
+    const rest = params.toString();
+    navigate(`${location.pathname}${rest ? `?${rest}` : ''}`, { replace: true });
+    if (!match) toast({ title: `No vessel matching "${wanted}" in your fleet.`, variant: 'destructive' });
+  }, [location.search, location.pathname, vessels, selectedVessel?.id, setSelectedVesselById, navigate, toast]);
+
   const volume = ws.volume;
   const sections = React.useMemo<TemplateSection[]>(
     () => [...(volume?.template.sections ?? book.sections), ...(ws.legacyEntries.length ? [LEGACY_SECTION] : [])],

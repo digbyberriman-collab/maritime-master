@@ -18,6 +18,10 @@ interface VesselToggleBarProps {
   className?: string;
 }
 
+/**
+ * Quick vessel scope switcher. Reflects VesselContext directly — one active
+ * vessel (or all vessels) at a time, so a click here changes scope app-wide.
+ */
 const VesselToggleBar: React.FC<VesselToggleBarProps> = ({ className }) => {
   const {
     vessels,
@@ -25,65 +29,52 @@ const VesselToggleBar: React.FC<VesselToggleBarProps> = ({ className }) => {
     isAllVessels,
     setSelectedVesselById,
     setAllVessels,
+    canAccessAllVessels,
     loading,
   } = useVessel();
 
-  const [activeVessels, setActiveVessels] = React.useState<Set<string>>(
-    () => new Set(vessels.map(v => v.id))
-  );
-
-  React.useEffect(() => {
-    if (isAllVessels) {
-      setActiveVessels(new Set(vessels.map(v => v.id)));
-    } else if (selectedVessel) {
-      setActiveVessels(new Set([selectedVessel.id]));
-    }
-  }, [vessels, isAllVessels, selectedVessel]);
-
-  const handleToggle = (vesselId: string) => {
-    const newActive = new Set(activeVessels);
-    if (newActive.has(vesselId)) {
-      if (newActive.size > 1) {
-        newActive.delete(vesselId);
-      }
-    } else {
-      newActive.add(vesselId);
-    }
-    setActiveVessels(newActive);
-
-    if (newActive.size === vessels.length) {
-      setAllVessels();
-    } else if (newActive.size === 1) {
-      const [id] = newActive;
-      setSelectedVesselById(id);
-    }
-  };
-
   if (loading || vessels.length === 0) return null;
 
-  const activeCount = activeVessels.size;
+  const pill = (active: boolean) =>
+    cn(
+      'px-2 py-1 rounded text-xs font-semibold transition-all duration-200 min-h-[28px]',
+      active
+        ? 'bg-[#3B82F6]/20 text-[#3B82F6] border border-[#3B82F6]/50'
+        : 'bg-[#1A2740]/50 text-[#94A3B8] border border-[#94A3B8]/30 opacity-60 hover:opacity-80'
+    );
 
   return (
     <div className={cn('flex items-center gap-1.5', className)}>
       <Ship className="w-4 h-4 text-[#94A3B8] mr-1 hidden sm:block" />
+
+      {canAccessAllVessels && (
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button onClick={() => setAllVessels()} className={pill(isAllVessels)}>
+              ALL
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>All vessels (fleet-wide)</p>
+          </TooltipContent>
+        </Tooltip>
+      )}
+
       {vessels.map((vessel) => {
-        const isActive = activeVessels.has(vessel.id);
+        const isActive = !isAllVessels && selectedVessel?.id === vessel.id;
         const abbrev = VESSEL_ABBREVIATIONS[vessel.name] || vessel.name.split(' ').pop();
 
         return (
           <Tooltip key={vessel.id}>
             <TooltipTrigger asChild>
               <button
-                onClick={() => handleToggle(vessel.id)}
-                className={cn(
-                  'px-2 py-1 rounded text-xs font-semibold transition-all duration-200 min-h-[28px]',
-                  isActive
-                    ? 'bg-[#3B82F6]/20 text-[#3B82F6] border border-[#3B82F6]/50'
-                    : 'bg-[#1A2740]/50 text-[#94A3B8] border border-[#94A3B8]/30 opacity-60 hover:opacity-80'
-                )}
+                onClick={() => setSelectedVesselById(vessel.id)}
+                className={pill(isActive)}
               >
                 {abbrev}
-                {isActive && <span className="ml-0.5 inline-block w-1.5 h-1.5 rounded-full bg-[#22C55E]" />}
+                {isActive && (
+                  <span className="ml-0.5 inline-block w-1.5 h-1.5 rounded-full bg-[#22C55E]" />
+                )}
               </button>
             </TooltipTrigger>
             <TooltipContent>
@@ -92,8 +83,9 @@ const VesselToggleBar: React.FC<VesselToggleBarProps> = ({ className }) => {
           </Tooltip>
         );
       })}
+
       <span className="text-xs text-[#94A3B8] ml-1.5 hidden sm:inline">
-        {activeCount}/{vessels.length}
+        {isAllVessels ? `${vessels.length}/${vessels.length}` : `1/${vessels.length}`}
       </span>
     </div>
   );
