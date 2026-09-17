@@ -6,6 +6,7 @@
  */
 
 import {
+  addDays,
   differenceInCalendarDays,
   differenceInCalendarMonths,
   endOfMonth,
@@ -271,9 +272,11 @@ export const calculateLeaveBreakdown = (input: CalculateInput): AccrualBreakdown
     ...policy,
     accrualMethod: profile.leave_accrual_method ?? policy.accrualMethod,
     defaultAnnualEntitlement: annualEntitlement,
+    // A per-crew annual entitlement overrides the policy's monthly accrual
+    // (entitlement spread evenly across the year); otherwise use the policy.
     monthlyAccrualDays:
-      profile.leave_accrual_method === 'monthly' || profile.leave_accrual_method === 'rotation'
-        ? policy.monthlyAccrualDays
+      profile.annual_leave_entitlement != null
+        ? annualEntitlement / 12
         : policy.monthlyAccrualDays,
   };
 
@@ -302,12 +305,16 @@ export const calculateLeaveBreakdown = (input: CalculateInput): AccrualBreakdown
     const start = parseDate(r.start_date);
     const end = parseDate(r.end_date);
     if (!start || !end) continue;
-    const days = differenceInCalendarDays(end, start) + 1;
-    const future = isAfter(start, asOf);
+    // Days still to come. A request that straddles asOf counts only its
+    // remaining days here; the elapsed days are already in `taken` via entries.
+    if (!isAfter(end, asOf)) continue;
+    const effectiveStart = isAfter(start, asOf) ? start : addDays(asOf, 1);
+    const days = differenceInCalendarDays(end, effectiveStart) + 1;
+    if (days <= 0) continue;
 
-    if (r.status === 'approved' && future && policy.bookedDeducts) {
+    if (r.status === 'approved' && policy.bookedDeducts) {
       booked += days;
-    } else if (r.status === 'pending' && future) {
+    } else if (r.status === 'pending') {
       pending += days;
     }
   }

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { toast } from '@/shared/hooks/use-toast';
 
@@ -128,10 +129,62 @@ export interface TransferCrewData {
   notes?: string;
 }
 
+export interface SignOffCrewData {
+  assignmentId: string;
+  leaveDate: string;
+  /** Why the assignment ended (contract_end, transfer, resignation, …). Stored in crew_assignments.end_reason. */
+  reason?: string;
+  notes?: string;
+}
+
+/** Columns snapshotted into audit_logs when an assignment changes. */
+const ASSIGNMENT_AUDIT_COLUMNS = 'id, user_id, vessel_id, position, rank, department, join_date, leave_date, is_current, end_reason, notes';
+
+type AssignmentAuditSnapshot = Record<string, unknown> | null;
+
 // Fetch all crew members for the company
 export const useCrew = (vesselFilter?: string) => {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const queryClient = useQueryClient();
+
+  /** Best-effort snapshot of an assignment row for audit old_values. */
+  const snapshotAssignment = async (assignmentId: string): Promise<AssignmentAuditSnapshot> => {
+    const { data } = await supabase
+      .from('crew_assignments')
+      .select(ASSIGNMENT_AUDIT_COLUMNS)
+      .eq('id', assignmentId)
+      .maybeSingle();
+    return (data as AssignmentAuditSnapshot) ?? null;
+  };
+
+  /** Writes an audit_logs row for a crew_assignment change; never throws. */
+  const logAssignmentAudit = async (
+    assignmentId: string,
+    action: 'CREATE' | 'UPDATE',
+    oldValues: AssignmentAuditSnapshot,
+    newValues: Record<string, unknown>,
+  ) => {
+    try {
+      const changedFields = Object.fromEntries(
+        Object.keys(newValues).filter((k) => (oldValues ? oldValues[k] !== newValues[k] : true)).map((k) => [k, true]),
+      );
+      const { error } = await supabase.from('audit_logs').insert({
+        entity_type: 'crew_assignment',
+        entity_id: assignmentId,
+        action,
+        actor_user_id: user?.id ?? null,
+        actor_email: profile?.email ?? null,
+        actor_role: profile?.role ?? null,
+        changed_fields: changedFields as Json,
+        old_values: (oldValues ?? {}) as Json,
+        new_values: newValues as Json,
+        user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
+      });
+      if (error) console.error('Failed to log assignment audit:', error);
+    } catch (error) {
+      console.error('Failed to log assignment audit:', error);
+    }
+  };
 
   const crewQuery = useQuery({
     queryKey: ['crew', profile?.company_id, vesselFilter],
@@ -390,33 +443,62 @@ export const useCrew = (vesselFilter?: string) => {
 
   const transferCrew = useMutation({
     mutationFn: async (data: TransferCrewData) => {
+      const now = new Date().toISOString();
+      const notes = data.notes?.trim() || null;
+      const previous = await snapshotAssignment(data.currentAssignmentId);
+
+      // Rank travels with the crew member, not the assignment they leave.
+      const { data: crewProfile } = await supabase
+        .from('profiles')
+        .select('rank')
+        .eq('user_id', data.userId)
+        .maybeSingle();
+
       // End current assignment
+      const closedValues = {
+        is_current: false,
+        leave_date: data.transferDate,
+        end_date: data.transferDate,
+        end_reason: 'transfer',
+        ...(notes ? { notes } : {}),
+        updated_by: user?.id ?? null,
+        updated_at: now,
+      };
       const { error: endError } = await supabase
         .from('crew_assignments')
-        .update({
-          is_current: false,
-          leave_date: data.transferDate,
-        })
+        .update(closedValues)
         .eq('id', data.currentAssignmentId);
 
       if (endError) throw endError;
+      await logAssignmentAudit(data.currentAssignmentId, 'UPDATE', previous, closedValues);
 
       // Create new assignment
-      const { error: createError } = await supabase
+      const newValues = {
+        user_id: data.userId,
+        vessel_id: data.newVesselId,
+        position: data.position,
+        rank: crewProfile?.rank ?? (previous?.rank as string | null | undefined) ?? null,
+        department: (previous?.department as string | null | undefined) ?? null,
+        join_date: data.transferDate,
+        start_date: data.transferDate,
+        is_current: true,
+        notes,
+        created_by: user?.id ?? null,
+        updated_by: user?.id ?? null,
+      };
+      const { data: created, error: createError } = await supabase
         .from('crew_assignments')
-        .insert({
-          user_id: data.userId,
-          vessel_id: data.newVesselId,
-          position: data.position,
-          join_date: data.transferDate,
-          is_current: true,
-        });
+        .insert(newValues)
+        .select('id')
+        .maybeSingle();
 
       if (createError) throw createError;
+      if (created?.id) await logAssignmentAudit(created.id, 'CREATE', null, newValues);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crew'] });
       queryClient.invalidateQueries({ queryKey: ['crew-changes'] });
+      queryClient.invalidateQueries({ queryKey: ['hris'] });
       toast({
         title: 'Success',
         description: 'Crew member transferred successfully',
@@ -432,26 +514,30 @@ export const useCrew = (vesselFilter?: string) => {
   });
 
   const signOffCrew = useMutation({
-    mutationFn: async ({
-      assignmentId,
-      leaveDate,
-    }: {
-      assignmentId: string;
-      leaveDate: string;
-    }) => {
+    mutationFn: async ({ assignmentId, leaveDate, reason, notes }: SignOffCrewData) => {
+      const previous = await snapshotAssignment(assignmentId);
+      const trimmedNotes = notes?.trim();
+      const values = {
+        is_current: false,
+        leave_date: leaveDate,
+        end_date: leaveDate,
+        ...(reason ? { end_reason: reason } : {}),
+        ...(trimmedNotes ? { notes: trimmedNotes } : {}),
+        updated_by: user?.id ?? null,
+        updated_at: new Date().toISOString(),
+      };
       const { error } = await supabase
         .from('crew_assignments')
-        .update({
-          is_current: false,
-          leave_date: leaveDate,
-        })
+        .update(values)
         .eq('id', assignmentId);
 
       if (error) throw error;
+      await logAssignmentAudit(assignmentId, 'UPDATE', previous, values);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crew'] });
       queryClient.invalidateQueries({ queryKey: ['crew-changes'] });
+      queryClient.invalidateQueries({ queryKey: ['hris'] });
       toast({
         title: 'Success',
         description: 'Crew member signed off successfully',
@@ -477,18 +563,34 @@ export const useCrew = (vesselFilter?: string) => {
       if (error) throw error;
 
       // End any current assignments
-      await supabase
+      const today = new Date().toISOString().split('T')[0];
+      const { data: current } = await supabase
         .from('crew_assignments')
-        .update({
-          is_current: false,
-          leave_date: new Date().toISOString().split('T')[0],
-        })
+        .select(ASSIGNMENT_AUDIT_COLUMNS)
         .eq('user_id', userId)
         .eq('is_current', true);
+      const values = {
+        is_current: false,
+        leave_date: today,
+        end_date: today,
+        end_reason: 'deactivated',
+        updated_by: user?.id ?? null,
+        updated_at: new Date().toISOString(),
+      };
+      await supabase
+        .from('crew_assignments')
+        .update(values)
+        .eq('user_id', userId)
+        .eq('is_current', true);
+      for (const row of (current ?? []) as AssignmentAuditSnapshot[]) {
+        if (row?.id) await logAssignmentAudit(String(row.id), 'UPDATE', row, values);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crew'] });
       queryClient.invalidateQueries({ queryKey: ['crew-count'] });
+      queryClient.invalidateQueries({ queryKey: ['crew-changes'] });
+      queryClient.invalidateQueries({ queryKey: ['hris'] });
       toast({
         title: 'Success',
         description: 'Crew member deactivated',

@@ -2,20 +2,14 @@ import React from 'react';
 import { Route } from 'react-router-dom';
 import ModuleRoute from '@/shared/components/ModuleRoute';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { Loader2 } from 'lucide-react';
-
-const LazyLoader = () => (
-  <div className="flex min-h-[40vh] items-center justify-center">
-    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-  </div>
-);
+import { LazyLoader } from '@/shared/components/common/LazyLoader';
 
 type Loader = () => Promise<{ default: React.ComponentType }>;
 
-const page = (loader: Loader, hrLevel?: 'view' | 'edit' | 'admin') => {
+const page = (loader: Loader, gate: { hrLevel?: 'view' | 'edit' | 'admin'; payrollLevel?: 'view' | 'edit' | 'admin' } = {}) => {
   const C = React.lazy(loader);
   return (
-    <ModuleRoute moduleId="hris" hrLevel={hrLevel}>
+    <ModuleRoute moduleId="hris" hrLevel={gate.hrLevel} payrollLevel={gate.payrollLevel}>
       <DashboardLayout>
         <React.Suspense fallback={<LazyLoader />}>
           <C />
@@ -25,13 +19,7 @@ const page = (loader: Loader, hrLevel?: 'view' | 'edit' | 'admin') => {
   );
 };
 
-export const HRIS_PATHS = {
-  personalDetails: '/hris/employee-records/personal-details',
-  contracts: '/hris/employee-records/contracts-and-employment',
-  documents: '/hris/employee-records/documents-and-certificates',
-  nextOfKin: '/hris/employee-records/next-of-kin-emergency',
-  employmentHistory: '/hris/employee-records/employment-history',
-} as const;
+import { HRIS_PATHS } from './paths';
 
 /**
  * HRIS routes. Listed in src/routes/index.tsx before the sitemap placeholder
@@ -46,5 +34,10 @@ export const hrisRoutes = (
     <Route path={HRIS_PATHS.documents} element={page(() => import('@/modules/hris/pages/DocumentsPage'))} />
     <Route path={HRIS_PATHS.nextOfKin} element={page(() => import('@/modules/hris/pages/NextOfKinPage'))} />
     <Route path={HRIS_PATHS.employmentHistory} element={page(() => import('@/modules/hris/pages/EmploymentHistoryPage'))} />
+    <Route path={HRIS_PATHS.salaries} element={page(() => import('@/modules/hris/pages/SalariesPage'))} />
+    <Route path={HRIS_PATHS.payroll} element={page(() => import('@/modules/hris/pages/PayrollPage'), { payrollLevel: 'view' })} />
+    <Route path={HRIS_PATHS.gratuities} element={page(() => import('@/modules/hris/pages/GratuitiesPage'), { payrollLevel: 'view' })} />
+    <Route path={HRIS_PATHS.payReviews} element={page(() => import('@/modules/hris/pages/PayReviewsPage'), { payrollLevel: 'view' })} />
+    <Route path={HRIS_PATHS.compensationSettings} element={page(() => import('@/modules/hris/pages/CompensationSettingsPage'), { payrollLevel: 'admin' })} />
   </>
 );

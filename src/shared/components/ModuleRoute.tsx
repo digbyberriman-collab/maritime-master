@@ -7,6 +7,8 @@ import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
 import { useHrAccess } from '@/modules/auth/hooks/useHrAccess';
 import { hrAccessSatisfies } from '@/modules/auth/lib/hrAccess';
+import { usePayrollAccess } from '@/modules/auth/hooks/usePayrollAccess';
+import { payrollAccessSatisfies } from '@/modules/auth/lib/payrollAccess';
 import { Button } from '@/components/ui/button';
 
 interface ModuleRouteProps {
@@ -14,6 +16,8 @@ interface ModuleRouteProps {
   moduleId: string;
   /** Extra HR gate for sensitive pages inside HRIS. */
   hrLevel?: 'view' | 'edit' | 'admin';
+  /** Extra finance gate for compensation / payroll pages. */
+  payrollLevel?: 'view' | 'edit' | 'admin';
   children: React.ReactNode;
 }
 
@@ -37,13 +41,14 @@ export const AccessDenied: React.FC<{ title?: string; detail?: string }> = ({
   </DashboardLayout>
 );
 
-const Gate: React.FC<ModuleRouteProps> = ({ moduleId, hrLevel, children }) => {
+const Gate: React.FC<ModuleRouteProps> = ({ moduleId, hrLevel, payrollLevel, children }) => {
   const { canAccessModule } = useAuth();
   const rbacInitialized = usePermissionsStore((s) => s.isInitialized);
   const rbacLoading = usePermissionsStore((s) => s.isLoading);
   const hr = useHrAccess();
+  const payroll = usePayrollAccess();
 
-  if (!rbacInitialized || rbacLoading || hr.loading) {
+  if (!rbacInitialized || rbacLoading || hr.loading || payroll.loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -57,6 +62,15 @@ const Gate: React.FC<ModuleRouteProps> = ({ moduleId, hrLevel, children }) => {
       <AccessDenied
         title="HR access required"
         detail={`This page needs HR ${hrLevel} rights. DPA has full access; captains and pursers have edit rights; heads of department have view rights.`}
+      />
+    );
+  }
+
+  if (payrollLevel && !payrollAccessSatisfies(payroll, payrollLevel)) {
+    return (
+      <AccessDenied
+        title="Finance access required"
+        detail={`This page needs finance ${payrollLevel} rights. DPA has full access and pursers can edit; fleet managers can view.`}
       />
     );
   }

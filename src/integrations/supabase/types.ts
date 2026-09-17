@@ -1602,6 +1602,945 @@ export type Database = {
           },
         ]
       }
+      hr_company_settings: {
+        Row: {
+          company_id: string
+          default_currency: string
+          gratuity_default_method: string
+          gratuity_default_points: number
+          pay_cutoff_day: number
+          pay_day_of_month: number
+          pay_period_type: string
+          payslip_footer: string | null
+          rounding_minor: number
+          travel_days_paid: boolean
+          unpaid_leave_codes: string[]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          company_id: string
+          default_currency?: string
+          gratuity_default_method?: string
+          gratuity_default_points?: number
+          pay_cutoff_day?: number
+          pay_day_of_month?: number
+          pay_period_type?: string
+          payslip_footer?: string | null
+          rounding_minor?: number
+          travel_days_paid?: boolean
+          unpaid_leave_codes?: string[]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          company_id?: string
+          default_currency?: string
+          gratuity_default_method?: string
+          gratuity_default_points?: number
+          pay_cutoff_day?: number
+          pay_day_of_month?: number
+          pay_period_type?: string
+          payslip_footer?: string | null
+          rounding_minor?: number
+          travel_days_paid?: boolean
+          unpaid_leave_codes?: string[]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hr_company_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fx_rates: {
+        Row: {
+          base_currency: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          quote_currency: string
+          rate: number
+          source: string | null
+          valid_from: string
+        }
+        Insert: {
+          base_currency: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          quote_currency: string
+          rate: number
+          source?: string | null
+          valid_from?: string
+        }
+        Update: {
+          base_currency?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          quote_currency?: string
+          rate?: number
+          source?: string | null
+          valid_from?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fx_rates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pay_grades: {
+        Row: {
+          code: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          daily_rate_minor: number | null
+          department: string | null
+          effective_from: string
+          effective_to: string | null
+          grade_level: number
+          gratuity_points: number
+          id: string
+          is_active: boolean
+          monthly_base_minor: number
+          name: string
+          notes: string | null
+          rank: string | null
+          step: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          code: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          daily_rate_minor?: number | null
+          department?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          grade_level?: number
+          gratuity_points?: number
+          id?: string
+          is_active?: boolean
+          monthly_base_minor?: number
+          name: string
+          notes?: string | null
+          rank?: string | null
+          step?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          code?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          daily_rate_minor?: number | null
+          department?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          grade_level?: number
+          gratuity_points?: number
+          id?: string
+          is_active?: boolean
+          monthly_base_minor?: number
+          name?: string
+          notes?: string | null
+          rank?: string | null
+          step?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pay_grades_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crew_compensation: {
+        Row: {
+          allowances: Json
+          approved_at: string | null
+          approved_by: string | null
+          base_salary_minor: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          effective_from: string
+          effective_to: string | null
+          gratuity_eligible: boolean
+          gratuity_points: number | null
+          id: string
+          notes: string | null
+          pay_frequency: string
+          pay_grade_id: string | null
+          profile_id: string
+          reason: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          allowances?: Json
+          approved_at?: string | null
+          approved_by?: string | null
+          base_salary_minor?: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          effective_from?: string
+          effective_to?: string | null
+          gratuity_eligible?: boolean
+          gratuity_points?: number | null
+          id?: string
+          notes?: string | null
+          pay_frequency?: string
+          pay_grade_id?: string | null
+          profile_id: string
+          reason?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          allowances?: Json
+          approved_at?: string | null
+          approved_by?: string | null
+          base_salary_minor?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          effective_from?: string
+          effective_to?: string | null
+          gratuity_eligible?: boolean
+          gratuity_points?: number | null
+          id?: string
+          notes?: string | null
+          pay_frequency?: string
+          pay_grade_id?: string | null
+          profile_id?: string
+          reason?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_compensation_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_compensation_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_compensation_pay_grade_id_fkey"
+            columns: ["pay_grade_id"]
+            isOneToOne: false
+            referencedRelation: "pay_grades"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crew_bank_details: {
+        Row: {
+          account_holder: string
+          account_number: string | null
+          bank_country: string | null
+          bank_name: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          iban: string | null
+          id: string
+          is_primary: boolean
+          notes: string | null
+          profile_id: string
+          routing_number: string | null
+          sort_code: string | null
+          swift_bic: string | null
+          updated_at: string
+          updated_by: string | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          account_holder: string
+          account_number?: string | null
+          bank_country?: string | null
+          bank_name?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          iban?: string | null
+          id?: string
+          is_primary?: boolean
+          notes?: string | null
+          profile_id: string
+          routing_number?: string | null
+          sort_code?: string | null
+          swift_bic?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          account_holder?: string
+          account_number?: string | null
+          bank_country?: string | null
+          bank_name?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          iban?: string | null
+          id?: string
+          is_primary?: boolean
+          notes?: string | null
+          profile_id?: string
+          routing_number?: string | null
+          sort_code?: string | null
+          swift_bic?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_bank_details_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_bank_details_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pay_periods: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          company_id: string
+          created_at: string
+          end_date: string
+          id: string
+          label: string
+          locked_at: string | null
+          locked_by: string | null
+          period_type: string
+          start_date: string
+          status: string
+          vessel_id: string | null
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          company_id: string
+          created_at?: string
+          end_date: string
+          id?: string
+          label: string
+          locked_at?: string | null
+          locked_by?: string | null
+          period_type?: string
+          start_date: string
+          status?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          company_id?: string
+          created_at?: string
+          end_date?: string
+          id?: string
+          label?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          period_type?: string
+          start_date?: string
+          status?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pay_periods_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_periods_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gratuity_pools: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          calculated_at: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          deductions_minor: number
+          deductions_note: string | null
+          distributed_at: string | null
+          gross_amount_minor: number
+          id: string
+          name: string
+          notes: string | null
+          period_end: string
+          period_start: string
+          received_date: string
+          source: string
+          split_method: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+          vessel_id: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          calculated_at?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          deductions_minor?: number
+          deductions_note?: string | null
+          distributed_at?: string | null
+          gross_amount_minor: number
+          id?: string
+          name: string
+          notes?: string | null
+          period_end: string
+          period_start: string
+          received_date?: string
+          source?: string
+          split_method?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          calculated_at?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          deductions_minor?: number
+          deductions_note?: string | null
+          distributed_at?: string | null
+          gross_amount_minor?: number
+          id?: string
+          name?: string
+          notes?: string | null
+          period_end?: string
+          period_start?: string
+          received_date?: string
+          source?: string
+          split_method?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gratuity_pools_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gratuity_pools_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gratuity_distributions: {
+        Row: {
+          adjustment_minor: number
+          adjustment_reason: string | null
+          amount_minor: number
+          company_id: string
+          created_at: string
+          days_onboard: number
+          excluded: boolean
+          exclusion_reason: string | null
+          id: string
+          paid_at: string | null
+          payout_status: string
+          payroll_line_id: string | null
+          points: number
+          pool_id: string
+          profile_id: string
+          share_ratio: number
+          updated_at: string
+          weight: number
+        }
+        Insert: {
+          adjustment_minor?: number
+          adjustment_reason?: string | null
+          amount_minor?: number
+          company_id: string
+          created_at?: string
+          days_onboard?: number
+          excluded?: boolean
+          exclusion_reason?: string | null
+          id?: string
+          paid_at?: string | null
+          payout_status?: string
+          payroll_line_id?: string | null
+          points?: number
+          pool_id: string
+          profile_id: string
+          share_ratio?: number
+          updated_at?: string
+          weight?: number
+        }
+        Update: {
+          adjustment_minor?: number
+          adjustment_reason?: string | null
+          amount_minor?: number
+          company_id?: string
+          created_at?: string
+          days_onboard?: number
+          excluded?: boolean
+          exclusion_reason?: string | null
+          id?: string
+          paid_at?: string | null
+          payout_status?: string
+          payroll_line_id?: string | null
+          points?: number
+          pool_id?: string
+          profile_id?: string
+          share_ratio?: number
+          updated_at?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gratuity_distributions_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: false
+            referencedRelation: "gratuity_pools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gratuity_distributions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gratuity_distributions_payroll_line_id_fkey"
+            columns: ["payroll_line_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_runs: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          calculated_at: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          currency: string
+          headcount: number
+          id: string
+          notes: string | null
+          paid_at: string | null
+          pay_period_id: string
+          run_number: string
+          status: string
+          submitted_at: string | null
+          submitted_by: string | null
+          total_deductions_minor: number
+          total_gross_minor: number
+          total_net_minor: number
+          updated_at: string
+          updated_by: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          calculated_at?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          headcount?: number
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          pay_period_id: string
+          run_number: string
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          total_deductions_minor?: number
+          total_gross_minor?: number
+          total_net_minor?: number
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          calculated_at?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          headcount?: number
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          pay_period_id?: string
+          run_number?: string
+          status?: string
+          submitted_at?: string | null
+          submitted_by?: string | null
+          total_deductions_minor?: number
+          total_gross_minor?: number
+          total_net_minor?: number
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_runs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_runs_pay_period_id_fkey"
+            columns: ["pay_period_id"]
+            isOneToOne: false
+            referencedRelation: "pay_periods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_runs_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_lines: {
+        Row: {
+          allowances_minor: number
+          base_period_minor: number
+          breakdown: Json
+          company_id: string
+          compensation_id: string | null
+          created_at: string
+          currency: string
+          days_in_period: number
+          days_leave_paid: number
+          days_onboard: number
+          days_paid: number
+          days_travel: number
+          days_unpaid: number
+          deductions_minor: number
+          fx_rate_to_run: number | null
+          gratuity_minor: number
+          gross_minor: number
+          id: string
+          net_minor: number
+          net_run_currency_minor: number | null
+          notes: string | null
+          other_earnings_minor: number
+          pay_frequency: string
+          pay_grade_id: string | null
+          payslip_generated_at: string | null
+          payslip_path: string | null
+          profile_id: string
+          proration_ratio: number
+          prorated_base_minor: number
+          run_id: string
+          status: string
+          updated_at: string
+          vessel_id: string | null
+        }
+        Insert: {
+          allowances_minor?: number
+          base_period_minor?: number
+          breakdown?: Json
+          company_id: string
+          compensation_id?: string | null
+          created_at?: string
+          currency: string
+          days_in_period: number
+          days_leave_paid?: number
+          days_onboard?: number
+          days_paid?: number
+          days_travel?: number
+          days_unpaid?: number
+          deductions_minor?: number
+          fx_rate_to_run?: number | null
+          gratuity_minor?: number
+          gross_minor?: number
+          id?: string
+          net_minor?: number
+          net_run_currency_minor?: number | null
+          notes?: string | null
+          other_earnings_minor?: number
+          pay_frequency: string
+          pay_grade_id?: string | null
+          payslip_generated_at?: string | null
+          payslip_path?: string | null
+          profile_id: string
+          proration_ratio?: number
+          prorated_base_minor?: number
+          run_id: string
+          status?: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          allowances_minor?: number
+          base_period_minor?: number
+          breakdown?: Json
+          company_id?: string
+          compensation_id?: string | null
+          created_at?: string
+          currency?: string
+          days_in_period?: number
+          days_leave_paid?: number
+          days_onboard?: number
+          days_paid?: number
+          days_travel?: number
+          days_unpaid?: number
+          deductions_minor?: number
+          fx_rate_to_run?: number | null
+          gratuity_minor?: number
+          gross_minor?: number
+          id?: string
+          net_minor?: number
+          net_run_currency_minor?: number | null
+          notes?: string | null
+          other_earnings_minor?: number
+          pay_frequency?: string
+          pay_grade_id?: string | null
+          payslip_generated_at?: string | null
+          payslip_path?: string | null
+          profile_id?: string
+          proration_ratio?: number
+          prorated_base_minor?: number
+          run_id?: string
+          status?: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_lines_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_lines_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_lines_compensation_id_fkey"
+            columns: ["compensation_id"]
+            isOneToOne: false
+            referencedRelation: "crew_compensation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_lines_pay_grade_id_fkey"
+            columns: ["pay_grade_id"]
+            isOneToOne: false
+            referencedRelation: "pay_grades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_lines_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pay_reviews: {
+        Row: {
+          applied_at: string | null
+          approved_at: string | null
+          approved_by: string | null
+          change_pct: number | null
+          company_id: string
+          comparator_notes: string | null
+          created_at: string
+          currency: string
+          effective_date: string
+          id: string
+          justification: string | null
+          new_compensation_id: string | null
+          notes: string | null
+          previous_base_minor: number
+          previous_compensation_id: string | null
+          profile_id: string
+          proposed_base_minor: number
+          proposed_by: string | null
+          reason: string
+          review_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          applied_at?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id: string
+          comparator_notes?: string | null
+          created_at?: string
+          currency?: string
+          effective_date: string
+          id?: string
+          justification?: string | null
+          new_compensation_id?: string | null
+          notes?: string | null
+          previous_base_minor?: number
+          previous_compensation_id?: string | null
+          profile_id: string
+          proposed_base_minor?: number
+          proposed_by?: string | null
+          reason?: string
+          review_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          applied_at?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
+          company_id?: string
+          comparator_notes?: string | null
+          created_at?: string
+          currency?: string
+          effective_date?: string
+          id?: string
+          justification?: string | null
+          new_compensation_id?: string | null
+          notes?: string | null
+          previous_base_minor?: number
+          previous_compensation_id?: string | null
+          profile_id?: string
+          proposed_base_minor?: number
+          proposed_by?: string | null
+          reason?: string
+          review_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pay_reviews_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_reviews_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_reviews_previous_compensation_id_fkey"
+            columns: ["previous_compensation_id"]
+            isOneToOne: false
+            referencedRelation: "crew_compensation"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_reviews_new_compensation_id_fkey"
+            columns: ["new_compensation_id"]
+            isOneToOne: false
+            referencedRelation: "crew_compensation"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crew_import: {
         Row: {
           airtable_id: string
@@ -11199,6 +12138,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          visa_expiry: string | null
           annual_leave_entitlement: number | null
           employment_start_date: string | null
           employment_status: string | null
@@ -11253,6 +12193,7 @@ export type Database = {
           visa_status: string | null
         }
         Insert: {
+          visa_expiry?: string | null
           annual_leave_entitlement?: number | null
           employment_start_date?: string | null
           employment_status?: string | null
@@ -11307,6 +12248,7 @@ export type Database = {
           visa_status?: string | null
         }
         Update: {
+          visa_expiry?: string | null
           annual_leave_entitlement?: number | null
           employment_start_date?: string | null
           employment_status?: string | null
@@ -14012,6 +14954,34 @@ export type Database = {
       }
     }
     Functions: {
+      hr_days_onboard: {
+        Args: { p_profile_id: string; p_start: string; p_end: string; p_vessel_id?: string | null; p_unpaid_codes?: string[] }
+        Returns: {
+          days_in_period: number
+          days_onboard: number
+          days_leave_paid: number
+          days_travel: number
+          days_unpaid: number
+          days_unknown: number
+          source_summary: Json
+        }[]
+      }
+      payroll_calculate_run: {
+        Args: { p_run_id: string }
+        Returns: number
+      }
+      gratuity_calculate_pool: {
+        Args: { p_pool_id: string }
+        Returns: number
+      }
+      pay_review_apply: {
+        Args: { p_review_id: string }
+        Returns: string
+      }
+      fx_rate_for: {
+        Args: { p_company_id: string; p_from: string; p_to: string; p_on: string }
+        Returns: number
+      }
       acknowledge_alert_action: {
         Args: { p_alert_id: string; p_notes?: string }
         Returns: Json

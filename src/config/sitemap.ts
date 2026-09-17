@@ -541,17 +541,20 @@ const hrisChildren: NavChild[] = [
   L('HR Dashboard', HR, { existing: '/hr', icon: LayoutGrid, ...hrView }),
   G('Employee Records', HR, [
     L('Personal Details', hrisEmpRec, hrView),
-    L('Contracts & Employment', hrisEmpRec, { existing: '/hr?tab=contracts-employment', ...hrView }),
+    L('Contracts & Employment', hrisEmpRec, hrView),
     L('Documents & Certificates', hrisEmpRec, hrView),
     L('Next of Kin / Emergency', hrisEmpRec, hrView),
     L('Employment History', hrisEmpRec, hrView),
   ], { icon: Users, slug: 'employee-records', ...hrView }),
+  // Compensation is gated on the narrower `finance` module (DPA, purser,
+  // fleet manager) rather than HR at large.
   G('Compensation', HR, [
-    L('Salaries & Compensation', hrisComp, { existing: '/hr?tab=salaries-compensation', ...hrEdit }),
-    L('Payroll', hrisComp, hrEdit),
-    L('Gratuities', hrisComp, hrEdit),
-    L('Pay Reviews', hrisComp, { existing: '/hr?tab=pay-reviews', ...hrEdit }),
-  ], { icon: Banknote, slug: 'compensation', ...hrEdit }),
+    L('Salaries & Compensation', hrisComp, { moduleKey: 'finance' }),
+    L('Payroll', hrisComp, { moduleKey: 'finance' }),
+    L('Gratuities', hrisComp, { moduleKey: 'finance' }),
+    L('Pay Reviews', hrisComp, { moduleKey: 'finance' }),
+    L('Compensation Settings', hrisComp, { moduleKey: 'finance', minPermission: 'admin', icon: Settings }),
+  ], { icon: Banknote, slug: 'compensation', moduleKey: 'finance' }),
   G('Performance', HR, [
     L('Annual Evaluations', hrisPerf, { existing: '/hr?tab=annual-evaluations', ...hrView }),
     L('Annual Reviews', hrisPerf, { existing: '/hr?tab=annual-reviews', ...hrView }),

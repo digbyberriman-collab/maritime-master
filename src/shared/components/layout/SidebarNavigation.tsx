@@ -8,6 +8,8 @@ import { useSidebarOrder, applySidebarOrder } from '@/shared/hooks/useSidebarOrd
 import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
 import { useHrAccess } from '@/modules/auth/hooks/useHrAccess';
 import { hrAccessSatisfies } from '@/modules/auth/lib/hrAccess';
+import { usePayrollAccess } from '@/modules/auth/hooks/usePayrollAccess';
+import { payrollAccessSatisfies } from '@/modules/auth/lib/payrollAccess';
 
 interface SidebarNavigationProps {
   moduleId: string | null;
@@ -29,6 +31,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
   const hasPermission = usePermissionsStore((s) => s.hasPermission);
   const rbacInitialized = usePermissionsStore((s) => s.isInitialized);
   const hrAccess = useHrAccess();
+  const payrollAccess = usePayrollAccess();
   const selectedModule = NAVIGATION_ITEMS.find((item) => item.id === moduleId) ?? null;
 
   // Leaf-level gating: entries with a moduleKey are hidden unless the user
@@ -41,9 +44,13 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
       if (hrAccess.loading) return false;
       return hrAccessSatisfies(hrAccess, required);
     }
+    if (item.moduleKey === 'finance') {
+      if (payrollAccess.loading) return false;
+      return payrollAccessSatisfies(payrollAccess, required);
+    }
     if (!rbacInitialized) return true;
     return hasPermission(item.moduleKey, required);
-  }, [hrAccess, hasPermission, rbacInitialized]);
+  }, [hrAccess, payrollAccess, hasPermission, rbacInitialized]);
 
   const children = useMemo(() => {
     if (!selectedModule?.children) return [];

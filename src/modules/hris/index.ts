@@ -1,5 +1,8 @@
-export { hrisRoutes, HRIS_PATHS } from './routes';
+export { hrisRoutes } from './routes';
+export { HRIS_PATHS } from './paths';
 export { CrewPicker } from './components/CrewPicker';
 export { HrisPageHeader } from './components/HrisPageHeader';
 export { useHrCrewDirectory } from './hooks/useHrCrewDirectory';
 export { useSelectedCrew } from './hooks/useSelectedCrew';
+export { useCrewContracts, useCompanyContracts, useContractMutations, useHrExpiryItems } from './hooks/useCrewContracts';
+export { useEmploymentHistory, useRecentMovements } from './hooks/useEmploymentHistory';

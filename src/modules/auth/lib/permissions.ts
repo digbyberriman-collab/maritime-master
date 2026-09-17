@@ -152,7 +152,7 @@ const BASIC_FIELDS = [
 ] as const;
 
 // Fields crew can edit on their own profile
-const OWN_PROFILE_FIELDS = [
+export const OWN_PROFILE_FIELDS = [
   'preferred_name',
   'phone',
   'emergency_contact_name',
