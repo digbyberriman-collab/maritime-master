@@ -518,6 +518,20 @@ export type Database = {
             referencedRelation: "candidate_applications"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "application_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_events_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
         ]
       }
       audit_findings: {
@@ -910,6 +924,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "candidate_applications_candidate_id_fkey"
+            columns: ["candidate_id"]
+            isOneToOne: false
+            referencedRelation: "candidates"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "candidate_applications_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
@@ -917,17 +938,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "candidate_applications_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "candidate_applications_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "candidate_applications_vacancy_id_fkey"
             columns: ["vacancy_id"]
             isOneToOne: false
             referencedRelation: "vacancies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "candidate_applications_candidate_id_fkey"
-            columns: ["candidate_id"]
-            isOneToOne: false
-            referencedRelation: "candidates"
             referencedColumns: ["id"]
           },
         ]
@@ -1053,6 +1081,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "candidates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "candidates_hired_profile_id_fkey"
             columns: ["hired_profile_id"]
             isOneToOne: false
@@ -1065,6 +1100,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "candidates_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -1461,19 +1503,19 @@ export type Database = {
           created_by: string | null
           department: string | null
           end_date: string | null
+          end_reason: string | null
           id: string
           is_current: boolean | null
           join_date: string
           leave_date: string | null
+          notes: string | null
           position: string
+          rank: string | null
           start_date: string | null
           updated_at: string
+          updated_by: string | null
           user_id: string
           vessel_id: string
-          end_reason: string | null
-          notes: string | null
-          rank: string | null
-          updated_by: string | null
         }
         Insert: {
           assignment_type?: string | null
@@ -1481,19 +1523,19 @@ export type Database = {
           created_by?: string | null
           department?: string | null
           end_date?: string | null
+          end_reason?: string | null
           id?: string
           is_current?: boolean | null
           join_date: string
           leave_date?: string | null
+          notes?: string | null
           position: string
+          rank?: string | null
           start_date?: string | null
           updated_at?: string
+          updated_by?: string | null
           user_id: string
           vessel_id: string
-          end_reason?: string | null
-          notes?: string | null
-          rank?: string | null
-          updated_by?: string | null
         }
         Update: {
           assignment_type?: string | null
@@ -1501,24 +1543,31 @@ export type Database = {
           created_by?: string | null
           department?: string | null
           end_date?: string | null
+          end_reason?: string | null
           id?: string
           is_current?: boolean | null
           join_date?: string
           leave_date?: string | null
+          notes?: string | null
           position?: string
+          rank?: string | null
           start_date?: string | null
           updated_at?: string
+          updated_by?: string | null
           user_id?: string
           vessel_id?: string
-          end_reason?: string | null
-          notes?: string | null
-          rank?: string | null
-          updated_by?: string | null
         }
         Relationships: [
           {
             foreignKeyName: "crew_assignments_created_by_fkey"
             columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_assignments_updated_by_fkey"
+            columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
@@ -1672,11 +1721,32 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "crew_bank_details_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "crew_bank_details_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_bank_details_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_bank_details_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -1875,10 +1945,31 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "crew_compensation_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "crew_compensation_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_compensation_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_compensation_pay_grade_id_fkey"
+            columns: ["pay_grade_id"]
+            isOneToOne: false
+            referencedRelation: "pay_grades"
             referencedColumns: ["id"]
           },
           {
@@ -1889,11 +1980,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "crew_compensation_pay_grade_id_fkey"
-            columns: ["pay_grade_id"]
+            foreignKeyName: "crew_compensation_updated_by_fkey"
+            columns: ["updated_by"]
             isOneToOne: false
-            referencedRelation: "pay_grades"
-            referencedColumns: ["id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -2012,17 +2103,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "crew_contracts_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "crew_contracts_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "crew_contracts_vessel_id_fkey"
-            columns: ["vessel_id"]
-            isOneToOne: false
-            referencedRelation: "vessels"
             referencedColumns: ["id"]
           },
           {
@@ -2033,18 +2124,18 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "crew_contracts_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
-          },
-          {
             foreignKeyName: "crew_contracts_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_contracts_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2496,18 +2587,18 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "crew_next_of_kin_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "crew_next_of_kin_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_next_of_kin_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "crew_next_of_kin_updated_by_fkey"
@@ -2547,6 +2638,20 @@ export type Database = {
           progress_pct?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "crew_objective_updates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_objective_updates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
           {
             foreignKeyName: "crew_objective_updates_objective_id_fkey"
             columns: ["objective_id"]
@@ -2635,15 +2740,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "crew_objectives_profile_id_fkey"
-            columns: ["profile_id"]
+            foreignKeyName: "crew_objectives_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_objectives_linked_application_id_fkey"
+            columns: ["linked_application_id"]
+            isOneToOne: false
+            referencedRelation: "development_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_objectives_linked_course_id_fkey"
+            columns: ["linked_course_id"]
+            isOneToOne: false
+            referencedRelation: "development_courses"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "crew_objectives_owner_profile_id_fkey"
             columns: ["owner_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_objectives_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -2656,18 +2782,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "crew_objectives_linked_course_id_fkey"
-            columns: ["linked_course_id"]
+            foreignKeyName: "crew_objectives_updated_by_fkey"
+            columns: ["updated_by"]
             isOneToOne: false
-            referencedRelation: "development_courses"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "crew_objectives_linked_application_id_fkey"
-            columns: ["linked_application_id"]
-            isOneToOne: false
-            referencedRelation: "development_applications"
-            referencedColumns: ["id"]
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -3100,11 +3219,32 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "crew_work_authorisations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "crew_work_authorisations_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_work_authorisations_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_work_authorisations_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -4302,10 +4442,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "disciplinary_records_profile_id_fkey"
-            columns: ["profile_id"]
+            foreignKeyName: "disciplinary_records_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "disciplinary_records_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
             referencedColumns: ["id"]
           },
           {
@@ -4316,11 +4463,18 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "disciplinary_records_incident_id_fkey"
-            columns: ["incident_id"]
+            foreignKeyName: "disciplinary_records_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
-            referencedRelation: "incidents"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "disciplinary_records_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "disciplinary_records_vessel_id_fkey"
@@ -7278,6 +7432,13 @@ export type Database = {
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fx_rates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
         ]
       }
       gdpr_requests: {
@@ -7423,6 +7584,20 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "gratuity_distributions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gratuity_distributions_payroll_line_id_fkey"
+            columns: ["payroll_line_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_lines"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "gratuity_distributions_pool_id_fkey"
             columns: ["pool_id"]
             isOneToOne: false
@@ -7434,13 +7609,6 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "gratuity_distributions_payroll_line_id_fkey"
-            columns: ["payroll_line_id"]
-            isOneToOne: false
-            referencedRelation: "payroll_lines"
             referencedColumns: ["id"]
           },
         ]
@@ -7523,11 +7691,32 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "gratuity_pools_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "gratuity_pools_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gratuity_pools_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "gratuity_pools_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "gratuity_pools_vessel_id_fkey"
@@ -7732,9 +7921,16 @@ export type Database = {
           {
             foreignKeyName: "hr_company_settings_company_id_fkey"
             columns: ["company_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hr_company_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -7752,15 +7948,15 @@ export type Database = {
           lifecycle_status:
             | Database["public"]["Enums"]["record_lifecycle_status"]
             | null
+          profile_id: string | null
           record_id: string
           record_type: Database["public"]["Enums"]["hr_record_type"]
           retention_end_date: string
           retention_start_date: string
           source_table: string
           updated_at: string | null
-          user_id: string
+          user_id: string | null
           version: number | null
-          profile_id: string | null
         }
         Insert: {
           anonymized_at?: string | null
@@ -7775,15 +7971,15 @@ export type Database = {
           lifecycle_status?:
             | Database["public"]["Enums"]["record_lifecycle_status"]
             | null
+          profile_id?: string | null
           record_id: string
           record_type: Database["public"]["Enums"]["hr_record_type"]
           retention_end_date: string
           retention_start_date: string
           source_table: string
           updated_at?: string | null
-          user_id: string
+          user_id?: string | null
           version?: number | null
-          profile_id?: string | null
         }
         Update: {
           anonymized_at?: string | null
@@ -7798,15 +7994,15 @@ export type Database = {
           lifecycle_status?:
             | Database["public"]["Enums"]["record_lifecycle_status"]
             | null
+          profile_id?: string | null
           record_id?: string
           record_type?: Database["public"]["Enums"]["hr_record_type"]
           retention_end_date?: string
           retention_start_date?: string
           source_table?: string
           updated_at?: string | null
-          user_id?: string
+          user_id?: string | null
           version?: number | null
-          profile_id?: string | null
         }
         Relationships: [
           {
@@ -7836,6 +8032,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "hr_record_metadata_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "hr_record_metadata_user_id_fkey"
@@ -8493,6 +8696,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "candidate_applications"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interviews_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "interviews_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -12241,38 +12458,6 @@ export type Database = {
         }
         Relationships: []
       }
-      performance_review_welfare_notes: {
-        Row: {
-          company_id: string
-          notes: string | null
-          review_id: string
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          company_id: string
-          notes?: string | null
-          review_id: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          company_id?: string
-          notes?: string | null
-          review_id?: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "performance_review_welfare_notes_review_id_fkey"
-            columns: ["review_id"]
-            isOneToOne: true
-            referencedRelation: "performance_reviews"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       onboarding_items: {
         Row: {
           company_id: string
@@ -12329,6 +12514,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "onboarding_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_items_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
           {
             foreignKeyName: "onboarding_items_record_id_fkey"
             columns: ["record_id"]
@@ -12389,6 +12588,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "onboarding_records_buddy_profile_id_fkey"
+            columns: ["buddy_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "onboarding_records_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
@@ -12396,15 +12602,15 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "onboarding_records_profile_id_fkey"
-            columns: ["profile_id"]
+            foreignKeyName: "onboarding_records_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
+            referencedColumns: ["user_id"]
           },
           {
-            foreignKeyName: "onboarding_records_buddy_profile_id_fkey"
-            columns: ["buddy_profile_id"]
+            foreignKeyName: "onboarding_records_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -12474,6 +12680,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "onboarding_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "onboarding_templates_vessel_id_fkey"
             columns: ["vessel_id"]
             isOneToOne: false
@@ -12482,260 +12695,170 @@ export type Database = {
           },
         ]
       }
-      performance_reviews: {
+      pay_grades: {
         Row: {
-          career_aspirations: string | null
-          company_id: string
-          completed_at: string | null
-          created_at: string
-          created_by: string | null
-          cycle_id: string | null
-          development_areas: string | null
-          document_path: string | null
-          due_date: string | null
-          employee_acknowledged_at: string | null
-          employee_comments: string | null
-          follow_up_actions: Json
-          id: string
-          next_review_date: string | null
-          overall_rating: number | null
-          period_end: string | null
-          period_start: string | null
-          profile_id: string
-          ratings: Json
-          recommend_pay_review: boolean | null
-          recommend_promotion: boolean | null
-          retain: boolean | null
-          review_type: string
-          reviewer_comments: string | null
-          reviewer_profile_id: string | null
-          reviewer_signed_at: string | null
-          self_assessment_submitted_at: string | null
-          self_ratings: Json
-          status: string
-          strengths: string | null
-          submitted_at: string | null
-          summary: string | null
-          training_needs: string | null
-          updated_at: string
-          updated_by: string | null
-          vessel_id: string | null
-          welfare_notes?: string | null
-        }
-        Insert: {
-          career_aspirations?: string | null
-          company_id: string
-          completed_at?: string | null
-          created_at?: string
-          created_by?: string | null
-          cycle_id?: string | null
-          development_areas?: string | null
-          document_path?: string | null
-          due_date?: string | null
-          employee_acknowledged_at?: string | null
-          employee_comments?: string | null
-          follow_up_actions?: Json
-          id?: string
-          next_review_date?: string | null
-          overall_rating?: number | null
-          period_end?: string | null
-          period_start?: string | null
-          profile_id: string
-          ratings?: Json
-          recommend_pay_review?: boolean | null
-          recommend_promotion?: boolean | null
-          retain?: boolean | null
-          review_type?: string
-          reviewer_comments?: string | null
-          reviewer_profile_id?: string | null
-          reviewer_signed_at?: string | null
-          self_assessment_submitted_at?: string | null
-          self_ratings?: Json
-          status?: string
-          strengths?: string | null
-          submitted_at?: string | null
-          summary?: string | null
-          training_needs?: string | null
-          updated_at?: string
-          updated_by?: string | null
-          vessel_id?: string | null
-        }
-        Update: {
-          career_aspirations?: string | null
-          company_id?: string
-          completed_at?: string | null
-          created_at?: string
-          created_by?: string | null
-          cycle_id?: string | null
-          development_areas?: string | null
-          document_path?: string | null
-          due_date?: string | null
-          employee_acknowledged_at?: string | null
-          employee_comments?: string | null
-          follow_up_actions?: Json
-          id?: string
-          next_review_date?: string | null
-          overall_rating?: number | null
-          period_end?: string | null
-          period_start?: string | null
-          profile_id?: string
-          ratings?: Json
-          recommend_pay_review?: boolean | null
-          recommend_promotion?: boolean | null
-          retain?: boolean | null
-          review_type?: string
-          reviewer_comments?: string | null
-          reviewer_profile_id?: string | null
-          reviewer_signed_at?: string | null
-          self_assessment_submitted_at?: string | null
-          self_ratings?: Json
-          status?: string
-          strengths?: string | null
-          submitted_at?: string | null
-          summary?: string | null
-          training_needs?: string | null
-          updated_at?: string
-          updated_by?: string | null
-          vessel_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "performance_reviews_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "performance_reviews_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "performance_reviews_reviewer_profile_id_fkey"
-            columns: ["reviewer_profile_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "performance_reviews_cycle_id_fkey"
-            columns: ["cycle_id"]
-            isOneToOne: false
-            referencedRelation: "performance_review_cycles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "performance_reviews_vessel_id_fkey"
-            columns: ["vessel_id"]
-            isOneToOne: false
-            referencedRelation: "vessels"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      performance_review_cycles: {
-        Row: {
+          code: string
           company_id: string
           created_at: string
           created_by: string | null
-          due_date: string
-          id: string
-          name: string
-          notes: string | null
-          period_end: string
-          period_start: string
-          review_type: string
-          status: string
-          updated_at: string
-          vessel_id: string | null
-        }
-        Insert: {
-          company_id: string
-          created_at?: string
-          created_by?: string | null
-          due_date: string
-          id?: string
-          name: string
-          notes?: string | null
-          period_end: string
-          period_start: string
-          review_type?: string
-          status?: string
-          updated_at?: string
-          vessel_id?: string | null
-        }
-        Update: {
-          company_id?: string
-          created_at?: string
-          created_by?: string | null
-          due_date?: string
-          id?: string
-          name?: string
-          notes?: string | null
-          period_end?: string
-          period_start?: string
-          review_type?: string
-          status?: string
-          updated_at?: string
-          vessel_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "performance_review_cycles_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "performance_review_cycles_vessel_id_fkey"
-            columns: ["vessel_id"]
-            isOneToOne: false
-            referencedRelation: "vessels"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      performance_competencies: {
-        Row: {
-          company_id: string
-          created_at: string
+          currency: string
+          daily_rate_minor: number | null
           department: string | null
-          description: string | null
+          effective_from: string
+          effective_to: string | null
+          grade_level: number
+          gratuity_points: number
           id: string
           is_active: boolean
+          monthly_base_minor: number
           name: string
-          sort_order: number
+          notes: string | null
+          rank: string | null
+          step: number
+          updated_at: string
+          updated_by: string | null
         }
         Insert: {
+          code: string
           company_id: string
           created_at?: string
+          created_by?: string | null
+          currency?: string
+          daily_rate_minor?: number | null
           department?: string | null
-          description?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          grade_level?: number
+          gratuity_points?: number
           id?: string
           is_active?: boolean
+          monthly_base_minor?: number
           name: string
-          sort_order?: number
+          notes?: string | null
+          rank?: string | null
+          step?: number
+          updated_at?: string
+          updated_by?: string | null
         }
         Update: {
+          code?: string
           company_id?: string
           created_at?: string
+          created_by?: string | null
+          currency?: string
+          daily_rate_minor?: number | null
           department?: string | null
-          description?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          grade_level?: number
+          gratuity_points?: number
           id?: string
           is_active?: boolean
+          monthly_base_minor?: number
           name?: string
-          sort_order?: number
+          notes?: string | null
+          rank?: string | null
+          step?: number
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "performance_competencies_company_id_fkey"
+            foreignKeyName: "pay_grades_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_grades_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "pay_grades_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      pay_periods: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          company_id: string
+          created_at: string
+          end_date: string
+          id: string
+          label: string
+          locked_at: string | null
+          locked_by: string | null
+          period_type: string
+          start_date: string
+          status: string
+          vessel_id: string | null
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          company_id: string
+          created_at?: string
+          end_date: string
+          id?: string
+          label: string
+          locked_at?: string | null
+          locked_by?: string | null
+          period_type?: string
+          start_date: string
+          status?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          company_id?: string
+          created_at?: string
+          end_date?: string
+          id?: string
+          label?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          period_type?: string
+          start_date?: string
+          status?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pay_periods_closed_by_fkey"
+            columns: ["closed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "pay_periods_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_periods_locked_by_fkey"
+            columns: ["locked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "pay_periods_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
             referencedColumns: ["id"]
           },
         ]
@@ -12769,6 +12892,7 @@ export type Database = {
           applied_at?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          change_pct?: number | null
           company_id: string
           comparator_notes?: string | null
           created_at?: string
@@ -12792,6 +12916,7 @@ export type Database = {
           applied_at?: string | null
           approved_at?: string | null
           approved_by?: string | null
+          change_pct?: number | null
           company_id?: string
           comparator_notes?: string | null
           created_at?: string
@@ -12813,6 +12938,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "pay_reviews_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "pay_reviews_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
@@ -12820,10 +12952,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pay_reviews_profile_id_fkey"
-            columns: ["profile_id"]
+            foreignKeyName: "pay_reviews_new_compensation_id_fkey"
+            columns: ["new_compensation_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "crew_compensation"
             referencedColumns: ["id"]
           },
           {
@@ -12834,11 +12966,18 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pay_reviews_new_compensation_id_fkey"
-            columns: ["new_compensation_id"]
+            foreignKeyName: "pay_reviews_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
-            referencedRelation: "crew_compensation"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pay_reviews_proposed_by_fkey"
+            columns: ["proposed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -12871,8 +13010,8 @@ export type Database = {
           payslip_generated_at: string | null
           payslip_path: string | null
           profile_id: string
-          proration_ratio: number
           prorated_base_minor: number
+          proration_ratio: number
           run_id: string
           status: string
           updated_at: string
@@ -12906,8 +13045,8 @@ export type Database = {
           payslip_generated_at?: string | null
           payslip_path?: string | null
           profile_id: string
-          proration_ratio?: number
           prorated_base_minor?: number
+          proration_ratio?: number
           run_id: string
           status?: string
           updated_at?: string
@@ -12941,8 +13080,8 @@ export type Database = {
           payslip_generated_at?: string | null
           payslip_path?: string | null
           profile_id?: string
-          proration_ratio?: number
           prorated_base_minor?: number
+          proration_ratio?: number
           run_id?: string
           status?: string
           updated_at?: string
@@ -12950,17 +13089,10 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "payroll_lines_run_id_fkey"
-            columns: ["run_id"]
+            foreignKeyName: "payroll_lines_company_id_fkey"
+            columns: ["company_id"]
             isOneToOne: false
-            referencedRelation: "payroll_runs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payroll_lines_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
@@ -12975,6 +13107,20 @@ export type Database = {
             columns: ["pay_grade_id"]
             isOneToOne: false
             referencedRelation: "pay_grades"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_lines_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_lines_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_runs"
             referencedColumns: ["id"]
           },
           {
@@ -13061,6 +13207,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "payroll_runs_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "payroll_runs_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
@@ -13068,11 +13221,32 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "payroll_runs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
             foreignKeyName: "payroll_runs_pay_period_id_fkey"
             columns: ["pay_period_id"]
             isOneToOne: false
             referencedRelation: "pay_periods"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_runs_submitted_by_fkey"
+            columns: ["submitted_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "payroll_runs_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "payroll_runs_vessel_id_fkey"
@@ -13083,62 +13257,110 @@ export type Database = {
           },
         ]
       }
-      pay_periods: {
+      performance_competencies: {
         Row: {
-          closed_at: string | null
-          closed_by: string | null
           company_id: string
           created_at: string
-          end_date: string
+          department: string | null
+          description: string | null
           id: string
-          label: string
-          locked_at: string | null
-          locked_by: string | null
-          period_type: string
-          start_date: string
+          is_active: boolean
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          department?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          department?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_competencies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      performance_review_cycles: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          due_date: string
+          id: string
+          name: string
+          notes: string | null
+          period_end: string
+          period_start: string
+          review_type: string
           status: string
+          updated_at: string
           vessel_id: string | null
         }
         Insert: {
-          closed_at?: string | null
-          closed_by?: string | null
           company_id: string
           created_at?: string
-          end_date: string
+          created_by?: string | null
+          due_date: string
           id?: string
-          label: string
-          locked_at?: string | null
-          locked_by?: string | null
-          period_type?: string
-          start_date: string
+          name: string
+          notes?: string | null
+          period_end: string
+          period_start: string
+          review_type?: string
           status?: string
+          updated_at?: string
           vessel_id?: string | null
         }
         Update: {
-          closed_at?: string | null
-          closed_by?: string | null
           company_id?: string
           created_at?: string
-          end_date?: string
+          created_by?: string | null
+          due_date?: string
           id?: string
-          label?: string
-          locked_at?: string | null
-          locked_by?: string | null
-          period_type?: string
-          start_date?: string
+          name?: string
+          notes?: string | null
+          period_end?: string
+          period_start?: string
+          review_type?: string
           status?: string
+          updated_at?: string
           vessel_id?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "pay_periods_company_id_fkey"
+            foreignKeyName: "performance_review_cycles_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "pay_periods_vessel_id_fkey"
+            foreignKeyName: "performance_review_cycles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "performance_review_cycles_vessel_id_fkey"
             columns: ["vessel_id"]
             isOneToOne: false
             referencedRelation: "vessels"
@@ -13146,79 +13368,204 @@ export type Database = {
           },
         ]
       }
-      pay_grades: {
+      performance_review_welfare_notes: {
         Row: {
-          code: string
           company_id: string
-          created_at: string
-          created_by: string | null
-          currency: string
-          daily_rate_minor: number | null
-          department: string | null
-          effective_from: string
-          effective_to: string | null
-          grade_level: number
-          gratuity_points: number
-          id: string
-          is_active: boolean
-          monthly_base_minor: number
-          name: string
           notes: string | null
-          rank: string | null
-          step: number
+          review_id: string
           updated_at: string
           updated_by: string | null
         }
         Insert: {
-          code: string
           company_id: string
-          created_at?: string
-          created_by?: string | null
-          currency?: string
-          daily_rate_minor?: number | null
-          department?: string | null
-          effective_from?: string
-          effective_to?: string | null
-          grade_level?: number
-          gratuity_points?: number
-          id?: string
-          is_active?: boolean
-          monthly_base_minor?: number
-          name: string
           notes?: string | null
-          rank?: string | null
-          step?: number
+          review_id: string
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
-          code?: string
           company_id?: string
-          created_at?: string
-          created_by?: string | null
-          currency?: string
-          daily_rate_minor?: number | null
-          department?: string | null
-          effective_from?: string
-          effective_to?: string | null
-          grade_level?: number
-          gratuity_points?: number
-          id?: string
-          is_active?: boolean
-          monthly_base_minor?: number
-          name?: string
           notes?: string | null
-          rank?: string | null
-          step?: number
+          review_id?: string
           updated_at?: string
           updated_by?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "pay_grades_company_id_fkey"
+            foreignKeyName: "performance_review_welfare_notes_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: true
+            referencedRelation: "performance_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      performance_reviews: {
+        Row: {
+          career_aspirations: string | null
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          cycle_id: string | null
+          development_areas: string | null
+          document_path: string | null
+          due_date: string | null
+          employee_acknowledged_at: string | null
+          employee_comments: string | null
+          follow_up_actions: Json
+          id: string
+          next_review_date: string | null
+          overall_rating: number | null
+          period_end: string | null
+          period_start: string | null
+          profile_id: string
+          ratings: Json
+          recommend_pay_review: boolean | null
+          recommend_promotion: boolean | null
+          retain: boolean | null
+          review_type: string
+          reviewer_comments: string | null
+          reviewer_profile_id: string | null
+          reviewer_signed_at: string | null
+          self_assessment_submitted_at: string | null
+          self_ratings: Json
+          status: string
+          strengths: string | null
+          submitted_at: string | null
+          summary: string | null
+          training_needs: string | null
+          updated_at: string
+          updated_by: string | null
+          vessel_id: string | null
+          welfare_notes: string | null
+        }
+        Insert: {
+          career_aspirations?: string | null
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          cycle_id?: string | null
+          development_areas?: string | null
+          document_path?: string | null
+          due_date?: string | null
+          employee_acknowledged_at?: string | null
+          employee_comments?: string | null
+          follow_up_actions?: Json
+          id?: string
+          next_review_date?: string | null
+          overall_rating?: number | null
+          period_end?: string | null
+          period_start?: string | null
+          profile_id: string
+          ratings?: Json
+          recommend_pay_review?: boolean | null
+          recommend_promotion?: boolean | null
+          retain?: boolean | null
+          review_type?: string
+          reviewer_comments?: string | null
+          reviewer_profile_id?: string | null
+          reviewer_signed_at?: string | null
+          self_assessment_submitted_at?: string | null
+          self_ratings?: Json
+          status?: string
+          strengths?: string | null
+          submitted_at?: string | null
+          summary?: string | null
+          training_needs?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+          welfare_notes?: string | null
+        }
+        Update: {
+          career_aspirations?: string | null
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          cycle_id?: string | null
+          development_areas?: string | null
+          document_path?: string | null
+          due_date?: string | null
+          employee_acknowledged_at?: string | null
+          employee_comments?: string | null
+          follow_up_actions?: Json
+          id?: string
+          next_review_date?: string | null
+          overall_rating?: number | null
+          period_end?: string | null
+          period_start?: string | null
+          profile_id?: string
+          ratings?: Json
+          recommend_pay_review?: boolean | null
+          recommend_promotion?: boolean | null
+          retain?: boolean | null
+          review_type?: string
+          reviewer_comments?: string | null
+          reviewer_profile_id?: string | null
+          reviewer_signed_at?: string | null
+          self_assessment_submitted_at?: string | null
+          self_ratings?: Json
+          status?: string
+          strengths?: string | null
+          submitted_at?: string | null
+          summary?: string | null
+          training_needs?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+          welfare_notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_reviews_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_reviews_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "performance_reviews_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "performance_review_cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_reviews_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_reviews_reviewer_profile_id_fkey"
+            columns: ["reviewer_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "performance_reviews_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "performance_reviews_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
             referencedColumns: ["id"]
           },
         ]
@@ -13703,8 +14050,8 @@ export type Database = {
           updated_by: string | null
           user_id: string | null
           version: number | null
-          visa_status: string | null
           visa_expiry: string | null
+          visa_status: string | null
           annual_leave_entitlement: number | null
           employment_status: string | null
           joining_date: string | null
@@ -13765,8 +14112,8 @@ export type Database = {
           updated_by?: string | null
           user_id?: string | null
           version?: number | null
-          visa_status?: string | null
           visa_expiry?: string | null
+          visa_status?: string | null
           annual_leave_entitlement?: number | null
           employment_status?: string | null
           joining_date?: string | null
@@ -13827,8 +14174,8 @@ export type Database = {
           updated_by?: string | null
           user_id?: string | null
           version?: number | null
-          visa_status?: string | null
           visa_expiry?: string | null
+          visa_status?: string | null
           annual_leave_entitlement?: number | null
           employment_status?: string | null
           joining_date?: string | null
@@ -15963,10 +16310,17 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "vacancies_vessel_id_fkey"
-            columns: ["vessel_id"]
+            foreignKeyName: "vacancies_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
-            referencedRelation: "vessels"
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "vacancies_hiring_manager_profile_id_fkey"
+            columns: ["hiring_manager_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -15977,17 +16331,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "vacancies_hiring_manager_profile_id_fkey"
-            columns: ["hiring_manager_profile_id"]
+            foreignKeyName: "vacancies_replaces_profile_id_fkey"
+            columns: ["replaces_profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "vacancies_replaces_profile_id_fkey"
-            columns: ["replaces_profile_id"]
+            foreignKeyName: "vacancies_updated_by_fkey"
+            columns: ["updated_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "vacancies_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
             referencedColumns: ["id"]
           },
         ]
@@ -16617,21 +16978,6 @@ export type Database = {
           },
         ]
       }
-      hr_expiry_items: {
-        Row: {
-          company_id: string | null
-          crew_name: string | null
-          days_remaining: number | null
-          due_date: string | null
-          item_type: string | null
-          label: string | null
-          profile_id: string | null
-          record_id: string | null
-          user_id: string | null
-          vessel_id: string | null
-        }
-        Relationships: []
-      }
       disciplinary_records_self: {
         Row: {
           acknowledged_by_crew_at: string | null
@@ -16649,6 +16995,79 @@ export type Database = {
           severity: string | null
           stage: string | null
           status: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          acknowledged_by_crew_at?: string | null
+          appeal_status?: string | null
+          category?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          expiry_date?: string | null
+          id?: string | null
+          incident_date?: string | null
+          outcome?: string | null
+          outcome_date?: string | null
+          profile_id?: string | null
+          severity?: string | null
+          stage?: string | null
+          status?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          acknowledged_by_crew_at?: string | null
+          appeal_status?: string | null
+          category?: string | null
+          company_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          expiry_date?: string | null
+          id?: string | null
+          incident_date?: string | null
+          outcome?: string | null
+          outcome_date?: string | null
+          profile_id?: string | null
+          severity?: string | null
+          stage?: string | null
+          status?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "disciplinary_records_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "disciplinary_records_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "disciplinary_records_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hr_expiry_items: {
+        Row: {
+          company_id: string | null
+          crew_name: string | null
+          days_remaining: number | null
+          due_date: string | null
+          item_type: string | null
+          label: string | null
+          profile_id: string | null
+          record_id: string | null
+          user_id: string | null
           vessel_id: string | null
         }
         Relationships: []
@@ -16695,7 +17114,12 @@ export type Database = {
       frp_can_view: { Args: { _user_id: string }; Returns: boolean }
       frp_planner_access: { Args: never; Returns: Json }
       fx_rate_for: {
-        Args: { p_company_id: string; p_from: string; p_to: string; p_on: string }
+        Args: {
+          p_company_id: string
+          p_from: string
+          p_on: string
+          p_to: string
+        }
         Returns: number
       }
       get_dashboard_alerts: {
@@ -16894,10 +17318,7 @@ export type Database = {
           vessel_id: string
         }[]
       }
-      gratuity_calculate_pool: {
-        Args: { p_pool_id: string }
-        Returns: number
-      }
+      gratuity_calculate_pool: { Args: { p_pool_id: string }; Returns: number }
       has_any_role: {
         Args: {
           _roles: Database["public"]["Enums"]["app_role"][]
@@ -16929,13 +17350,13 @@ export type Database = {
         }
         Returns: boolean
       }
-      hr_anonymize_profile: {
-        Args: { p_profile_id: string; p_reason?: string | null }
-        Returns: undefined
-      }
       hr_archive_due_records: {
         Args: { p_company_id?: string | null }
         Returns: number
+      }
+      hr_anonymize_profile: {
+        Args: { p_profile_id: string; p_reason?: string | null }
+        Returns: undefined
       }
       hr_can_admin: { Args: { _user_id: string }; Returns: boolean }
       hr_can_edit: { Args: { _user_id: string }; Returns: boolean }
@@ -16944,37 +17365,65 @@ export type Database = {
         Args: { _subject_user_id: string }
         Returns: boolean
       }
+      hr_company_settings_for: {
+        Args: { p_company_id: string }
+        Returns: {
+          company_id: string
+          default_currency: string
+          gratuity_default_method: string
+          gratuity_default_points: number
+          pay_cutoff_day: number
+          pay_day_of_month: number
+          pay_period_type: string
+          payslip_footer: string | null
+          rounding_minor: number
+          travel_days_paid: boolean
+          unpaid_leave_codes: string[]
+          updated_at: string
+          updated_by: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "hr_company_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       hr_days_onboard: {
-        Args: { p_profile_id: string; p_start: string; p_end: string; p_vessel_id?: string | null; p_unpaid_codes?: string[] }
+        Args: {
+          p_end: string
+          p_profile_id: string
+          p_start: string
+          p_unpaid_codes?: string[]
+          p_vessel_id?: string
+        }
         Returns: {
           days_in_period: number
-          days_onboard: number
           days_leave_paid: number
+          days_onboard: number
           days_travel: number
-          days_unpaid: number
           days_unknown: number
+          days_unpaid: number
           source_summary: Json
         }[]
       }
-      hr_expire_disciplinary_records: {
-        Args: Record<string, never>
-        Returns: number
-      }
-      hr_expire_overrun_contracts: {
-        Args: Record<string, never>
-        Returns: number
-      }
-      hr_generate_alerts: {
-        Args: { p_company_id?: string | null }
-        Returns: number
-      }
+      hr_expire_disciplinary_records: { Args: never; Returns: number }
+      hr_expire_overrun_contracts: { Args: never; Returns: number }
+      hr_generate_alerts: { Args: { p_company_id?: string }; Returns: number }
       hr_record_access_log: {
         Args: { p_record_type: string; p_record_id: string; p_profile_id: string; p_context?: string | null }
         Returns: undefined
       }
-      hr_company_settings_for: {
-        Args: { p_company_id: string }
-        Returns: Database['public']['Tables']['hr_company_settings']['Row']
+      hr_register_record: {
+        Args: {
+          p_company_id: string
+          p_profile_id: string
+          p_record_id: string
+          p_record_type: Database["public"]["Enums"]["hr_record_type"]
+          p_retention_start: string
+          p_source_table: string
+        }
+        Returns: string
       }
       initialize_vessel_emergency_from_defaults: {
         Args: { p_company_id: string; p_vessel_id: string }
@@ -16999,32 +17448,43 @@ export type Database = {
         Returns: string
       }
       logbook_actor_name: { Args: { _user_id: string }; Returns: string }
-      pay_review_apply: {
-        Args: { p_review_id: string }
-        Returns: string
-      }
-      payroll_calculate_run: {
-        Args: { p_run_id: string }
-        Returns: number
-      }
-      performance_review_acknowledge: {
-        Args: { p_review_id: string; p_employee_comments?: string | null }
-        Returns: undefined
-      }
-      performance_review_submit_self_assessment: {
-        Args: { p_review_id: string; p_self_ratings: Json; p_employee_comments: string | null }
-        Returns: undefined
-      }
+      my_profile_id: { Args: never; Returns: string }
       onboarding_recompute: {
         Args: { p_record_id: string }
         Returns: undefined
       }
       onboarding_start: {
-        Args: { p_profile_id: string; p_vessel_id: string | null; p_start_date: string; p_template_id?: string | null }
-        Returns: string | null
+        Args: {
+          p_profile_id: string
+          p_start_date: string
+          p_template_id?: string
+          p_vessel_id: string
+        }
+        Returns: string
+      }
+      pay_review_apply: { Args: { p_review_id: string }; Returns: string }
+      payroll_calculate_run: { Args: { p_run_id: string }; Returns: number }
+      payroll_can_admin: { Args: { _user_id: string }; Returns: boolean }
+      payroll_can_edit: { Args: { _user_id: string }; Returns: boolean }
+      payroll_can_view: { Args: { _user_id: string }; Returns: boolean }
+      performance_review_acknowledge: {
+        Args: { p_employee_comments?: string; p_review_id: string }
+        Returns: undefined
+      }
+      performance_review_submit_self_assessment: {
+        Args: {
+          p_employee_comments: string
+          p_review_id: string
+          p_self_ratings: Json
+        }
+        Returns: undefined
       }
       recruitment_hire_candidate: {
-        Args: { p_application_id: string; p_start_date: string; p_vessel_id?: string | null }
+        Args: {
+          p_application_id: string
+          p_start_date: string
+          p_vessel_id?: string
+        }
         Returns: string
       }
       snooze_alert: {
