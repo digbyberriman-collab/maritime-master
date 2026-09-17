@@ -10942,8 +10942,10 @@ export type Database = {
           email: string
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
+          employment_start_date: string | null
           first_name: string
           gender: string | null
+          hod_user_id: string | null
           id: string
           imported_vessel_id: string | null
           invitation_count: number | null
@@ -10987,8 +10989,10 @@ export type Database = {
           email: string
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
+          employment_start_date?: string | null
           first_name: string
           gender?: string | null
+          hod_user_id?: string | null
           id?: string
           imported_vessel_id?: string | null
           invitation_count?: number | null
@@ -11032,8 +11036,10 @@ export type Database = {
           email?: string
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
+          employment_start_date?: string | null
           first_name?: string
           gender?: string | null
+          hod_user_id?: string | null
           id?: string
           imported_vessel_id?: string | null
           invitation_count?: number | null
@@ -11070,6 +11076,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_hod_user_id_fkey"
+            columns: ["hod_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "profiles_imported_vessel_id_fkey"

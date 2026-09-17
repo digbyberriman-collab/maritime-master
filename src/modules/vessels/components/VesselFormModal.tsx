@@ -26,11 +26,17 @@ import { Loader2 } from 'lucide-react';
 
 const currentYear = new Date().getFullYear();
 
-const optionalNumber = z
-  .union([z.coerce.number(), z.literal(''), z.null()])
-  .transform((v) => (v === '' || v === null || Number.isNaN(v) ? null : (v as number)))
-  .nullable()
-  .optional();
+const blankToNull = (v: unknown) =>
+  v === '' || v === null || v === undefined || (typeof v === 'string' && v.trim() === '') ? null : v;
+
+const optionalNumber = z.preprocess(
+  blankToNull,
+  z.coerce
+    .number()
+    .transform((v) => (Number.isNaN(v) ? null : v))
+    .nullable()
+    .optional(),
+);
 
 const vesselSchema = z.object({
   name: z.string().min(1, 'Vessel name is required').max(120),
@@ -51,11 +57,15 @@ const vesselSchema = z.object({
   builder: z.string().trim().max(120).optional(),
   home_port: z.string().trim().max(120).optional(),
   gross_tonnage: optionalNumber,
-  build_year: z
-    .union([z.coerce.number().min(1900, 'Build year must be 1900 or later').max(currentYear, `Build year cannot exceed ${currentYear}`), z.literal(''), z.null()])
-    .transform((v) => (v === '' || v === null || Number.isNaN(v) ? null : (v as number)))
-    .nullable()
-    .optional(),
+  build_year: z.preprocess(
+    blankToNull,
+    z.coerce
+      .number()
+      .min(1900, 'Build year must be 1900 or later')
+      .max(currentYear, `Build year cannot exceed ${currentYear}`)
+      .nullable()
+      .optional(),
+  ),
   length_overall: optionalNumber,
   beam: optionalNumber,
   draft: optionalNumber,
