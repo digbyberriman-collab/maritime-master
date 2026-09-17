@@ -11,6 +11,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import type { LogbookDefinition } from '@/modules/logbooks/lib/logbookDefinitions';
+import type { SheetTemplate } from '@/modules/logbooks/lib/dagonEngineLog';
+import LogbookSheetForm from '@/modules/logbooks/components/LogbookSheetForm';
 import LogbookAttachments from '@/modules/logbooks/components/LogbookAttachments';
 import LogbookEntryHistory from '@/modules/logbooks/components/LogbookEntryHistory';
 import type { LogbookEntry, LogbookEntryInput } from '@/modules/logbooks/hooks/useLogbook';
@@ -23,6 +25,8 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   definition: LogbookDefinition;
+  /** Vessel-specific daily readings sheet, used instead of the generic fields. */
+  sheet?: SheetTemplate;
   entry?: LogbookEntry | null;
   defaultDate?: Date | null;
   saving?: boolean;
