@@ -511,7 +511,7 @@ export default function InteriorMaterials() {
     if (!path) return;
     try {
       await supabase.storage.from("nb-material-swatches").remove([path]);
-    } catch {}
+    } catch { /* best-effort: swatch may already be gone */ }
     setMaterialForm((f) => ({ ...f, swatch_storage_path: "" }));
   };
 
@@ -539,7 +539,7 @@ export default function InteriorMaterials() {
   const handleRemovePhoto = async (path: string) => {
     try {
       await supabase.storage.from("nb-material-swatches").remove([path]);
-    } catch {}
+    } catch { /* best-effort: photo may already be gone */ }
     setMaterialForm((f) => ({ ...f, photos: (f.photos || []).filter((p) => p !== path) }));
   };
 

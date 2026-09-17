@@ -84,8 +84,11 @@ export default function DocumentUploadPage() {
     try {
       updateFileStatus(uploadedFile.id, { status: 'uploading', progress: 30 });
 
-      // Upload to Supabase Storage
-      const filePath = `temp/${uploadedFile.id}/${uploadedFile.file.name}`;
+      // Upload to Supabase Storage. Bucket policies require the first path
+      // segment to be the uploader's company id.
+      if (!profile?.company_id) throw new Error('Your profile has no company; cannot upload files');
+      const safeName = uploadedFile.file.name.replace(/[^A-Za-z0-9._-]+/g, '_');
+      const filePath = `${profile.company_id}/travel/${selectedCrewMember || 'unassigned'}/${uploadedFile.id}/${safeName}`;
       const { error: uploadError } = await supabase.storage
         .from('crew-travel-documents')
         .upload(filePath, uploadedFile.file);

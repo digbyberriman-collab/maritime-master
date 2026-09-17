@@ -323,7 +323,18 @@ const HRPage: React.FC = () => {
         </Alert>
 
         {/* Tabbed Content */}
-        <Tabs value={hrTab} onValueChange={(v) => setSearchParams({ tab: v })} className="w-full">
+        <Tabs
+          value={hrTab}
+          onValueChange={(v) =>
+            setSearchParams((prev) => {
+              // Preserve ?module=hris (and anything else) so the layout stays in HRIS.
+              const next = new URLSearchParams(prev);
+              next.set('tab', v);
+              return next;
+            })
+          }
+          className="w-full"
+        >
           <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7 h-auto">
             {hrTabs.map((tab) => (
               <TabsTrigger key={tab.id} value={tab.id} className="text-xs px-2 py-2">

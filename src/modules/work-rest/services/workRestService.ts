@@ -82,7 +82,7 @@ export async function listVesselSubmissions(opts: {
   month: number;
   department?: string | null;
 }) {
-  let q = sb
+  const q = sb
     .from('work_rest_monthly_submissions')
     .select(
       `*, profiles:crew_id (first_name, last_name, rank, department, hod_user_id, employment_status)`

@@ -3,7 +3,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from '@/shared/components/ProtectedRoute';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { PlaceholderPage } from '@/shared/components/common/PlaceholderPage';
-import { PLACEHOLDER_LEAVES } from '@/config/sitemap';
+import { PLACEHOLDER_LEAVES, SECTION_REDIRECTS } from '@/config/sitemap';
+import ModuleRoute from '@/shared/components/ModuleRoute';
 import { newBuildRoutes } from '@/modules/new-build/routes';
 import { refitRoutes } from '@/modules/refit/routes';
 import { 
@@ -622,7 +623,7 @@ export const AppRoutes: React.FC = () => {
       } />
 
       {/* HR */}
-      <Route path="/hr" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><HRPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/hr" element={<ModuleRoute moduleId="hris"><React.Suspense fallback={<LazyLoader />}><HRPage /></React.Suspense></ModuleRoute>} />
 
       {/* Insurance */}
       <Route path="/insurance" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><InsurancePage /></React.Suspense></ProtectedRoute>} />
@@ -797,11 +798,23 @@ export const AppRoutes: React.FC = () => {
           key={leaf.path}
           path={leaf.path}
           element={
-            <ProtectedRoute>
-              <PlaceholderWrapper title={leaf.label} />
-            </ProtectedRoute>
+            leaf.path.startsWith('/hris/') ? (
+              <ModuleRoute moduleId="hris">
+                <PlaceholderWrapper title={leaf.label} />
+              </ModuleRoute>
+            ) : (
+              <ProtectedRoute>
+                <PlaceholderWrapper title={leaf.label} />
+              </ProtectedRoute>
+            )
           }
         />
+      ))}
+
+      {/* Section and group paths (e.g. /hris, /hris/compensation) redirect to
+          their first leaf so bookmarks don't bounce to the dashboard. */}
+      {SECTION_REDIRECTS.map((redirect) => (
+        <Route key={redirect.from} path={redirect.from} element={<Navigate to={redirect.to} replace />} />
       ))}
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

@@ -135,7 +135,8 @@ function buildDateAxis(tl: XLSX.WorkSheet, range: XLSX.Range): Record<number, st
   for (let C = range.s.c + 1; C <= range.e.c; C++) {
     const marker = parseMonthMarker(tl[XLSX.utils.encode_cell({ r: 2, c: C })]);
     if (marker) {
-      let { year, month } = marker;
+      let { year } = marker;
+      const { month } = marker;
       // Guard against typo'd year labels (e.g. "Jan-14" between Dec-25 and Feb-26):
       // the month axis only ever moves forward.
       if (curYear != null && curMonth != null && (year < curYear || (year === curYear && month < curMonth))) {

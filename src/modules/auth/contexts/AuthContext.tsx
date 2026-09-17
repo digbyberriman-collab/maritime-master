@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
+import { resolveHrAccess } from '@/modules/auth/lib/hrAccess';
 
 interface Profile {
   id: string;
@@ -74,7 +75,11 @@ const MODULE_ACCESS: Record<string, string[]> = {
   'alerts': ['dpa', 'shore_management', 'master', 'chief_engineer', 'chief_officer'],
   'settings': ['dpa', 'shore_management', 'master', 'chief_engineer', 'chief_officer', 'crew'],
   'admin': ['dpa', 'shore_management'],
+  'hris': ['dpa', 'shore_management', 'master', 'chief_officer', 'chief_engineer'],
 };
+
+// Modules that must never fail open and are resolved by dedicated rules.
+const SENSITIVE_MODULES = new Set(['hris']);
 
 interface AuthContextType {
   user: User | null;
@@ -124,6 +129,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isLoading: rbacLoading,
     canView,
     hasRole: hasRBACRole,
+    permissions: rbacPermissions,
+    userRoles: rbacUserRoles,
   } = usePermissionsStore();
 
   const userRole = profile?.role ?? null;
@@ -158,6 +165,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const canAccessModule = useCallback((moduleId: string): boolean => {
     if (!user) return false;
 
+    // Sensitive modules never fail open while RBAC is still loading, and are
+    // resolved by the dedicated HR access rules (which mirror the hr_can_*
+    // SQL helpers) rather than the coarse module map below.
+    if (SENSITIVE_MODULES.has(moduleId)) {
+      if (!rbacInitialized || rbacLoading) return false;
+      const hrPermission = rbacPermissions.find((p) => p.module_key === 'hr') ?? null;
+      const access = resolveHrAccess({
+        rbacInitialized,
+        rbacRoles: rbacUserRoles.map((r) => r.role_name).filter(Boolean) as string[],
+        hrPermission,
+        legacyRole: userRole,
+      });
+      return access.canView;
+    }
+
     if (!rbacInitialized || rbacLoading) {
       return true;
     }
@@ -174,9 +196,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         'fleet': 'fleet',
         'vessel': 'vessels',
         'shoreside': 'reports',
-        'health': 'hr',
+        'health': 'crew_roster',
         'yard': 'maintenance',
-        'hris': 'hr',
+        'hris': 'hr', // handled by SENSITIVE_MODULES above; kept for completeness
         'fleet-map': 'fleet',
         'vessels': 'vessels',
         'crew': 'crew_roster',
@@ -209,7 +231,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!allowedRoles) return true;
     
     return allowedRoles.includes(userRole);
-  }, [user, userRole, rbacInitialized, rbacLoading, canView, hasRBACRole]);
+  }, [user, userRole, rbacInitialized, rbacLoading, canView, hasRBACRole, rbacPermissions, rbacUserRoles]);
 
   useEffect(() => {
     // Set up auth state listener FIRST

@@ -83,7 +83,10 @@ export interface AddCrewMemberData {
 }
 
 export interface UpdateCrewMemberData {
-  userId: string;
+  /** profiles.user_id. Null for imported crew who have not been invited yet. */
+  userId: string | null;
+  /** profiles.id. Preferred write key: it exists for every profile, including imported crew. */
+  profileId?: string;
   // Personal Information
   firstName?: string;
   lastName?: string;
@@ -335,13 +338,21 @@ export const useCrew = (vesselFilter?: string) => {
       // Metadata
       updateData.updated_at = new Date().toISOString();
 
-      // Update profile
-      const { error } = await supabase
-        .from('profiles')
-        .update(updateData)
-        .eq('user_id', data.userId);
+      // Update profile. Key on profiles.id when we have it: imported crew have
+      // no user_id yet, and `.eq('user_id', null)` silently matches nothing.
+      if (!data.profileId && !data.userId) {
+        throw new Error('Cannot update a crew member without a profile id');
+      }
+      const profileQuery = supabase.from('profiles').update(updateData);
+      const { data: updatedRows, error } = await (data.profileId
+        ? profileQuery.eq('id', data.profileId)
+        : profileQuery.eq('user_id', data.userId as string)
+      ).select('id');
 
       if (error) throw error;
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error('No changes were saved. You may not have permission to edit this crew member.');
+      }
 
       // Update assignment if join date or position changed
       if (data.assignmentId && (data.joinDate !== undefined || data.position !== undefined)) {

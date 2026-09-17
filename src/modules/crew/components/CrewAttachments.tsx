@@ -26,6 +26,7 @@ import {
   DialogFooter 
 } from '@/components/ui/dialog';
 import { useToast } from '@/shared/hooks/use-toast';
+import { downloadCrewDocument, getCrewDocumentSignedUrl } from '@/lib/storage/crewDocuments';
 import { 
   Plus, 
   Trash2, 
@@ -50,6 +51,7 @@ export const CrewAttachments: React.FC<CrewAttachmentsProps> = ({ crewId, crewVe
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedAttachment, setSelectedAttachment] = useState<CrewAttachment | null>(null);
   const [uploading, setUploading] = useState(false);
 
@@ -123,16 +125,7 @@ export const CrewAttachments: React.FC<CrewAttachmentsProps> = ({ crewId, crewVe
 
   const handleDownload = async (attachment: CrewAttachment) => {
     try {
-      const response = await fetch(attachment.file_url);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = attachment.file_name;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+      await downloadCrewDocument(attachment.file_url, attachment.file_name);
     } catch (error) {
       console.error('Error downloading:', error);
       toast({
@@ -143,9 +136,20 @@ export const CrewAttachments: React.FC<CrewAttachmentsProps> = ({ crewId, crewVe
     }
   };
 
-  const handlePreview = (attachment: CrewAttachment) => {
+  const handlePreview = async (attachment: CrewAttachment) => {
     setSelectedAttachment(attachment);
+    setPreviewUrl(null);
     setIsPreviewOpen(true);
+    try {
+      setPreviewUrl(await getCrewDocumentSignedUrl(attachment.file_url));
+    } catch (error) {
+      console.error('Error creating preview link:', error);
+      toast({
+        title: 'Error',
+        description: 'Could not open a preview for this file',
+        variant: 'destructive'
+      });
+    }
   };
 
   if (isLoading) {
@@ -340,15 +344,17 @@ export const CrewAttachments: React.FC<CrewAttachmentsProps> = ({ crewId, crewVe
             <DialogTitle>{selectedAttachment?.file_name}</DialogTitle>
           </DialogHeader>
           <div className="flex items-center justify-center min-h-[400px]">
-            {selectedAttachment?.mime_type?.startsWith('image/') ? (
-              <img 
-                src={selectedAttachment.file_url} 
+            {selectedAttachment && !previewUrl && (selectedAttachment.mime_type?.startsWith('image/') || selectedAttachment.mime_type?.includes('pdf')) ? (
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+            ) : selectedAttachment?.mime_type?.startsWith('image/') && previewUrl ? (
+              <img
+                src={previewUrl}
                 alt={selectedAttachment.file_name}
                 className="max-w-full max-h-[70vh] object-contain"
               />
-            ) : selectedAttachment?.mime_type?.includes('pdf') ? (
-              <iframe 
-                src={selectedAttachment.file_url}
+            ) : selectedAttachment?.mime_type?.includes('pdf') && previewUrl ? (
+              <iframe
+                src={previewUrl}
                 className="w-full h-[70vh]"
                 title={selectedAttachment.file_name}
               />

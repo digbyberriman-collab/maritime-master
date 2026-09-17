@@ -371,7 +371,7 @@ export const findNextLeaveBlock = (
 
   if (futureLeaveEntries.length > 0) {
     // Walk forward to find the contiguous block
-    let start = futureLeaveEntries[0].date;
+    const start = futureLeaveEntries[0].date;
     let end = start;
     for (let i = 1; i < futureLeaveEntries.length; i++) {
       const prev = parseDate(futureLeaveEntries[i - 1].date)!;

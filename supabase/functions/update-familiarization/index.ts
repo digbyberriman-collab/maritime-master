@@ -6,12 +6,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+/**
+ * Marks one familiarization checklist item complete/incomplete on behalf of a
+ * supervisor. The parent familiarization_records row (completion_percentage,
+ * status, actual_completion_date) is recomputed by the
+ * trg_recompute_familiarization_progress database trigger, so this function
+ * only touches the checklist item.
+ */
 interface UpdateFamiliarizationRequest {
-  crewId: string;
-  sectionId: string;
-  checklistItemIndex: number;
+  familiarizationId: string;
+  checklistItemId: string;
   completed: boolean;
   notes?: string;
+  evidenceUrl?: string;
 }
 
 serve(async (req: Request) => {
@@ -33,7 +40,7 @@ serve(async (req: Request) => {
 
     const token = authHeader.replace('Bearer ', '');
     const { data: userData, error: userError } = await supabaseAdmin.auth.getUser(token);
-    
+
     if (userError || !userData.user) {
       throw new Error('Unauthorized');
     }
@@ -48,76 +55,62 @@ serve(async (req: Request) => {
       throw new Error('Profile not found');
     }
 
-    // Only DPA, Master, and Supervisors can update familiarization
-    if (!['dpa', 'master', 'shore_management', 'chief_officer', 'chief_engineer'].includes(profile.role)) {
-      throw new Error('Insufficient permissions');
+    const body: UpdateFamiliarizationRequest = await req.json();
+    if (!body.familiarizationId || !body.checklistItemId || typeof body.completed !== 'boolean') {
+      throw new Error('familiarizationId, checklistItemId and completed are required');
     }
 
-    const body: UpdateFamiliarizationRequest = await req.json();
-
-    // Get familiarization record
+    // Load the record with its vessel so we can scope the permission check.
     const { data: familiarization, error: famError } = await supabaseAdmin
       .from('familiarization_records')
-      .select('*')
-      .eq('user_id', body.crewId)
-      .eq('id', body.sectionId)
+      .select('id, user_id, supervisor_id, vessel_id, vessels!inner(company_id)')
+      .eq('id', body.familiarizationId)
       .single();
 
     if (famError || !familiarization) {
       throw new Error('Familiarization record not found');
     }
 
-    // Update checklist progress
-    const checklistProgress = familiarization.checklist_progress || [];
-    checklistProgress[body.checklistItemIndex] = {
-      completed: body.completed,
-      completed_at: body.completed ? new Date().toISOString() : null,
-      completed_by: body.completed ? userData.user.id : null,
-      notes: body.notes,
-    };
-
-    // Calculate completion percentage
-    const totalItems = checklistProgress.length;
-    const completedItems = checklistProgress.filter((item: { completed: boolean }) => item?.completed).length;
-    const completionPercentage = Math.round((completedItems / totalItems) * 100);
-
-    // Determine status
-    let status = 'In_Progress';
-    if (completionPercentage === 100) {
-      status = 'Completed';
-    } else if (completionPercentage === 0) {
-      status = 'Not_Started';
+    const recordCompanyId = (familiarization as unknown as { vessels: { company_id: string } }).vessels?.company_id;
+    if (recordCompanyId !== profile.company_id) {
+      throw new Error('Familiarization record not found');
     }
 
-    // Check if overdue
-    const requiredCompletionDate = new Date(familiarization.required_completion_date);
-    if (status !== 'Completed' && requiredCompletionDate < new Date()) {
-      status = 'Overdue';
+    const isSupervisor = familiarization.supervisor_id === userData.user.id;
+    const isManager = ['dpa', 'master', 'shore_management', 'chief_officer', 'chief_engineer'].includes(profile.role);
+    if (!isSupervisor && !isManager) {
+      throw new Error('Insufficient permissions');
     }
 
     const { error: updateError } = await supabaseAdmin
-      .from('familiarization_records')
+      .from('familiarization_checklist_items')
       .update({
-        checklist_progress: checklistProgress,
-        completion_percentage: completionPercentage,
-        status,
-        completed_at: status === 'Completed' ? new Date().toISOString() : null,
-        signed_off_by: status === 'Completed' ? userData.user.id : null,
-        updated_at: new Date().toISOString(),
+        completed: body.completed,
+        completed_date: body.completed ? new Date().toISOString() : null,
+        completed_by_id: body.completed ? userData.user.id : null,
+        notes: body.notes ?? null,
+        evidence_url: body.evidenceUrl ?? null,
       })
-      .eq('id', body.sectionId);
+      .eq('id', body.checklistItemId)
+      .eq('familiarization_id', body.familiarizationId);
 
     if (updateError) {
-      throw new Error(`Failed to update familiarization: ${updateError.message}`);
+      throw new Error(`Failed to update checklist item: ${updateError.message}`);
     }
 
-    console.log(`Familiarization updated for crew ${body.crewId}, section ${body.sectionId}`);
+    // The trigger has already recomputed the parent; read it back for the caller.
+    const { data: updated } = await supabaseAdmin
+      .from('familiarization_records')
+      .select('completion_percentage, status, actual_completion_date')
+      .eq('id', body.familiarizationId)
+      .single();
 
     return new Response(
       JSON.stringify({
         success: true,
-        completionPercentage,
-        status,
+        completionPercentage: updated?.completion_percentage ?? null,
+        status: updated?.status ?? null,
+        actualCompletionDate: updated?.actual_completion_date ?? null,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

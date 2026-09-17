@@ -36,14 +36,24 @@ const slug = (s: string): string =>
 
 /** Build a leaf NavChild under a base path. Pass `existing` to point at
  *  an already-implemented route; otherwise a synthesized path is used. */
+type GateOpts = Pick<NavChild, 'moduleKey' | 'minPermission' | 'crossLink'>;
+
 function L(
   label: string,
   base: string,
-  opts: { existing?: string; icon?: LucideIcon; slug?: string } = {},
+  opts: { existing?: string; icon?: LucideIcon; slug?: string } & GateOpts = {},
 ): NavChild {
   const s = opts.slug ?? slug(label);
   const path = opts.existing ?? `${base}/${s}`;
-  return { id: `${base}-${s}`.replace(/[^a-z0-9-]+/gi, '-').replace(/^-+/, ''), label, path, icon: opts.icon ?? def };
+  return {
+    id: `${base}-${s}`.replace(/[^a-z0-9-]+/gi, '-').replace(/^-+/, ''),
+    label,
+    path,
+    icon: opts.icon ?? def,
+    ...(opts.moduleKey ? { moduleKey: opts.moduleKey } : {}),
+    ...(opts.minPermission ? { minPermission: opts.minPermission } : {}),
+    ...(opts.crossLink ? { crossLink: true } : {}),
+  };
 }
 
 /** Build a group (collapsible child with its own children) under a base path. */
@@ -51,7 +61,7 @@ function G(
   label: string,
   base: string,
   children: NavChild[],
-  opts: { icon?: LucideIcon; slug?: string } = {},
+  opts: { icon?: LucideIcon; slug?: string } & GateOpts = {},
 ): NavChild {
   const s = opts.slug ?? slug(label);
   return {
@@ -60,6 +70,8 @@ function G(
     path: `${base}/${s}`,
     icon: opts.icon ?? def,
     children,
+    ...(opts.moduleKey ? { moduleKey: opts.moduleKey } : {}),
+    ...(opts.minPermission ? { minPermission: opts.minPermission } : {}),
   };
 }
 
@@ -73,7 +85,7 @@ const fleetChildren: NavChild[] = [
   L('Fleet Calendar', FLEET_BASE, { existing: '/itinerary/timeline', icon: Calendar }),
   L('Fleet Rotation Planner', FLEET_BASE, { icon: Network }),
   L('Fleet Documents', FLEET_BASE, { existing: '/documents', icon: FileText }),
-  L('Fleet Checklists', FLEET_BASE, { existing: '/ism/checklists', icon: CheckSquare }),
+  L('Fleet Checklists', FLEET_BASE, { existing: '/ism/checklists', icon: CheckSquare, crossLink: true }),
   L('Vessels', FLEET_BASE, { existing: '/vessels/dashboard', icon: Ship }),
   L('Users & Access', FLEET_BASE, { existing: '/admin/users', icon: Users }),
   L('Notification Management', FLEET_BASE, { existing: '/admin/notifications', icon: Bell }),
@@ -86,17 +98,16 @@ const V = '/vessel';
 
 // Crew
 const vCrew = `${V}/crew`;
+// HR-owned pages (leave, appraisals, employment history, crewing) live in the
+// HRIS module. Vessel keeps cross-links only, so URL → module resolution
+// always lands in HRIS for those pages.
 const vesselCrew: NavChild[] = [
-  L('Crew List', vCrew, { existing: '/crew/list', icon: Users }),
-  L('Crew Compliance', vCrew, { icon: ClipboardCheck }),
-  L('Leave', vCrew, { existing: '/crew/leave', icon: CalendarDays }),
-  L('Crewing', vCrew, { icon: Users }),
-  L('Rotation Planner', vCrew, { existing: '/crew/rotation-planner', icon: Network }),
+  L('Crew List', vCrew, { existing: '/crew/roster', icon: Users }),
+  L('Leave', vCrew, { existing: '/crew/leave', icon: CalendarDays, crossLink: true }),
+  L('Rotation Planner', vCrew, { existing: '/crew/rotation-planner', icon: Network, crossLink: true }),
   L('Hours of Rest', vCrew, { existing: '/crew/work-rest', icon: Clock }),
-  L('Crew Training', vCrew, { existing: '/development/crew-training', icon: GraduationCap }),
-  L('Familiarisation Forms', vCrew, { icon: FileCheck }),
-  L('Performance Appraisals', vCrew, { icon: ClipboardList }),
-  L('Employment History', vCrew, { icon: ScrollText }),
+  L('Crew Training', vCrew, { existing: '/development/crew-training', icon: GraduationCap, crossLink: true }),
+  L('Familiarisation', vCrew, { existing: '/training', icon: FileCheck, crossLink: true }),
 ];
 
 // Safety
@@ -254,32 +265,24 @@ const crewDepartments: NavChild[] = [
   G('Engineering', crewDeptBase, standardDept6(`${crewDeptBase}/engineering`), { icon: Wrench,    slug: 'engineering' }),
   G('Interior',    crewDeptBase, standardDept6(`${crewDeptBase}/interior`),    { icon: Sparkles,  slug: 'interior' }),
   G('Galley',      crewDeptBase, galleyChildren,                                { icon: Utensils,  slug: 'galley' }),
-  L('Spa', crewDeptBase, { existing: '/health/spa', icon: Heart, slug: 'spa' }),
+  L('Spa', crewDeptBase, { existing: '/health/spa', icon: Heart, slug: 'spa', crossLink: true }),
   G('Media',       crewDeptBase, standardDept6(`${crewDeptBase}/media`),       { icon: Camera,    slug: 'media' }),
   G('IT',          crewDeptBase, standardDept6(`${crewDeptBase}/it`),          { icon: Cpu,       slug: 'it' }),
-  L('Medical', crewDeptBase, { existing: '/health/medical', icon: Stethoscope, slug: 'medical' }),
+  L('Medical', crewDeptBase, { existing: '/health/medical', icon: Stethoscope, slug: 'medical', crossLink: true }),
   G('Dive',        crewDeptBase, diveChildren,                                  { icon: Waves,     slug: 'dive' }),
 ];
 
 const mgmtBase = `${vDept}/management`;
-const hrSubBase = `${mgmtBase}/hr`;
 const managementOffice: NavChild[] = [
-  G('HR', mgmtBase, [
-    L('Contracts & Employment', hrSubBase, { existing: '/hr?tab=contracts-employment' }),
-    L('Salaries & Compensation', hrSubBase, { existing: '/hr?tab=salaries-compensation' }),
-    L('Payroll', hrSubBase),
-    L('Annual Evaluations', hrSubBase, { existing: '/hr?tab=annual-evaluations' }),
-    L('Annual Reviews', hrSubBase, { existing: '/hr?tab=annual-reviews' }),
-    L('Pay Reviews', hrSubBase, { existing: '/hr?tab=pay-reviews' }),
-    L('End of Rotation', hrSubBase, { existing: '/hr?tab=end-of-rotation' }),
-  ], { icon: Briefcase, slug: 'hr' }),
+  // HR records are owned by the HRIS module; this is a cross-link only.
+  L('HR', mgmtBase, { existing: '/hr', icon: Briefcase, slug: 'hr', crossLink: true, moduleKey: 'hr' }),
   L('Management Company', mgmtBase, { existing: '/vessels/company-details', icon: Building2 }),
   L('DPA / ISM Office', mgmtBase, { icon: Shield }),
   L('Procurement', mgmtBase, { icon: Truck }),
   L('Finance / Accounts', mgmtBase, { icon: Banknote }),
   L('Legal', mgmtBase, { icon: ScrollText }),
   L('Insurance', mgmtBase, { icon: Umbrella }),
-  L('Crewing & Recruitment', mgmtBase, { icon: Users }),
+  L('Crewing & Recruitment', mgmtBase, { existing: '/hris/recruitment/vacancies', icon: Users, crossLink: true, moduleKey: 'hr' }),
 ];
 
 const vesselDepartments: NavChild[] = [
@@ -529,37 +532,47 @@ const hrisEmpRec = `${HR}/employee-records`;
 const hrisComp = `${HR}/compensation`;
 const hrisPerf = `${HR}/performance`;
 const hrisRecruit = `${HR}/recruitment`;
+const hrisLeave = `${HR}/leave-and-rotation`;
+// Every HR record leaf is gated on the RBAC `hr` module (view by default).
+// Compensation and disciplinary need edit rights; see hr_can_* SQL helpers.
+const hrView: GateOpts = { moduleKey: 'hr' };
+const hrEdit: GateOpts = { moduleKey: 'hr', minPermission: 'edit' };
 const hrisChildren: NavChild[] = [
-  L('HR Dashboard', HR, { existing: '/hr', icon: LayoutGrid }),
+  L('HR Dashboard', HR, { existing: '/hr', icon: LayoutGrid, ...hrView }),
   G('Employee Records', HR, [
-    L('Personal Details', hrisEmpRec),
-    L('Contracts & Employment', hrisEmpRec, { existing: '/hr?tab=contracts-employment' }),
-    L('Documents & Certificates', hrisEmpRec),
-    L('Next of Kin / Emergency', hrisEmpRec),
-    L('Employment History', hrisEmpRec),
-  ], { icon: Users, slug: 'employee-records' }),
+    L('Personal Details', hrisEmpRec, hrView),
+    L('Contracts & Employment', hrisEmpRec, { existing: '/hr?tab=contracts-employment', ...hrView }),
+    L('Documents & Certificates', hrisEmpRec, hrView),
+    L('Next of Kin / Emergency', hrisEmpRec, hrView),
+    L('Employment History', hrisEmpRec, hrView),
+  ], { icon: Users, slug: 'employee-records', ...hrView }),
   G('Compensation', HR, [
-    L('Salaries & Compensation', hrisComp, { existing: '/hr?tab=salaries-compensation' }),
-    L('Payroll', hrisComp),
-    L('Gratuities', hrisComp),
-    L('Pay Reviews', hrisComp, { existing: '/hr?tab=pay-reviews' }),
-  ], { icon: Banknote, slug: 'compensation' }),
+    L('Salaries & Compensation', hrisComp, { existing: '/hr?tab=salaries-compensation', ...hrEdit }),
+    L('Payroll', hrisComp, hrEdit),
+    L('Gratuities', hrisComp, hrEdit),
+    L('Pay Reviews', hrisComp, { existing: '/hr?tab=pay-reviews', ...hrEdit }),
+  ], { icon: Banknote, slug: 'compensation', ...hrEdit }),
   G('Performance', HR, [
-    L('Annual Evaluations', hrisPerf, { existing: '/hr?tab=annual-evaluations' }),
-    L('Annual Reviews', hrisPerf, { existing: '/hr?tab=annual-reviews' }),
-    L('Objectives & PDPs', hrisPerf),
-    L('End of Rotation', hrisPerf, { existing: '/hr?tab=end-of-rotation' }),
-  ], { icon: ClipboardCheck, slug: 'performance' }),
+    L('Annual Evaluations', hrisPerf, { existing: '/hr?tab=annual-evaluations', ...hrView }),
+    L('Annual Reviews', hrisPerf, { existing: '/hr?tab=annual-reviews', ...hrView }),
+    L('Objectives & PDPs', hrisPerf, hrView),
+    L('End of Rotation', hrisPerf, { existing: '/hr?tab=end-of-rotation', ...hrView }),
+    L('Disciplinary Matters', hrisPerf, { existing: '/hr?tab=disciplinary-matters', ...hrEdit }),
+  ], { icon: ClipboardCheck, slug: 'performance', ...hrView }),
   G('Recruitment', HR, [
-    L('Vacancies', hrisRecruit),
-    L('Candidates', hrisRecruit),
-    L('Onboarding', hrisRecruit),
-    L('Crewing & Recruitment', hrisRecruit),
-  ], { icon: Search, slug: 'recruitment' }),
-  L('Leave & Rotation', HR, { existing: '/crew/leave', icon: CalendarDays }),
+    L('Vacancies', hrisRecruit, hrView),
+    L('Candidates', hrisRecruit, hrView),
+    L('Onboarding', hrisRecruit, hrView),
+  ], { icon: Search, slug: 'recruitment', ...hrView }),
+  G('Leave & Rotation', HR, [
+    L('Leave Planner', hrisLeave, { existing: '/crew/leave', icon: CalendarDays }),
+    L('Leave Requests', hrisLeave, { existing: '/crew/leave/requests', icon: ClipboardList }),
+    L('Leave Calculator', hrisLeave, { existing: '/crew/leave/calculator', icon: Clock }),
+    L('Rotation Planner', hrisLeave, { existing: '/crew/rotation-planner', icon: Network }),
+  ], { icon: CalendarDays, slug: 'leave-and-rotation' }),
   L('Training & Development', HR, { existing: '/development', icon: GraduationCap }),
-  L('Compliance & Right to Work', HR, { icon: Shield }),
-  L('Reporting & Analytics', HR, { icon: ClipboardList }),
+  L('Compliance & Right to Work', HR, { icon: Shield, ...hrView }),
+  L('Reporting & Analytics', HR, { icon: ClipboardList, ...hrView }),
 ];
 
 // ─── TOP-LEVEL ────────────────────────────────────────────────────────────
@@ -592,10 +605,11 @@ export interface SitemapLeaf {
   label: string;
 }
 
-function collectLeaves(items: (NavItem | NavChild)[], acc: SitemapLeaf[]): void {
+function collectLeaves(items: (NavItem | NavChild)[], acc: SitemapLeaf[], groups: Set<string>): void {
   for (const it of items) {
     if ('children' in it && it.children?.length) {
-      collectLeaves(it.children, acc);
+      groups.add(it.path.split('?')[0]);
+      collectLeaves(it.children, acc, groups);
     } else {
       acc.push({ path: it.path, label: it.label });
     }
@@ -603,17 +617,77 @@ function collectLeaves(items: (NavItem | NavChild)[], acc: SitemapLeaf[]): void 
 }
 
 const _allLeaves: SitemapLeaf[] = [];
-collectLeaves(NAVIGATION_ITEMS, _allLeaves);
+const _groupPaths = new Set<string>();
+collectLeaves(NAVIGATION_ITEMS, _allLeaves, _groupPaths);
 
-/** Unique placeholder leaves (only paths under our synthesized section roots). */
+/** Unique placeholder leaves (only paths under our synthesized section roots).
+ *  A path that is a group elsewhere in the tree is not a placeholder: it gets
+ *  a section redirect instead (see SECTION_REDIRECTS). */
 export const PLACEHOLDER_LEAVES: SitemapLeaf[] = (() => {
   const seen = new Set<string>();
   const out: SitemapLeaf[] = [];
   for (const leaf of _allLeaves) {
     if (!PLACEHOLDER_PREFIXES.some((p) => leaf.path.startsWith(p))) continue;
     if (seen.has(leaf.path)) continue;
+    if (_groupPaths.has(leaf.path.split('?')[0])) continue;
     seen.add(leaf.path);
     out.push(leaf);
+  }
+  return out;
+})();
+// ─── Section / group redirects ───────────────────────────────────────────
+// `/hris`, `/hris/employee-records`, … have no page of their own. Each one
+// redirects to its first real (non-cross-link) leaf so bookmarks and typed
+// URLs land somewhere useful instead of bouncing to the dashboard.
+export interface SectionRedirect {
+  from: string;
+  to: string;
+}
+
+function firstLeaf(items: NavChild[] | undefined): string | null {
+  for (const item of items ?? []) {
+    if (item.crossLink) continue;
+    if (item.children?.length) {
+      const nested = firstLeaf(item.children);
+      if (nested) return nested;
+    } else {
+      return item.path;
+    }
+  }
+  return null;
+}
+
+function withModule(path: string, moduleId: string): string {
+  const [pathname, query = ''] = path.split('?');
+  const params = new URLSearchParams(query);
+  params.set('module', moduleId);
+  return `${pathname}?${params.toString()}`;
+}
+
+export const SECTION_REDIRECTS: SectionRedirect[] = (() => {
+  const out: SectionRedirect[] = [];
+  const seen = new Set<string>();
+  const visit = (items: NavChild[] | undefined, moduleId: string) => {
+    for (const item of items ?? []) {
+      if (!item.children?.length) continue;
+      const target = firstLeaf(item.children);
+      if (target && PLACEHOLDER_PREFIXES.some((p) => item.path.startsWith(p)) && !seen.has(item.path)) {
+        seen.add(item.path);
+        out.push({ from: item.path, to: withModule(target, moduleId) });
+      }
+      visit(item.children, moduleId);
+    }
+  };
+  for (const module of NAVIGATION_ITEMS) {
+    const root = `${module.path}/`;
+    if (PLACEHOLDER_PREFIXES.includes(root)) {
+      const target = firstLeaf(module.children);
+      if (target && !seen.has(module.path)) {
+        seen.add(module.path);
+        out.push({ from: module.path, to: withModule(target, module.id) });
+      }
+    }
+    visit(module.children, module.id);
   }
   return out;
 })();

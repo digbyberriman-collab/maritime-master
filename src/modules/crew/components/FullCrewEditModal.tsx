@@ -206,6 +206,7 @@ const FullCrewEditModal: React.FC<FullCrewEditModalProps> = ({
     // Build update data based on editable fields
     const updateData: Record<string, any> = {
       userId: crewMember.user_id,
+      profileId: crewMember.id,
     };
 
     // Map form fields to database fields
