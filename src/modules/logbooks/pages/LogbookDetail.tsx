@@ -336,7 +336,47 @@ const LogbookDetail: React.FC = () => {
             });
           }
         }}
+        onDelete={editing && canEditEntry(editing) ? (entry) => setPendingDelete(entry) : undefined}
       />
+
+      <AlertDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => { if (!open) setPendingDelete(null); }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this logbook entry?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete
+                ? `${format(new Date(pendingDelete.entry_at), 'dd MMM yyyy HH:mm')} — ${pendingDelete.summary ?? 'No summary'}. `
+                : ''}
+              The entry, its attachments and its history will be removed permanently.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep entry</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                const target = pendingDelete;
+                if (!target) return;
+                deleteEntry.mutate(target.id, {
+                  onSuccess: () => {
+                    setPendingDelete(null);
+                    // Close the editor too when the deleted entry was open in it.
+                    if (editing?.id === target.id) {
+                      setEditing(null);
+                      setFormOpen(false);
+                    }
+                  },
+                });
+              }}
+            >
+              Delete entry
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 };
