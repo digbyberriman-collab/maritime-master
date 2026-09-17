@@ -35,7 +35,7 @@ interface SidebarAccountMenuProps {
 
 const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate }) => {
   const { profile, signOut } = useAuth();
-  const { vessels, loading } = useVessel();
+  const { vessels, loading, selectedVessel, setSelectedVesselById } = useVessel();
   const { selectedVesselIds, setSelectedVesselIds } = useDashboardFilter();
   const { brandColor } = useBrandingContext();
   const { setPanelOpen } = useFeedbackStore();
@@ -57,23 +57,42 @@ const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate }) =
     onNavigate?.();
   };
 
+  const syncActiveVessel = (ids: string[]) => {
+    if (ids.length === 1) {
+      setSelectedVesselById(ids[0]);
+    } else if (!selectedVessel || !ids.includes(selectedVessel.id)) {
+      if (ids[0]) setSelectedVesselById(ids[0]);
+    }
+  };
+
   const toggleVessel = (vesselId: string) => {
     const selected = selectedVesselIds.includes(vesselId);
+    let next = selectedVesselIds;
     if (selected && selectedVesselIds.length > 1) {
-      setSelectedVesselIds(selectedVesselIds.filter((id) => id !== vesselId));
+      next = selectedVesselIds.filter((id) => id !== vesselId);
     } else if (!selected) {
-      setSelectedVesselIds([...selectedVesselIds, vesselId]);
+      next = [...selectedVesselIds, vesselId];
     }
+    setSelectedVesselIds(next);
+    syncActiveVessel(next);
+  };
+
+  const selectOnly = (vesselId: string) => {
+    setSelectedVesselIds([vesselId]);
+    setSelectedVesselById(vesselId);
   };
 
   const toggleAll = () => {
     if (allSelected) {
       const firstVessel = vessels[0];
-      if (firstVessel) setSelectedVesselIds([firstVessel.id]);
+      if (firstVessel) selectOnly(firstVessel.id);
       return;
     }
-    setSelectedVesselIds(vessels.map((vessel) => vessel.id));
+    const all = vessels.map((vessel) => vessel.id);
+    setSelectedVesselIds(all);
+    syncActiveVessel(all);
   };
+
 
   const handleSignOut = async () => {
     await signOut();
@@ -120,10 +139,25 @@ const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate }) =
                   checked={selectedVesselIds.includes(vessel.id)}
                   onCheckedChange={() => toggleVessel(vessel.id)}
                   onSelect={(event) => event.preventDefault()}
+                  className="pr-2"
                 >
-                  <span className="truncate">{vessel.name}</span>
+                  <span className="flex w-full items-center justify-between gap-2">
+                    <span className="truncate">{vessel.name}</span>
+                    <button
+                      type="button"
+                      onClick={(event) => { event.preventDefault(); event.stopPropagation(); selectOnly(vessel.id); }}
+                      className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
+                        selectedVessel?.id === vessel.id
+                          ? 'bg-primary/15 text-primary'
+                          : 'text-muted-foreground hover:bg-accent'
+                      }`}
+                    >
+                      {selectedVessel?.id === vessel.id ? 'Active' : 'Only'}
+                    </button>
+                  </span>
                 </DropdownMenuCheckboxItem>
               ))}
+
               <DropdownMenuSeparator />
             </>
           )}

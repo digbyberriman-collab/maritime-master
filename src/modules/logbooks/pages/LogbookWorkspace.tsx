@@ -5,6 +5,7 @@ import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import BookStrip from '../components/BookStrip';
@@ -60,7 +61,7 @@ const LogbookWorkspace: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
-  const { selectedVessel } = useVessel();
+  const { selectedVessel, vessels, setSelectedVesselById } = useVessel();
   const actor = useLogbookActor();
   const prefs = useLogbookPreferences(actor.userId);
 
@@ -356,12 +357,19 @@ const LogbookWorkspace: React.FC = () => {
     toast({ title: 'Volume closed', description: 'Its records remain available.' });
   };
 
+  const vesselPicker = vessels.length > 0 ? (
+    <Select value={selectedVessel?.id ?? ''} onValueChange={(value) => setSelectedVesselById(value)}>
+      <SelectTrigger className="h-9 w-[13rem]" aria-label="Select vessel"><SelectValue placeholder="Select vessel" /></SelectTrigger>
+      <SelectContent>{vessels.map((v) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
+    </Select>
+  ) : null;
+
   if (!selectedVessel) {
     return (
       <DashboardLayout>
         <div className="space-y-4 p-1">
           <h1 className="text-2xl font-bold text-foreground">Logbooks</h1>
-          <Card><CardContent className="py-6 text-sm text-muted-foreground">Select a vessel from the menu in the lower left to open its logbooks.</CardContent></Card>
+          <Card><CardContent className="flex flex-wrap items-center gap-3 py-6 text-sm text-muted-foreground">Select a vessel to open its logbooks. {vesselPicker}</CardContent></Card>
         </div>
       </DashboardLayout>
     );
@@ -378,9 +386,12 @@ const LogbookWorkspace: React.FC = () => {
       <div className="space-y-4 p-1">
         <div className="flex items-start justify-between gap-2">
           <BookStrip books={LOGBOOK_BOOKS} counts={counts} selectedId={book.id} onSelect={selectBook} query={query} onQueryChange={setQuery} />
-          <Button type="button" variant="ghost" size="sm" className="mt-0.5 shrink-0" onClick={() => prefs.setExpanded(!prefs.expanded)} aria-pressed={prefs.expanded}>
+          <div className="flex shrink-0 items-center gap-2">
+          {vesselPicker}
+          <Button type="button" variant="ghost" size="sm" onClick={() => prefs.setExpanded(!prefs.expanded)} aria-pressed={prefs.expanded}>
             {prefs.expanded ? <><PanelLeftOpen className="mr-1 h-4 w-4" /> Restore sidebar</> : <><PanelLeftClose className="mr-1 h-4 w-4" /> Expand workspace</>}
           </Button>
+          </div>
         </div>
 
         <BookMasthead
