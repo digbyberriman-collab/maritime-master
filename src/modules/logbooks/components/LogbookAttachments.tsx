@@ -35,6 +35,7 @@ const LogbookAttachments: React.FC<Props> = ({
   const {
     attachments, isLoading, uploadFiles, removeAttachment, openAttachment, currentUserId,
   } = useLogbookAttachments({ entryId, logbookId, companyId, vesselId });
+  const [sizeError, setSizeError] = React.useState<string | null>(null);
 
   if (!entryId) {
     return (
@@ -46,7 +47,20 @@ const LogbookAttachments: React.FC<Props> = ({
 
   const handleFiles = (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
-    uploadFiles.mutate(Array.from(fileList));
+    const files = Array.from(fileList);
+    const oversized = files.filter((file) => file.size > MAX_ATTACHMENT_BYTES);
+    if (oversized.length > 0) {
+      const names = oversized
+        .map((file) => `"${file.name}" (${formatSize(file.size)})`)
+        .join(', ');
+      setSizeError(
+        `${names} ${oversized.length > 1 ? 'exceed' : 'exceeds'} the ${MAX_ATTACHMENT_MB} MB limit and ${oversized.length > 1 ? 'were' : 'was'} not attached. Please choose ${oversized.length > 1 ? 'smaller files' : 'a smaller file'}.`,
+      );
+    } else {
+      setSizeError(null);
+    }
+    const allowed = files.filter((file) => file.size <= MAX_ATTACHMENT_BYTES);
+    if (allowed.length > 0) uploadFiles.mutate(allowed);
     if (inputRef.current) inputRef.current.value = '';
   };
 
