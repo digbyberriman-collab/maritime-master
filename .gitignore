@@ -27,3 +27,12 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Private database migration inputs and generated source data
+*.backup
+*.backup.zip
+*.dump
+*.sqlite
+*.sqlite3
+inkfish-private/
+__pycache__/
