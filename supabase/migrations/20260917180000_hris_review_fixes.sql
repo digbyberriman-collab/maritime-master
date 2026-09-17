@@ -216,7 +216,7 @@ BEGIN
   IF NOT public.hr_can_edit(auth.uid()) THEN RAISE EXCEPTION 'Not allowed to start onboarding'; END IF;
   SELECT company_id INTO v_company FROM public.profiles WHERE id = p_profile_id;
   IF v_company IS NULL THEN RAISE EXCEPTION 'Profile has no company'; END IF;
-  IF v_company <> public.get_user_company_id(auth.uid()) THEN RAISE EXCEPTION 'Profile not found'; END IF;
+  IF v_company IS DISTINCT FROM public.get_user_company_id(auth.uid()) THEN RAISE EXCEPTION 'Profile not found'; END IF;
   IF p_vessel_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.vessels WHERE id = p_vessel_id AND company_id = v_company) THEN
     RAISE EXCEPTION 'Vessel not found';
   END IF;
