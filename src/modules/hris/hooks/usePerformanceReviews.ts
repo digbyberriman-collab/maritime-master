@@ -273,7 +273,15 @@ export function useReview(id: string | null) {
     queryFn: async (): Promise<PerformanceReview | null> => {
       const { data, error } = await supabase.from('performance_reviews').select(REVIEW_SELECT).eq('id', id as string).maybeSingle();
       if (error) throw error;
-      return data ? shapeReview(data) : null;
+      if (!data) return null;
+      // Welfare notes live in a side table only HR editors and the reviewer can read;
+      // for everyone else the query returns nothing and the field stays null.
+      const { data: welfare } = await supabase
+        .from('performance_review_welfare_notes')
+        .select('notes')
+        .eq('review_id', id as string)
+        .maybeSingle();
+      return shapeReview({ ...data, welfare_notes: welfare?.notes ?? null });
     },
   });
   return { ...query, review: query.data ?? null };
@@ -429,9 +437,11 @@ export interface CreateBulkArgs extends BulkDraftOptions {
   crewIds: string[];
 }
 
+export type ReviewPatch = TablesUpdate<'performance_reviews'> & { welfare_notes?: string | null };
+
 export interface UpdateReviewArgs {
   review: PerformanceReviewRow;
-  patch: TablesUpdate<'performance_reviews'>;
+  patch: ReviewPatch;
 }
 
 export interface SignAndSendArgs {
@@ -494,13 +504,20 @@ export function useReviewMutations() {
   );
 
   const updateRow = useCallback(
-    async (id: string, patch: TablesUpdate<'performance_reviews'>): Promise<PerformanceReviewRow> => {
-      const next = { ...patch, updated_by: user?.id ?? null };
+    async (id: string, patch: ReviewPatch): Promise<PerformanceReviewRow> => {
+      const { welfare_notes, ...rowPatch } = patch;
+      const next = { ...rowPatch, updated_by: user?.id ?? null };
       // Keep the stored overall in step with the ratings.
-      if (patch.ratings !== undefined) next.overall_rating = computeOverallRating(parseRatings(patch.ratings));
+      if (rowPatch.ratings !== undefined) next.overall_rating = computeOverallRating(parseRatings(rowPatch.ratings));
       const { data, error } = await supabase.from('performance_reviews').update(next).eq('id', id).select('*').single();
       if (error) throw error;
-      return data;
+      if (welfare_notes !== undefined) {
+        const { error: wErr } = await supabase
+          .from('performance_review_welfare_notes')
+          .upsert({ review_id: id, company_id: data.company_id, notes: welfare_notes, updated_by: user?.id ?? null, updated_at: new Date().toISOString() });
+        if (wErr) throw wErr;
+      }
+      return { ...data, welfare_notes: welfare_notes ?? null };
     },
     [user?.id],
   );

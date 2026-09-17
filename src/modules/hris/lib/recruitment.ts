@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { differenceInCalendarDays, getYear, isValid, parseISO } from 'date-fns';
 import type { Json, Tables } from '@/integrations/supabase/types';
 import { fromMinor, toMinor } from '@/modules/hris/lib/format';
+import { HRIS_PATHS } from '@/modules/hris/paths';
 
 /**
  * Pure helpers for recruitment (vacancies, candidates, applications and
@@ -899,6 +900,9 @@ export const combineDateTime = (date: string, time: string): string => {
   const [hh, mm] = time.split(':').map(Number);
   return new Date(y, m - 1, d, hh, mm, 0, 0).toISOString();
 };
+
+/** Deep link to a crew member's HRIS record (profiles.id). */
+export const personalDetailsLink = (profileId: string): string => `${HRIS_PATHS.personalDetails}?crew=${encodeURIComponent(profileId)}&module=hris`;
 
 /** Snapshot suitable for `audit_logs.old_values` / `new_values`. */
 export const toAuditJson = (value: object | null | undefined): Json | null => (value ? (JSON.parse(JSON.stringify(value)) as Json) : null);

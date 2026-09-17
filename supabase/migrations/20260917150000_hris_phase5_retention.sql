@@ -212,6 +212,8 @@ CREATE POLICY "HR can view crew audit logs"
       'hr_record_metadata', 'vacancy', 'candidate', 'candidate_application', 'onboarding_record', 'onboarding_item',
       'crew_work_authorisation', 'pay_grade', 'pay_period', 'fx_rate', 'hr_company_settings'
     )
+    -- Disciplinary audit rows (including VIEW rows) follow the record's edit-only access.
+    AND (entity_type <> 'disciplinary_record' OR public.hr_can_edit(auth.uid()))
     AND (
       EXISTS (
         SELECT 1 FROM public.profiles p
@@ -234,3 +236,42 @@ CREATE POLICY "HR can view crew audit logs"
       )
     )
   );
+
+-- ---------------------------------------------------------------
+-- Welfare notes live in a side table so the review subject can never
+-- read them through the API (the subject's SELECT policy on
+-- performance_reviews returns whole rows once the review reaches them).
+-- ---------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.performance_review_welfare_notes (
+  review_id uuid PRIMARY KEY REFERENCES public.performance_reviews(id) ON DELETE CASCADE,
+  company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+  notes text,
+  updated_by uuid REFERENCES public.profiles(user_id) ON DELETE SET NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.performance_review_welfare_notes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "performance_review_welfare_notes_rw" ON public.performance_review_welfare_notes;
+CREATE POLICY "performance_review_welfare_notes_rw" ON public.performance_review_welfare_notes
+  FOR ALL USING (
+    public.user_belongs_to_company(auth.uid(), company_id)
+    AND (
+      public.hr_can_edit(auth.uid())
+      OR EXISTS (SELECT 1 FROM public.performance_reviews r WHERE r.id = review_id AND r.reviewer_profile_id = public.my_profile_id())
+    )
+  ) WITH CHECK (
+    public.user_belongs_to_company(auth.uid(), company_id)
+    AND (
+      public.hr_can_edit(auth.uid())
+      OR EXISTS (SELECT 1 FROM public.performance_reviews r WHERE r.id = review_id AND r.reviewer_profile_id = public.my_profile_id())
+    )
+  );
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'performance_reviews' AND column_name = 'welfare_notes') THEN
+    INSERT INTO public.performance_review_welfare_notes (review_id, company_id, notes)
+    SELECT id, company_id, welfare_notes FROM public.performance_reviews WHERE welfare_notes IS NOT NULL
+    ON CONFLICT (review_id) DO NOTHING;
+    ALTER TABLE public.performance_reviews DROP COLUMN welfare_notes;
+  END IF;
+END $$;

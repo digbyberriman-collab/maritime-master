@@ -2683,7 +2683,7 @@ export type Database = {
           updated_at: string
           updated_by: string | null
           vessel_id: string | null
-          welfare_notes: string | null
+          welfare_notes?: string | null
         }
         Insert: {
           career_aspirations?: string | null
@@ -2722,7 +2722,6 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           vessel_id?: string | null
-          welfare_notes?: string | null
         }
         Update: {
           career_aspirations?: string | null
@@ -2761,7 +2760,6 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
           vessel_id?: string | null
-          welfare_notes?: string | null
         }
         Relationships: [
           {
@@ -3873,6 +3871,38 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      performance_review_welfare_notes: {
+        Row: {
+          company_id: string
+          notes: string | null
+          review_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          company_id: string
+          notes?: string | null
+          review_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          company_id?: string
+          notes?: string | null
+          review_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "performance_review_welfare_notes_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: true
+            referencedRelation: "performance_reviews"
             referencedColumns: ["id"]
           },
         ]
