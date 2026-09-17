@@ -277,7 +277,7 @@ ALTER TABLE public.logbook_entries
   ADD COLUMN IF NOT EXISTS page_id uuid REFERENCES public.logbook_pages(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS recorded_capacity text;
 
-CREATE INDEX IF NOT EXISTS idx_logbook_entries_volume_section ON public.logbook_entries(volume_id, section_id, line_number);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_logbook_entries_volume_section ON public.logbook_entries(volume_id, section_id, line_number) WHERE volume_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_logbook_entries_page ON public.logbook_entries(page_id);
 CREATE INDEX IF NOT EXISTS idx_logbook_entries_amended ON public.logbook_entries(amended_from_id);
 
@@ -503,6 +503,8 @@ BEGIN
          AND NOT (v_section -> 'roles') ? NEW.recorded_capacity THEN
         RAISE EXCEPTION 'This section requires a different author role.';
       END IF;
+      -- Serialise concurrent inserts into the same section so line numbers stay gap-free and unique.
+      PERFORM pg_advisory_xact_lock(hashtext(NEW.volume_id::text || ':' || NEW.section_id));
       SELECT COALESCE(MAX(line_number), 0) + 1 INTO NEW.line_number FROM public.logbook_entries
        WHERE volume_id = NEW.volume_id AND section_id = NEW.section_id;
     END IF;
@@ -839,6 +841,10 @@ BEGIN
     FROM public.logbook_entries e WHERE e.id = ANY(v_ordered)
      AND NOT EXISTS (SELECT 1 FROM public.logbook_signatures s WHERE s.entry_id = e.id AND s.kind = 'verify');
   UPDATE public.logbook_volumes SET page_count = v_number WHERE id = p_volume_id;
+  -- A sealed correction now carries the Master's review: let it supersede its original.
+  FOR v_entry IN SELECT e.* FROM public.logbook_entries e WHERE e.id = ANY(v_ordered) AND e.amended_from_id IS NOT NULL LOOP
+    PERFORM public.logbook_refresh_supersession(v_entry.id);
+  END LOOP;
   RETURN v_page;
 END; $$;
 REVOKE ALL ON FUNCTION public.logbook_seal_page(uuid, text, uuid[]) FROM PUBLIC, anon;

@@ -189,9 +189,8 @@ const LogbookWorkspace: React.FC = () => {
     const sample = samples.find((s) => s.id === sampleParam);
     navigate(location.pathname, { replace: true });
     if (!sample) { toast({ title: 'Sample not found', variant: 'destructive' }); return; }
-    const target = book.id === 'deck' ? 'watch' : book.id === 'engine' ? 'round' : section.id;
-    if (section.id !== target) setSectionId(target);
-    setTimeout(() => addLine(null, sample), 0);
+    const targetId = book.id === 'deck' ? 'watch' : book.id === 'engine' ? 'round' : section.id;
+    addLine(null, sample, { section: sections.find((x) => x.id === targetId) ?? section });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sampleParam, ws.isLoading, volume?.id, samples.length]);
 
@@ -202,8 +201,10 @@ const LogbookWorkspace: React.FC = () => {
   };
 
   const saveLine = React.useCallback(async (id: string) => {
-    const b = buffers[id] ?? copies.store[id];
-    if (!b || !volume || !ws.logbookRow) return;
+    const b = copies.get(id) ?? buffers[id];
+    if (!b || !ws.logbookRow) return;
+    const target = ws.allVolumes.find((v) => v.id === b.volumeId) ?? volume;
+    if (!target) return;
     if (!b.occurredAt) { setErrors((e) => ({ ...e, [id]: 'Enter the event time.' })); return; }
     if (b.correctsId && !b.existingId && !b.correctionReason.trim()) { setErrors((e) => ({ ...e, [id]: 'Correction reason is required.' })); return; }
     const revision = JSON.stringify(b);
@@ -211,12 +212,12 @@ const LogbookWorkspace: React.FC = () => {
     await withBusy(id, async () => {
       try {
         const savedRow = await ws.save.mutateAsync({
-          id: b.existingId ?? undefined, expectedVersion: b.version, logbookId: ws.logbookRow!.id, companyId: volume.company_id, vesselId: volume.vessel_id,
-          volumeId: volume.id, sectionId: b.sectionId, entryAt: eventTime(b.occurredAt, b.originalTime), data: lineFields(b.schema.fields, b.fields),
+          id: b.existingId ?? undefined, expectedVersion: b.version, logbookId: ws.logbookRow!.id, companyId: target.company_id, vesselId: target.vessel_id,
+          volumeId: target.id, sectionId: b.sectionId, entryAt: eventTime(b.occurredAt, b.originalTime), data: lineFields(b.schema.fields, b.fields),
           remarks: b.notes.trim() || null, sourceSampleId: b.sample?.id ?? null, overrideReason: b.overrideReason.trim() || null,
           amendedFromId: b.existingId ? undefined : b.correctsId, amendmentReason: b.existingId ? undefined : b.correctionReason.trim() || null,
         });
-        const latest = copies.store[id] ?? b;
+        const latest = copies.get(id) ?? b;
         if (JSON.stringify(latest) !== revision) {
           // Edits made while saving stay with the saved row.
           copies.rekey(id, { ...latest, id: savedRow.id, existingId: savedRow.id, version: savedRow.version, originalTime: savedRow.entry_at });
@@ -231,33 +232,43 @@ const LogbookWorkspace: React.FC = () => {
         toast({ title: 'Could not save line', description: (error as Error).message, variant: 'destructive' });
       }
     });
-  }, [buffers, copies, volume, ws.logbookRow, ws.save, toast]);
+  }, [buffers, copies, volume, ws.allVolumes, ws.logbookRow, ws.save, toast]);
 
-  const addLine = React.useCallback((existing: EntryView | null, sample: SampleRow | null, options: { automatic?: boolean } = {}): boolean => {
-    if (!volume || volume.status !== 'open') { toast({ title: 'The Master needs to open a volume before you can add a line.', variant: 'destructive' }); return false; }
-    if (!actor.canWrite(book, section) || legacy) { toast({ title: 'Your role cannot write in this section.', variant: 'destructive' }); return false; }
+  /**
+   * Add a new line (or a correction of `existing`, or a draft from `sample`).
+   * `options.section` / `options.volume` override the current selection so
+   * callers that have just changed section or volume do not depend on a
+   * re-render before the row is created.
+   */
+  const addLine = React.useCallback((existing: EntryView | null, sample: SampleRow | null, options: { automatic?: boolean; section?: TemplateSection; volume?: VolumeRow } = {}): boolean => {
+    const v = options.volume ?? volume;
+    const s = options.section ?? section;
+    if (!v || v.status !== 'open') { toast({ title: 'The Master needs to open a volume before you can add a line.', variant: 'destructive' }); return false; }
+    if (!actor.canWrite(book, s) || s.id === 'legacy') { toast({ title: 'Your role cannot write in this section.', variant: 'destructive' }); return false; }
     if (sample && !freshReading([sample], sample.sample_type)) { toast({ title: 'Capture a fresh sample first.', variant: 'destructive' }); return false; }
     if (options.automatic && sample) {
-      const prior = ws.entries.find((e) => e.volume_id === volume.id && e.section_id === section.id && e.recorded_by === actor.userId && e.source_sample_id === sample.id);
-      const working = copies.list.find((b) => b.volumeId === volume.id && b.sectionId === section.id && b.sample?.id === sample.id);
+      const prior = ws.entries.find((e) => e.volume_id === v.id && e.section_id === s.id && e.recorded_by === actor.userId && e.source_sample_id === sample.id);
+      const working = copies.list.find((b) => b.volumeId === v.id && b.sectionId === s.id && b.sample?.id === sample.id);
       if (prior || working) { setHighlighted((prior ?? working)!.id); scrollToLine((prior ?? working)!.id); return false; }
     }
     const values: Record<string, string> = existing
-      ? Object.fromEntries(Object.entries(existing.data).map(([k, v]) => [k, v == null ? '' : String(v)]))
-      : Object.fromEntries(Object.entries(particularsFromVolume(volume, section)).map(([k, v]) => [k, String(v)]));
-    if (sample) for (const f of section.fields) if (f.telemetry && sample.values[f.telemetry] !== undefined) values[f.key] = String(sample.values[f.telemetry]);
+      ? Object.fromEntries(Object.entries(existing.data).map(([k, val]) => [k, val == null ? '' : String(val)]))
+      : Object.fromEntries(Object.entries(particularsFromVolume(v, s)).map(([k, val]) => [k, String(val)]));
+    if (sample) for (const f of s.fields) if (f.telemetry && sample.values[f.telemetry] !== undefined) values[f.key] = String(sample.values[f.telemetry]);
     const id = `new-${crypto.randomUUID()}`;
     const originalTime = existing?.entry_at ?? sample?.observed_at ?? new Date().toISOString();
     copies.put({
-      id, existingId: null, bookId: book.id, volumeId: volume.id, sectionId: section.id, schema: section, version: 0, fields: values,
+      id, existingId: null, bookId: book.id, volumeId: v.id, sectionId: s.id, schema: s, version: 0, fields: values,
       occurredAt: originalTime.slice(0, 16), originalTime, notes: existing?.remarks ?? '', sample, overrideReason: '',
       correctsId: existing?.id ?? null, correctionReason: '', dirty: true,
     });
+    if (options.volume && options.volume.id !== volume?.id) setVolumeId(options.volume.id);
+    if (options.section && options.section.id !== section.id) setSectionId(options.section.id);
     setPageView('all'); setProposal(null); setHighlighted(id);
     scrollToLine(id, true);
     if (options.automatic) setTimeout(() => void saveLine(id), 0);
     return true;
-  }, [volume, actor, book, section, legacy, ws.entries, copies, toast, saveLine]);
+  }, [volume, actor, book, section, ws.entries, copies, toast, saveLine]);
 
   const onChange = React.useCallback((id: string, patch: (b: LineBuffer) => LineBuffer) => {
     if (copies.store[id]) copies.update(id, patch);
@@ -285,9 +296,7 @@ const LogbookWorkspace: React.FC = () => {
     if (volume.status === 'closed') {
       const continuation = ws.allVolumes.find((v) => v.continuation_of === volume.id && v.status === 'open');
       if (!continuation) { toast({ title: 'Open a continuation volume before correcting this closed book.', variant: 'destructive' }); return; }
-      setVolumeId(continuation.id);
-      // The line is added once the continuation's entries are loaded.
-      setTimeout(() => addLine(entry, null), 300);
+      addLine(entry, null, { volume: continuation });
       return;
     }
     addLine(entry, null);
@@ -308,9 +317,10 @@ const LogbookWorkspace: React.FC = () => {
     if (openedFor.current === key) return;
     openedFor.current = key;
     if (!prefs.autoReadings || !book.sensor || !volume || volume.status !== 'open' || !actor.canWrite(book, section) || !fresh || ws.isLoading) return;
-    const target = book.id === 'deck' ? 'watch' : 'round';
-    if (section.id !== target) { setSectionId(target); openedFor.current = ''; return; }
-    addLine(null, fresh, { automatic: true });
+    const targetId = book.id === 'deck' ? 'watch' : 'round';
+    const target = sections.find((x) => x.id === targetId);
+    if (!target || !actor.canWrite(book, target)) return;
+    addLine(null, fresh, { automatic: true, section: target });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book.id, profile, volume?.id, prefs.autoReadings, section.id, ws.isLoading, fresh?.id, tick]);
 

@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import { fetchUserRoles } from '../lib/logbookApi';
-import { capacityFor, canWrite as canWriteRule, isReadOnlyRole, type CrewCapacity } from '../lib/roles';
+import { resolveCapacity, canWrite as canWriteRule, isReadOnlyRole, type CrewCapacity } from '../lib/roles';
 import type { LogbookBook } from '../lib/catalog';
 import type { TemplateSection } from '../lib/templates';
 
@@ -34,8 +34,9 @@ export function useLogbookActor(): LogbookActor {
   });
 
   return useMemo(() => {
-    const roles = [...(rolesQuery.data ?? []), profile?.role ?? null].filter((r): r is string => Boolean(r));
-    const capacity = capacityFor(roles);
+    const rbac = rolesQuery.data ?? [];
+    const roles = [...rbac, profile?.role ?? null].filter((r): r is string => Boolean(r));
+    const capacity = resolveCapacity(rbac, profile?.role);
     const name = `${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`.trim() || profile?.email || 'Unknown';
     return {
       userId,

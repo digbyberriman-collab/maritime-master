@@ -81,6 +81,9 @@ export function useWorkingCopies(userId: string | null, onPersistError?: (messag
     persist(uid, next);
   }, [uid]);
 
+  /** Live read (not the render snapshot) so callbacks scheduled after a put see the latest copy. */
+  const get = useCallback((id: string): LineBuffer | undefined => load(uid)[id], [uid]);
+
   const list = useMemo(() => Object.values(store), [store]);
-  return { store, list, put, update, remove, rekey };
+  return { store, list, put, update, remove, rekey, get };
 }

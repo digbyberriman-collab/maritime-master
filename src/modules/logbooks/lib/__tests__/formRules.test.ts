@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { LOGBOOK_BOOKS } from '../catalog';
 import { canAttestWitness, canCountersign, completion, fieldProblems, missingSigners } from '../formRules';
-import { capacityFor, canWrite } from '../roles';
+import { capacityFor, canWrite, resolveCapacity } from '../roles';
 
 const official = LOGBOOK_BOOKS.find((b) => b.id === 'official')!;
 const ballast = LOGBOOK_BOOKS.find((b) => b.id === 'ballast')!;
@@ -72,6 +72,13 @@ describe('role mapping', () => {
     expect(capacityFor(['crew'])).toBe('steward');
     expect(capacityFor(['dpa'])).toBeNull();
     expect(capacityFor(['superadmin', 'fleet_master'])).toBeNull();
+  });
+
+  it('lets RBAC roles decide before the legacy profile role, as the database does', () => {
+    expect(resolveCapacity(['officer'], 'master')).toBe('officer');
+    expect(resolveCapacity([], 'master')).toBe('master');
+    expect(resolveCapacity(['dpa'], 'chief_engineer')).toBe('engineer');
+    expect(resolveCapacity(['dpa'], 'dpa')).toBeNull();
   });
 
   it('lets the Master write everywhere and restricts sections by author role', () => {

@@ -41,6 +41,14 @@ export function capacityFor(roles: Array<string | null | undefined>): CrewCapaci
   return null;
 }
 
+/**
+ * Mirrors public.logbook_capacity(): the RBAC roles decide when any of them maps
+ * to a capacity; the legacy profile role is only a fallback.
+ */
+export function resolveCapacity(rbacRoles: Array<string | null | undefined>, legacyRole: string | null | undefined): CrewCapacity | null {
+  return capacityFor(rbacRoles) ?? capacityFor([legacyRole]);
+}
+
 export const isMaster = (capacity: ActorCapacity | null | undefined) => capacity === 'master';
 
 /** Whether the capacity may author lines in this book. The Master may write in every book. */
