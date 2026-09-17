@@ -52,6 +52,7 @@ const NotFound = React.lazy(() => import('@/shared/pages/NotFound'));
 const InsurancePage = React.lazy(() => import('@/modules/compliance/pages/InsurancePage'));
 const HRPage = React.lazy(() => import('@/modules/compliance/pages/HRPage'));
 const HowToGuidesPage = React.lazy(() => import('@/modules/help/pages/HowToGuidesPage'));
+const SupportPage = React.lazy(() => import('@/modules/help/pages/SupportPage'));
 const PrivacyPolicyPage = React.lazy(() => import('@/modules/help/pages/PrivacyPolicyPage'));
 const TermsOfServicePage = React.lazy(() => import('@/modules/help/pages/TermsOfServicePage'));
 
