@@ -31,7 +31,7 @@ interface Props {
 const toInput = (date: Date) => format(date, 'yyyy-MM-dd');
 
 const LogbookExportDialog: React.FC<Props> = ({
-  open, onOpenChange, definition, logbookId, vesselName, month,
+  open, onOpenChange, definition, sheet, logbookId, vesselName, month,
 }) => {
   const { clientDisplayName, clientLogoUrl, brandColor } = useBrandingContext();
   const [from, setFrom] = React.useState(() => toInput(startOfMonth(month)));
@@ -85,6 +85,7 @@ const LogbookExportDialog: React.FC<Props> = ({
         to: toDate,
         entries,
         includeDetails,
+        sheet,
         branding: { clientDisplayName, clientLogoUrl, brandColor },
       });
 
