@@ -4,8 +4,11 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
+  MAX_ATTACHMENT_BYTES,
   useLogbookAttachments, type LogbookAttachment,
 } from '@/modules/logbooks/hooks/useLogbookAttachments';
+
+const MAX_ATTACHMENT_MB = MAX_ATTACHMENT_BYTES / (1024 * 1024);
 
 interface Props {
   entryId: string | null;
@@ -32,6 +35,7 @@ const LogbookAttachments: React.FC<Props> = ({
   const {
     attachments, isLoading, uploadFiles, removeAttachment, openAttachment, currentUserId,
   } = useLogbookAttachments({ entryId, logbookId, companyId, vesselId });
+  const [sizeError, setSizeError] = React.useState<string | null>(null);
 
   if (!entryId) {
     return (
@@ -43,7 +47,20 @@ const LogbookAttachments: React.FC<Props> = ({
 
   const handleFiles = (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
-    uploadFiles.mutate(Array.from(fileList));
+    const files = Array.from(fileList);
+    const oversized = files.filter((file) => file.size > MAX_ATTACHMENT_BYTES);
+    if (oversized.length > 0) {
+      const names = oversized
+        .map((file) => `"${file.name}" (${formatSize(file.size)})`)
+        .join(', ');
+      setSizeError(
+        `${names} ${oversized.length > 1 ? 'exceed' : 'exceeds'} the ${MAX_ATTACHMENT_MB} MB limit and ${oversized.length > 1 ? 'were' : 'was'} not attached. Please choose ${oversized.length > 1 ? 'smaller files' : 'a smaller file'}.`,
+      );
+    } else {
+      setSizeError(null);
+    }
+    const allowed = files.filter((file) => file.size <= MAX_ATTACHMENT_BYTES);
+    if (allowed.length > 0) uploadFiles.mutate(allowed);
     if (inputRef.current) inputRef.current.value = '';
   };
 
@@ -74,6 +91,12 @@ const LogbookAttachments: React.FC<Props> = ({
           onChange={(event) => handleFiles(event.target.files)}
         />
       </div>
+
+      {sizeError && (
+        <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+          {sizeError}
+        </p>
+      )}
 
       {isLoading ? (
         <Skeleton className="h-10 w-full" />
