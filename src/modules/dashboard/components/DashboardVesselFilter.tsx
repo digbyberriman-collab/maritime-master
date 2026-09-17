@@ -28,24 +28,15 @@ const DashboardVesselFilter: React.FC<DashboardVesselFilterProps> = ({
   const noneSelected = selectedVesselIds.length === 0;
   const someSelected = !allSelected && !noneSelected;
 
+  // Scope is single-choice: one vessel, or every vessel (fleet-wide).
   const handleToggleAll = () => {
-    if (allSelected) {
-      // Deselect all → select first vessel (must have at least one)
-      onSelectionChange([vessels[0].id]);
-    } else {
-      onSelectionChange(vessels.map((v) => v.id));
-    }
+    if (allSelected) return;
+    onSelectionChange(vessels.map((v) => v.id));
   };
 
-  const handleToggleVessel = (vesselId: string) => {
-    const isSelected = selectedVesselIds.includes(vesselId);
-    if (isSelected) {
-      // Don't allow deselecting the last one
-      if (selectedVesselIds.length <= 1) return;
-      onSelectionChange(selectedVesselIds.filter((id) => id !== vesselId));
-    } else {
-      onSelectionChange([...selectedVesselIds, vesselId]);
-    }
+  const handleSelectVessel = (vesselId: string) => {
+    onSelectionChange([vesselId]);
+    setOpen(false);
   };
 
   const getLabel = () => {
