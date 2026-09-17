@@ -173,6 +173,8 @@ export const AppRoutes: React.FC = () => {
       {/* Electronic Logbooks */}
       <Route path="/vessel/logbooks" element={<Navigate to="/vessel/logbooks/list" replace />} />
       <Route path="/vessel/logbooks/list" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookList /></React.Suspense></ProtectedRoute>} />
+      <Route path="/vessel/logbooks/:logbookSlug" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookDetail /></React.Suspense></ProtectedRoute>} />
+
 
       {/* Vessels */}
       <Route path="/vessels" element={<Navigate to="/vessels/dashboard" replace />} />
