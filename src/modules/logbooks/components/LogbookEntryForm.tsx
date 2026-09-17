@@ -123,7 +123,7 @@ const LogbookEntryForm: React.FC<Props> = ({
     onSubmit({
       entry_at: new Date(entryAt).toISOString(),
       watch_period: watchPeriod || null,
-      summary: summary.trim(),
+      summary: finalSummary,
       remarks: remarks.trim() || null,
       position_text: positionText.trim() || null,
       latitude: latitude === '' ? null : Number(latitude),
@@ -178,7 +178,15 @@ const LogbookEntryForm: React.FC<Props> = ({
             />
           </div>
 
-          {definition.fields.length > 0 && (
+          {sheet && (
+            <LogbookSheetForm
+              template={sheet}
+              values={details}
+              onChange={(key, value) => setDetails((prev) => ({ ...prev, [key]: value }))}
+            />
+          )}
+
+          {!sheet && definition.fields.length > 0 && (
             <div className="space-y-3 rounded-md border border-border p-4">
               <p className="text-sm font-semibold text-foreground">{definition.label} details</p>
               <div className="grid gap-4 sm:grid-cols-2">
