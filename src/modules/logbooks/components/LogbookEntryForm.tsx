@@ -30,6 +30,8 @@ interface Props {
   vesselId?: string | null;
   canManageAttachments?: boolean;
   onSubmit: (input: LogbookEntryInput) => void;
+  /** Omitted when the reader is not allowed to remove this entry. */
+  onDelete?: (entry: LogbookEntry) => void;
 }
 
 const toLocalInputValue = (iso: string) => {
