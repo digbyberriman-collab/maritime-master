@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import mammoth from 'npm:mammoth@1.8.0';
+import { extractDocx } from './docx.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -100,22 +100,19 @@ serve(async (req: Request) => {
     let docxHtml: string | null = null;
     if (isDocx && fileBytes) {
       try {
-        console.log('Extracting DOCX content with mammoth...');
+        console.log('Extracting DOCX content...');
         const buffer = fileBytes.buffer.slice(
           fileBytes.byteOffset,
           fileBytes.byteOffset + fileBytes.byteLength
         ) as ArrayBuffer;
-        const [textResult, htmlResult] = await Promise.all([
-          mammoth.extractRawText({ arrayBuffer: buffer }),
-          mammoth.convertToHtml({ arrayBuffer: buffer }),
-        ]);
-        docxText = textResult.value;
-        docxHtml = htmlResult.value;
+        const { text, html } = await extractDocx(buffer);
+        docxText = text;
+        docxHtml = html;
         console.log(
           `DOCX extracted: ${docxText.length} chars text, ${docxHtml.length} chars HTML`
         );
-      } catch (mammothErr) {
-        console.error('mammoth extraction failed:', mammothErr);
+      } catch (extractErr) {
+        console.error('DOCX extraction failed:', extractErr);
       }
     }
 
@@ -184,7 +181,7 @@ Return ONLY valid JSON (no markdown, no code fences) with this exact structure:
 
     console.log(
       'Calling AI Gateway with',
-      docxHtml ? 'docx-text (mammoth extracted)' : (canSendAsMultimodal ? 'multimodal (file attached)' : 'text-only fallback')
+      docxHtml ? 'docx-text (server-extracted)' : (canSendAsMultimodal ? 'multimodal (file attached)' : 'text-only fallback')
     );
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
