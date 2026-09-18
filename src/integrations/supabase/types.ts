@@ -8970,6 +8970,429 @@ export type Database = {
           },
         ]
       }
+      legal_document_templates: {
+        Row: {
+          category: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          current_version: number
+          department: string
+          description: string | null
+          document_type: string
+          id: string
+          is_prerequisite_gate: boolean
+          linked_data_key: string | null
+          linked_table: string | null
+          name: string
+          source_id: string | null
+          status: string
+          tags: string[]
+          updated_at: string
+          validity_months: number | null
+        }
+        Insert: {
+          category?: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          current_version?: number
+          department?: string
+          description?: string | null
+          document_type?: string
+          id?: string
+          is_prerequisite_gate?: boolean
+          linked_data_key?: string | null
+          linked_table?: string | null
+          name: string
+          source_id?: string | null
+          status?: string
+          tags?: string[]
+          updated_at?: string
+          validity_months?: number | null
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          current_version?: number
+          department?: string
+          description?: string | null
+          document_type?: string
+          id?: string
+          is_prerequisite_gate?: boolean
+          linked_data_key?: string | null
+          linked_table?: string | null
+          name?: string
+          source_id?: string | null
+          status?: string
+          tags?: string[]
+          updated_at?: string
+          validity_months?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_document_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      legal_document_versions: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          authored_by: string | null
+          change_summary: string | null
+          content: string
+          created_at: string
+          form_schema: Json | null
+          id: string
+          search_vector: unknown | null
+          source_id: string | null
+          status: string
+          template_id: string
+          version_number: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          authored_by?: string | null
+          change_summary?: string | null
+          content?: string
+          created_at?: string
+          form_schema?: Json | null
+          id?: string
+          search_vector?: unknown | null
+          source_id?: string | null
+          status?: string
+          template_id: string
+          version_number?: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          authored_by?: string | null
+          change_summary?: string | null
+          content?: string
+          created_at?: string
+          form_schema?: Json | null
+          id?: string
+          search_vector?: unknown | null
+          source_id?: string | null
+          status?: string
+          template_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_document_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "legal_document_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      legal_form_submissions: {
+        Row: {
+          company_id: string
+          created_at: string
+          form_data: Json
+          id: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_id: string | null
+          status: string
+          submitted_by: string
+          submitted_for_name: string | null
+          submitted_for_profile_id: string | null
+          template_id: string
+          updated_at: string
+          version_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          form_data?: Json
+          id?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_id?: string | null
+          status?: string
+          submitted_by: string
+          submitted_for_name?: string | null
+          submitted_for_profile_id?: string | null
+          template_id: string
+          updated_at?: string
+          version_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          form_data?: Json
+          id?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_id?: string | null
+          status?: string
+          submitted_by?: string
+          submitted_for_name?: string | null
+          submitted_for_profile_id?: string | null
+          template_id?: string
+          updated_at?: string
+          version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_form_submissions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legal_form_submissions_submitted_for_profile_id_fkey"
+            columns: ["submitted_for_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legal_form_submissions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "legal_document_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legal_form_submissions_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "legal_document_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      legal_request_comments: {
+        Row: {
+          author_id: string
+          comment_type: string
+          content: string
+          created_at: string
+          id: string
+          metadata: Json
+          request_id: string
+          source_id: string | null
+        }
+        Insert: {
+          author_id: string
+          comment_type?: string
+          content: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          request_id: string
+          source_id?: string | null
+        }
+        Update: {
+          author_id?: string
+          comment_type?: string
+          content?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          request_id?: string
+          source_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_request_comments_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "legal_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      legal_request_events: {
+        Row: {
+          actor_id: string | null
+          company_id: string
+          created_at: string
+          event_type: string
+          field: string | null
+          id: string
+          metadata: Json
+          new_value: string | null
+          old_value: string | null
+          request_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          company_id: string
+          created_at?: string
+          event_type: string
+          field?: string | null
+          id?: string
+          metadata?: Json
+          new_value?: string | null
+          old_value?: string | null
+          request_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          company_id?: string
+          created_at?: string
+          event_type?: string
+          field?: string | null
+          id?: string
+          metadata?: Json
+          new_value?: string | null
+          old_value?: string | null
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_request_events_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "legal_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      legal_requests: {
+        Row: {
+          assigned_to: string | null
+          attachments: Json
+          cfm_employee_id: number | null
+          company_id: string
+          contract_value: number | null
+          counterparty: string | null
+          created_at: string
+          currency: string | null
+          description: string | null
+          id: string
+          incident_id: string | null
+          jurisdiction: string | null
+          priority: string
+          profile_id: string | null
+          reference_number: string | null
+          request_type: string
+          requested_deadline: string | null
+          requester_department: string | null
+          resolution_summary: string | null
+          resolved_at: string | null
+          risk_level: string | null
+          sla_deadline: string | null
+          source_id: string | null
+          status: string
+          submitted_by: string
+          tags: string[]
+          title: string
+          updated_at: string
+          vessel_id: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          attachments?: Json
+          cfm_employee_id?: number | null
+          company_id?: string
+          contract_value?: number | null
+          counterparty?: string | null
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          id?: string
+          incident_id?: string | null
+          jurisdiction?: string | null
+          priority?: string
+          profile_id?: string | null
+          reference_number?: string | null
+          request_type: string
+          requested_deadline?: string | null
+          requester_department?: string | null
+          resolution_summary?: string | null
+          resolved_at?: string | null
+          risk_level?: string | null
+          sla_deadline?: string | null
+          source_id?: string | null
+          status?: string
+          submitted_by: string
+          tags?: string[]
+          title: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          attachments?: Json
+          cfm_employee_id?: number | null
+          company_id?: string
+          contract_value?: number | null
+          counterparty?: string | null
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          id?: string
+          incident_id?: string | null
+          jurisdiction?: string | null
+          priority?: string
+          profile_id?: string | null
+          reference_number?: string | null
+          request_type?: string
+          requested_deadline?: string | null
+          requester_department?: string | null
+          resolution_summary?: string | null
+          resolved_at?: string | null
+          risk_level?: string | null
+          sla_deadline?: string | null
+          source_id?: string | null
+          status?: string
+          submitted_by?: string
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legal_requests_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legal_requests_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legal_requests_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       logbook_attachments: {
         Row: {
           company_id: string
@@ -17529,6 +17952,46 @@ export type Database = {
         Returns: string
       }
       logbook_actor_name: { Args: { _user_id: string }; Returns: string }
+      legal_add_business_days: {
+        Args: { p_days: number; p_from: string }
+        Returns: string
+      }
+      legal_can_admin: { Args: { _user_id: string }; Returns: boolean }
+      legal_can_edit: { Args: { _user_id: string }; Returns: boolean }
+      legal_can_view: { Args: { _user_id: string }; Returns: boolean }
+      legal_generate_alerts: { Args: { p_company_id?: string }; Returns: number }
+      legal_request_type_label: { Args: { p_type: string }; Returns: string }
+      legal_request_visible: { Args: { p_request_id: string }; Returns: boolean }
+      legal_search_documents: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          headline: string
+          rank: number
+          template_id: string
+          version_id: string
+          version_number: number
+        }[]
+      }
+      legal_sla_deadline: {
+        Args: { p_from?: string; p_priority: string }
+        Returns: string
+      }
+      legal_team_directory: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          avatar_url: string
+          email: string
+          first_name: string
+          last_name: string
+          level: string
+          position: string
+          preferred_name: string
+          profile_id: string
+          rank: string
+          user_id: string
+        }[]
+      }
+      legal_template_company: { Args: { p_template_id: string }; Returns: string }
       logbook_attachment_path_allowed: {
         Args: { _name: string }
         Returns: boolean
