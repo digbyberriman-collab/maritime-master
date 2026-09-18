@@ -17717,6 +17717,7 @@ export type Database = {
         | "signed"
         | "amended"
         | "finalized"
+        | "verified"
       logbook_type:
         | "deck_log"
         | "engine_log"
@@ -17726,6 +17727,17 @@ export type Database = {
         | "garbage_record_book"
         | "ballast_water_record"
         | "visitor_log"
+        | "official_log"
+        | "ihm_record"
+        | "orders_book"
+        | "garbage_record_book_2"
+        | "oil_record_book_2"
+        | "cargo_record_book"
+        | "ods_record"
+        | "fuel_record"
+        | "nox_record"
+        | "sewage_record"
+        | "biofouling_record"
       nb_approval_status: "pending" | "approved" | "changes_needed"
       nb_build_phase_status: "planned" | "active" | "completed" | "on_hold"
       nb_change_order_status:
@@ -18037,6 +18049,7 @@ export const Constants = {
         "signed",
         "amended",
         "finalized",
+        "verified",
       ],
       logbook_type: [
         "deck_log",
@@ -18047,6 +18060,17 @@ export const Constants = {
         "garbage_record_book",
         "ballast_water_record",
         "visitor_log",
+        "official_log",
+        "ihm_record",
+        "orders_book",
+        "garbage_record_book_2",
+        "oil_record_book_2",
+        "cargo_record_book",
+        "ods_record",
+        "fuel_record",
+        "nox_record",
+        "sewage_record",
+        "biofouling_record",
       ],
       nb_approval_status: ["pending", "approved", "changes_needed"],
       nb_build_phase_status: ["planned", "active", "completed", "on_hold"],
