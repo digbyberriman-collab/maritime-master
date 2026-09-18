@@ -9074,6 +9074,19 @@ export type Database = {
           updated_by_name: string | null
           version: number
           vessel_id: string
+          digest: string | null
+          flag_profile: string | null
+          line_number: number | null
+          override_reason: string | null
+          page_id: string | null
+          recorded_capacity: string | null
+          schema_snapshot: Json | null
+          section_id: string | null
+          source_sample_id: string | null
+          source_snapshot: Json | null
+          superseded_by_id: string | null
+          template_revision: string | null
+          volume_id: string | null
           watch_period: string | null
         }
         Insert: {
@@ -9106,6 +9119,19 @@ export type Database = {
           updated_by_name?: string | null
           version?: number
           vessel_id: string
+          digest?: string | null
+          flag_profile?: string | null
+          line_number?: number | null
+          override_reason?: string | null
+          page_id?: string | null
+          recorded_capacity?: string | null
+          schema_snapshot?: Json | null
+          section_id?: string | null
+          source_sample_id?: string | null
+          source_snapshot?: Json | null
+          superseded_by_id?: string | null
+          template_revision?: string | null
+          volume_id?: string | null
           watch_period?: string | null
         }
         Update: {
@@ -9138,9 +9164,50 @@ export type Database = {
           updated_by_name?: string | null
           version?: number
           vessel_id?: string
+          digest?: string | null
+          flag_profile?: string | null
+          line_number?: number | null
+          override_reason?: string | null
+          page_id?: string | null
+          recorded_capacity?: string | null
+          schema_snapshot?: Json | null
+          section_id?: string | null
+          source_sample_id?: string | null
+          source_snapshot?: Json | null
+          superseded_by_id?: string | null
+          template_revision?: string | null
+          volume_id?: string | null
           watch_period?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "logbook_entries_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "logbook_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logbook_entries_source_sample_id_fkey"
+            columns: ["source_sample_id"]
+            isOneToOne: false
+            referencedRelation: "logbook_samples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logbook_entries_superseded_by_id_fkey"
+            columns: ["superseded_by_id"]
+            isOneToOne: false
+            referencedRelation: "logbook_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logbook_entries_volume_id_fkey"
+            columns: ["volume_id"]
+            isOneToOne: false
+            referencedRelation: "logbook_volumes"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "logbook_entries_amended_from_id_fkey"
             columns: ["amended_from_id"]
@@ -9208,6 +9275,374 @@ export type Database = {
           vessel_id?: string | null
         }
         Relationships: []
+      }
+      logbook_pages: {
+        Row: {
+          company_id: string
+          digest: string
+          digests: string[]
+          entry_ids: string[]
+          id: string
+          logbook_id: string
+          page_number: number
+          sealed_at: string
+          sealed_by: string | null
+          sealed_by_name: string | null
+          section_id: string
+          statement: string | null
+          vessel_id: string
+          volume_id: string
+        }
+        Insert: {
+          company_id: string
+          digest: string
+          digests: string[]
+          entry_ids: string[]
+          id?: string
+          logbook_id: string
+          page_number: number
+          sealed_at?: string
+          sealed_by?: string | null
+          sealed_by_name?: string | null
+          section_id: string
+          statement?: string | null
+          vessel_id: string
+          volume_id: string
+        }
+        Update: {
+          company_id?: string
+          digest?: string
+          digests?: string[]
+          entry_ids?: string[]
+          id?: string
+          logbook_id?: string
+          page_number?: number
+          sealed_at?: string
+          sealed_by?: string | null
+          sealed_by_name?: string | null
+          section_id?: string
+          statement?: string | null
+          vessel_id?: string
+          volume_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logbook_pages_logbook_id_fkey"
+            columns: ["logbook_id"]
+            isOneToOne: false
+            referencedRelation: "logbooks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logbook_pages_volume_id_fkey"
+            columns: ["volume_id"]
+            isOneToOne: false
+            referencedRelation: "logbook_volumes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      logbook_registries: {
+        Row: {
+          auto_populate_cover: boolean
+          book_defaults: Json
+          company_id: string
+          created_at: string
+          fields: Json
+          flag_profile: string
+          id: string
+          saved_by: string | null
+          saved_by_name: string | null
+          updated_at: string
+          version: number
+          vessel_id: string
+        }
+        Insert: {
+          auto_populate_cover?: boolean
+          book_defaults?: Json
+          company_id: string
+          created_at?: string
+          fields?: Json
+          flag_profile: string
+          id?: string
+          saved_by?: string | null
+          saved_by_name?: string | null
+          updated_at?: string
+          version?: number
+          vessel_id: string
+        }
+        Update: {
+          auto_populate_cover?: boolean
+          book_defaults?: Json
+          company_id?: string
+          created_at?: string
+          fields?: Json
+          flag_profile?: string
+          id?: string
+          saved_by?: string | null
+          saved_by_name?: string | null
+          updated_at?: string
+          version?: number
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logbook_registries_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      logbook_samples: {
+        Row: {
+          captured_by: string | null
+          captured_by_name: string | null
+          company_id: string
+          created_at: string
+          id: string
+          mode: string
+          observed_at: string
+          protocol: string | null
+          quality: string | null
+          raw: Json | null
+          received_at: string
+          sample_type: string
+          source: string
+          values: Json
+          vessel_id: string
+        }
+        Insert: {
+          captured_by?: string | null
+          captured_by_name?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          mode: string
+          observed_at: string
+          protocol?: string | null
+          quality?: string | null
+          raw?: Json | null
+          received_at?: string
+          sample_type: string
+          source: string
+          values?: Json
+          vessel_id: string
+        }
+        Update: {
+          captured_by?: string | null
+          captured_by_name?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          mode?: string
+          observed_at?: string
+          protocol?: string | null
+          quality?: string | null
+          raw?: Json | null
+          received_at?: string
+          sample_type?: string
+          source?: string
+          values?: Json
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logbook_samples_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      logbook_signatures: {
+        Row: {
+          actor_capacity: string | null
+          actor_id: string | null
+          actor_name: string | null
+          actor_role: string | null
+          company_id: string
+          digest: string
+          entry_id: string
+          entry_version: number
+          id: string
+          kind: string
+          method: string
+          page_id: string | null
+          signed_at: string
+          statement: string | null
+          vessel_id: string
+          witness_capacity: string | null
+          witness_name: string | null
+        }
+        Insert: {
+          actor_capacity?: string | null
+          actor_id?: string | null
+          actor_name?: string | null
+          actor_role?: string | null
+          company_id: string
+          digest: string
+          entry_id: string
+          entry_version: number
+          id?: string
+          kind: string
+          method?: string
+          page_id?: string | null
+          signed_at?: string
+          statement?: string | null
+          vessel_id: string
+          witness_capacity?: string | null
+          witness_name?: string | null
+        }
+        Update: {
+          actor_capacity?: string | null
+          actor_id?: string | null
+          actor_name?: string | null
+          actor_role?: string | null
+          company_id?: string
+          digest?: string
+          entry_id?: string
+          entry_version?: number
+          id?: string
+          kind?: string
+          method?: string
+          page_id?: string | null
+          signed_at?: string
+          statement?: string | null
+          vessel_id?: string
+          witness_capacity?: string | null
+          witness_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logbook_signatures_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "logbook_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logbook_signatures_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "logbook_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      logbook_volumes: {
+        Row: {
+          book_id: string
+          closed_at: string | null
+          closed_by: string | null
+          closed_by_name: string | null
+          closure_place: string | null
+          closure_reason: string | null
+          company_id: string
+          continuation_of: string | null
+          cover_fields: Json
+          created_at: string
+          flag_profile: string
+          id: string
+          label: string
+          logbook_id: string
+          opened_at: string
+          opened_by: string | null
+          opened_by_name: string | null
+          page_count: number
+          particulars: Json
+          registry_source: Json | null
+          sequence: number
+          status: string
+          template: Json
+          template_revision: string
+          updated_at: string
+          version: number
+          vessel_id: string
+        }
+        Insert: {
+          book_id: string
+          closed_at?: string | null
+          closed_by?: string | null
+          closed_by_name?: string | null
+          closure_place?: string | null
+          closure_reason?: string | null
+          company_id: string
+          continuation_of?: string | null
+          cover_fields?: Json
+          created_at?: string
+          flag_profile: string
+          id?: string
+          label: string
+          logbook_id: string
+          opened_at?: string
+          opened_by?: string | null
+          opened_by_name?: string | null
+          page_count?: number
+          particulars?: Json
+          registry_source?: Json | null
+          sequence?: number
+          status?: string
+          template: Json
+          template_revision: string
+          updated_at?: string
+          version?: number
+          vessel_id: string
+        }
+        Update: {
+          book_id?: string
+          closed_at?: string | null
+          closed_by?: string | null
+          closed_by_name?: string | null
+          closure_place?: string | null
+          closure_reason?: string | null
+          company_id?: string
+          continuation_of?: string | null
+          cover_fields?: Json
+          created_at?: string
+          flag_profile?: string
+          id?: string
+          label?: string
+          logbook_id?: string
+          opened_at?: string
+          opened_by?: string | null
+          opened_by_name?: string | null
+          page_count?: number
+          particulars?: Json
+          registry_source?: Json | null
+          sequence?: number
+          status?: string
+          template?: Json
+          template_revision?: string
+          updated_at?: string
+          version?: number
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logbook_volumes_continuation_of_fkey"
+            columns: ["continuation_of"]
+            isOneToOne: false
+            referencedRelation: "logbook_volumes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logbook_volumes_logbook_id_fkey"
+            columns: ["logbook_id"]
+            isOneToOne: false
+            referencedRelation: "logbooks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logbook_volumes_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       logbooks: {
         Row: {
@@ -17529,6 +17964,23 @@ export type Database = {
         Returns: string
       }
       logbook_actor_name: { Args: { _user_id: string }; Returns: string }
+      logbook_capacity: { Args: { _user_id: string }; Returns: string }
+      logbook_close_volume: {
+        Args: { p_expected_version: number; p_place: string; p_reason: string; p_volume_id: string }
+        Returns: Database["public"]["Tables"]["logbook_volumes"]["Row"]
+      }
+      logbook_missing_signers: {
+        Args: { _capacities: string[]; _policy: string; _with_master?: boolean }
+        Returns: string[]
+      }
+      logbook_seal_page: {
+        Args: { p_entry_ids: string[]; p_section_id: string; p_volume_id: string }
+        Returns: Database["public"]["Tables"]["logbook_pages"]["Row"]
+      }
+      logbook_sign_entry: {
+        Args: { p_entry_id: string; p_expected_version: number; p_kind: string; p_witness_capacity?: string; p_witness_name?: string }
+        Returns: Database["public"]["Tables"]["logbook_entries"]["Row"]
+      }
       logbook_attachment_path_allowed: {
         Args: { _name: string }
         Returns: boolean
@@ -17711,12 +18163,7 @@ export type Database = {
         | "postponed"
         | "cancelled"
         | "completed"
-      logbook_entry_status:
-        | "draft"
-        | "submitted"
-        | "signed"
-        | "amended"
-        | "finalized"
+      logbook_entry_status: "draft" | "submitted" | "signed" | "verified" | "amended" | "finalized"
       logbook_type:
         | "deck_log"
         | "engine_log"
@@ -17726,6 +18173,17 @@ export type Database = {
         | "garbage_record_book"
         | "ballast_water_record"
         | "visitor_log"
+        | "official_log"
+        | "ihm_record"
+        | "orders_book"
+        | "garbage_record_book_2"
+        | "oil_record_book_2"
+        | "cargo_record_book"
+        | "ods_record"
+        | "fuel_record"
+        | "nox_record"
+        | "sewage_record"
+        | "biofouling_record"
       nb_approval_status: "pending" | "approved" | "changes_needed"
       nb_build_phase_status: "planned" | "active" | "completed" | "on_hold"
       nb_change_order_status:
@@ -18031,13 +18489,7 @@ export const Constants = {
         "cancelled",
         "completed",
       ],
-      logbook_entry_status: [
-        "draft",
-        "submitted",
-        "signed",
-        "amended",
-        "finalized",
-      ],
+      logbook_entry_status: ["draft", "submitted", "signed", "verified", "amended", "finalized"],
       logbook_type: [
         "deck_log",
         "engine_log",
@@ -18047,6 +18499,17 @@ export const Constants = {
         "garbage_record_book",
         "ballast_water_record",
         "visitor_log",
+        "official_log",
+        "ihm_record",
+        "orders_book",
+        "garbage_record_book_2",
+        "oil_record_book_2",
+        "cargo_record_book",
+        "ods_record",
+        "fuel_record",
+        "nox_record",
+        "sewage_record",
+        "biofouling_record",
       ],
       nb_approval_status: ["pending", "approved", "changes_needed"],
       nb_build_phase_status: ["planned", "active", "completed", "on_hold"],
