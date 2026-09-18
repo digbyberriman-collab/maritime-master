@@ -27,17 +27,24 @@ function runText(fragment: string): string {
   return decodeEntities(out).replace(/\s+/g, ' ').trim();
 }
 
-/** Plain-text view: paragraphs on their own line, table cells separated by " | ". */
+/** Plain-text view: paragraphs on their own line, tables rendered as pipe rows. */
 export function xmlToText(xml: string): string {
-  let s = xml
-    .replace(/<w:tbl>/g, '\n[TABLE]\n')
-    .replace(/<\/w:tbl>/g, '\n[/TABLE]\n')
+  let s = xml.replace(/<w:sectPr[\s\S]*?<\/w:sectPr>/g, '');
+  s = s.replace(/<w:tbl>[\s\S]*?<\/w:tbl>/g, (tbl) => {
+    const lines: string[] = ['[TABLE]'];
+    for (const row of tbl.matchAll(/<w:tr\b[\s\S]*?<\/w:tr>/g)) {
+      const cells: string[] = [];
+      for (const cell of row[0].matchAll(/<w:tc>[\s\S]*?<\/w:tc>/g)) cells.push(runText(cell[0]));
+      lines.push('| ' + cells.join(' | ') + ' |');
+    }
+    lines.push('[/TABLE]');
+    return '\n' + lines.join('\n') + '\n';
+  });
+  s = s
     .replace(/<w:tab[^>]*\/>/g, '\t')
     .replace(/<w:br[^>]*\/>/g, '\n')
-    .replace(/<\/w:tc>/g, ' | ')
-    .replace(/<\/w:tr>/g, '\n')
-    .replace(/<\/w:p>/g, '\n');
-  s = s.replace(/<[^>]+>/g, '');
+    .replace(/<\/w:p>/g, '\n')
+    .replace(/<[^>]+>/g, '');
   return decodeEntities(s).replace(/\n{3,}/g, '\n\n').trim();
 }
 
@@ -61,10 +68,11 @@ export function xmlToHtml(xml: string): string {
   const parts: string[] = [];
   let last = 0;
   for (const m of s.matchAll(/<w:p\b[\s\S]*?<\/w:p>/g)) {
+    parts.push(s.slice(last, m.index ?? last).replace(/<[^>]+>/g, ''));
     parts.push(`<p>${runText(m[0])}</p>`);
     last = (m.index ?? 0) + m[0].length;
   }
-  parts.push(runText(s.slice(last)));
+  parts.push(s.slice(last).replace(/<[^>]+>/g, ''));
   return parts.join('').replace(/\u0000T(\d+)\u0000/g, (_, i: string) => tables[Number(i)]);
 }
 
