@@ -102,7 +102,8 @@ const vCrew = `${V}/crew`;
 // HRIS module. Vessel keeps cross-links only, so URL → module resolution
 // always lands in HRIS for those pages.
 const vesselCrew: NavChild[] = [
-  L('Crew List', vCrew, { existing: '/crew/roster', icon: Users }),
+  L('Crew List', vCrew, { existing: '/crew/list', icon: Users }),
+  L('Crew Roster', vCrew, { existing: '/crew/roster', icon: Users }),
   L('Leave', vCrew, { existing: '/crew/leave', icon: CalendarDays, crossLink: true }),
   L('Rotation Planner', vCrew, { existing: '/crew/rotation-planner', icon: Network, crossLink: true }),
   L('Hours of Rest', vCrew, { existing: '/crew/work-rest', icon: Clock }),
