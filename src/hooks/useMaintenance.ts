@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { getStockStatus } from '@/lib/maintenanceConstants';
 
 // Types
 export interface EquipmentCategory {
@@ -501,7 +502,9 @@ export function useMaintenance() {
       weekFromNow.setDate(today.getDate() + 7);
       return t.status !== 'Completed' && t.status !== 'Cancelled' && dueDate >= today && dueDate <= weekFromNow;
     }).length,
-    lowStockParts: spareParts.filter(p => p.quantity_onboard <= p.minimum_stock).length,
+    lowStockParts: spareParts.filter(
+      p => getStockStatus(p.quantity_onboard, p.minimum_stock) !== 'ok'
+    ).length,
   };
 
   return {

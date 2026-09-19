@@ -508,16 +508,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/maintenance/dashboard" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Maintenance /></React.Suspense></ProtectedRoute>} />
       <Route path="/maintenance/defects" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><MaintenanceDefects /></React.Suspense></ProtectedRoute>} />
       <Route path="/maintenance/critical" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CriticalEquipment /></React.Suspense></ProtectedRoute>} />
-      <Route path="/maintenance/spares" element={
-        <ProtectedRoute>
-          <PlaceholderWrapper 
-            title="Spare Parts" 
-            description="Spare parts inventory management"
-            icon={<Package className="w-8 h-8 text-primary" />}
-            features={['Inventory levels', 'Reorder alerts', 'Critical spares list', 'Location tracking']} 
-          />
-        </ProtectedRoute>
-      } />
+      <Route path="/maintenance/spares" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><SpareParts /></React.Suspense></ProtectedRoute>} />
 
       {/* Alerts */}
       <Route path="/alerts" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Alerts /></React.Suspense></ProtectedRoute>} />

@@ -1,150 +1,164 @@
-import { useState, useEffect } from 'react';
-import DashboardLayout from '@/components/layout/DashboardLayout';
-import { 
-  Package, Search, Filter, Plus, AlertCircle, CheckCircle,
-  Ship, Loader2, ArrowDown, ArrowUp, Settings, Tag
+import { useMemo, useState } from 'react';
+import { format } from 'date-fns';
+import {
+  AlertCircle,
+  ArrowDown,
+  Filter,
+  Loader2,
+  Package,
+  Search,
+  Settings,
+  Ship,
+  ShoppingCart,
+  Tag,
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import DashboardLayout from '@/components/layout/DashboardLayout';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { toast } from 'sonner';
+import { useMaintenance, type SparePart } from '@/hooks/useMaintenance';
+import { useVessels } from '@/hooks/useVessels';
+import {
+  getStockStatus as stockStatusOf,
+  getStockPercent as stockPercentOf,
+  type StockStatus,
+} from '@/lib/maintenanceConstants';
 
-interface SparePart {
-  id: string;
-  name: string;
-  part_number: string;
-  category: string;
-  location: string | null;
-  vessel_id: string | null;
-  vessel_name: string | null;
-  quantity_on_hand: number;
-  minimum_quantity: number;
-  unit: string;
-  unit_cost: number | null;
-  supplier: string | null;
-  is_critical: boolean;
-  last_ordered: string | null;
-}
+const STOCK_LABELS: Record<StockStatus, string> = {
+  ok: 'In Stock',
+  low: 'Low Stock',
+  out: 'Out of Stock',
+};
 
-const categories = [
-  { value: 'engine', label: 'Engine Parts' },
-  { value: 'electrical', label: 'Electrical' },
-  { value: 'deck', label: 'Deck Equipment' },
-  { value: 'safety', label: 'Safety Equipment' },
-  { value: 'navigation', label: 'Navigation' },
-  { value: 'hvac', label: 'HVAC' },
-  { value: 'plumbing', label: 'Plumbing' },
-  { value: 'consumables', label: 'Consumables' },
-];
+const getStockStatus = (part: SparePart) =>
+  stockStatusOf(part.quantity_onboard, part.minimum_stock);
+
+const getStockPercent = (part: SparePart) =>
+  stockPercentOf(part.quantity_onboard, part.minimum_stock);
+
+const EMPTY_FORM = {
+  part_name: '',
+  part_number: '',
+  vessel_id: '',
+  manufacturer: '',
+  supplier: '',
+  location_onboard: '',
+  quantity_onboard: '0',
+  minimum_stock: '0',
+  unit_cost: '',
+  notes: '',
+};
 
 export default function SpareParts() {
-  const [parts, setParts] = useState<SparePart[]>([]);
-  const [vessels, setVessels] = useState<{ id: string; name: string }[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { spareParts, equipment, createSparePart, updateSparePart, isLoading } = useMaintenance();
+  const { vessels } = useVessels();
+
   const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('all');
   const [vesselFilter, setVesselFilter] = useState('all');
   const [stockFilter, setStockFilter] = useState('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [form, setForm] = useState(EMPTY_FORM);
 
-  useEffect(() => {
-    loadData();
-  }, [categoryFilter, vesselFilter, stockFilter]);
+  // The spare_parts table has no criticality column of its own. A part counts as
+  // critical when it serves equipment the vessel cannot operate without.
+  const criticalEquipmentIds = useMemo(
+    () => new Set(equipment.filter((e) => e.criticality === 'Critical').map((e) => e.id)),
+    [equipment]
+  );
 
-  async function loadData() {
-    setIsLoading(true);
-    try {
-      const [partsRes, vesselsRes] = await Promise.all([
-        supabase
-          .from('spare_parts')
-          .select('*, vessel:vessels(name)')
-          .order('name', { ascending: true }),
-        supabase
-          .from('vessels')
-          .select('id, name')
-          .eq('status', 'active')
-          .order('name'),
-      ]);
+  const isCritical = (part: SparePart) =>
+    (part.equipment_ids ?? []).some((id) => criticalEquipmentIds.has(id));
 
-      if (partsRes.error) throw partsRes.error;
-      if (vesselsRes.error) throw vesselsRes.error;
+  const filteredParts = useMemo(() => {
+    const term = search.trim().toLowerCase();
 
-      setVessels(vesselsRes.data || []);
-      setParts((partsRes.data || []).map((p: any) => ({
-        id: p.id,
-        name: p.part_name,
-        part_number: p.part_number,
-        category: p.category || 'other',
-        location: p.location_onboard || null,
-        vessel_id: p.vessel_id || null,
-        vessel_name: p.vessel?.name || null,
-        quantity_on_hand: p.quantity || 0,
-        minimum_quantity: p.minimum_stock || 0,
-        unit: p.unit || 'pcs',
-        unit_cost: p.unit_cost || null,
-        supplier: p.supplier || null,
-        is_critical: p.is_critical || false,
-        last_ordered: p.last_ordered_date || null,
-      })));
-    } catch (error) {
-      console.error('Failed to load data:', error);
-      // Mock data
-      setParts([
-        { id: '1', name: 'Fuel Injector - Main Engine', part_number: 'ME-FI-001', category: 'engine', location: 'Engine Store A1', vessel_id: '1', vessel_name: 'MV Ocean Star', quantity_on_hand: 4, minimum_quantity: 2, unit: 'pcs', unit_cost: 2500, supplier: 'MAN Energy Solutions', is_critical: true, last_ordered: '2024-01-15' },
-        { id: '2', name: 'Turbocharger Bearing Kit', part_number: 'ME-TB-002', category: 'engine', location: 'Engine Store A2', vessel_id: '1', vessel_name: 'MV Ocean Star', quantity_on_hand: 1, minimum_quantity: 2, unit: 'kit', unit_cost: 8500, supplier: 'ABB Marine', is_critical: true, last_ordered: '2023-11-20' },
-        { id: '3', name: 'Navigation Light - Port Red', part_number: 'NAV-LT-003', category: 'navigation', location: 'Bridge Store', vessel_id: '1', vessel_name: 'MV Ocean Star', quantity_on_hand: 6, minimum_quantity: 4, unit: 'pcs', unit_cost: 350, supplier: 'Hella Marine', is_critical: false, last_ordered: '2024-02-01' },
-        { id: '4', name: 'Fire Extinguisher CO2 5kg', part_number: 'SAF-FE-001', category: 'safety', location: 'Safety Store', vessel_id: '2', vessel_name: 'MV Pacific Trader', quantity_on_hand: 8, minimum_quantity: 6, unit: 'pcs', unit_cost: 180, supplier: 'Tyco Fire', is_critical: true, last_ordered: '2024-01-10' },
-        { id: '5', name: 'Hydraulic Oil Filter', part_number: 'HYD-FL-001', category: 'deck', location: 'Deck Store B1', vessel_id: '2', vessel_name: 'MV Pacific Trader', quantity_on_hand: 3, minimum_quantity: 4, unit: 'pcs', unit_cost: 120, supplier: 'Parker Hannifin', is_critical: false, last_ordered: '2023-12-15' },
-        { id: '6', name: 'Alternator Brush Set', part_number: 'EL-ALT-001', category: 'electrical', location: 'Engine Store B1', vessel_id: '1', vessel_name: 'MV Ocean Star', quantity_on_hand: 0, minimum_quantity: 2, unit: 'set', unit_cost: 450, supplier: 'Leroy Somer', is_critical: true, last_ordered: '2024-03-01' },
-      ]);
-      setVessels([
-        { id: '1', name: 'MV Ocean Star' },
-        { id: '2', name: 'MV Pacific Trader' },
-      ]);
-    } finally {
-      setIsLoading(false);
-    }
+    return spareParts.filter((part) => {
+      if (vesselFilter !== 'all' && part.vessel_id !== vesselFilter) return false;
+
+      const status = getStockStatus(part);
+      if (stockFilter === 'low' && status !== 'low') return false;
+      if (stockFilter === 'out' && status !== 'out') return false;
+      if (stockFilter === 'critical' && !isCritical(part)) return false;
+
+      if (term) {
+        return [part.part_name, part.part_number, part.supplier, part.manufacturer].some((field) =>
+          field?.toLowerCase().includes(term)
+        );
+      }
+      return true;
+    });
+  }, [spareParts, search, vesselFilter, stockFilter, criticalEquipmentIds]);
+
+  const stats = useMemo(() => {
+    const byStatus = spareParts.map((p) => ({ part: p, status: getStockStatus(p) }));
+    return {
+      total: spareParts.length,
+      low: byStatus.filter((p) => p.status === 'low').length,
+      out: byStatus.filter((p) => p.status === 'out').length,
+      criticalLow: byStatus.filter((p) => p.status !== 'ok' && isCritical(p.part)).length,
+      value: spareParts.reduce((sum, p) => sum + p.quantity_onboard * (p.unit_cost ?? 0), 0),
+    };
+  }, [spareParts, criticalEquipmentIds]);
+
+  const canSubmit =
+    form.part_name.trim() !== '' && form.part_number.trim() !== '' && form.vessel_id !== '';
+
+  function handleAddPart() {
+    if (!canSubmit) return;
+
+    createSparePart.mutate(
+      {
+        part_name: form.part_name.trim(),
+        part_number: form.part_number.trim(),
+        vessel_id: form.vessel_id,
+        manufacturer: form.manufacturer.trim() || null,
+        supplier: form.supplier.trim() || null,
+        location_onboard: form.location_onboard.trim() || null,
+        quantity_onboard: Number(form.quantity_onboard) || 0,
+        minimum_stock: Number(form.minimum_stock) || 0,
+        unit_cost: form.unit_cost === '' ? null : Number(form.unit_cost),
+        notes: form.notes.trim() || null,
+        equipment_ids: null,
+        last_ordered_date: null,
+      },
+      {
+        onSuccess: () => {
+          setForm(EMPTY_FORM);
+          setIsDialogOpen(false);
+        },
+      }
+    );
   }
 
-  const filteredParts = parts.filter(p => {
-    if (categoryFilter !== 'all' && p.category !== categoryFilter) return false;
-    if (vesselFilter !== 'all' && p.vessel_id !== vesselFilter) return false;
-    if (stockFilter === 'low' && p.quantity_on_hand >= p.minimum_quantity) return false;
-    if (stockFilter === 'out' && p.quantity_on_hand > 0) return false;
-    if (stockFilter === 'critical' && !p.is_critical) return false;
-    if (search) {
-      const searchLower = search.toLowerCase();
-      return (
-        p.name?.toLowerCase().includes(searchLower) ||
-        p.part_number?.toLowerCase().includes(searchLower) ||
-        p.supplier?.toLowerCase().includes(searchLower)
-      );
-    }
-    return true;
-  });
-
-  const lowStockCount = parts.filter(p => p.quantity_on_hand < p.minimum_quantity && p.quantity_on_hand > 0).length;
-  const outOfStockCount = parts.filter(p => p.quantity_on_hand === 0).length;
-  const criticalLowCount = parts.filter(p => p.is_critical && p.quantity_on_hand < p.minimum_quantity).length;
-  const totalValue = parts.reduce((sum, p) => sum + (p.quantity_on_hand * (p.unit_cost || 0)), 0);
-
-  function getStockStatus(part: SparePart): 'ok' | 'low' | 'out' {
-    if (part.quantity_on_hand === 0) return 'out';
-    if (part.quantity_on_hand < part.minimum_quantity) return 'low';
-    return 'ok';
+  function handleMarkOrdered(part: SparePart) {
+    updateSparePart.mutate({
+      id: part.id,
+      last_ordered_date: format(new Date(), 'yyyy-MM-dd'),
+    });
   }
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -153,83 +167,148 @@ export default function SpareParts() {
             </h1>
             <p className="text-muted-foreground">Manage spare parts inventory across the fleet</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+
+          <Dialog
+            open={isDialogOpen}
+            onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) setForm(EMPTY_FORM);
+            }}
+          >
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
+              <Button disabled={vessels.length === 0}>
+                <Package className="w-4 h-4 mr-2" />
                 Add Part
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add Spare Part</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Part Name *</Label>
-                    <Input placeholder="e.g., Fuel Injector" />
+                    <Label htmlFor="part_name">Part Name *</Label>
+                    <Input
+                      id="part_name"
+                      placeholder="e.g., Fuel Injector"
+                      value={form.part_name}
+                      onChange={(e) => setForm({ ...form, part_name: e.target.value })}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label>Part Number *</Label>
-                    <Input placeholder="e.g., ME-FI-001" />
+                    <Label htmlFor="part_number">Part Number *</Label>
+                    <Input
+                      id="part_number"
+                      placeholder="e.g., ME-FI-001"
+                      value={form.part_number}
+                      onChange={(e) => setForm({ ...form, part_number: e.target.value })}
+                    />
                   </div>
                 </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Category</Label>
-                    <Select>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map(c => (
-                          <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Vessel</Label>
-                    <Select>
+                    <Label>Vessel *</Label>
+                    <Select
+                      value={form.vessel_id}
+                      onValueChange={(value) => setForm({ ...form, vessel_id: value })}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select vessel" />
                       </SelectTrigger>
                       <SelectContent>
-                        {vessels.map(v => (
-                          <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                        {vessels.map((v) => (
+                          <SelectItem key={v.id} value={v.id}>
+                            {v.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="location">Location Onboard</Label>
+                    <Input
+                      id="location"
+                      placeholder="e.g., Engine Store A1"
+                      value={form.location_onboard}
+                      onChange={(e) => setForm({ ...form, location_onboard: e.target.value })}
+                    />
+                  </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="manufacturer">Manufacturer</Label>
+                    <Input
+                      id="manufacturer"
+                      placeholder="e.g., MAN Energy Solutions"
+                      value={form.manufacturer}
+                      onChange={(e) => setForm({ ...form, manufacturer: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="supplier">Supplier</Label>
+                    <Input
+                      id="supplier"
+                      placeholder="e.g., Wartsila Parts"
+                      value={form.supplier}
+                      onChange={(e) => setForm({ ...form, supplier: e.target.value })}
+                    />
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label>Quantity</Label>
-                    <Input type="number" placeholder="0" />
+                    <Label htmlFor="quantity">Quantity Onboard</Label>
+                    <Input
+                      id="quantity"
+                      type="number"
+                      min="0"
+                      value={form.quantity_onboard}
+                      onChange={(e) => setForm({ ...form, quantity_onboard: e.target.value })}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label>Min. Quantity</Label>
-                    <Input type="number" placeholder="0" />
+                    <Label htmlFor="minimum">Reorder Point</Label>
+                    <Input
+                      id="minimum"
+                      type="number"
+                      min="0"
+                      value={form.minimum_stock}
+                      onChange={(e) => setForm({ ...form, minimum_stock: e.target.value })}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label>Unit Cost ($)</Label>
-                    <Input type="number" placeholder="0.00" />
+                    <Label htmlFor="cost">Unit Cost</Label>
+                    <Input
+                      id="cost"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={form.unit_cost}
+                      onChange={(e) => setForm({ ...form, unit_cost: e.target.value })}
+                    />
                   </div>
                 </div>
+
                 <div className="space-y-2">
-                  <Label>Location</Label>
-                  <Input placeholder="e.g., Engine Store A1" />
+                  <Label htmlFor="notes">Notes</Label>
+                  <Textarea
+                    id="notes"
+                    placeholder="Any additional detail"
+                    value={form.notes}
+                    onChange={(e) => setForm({ ...form, notes: e.target.value })}
+                  />
                 </div>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={() => {
-                  toast.success('Part added successfully');
-                  setIsDialogOpen(false);
-                }}>
+                <Button onClick={handleAddPart} disabled={!canSubmit || createSparePart.isPending}>
+                  {createSparePart.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                   Add Part
                 </Button>
               </DialogFooter>
@@ -237,113 +316,47 @@ export default function SpareParts() {
           </Dialog>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Package className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{parts.length}</p>
-                  <p className="text-sm text-muted-foreground">Total Parts</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-yellow-100 rounded-lg">
-                  <ArrowDown className="w-5 h-5 text-yellow-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{lowStockCount}</p>
-                  <p className="text-sm text-muted-foreground">Low Stock</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <AlertCircle className="w-5 h-5 text-red-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{outOfStockCount}</p>
-                  <p className="text-sm text-muted-foreground">Out of Stock</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <Settings className="w-5 h-5 text-orange-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{criticalLowCount}</p>
-                  <p className="text-sm text-muted-foreground">Critical Low</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <Tag className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">${(totalValue / 1000).toFixed(1)}k</p>
-                  <p className="text-sm text-muted-foreground">Total Value</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard icon={Package} tone="blue" value={stats.total} label="Total Parts" />
+          <StatCard icon={ArrowDown} tone="yellow" value={stats.low} label="Low Stock" />
+          <StatCard icon={AlertCircle} tone="red" value={stats.out} label="Out of Stock" />
+          <StatCard icon={Settings} tone="orange" value={stats.criticalLow} label="Critical Low" />
+          <StatCard
+            icon={Tag}
+            tone="green"
+            value={`${(stats.value / 1000).toFixed(1)}k`}
+            label="Total Value"
+          />
         </div>
 
-        {/* Filters */}
         <Card>
           <CardContent className="p-4">
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by name, part number, or supplier..."
+                  placeholder="Search by name, part number, supplier, or manufacturer..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-9"
                 />
               </div>
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-full sm:w-[160px]">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map(c => (
-                    <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <Select value={vesselFilter} onValueChange={setVesselFilter}>
-                <SelectTrigger className="w-full sm:w-[160px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <Ship className="w-4 h-4 mr-2" />
                   <SelectValue placeholder="Vessel" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Vessels</SelectItem>
-                  {vessels.map(v => (
-                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                  {vessels.map((v) => (
+                    <SelectItem key={v.id} value={v.id}>
+                      {v.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <Select value={stockFilter} onValueChange={setStockFilter}>
-                <SelectTrigger className="w-full sm:w-[160px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <Filter className="w-4 h-4 mr-2" />
                   <SelectValue placeholder="Stock Level" />
                 </SelectTrigger>
@@ -358,7 +371,6 @@ export default function SpareParts() {
           </CardContent>
         </Card>
 
-        {/* Parts List */}
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -367,88 +379,120 @@ export default function SpareParts() {
           <Card>
             <CardContent className="py-12 text-center">
               <Package className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No spare parts found</p>
+              <p className="text-muted-foreground">
+                {spareParts.length === 0
+                  ? 'No spare parts recorded yet'
+                  : 'No spare parts match these filters'}
+              </p>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-3">
             {filteredParts.map((part) => {
               const status = getStockStatus(part);
-              const stockPercent = Math.min((part.quantity_on_hand / part.minimum_quantity) * 100, 100);
-              
+              const critical = isCritical(part);
+
               return (
                 <Card key={part.id} className="hover:shadow-md transition-shadow">
                   <CardContent className="p-4">
-                    <div className="flex items-center gap-4">
-                      <div className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${
-                        status === 'ok' ? 'bg-green-100' :
-                        status === 'low' ? 'bg-yellow-100' : 'bg-red-100'
-                      }`}>
-                        <Package className={`w-6 h-6 ${
-                          status === 'ok' ? 'text-green-600' :
-                          status === 'low' ? 'text-yellow-600' : 'text-red-600'
-                        }`} />
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <p className="font-medium">{part.name}</p>
-                          {part.is_critical && (
-                            <Badge variant="destructive" className="text-xs">Critical</Badge>
-                          )}
-                          <Badge variant={status === 'ok' ? 'default' : status === 'low' ? 'secondary' : 'destructive'} className="text-xs">
-                            {status === 'ok' ? 'In Stock' : status === 'low' ? 'Low Stock' : 'Out of Stock'}
-                          </Badge>
-                        </div>
-                        
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                          <span className="font-mono">{part.part_number}</span>
-                          <span>•</span>
-                          <span>{categories.find(c => c.value === part.category)?.label}</span>
-                          {part.vessel_name && (
-                            <>
-                              <span>•</span>
-                              <span className="flex items-center gap-1">
-                                <Ship className="w-3 h-3" />
-                                {part.vessel_name}
-                              </span>
-                            </>
-                          )}
-                          {part.location && (
-                            <>
-                              <span>•</span>
-                              <span>{part.location}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="flex-shrink-0 w-32">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-medium">
-                            {part.quantity_on_hand} / {part.minimum_quantity}
-                          </span>
-                          <span className="text-xs text-muted-foreground">{part.unit}</span>
-                        </div>
-                        <Progress 
-                          value={stockPercent} 
-                          className={`h-2 ${
-                            status === 'out' ? '[&>div]:bg-red-500' :
-                            status === 'low' ? '[&>div]:bg-yellow-500' : ''
+                    <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+                      <div
+                        className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center ${
+                          status === 'ok'
+                            ? 'bg-green-100'
+                            : status === 'low'
+                              ? 'bg-yellow-100'
+                              : 'bg-red-100'
+                        }`}
+                      >
+                        <Package
+                          className={`w-6 h-6 ${
+                            status === 'ok'
+                              ? 'text-green-600'
+                              : status === 'low'
+                                ? 'text-yellow-600'
+                                : 'text-red-600'
                           }`}
                         />
                       </div>
-                      
-                      {part.unit_cost && (
-                        <div className="flex-shrink-0 text-right">
-                          <p className="font-medium">${part.unit_cost.toLocaleString()}</p>
-                          <p className="text-xs text-muted-foreground">per {part.unit}</p>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <p className="font-medium">{part.part_name}</p>
+                          {critical && (
+                            <Badge variant="destructive" className="text-xs">
+                              Critical
+                            </Badge>
+                          )}
+                          <Badge
+                            variant={
+                              status === 'ok'
+                                ? 'default'
+                                : status === 'low'
+                                  ? 'secondary'
+                                  : 'destructive'
+                            }
+                            className="text-xs"
+                          >
+                            {STOCK_LABELS[status]}
+                          </Badge>
+                        </div>
+
+                        <div className="flex items-center gap-x-4 gap-y-1 text-sm text-muted-foreground flex-wrap">
+                          <span className="font-mono">{part.part_number}</span>
+                          {part.vessel?.name && (
+                            <span className="flex items-center gap-1">
+                              <Ship className="w-3 h-3" />
+                              {part.vessel.name}
+                            </span>
+                          )}
+                          {part.location_onboard && <span>{part.location_onboard}</span>}
+                          {part.supplier && <span>{part.supplier}</span>}
+                          {part.last_ordered_date && (
+                            <span>
+                              Ordered {format(new Date(part.last_ordered_date), 'd MMM yyyy')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex-shrink-0 w-full lg:w-32">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-sm font-medium">
+                            {part.quantity_onboard}
+                            {part.minimum_stock > 0 && ` / ${part.minimum_stock}`}
+                          </span>
+                          {part.minimum_stock > 0 && (
+                            <span className="text-xs text-muted-foreground">min</span>
+                          )}
+                        </div>
+                        <Progress
+                          value={getStockPercent(part)}
+                          className={`h-2 ${
+                            status === 'out'
+                              ? '[&>div]:bg-red-500'
+                              : status === 'low'
+                                ? '[&>div]:bg-yellow-500'
+                                : ''
+                          }`}
+                        />
+                      </div>
+
+                      {part.unit_cost != null && (
+                        <div className="flex-shrink-0 text-right w-24">
+                          <p className="font-medium">{part.unit_cost.toLocaleString()}</p>
+                          <p className="text-xs text-muted-foreground">per unit</p>
                         </div>
                       )}
-                      
-                      <Button size="sm" variant="outline">
-                        <ArrowUp className="w-4 h-4 mr-1" />
-                        Reorder
+
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleMarkOrdered(part)}
+                        disabled={updateSparePart.isPending}
+                      >
+                        <ShoppingCart className="w-4 h-4 mr-1" />
+                        Mark Ordered
                       </Button>
                     </div>
                   </CardContent>
@@ -459,5 +503,43 @@ export default function SpareParts() {
         )}
       </div>
     </DashboardLayout>
+  );
+}
+
+const TONES = {
+  blue: 'bg-blue-100 text-blue-600',
+  yellow: 'bg-yellow-100 text-yellow-600',
+  red: 'bg-red-100 text-red-600',
+  orange: 'bg-orange-100 text-orange-600',
+  green: 'bg-green-100 text-green-600',
+} as const;
+
+function StatCard({
+  icon: Icon,
+  tone,
+  value,
+  label,
+}: {
+  icon: typeof Package;
+  tone: keyof typeof TONES;
+  value: number | string;
+  label: string;
+}) {
+  const [bg, fg] = TONES[tone].split(' ');
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-3">
+          <div className={`p-2 rounded-lg ${bg}`}>
+            <Icon className={`w-5 h-5 ${fg}`} />
+          </div>
+          <div>
+            <p className="text-2xl font-bold">{value}</p>
+            <p className="text-sm text-muted-foreground">{label}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

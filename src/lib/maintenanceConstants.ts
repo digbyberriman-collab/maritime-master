@@ -109,6 +109,24 @@ export const getDefectStatusConfig = (status: string) =>
 export const getOperationalImpactConfig = (impact: string) => 
   OPERATIONAL_IMPACT.find(i => i.value === impact);
 
+export type StockStatus = 'ok' | 'low' | 'out';
+
+/**
+ * A part is low once it reaches its reorder point, not only below it. A part
+ * with no reorder point set can only be out of stock or in stock.
+ */
+export const getStockStatus = (quantityOnboard: number, minimumStock: number): StockStatus => {
+  if (quantityOnboard <= 0) return 'out';
+  if (minimumStock > 0 && quantityOnboard <= minimumStock) return 'low';
+  return 'ok';
+};
+
+/** Stock level against the reorder point, capped at 100 and safe when no point is set. */
+export const getStockPercent = (quantityOnboard: number, minimumStock: number): number => {
+  if (minimumStock <= 0) return quantityOnboard > 0 ? 100 : 0;
+  return Math.min((quantityOnboard / minimumStock) * 100, 100);
+};
+
 // Generate task number
 export const generateTaskNumber = (year: number, sequence: number): string => {
   return `MAINT-${year}-${String(sequence).padStart(3, '0')}`;
