@@ -99,7 +99,7 @@ export function resolvePageNavigation(
 
   const match = findBestMatch(pathname, search, activeModuleId);
   if (match) {
-    const crumbs = match.trail.map((item, index) => ({
+    const crumbs: PageCrumb[] = match.trail.map((item, index) => ({
       label: item.label,
       path: index < match.trail.length - 1 ? item.path : undefined,
     }));
