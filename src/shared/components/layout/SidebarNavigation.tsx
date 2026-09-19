@@ -14,6 +14,10 @@ import { payrollAccessSatisfies } from '@/modules/auth/lib/payrollAccess';
 interface SidebarNavigationProps {
   moduleId: string | null;
   onNavigate?: () => void;
+  /** Icon-only (visuals only) rendering; labels become tooltips. */
+  collapsed?: boolean;
+  /** Called when a collapsed group icon is clicked so the layout can expand. */
+  onExpand?: () => void;
 }
 
 const DASHBOARD_LINKS = [
@@ -24,7 +28,7 @@ const DASHBOARD_LINKS = [
   { label: 'Fleet Reports', path: '/reports', icon: FileBarChart },
 ];
 
-const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavigate }) => {
+const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavigate, collapsed = false, onExpand }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { map } = useSidebarOrder();
@@ -112,6 +116,29 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
     const Icon = child.icon;
     const depthClass = depth === 0 ? 'pl-3' : depth === 1 ? 'pl-8' : depth === 2 ? 'pl-12' : 'pl-16';
 
+    // Collapsed: icons only. Leaves navigate; groups expand the panel.
+    if (collapsed) {
+      if (depth > 0) return null;
+      return (
+        <button
+          key={child.id}
+          type="button"
+          onClick={() => (hasChildren ? onExpand?.() : go(child.path))}
+          aria-current={active ? 'page' : undefined}
+          aria-label={child.label}
+          title={child.label}
+          className={cn(
+            'flex w-full items-center justify-center rounded-md p-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+            active || descendantActive
+              ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+              : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+          )}
+        >
+          <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+        </button>
+      );
+    }
+
     if (!hasChildren) {
       return (
         <button
@@ -160,15 +187,23 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
   };
 
   return (
-    <nav aria-label={selectedModule ? `${selectedModule.label} folders` : 'Dashboard shortcuts'} className="flex-1 min-h-0 overflow-y-auto px-3 py-4">
-      <div className="mb-3 flex items-center gap-2 px-3 text-xs font-semibold uppercase text-sidebar-foreground/60">
+    <nav
+      aria-label={selectedModule ? `${selectedModule.label} folders` : 'Dashboard shortcuts'}
+      className={cn('flex-1 min-h-0 overflow-y-auto py-4', collapsed ? 'px-2' : 'px-3')}
+    >
+      <div
+        className={cn(
+          'mb-3 flex items-center gap-2 text-xs font-semibold uppercase text-sidebar-foreground/60',
+          collapsed ? 'justify-center px-0' : 'px-3'
+        )}
+      >
         {selectedModule ? (
           <>
             <selectedModule.icon className="h-4 w-4" />
-            <span>{selectedModule.label}</span>
+            {!collapsed && <span>{selectedModule.label}</span>}
           </>
         ) : (
-          <span>Dashboard shortcuts</span>
+          !collapsed && <span>Dashboard shortcuts</span>
         )}
       </div>
       <div key={moduleId ?? 'dashboard'} className="space-y-1 motion-safe:animate-fade-in">
@@ -177,6 +212,24 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
           : DASHBOARD_LINKS.map((link) => {
               const Icon = link.icon;
               const active = location.pathname === link.path || (link.path === '/dashboard' && location.pathname === '/');
+              if (collapsed) {
+                return (
+                  <button
+                    key={link.path}
+                    type="button"
+                    onClick={() => go(link.path)}
+                    aria-current={active ? 'page' : undefined}
+                    aria-label={link.label}
+                    title={link.label}
+                    className={cn(
+                      'flex w-full items-center justify-center rounded-md p-2 transition-colors',
+                      active ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                  </button>
+                );
+              }
               return (
                 <button
                   key={link.path}

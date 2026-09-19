@@ -13,7 +13,7 @@ import { resolveModuleForPath } from '@/shared/lib/moduleNavigation';
 import { DashboardFilterProvider } from '@/modules/dashboard/contexts/DashboardFilterContext';
 import FeedbackPanel from '@/modules/feedback/components/FeedbackPanel';
 import FeedbackResolvedToast from '@/modules/feedback/components/FeedbackResolvedToast';
-import { Menu, X } from 'lucide-react';
+import { Menu, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DashboardLayoutProps {
@@ -27,6 +27,25 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  // Desktop icon-only (visuals only) mode, persisted across sessions.
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem('storm-sidebar-collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const toggleSidebarCollapsed = React.useCallback(() => {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem('storm-sidebar-collapsed', String(next));
+      } catch {
+        /* storage unavailable */
+      }
+      return next;
+    });
+  }, []);
   const activeModule = React.useMemo(() => {
     const requestedModule = new URLSearchParams(location.search).get('module');
     return NAVIGATION_ITEMS.find((item) => item.id === requestedModule) ?? resolveModuleForPath(location.pathname);
@@ -69,28 +88,43 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
       {/* Sidebar - z-10 to be above watermark */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-sidebar transform transition-transform duration-200 ease-in-out',
+          'fixed inset-y-0 left-0 z-50 bg-sidebar transform transition-all duration-200 ease-in-out',
           !collapseSidebar && 'lg:static lg:translate-x-0',
+          sidebarCollapsed ? 'w-64 lg:w-16' : 'w-64',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
         <div className="flex flex-col h-full">
           {/* Commercial branding and alerts */}
-          <div className="flex flex-col px-4 py-3 border-b border-sidebar-border">
-            <div className="flex items-center justify-between">
-              <Link 
-                to="/dashboard"
-                className="flex min-w-0 flex-1 items-center py-1 text-lg font-bold text-sidebar-foreground hover:text-sidebar-accent-foreground hover:opacity-80 transition-all focus:outline-none focus:ring-2 focus:ring-sidebar-ring"
-                aria-label="Return to Dashboard"
-                title="Return to Dashboard"
-              >
-                {clientLogoUrl ? (
-                  <img src={clientLogoUrl} alt={clientDisplayName || 'Company logo'} className="max-h-9 max-w-[150px] object-contain object-left" />
-                ) : (
-                  <span className="truncate">{clientDisplayName || 'STORM'}</span>
-                )}
-              </Link>
-              <NotificationBell />
+          <div className={cn('flex flex-col border-b border-sidebar-border', sidebarCollapsed ? 'px-2 py-3' : 'px-4 py-3')}>
+            <div className={cn('flex items-center', sidebarCollapsed ? 'flex-col gap-2' : 'justify-between')}>
+              {!sidebarCollapsed && (
+                <Link
+                  to="/dashboard"
+                  className="flex min-w-0 flex-1 items-center py-1 text-lg font-bold text-sidebar-foreground hover:text-sidebar-accent-foreground hover:opacity-80 transition-all focus:outline-none focus:ring-2 focus:ring-sidebar-ring"
+                  aria-label="Return to Dashboard"
+                  title="Return to Dashboard"
+                >
+                  {clientLogoUrl ? (
+                    <img src={clientLogoUrl} alt={clientDisplayName || 'Company logo'} className="max-h-9 max-w-[150px] object-contain object-left" />
+                  ) : (
+                    <span className="truncate">{clientDisplayName || 'STORM'}</span>
+                  )}
+                </Link>
+              )}
+              {!sidebarCollapsed && <NotificationBell />}
+              {/* Collapse/expand toggle (desktop) */}
+              {!collapseSidebar && (
+                <button
+                  type="button"
+                  onClick={toggleSidebarCollapsed}
+                  className="hidden lg:flex items-center justify-center rounded-md p-2 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  aria-label={sidebarCollapsed ? 'Expand folder panel' : 'Collapse folder panel to icons'}
+                  title={sidebarCollapsed ? 'Expand folder panel' : 'Collapse to icons'}
+                >
+                  {sidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setSidebarOpen(false)}
@@ -100,7 +134,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
                 <X className="w-5 h-5" />
               </button>
             </div>
-            {clientDisplayName && (
+            {!sidebarCollapsed && clientDisplayName && (
               <span className="text-xs text-sidebar-foreground/70 mt-1 truncate">
                 {clientDisplayName}
               </span>
@@ -108,10 +142,15 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
           </div>
 
           {/* Navigation */}
-          <SidebarNavigation moduleId={activeModule?.id ?? null} onNavigate={() => setSidebarOpen(false)} />
+          <SidebarNavigation
+            moduleId={activeModule?.id ?? null}
+            onNavigate={() => setSidebarOpen(false)}
+            collapsed={sidebarCollapsed}
+            onExpand={toggleSidebarCollapsed}
+          />
 
           <div className="mt-auto shrink-0">
-            <SidebarAccountMenu onNavigate={() => setSidebarOpen(false)} />
+            <SidebarAccountMenu onNavigate={() => setSidebarOpen(false)} collapsed={sidebarCollapsed} />
           </div>
         </div>
       </aside>
