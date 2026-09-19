@@ -112,18 +112,20 @@ export function ListRow({
   onClick?: () => void;
 }) {
   const cls =
-    "grid items-center px-4 py-3 border-b border-black/5 hover:bg-paper transition cursor-pointer text-sm";
+    "grid items-center px-4 py-3 border-b border-black/5 hover:bg-paper transition cursor-pointer text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset";
   if (to)
     return (
       <Link to={to} className={cls}>
         {children}
       </Link>
     );
-  return (
-    <div className={cls} onClick={onClick}>
-      {children}
-    </div>
-  );
+  if (onClick)
+    return (
+      <button type="button" className={`${cls} w-full text-left`} onClick={onClick}>
+        {children}
+      </button>
+    );
+  return <div className={cls}>{children}</div>;
 }
 
 // -------------------- EMPTY / LOADING / ERROR --------------------------
