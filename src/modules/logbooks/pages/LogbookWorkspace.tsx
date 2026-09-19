@@ -80,6 +80,8 @@ const LogbookWorkspace: React.FC = () => {
   const [printing, setPrinting] = React.useState(false);
   const [pageError, setPageError] = React.useState<string | null>(null);
   const [tick, setTick] = React.useState(0);
+  const [vesselPickerOpen, setVesselPickerOpen] = React.useState(false);
+  const vesselListId = React.useId();
 
   const ws = useLogbookWorkspace(actor.vesselId, book, profile, volumeId);
   const { counts } = useBookCounts(actor.vesselId);
@@ -403,9 +405,9 @@ const LogbookWorkspace: React.FC = () => {
       <Loader2 className="h-4 w-4 animate-spin" /> Loading vessels…
     </div>
   ) : (
-    <Select value={selectedVessel?.id ?? ''} onValueChange={(value) => setSelectedVesselById(value)} disabled={vessels.length === 0}>
-      <SelectTrigger className="h-9 w-[13rem]" aria-label="Select vessel"><SelectValue placeholder={vessels.length === 0 ? 'No vessels available' : 'Select vessel'} /></SelectTrigger>
-      <SelectContent>{vessels.map((v) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
+    <Select open={vesselPickerOpen} onOpenChange={setVesselPickerOpen} value={selectedVessel?.id ?? ''} onValueChange={(value) => setSelectedVesselById(value)} disabled={vessels.length === 0}>
+      <SelectTrigger className="h-9 w-[13rem]" aria-label="Select vessel" aria-controls={vesselPickerOpen ? vesselListId : undefined}><SelectValue placeholder={vessels.length === 0 ? 'No vessels available' : 'Select vessel'} /></SelectTrigger>
+      <SelectContent id={vesselListId}>{vessels.map((v) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
     </Select>
   );
 

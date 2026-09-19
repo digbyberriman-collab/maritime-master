@@ -121,7 +121,7 @@ const getDeepLink = (alert: AlertItem): string => {
   }
 
   // Default to alerts page
-  return '/alerts';
+  return '/notifications/center';
 };
 
 const NotificationBell: React.FC = () => {
@@ -388,6 +388,7 @@ const NotificationBell: React.FC = () => {
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className="relative">
+          <span className="sr-only">Open notifications</span>
           <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
             <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground animate-pulse">
@@ -464,11 +465,11 @@ const NotificationBell: React.FC = () => {
             className="w-full justify-center"
             onClick={() => {
               setIsOpen(false);
-              navigate('/alerts');
+              navigate('/notifications/center');
             }}
           >
             <ExternalLink className="w-4 h-4 mr-2" />
-            View all alerts
+            Open Notification Center
           </Button>
         </div>
       </PopoverContent>

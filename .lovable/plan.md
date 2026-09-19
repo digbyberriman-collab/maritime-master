@@ -1,13 +1,27 @@
-# Improve sidebar accessibility
+# Automated sidebar accessibility regression tests
 
-## Changes
-- Add strong, consistent keyboard focus rings to sidebar links, folder controls, account controls, and open/close buttons.
-- Give icon-only and folder controls descriptive accessible names, including current and expanded/collapsed state.
-- Announce sidebar navigation changes and folder expansion state through a polite screen-reader status region.
-- Preserve existing active-page highlighting, collapsed mode, navigation behavior, and mobile drawer behavior.
+## Goal
+Add repeatable tests that protect the sidebar’s keyboard navigation, visible focus treatment, ARIA state, and screen-reader announcements.
 
-## Validation
-- Verify keyboard navigation and focus visibility in expanded and collapsed sidebars.
-- Inspect active-page and folder controls for `aria-current`, accessible names, and expansion state.
-- Confirm the screen-reader status text updates after opening or closing a section.
-- Run type checks and confirm the preview build remains clean.
+## Confirmed current state
+- The project already uses Vitest, jsdom, React Testing Library, and jest-dom, so no new testing framework or package is needed.
+- Sidebar controls already expose active-page, expanded/collapsed, drawer-control, and polite live-region semantics.
+- Existing tests cover sidebar ordering, permissions, and general components, but there is no automated accessibility-focused sidebar test suite.
+
+## Implementation
+- Add focused component tests for the sidebar navigation in expanded and icon-only modes.
+- Mock permissions, access checks, ordering, and notification counts so tests are deterministic and do not contact the backend.
+- Cover:
+  - keyboard focus and activation of navigation items;
+  - focus-ring classes remaining present on interactive controls;
+  - one correct `aria-current="page"` item for active and nested pages;
+  - group `aria-expanded` state and accessible labels before and after keyboard toggling;
+  - valid `aria-controls` references for expandable controls;
+  - polite, atomic live-region announcements for the current page and group expansion/collapse;
+  - accessible names retained in collapsed icon-only mode.
+- Add focused layout tests for the desktop collapse control and mobile drawer trigger, including keyboard activation, `aria-expanded`, `aria-controls`, Escape dismissal, and focus return.
+
+## Verification
+- Run the new sidebar accessibility tests directly.
+- Run the full Vitest suite to detect regressions elsewhere.
+- Run the TypeScript check and confirm the preview build remains clean.

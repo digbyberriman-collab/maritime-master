@@ -102,6 +102,7 @@ const UsersAccessListPage = React.lazy(() => import('@/modules/users-access/page
 const UsersAccessDetailPage = React.lazy(() => import('@/modules/users-access/pages/UsersAccessDetailPage'));
 const NotificationManagementPage = React.lazy(() => import('@/modules/notifications-admin/pages/NotificationManagementPage'));
 const NotificationsPage = React.lazy(() => import('@/modules/notifications/pages/NotificationsPage'));
+const NotificationCenterPage = React.lazy(() => import('@/modules/notifications/pages/NotificationCenterPage'));
 const FleetGroups = React.lazy(() => import('@/modules/settings/pages/FleetGroups'));
 const AlertConfiguration = React.lazy(() => import('@/modules/settings/pages/AlertConfiguration'));
 const APIIntegrations = React.lazy(() => import('@/modules/settings/pages/APIIntegrations'));
@@ -690,6 +691,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/users-access/:userId" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><UsersAccessDetailPage /></React.Suspense></ProtectedRoute>} />
       <Route path="/settings/notifications" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><NotificationManagementPage /></React.Suspense></ProtectedRoute>} />
       <Route path="/notifications" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><NotificationsPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/notifications/center" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><NotificationCenterPage /></React.Suspense></ProtectedRoute>} />
       <Route path="/admin/roles" element={
         <ProtectedRoute>
           <DashboardLayout>

@@ -9051,7 +9051,7 @@ export type Database = {
           created_at: string
           form_schema: Json | null
           id: string
-          search_vector: unknown | null
+          search_vector: unknown
           source_id: string | null
           status: string
           template_id: string
@@ -9066,7 +9066,7 @@ export type Database = {
           created_at?: string
           form_schema?: Json | null
           id?: string
-          search_vector?: unknown | null
+          search_vector?: unknown
           source_id?: string | null
           status?: string
           template_id: string
@@ -9081,7 +9081,7 @@ export type Database = {
           created_at?: string
           form_schema?: Json | null
           id?: string
-          search_vector?: unknown | null
+          search_vector?: unknown
           source_id?: string | null
           status?: string
           template_id?: string
@@ -9304,7 +9304,7 @@ export type Database = {
           assigned_to?: string | null
           attachments?: Json
           cfm_employee_id?: number | null
-          company_id?: string
+          company_id: string
           contract_value?: number | null
           counterparty?: string | null
           created_at?: string
@@ -18369,26 +18369,17 @@ export type Database = {
         Returns: string
       }
       legacy_profile_role: { Args: { _user_id: string }; Returns: string }
-      log_permission_change: {
-        Args: {
-          p_action_type: Database["public"]["Enums"]["audit_action_type"]
-          p_actor_role: string
-          p_actor_user_id: string
-          p_after_state?: Json
-          p_before_state?: Json
-          p_ip_address?: unknown
-          p_reason_text?: string
-          p_target_module_key?: string
-          p_target_role_id?: string
-          p_target_user_id?: string
-          p_user_agent?: string
-          p_vessel_scope?: string
-        }
-        Returns: string
-      }
       legal_add_business_days: {
         Args: { p_days: number; p_from: string }
         Returns: string
+      }
+      legal_attachments_valid: {
+        Args: {
+          p_attachments: Json
+          p_company_id: string
+          p_request_id: string
+        }
+        Returns: boolean
       }
       legal_can_admin: { Args: { _user_id: string }; Returns: boolean }
       legal_can_edit: { Args: { _user_id: string }; Returns: boolean }
@@ -18426,6 +18417,23 @@ export type Database = {
         }[]
       }
       legal_template_company: { Args: { p_template_id: string }; Returns: string }
+      log_permission_change: {
+        Args: {
+          p_action_type: Database["public"]["Enums"]["audit_action_type"]
+          p_actor_role: string
+          p_actor_user_id: string
+          p_after_state?: Json
+          p_before_state?: Json
+          p_ip_address?: unknown
+          p_reason_text?: string
+          p_target_module_key?: string
+          p_target_role_id?: string
+          p_target_user_id?: string
+          p_user_agent?: string
+          p_vessel_scope?: string
+        }
+        Returns: string
+      }
       logbook_actor_name: { Args: { _user_id: string }; Returns: string }
       logbook_attachment_path_allowed: {
         Args: { _name: string }
@@ -18610,6 +18618,14 @@ export type Database = {
           p_self_ratings: Json
         }
         Returns: undefined
+      }
+      rbac_company_permission: {
+        Args: {
+          _module_key: string
+          _required: Database["public"]["Enums"]["permission_level"]
+          _user_id: string
+        }
+        Returns: boolean
       }
       recruitment_hire_candidate: {
         Args: {
