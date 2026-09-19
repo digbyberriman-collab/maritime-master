@@ -2273,6 +2273,71 @@ export type Database = {
           },
         ]
       }
+      crew_leave_balance_adjustments: {
+        Row: {
+          adjustment_days: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          crew_id: string
+          effective_date: string
+          id: string
+          reason: string
+          vessel_id: string | null
+        }
+        Insert: {
+          adjustment_days: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          crew_id: string
+          effective_date?: string
+          id?: string
+          reason: string
+          vessel_id?: string | null
+        }
+        Update: {
+          adjustment_days?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          crew_id?: string
+          effective_date?: string
+          id?: string
+          reason?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_leave_balance_adjustments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_leave_balance_adjustments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_leave_balance_adjustments_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_leave_balance_adjustments_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crew_leave_carryover: {
         Row: {
           carryover_days: number
@@ -2425,12 +2490,90 @@ export type Database = {
           },
         ]
       }
+      crew_leave_policies: {
+        Row: {
+          accrual_method: string
+          booked_deducts: boolean
+          company_id: string
+          created_at: string
+          default_annual_entitlement: number
+          default_rotation: string | null
+          id: string
+          monthly_accrual_days: number
+          notes: string | null
+          pro_rata: boolean
+          rounding: string
+          scope_label: string
+          sick_affects_balance: boolean
+          training_affects_balance: boolean
+          unpaid_affects_balance: boolean
+          updated_at: string
+          vessel_id: string | null
+        }
+        Insert: {
+          accrual_method?: string
+          booked_deducts?: boolean
+          company_id: string
+          created_at?: string
+          default_annual_entitlement?: number
+          default_rotation?: string | null
+          id?: string
+          monthly_accrual_days?: number
+          notes?: string | null
+          pro_rata?: boolean
+          rounding?: string
+          scope_label?: string
+          sick_affects_balance?: boolean
+          training_affects_balance?: boolean
+          unpaid_affects_balance?: boolean
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          accrual_method?: string
+          booked_deducts?: boolean
+          company_id?: string
+          created_at?: string
+          default_annual_entitlement?: number
+          default_rotation?: string | null
+          id?: string
+          monthly_accrual_days?: number
+          notes?: string | null
+          pro_rata?: boolean
+          rounding?: string
+          scope_label?: string
+          sick_affects_balance?: boolean
+          training_affects_balance?: boolean
+          unpaid_affects_balance?: boolean
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_leave_policies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_leave_policies_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crew_leave_requests: {
         Row: {
+          cancellation_reason: string | null
           company_id: string
           created_at: string
           crew_id: string
           end_date: string
+          hod_reviewed_at: string | null
+          hod_reviewed_by: string | null
           id: string
           leave_type: string
           notes: string | null
@@ -2443,10 +2586,13 @@ export type Database = {
           vessel_id: string | null
         }
         Insert: {
+          cancellation_reason?: string | null
           company_id: string
           created_at?: string
           crew_id: string
           end_date: string
+          hod_reviewed_at?: string | null
+          hod_reviewed_by?: string | null
           id?: string
           leave_type: string
           notes?: string | null
@@ -2459,10 +2605,13 @@ export type Database = {
           vessel_id?: string | null
         }
         Update: {
+          cancellation_reason?: string | null
           company_id?: string
           created_at?: string
           crew_id?: string
           end_date?: string
+          hod_reviewed_at?: string | null
+          hod_reviewed_by?: string | null
           id?: string
           leave_type?: string
           notes?: string | null
@@ -2485,6 +2634,13 @@ export type Database = {
           {
             foreignKeyName: "crew_leave_requests_crew_id_fkey"
             columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_leave_requests_hod_reviewed_by_fkey"
+            columns: ["hod_reviewed_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
@@ -10565,7 +10721,7 @@ export type Database = {
         Insert: {
           approver_id?: string | null
           comment?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           file_id: string
           id?: string
@@ -10608,7 +10764,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           current_focus?: string | null
           description?: string | null
@@ -10655,7 +10811,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           deck_id: string
           description?: string | null
@@ -10717,7 +10873,7 @@ export type Database = {
           actual_end_date?: string | null
           actual_start_date?: string | null
           colour?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -10773,7 +10929,7 @@ export type Database = {
           activity_type: string
           change_order_id: string
           comment?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           from_status?: string | null
@@ -10813,7 +10969,7 @@ export type Database = {
         }
         Insert: {
           change_order_id: string
-          company_id?: string
+          company_id: string
           deliverable_id: string
           deliverable_type: string
           id?: string
@@ -10858,7 +11014,7 @@ export type Database = {
         }
         Insert: {
           area_id?: string | null
-          company_id?: string
+          company_id: string
           cost_impact?: number | null
           created_at?: string
           created_by?: string | null
@@ -10928,7 +11084,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           company?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           display_order?: number
@@ -11006,7 +11162,7 @@ export type Database = {
           area_id?: string | null
           assigned_owner?: string | null
           background?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           date?: string | null
@@ -11109,7 +11265,7 @@ export type Database = {
           bbox_width?: number | null
           bbox_x?: number | null
           bbox_y?: number | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           deck: string
@@ -11188,7 +11344,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           display_order?: number
@@ -11249,7 +11405,7 @@ export type Database = {
           zone_id: string | null
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           deck_number?: number | null
           description?: string | null
@@ -11311,7 +11467,7 @@ export type Database = {
           builder_info_date?: string | null
           chapter_name: string
           chapter_number: number
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           delivery_by_owner?: string | null
@@ -11376,7 +11532,7 @@ export type Database = {
           uploaded_by: string | null
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           drawing_number: string
           drawing_type?: string
@@ -11444,7 +11600,7 @@ export type Database = {
         }
         Insert: {
           code: string
-          company_id?: string
+          company_id: string
           created_at?: string
           description?: string | null
           id?: string
@@ -11497,7 +11653,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           area_id?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           delivery_date?: string | null
@@ -11568,7 +11724,7 @@ export type Database = {
         }
         Insert: {
           area_id?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           external_url?: string | null
           id?: string
@@ -11653,7 +11809,7 @@ export type Database = {
           approval_doc_phase_2?: string | null
           approval_doc_phase_3?: string | null
           approval_doc_phase_4_5?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           deck_name?: string | null
           deliverables_materials?: string | null
@@ -11728,7 +11884,7 @@ export type Database = {
         Insert: {
           area_code?: string | null
           block_id?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           description?: string | null
           id?: string
@@ -11779,7 +11935,7 @@ export type Database = {
         Insert: {
           changed_at?: string
           changed_by?: string | null
-          company_id?: string
+          company_id: string
           from_status?: string | null
           id?: string
           material_id: string
@@ -11819,7 +11975,7 @@ export type Database = {
         }
         Insert: {
           area_id?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           id?: string
@@ -11903,7 +12059,7 @@ export type Database = {
           certificate_file_id?: string | null
           certificate_url?: string | null
           colour?: string | null
-          company_id?: string
+          company_id: string
           corrosion_resistance?: string | null
           created_at?: string
           created_by?: string | null
@@ -12017,7 +12173,7 @@ export type Database = {
         }
         Insert: {
           actual_date?: string | null
-          company_id?: string
+          company_id: string
           completed_by?: string | null
           created_at?: string
           created_by?: string | null
@@ -12084,7 +12240,7 @@ export type Database = {
         }
         Insert: {
           block_code: string
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           display_order?: number
@@ -12143,7 +12299,7 @@ export type Database = {
         }
         Insert: {
           code?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           display_order?: number
           has_date_markers?: boolean
@@ -12199,7 +12355,7 @@ export type Database = {
           achieved_week?: number | null
           achieved_year?: number | null
           block_id: string
-          company_id?: string
+          company_id: string
           created_at?: string
           id?: string
           milestone_id: string
@@ -12251,7 +12407,7 @@ export type Database = {
           name: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           description?: string | null
           id?: string
@@ -12281,7 +12437,7 @@ export type Database = {
         Insert: {
           activity_type: string
           comment?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           from_status?: string | null
@@ -12339,7 +12495,7 @@ export type Database = {
           actual_delivery_date?: string | null
           amount?: number | null
           area_id?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -12407,7 +12563,7 @@ export type Database = {
         }
         Insert: {
           assignment: Database["public"]["Enums"]["nb_rasci_value"]
-          company_id?: string
+          company_id: string
           created_at?: string
           element_code_id: string
           id?: string
@@ -12462,7 +12618,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           display_order?: number
           id?: string
@@ -12512,7 +12668,7 @@ export type Database = {
         }
         Insert: {
           category?: string
-          company_id?: string
+          company_id: string
           content_indexed_at?: string | null
           content_text?: string | null
           created_at?: string
@@ -12571,7 +12727,7 @@ export type Database = {
           requirement_id: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           deliverable_id: string
           deliverable_type: string
           id?: string
@@ -12613,7 +12769,7 @@ export type Database = {
         }
         Insert: {
           area_id?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -12670,7 +12826,7 @@ export type Database = {
         }
         Insert: {
           approves_drawing?: boolean
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           creates_detail_booklet?: boolean
@@ -12740,7 +12896,7 @@ export type Database = {
         Insert: {
           baseline_end_date?: string | null
           baseline_start_date?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           duration_days?: number | null
           end_date?: string | null
@@ -12816,7 +12972,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           description?: string | null
           id?: string
@@ -12866,7 +13022,7 @@ export type Database = {
           zone_id: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           description?: string | null
           id?: string
@@ -12919,7 +13075,7 @@ export type Database = {
         Insert: {
           area_id?: string | null
           company?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           id?: string
@@ -12970,7 +13126,7 @@ export type Database = {
           row_count: number | null
         }
         Insert: {
-          company_id?: string
+          company_id: string
           id?: string
           imported_at?: string
           imported_by?: string | null
@@ -13010,7 +13166,7 @@ export type Database = {
           supplier_id: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           email?: string | null
@@ -13069,7 +13225,7 @@ export type Database = {
         }
         Insert: {
           category?: string
-          company_id?: string
+          company_id: string
           content_indexed_at?: string | null
           content_text?: string | null
           created_at?: string
@@ -13140,7 +13296,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           description?: string | null
           id?: string
@@ -17362,6 +17518,61 @@ export type Database = {
           },
         ]
       }
+      vessel_work_rest_settings: {
+        Row: {
+          cutoff_day_of_month: number
+          default_unmarked_as_rest: boolean
+          reminder_days_before_lock: number
+          rule_set_id: string | null
+          timezone: string | null
+          updated_at: string | null
+          updated_by: string | null
+          vessel_id: string
+        }
+        Insert: {
+          cutoff_day_of_month?: number
+          default_unmarked_as_rest?: boolean
+          reminder_days_before_lock?: number
+          rule_set_id?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          vessel_id: string
+        }
+        Update: {
+          cutoff_day_of_month?: number
+          default_unmarked_as_rest?: boolean
+          reminder_days_before_lock?: number
+          rule_set_id?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vessel_work_rest_settings_rule_set_id_fkey"
+            columns: ["rule_set_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_rule_sets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessel_work_rest_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "vessel_work_rest_settings_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: true
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vessels: {
         Row: {
           beam: number | null
@@ -17772,6 +17983,630 @@ export type Database = {
             columns: ["vessel_id"]
             isOneToOne: false
             referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_rest_audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_role: string | null
+          created_at: string | null
+          crew_id: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          metadata: Json | null
+          new_value: Json | null
+          old_value: Json | null
+          submission_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string | null
+          crew_id?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
+          submission_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string | null
+          crew_id?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
+          submission_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_rest_audit_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_audit_log_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_audit_log_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_monthly_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_rest_blocks: {
+        Row: {
+          block_type: string
+          category: string | null
+          created_at: string | null
+          created_by: string | null
+          crew_id: string
+          end_minute: number
+          id: string
+          notes: string | null
+          record_id: string
+          start_minute: number
+          updated_at: string | null
+        }
+        Insert: {
+          block_type?: string
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          crew_id: string
+          end_minute: number
+          id?: string
+          notes?: string | null
+          record_id: string
+          start_minute: number
+          updated_at?: string | null
+        }
+        Update: {
+          block_type?: string
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          crew_id?: string
+          end_minute?: number
+          id?: string
+          notes?: string | null
+          record_id?: string
+          start_minute?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_rest_blocks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_blocks_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_blocks_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_rest_compliance_checks: {
+        Row: {
+          check_window: string
+          created_at: string | null
+          crew_id: string
+          id: string
+          passes: boolean
+          rest_minutes: number
+          submission_id: string | null
+          threshold_minutes: number | null
+          window_end: string
+          window_start: string
+          work_minutes: number
+        }
+        Insert: {
+          check_window: string
+          created_at?: string | null
+          crew_id: string
+          id?: string
+          passes: boolean
+          rest_minutes: number
+          submission_id?: string | null
+          threshold_minutes?: number | null
+          window_end: string
+          window_start: string
+          work_minutes: number
+        }
+        Update: {
+          check_window?: string
+          created_at?: string | null
+          crew_id?: string
+          id?: string
+          passes?: boolean
+          rest_minutes?: number
+          submission_id?: string | null
+          threshold_minutes?: number | null
+          window_end?: string
+          window_start?: string
+          work_minutes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_rest_compliance_checks_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_compliance_checks_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_monthly_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_rest_monthly_submissions: {
+        Row: {
+          captain_reviewed_at: string | null
+          created_at: string | null
+          crew_id: string
+          crew_signed_at: string | null
+          hod_signed_at: string | null
+          id: string
+          is_compliant: boolean | null
+          locked_at: string | null
+          open_non_conformities: number | null
+          period_month: number
+          period_year: number
+          reopen_reason: string | null
+          reopened_at: string | null
+          reopened_by: string | null
+          rule_set_id: string | null
+          status: string
+          submitted_at: string | null
+          total_rest_hours: number | null
+          total_work_hours: number | null
+          updated_at: string | null
+          vessel_id: string
+        }
+        Insert: {
+          captain_reviewed_at?: string | null
+          created_at?: string | null
+          crew_id: string
+          crew_signed_at?: string | null
+          hod_signed_at?: string | null
+          id?: string
+          is_compliant?: boolean | null
+          locked_at?: string | null
+          open_non_conformities?: number | null
+          period_month: number
+          period_year: number
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
+          rule_set_id?: string | null
+          status?: string
+          submitted_at?: string | null
+          total_rest_hours?: number | null
+          total_work_hours?: number | null
+          updated_at?: string | null
+          vessel_id: string
+        }
+        Update: {
+          captain_reviewed_at?: string | null
+          created_at?: string | null
+          crew_id?: string
+          crew_signed_at?: string | null
+          hod_signed_at?: string | null
+          id?: string
+          is_compliant?: boolean | null
+          locked_at?: string | null
+          open_non_conformities?: number | null
+          period_month?: number
+          period_year?: number
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
+          rule_set_id?: string | null
+          status?: string
+          submitted_at?: string | null
+          total_rest_hours?: number | null
+          total_work_hours?: number | null
+          updated_at?: string | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_rest_monthly_submissions_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_monthly_submissions_reopened_by_fkey"
+            columns: ["reopened_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_monthly_submissions_rule_set_id_fkey"
+            columns: ["rule_set_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_rule_sets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_rest_monthly_submissions_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_rest_non_conformities: {
+        Row: {
+          created_at: string | null
+          crew_id: string
+          id: string
+          justification: string | null
+          measured_value: number | null
+          reviewed_at: string | null
+          reviewer_id: string | null
+          rule_code: string
+          rule_description: string
+          severity: string
+          status: string
+          submission_id: string | null
+          suggested_correction: string | null
+          threshold_value: number | null
+          updated_at: string | null
+          window_end: string
+          window_start: string
+        }
+        Insert: {
+          created_at?: string | null
+          crew_id: string
+          id?: string
+          justification?: string | null
+          measured_value?: number | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          rule_code: string
+          rule_description: string
+          severity?: string
+          status?: string
+          submission_id?: string | null
+          suggested_correction?: string | null
+          threshold_value?: number | null
+          updated_at?: string | null
+          window_end: string
+          window_start: string
+        }
+        Update: {
+          created_at?: string | null
+          crew_id?: string
+          id?: string
+          justification?: string | null
+          measured_value?: number | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          rule_code?: string
+          rule_description?: string
+          severity?: string
+          status?: string
+          submission_id?: string | null
+          suggested_correction?: string | null
+          threshold_value?: number | null
+          updated_at?: string | null
+          window_end?: string
+          window_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_rest_non_conformities_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_non_conformities_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_non_conformities_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_monthly_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_rest_notes: {
+        Row: {
+          author_id: string | null
+          block_id: string | null
+          body: string
+          created_at: string | null
+          id: string
+          record_id: string | null
+          submission_id: string | null
+        }
+        Insert: {
+          author_id?: string | null
+          block_id?: string | null
+          body: string
+          created_at?: string | null
+          id?: string
+          record_id?: string | null
+          submission_id?: string | null
+        }
+        Update: {
+          author_id?: string | null
+          block_id?: string | null
+          body?: string
+          created_at?: string | null
+          id?: string
+          record_id?: string | null
+          submission_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_rest_notes_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_notes_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_blocks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_rest_notes_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_rest_notes_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_monthly_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_rest_records: {
+        Row: {
+          created_at: string | null
+          crew_id: string
+          id: string
+          is_compliant: boolean | null
+          longest_rest_minutes: number | null
+          notes: string | null
+          record_date: string
+          rest_period_count: number | null
+          submission_id: string | null
+          total_rest_minutes: number | null
+          total_work_minutes: number | null
+          updated_at: string | null
+          vessel_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          crew_id: string
+          id?: string
+          is_compliant?: boolean | null
+          longest_rest_minutes?: number | null
+          notes?: string | null
+          record_date: string
+          rest_period_count?: number | null
+          submission_id?: string | null
+          total_rest_minutes?: number | null
+          total_work_minutes?: number | null
+          updated_at?: string | null
+          vessel_id: string
+        }
+        Update: {
+          created_at?: string | null
+          crew_id?: string
+          id?: string
+          is_compliant?: boolean | null
+          longest_rest_minutes?: number | null
+          notes?: string | null
+          record_date?: string
+          rest_period_count?: number | null
+          submission_id?: string | null
+          total_rest_minutes?: number | null
+          total_work_minutes?: number | null
+          updated_at?: string | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_rest_records_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_records_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_monthly_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_rest_records_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_rest_rule_sets: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_default: boolean | null
+          max_interval_between_rest: number
+          max_rest_periods_per_24h: number
+          min_long_rest_block: number
+          min_rest_per_24h: number
+          min_rest_per_7d: number
+          name: string
+          notes: string | null
+          updated_at: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_default?: boolean | null
+          max_interval_between_rest?: number
+          max_rest_periods_per_24h?: number
+          min_long_rest_block?: number
+          min_rest_per_24h?: number
+          min_rest_per_7d?: number
+          name: string
+          notes?: string | null
+          updated_at?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_default?: boolean | null
+          max_interval_between_rest?: number
+          max_rest_periods_per_24h?: number
+          min_long_rest_block?: number
+          min_rest_per_24h?: number
+          min_rest_per_7d?: number
+          name?: string
+          notes?: string | null
+          updated_at?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_rest_rule_sets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_rest_rule_sets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_rule_sets_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_rest_signatures: {
+        Row: {
+          id: string
+          ip_address: string | null
+          signature_method: string
+          signature_payload: Json | null
+          signed_at: string | null
+          signer_id: string
+          signer_role: string
+          submission_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          id?: string
+          ip_address?: string | null
+          signature_method?: string
+          signature_payload?: Json | null
+          signed_at?: string | null
+          signer_id: string
+          signer_role: string
+          submission_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          id?: string
+          ip_address?: string | null
+          signature_method?: string
+          signature_payload?: Json | null
+          signed_at?: string | null
+          signer_id?: string
+          signer_role?: string
+          submission_id?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_rest_signatures_signer_id_fkey"
+            columns: ["signer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_signatures_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_monthly_submissions"
             referencedColumns: ["id"]
           },
         ]
