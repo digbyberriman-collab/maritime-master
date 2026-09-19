@@ -1112,7 +1112,11 @@ export function useExerciseSources() {
       let failed = 0;
       for (let i = 0; i < fresh.length; i += 200) {
         const chunk = fresh.slice(i, i + 200);
-        const { error } = await supabase.from('pt_exercises').insert(chunk);
+        // Upsert on the source key so a second import, or two people importing
+        // at once, tops the library up rather than failing the whole chunk.
+        const { error } = await supabase
+          .from('pt_exercises')
+          .upsert(chunk, { onConflict: 'company_id,source,source_id', ignoreDuplicates: true });
         if (error) failed += chunk.length;
         else imported += chunk.length;
       }

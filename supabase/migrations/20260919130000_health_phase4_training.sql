@@ -75,8 +75,11 @@ CREATE TABLE IF NOT EXISTS public.pt_exercises (
   updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_pt_exercises_company ON public.pt_exercises(company_id, is_active, category);
+-- Not a partial index: the importer upserts on these three columns through
+-- PostgREST, which cannot state an index predicate, and NULLs are distinct by
+-- default so hand-written exercises (source_id null) never collide.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_pt_exercises_source
-  ON public.pt_exercises(company_id, source, source_id) WHERE source_id IS NOT NULL;
+  ON public.pt_exercises(company_id, source, source_id);
 
 CREATE TABLE IF NOT EXISTS public.pt_videos (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

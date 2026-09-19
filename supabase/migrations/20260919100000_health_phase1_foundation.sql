@@ -567,7 +567,7 @@ BEGIN
     NEW.department, NEW.rank,
     COALESCE(NEW.status, 'active') <> 'inactive'
   )
-  ON CONFLICT (profile_id) DO UPDATE SET
+  ON CONFLICT (profile_id) WHERE profile_id IS NOT NULL DO UPDATE SET
     company_id = EXCLUDED.company_id,
     first_name = EXCLUDED.first_name,
     last_name = EXCLUDED.last_name,
@@ -607,7 +607,7 @@ SELECT
   COALESCE(p.status, 'active') <> 'inactive'
 FROM public.profiles p
 WHERE p.company_id IS NOT NULL
-ON CONFLICT (profile_id) DO NOTHING;
+ON CONFLICT (profile_id) WHERE profile_id IS NOT NULL DO NOTHING;
 
 -- Attach the current vessel where there is a live assignment.
 UPDATE public.hw_people hp

@@ -184,7 +184,7 @@ BEGIN
     SELECT id INTO v_existing FROM public.alerts
     WHERE company_id = item.company_id
       AND alert_type = v_alert_type
-      AND related_entity_id = item.record_id::text
+      AND related_entity_id = item.record_id
       AND status IN ('OPEN', 'ACKNOWLEDGED', 'SNOOZED', 'ESCALATED')
     LIMIT 1;
 
@@ -203,7 +203,7 @@ BEGIN
       ) VALUES (
         item.company_id, item.vessel_id, v_alert_type, v_title,
         'Health item (' || item.label || ') due ' || to_char(item.due_date, 'DD Mon YYYY'),
-        v_severity, 'OPEN', 'health', item.item_type, item.record_id::text,
+        v_severity, 'OPEN', 'health', item.item_type, item.record_id,
         item.due_date::timestamptz, 'DPA',
         jsonb_build_object('item_type', item.item_type, 'person_id', item.person_id, 'days_remaining', item.days_remaining)
       );
@@ -219,7 +219,7 @@ BEGIN
     AND (p_company_id IS NULL OR a.company_id = p_company_id)
     AND NOT EXISTS (
       SELECT 1 FROM public.hw_expiry_items e
-      WHERE e.record_id::text = a.related_entity_id AND e.days_remaining <= 90
+      WHERE e.record_id = a.related_entity_id AND e.days_remaining <= 90
     );
 
   RETURN v_count;
