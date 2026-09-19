@@ -2273,6 +2273,42 @@ export type Database = {
           },
         ]
       }
+      crew_leave_balance_adjustments: {
+        Row: {
+          adjustment_days: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          crew_id: string
+          effective_date: string
+          id: string
+          reason: string
+          vessel_id: string | null
+        }
+        Insert: {
+          adjustment_days: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          crew_id: string
+          effective_date?: string
+          id?: string
+          reason: string
+          vessel_id?: string | null
+        }
+        Update: {
+          adjustment_days?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          crew_id?: string
+          effective_date?: string
+          id?: string
+          reason?: string
+          vessel_id?: string | null
+        }
+        Relationships: []
+      }
       crew_leave_carryover: {
         Row: {
           carryover_days: number
@@ -2425,12 +2461,75 @@ export type Database = {
           },
         ]
       }
+      crew_leave_policies: {
+        Row: {
+          accrual_method: string
+          booked_deducts: boolean
+          company_id: string
+          created_at: string
+          default_annual_entitlement: number
+          default_rotation: string | null
+          id: string
+          monthly_accrual_days: number
+          notes: string | null
+          pro_rata: boolean
+          rounding: string
+          scope_label: string
+          sick_affects_balance: boolean
+          training_affects_balance: boolean
+          unpaid_affects_balance: boolean
+          updated_at: string
+          vessel_id: string | null
+        }
+        Insert: {
+          accrual_method?: string
+          booked_deducts?: boolean
+          company_id: string
+          created_at?: string
+          default_annual_entitlement?: number
+          default_rotation?: string | null
+          id?: string
+          monthly_accrual_days?: number
+          notes?: string | null
+          pro_rata?: boolean
+          rounding?: string
+          scope_label?: string
+          sick_affects_balance?: boolean
+          training_affects_balance?: boolean
+          unpaid_affects_balance?: boolean
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          accrual_method?: string
+          booked_deducts?: boolean
+          company_id?: string
+          created_at?: string
+          default_annual_entitlement?: number
+          default_rotation?: string | null
+          id?: string
+          monthly_accrual_days?: number
+          notes?: string | null
+          pro_rata?: boolean
+          rounding?: string
+          scope_label?: string
+          sick_affects_balance?: boolean
+          training_affects_balance?: boolean
+          unpaid_affects_balance?: boolean
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Relationships: []
+      }
       crew_leave_requests: {
         Row: {
+          cancellation_reason: string | null
           company_id: string
           created_at: string
           crew_id: string
           end_date: string
+          hod_reviewed_at: string | null
+          hod_reviewed_by: string | null
           id: string
           leave_type: string
           notes: string | null
@@ -2443,10 +2542,13 @@ export type Database = {
           vessel_id: string | null
         }
         Insert: {
+          cancellation_reason?: string | null
           company_id: string
           created_at?: string
           crew_id: string
           end_date: string
+          hod_reviewed_at?: string | null
+          hod_reviewed_by?: string | null
           id?: string
           leave_type: string
           notes?: string | null
@@ -2459,10 +2561,13 @@ export type Database = {
           vessel_id?: string | null
         }
         Update: {
+          cancellation_reason?: string | null
           company_id?: string
           created_at?: string
           crew_id?: string
           end_date?: string
+          hod_reviewed_at?: string | null
+          hod_reviewed_by?: string | null
           id?: string
           leave_type?: string
           notes?: string | null
@@ -17362,6 +17467,39 @@ export type Database = {
           },
         ]
       }
+      vessel_work_rest_settings: {
+        Row: {
+          cutoff_day_of_month: number
+          default_unmarked_as_rest: boolean
+          reminder_days_before_lock: number
+          rule_set_id: string | null
+          timezone: string | null
+          updated_at: string | null
+          updated_by: string | null
+          vessel_id: string
+        }
+        Insert: {
+          cutoff_day_of_month?: number
+          default_unmarked_as_rest?: boolean
+          reminder_days_before_lock?: number
+          rule_set_id?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          vessel_id: string
+        }
+        Update: {
+          cutoff_day_of_month?: number
+          default_unmarked_as_rest?: boolean
+          reminder_days_before_lock?: number
+          rule_set_id?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          vessel_id?: string
+        }
+        Relationships: []
+      }
       vessels: {
         Row: {
           beam: number | null
@@ -17775,6 +17913,432 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      work_rest_audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_role: string | null
+          created_at: string | null
+          crew_id: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          metadata: Json | null
+          new_value: Json | null
+          old_value: Json | null
+          submission_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string | null
+          crew_id?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
+          submission_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string | null
+          crew_id?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
+          submission_id?: string | null
+        }
+        Relationships: []
+      }
+      work_rest_blocks: {
+        Row: {
+          block_type: string
+          category: string | null
+          created_at: string | null
+          created_by: string | null
+          crew_id: string
+          end_minute: number
+          id: string
+          notes: string | null
+          record_id: string
+          start_minute: number
+          updated_at: string | null
+        }
+        Insert: {
+          block_type?: string
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          crew_id: string
+          end_minute: number
+          id?: string
+          notes?: string | null
+          record_id: string
+          start_minute: number
+          updated_at?: string | null
+        }
+        Update: {
+          block_type?: string
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          crew_id?: string
+          end_minute?: number
+          id?: string
+          notes?: string | null
+          record_id?: string
+          start_minute?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      work_rest_compliance_checks: {
+        Row: {
+          check_window: string
+          created_at: string | null
+          crew_id: string
+          id: string
+          passes: boolean
+          rest_minutes: number
+          submission_id: string | null
+          threshold_minutes: number | null
+          window_end: string
+          window_start: string
+          work_minutes: number
+        }
+        Insert: {
+          check_window: string
+          created_at?: string | null
+          crew_id: string
+          id?: string
+          passes: boolean
+          rest_minutes: number
+          submission_id?: string | null
+          threshold_minutes?: number | null
+          window_end: string
+          window_start: string
+          work_minutes: number
+        }
+        Update: {
+          check_window?: string
+          created_at?: string | null
+          crew_id?: string
+          id?: string
+          passes?: boolean
+          rest_minutes?: number
+          submission_id?: string | null
+          threshold_minutes?: number | null
+          window_end?: string
+          window_start?: string
+          work_minutes?: number
+        }
+        Relationships: []
+      }
+      work_rest_monthly_submissions: {
+        Row: {
+          captain_reviewed_at: string | null
+          created_at: string | null
+          crew_id: string
+          crew_signed_at: string | null
+          hod_signed_at: string | null
+          id: string
+          is_compliant: boolean | null
+          locked_at: string | null
+          open_non_conformities: number | null
+          period_month: number
+          period_year: number
+          reopen_reason: string | null
+          reopened_at: string | null
+          reopened_by: string | null
+          rule_set_id: string | null
+          status: string
+          submitted_at: string | null
+          total_rest_hours: number | null
+          total_work_hours: number | null
+          updated_at: string | null
+          vessel_id: string
+        }
+        Insert: {
+          captain_reviewed_at?: string | null
+          created_at?: string | null
+          crew_id: string
+          crew_signed_at?: string | null
+          hod_signed_at?: string | null
+          id?: string
+          is_compliant?: boolean | null
+          locked_at?: string | null
+          open_non_conformities?: number | null
+          period_month: number
+          period_year: number
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
+          rule_set_id?: string | null
+          status?: string
+          submitted_at?: string | null
+          total_rest_hours?: number | null
+          total_work_hours?: number | null
+          updated_at?: string | null
+          vessel_id: string
+        }
+        Update: {
+          captain_reviewed_at?: string | null
+          created_at?: string | null
+          crew_id?: string
+          crew_signed_at?: string | null
+          hod_signed_at?: string | null
+          id?: string
+          is_compliant?: boolean | null
+          locked_at?: string | null
+          open_non_conformities?: number | null
+          period_month?: number
+          period_year?: number
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
+          rule_set_id?: string | null
+          status?: string
+          submitted_at?: string | null
+          total_rest_hours?: number | null
+          total_work_hours?: number | null
+          updated_at?: string | null
+          vessel_id?: string
+        }
+        Relationships: []
+      }
+      work_rest_non_conformities: {
+        Row: {
+          created_at: string | null
+          crew_id: string
+          id: string
+          justification: string | null
+          measured_value: number | null
+          reviewed_at: string | null
+          reviewer_id: string | null
+          rule_code: string
+          rule_description: string
+          severity: string
+          status: string
+          submission_id: string | null
+          suggested_correction: string | null
+          threshold_value: number | null
+          updated_at: string | null
+          window_end: string
+          window_start: string
+        }
+        Insert: {
+          created_at?: string | null
+          crew_id: string
+          id?: string
+          justification?: string | null
+          measured_value?: number | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          rule_code: string
+          rule_description: string
+          severity?: string
+          status?: string
+          submission_id?: string | null
+          suggested_correction?: string | null
+          threshold_value?: number | null
+          updated_at?: string | null
+          window_end: string
+          window_start: string
+        }
+        Update: {
+          created_at?: string | null
+          crew_id?: string
+          id?: string
+          justification?: string | null
+          measured_value?: number | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          rule_code?: string
+          rule_description?: string
+          severity?: string
+          status?: string
+          submission_id?: string | null
+          suggested_correction?: string | null
+          threshold_value?: number | null
+          updated_at?: string | null
+          window_end?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
+      work_rest_notes: {
+        Row: {
+          author_id: string | null
+          block_id: string | null
+          body: string
+          created_at: string | null
+          id: string
+          record_id: string | null
+          submission_id: string | null
+        }
+        Insert: {
+          author_id?: string | null
+          block_id?: string | null
+          body: string
+          created_at?: string | null
+          id?: string
+          record_id?: string | null
+          submission_id?: string | null
+        }
+        Update: {
+          author_id?: string | null
+          block_id?: string | null
+          body?: string
+          created_at?: string | null
+          id?: string
+          record_id?: string | null
+          submission_id?: string | null
+        }
+        Relationships: []
+      }
+      work_rest_records: {
+        Row: {
+          created_at: string | null
+          crew_id: string
+          id: string
+          is_compliant: boolean | null
+          longest_rest_minutes: number | null
+          notes: string | null
+          record_date: string
+          rest_period_count: number | null
+          submission_id: string | null
+          total_rest_minutes: number | null
+          total_work_minutes: number | null
+          updated_at: string | null
+          vessel_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          crew_id: string
+          id?: string
+          is_compliant?: boolean | null
+          longest_rest_minutes?: number | null
+          notes?: string | null
+          record_date: string
+          rest_period_count?: number | null
+          submission_id?: string | null
+          total_rest_minutes?: number | null
+          total_work_minutes?: number | null
+          updated_at?: string | null
+          vessel_id: string
+        }
+        Update: {
+          created_at?: string | null
+          crew_id?: string
+          id?: string
+          is_compliant?: boolean | null
+          longest_rest_minutes?: number | null
+          notes?: string | null
+          record_date?: string
+          rest_period_count?: number | null
+          submission_id?: string | null
+          total_rest_minutes?: number | null
+          total_work_minutes?: number | null
+          updated_at?: string | null
+          vessel_id?: string
+        }
+        Relationships: []
+      }
+      work_rest_rule_sets: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_default: boolean | null
+          max_interval_between_rest: number
+          max_rest_periods_per_24h: number
+          min_long_rest_block: number
+          min_rest_per_24h: number
+          min_rest_per_7d: number
+          name: string
+          notes: string | null
+          updated_at: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_default?: boolean | null
+          max_interval_between_rest?: number
+          max_rest_periods_per_24h?: number
+          min_long_rest_block?: number
+          min_rest_per_24h?: number
+          min_rest_per_7d?: number
+          name: string
+          notes?: string | null
+          updated_at?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_default?: boolean | null
+          max_interval_between_rest?: number
+          max_rest_periods_per_24h?: number
+          min_long_rest_block?: number
+          min_rest_per_24h?: number
+          min_rest_per_7d?: number
+          name?: string
+          notes?: string | null
+          updated_at?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: []
+      }
+      work_rest_signatures: {
+        Row: {
+          id: string
+          ip_address: string | null
+          signature_method: string
+          signature_payload: Json | null
+          signed_at: string | null
+          signer_id: string
+          signer_role: string
+          submission_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          id?: string
+          ip_address?: string | null
+          signature_method?: string
+          signature_payload?: Json | null
+          signed_at?: string | null
+          signer_id: string
+          signer_role: string
+          submission_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          id?: string
+          ip_address?: string | null
+          signature_method?: string
+          signature_payload?: Json | null
+          signed_at?: string | null
+          signer_id?: string
+          signer_role?: string
+          submission_id?: string
+          user_agent?: string | null
+        }
+        Relationships: []
       }
     }
     Views: {
