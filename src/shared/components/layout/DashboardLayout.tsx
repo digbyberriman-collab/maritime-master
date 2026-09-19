@@ -169,7 +169,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
                 <button
                   type="button"
                   onClick={toggleSidebarCollapsed}
-                  className="hidden lg:flex items-center justify-center rounded-md p-2 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  className="hidden min-h-11 min-w-11 items-center justify-center rounded-md p-2 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar lg:flex"
                   aria-label={sidebarCollapsed ? 'Expand folder panel' : 'Collapse folder panel to icons'}
                   title={`${sidebarCollapsed ? 'Expand folder panel' : 'Collapse to icons'} (Ctrl+B)`}
                 >
@@ -180,7 +180,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
                 ref={mobileCloseButtonRef}
                 type="button"
                 onClick={() => setSidebarOpen(false)}
-                className={cn('text-sidebar-foreground', !collapseSidebar && 'lg:hidden')}
+                className={cn('min-h-11 min-w-11 rounded-md text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar', !collapseSidebar && 'lg:hidden')}
                 aria-label="Close navigation drawer"
               >
                 <X className="w-5 h-5" />
@@ -216,7 +216,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
             ref={mobileMenuButtonRef}
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className={cn('p-2 text-foreground', !collapseSidebar && 'lg:hidden')}
+            className={cn('min-h-11 min-w-11 rounded-md p-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background', !collapseSidebar && 'lg:hidden')}
             aria-label="Open navigation drawer"
             aria-controls="mobile-navigation-drawer"
             aria-expanded={sidebarOpen}
