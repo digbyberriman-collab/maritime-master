@@ -30,11 +30,27 @@ const RotationBlock: React.FC<Props> = ({
   const baseColour = assignment.colour || ROTATION_TYPE_COLOURS[assignment.rotation_type];
   const hasHard = conflicts?.some((c) => c.severity === 'hard');
   const hasSoft = conflicts?.some((c) => c.severity === 'soft');
+  const accessibleName = [
+    ROTATION_TYPE_LABELS[assignment.rotation_type],
+    assignment.label,
+    crewName,
+    `${assignment.start_date} to ${assignment.end_date}`,
+    conflicts?.length ? `${conflicts.length} conflict${conflicts.length > 1 ? 's' : ''}` : null,
+  ].filter(Boolean).join(', ');
   return (
     <div
       role="button"
       tabIndex={0}
       data-block="1"
+      aria-label={accessibleName}
+      aria-pressed={selected ?? false}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          e.stopPropagation();
+          onClick(assignment, e.shiftKey ? 'range' : (e.metaKey || e.ctrlKey) ? 'toggle' : 'single');
+        }
+      }}
       onClick={(e) => {
         e.stopPropagation();
         onClick(assignment, e.shiftKey ? 'range' : (e.metaKey || e.ctrlKey) ? 'toggle' : 'single');
@@ -48,6 +64,7 @@ const RotationBlock: React.FC<Props> = ({
       title={`${ROTATION_TYPE_LABELS[assignment.rotation_type]} • ${assignment.label ?? ''}${crewName ? `\n${crewName}` : ''}\n${assignment.start_date} → ${assignment.end_date}${conflicts?.length ? '\n⚠ ' + conflicts.map(c => c.reason).join('; ') : ''}`}
       className={cn(
         'absolute rounded-md text-[11px] text-white truncate cursor-grab active:cursor-grabbing select-none shadow-sm flex items-center px-1.5',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:z-20',
         selected && 'ring-2 ring-primary ring-offset-1 z-10',
         hasHard && 'outline outline-2 outline-destructive',
         !hasHard && hasSoft && 'outline outline-2 outline-amber-500',
