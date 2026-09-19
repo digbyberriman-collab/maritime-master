@@ -18373,6 +18373,10 @@ export type Database = {
         Args: { p_days: number; p_from: string }
         Returns: string
       }
+      legal_attachment_path_allowed: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
       legal_attachments_valid: {
         Args: {
           p_attachments: Json
@@ -18384,8 +18388,46 @@ export type Database = {
       legal_can_admin: { Args: { _user_id: string }; Returns: boolean }
       legal_can_edit: { Args: { _user_id: string }; Returns: boolean }
       legal_can_view: { Args: { _user_id: string }; Returns: boolean }
+      legal_generate_alerts: {
+        Args: { p_company_id?: string }
+        Returns: number
+      }
+      legal_request_type_label: { Args: { p_type: string }; Returns: string }
+      legal_request_visible: {
+        Args: { p_request_id: string }
+        Returns: boolean
+      }
+      legal_search_documents: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          headline: string
+          rank: number
+          template_id: string
+          version_id: string
+          version_number: number
+        }[]
+      }
       legal_sla_deadline: {
         Args: { p_from?: string; p_priority: string }
+        Returns: string
+      }
+      legal_team_directory: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          email: string
+          first_name: string
+          job_position: string
+          last_name: string
+          level: string
+          preferred_name: string
+          profile_id: string
+          rank: string
+          user_id: string
+        }[]
+      }
+      legal_template_company: {
+        Args: { p_template_id: string }
         Returns: string
       }
       log_permission_change: {
