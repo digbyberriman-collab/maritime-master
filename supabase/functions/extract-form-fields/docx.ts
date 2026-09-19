@@ -62,7 +62,8 @@ export function xmlToHtml(xml: string): string {
       rows.push(`<tr>${cells.join('')}</tr>`);
     }
     tables.push(`<table>${rows.join('')}</table>`);
-    return `\u0000T${tables.length - 1}\u0000`;
+    // Private-use sentinel (cannot occur in document text) marking where the table goes.
+    return `T${tables.length - 1}`;
   });
 
   const parts: string[] = [];
@@ -73,7 +74,7 @@ export function xmlToHtml(xml: string): string {
     last = (m.index ?? 0) + m[0].length;
   }
   parts.push(s.slice(last).replace(/<[^>]+>/g, ''));
-  return parts.join('').replace(/\u0000T(\d+)\u0000/g, (_, i: string) => tables[Number(i)]);
+  return parts.join('').replace(/T(\d+)/g, (_, i: string) => tables[Number(i)]);
 }
 
 /** Extract { text, html } from a .docx file. */
