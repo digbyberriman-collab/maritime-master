@@ -77,9 +77,23 @@ const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate, col
   };
 
   return (
-    <div className="border-t border-sidebar-border p-3">
+    <div className={collapsed ? 'border-t border-sidebar-border p-2' : 'border-t border-sidebar-border p-3'}>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
+          {collapsed ? (
+            <Button
+              variant="ghost"
+              className="h-auto w-full justify-center px-0 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              aria-label={`Account menu: ${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`}
+              title={`${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`}
+            >
+              <Avatar className="h-9 w-9 shrink-0">
+                <AvatarFallback className="text-sm text-primary-foreground" style={{ backgroundColor: brandColor }}>
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+            </Button>
+          ) : (
           <Button variant="ghost" className="h-auto w-full justify-start gap-3 px-2 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
             <Avatar className="h-9 w-9 shrink-0">
               <AvatarFallback className="text-sm text-primary-foreground" style={{ backgroundColor: brandColor }}>
@@ -99,6 +113,7 @@ const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate, col
             </span>
             <ChevronUp className="h-4 w-4 shrink-0 text-sidebar-foreground/60" />
           </Button>
+          )}
         </DropdownMenuTrigger>
         <DropdownMenuContent side="top" align="start" className="w-64 bg-popover">
           {!loading && vessels.length > 0 && (
