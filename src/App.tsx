@@ -20,7 +20,9 @@ const App = () => (
         <AuthProvider>
           <BrandingProvider>
             <VesselProvider>
-              <AppRoutes />
+              <AppErrorBoundary>
+                <AppRoutes />
+              </AppErrorBoundary>
             </VesselProvider>
           </BrandingProvider>
         </AuthProvider>
