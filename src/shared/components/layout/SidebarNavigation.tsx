@@ -130,7 +130,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
       const count = badgeCounts?.pendingCompliance ?? 0;
       return count > 0 ? { count, label: badgeLabel(count, 'pending compliance item'), destination: '/notifications/center?tab=compliance' } : null;
     }
-    if (pathname === '/vessel/general/communications') {
+    if (pathname === '/vessel/general/communications' || (collapsed && pathname === '/vessel/general')) {
       const count = badgeCounts?.unreadMessages ?? 0;
       return count > 0 ? { count, label: badgeLabel(count, 'unread message'), destination: '/notifications/center?tab=messages' } : null;
     }
@@ -139,7 +139,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
       return count > 0 ? { count, label: badgeLabel(count, 'overdue operational task'), destination: '/notifications/center?tab=tasks' } : null;
     }
     return null;
-  }, [badgeCounts]);
+  }, [badgeCounts, collapsed]);
 
   const activeLabel = useMemo(() => {
     if (!selectedModule) {
