@@ -41,11 +41,13 @@ const useFormField = () => {
     throw new Error("useFormField should be used within <FormField>");
   }
 
-  const { id } = itemContext;
+  const { id, hasDescription, registerDescription } = itemContext;
 
   return {
     id,
     name: fieldContext.name,
+    hasDescription,
+    registerDescription,
     formItemId: `${id}-form-item`,
     formDescriptionId: `${id}-form-item-description`,
     formMessageId: `${id}-form-item-message`,
@@ -55,6 +57,8 @@ const useFormField = () => {
 
 type FormItemContextValue = {
   id: string;
+  hasDescription: boolean;
+  registerDescription: (present: boolean) => void;
 };
 
 const FormItemContext = React.createContext<FormItemContextValue>({} as FormItemContextValue);
@@ -62,9 +66,14 @@ const FormItemContext = React.createContext<FormItemContextValue>({} as FormItem
 const FormItem = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => {
     const id = React.useId();
+    const [hasDescription, setHasDescription] = React.useState(false);
+    const value = React.useMemo(
+      () => ({ id, hasDescription, registerDescription: setHasDescription }),
+      [id, hasDescription],
+    );
 
     return (
-      <FormItemContext.Provider value={{ id }}>
+      <FormItemContext.Provider value={value}>
         <div ref={ref} className={cn("space-y-2", className)} {...props} />
       </FormItemContext.Provider>
     );
