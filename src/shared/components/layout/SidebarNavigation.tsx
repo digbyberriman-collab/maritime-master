@@ -10,6 +10,7 @@ import { useHrAccess } from '@/modules/auth/hooks/useHrAccess';
 import { hrAccessSatisfies } from '@/modules/auth/lib/hrAccess';
 import { usePayrollAccess } from '@/modules/auth/hooks/usePayrollAccess';
 import { payrollAccessSatisfies } from '@/modules/auth/lib/payrollAccess';
+import { useSidebarBadgeCounts } from '@/shared/hooks/useSidebarBadgeCounts';
 
 interface SidebarNavigationProps {
   moduleId: string | null;
@@ -28,6 +29,10 @@ const DASHBOARD_LINKS = [
   { label: 'Fleet Reports', path: '/reports', icon: FileBarChart },
 ];
 
+const badgeLabel = (count: number, singular: string, plural = `${singular}s`) => (
+  `${count} ${count === 1 ? singular : plural}`
+);
+
 const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavigate, collapsed = false, onExpand }) => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -36,6 +41,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
   const rbacInitialized = usePermissionsStore((s) => s.isInitialized);
   const hrAccess = useHrAccess();
   const payrollAccess = usePayrollAccess();
+  const { data: badgeCounts } = useSidebarBadgeCounts();
   const selectedModule = NAVIGATION_ITEMS.find((item) => item.id === moduleId) ?? null;
 
   // Leaf-level gating: entries with a moduleKey are hidden unless the user
@@ -118,6 +124,23 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [announcement, setAnnouncement] = useState('');
 
+  const badgeFor = useCallback((child: NavChild): { count: number; label: string } | null => {
+    const pathname = child.path.split('?')[0];
+    if (pathname === '/vessel/safety') {
+      const count = badgeCounts?.pendingCompliance ?? 0;
+      return count > 0 ? { count, label: badgeLabel(count, 'pending compliance item') } : null;
+    }
+    if (pathname === '/vessel/general/communications') {
+      const count = badgeCounts?.unreadMessages ?? 0;
+      return count > 0 ? { count, label: badgeLabel(count, 'unread message') } : null;
+    }
+    if (pathname === '/vessel/technical') {
+      const count = badgeCounts?.overdueTasks ?? 0;
+      return count > 0 ? { count, label: badgeLabel(count, 'overdue operational task') } : null;
+    }
+    return null;
+  }, [badgeCounts]);
+
   const activeLabel = useMemo(() => {
     if (!selectedModule) {
       return DASHBOARD_LINKS.find((link) => (
@@ -171,6 +194,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
     const hasChildren = Boolean(child.children?.length);
     const active = hasChildren ? matchesPath(child.path) : child.path === activeLeafPath;
     const descendantActive = containsCurrentPath(child);
+    const badge = badgeFor(child);
     const Icon = child.icon;
     const depthClass = depth === 0 ? 'pl-3' : depth === 1 ? 'pl-8' : depth === 2 ? 'pl-12' : 'pl-16';
 
@@ -192,8 +216,8 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
             onClick={() => (hasChildren ? onExpand?.() : go(child.path))}
             aria-current={active ? 'page' : undefined}
             aria-label={hasChildren
-              ? `${child.label} section${descendantActive ? ', contains current page' : ''}. Expand sidebar to view`
-              : `${child.label}${active ? ', current page' : ''}`}
+              ? `${child.label} section${descendantActive ? ', contains current page' : ''}${badge ? `, ${badge.label}` : ''}. Expand sidebar to view`
+              : `${child.label}${active ? ', current page' : ''}${badge ? `, ${badge.label}` : ''}`}
             title={child.label}
             className={cn(
               'relative flex h-11 w-11 items-center justify-center rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar',
@@ -208,6 +232,14 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
                 aria-hidden="true"
                 className="absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full border-2 border-sidebar bg-sidebar-primary shadow-[0_0_6px_hsl(var(--sidebar-primary)/0.6)]"
               />
+            )}
+            {badge && (
+              <span
+                aria-hidden="true"
+                className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-destructive-foreground ring-2 ring-sidebar"
+              >
+                {badge.count > 99 ? '99+' : badge.count}
+              </span>
             )}
           </button>
         </div>
@@ -230,6 +262,14 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
         >
           <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span className="truncate">{child.label}</span>
+          {badge && (
+            <span
+              className="ml-auto inline-flex min-h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold leading-none text-destructive-foreground"
+              aria-label={badge.label}
+            >
+              {badge.count > 99 ? '99+' : badge.count}
+            </span>
+          )}
         </button>
       );
     }
@@ -244,7 +284,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
         <CollapsibleTrigger asChild>
           <button
             type="button"
-            aria-label={`${child.label} section, ${isOpen ? 'expanded' : 'collapsed'}${descendantActive ? ', contains current page' : ''}`}
+            aria-label={`${child.label} section, ${isOpen ? 'expanded' : 'collapsed'}${descendantActive ? ', contains current page' : ''}${badge ? `, ${badge.label}` : ''}`}
             className={cn(
               'flex min-h-11 w-full items-center gap-3 rounded-md py-2 pr-3 text-left text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar',
               depthClass,
@@ -253,6 +293,14 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
           >
             <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span className="min-w-0 flex-1 truncate">{child.label}</span>
+            {badge && (
+              <span
+                className="inline-flex min-h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold leading-none text-destructive-foreground"
+                aria-hidden="true"
+              >
+                {badge.count > 99 ? '99+' : badge.count}
+              </span>
+            )}
             {isOpen ? <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" /> : <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />}
           </button>
         </CollapsibleTrigger>
