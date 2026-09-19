@@ -18386,7 +18386,6 @@ export type Database = {
         }
         Returns: string
       }
-      logbook_actor_name: { Args: { _user_id: string }; Returns: string }
       legal_add_business_days: {
         Args: { p_days: number; p_from: string }
         Returns: string
@@ -18427,6 +18426,7 @@ export type Database = {
         }[]
       }
       legal_template_company: { Args: { p_template_id: string }; Returns: string }
+      logbook_actor_name: { Args: { _user_id: string }; Returns: string }
       logbook_attachment_path_allowed: {
         Args: { _name: string }
         Returns: boolean
@@ -18475,7 +18475,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      logbook_entry_capacities: { Args: { _entry_id: string }; Returns: string[] }
+      logbook_entry_capacities: {
+        Args: { _entry_id: string }
+        Returns: string[]
+      }
       logbook_entry_digest: {
         Args: { e: Database["public"]["Tables"]["logbook_entries"]["Row"] }
         Returns: string
@@ -18489,7 +18492,11 @@ export type Database = {
         Returns: undefined
       }
       logbook_seal_page: {
-        Args: { p_entry_ids: string[]; p_section_id: string; p_volume_id: string }
+        Args: {
+          p_entry_ids: string[]
+          p_section_id: string
+          p_volume_id: string
+        }
         Returns: {
           company_id: string
           digest: string

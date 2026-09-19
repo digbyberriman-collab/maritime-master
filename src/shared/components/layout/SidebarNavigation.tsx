@@ -14,6 +14,10 @@ import { payrollAccessSatisfies } from '@/modules/auth/lib/payrollAccess';
 interface SidebarNavigationProps {
   moduleId: string | null;
   onNavigate?: () => void;
+  /** Icon-only (visuals only) rendering; labels become tooltips. */
+  collapsed?: boolean;
+  /** Called when a collapsed group icon is clicked so the layout can expand. */
+  onExpand?: () => void;
 }
 
 const DASHBOARD_LINKS = [
@@ -24,7 +28,7 @@ const DASHBOARD_LINKS = [
   { label: 'Fleet Reports', path: '/reports', icon: FileBarChart },
 ];
 
-const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavigate }) => {
+const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavigate, collapsed = false, onExpand }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { map } = useSidebarOrder();
@@ -74,10 +78,42 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
     return Array.from(wanted.entries()).every(([key, value]) => current.get(key) === value);
   }, [location.pathname, location.search]);
 
+  // Section-level match: exact path or any page nested under it. Used for
+  // group "contains active" state so detail pages (e.g. a logbook entry
+  // under /vessel/logbooks/...) still light up their section icon.
+  const matchesSection = useCallback((path: string) => {
+    const [pathname, queryString] = path.split('?');
+    if (location.pathname !== pathname && !location.pathname.startsWith(`${pathname}/`)) return false;
+    if (!queryString) return true;
+    const wanted = new URLSearchParams(queryString);
+    const current = new URLSearchParams(location.search);
+    return Array.from(wanted.entries()).every(([key, value]) => current.get(key) === value);
+  }, [location.pathname, location.search]);
+
   const containsCurrentPath = useCallback((item: NavChild): boolean => {
-    if (matchesPath(item.path)) return true;
+    if (matchesSection(item.path)) return true;
     return item.children?.some(containsCurrentPath) ?? false;
-  }, [matchesPath]);
+  }, [matchesSection]);
+
+  // The single leaf that best represents the current page: exact match
+  // wins; otherwise the longest leaf path the current URL sits under.
+  const activeLeafPath = useMemo(() => {
+    const leaves: string[] = [];
+    const walk = (items: NavChild[]) => items.forEach((item) => {
+      if (item.children?.length) walk(item.children);
+      else leaves.push(item.path);
+    });
+    walk(children);
+    let best: string | null = null;
+    for (const leaf of leaves) {
+      if (matchesPath(leaf)) return leaf;
+      const [pathname] = leaf.split('?');
+      if (location.pathname.startsWith(`${pathname}/`)) {
+        if (!best || pathname.length > best.split('?')[0].length) best = leaf;
+      }
+    }
+    return best;
+  }, [children, matchesPath, location.pathname]);
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
@@ -107,10 +143,48 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
 
   const renderChild = (child: NavChild, depth = 0): React.ReactNode => {
     const hasChildren = Boolean(child.children?.length);
-    const active = matchesPath(child.path);
+    const active = hasChildren ? matchesPath(child.path) : child.path === activeLeafPath;
     const descendantActive = containsCurrentPath(child);
     const Icon = child.icon;
     const depthClass = depth === 0 ? 'pl-3' : depth === 1 ? 'pl-8' : depth === 2 ? 'pl-12' : 'pl-16';
+
+    // Collapsed: icons only. Leaves navigate; groups expand the panel.
+    // Active leaf: glowing left-edge bar + lit pill. Group containing the
+    // active page: small pip on the icon so its state is still visible.
+    if (collapsed) {
+      if (depth > 0) return null;
+      return (
+        <div key={child.id} className="relative flex w-full justify-center">
+          {active && (
+            <span
+              aria-hidden="true"
+              className="absolute left-0 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-sidebar-primary shadow-[0_0_12px_hsl(var(--sidebar-primary)/0.8)]"
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => (hasChildren ? onExpand?.() : go(child.path))}
+            aria-current={active ? 'page' : undefined}
+            aria-label={child.label}
+            title={child.label}
+            className={cn(
+              'relative flex h-10 w-10 items-center justify-center rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+              active
+                ? 'border border-sidebar-primary/30 bg-sidebar-primary/20 text-sidebar-primary shadow-inner'
+                : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+            )}
+          >
+            <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+            {hasChildren && descendantActive && !active && (
+              <span
+                aria-hidden="true"
+                className="absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full border-2 border-sidebar bg-sidebar-primary shadow-[0_0_6px_hsl(var(--sidebar-primary)/0.6)]"
+              />
+            )}
+          </button>
+        </div>
+      );
+    }
 
     if (!hasChildren) {
       return (
@@ -160,15 +234,23 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
   };
 
   return (
-    <nav aria-label={selectedModule ? `${selectedModule.label} folders` : 'Dashboard shortcuts'} className="flex-1 min-h-0 overflow-y-auto px-3 py-4">
-      <div className="mb-3 flex items-center gap-2 px-3 text-xs font-semibold uppercase text-sidebar-foreground/60">
+    <nav
+      aria-label={selectedModule ? `${selectedModule.label} folders` : 'Dashboard shortcuts'}
+      className={cn('flex-1 min-h-0 overflow-y-auto py-4', collapsed ? 'px-0' : 'px-3')}
+    >
+      <div
+        className={cn(
+          'mb-3 flex items-center gap-2 text-xs font-semibold uppercase text-sidebar-foreground/60',
+          collapsed ? 'justify-center px-0' : 'px-3'
+        )}
+      >
         {selectedModule ? (
           <>
             <selectedModule.icon className="h-4 w-4" />
-            <span>{selectedModule.label}</span>
+            {!collapsed && <span>{selectedModule.label}</span>}
           </>
         ) : (
-          <span>Dashboard shortcuts</span>
+          !collapsed && <span>Dashboard shortcuts</span>
         )}
       </div>
       <div key={moduleId ?? 'dashboard'} className="space-y-1 motion-safe:animate-fade-in">
@@ -177,6 +259,33 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
           : DASHBOARD_LINKS.map((link) => {
               const Icon = link.icon;
               const active = location.pathname === link.path || (link.path === '/dashboard' && location.pathname === '/');
+              if (collapsed) {
+                return (
+                  <div key={link.path} className="relative flex w-full justify-center">
+                    {active && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute left-0 top-1/2 h-8 w-1 -translate-y-1/2 rounded-r-full bg-sidebar-primary shadow-[0_0_12px_hsl(var(--sidebar-primary)/0.8)]"
+                      />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => go(link.path)}
+                      aria-current={active ? 'page' : undefined}
+                      aria-label={link.label}
+                      title={link.label}
+                      className={cn(
+                        'flex h-10 w-10 items-center justify-center rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                        active
+                          ? 'border border-sidebar-primary/30 bg-sidebar-primary/20 text-sidebar-primary shadow-inner'
+                          : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                      )}
+                    >
+                      <Icon className="h-[18px] w-[18px]" />
+                    </button>
+                  </div>
+                );
+              }
               return (
                 <button
                   key={link.path}

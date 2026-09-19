@@ -50,6 +50,7 @@ const Auth: React.FC = () => {
   const [role, setRole] = useState<typeof roles[number]['value']>('crew');
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const { signIn, signUp, resetPassword, user } = useAuth();
   const navigate = useNavigate();
@@ -125,6 +126,7 @@ const Auth: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAuthError(null);
     if (!validateForm()) return;
 
     setIsLoading(true);
@@ -133,9 +135,16 @@ const Auth: React.FC = () => {
       if (mode === 'login') {
         const { error } = await signIn(email, password);
         if (error) {
+          const friendly =
+            /invalid login credentials/i.test(error.message)
+              ? 'That email and password combination does not match an account. Check the email address, or use "Forgot password?" to set a new password.'
+              : /email not confirmed/i.test(error.message)
+                ? 'This account has not been confirmed yet. Check your inbox for the confirmation email.'
+                : error.message;
+          setAuthError(friendly);
           toast({
             title: 'Login failed',
-            description: error.message,
+            description: friendly,
             variant: 'destructive',
           });
         } else {
@@ -342,6 +351,12 @@ const Auth: React.FC = () => {
                 >
                   Forgot password?
                 </button>
+              )}
+
+              {authError && (
+                <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {authError}
+                </p>
               )}
 
               {/* Submit button */}
