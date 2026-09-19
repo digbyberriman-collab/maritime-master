@@ -86,18 +86,31 @@ export const hasPermission = (
     return false;
   }
 
-  // Additional context-based checks
+  // Additional context-based checks.
+  //
+  // A caller that supplies a context is asking for a scoped decision, so a
+  // scope that cannot be evaluated must deny rather than fall through to a
+  // grant. Two absent values are not a match: `undefined === undefined` would
+  // otherwise hand out access while a profile has no linked account or auth is
+  // still loading. Omitting the context entirely remains a coarse "can this
+  // role ever do this" check.
   if (context) {
     // Crew can only edit their own profile
     if (roleKey === 'crew' && permission === Permission.EDIT_OWN_PROFILE) {
-      return context.targetUserId === context.currentUserId;
+      return (
+        context.targetUserId != null &&
+        context.currentUserId != null &&
+        context.targetUserId === context.currentUserId
+      );
     }
 
     // Master can only edit crew on their vessel
     if (roleKey === 'master' && permission === Permission.EDIT_CREW_FULL) {
-      if (context.targetVesselId && context.userVesselIds) {
-        return context.userVesselIds.includes(context.targetVesselId);
-      }
+      return (
+        context.targetVesselId != null &&
+        context.userVesselIds != null &&
+        context.userVesselIds.includes(context.targetVesselId)
+      );
     }
 
     // HODs can only edit crew in their department
@@ -105,7 +118,11 @@ export const hasPermission = (
       (roleKey === 'chief_engineer' || roleKey === 'chief_officer') &&
       permission === Permission.EDIT_CREW_BASIC
     ) {
-      return context.targetDepartment === context.userDepartment;
+      return (
+        context.targetDepartment != null &&
+        context.userDepartment != null &&
+        context.targetDepartment === context.userDepartment
+      );
     }
   }
 
