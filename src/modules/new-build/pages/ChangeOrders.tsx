@@ -410,7 +410,18 @@ export default function ChangeOrders() {
                 const area = areas.find((a) => a.id === co.area_id);
                 const linkCount = coDeliverables.filter((d) => d.change_order_id === co.id).length;
                 return (
-                  <TableRow key={co.id} className="cursor-pointer hover:bg-accent/30" onClick={() => setDetailId(co.id)}>
+                  <TableRow
+                    key={co.id}
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setDetailId(co.id);
+                      }
+                    }}
+                    className="cursor-pointer hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                    onClick={() => setDetailId(co.id)}
+                  >
                     <TableCell>
                       <div className="font-medium">{co.title}</div>
                       {linkCount > 0 && <span className="text-xs text-muted-foreground">{linkCount} linked</span>}
