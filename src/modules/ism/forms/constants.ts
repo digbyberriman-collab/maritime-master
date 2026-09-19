@@ -76,10 +76,8 @@ export const FORM_SUBMISSION_STATUS_CONFIG: Record<FormSubmissionStatus, { label
   DRAFT: { label: 'Draft', color: 'bg-muted text-muted-foreground' },
   IN_PROGRESS: { label: 'In Progress', color: 'bg-blue-100 text-blue-800' },
   PENDING_SIGNATURE: { label: 'Pending Signature', color: 'bg-amber-100 text-amber-800' },
-  SUBMITTED: { label: 'Submitted', color: 'bg-blue-100 text-blue-800' },
   SIGNED: { label: 'Signed', color: 'bg-green-100 text-green-800' },
   REJECTED: { label: 'Rejected', color: 'bg-red-100 text-red-800' },
-  EXPIRED: { label: 'Expired', color: 'bg-gray-100 text-gray-800' },
   AMENDED: { label: 'Amended', color: 'bg-purple-100 text-purple-800' },
   ARCHIVED: { label: 'Archived', color: 'bg-gray-100 text-gray-800' }
 };
