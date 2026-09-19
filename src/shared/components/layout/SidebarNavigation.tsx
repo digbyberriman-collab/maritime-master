@@ -253,7 +253,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
           type="button"
           onClick={() => go(child.path)}
           aria-current={active ? 'page' : undefined}
-          aria-label={`${child.label}${active ? ', current page' : ''}`}
+          aria-label={`${child.label}${active ? ', current page' : ''}${badge ? `, ${badge.label}` : ''}`}
           className={cn(
             'flex min-h-11 w-full items-center gap-3 rounded-md py-2 pr-3 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar',
             depthClass,

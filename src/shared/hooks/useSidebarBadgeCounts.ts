@@ -16,8 +16,6 @@ const EMPTY_COUNTS: SidebarBadgeCounts = {
 };
 
 const COMPLIANCE_TERMS = ['compliance', 'certificate', 'audit', 'capa', 'ism', 'isps', 'mlc', 'marpol'];
-const MESSAGE_TERMS = ['message', 'communication', 'comment'];
-
 const includesTerm = (value: string | null, terms: string[]): boolean => {
   const normalized = value?.toLowerCase() ?? '';
   return terms.some((term) => normalized.includes(term));
@@ -64,7 +62,9 @@ export function useSidebarBadgeCounts() {
 
       return {
         pendingCompliance: alerts.filter((alert) => matchesAnyField(alert, COMPLIANCE_TERMS)).length,
-        unreadMessages: alerts.filter((alert) => alert.status === 'OPEN' && matchesAnyField(alert, MESSAGE_TERMS)).length,
+        // OPEN alerts are the app's existing unread notification source (the
+        // header bell uses the same definition), so the sidebar stays aligned.
+        unreadMessages: alerts.filter((alert) => alert.status === 'OPEN').length,
         overdueTasks: tasksResult.count ?? 0,
       };
     },
