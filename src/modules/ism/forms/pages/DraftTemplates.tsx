@@ -40,7 +40,7 @@ export default function DraftTemplates() {
       const { data, error } = await supabase
         .from('form_templates')
         .select('id, template_name, description, category, status, created_at, updated_at, created_by_name, fields')
-        .eq('status', 'draft')
+        .eq('status', 'DRAFT')
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
@@ -68,7 +68,7 @@ export default function DraftTemplates() {
     try {
       const { error } = await supabase
         .from('form_templates')
-        .update({ status: 'active' })
+        .update({ status: 'PUBLISHED' })
         .eq('id', id);
 
       if (error) throw error;

@@ -25,6 +25,7 @@ export interface FormSubmission {
   is_locked: boolean | null;
   locked_at: string | null;
   content_hash: string | null;
+  signing_cycle: number;
   created_offline: boolean | null;
   synced_at: string | null;
   offline_device_id: string | null;
@@ -58,6 +59,7 @@ export interface FormSubmission {
 export interface FormSignature {
   id: string;
   submission_id: string;
+  signing_cycle: number;
   signer_user_id: string | null;
   signer_name: string | null;
   signer_role: string | null;
@@ -214,7 +216,14 @@ export function useMyDraftSubmissions() {
   });
 }
 
-// Fetch submissions pending user's signature
+// Fetch submissions pending the current user's signature
+//
+// Eligibility used to be decided here, by comparing the template's
+// required_signers[].role against profiles.rank ("Bosun", "2nd Officer").
+// No live template's role is a rank, so the queue was always empty, and the
+// rules it applied were not the rules the database applies. form_pending_
+// signatures() answers with the same resolution form_sign_submission uses,
+// and we fetch the rows it names for display.
 export function usePendingSignatures() {
   const { profile, user } = useAuth();
 
@@ -223,10 +232,14 @@ export function usePendingSignatures() {
     queryFn: async () => {
       if (!profile?.company_id || !user?.id) return [];
 
-      // Get user's role/rank from profile
-      const userRole = (profile as any).rank?.toLowerCase() || (profile as any).position?.toLowerCase() || 'crew';
+      const { data: queue, error: queueError } = await supabase.rpc('form_pending_signatures');
+      if (queueError) throw queueError;
 
-      // First get all pending submissions
+      const ids = (queue || []).map((q) => q.submission_id);
+      if (ids.length === 0) return [];
+
+      const nextOrder = new Map((queue || []).map((q) => [q.submission_id, q.next_signature_order]));
+
       const { data, error } = await supabase
         .from('form_submissions')
         .select(`
@@ -238,43 +251,15 @@ export function usePendingSignatures() {
           creator:profiles!form_submissions_created_by_fkey(user_id, first_name, last_name),
           signatures:form_signatures(*)
         `)
-        .eq('company_id', profile.company_id)
-        .eq('status', 'PENDING_SIGNATURE')
+        .in('id', ids)
         .order('submitted_at', { ascending: true });
 
       if (error) throw error;
 
-      // Filter to only those requiring this user's signature
-      const pendingForUser = (data || []).filter((submission) => {
-        const requiredSigners = (submission.template?.required_signers as any[]) || [];
-        const existingSignatures = submission.signatures || [];
-        
-        // Find if there's a requirement matching user's role
-        const matchingReq = requiredSigners.find(
-          (r: any) => r.role?.toLowerCase() === userRole
-        );
-        if (!matchingReq) return false;
-
-        // Check if already signed by this user
-        const alreadySigned = existingSignatures.some(
-          s => s.signer_user_id === user.id
-        );
-        if (alreadySigned) return false;
-
-        // Check sequential signing order
-        if (!submission.template?.allow_parallel_signing) {
-          const reqOrder = matchingReq.order || 0;
-          const previousReqs = requiredSigners.filter((r: any) => (r.order || 0) < reqOrder);
-          const allPreviousSigned = previousReqs.every((req: any) =>
-            existingSignatures.some(s => s.signer_role?.toLowerCase() === req.role?.toLowerCase())
-          );
-          if (!allPreviousSigned) return false;
-        }
-
-        return true;
-      });
-
-      return pendingForUser;
+      return (data || []).map((submission) => ({
+        ...submission,
+        next_signature_order: nextOrder.get(submission.id) ?? null,
+      }));
     },
     enabled: !!profile?.company_id && !!user?.id,
   });
@@ -389,9 +374,13 @@ export function useUpdateSubmission() {
 }
 
 // Submit for signatures mutation
+//
+// The hash, the lock and the submitter stamp are set by the database now
+// (form_submissions_before_write). The client used to compute a 32-bit
+// string hash and set is_locked itself, which meant whoever could write the
+// row could also write a hash that matched their edit.
 export function useSubmitForSignatures() {
   const queryClient = useQueryClient();
-  const { user } = useAuth();
   const { toast } = useToast();
 
   return useMutation({
@@ -402,26 +391,11 @@ export function useSubmitForSignatures() {
       submissionId: string;
       formData: Record<string, unknown>;
     }) => {
-      // Generate content hash
-      const content = JSON.stringify(formData);
-      let hash = 0;
-      for (let i = 0; i < content.length; i++) {
-        const char = content.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-      }
-      const contentHash = Math.abs(hash).toString(16).padStart(16, '0');
-
       const { data, error } = await supabase
         .from('form_submissions')
         .update({
           form_data: formData as unknown as Json,
           status: 'PENDING_SIGNATURE',
-          submitted_at: new Date().toISOString(),
-          submitted_by: user?.id,
-          content_hash: contentHash,
-          is_locked: true,
-          locked_at: new Date().toISOString(),
         })
         .eq('id', submissionId)
         .select()
@@ -430,20 +404,24 @@ export function useSubmitForSignatures() {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['form-submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['form-submission', data.id] });
       queryClient.invalidateQueries({ queryKey: ['my-draft-submissions'] });
       queryClient.invalidateQueries({ queryKey: ['pending-signatures'] });
       toast({
-        title: 'Submitted',
-        description: 'Form submitted for signature',
+        title: data.status === 'SIGNED' ? 'Completed' : 'Submitted',
+        description:
+          data.status === 'SIGNED'
+            ? 'This form needs no signatures and is now complete'
+            : 'Form submitted for signature',
       });
     },
     onError: (error) => {
       console.error('Failed to submit:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to submit form',
+        title: 'Could not submit',
+        description: error instanceof Error ? error.message : 'Failed to submit form',
         variant: 'destructive',
       });
     },
@@ -451,94 +429,97 @@ export function useSubmitForSignatures() {
 }
 
 // Sign submission mutation
+//
+// form_sign_submission decides who may sign, in which slot and in what
+// order, and completes the submission when the last mandatory signature
+// lands. The client no longer sends the signer name, role or order, and no
+// longer sets status = 'SIGNED' itself: a signature the browser composes is
+// not evidence of anything.
 export function useSignSubmission() {
   const queryClient = useQueryClient();
-  const { user, profile } = useAuth();
   const { toast } = useToast();
 
   return useMutation({
     mutationFn: async ({
       submissionId,
       signatureData,
+      typedName,
     }: {
       submissionId: string;
-      signatureData?: string; // Base64 drawn signature
+      /** Base64 drawn signature, when the signer drew one. */
+      signatureData?: string;
+      /** What the signer typed to attest, when they did not draw. */
+      typedName?: string;
     }) => {
-      if (!user?.id || !profile) throw new Error('Not authenticated');
+      const { data, error } = await supabase.rpc('form_sign_submission', {
+        p_submission_id: submissionId,
+        p_signature_data: signatureData || typedName || null,
+        p_signature_type: signatureData ? 'DRAWN' : 'TYPED',
+      });
 
-      const signerRole = (profile as any).rank || (profile as any).position || 'Crew';
-      const signerName = [profile.first_name, profile.last_name].filter(Boolean).join(' ') || user.email || 'Unknown';
-
-      // Get the next signature order
-      const { data: existingSigs } = await supabase
-        .from('form_signatures')
-        .select('signature_order')
-        .eq('submission_id', submissionId)
-        .order('signature_order', { ascending: false })
-        .limit(1);
-
-      const nextOrder = (existingSigs?.[0]?.signature_order || 0) + 1;
-
-      // Create signature record
-      const { error: sigError } = await supabase
-        .from('form_signatures')
-        .insert({
-          submission_id: submissionId,
-          signer_role: signerRole,
-          signer_user_id: user.id,
-          signer_name: signerName,
-          signature_order: nextOrder,
-          signature_type: signatureData ? 'DRAWN' : 'TYPED',
-          signature_data: signatureData || null,
-          status: 'SIGNED',
-          signed_at: new Date().toISOString(),
-          device_info: JSON.stringify({ userAgent: navigator.userAgent }),
-        });
-
-      if (sigError) throw sigError;
-
-      // Check if all signatures are collected
-      const { data: submission } = await supabase
-        .from('form_submissions')
-        .select(`
-          *,
-          template:form_templates(required_signers),
-          signatures:form_signatures(*)
-        `)
-        .eq('id', submissionId)
-        .single();
-
-      if (submission) {
-        const requiredSigners = (submission.template?.required_signers as any[]) || [];
-        const signatures = submission.signatures || [];
-        const requiredCount = requiredSigners.filter((r: any) => r.is_mandatory !== false).length;
-
-        if (signatures.length >= requiredCount) {
-          // All signatures collected - mark as complete
-          await supabase
-            .from('form_submissions')
-            .update({
-              status: 'SIGNED',
-            })
-            .eq('id', submissionId);
-        }
-      }
-
-      return { success: true };
+      if (error) throw error;
+      return data as {
+        signature_order: number;
+        outstanding_signatures: number;
+        submission_status: string;
+      };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['form-submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['form-submission'] });
       queryClient.invalidateQueries({ queryKey: ['pending-signatures'] });
       toast({
         title: 'Signed',
-        description: 'Your signature has been recorded',
+        description:
+          result.submission_status === 'SIGNED'
+            ? 'Your signature completed the form'
+            : `Your signature was recorded. ${result.outstanding_signatures} still outstanding.`,
       });
     },
     onError: (error) => {
       console.error('Failed to sign:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to sign form',
+        title: 'Could not sign',
+        description: error instanceof Error ? error.message : 'Failed to sign form',
+        variant: 'destructive',
+      });
+    },
+  });
+}
+
+// Reject submission mutation
+//
+// A signer sends the form back with a reason; the reason goes on the record
+// as a REJECTED signature row, and the form reopens for correction. The next
+// submission starts a new signing cycle, so this round stays on file.
+export function useRejectSubmission() {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async ({ submissionId, reason }: { submissionId: string; reason: string }) => {
+      const { data, error } = await supabase.rpc('form_reject_submission', {
+        p_submission_id: submissionId,
+        p_reason: reason,
+      });
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['form-submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['form-submission'] });
+      queryClient.invalidateQueries({ queryKey: ['pending-signatures'] });
+      toast({
+        title: 'Sent back',
+        description: 'The form was returned to its originator with your reason',
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to reject:', error);
+      toast({
+        title: 'Could not send back',
+        description: error instanceof Error ? error.message : 'Failed to reject form',
         variant: 'destructive',
       });
     },

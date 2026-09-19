@@ -119,13 +119,4 @@ export function getFindingStatusBadgeClass(status: string): string {
   return statusConfig?.color || 'bg-gray-100 text-gray-800';
 }
 
-export function generateAuditNumber(existingCount: number): string {
-  const year = new Date().getFullYear();
-  const paddedNumber = String(existingCount + 1).padStart(3, '0');
-  return `AUD-${year}-${paddedNumber}`;
-}
 
-export function generateFindingNumber(auditNumber: string, findingCount: number): string {
-  const paddedNumber = String(findingCount + 1).padStart(2, '0');
-  return `${auditNumber}-F${paddedNumber}`;
-}

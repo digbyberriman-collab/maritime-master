@@ -29,6 +29,4 @@ export {
   getAuditStatusBadgeClass,
   getFindingTypeBadgeClass,
   getFindingStatusBadgeClass,
-  generateAuditNumber,
-  generateFindingNumber,
 } from './constants';

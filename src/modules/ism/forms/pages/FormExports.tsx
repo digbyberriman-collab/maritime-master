@@ -52,12 +52,12 @@ export default function FormExports() {
         supabase
           .from('form_templates')
           .select('id, template_name, category')
-          .eq('status', 'active')
+          .eq('status', 'PUBLISHED')
           .order('template_name'),
         supabase
           .from('vessels')
           .select('id, name')
-          .eq('status', 'active')
+          .neq('status', 'Sold')
           .order('name'),
       ]);
 
@@ -79,14 +79,12 @@ export default function FormExports() {
       return;
     }
 
-    setIsExporting(true);
-    toast.info('Preparing export...');
-
-    // Simulate export process
-    setTimeout(() => {
-      setIsExporting(false);
-      toast.success(`Export completed! ${selectedTemplates.length} form type(s) exported as ${exportFormat.toUpperCase()}`);
-    }, 2000);
+    // Bulk export is not built. This used to wait two seconds and report
+    // "Export completed!" without producing a file, which is worse than
+    // saying so: a compliance export nobody can find is assumed to exist.
+    toast.error('Bulk export is not available yet', {
+      description: 'Export a single submission from its page in the meantime.',
+    });
   }
 
   function toggleTemplate(id: string) {

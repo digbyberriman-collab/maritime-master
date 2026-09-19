@@ -29,6 +29,5 @@ export {
   STATION_ASSIGNMENTS,
   DRILL_TYPE_COLORS,
   getDrillTypeColor,
-  generateDrillNumber,
   calculateComplianceStatus,
 } from './constants';

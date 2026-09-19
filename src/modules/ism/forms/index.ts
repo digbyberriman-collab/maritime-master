@@ -29,22 +29,9 @@ export {
   useCreateAmendment as useCreateFormAmendment,
   usePendingSignatures as useFormPendingSignatures,
   useSignSubmission as useFormSignSubmission,
+  useRejectSubmission as useFormRejectSubmission,
 } from './hooks/useFormSubmissions';
-
-// Hooks - useSMSForms
-export {
-  useSMSTemplates,
-  useSMSSubmissions,
-  useSMSSubmission,
-  useCreateSMSSubmission,
-  useUpdateSMSSubmission,
-  useSubmitForSigning,
-  useStartSigning,
-  useSignSubmission as useSMSSignSubmission,
-  useRejectSubmission,
-  useCreateAmendment as useSMSCreateAmendment,
-  usePendingSignatures as useSMSPendingSignatures,
-} from './hooks/useSMSForms';
+export type { FormSignature } from './hooks/useFormSubmissions';
 
 // Pages
 export {

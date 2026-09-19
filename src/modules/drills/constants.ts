@@ -184,11 +184,6 @@ export function getDrillTypeColor(drillTypeName: string): string {
 }
 
 // Generate drill number
-export function generateDrillNumber(existingCount: number): string {
-  const year = new Date().getFullYear();
-  const sequence = String(existingCount + 1).padStart(3, '0');
-  return `DRILL-${year}-${sequence}`;
-}
 
 // Calculate compliance status
 export function calculateComplianceStatus(

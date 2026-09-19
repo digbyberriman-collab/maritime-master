@@ -228,24 +228,4 @@ export function getAvailableActions(currentStatus: SubmissionStatus): string[] {
   return Object.keys(stateTransitions);
 }
 
-export function generateSubmissionNumber(
-  templateCode: string,
-  vesselName: string,
-  year: number,
-  sequence: number
-): string {
-  const vesselAbbr = vesselName.substring(0, 5).toUpperCase().replace(/\s/g, '');
-  return `${templateCode}-${vesselAbbr}-${year}-${String(sequence).padStart(5, '0')}`;
-}
 
-export function generateContentHash(formData: Record<string, unknown>): string {
-  // Simple hash for integrity verification
-  const content = JSON.stringify(formData);
-  let hash = 0;
-  for (let i = 0; i < content.length; i++) {
-    const char = content.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash).toString(16).padStart(16, '0');
-}

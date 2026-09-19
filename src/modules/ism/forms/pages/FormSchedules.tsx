@@ -97,7 +97,7 @@ export default function FormSchedules() {
       const { data, error } = await supabase
         .from('form_templates')
         .select('id, template_name')
-        .eq('status', 'active')
+        .eq('status', 'PUBLISHED')
         .order('template_name');
 
       if (error) throw error;
@@ -112,7 +112,7 @@ export default function FormSchedules() {
       const { data, error } = await supabase
         .from('vessels')
         .select('id, name')
-        .eq('status', 'active')
+        .neq('status', 'Sold')
         .order('name');
 
       if (error) throw error;

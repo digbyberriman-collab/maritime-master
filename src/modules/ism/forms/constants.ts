@@ -39,36 +39,35 @@ export const FORM_TYPES = [
 
 export type FormType = typeof FORM_TYPES[number]['value'];
 
-// Form/Template statuses
+// Form/Template statuses.
+// These are exactly the values form_templates_status_check allows: the list
+// used to carry UNDER_REVIEW and SUPERSEDED as well, which the column has
+// never held and now rejects.
 export const FORM_TEMPLATE_STATUSES = [
   'DRAFT',
-  'UNDER_REVIEW',
   'PUBLISHED',
   'ARCHIVED',
-  'SUPERSEDED'
 ] as const;
 
 export type FormTemplateStatus = typeof FORM_TEMPLATE_STATUSES[number];
 
 export const FORM_TEMPLATE_STATUS_CONFIG: Record<FormTemplateStatus, { label: string; color: string }> = {
   DRAFT: { label: 'Draft', color: 'bg-muted text-muted-foreground' },
-  UNDER_REVIEW: { label: 'Under Review', color: 'bg-amber-100 text-amber-800' },
   PUBLISHED: { label: 'Published', color: 'bg-green-100 text-green-800' },
   ARCHIVED: { label: 'Archived', color: 'bg-gray-100 text-gray-800' },
-  SUPERSEDED: { label: 'Superseded', color: 'bg-purple-100 text-purple-800' }
 };
 
-// Submission statuses  
+// Submission statuses, exactly as form_submissions_status_check allows.
+// SUBMITTED and EXPIRED were in this list and in no transition: a form goes
+// DRAFT or IN_PROGRESS, then PENDING_SIGNATURE, then SIGNED or REJECTED.
 export const FORM_SUBMISSION_STATUSES = [
   'DRAFT',
   'IN_PROGRESS',
   'PENDING_SIGNATURE',
-  'SUBMITTED',
   'SIGNED',
   'REJECTED',
-  'EXPIRED',
   'AMENDED',
-  'ARCHIVED'
+  'ARCHIVED',
 ] as const;
 
 export type FormSubmissionStatus = typeof FORM_SUBMISSION_STATUSES[number];
@@ -213,24 +212,4 @@ export function getSubmissionStatusConfig(status: string) {
   return FORM_SUBMISSION_STATUS_CONFIG[status as FormSubmissionStatus] || { label: status, color: 'bg-muted' };
 }
 
-// Generate submission number format: TEMPLATE_CODE-YYYYMMDD-NNNN
-export function formatSubmissionNumber(
-  templateCode: string,
-  date: Date,
-  sequence: number
-): string {
-  const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
-  return `${templateCode}-${dateStr}-${String(sequence).padStart(4, '0')}`;
-}
 
-// Generate content hash for integrity verification
-export function generateContentHash(formData: Record<string, unknown>): string {
-  const content = JSON.stringify(formData);
-  let hash = 0;
-  for (let i = 0; i < content.length; i++) {
-    const char = content.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return Math.abs(hash).toString(16).padStart(16, '0');
-}

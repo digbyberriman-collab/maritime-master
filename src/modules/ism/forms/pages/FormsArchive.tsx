@@ -44,7 +44,7 @@ export default function FormsArchive() {
       const { data, error } = await supabase
         .from('form_templates')
         .select('id, template_name')
-        .eq('status', 'active')
+        .in('status', ['PUBLISHED', 'ARCHIVED'])
         .order('template_name');
 
       if (error) throw error;
@@ -57,6 +57,9 @@ export default function FormsArchive() {
   async function loadSubmissions() {
     setIsLoading(true);
     try {
+      // form_submissions has no submitted_by_name, vessel_name or data
+      // column, and form_templates has no name column, so this select used to
+      // fail outright and the archive showed empty whatever was in it.
       let query = supabase
         .from('form_submissions')
         .select(`
@@ -64,12 +67,13 @@ export default function FormsArchive() {
           template_id,
           status,
           submitted_at,
-          submitted_by_name,
-          vessel_name,
-          data,
-          form_templates(name)
+          form_data,
+          template:form_templates(template_name),
+          vessel:vessels(name),
+          submitter:profiles!form_submissions_submitted_by_fkey(first_name, last_name),
+          signatures:form_signatures(id, status)
         `)
-        .eq('status', 'completed')
+        .in('status', ['SIGNED', 'ARCHIVED'])
         .order('submitted_at', { ascending: false });
 
       if (templateFilter !== 'all') {
@@ -105,14 +109,15 @@ export default function FormsArchive() {
       
       setSubmissions((data || []).map((s: any) => ({
         id: s.id,
-        template_name: s.form_templates?.template_name || 'Unknown Template',
+        template_name: s.template?.template_name || 'Unknown Template',
         template_id: s.template_id,
         status: s.status,
         submitted_at: s.submitted_at,
-        submitted_by_name: s.submitted_by_name,
-        vessel_name: s.vessel_name,
-        signature_count: 0,
-        data: s.data || {},
+        submitted_by_name:
+          [s.submitter?.first_name, s.submitter?.last_name].filter(Boolean).join(' ') || null,
+        vessel_name: s.vessel?.name || null,
+        signature_count: (s.signatures || []).filter((sig: any) => sig.status === 'SIGNED').length,
+        data: s.form_data || {},
       })));
     } catch (error) {
       console.error('Failed to load submissions:', error);

@@ -558,7 +558,7 @@ export type Database = {
           closeout_evidence_urls?: string[] | null
           created_at?: string
           finding_description: string
-          finding_number: string
+          finding_number?: string
           finding_type: string
           id?: string
           ism_section: number
@@ -793,7 +793,7 @@ export type Database = {
         Insert: {
           actual_end_date?: string | null
           actual_start_date?: string | null
-          audit_number: string
+          audit_number?: string
           audit_report_url?: string | null
           audit_scope: string
           audit_team?: string[] | null
@@ -5168,7 +5168,7 @@ export type Database = {
           drill_date_actual?: string | null
           drill_date_scheduled: string
           drill_duration_minutes?: number | null
-          drill_number: string
+          drill_number?: string
           drill_type_id: string
           id?: string
           lessons_learned_improvement?: string | null
@@ -6633,6 +6633,7 @@ export type Database = {
           rejection_reason: string | null
           signature_data: string | null
           signature_order: number
+          signing_cycle: number
           signature_type: string | null
           signed_at: string | null
           signer_name: string
@@ -6652,6 +6653,7 @@ export type Database = {
           rejection_reason?: string | null
           signature_data?: string | null
           signature_order: number
+          signing_cycle?: number
           signature_type?: string | null
           signed_at?: string | null
           signer_name: string
@@ -6671,6 +6673,7 @@ export type Database = {
           rejection_reason?: string | null
           signature_data?: string | null
           signature_order?: number
+          signing_cycle?: number
           signature_type?: string | null
           signed_at?: string | null
           signer_name?: string
@@ -6705,6 +6708,42 @@ export type Database = {
           },
         ]
       }
+      form_submission_counters: {
+        Row: {
+          company_id: string
+          next_value: number
+          template_id: string
+          year: number
+        }
+        Insert: {
+          company_id: string
+          next_value?: number
+          template_id: string
+          year: number
+        }
+        Update: {
+          company_id?: string
+          next_value?: number
+          template_id?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_submission_counters_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submission_counters_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "form_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       form_submissions: {
         Row: {
           amendment_of_id: string | null
@@ -6729,6 +6768,7 @@ export type Database = {
           offline_device_id: string | null
           requires_amendment: boolean | null
           schedule_id: string | null
+          signing_cycle: number
           status: string | null
           submission_number: string
           submitted_at: string | null
@@ -6762,6 +6802,7 @@ export type Database = {
           offline_device_id?: string | null
           requires_amendment?: boolean | null
           schedule_id?: string | null
+          signing_cycle?: number
           status?: string | null
           submission_number: string
           submitted_at?: string | null
@@ -6795,6 +6836,7 @@ export type Database = {
           offline_device_id?: string | null
           requires_amendment?: boolean | null
           schedule_id?: string | null
+          signing_cycle?: number
           status?: string | null
           submission_number?: string
           submitted_at?: string | null
@@ -15566,6 +15608,24 @@ export type Database = {
           },
         ]
       }
+      reference_counters: {
+        Row: {
+          next_value: number
+          scope: string
+          updated_at: string
+        }
+        Insert: {
+          next_value?: number
+          scope: string
+          updated_at?: string
+        }
+        Update: {
+          next_value?: number
+          scope?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       risk_assessment_hazards: {
         Row: {
           consequences: string
@@ -18996,6 +19056,37 @@ export type Database = {
           vessel_name: string
         }[]
       }
+      form_next_submission_number: {
+        Args: { p_company_id: string; p_created_date: string; p_template_id: string }
+        Returns: string
+      }
+      form_normalize_signer_role: { Args: { p_role: string }; Returns: string }
+      form_pending_signatures: {
+        Args: Record<PropertyKey, never>
+        Returns: { next_signature_order: number; submission_id: string }[]
+      }
+      form_reject_submission: {
+        Args: { p_reason: string; p_submission_id: string }
+        Returns: Json
+      }
+      form_sign_submission: {
+        Args: { p_signature_data?: string; p_signature_type?: string; p_submission_id: string }
+        Returns: Json
+      }
+      form_signature_requirements: {
+        Args: { p_submission_id: string }
+        Returns: {
+          is_mandatory: boolean
+          signature_order: number
+          signed: boolean
+          signed_by: string
+          signer_role: string
+        }[]
+      }
+      form_user_satisfies_signer_role: {
+        Args: { p_role: string; p_user_id: string }
+        Returns: boolean
+      }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_permissions_full: {
         Args: { p_user_id: string }
@@ -19441,6 +19532,7 @@ export type Database = {
         Args: { p_project_id: string }
         Returns: boolean
       }
+      next_reference_value: { Args: { p_scope: string }; Returns: number }
       onboarding_recompute: {
         Args: { p_record_id: string }
         Returns: undefined
