@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import SidebarNavigation from '@/shared/components/layout/SidebarNavigation';
 
@@ -38,10 +38,12 @@ function renderSidebar(path = '/vessel/logbooks/review?module=vessel', collapsed
 }
 
 function activateWithKeyboard(control: HTMLElement) {
-  control.focus();
-  fireEvent.keyDown(control, { key: 'Enter', code: 'Enter' });
-  control.click();
-  fireEvent.keyUp(control, { key: 'Enter', code: 'Enter' });
+  act(() => {
+    control.focus();
+    fireEvent.keyDown(control, { key: 'Enter', code: 'Enter' });
+    control.click();
+    fireEvent.keyUp(control, { key: 'Enter', code: 'Enter' });
+  });
 }
 
 describe('SidebarNavigation accessibility regressions', () => {
