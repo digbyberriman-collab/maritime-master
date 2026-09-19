@@ -25,6 +25,11 @@ const queryClient = new QueryClient({
   },
 });
 
+// Two boundaries, because they catch different things: the outer one covers
+// the providers themselves (a throw in AuthProvider or VesselProvider would
+// otherwise blank the app), the inner one covers the routes, including the
+// public pages that sit outside ProtectedRoute. ProtectedRoute adds a third
+// per page, so one broken page leaves the shell usable.
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
@@ -35,7 +40,9 @@ const App = () => (
           <AuthProvider>
             <BrandingProvider>
               <VesselProvider>
-                <AppRoutes />
+                <ErrorBoundary>
+                  <AppRoutes />
+                </ErrorBoundary>
               </VesselProvider>
             </BrandingProvider>
           </AuthProvider>

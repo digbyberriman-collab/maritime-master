@@ -64,10 +64,14 @@ class ErrorBoundary extends React.Component<Props, State> {
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-muted-foreground break-words">{error.message}</p>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button onClick={this.reset} className="gap-2">
                 <RotateCcw className="h-4 w-4" />
                 Try again
+              </Button>
+              {/* A reload also clears a stale chunk, which main.tsx guards against looping on. */}
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Reload
               </Button>
               <Button variant="outline" onClick={() => window.location.assign('/dashboard')}>
                 Back to dashboard
