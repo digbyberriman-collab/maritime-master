@@ -14,6 +14,10 @@ import { payrollAccessSatisfies } from '@/modules/auth/lib/payrollAccess';
 interface SidebarNavigationProps {
   moduleId: string | null;
   onNavigate?: () => void;
+  /** Icon-only (visuals only) rendering; labels become tooltips. */
+  collapsed?: boolean;
+  /** Called when a collapsed group icon is clicked so the layout can expand. */
+  onExpand?: () => void;
 }
 
 const DASHBOARD_LINKS = [
@@ -24,7 +28,7 @@ const DASHBOARD_LINKS = [
   { label: 'Fleet Reports', path: '/reports', icon: FileBarChart },
 ];
 
-const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavigate }) => {
+const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavigate, collapsed = false, onExpand }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { map } = useSidebarOrder();
