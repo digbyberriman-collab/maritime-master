@@ -353,6 +353,12 @@ const Auth: React.FC = () => {
                 </button>
               )}
 
+              {authError && (
+                <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {authError}
+                </p>
+              )}
+
               {/* Submit button */}
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
