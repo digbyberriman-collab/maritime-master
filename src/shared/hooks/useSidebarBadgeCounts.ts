@@ -37,16 +37,14 @@ export function useSidebarBadgeCounts() {
         .in('status', ['OPEN', 'ACKNOWLEDGED', 'SNOOZED', 'ESCALATED']);
 
       let tasksQuery = supabase
-        .from('crew_tasks')
-        .select('id', { count: 'exact', head: true })
-        .eq('company_id', profile.company_id)
-        .eq('assigned_to', user.id)
+        .from('maintenance_tasks')
+        .select('id, equipment!inner(vessel_id)', { count: 'exact', head: true })
         .lt('due_date', new Date().toISOString())
-        .in('status', ['pending', 'in_progress', 'overdue']);
+        .in('status', ['Pending', 'In Progress', 'Overdue', 'pending', 'in_progress', 'overdue']);
 
       if (!isAllVessels && selectedVesselId) {
         alertsQuery = alertsQuery.or(`vessel_id.eq.${selectedVesselId},vessel_id.is.null`);
-        tasksQuery = tasksQuery.or(`vessel_id.eq.${selectedVesselId},vessel_id.is.null`);
+        tasksQuery = tasksQuery.eq('equipment.vessel_id', selectedVesselId);
       }
 
       const [alertsResult, tasksResult] = await Promise.all([alertsQuery, tasksQuery]);
