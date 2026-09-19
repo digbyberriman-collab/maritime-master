@@ -29,6 +29,20 @@ const ACTION_LABELS: Record<string, string> = {
   details: 'Details',
 };
 
+const DETAIL_LABELS: Record<string, string> = {
+  official: 'Official Logbook',
+  deck: 'Deck & Bridge Logbook',
+  engine: 'Engine Room Logbook',
+  'engine-log': 'Engine Room Logbook',
+  garbage: 'Garbage Record Book',
+  gmdss: 'GMDSS Radio Logbook',
+  oil: 'Oil Record Book',
+  ihm: 'IHM Maintenance Logbook',
+  orders: 'Standing & Night Orders',
+  bell: 'Bell Book',
+  visitor: 'Visitor & Guest Log',
+};
+
 const pathnameOf = (path: string): string => path.split('?')[0] || '/';
 
 function titleCase(value: string): string {
@@ -85,6 +99,8 @@ function detailCrumb(pathname: string, matchedPath: string, parentLabel: string)
   if (!finalSegment) return null;
   const action = ACTION_LABELS[finalSegment.toLowerCase()];
   if (action) return { label: action };
+  const knownDetail = DETAIL_LABELS[finalSegment.toLowerCase()];
+  if (knownDetail) return { label: knownDetail };
   if (isRecordIdentifier(finalSegment)) return { label: `${parentLabel} Details` };
   return { label: titleCase(finalSegment) };
 }
