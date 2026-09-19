@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,7 +29,9 @@ import EquipmentDetailModal from '@/modules/maintenance/components/EquipmentDeta
 
 const Maintenance: React.FC = () => {
   const { stats, tasks, defects, isLoading } = useMaintenance();
-  const [activeTab, setActiveTab] = useState('equipment');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedTab = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(requestedTab === 'schedule' ? 'schedule' : 'equipment');
   const [showAddEquipment, setShowAddEquipment] = useState(false);
   const [showCreateTask, setShowCreateTask] = useState(false);
   const [showLogDefect, setShowLogDefect] = useState(false);
@@ -143,7 +146,12 @@ const Maintenance: React.FC = () => {
         </div>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <Tabs value={activeTab} onValueChange={(nextTab) => {
+          setActiveTab(nextTab);
+          const next = new URLSearchParams(searchParams);
+          next.set('tab', nextTab);
+          setSearchParams(next, { replace: true });
+        }} className="space-y-4">
           <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="equipment" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
