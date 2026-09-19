@@ -29,7 +29,7 @@ export function RolePreviewSwitcher() {
       <select
         value={current}
         onChange={(e) => setPreviewRole((e.target.value || null) as AppRole | null)}
-        className="w-full bg-navy text-white text-xs px-2 py-1.5 border border-white/15 rounded-sm focus:outline-none focus:ring-1 focus:ring-ocean"
+        className="w-full bg-navy text-white text-xs px-2 py-1.5 border border-white/15 rounded-sm focus-visible:outline-none focus:ring-2 focus:ring-ocean"
       >
         <option value="">Use my real role ({realRole ? ROLE_LABEL[realRole] : "—"})</option>
         {PREVIEW_OPTIONS.map((r) => (

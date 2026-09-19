@@ -190,7 +190,7 @@ function ReauthModal({
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-input rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full px-3 py-2 bg-white border border-input rounded-sm text-sm focus-visible:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
           <div>
@@ -203,7 +203,7 @@ function ReauthModal({
               autoFocus
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-3 py-2 bg-white border border-input rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full px-3 py-2 bg-white border border-input rounded-sm text-sm focus-visible:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
           {err && (

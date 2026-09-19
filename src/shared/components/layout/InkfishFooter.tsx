@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 const linkClass =
-  'text-xs text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap';
+  'text-xs text-muted-foreground hover:text-foreground transition-colors whitespace-nowrap rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2';
 
 const InkfishFooter: React.FC = () => {
   return (

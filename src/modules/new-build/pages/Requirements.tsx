@@ -389,7 +389,18 @@ export default function Requirements() {
           <Collapsible key={areaKey} open={isOpen} onOpenChange={() => toggleArea(areaKey)}>
             <Card>
               <CollapsibleTrigger asChild>
-                <CardHeader className="cursor-pointer hover:bg-accent/30 transition-colors">
+                <CardHeader
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isOpen}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleArea(areaKey);
+                    }
+                  }}
+                  className="cursor-pointer hover:bg-accent/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}

@@ -14,7 +14,7 @@ interface Props {
   onChange: (value: string) => void;
 }
 
-const base = 'w-full rounded border border-input bg-background px-1.5 py-1 text-[13px] text-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-60 aria-[invalid=true]:border-destructive';
+const base = 'w-full rounded border border-input bg-background px-1.5 py-1 text-[13px] text-foreground focus:border-primary focus-visible:outline-none focus:ring-2 focus:ring-primary disabled:opacity-60 aria-[invalid=true]:border-destructive';
 
 /** A directly editable cell control for one schema field. */
 const CellField: React.FC<Props> = ({ field, value, required, invalid, lineNumber, showLabel, disabled, onChange }) => {
