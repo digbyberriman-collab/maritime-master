@@ -8,6 +8,7 @@ import ModuleTopNav from '@/shared/components/layout/ModuleTopNav';
 import FloatingQuickActions from '@/shared/components/layout/FloatingQuickActions';
 import SidebarAccountMenu from '@/shared/components/layout/SidebarAccountMenu';
 import NotificationBell from '@/shared/components/layout/NotificationBell';
+import PageLocationHeader from '@/shared/components/layout/PageLocationHeader';
 import { NAVIGATION_ITEMS, type NavChild } from '@/config/navigation';
 import { resolveModuleForPath } from '@/shared/lib/moduleNavigation';
 import { DashboardFilterProvider } from '@/modules/dashboard/contexts/DashboardFilterContext';
@@ -228,6 +229,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
 
         {/* Page content */}
         <main className="flex-1 p-4 lg:p-6 overflow-auto">
+          <PageLocationHeader activeModuleId={activeModule?.id ?? null} />
           {children}
         </main>
 
