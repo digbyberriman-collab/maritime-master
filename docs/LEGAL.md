@@ -40,7 +40,7 @@ Forms are a `FormSchema` (`{ title, description?, fields }`) stored on the versi
 
 ## Data
 
-Migration: `supabase/migrations/20260918100000_legal_module.sql` (tables, triggers, RLS, grants, RBAC seeds, `legal-attachments` bucket, RPCs, pg_cron job). Generated types were added by hand to `src/integrations/supabase/types.ts` until the next `supabase gen types` run.
+Migration: `supabase/migrations/20260919120000_legal_module.sql` (tables, triggers, RLS, grants, RBAC seeds, `legal-attachments` bucket, RPCs, pg_cron job). Generated types were added by hand to `src/integrations/supabase/types.ts` until the next `supabase gen types` run.
 
 Storage: request attachments go to the private `legal-attachments` bucket under `<company_id>/requests/<request_id>/…` and are indexed in `legal_requests.attachments`; reads use signed URLs (`src/modules/legal/lib/storage.ts`).
 

@@ -2,7 +2,7 @@
 
 Everything the STORM build added on top of the original Inkfleet Legal module,
 with the SQL, so the module can be lifted back without surprises. The single
-migration is `supabase/migrations/20260918100000_legal_module.sql`; the
+migration is `supabase/migrations/20260919120000_legal_module.sql`; the
 statements below are copied from it (bodies shortened where noted).
 
 ## Contract kept from Inkfleet

@@ -46,7 +46,7 @@ const legalSources = [
 
 const routesSource = read('src/modules/legal/routes.tsx');
 const routesIndex = read('src/routes/index.tsx');
-const legalMigration = read('supabase/migrations/20260918100000_legal_module.sql');
+const legalMigration = read('supabase/migrations/20260919120000_legal_module.sql');
 
 const leavesOf = (items: NavChild[], acc: NavChild[] = []): NavChild[] => {
   for (const it of items) {
