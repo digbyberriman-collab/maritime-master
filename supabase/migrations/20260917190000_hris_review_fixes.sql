@@ -331,7 +331,7 @@ BEGIN
       ELSE item.crew_name || ': ' || item.label || ' due in ' || item.days_remaining || ' days' END;
 
     SELECT id INTO v_existing FROM public.alerts
-    WHERE company_id = item.company_id AND alert_type = v_alert_type AND related_entity_id = item.record_id::text
+    WHERE company_id = item.company_id AND alert_type = v_alert_type AND related_entity_id = item.record_id
       AND status IN ('OPEN', 'ACKNOWLEDGED', 'SNOOZED', 'ESCALATED')
     LIMIT 1;
 
@@ -345,7 +345,7 @@ BEGIN
         related_entity_type, related_entity_id, due_at, owner_role, metadata)
       VALUES (item.company_id, item.vessel_id, v_alert_type, v_title,
         'HR item for ' || item.crew_name || ' (' || item.label || ') due ' || to_char(item.due_date, 'DD Mon YYYY'),
-        v_severity, 'OPEN', 'hris', item.item_type, item.record_id::text, item.due_date::timestamptz, 'DPA',
+        v_severity, 'OPEN', 'hris', item.item_type, item.record_id, item.due_date::timestamptz, 'DPA',
         jsonb_build_object('item_type', item.item_type, 'profile_id', item.profile_id, 'days_remaining', item.days_remaining));
       v_count := v_count + 1;
     END IF;
@@ -356,9 +356,9 @@ BEGIN
   WHERE a.source_module = 'hris' AND a.status IN ('OPEN', 'ACKNOWLEDGED', 'SNOOZED', 'ESCALATED')
     AND (p_company_id IS NULL OR a.company_id = p_company_id)
     AND NOT EXISTS (
-      SELECT 1 FROM public.hr_expiry_items e WHERE e.record_id::text = a.related_entity_id AND e.days_remaining <= 90
+      SELECT 1 FROM public.hr_expiry_items e WHERE e.record_id = a.related_entity_id AND e.days_remaining <= 90
       UNION ALL
-      SELECT 1 FROM public.hr_performance_due_items d WHERE d.record_id::text = a.related_entity_id AND d.days_remaining <= 14
+      SELECT 1 FROM public.hr_performance_due_items d WHERE d.record_id = a.related_entity_id AND d.days_remaining <= 14
     );
 
   RETURN v_count;
@@ -431,7 +431,7 @@ BEGIN
   END IF;
 
   INSERT INTO public.audit_logs (entity_type, entity_id, action, actor_user_id, new_values)
-  VALUES ('crew_profile', p_profile_id::text, 'ANONYMIZE', auth.uid(),
+  VALUES ('crew_profile', p_profile_id, 'ANONYMIZE', auth.uid(),
           jsonb_build_object('reason', p_reason, 'had_login', p.user_id IS NOT NULL));
 END;
 $$;
