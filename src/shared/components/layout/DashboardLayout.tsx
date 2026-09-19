@@ -49,6 +49,23 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
     });
   }, []);
 
+  // Keyboard shortcut: Ctrl/Cmd + B toggles sidebar collapse (desktop icon-only mode).
+  React.useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'b') {
+        // Don't hijack the shortcut while typing in inputs, textareas or a content editor.
+        const target = event.target as HTMLElement | null;
+        const tag = target?.tagName?.toLowerCase();
+        if (tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable) return;
+
+        event.preventDefault();
+        toggleSidebarCollapsed();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [toggleSidebarCollapsed]);
+
   React.useEffect(() => {
     setSidebarOpen(false);
   }, [location.pathname, location.search]);
@@ -153,7 +170,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
                   onClick={toggleSidebarCollapsed}
                   className="hidden lg:flex items-center justify-center rounded-md p-2 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
                   aria-label={sidebarCollapsed ? 'Expand folder panel' : 'Collapse folder panel to icons'}
-                  title={sidebarCollapsed ? 'Expand folder panel' : 'Collapse to icons'}
+                  title={`${sidebarCollapsed ? 'Expand folder panel' : 'Collapse to icons'} (Ctrl+B)`}
                 >
                   {sidebarCollapsed ? <PanelLeftOpen className="w-5 h-5" /> : <PanelLeftClose className="w-5 h-5" />}
                 </button>
