@@ -31,9 +31,11 @@ const ROLE_LABELS: Record<string, string> = {
 
 interface SidebarAccountMenuProps {
   onNavigate?: () => void;
+  /** Icon-only rendering: just the avatar, menu unchanged. */
+  collapsed?: boolean;
 }
 
-const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate }) => {
+const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate, collapsed = false }) => {
   const { profile, signOut } = useAuth();
   const { vessels, loading, selectedVessel, setSelectedVesselById } = useVessel();
   const { selectedVesselIds, setSelectedVesselIds } = useDashboardFilter();
