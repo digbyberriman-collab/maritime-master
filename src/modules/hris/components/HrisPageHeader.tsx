@@ -25,15 +25,15 @@ const LEVEL_LABEL: Record<string, string> = {
 export const HrisPageHeader: React.FC<HrisPageHeaderProps> = ({ icon: Icon, title, description, actions, toolbar }) => {
   const access = useHrAccess();
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+    <div className="space-y-3">
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div className="flex items-start gap-3">
-          <div className="rounded-lg bg-primary/10 p-2">
-            <Icon className="h-6 w-6 text-primary" />
+          <div className="rounded-md bg-primary/10 p-1.5">
+            <Icon className="h-5 w-5 text-primary" />
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-semibold text-foreground">{title}</h1>
+              <h1 className="text-xl font-semibold text-foreground">{title}</h1>
               {!access.loading && (
                 <Badge variant={access.canEdit ? 'default' : 'secondary'} className="text-[10px] uppercase tracking-wide">
                   {LEVEL_LABEL[access.level]}
@@ -45,7 +45,7 @@ export const HrisPageHeader: React.FC<HrisPageHeaderProps> = ({ icon: Icon, titl
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
-      {toolbar && <div className="flex flex-col gap-3 md:flex-row md:items-center">{toolbar}</div>}
+      {toolbar && <div className="flex flex-col gap-2 md:flex-row md:items-center">{toolbar}</div>}
     </div>
   );
 };
