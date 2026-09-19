@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   hrAccess: { loading: false },
   payrollAccess: { loading: false },
   badgeCounts: { data: { pendingCompliance: 0, unreadMessages: 0, overdueTasks: 0 } },
+  permissions: { hasPermission: () => true, isInitialized: true },
 }));
 
 vi.mock('@/shared/hooks/useSidebarOrder', () => ({
@@ -15,10 +16,7 @@ vi.mock('@/shared/hooks/useSidebarOrder', () => ({
   applySidebarOrder: <T,>(items: T[]) => items,
 }));
 vi.mock('@/modules/auth/store/permissionsStore', () => ({
-  usePermissionsStore: (selector: (state: object) => unknown) => selector({
-    hasPermission: () => true,
-    isInitialized: true,
-  }),
+  usePermissionsStore: (selector: (state: object) => unknown) => selector(mocks.permissions),
 }));
 vi.mock('@/modules/auth/hooks/useHrAccess', () => ({ useHrAccess: () => mocks.hrAccess }));
 vi.mock('@/modules/auth/lib/hrAccess', () => ({ hrAccessSatisfies: () => true }));
