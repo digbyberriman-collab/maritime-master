@@ -53,7 +53,7 @@ Modules required by brief (all present): ISM, HR (`compliance/HRPage`), Certific
 - Captured baseline: build ✅, tsc --noEmit ✅, vitest 311/311 ✅, lint = 401 pre-existing errors (matches prior audit, out of scope).
 
 **Manual follow-up (Digby):**
-1. Revoke `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` at https://github.com/settings/tokens.
+1. Revoke `<leaked token, redacted; revoke at github.com/settings/tokens>` at https://github.com/settings/tokens.
 2. Rotate Supabase anon key for the production project (Settings → API → Reset).
 3. Locally, repopulate `.env` from `.env.example` with current values (or re-rotated values).
 
