@@ -11,6 +11,13 @@ export interface HealthPersonEntry extends HealthPerson {
   fullName: string;
   displayName: string;
   vessel_name: string | null;
+  /**
+   * `profiles.user_id`, needed by the tables that predate the health
+   * section (crew certificates, attachments) and key on it rather than on
+   * the profile. Null for imported crew who have never been invited, and
+   * for guests, who have no profile at all.
+   */
+  user_id: string | null;
   /** Non-crew subjects (guests, owner's party) have no profile. */
   isCrew: boolean;
 }
@@ -32,7 +39,10 @@ export const personTypeLabel = (value: string | null | undefined): string =>
   PERSON_TYPES.find((t) => t.value === value)?.label ?? 'Other';
 
 const decorate = (
-  row: HealthPerson & { vessels?: { name: string } | null },
+  row: HealthPerson & {
+    vessels?: { name: string } | null;
+    profiles?: { user_id: string | null } | null;
+  },
 ): HealthPersonEntry => {
   const fullName = `${row.first_name} ${row.last_name}`.trim();
   return {
@@ -40,6 +50,7 @@ const decorate = (
     fullName,
     displayName: row.preferred_name ? `${row.preferred_name} ${row.last_name}` : fullName,
     vessel_name: row.vessels?.name ?? null,
+    user_id: row.profiles?.user_id ?? null,
     isCrew: Boolean(row.profile_id),
   };
 };
@@ -61,7 +72,7 @@ export function useHealthPeople(options: { includeInactive?: boolean } = {}) {
     queryFn: async (): Promise<HealthPersonEntry[]> => {
       const { data, error } = await supabase
         .from('hw_people')
-        .select('*, vessels(name)')
+        .select('*, vessels(name), profiles(user_id)')
         .eq('company_id', companyId as string)
         .order('last_name')
         .order('first_name');

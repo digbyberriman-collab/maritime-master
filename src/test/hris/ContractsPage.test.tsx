@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { renderHrisPage, setupAccess, setupSupabase, baseFixtures, COMPANY_ID } from '@/test/hris/harness';
 import type { SupabaseCall } from '@/test/hris/supabaseMock';
@@ -100,7 +100,15 @@ describe('ContractsPage', () => {
   let mock: ReturnType<typeof setupSupabase>;
 
   beforeEach(() => {
+    // The fixtures state dates relative to 2026-09-17, and the page derives
+    // "74d remaining" and the expiry tiles from the current date, so the
+    // clock is frozen rather than the expectations being recomputed.
+    vi.useFakeTimers({ shouldAdvanceTime: true, now: new Date('2026-09-17T09:00:00Z') });
     mock = setupSupabase(fixtures());
+  });
+
+  afterAll(() => {
+    vi.useRealTimers();
   });
 
   it('shows HR admins the company overview with KPIs, expiries and the contract table', async () => {
