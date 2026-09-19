@@ -24,7 +24,7 @@ interface SidebarNavigationProps {
 const DASHBOARD_LINKS = [
   { label: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
   { label: 'Fleet Tracker', path: '/fleet-map', icon: Map },
-  { label: 'Alerts', path: '/alerts', icon: Bell },
+  { label: 'Notification Center', path: '/notifications/center', icon: Bell },
   { label: 'Fleet Calendar', path: '/crew/calendar', icon: Calendar },
   { label: 'Fleet Reports', path: '/reports', icon: FileBarChart },
 ];
