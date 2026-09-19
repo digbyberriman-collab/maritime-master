@@ -18,7 +18,7 @@ interface MarkdownEditorProps {
 
 type Mode = 'write' | 'preview' | 'split';
 
-const ACTIONS: { id: Action; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+const ACTIONS: { id: MarkdownAction; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
   { id: 'h1', label: 'Heading 1', icon: Heading1 },
   { id: 'h2', label: 'Heading 2', icon: Heading2 },
   { id: 'bold', label: 'Bold', icon: Bold },
