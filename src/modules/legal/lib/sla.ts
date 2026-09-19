@@ -2,7 +2,7 @@ import { OPEN_STATUSES, type LegalPriority, type Tone } from './constants';
 
 /**
  * Client-side mirror of `legal_sla_deadline` / `legal_add_business_days`
- * (supabase/migrations/20260918100000_legal_module.sql). The database value
+ * (supabase/migrations/20260919120000_legal_module.sql). The database value
  * is authoritative; this is used for previews in the intake form and for
  * the countdown badges.
  */

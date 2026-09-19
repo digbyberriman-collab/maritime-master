@@ -3,7 +3,7 @@ import type { ModulePermission } from '@/modules/auth/types';
 /**
  * Client-side mirror of the database helpers `legal_can_view` /
  * `legal_can_edit` / `legal_can_admin`
- * (supabase/migrations/20260918100000_legal_module.sql).
+ * (supabase/migrations/20260919120000_legal_module.sql).
  *
  * Two tiers matter: the legal team (edit / admin) who triage, assign and
  * resolve every request in the company and own the document library, and
