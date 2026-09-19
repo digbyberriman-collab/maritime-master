@@ -276,7 +276,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setLoading(false);
       });
 
-    return () => subscription.unsubscribe();
+    // Safety net: in the preview frame the session broker can go silent, and
+    // without this the app would wait forever on a blank loading screen.
+    const safetyTimer = window.setTimeout(() => {
+      setLoading(false);
+    }, 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      window.clearTimeout(safetyTimer);
+    };
   }, [loadPermissions, resetPermissions]);
 
   const signIn = async (email: string, password: string) => {
