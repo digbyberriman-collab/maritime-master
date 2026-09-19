@@ -116,6 +116,29 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
     const Icon = child.icon;
     const depthClass = depth === 0 ? 'pl-3' : depth === 1 ? 'pl-8' : depth === 2 ? 'pl-12' : 'pl-16';
 
+    // Collapsed: icons only. Leaves navigate; groups expand the panel.
+    if (collapsed) {
+      if (depth > 0) return null;
+      return (
+        <button
+          key={child.id}
+          type="button"
+          onClick={() => (hasChildren ? onExpand?.() : go(child.path))}
+          aria-current={active ? 'page' : undefined}
+          aria-label={child.label}
+          title={child.label}
+          className={cn(
+            'flex w-full items-center justify-center rounded-md p-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+            active || descendantActive
+              ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+              : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+          )}
+        >
+          <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+        </button>
+      );
+    }
+
     if (!hasChildren) {
       return (
         <button
