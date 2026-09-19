@@ -31,7 +31,7 @@ const tiles: TileConfig[] = [
     label: 'Open Alerts',
     icon: AlertTriangle,
     getValue: (s) => s.open_alerts_count,
-    href: '/alerts',
+    href: '/notifications/center',
     colorClass: 'text-destructive bg-destructive/10',
     statusClass: (s) => s.red_alerts_count > 0 ? 'border-l-destructive' : s.open_alerts_count > 0 ? 'border-l-warning' : 'border-l-green-500',
   },

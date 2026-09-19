@@ -24,9 +24,7 @@ import Dashboard from '@/modules/dashboard/pages/Dashboard';
 // New module pages - lazy loaded
 const CompliancePage = React.lazy(() => import('@/modules/compliance/pages/CompliancePage'));
 const NewChecklistsPage = React.lazy(() => import('@/modules/ism/pages/ChecklistsPage'));
-const FlightsTravelPage = React.lazy(() => import('@/modules/flights/pages/FlightsTravelPage'));
 const IndividualVesselDashboard = React.lazy(() => import('@/modules/vessels/pages/IndividualVesselDashboard'));
-const NewPermissionsPage = React.lazy(() => import('@/modules/settings/pages/PermissionsPage'));
 
 // Lazy loaded pages
 const Vessels = React.lazy(() => import('@/modules/vessels/pages/Vessels'));
@@ -50,8 +48,6 @@ const FleetMap = React.lazy(() => import('@/modules/dashboard/pages/FleetMap'));
 const RiskAssessments = React.lazy(() => import('@/modules/risk-assessments/pages/RiskAssessments'));
 const RiskAssessmentForm = React.lazy(() => import('@/modules/risk-assessments/pages/RiskAssessmentForm'));
 const SafetyDocumentVersioning = React.lazy(() => import('@/modules/documents/pages/SafetyDocumentVersioning'));
-const AccountDetailsPage = React.lazy(() => import('@/modules/settings/pages/AccountDetailsPage'));
-const Alerts = React.lazy(() => import('@/modules/alerts/pages/Alerts'));
 const Settings = React.lazy(() => import('@/modules/settings/pages/Settings'));
 const NotFound = React.lazy(() => import('@/shared/pages/NotFound'));
 const InsurancePage = React.lazy(() => import('@/modules/compliance/pages/InsurancePage'));
@@ -97,14 +93,13 @@ const DPADashboard = React.lazy(() => import('@/modules/dashboard/pages/DPADashb
 const RolesPermissionsPage = React.lazy(() => import('@/modules/settings/pages/RolesPermissionsPage'));
 
 // Admin Pages - lazy loaded
-const UserManagement = React.lazy(() => import('@/modules/settings/pages/UserManagement'));
 const UsersAccessListPage = React.lazy(() => import('@/modules/users-access/pages/UsersAccessListPage'));
 const UsersAccessDetailPage = React.lazy(() => import('@/modules/users-access/pages/UsersAccessDetailPage'));
 const NotificationManagementPage = React.lazy(() => import('@/modules/notifications-admin/pages/NotificationManagementPage'));
 const NotificationsPage = React.lazy(() => import('@/modules/notifications/pages/NotificationsPage'));
 const NotificationCenterPage = React.lazy(() => import('@/modules/notifications/pages/NotificationCenterPage'));
-const FleetGroups = React.lazy(() => import('@/modules/settings/pages/FleetGroups'));
-const AlertConfiguration = React.lazy(() => import('@/modules/settings/pages/AlertConfiguration'));
+// Honest "not built yet" page for admin areas whose previous pages showed sample data.
+const ComingSoonPage = React.lazy(() => import('@/shared/pages/Placeholder'));
 const APIIntegrations = React.lazy(() => import('@/modules/settings/pages/APIIntegrations'));
 const FeedbackAdmin = React.lazy(() => import('@/modules/feedback/pages/FeedbackAdmin'));
 
@@ -670,7 +665,8 @@ export const AppRoutes: React.FC = () => {
       } />
 
       {/* Alerts */}
-      <Route path="/alerts" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Alerts /></React.Suspense></ProtectedRoute>} />
+      {/* The sample-data alerts page is gone; the notification centre reads the real alerts table. */}
+      <Route path="/alerts" element={<Navigate to="/notifications/center" replace />} />
 
       {/* Settings */}
       <Route path="/settings" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Settings /></React.Suspense></ProtectedRoute>} />
@@ -685,8 +681,9 @@ export const AppRoutes: React.FC = () => {
       } />
 
       {/* Admin Routes */}
-      <Route path="/admin" element={<Navigate to="/admin/users" replace />} />
-      <Route path="/admin/users" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><UserManagement /></React.Suspense></ProtectedRoute>} />
+      <Route path="/admin" element={<Navigate to="/users-access" replace />} />
+      {/* The localStorage-backed user list is gone; Users & Access is the real editor. */}
+      <Route path="/admin/users" element={<Navigate to="/users-access" replace />} />
       <Route path="/users-access" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><UsersAccessListPage /></React.Suspense></ProtectedRoute>} />
       <Route path="/users-access/:userId" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><UsersAccessDetailPage /></React.Suspense></ProtectedRoute>} />
       <Route path="/settings/notifications" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><NotificationManagementPage /></React.Suspense></ProtectedRoute>} />
@@ -699,8 +696,8 @@ export const AppRoutes: React.FC = () => {
           </DashboardLayout>
         </ProtectedRoute>
       } />
-      <Route path="/admin/fleet-groups" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><FleetGroups /></React.Suspense></ProtectedRoute>} />
-      <Route path="/admin/alerts" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><AlertConfiguration /></React.Suspense></ProtectedRoute>} />
+      <Route path="/admin/fleet-groups" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><ComingSoonPage title="Fleet Groups" description="Grouping vessels into fleets is not built yet." /></React.Suspense></ProtectedRoute>} />
+      <Route path="/admin/alerts" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><ComingSoonPage title="Alert Configuration" description="Alert rules and escalation settings are not built yet." /></React.Suspense></ProtectedRoute>} />
       <Route path="/admin/integrations" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><APIIntegrations /></React.Suspense></ProtectedRoute>} />
       <Route path="/admin/feedback" element={
         <ProtectedRoute>
@@ -719,7 +716,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/risk-assessments" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><RiskAssessments /></React.Suspense></ProtectedRoute>} />
       <Route path="/risk-assessments/new" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><RiskAssessmentForm /></React.Suspense></ProtectedRoute>} />
       <Route path="/documents/safety-versioning" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><SafetyDocumentVersioning /></React.Suspense></ProtectedRoute>} />
-      <Route path="/settings/account-details" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><AccountDetailsPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/settings/account-details" element={<Navigate to="/settings" replace />} />
       <Route path="/reports" element={
         <ProtectedRoute>
           <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
@@ -763,12 +760,8 @@ export const AppRoutes: React.FC = () => {
         </ProtectedRoute>
       } />
 
-      {/* Flights & Travel */}
-      <Route path="/flights-travel" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><FlightsTravelPage /></React.Suspense>
-        </ProtectedRoute>
-      } />
+      {/* Flights & Travel: the sample-data page is gone; the crew module's page reads flight_bookings. */}
+      <Route path="/flights-travel" element={<Navigate to="/crew/flights" replace />} />
 
       {/* Individual Vessel Dashboards */}
       <Route path="/vessel/:vesselSlug/dashboard" element={
@@ -808,12 +801,8 @@ export const AppRoutes: React.FC = () => {
         </ProtectedRoute>
       } />
 
-      {/* Permissions (user-based toggle matrix) */}
-      <Route path="/settings/user-permissions" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><NewPermissionsPage /></React.Suspense>
-        </ProtectedRoute>
-      } />
+      {/* The seed-data permission matrix is gone; Users & Access edits real permissions. */}
+      <Route path="/settings/user-permissions" element={<Navigate to="/users-access" replace />} />
 
       {/* New Build module — sits before placeholders so it takes precedence. */}
       {newBuildRoutes}

@@ -3,7 +3,6 @@
 // Pages
 export { default as SettingsPage } from './pages/Settings';
 export { default as BrandingSettingsPage } from './pages/BrandingSettings';
-export { default as PermissionsPage } from './pages/PermissionsPage';
 export { default as RolesPermissionsPage } from './pages/RolesPermissionsPage';
 
 // Components
@@ -30,9 +29,6 @@ export {
   SupportSection,
   PlaceholderSection,
   IntegrationsSection,
-  EmailTemplatesSection,
-  ComplianceSection,
-  SystemLogsSection,
   VesselAccessSection,
   PermissionsSection,
   AuditModeSection,

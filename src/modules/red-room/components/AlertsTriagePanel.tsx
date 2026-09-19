@@ -26,7 +26,7 @@ export const AlertsTriagePanel: React.FC = () => {
           Active Alerts
         </CardTitle>
         <Button variant="ghost" size="sm" asChild>
-          <Link to="/alerts" className="flex items-center gap-1">
+          <Link to="/notifications/center" className="flex items-center gap-1">
             View All <ChevronRight className="w-4 h-4" />
           </Link>
         </Button>

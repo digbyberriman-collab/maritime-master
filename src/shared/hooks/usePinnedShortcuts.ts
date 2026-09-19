@@ -27,7 +27,7 @@ export const ALL_AVAILABLE_SHORTCUTS: AvailableShortcut[] = [
   { target: '/maintenance', label: 'Maintenance', icon: 'wrench' },
   { target: '/documents', label: 'Documents', icon: 'file-text' },
   { target: '/itinerary', label: 'Itinerary', icon: 'compass' },
-  { target: '/alerts', label: 'Alerts', icon: 'bell' },
+  { target: '/notifications/center', label: 'Alerts', icon: 'bell' },
   { target: '/incidents', label: 'Incidents', icon: 'alert-triangle' },
   { target: '/incidents?new=true', label: 'Report Incident', icon: 'alert-triangle' },
   { target: '/fleet-map', label: 'Fleet Map', icon: 'map' },

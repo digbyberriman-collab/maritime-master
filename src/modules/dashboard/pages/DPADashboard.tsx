@@ -64,7 +64,7 @@ const DPADashboard: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="secondary" size="icon" onClick={() => navigate('/alerts')}><Bell className="w-4 h-4" /></Button>
+              <Button variant="secondary" size="icon" onClick={() => navigate('/notifications/center')}><Bell className="w-4 h-4" /></Button>
               <Button variant="secondary" size="icon" onClick={() => navigate('/settings')}><SettingsIcon className="w-4 h-4" /></Button>
               <Button variant="secondary" size="icon" onClick={() => navigate('/settings')}><User className="w-4 h-4" /></Button>
             </div>

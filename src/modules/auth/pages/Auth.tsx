@@ -397,18 +397,9 @@ const Auth: React.FC = () => {
 
               {/* Mode switch */}
               <div className="text-center text-sm text-muted-foreground">
-                {mode === 'login' && (
-                  <>
-                    Don't have an account?{' '}
-                    <button
-                      type="button"
-                      onClick={() => setMode('register')}
-                      className="text-secondary hover:underline font-medium"
-                    >
-                      Sign up
-                    </button>
-                  </>
-                )}
+                {/* Self-registration is closed: accounts are created by invitation
+                    (see supabase/migrations/20260919170100_signup_backstop.sql). */}
+                {mode === 'login' && <>Need an account? Ask your DPA or fleet administrator for an invitation.</>}
                 {mode === 'register' && (
                   <>
                     Already have an account?{' '}
