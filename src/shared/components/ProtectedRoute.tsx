@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
+import ErrorBoundary from '@/shared/components/ErrorBoundary';
 import { Loader2 } from 'lucide-react';
 
 interface ProtectedRouteProps {
@@ -27,7 +28,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
 
-  return <>{children}</>;
+  // Every real page routes through here, so one boundary keyed on the path
+  // contains a failing page and clears itself when the user navigates away.
+  return <ErrorBoundary resetKey={location.pathname}>{children}</ErrorBoundary>;
 };
 
 export default ProtectedRoute;

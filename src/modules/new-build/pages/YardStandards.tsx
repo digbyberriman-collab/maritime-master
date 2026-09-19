@@ -52,6 +52,7 @@ import {
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
 import { BulkUpload } from "@/modules/new-build/components/yard-standards/BulkUpload";
+import SearchHighlight from "@/modules/new-build/components/SearchHighlight";
 import {
   parseYardStandardNumber,
   getMaterialLabel,
@@ -153,7 +154,7 @@ export default function YardStandards() {
     queryFn: async () => {
       if (!projectId) return [];
       const { data, error } = await supabase
-        .from("yard_standards" as any)
+        .from("nb_yard_standards")
         .select("*")
         .eq("project_id", projectId)
         .order("category")
@@ -230,7 +231,7 @@ export default function YardStandards() {
         fileName = file.name;
         const path = `${projectId}/${Date.now()}-${file.name}`;
         const { error: uploadErr } = await supabase.storage
-          .from("yard-standards")
+          .from("nb-yard-standards")
           .upload(path, file);
         if (uploadErr) throw uploadErr;
         storagePath = path;
@@ -265,13 +266,13 @@ export default function YardStandards() {
 
       if (editingId) {
         const { error } = await supabase
-          .from("yard_standards" as any)
+          .from("nb_yard_standards")
           .update(record)
           .eq("id", editingId);
         if (error) throw error;
       } else {
         const { error } = await supabase
-          .from("yard_standards" as any)
+          .from("nb_yard_standards")
           .insert(record);
         if (error) throw error;
       }
@@ -294,11 +295,11 @@ export default function YardStandards() {
     mutationFn: async (standard: YardStandard) => {
       if (standard.storage_path) {
         await supabase.storage
-          .from("yard-standards")
+          .from("nb-yard-standards")
           .remove([standard.storage_path]);
       }
       const { error } = await supabase
-        .from("yard_standards" as any)
+        .from("nb_yard_standards")
         .delete()
         .eq("id", standard.id);
       if (error) throw error;
@@ -335,7 +336,7 @@ export default function YardStandards() {
 
   const getSignedUrl = useCallback(async (storagePath: string) => {
     const { data, error } = await supabase.storage
-      .from("yard-standards")
+      .from("nb-yard-standards")
       .createSignedUrl(storagePath, 3600); // 1 hour
     if (error || !data?.signedUrl) return null;
     return data.signedUrl;
@@ -535,9 +536,9 @@ export default function YardStandards() {
                         <div>
                           <span className="font-medium">{s.title}</span>
                           {useFullText && s.headline ? (
-                            <p
+                            <SearchHighlight
+                              headline={s.headline}
                               className="text-xs text-muted-foreground mt-0.5 line-clamp-2"
-                              dangerouslySetInnerHTML={{ __html: s.headline }}
                             />
                           ) : s.description ? (
                             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">

@@ -196,15 +196,25 @@ export default function ChangeOrders() {
             // Notify the creator
             if (old.created_by !== user!.id) notifyUserIds.add(old.created_by);
             // Also notify the current user if they aren't the one making the change (edge case)
-            const notifications = Array.from(notifyUserIds).map((uid) => ({
-              user_id: uid,
+            // These used to be written to a `notifications` table that does
+            // not exist, with no error check, so no one was ever notified.
+            // They go to `alerts`, which the notification centre reads.
+            const alerts = Array.from(notifyUserIds).map((uid) => ({
+              company_id: currentProject!.company_id,
+              alert_type: "nb_change_order",
               title: `Change Order ${statusLabel}`,
-              message: `"${form.title}" has been moved to ${statusLabel}.`,
-              type: "change_order",
-              reference_id: editId!,
+              description: `"${form.title}" has been moved to ${statusLabel}.`,
+              severity_color: "YELLOW",
+              status: "OPEN",
+              source_module: "new_build",
+              related_entity_type: "nb_change_order",
+              related_entity_id: editId!,
+              assigned_to_user_id: uid,
+              owner_user_id: uid,
             }));
-            if (notifications.length) {
-              await supabase.from("notifications").insert(notifications);
+            if (alerts.length) {
+              const { error: notifyError } = await supabase.from("alerts").insert(alerts);
+              if (notifyError) throw notifyError;
             }
           }
         }

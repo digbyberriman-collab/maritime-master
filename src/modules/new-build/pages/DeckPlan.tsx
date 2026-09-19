@@ -246,7 +246,7 @@ export default function DeckPlan() {
     }
     (async () => {
       const { data, error } = await supabase.storage
-        .from("deck-plans")
+        .from("nb-deck-plans")
         .createSignedUrl(activeDeck.image_storage_path, 3600);
       if (error) {
         toast.error("Could not load deck image: " + error.message);
@@ -1337,7 +1337,7 @@ function DeckCropperDialog({
 
       const filename = `${projectId}/decks/${crypto.randomUUID()}.png`;
       const { error: upErr } = await supabase.storage
-        .from("deck-plans")
+        .from("nb-deck-plans")
         .upload(filename, blob, { contentType: "image/png", upsert: false });
       if (upErr) throw upErr;
 

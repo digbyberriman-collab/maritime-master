@@ -156,7 +156,7 @@ export default function Import() {
         const valid = mapped.filter((r) => r.task_name?.trim());
 
         for (const row of valid) {
-          const { error } = await supabase.from("schedule_tasks" as any).insert({
+          const { error } = await supabase.from("nb_schedule_tasks").insert({
             task_name: row.task_name.trim(),
             start_date: parseDate(row.start_date),
             end_date: parseDate(row.end_date),

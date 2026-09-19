@@ -31,6 +31,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
+import SearchHighlight from "@/modules/new-build/components/SearchHighlight";
 import {
   Search,
   Plus,
@@ -134,7 +135,7 @@ export default function Regulations() {
     queryFn: async () => {
       if (!projectId) return [];
       const { data, error } = await supabase
-        .from("regulations" as any)
+        .from("nb_regulations")
         .select("*")
         .eq("project_id", projectId)
         .order("category")
@@ -232,13 +233,13 @@ export default function Regulations() {
 
       if (editingId) {
         const { error } = await supabase
-          .from("regulations" as any)
+          .from("nb_regulations")
           .update(record)
           .eq("id", editingId);
         if (error) throw error;
       } else {
         const { error } = await supabase
-          .from("regulations" as any)
+          .from("nb_regulations")
           .insert(record);
         if (error) throw error;
       }
@@ -259,7 +260,7 @@ export default function Regulations() {
         await supabase.storage.from("nb_regulations").remove([reg.storage_path]);
       }
       const { error } = await supabase
-        .from("regulations" as any)
+        .from("nb_regulations")
         .delete()
         .eq("id", reg.id);
       if (error) throw error;
@@ -443,9 +444,9 @@ export default function Regulations() {
                         <div>
                           <span className="font-medium">{r.title}</span>
                           {useFullText && r.headline ? (
-                            <p
+                            <SearchHighlight
+                              headline={r.headline}
                               className="text-xs text-muted-foreground mt-0.5 line-clamp-2"
-                              dangerouslySetInnerHTML={{ __html: r.headline }}
                             />
                           ) : r.description ? (
                             <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">

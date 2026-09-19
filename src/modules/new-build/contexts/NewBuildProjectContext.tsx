@@ -7,6 +7,8 @@ interface Project {
   id: string;
   name: string;
   description: string | null;
+  /** Tenant the project belongs to; needed when writing rows that carry it. */
+  company_id: string;
 }
 
 interface ProjectContextType {
