@@ -93,16 +93,13 @@ FormLabel.displayName = "FormLabel";
 
 const FormControl = React.forwardRef<React.ElementRef<typeof Slot>, React.ComponentPropsWithoutRef<typeof Slot>>(
   ({ ...props }, ref) => {
-    const { error, formItemId, formDescriptionId, formMessageId } = useFormField();
+    const { error, formItemId, formDescriptionId, formMessageId, hasDescription } = useFormField();
+
+    const describedBy =
+      [hasDescription ? formDescriptionId : null, error ? formMessageId : null].filter(Boolean).join(" ") || undefined;
 
     return (
-      <Slot
-        ref={ref}
-        id={formItemId}
-        aria-describedby={!error ? `${formDescriptionId}` : `${formDescriptionId} ${formMessageId}`}
-        aria-invalid={!!error}
-        {...props}
-      />
+      <Slot ref={ref} id={formItemId} aria-describedby={describedBy} aria-invalid={!!error} {...props} />
     );
   },
 );
@@ -110,7 +107,12 @@ FormControl.displayName = "FormControl";
 
 const FormDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(
   ({ className, ...props }, ref) => {
-    const { formDescriptionId } = useFormField();
+    const { formDescriptionId, registerDescription } = useFormField();
+
+    React.useEffect(() => {
+      registerDescription?.(true);
+      return () => registerDescription?.(false);
+    }, [registerDescription]);
 
     return <p ref={ref} id={formDescriptionId} className={cn("text-sm text-muted-foreground", className)} {...props} />;
   },
