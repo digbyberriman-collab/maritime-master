@@ -496,6 +496,19 @@ Effort: S ≤ 1 day, M 2–5 days, L 1–3 weeks, XL > 3 weeks. Risk = risk of t
 - Whether Legal stays in STORM or returns to Inkfleet depends on the Inkfleet audit; the module is built to allow either.
 - The Inkfish person-data crosswalk (3.6) determines whether STORM's `profiles` or Inkfish's records become the master.
 
+### Decisions recorded on 19 September 2026 (product owner)
+
+| Question | Decision | Effect on the plan |
+|---|---|---|
+| How the restoration branch lands | Open a PR now | Action 1.4 proceeds; merge while Lovable is idle |
+| Public self-registration | Disable public sign-up; invite-only | Action 1.5 takes the "disable" path |
+| Lovable's role | CI-driven deploy; Lovable for prototyping only | Action 4.1 decided; hosting migration becomes a Phase 2/3 item |
+| Hours of Work & Rest | Apply `20260501100000_work_rest_module.sql` and regenerate types | Action 1.6 takes the migration path |
+| Refit | Import the source schema as company-scoped migrations | Action 2.3 takes the import path (XL) |
+| Mocked surfaces | Remove or replace all four groups: `/alerts`, `/flights-travel`, the mock admin pages, the AI certificate reader and compliance tabs | Action 1.7 scope confirmed in full |
+| Ownership transfer | Consolidation decision first; keep the Stage 0 hygiene items immediate | Action 3.5 deferred behind the other audits; 1.1 unchanged |
+| Design tokens | Introduce Abyss / Deep / Slate / Drift / Signal in this repo | Action 3.8 becomes "introduce and map", no longer blocked on other audits |
+
 ---
 
 ## Appendix A — Live data profile (19 Sep 2026, read-only)
