@@ -75,7 +75,9 @@ Every policy and trigger below calls only those three helpers.
 
 | Function | Purpose |
 |---|---|
+| `rbac_company_permission(uuid, text, permission_level)` | scope-aware RBAC check, identical to the HRIS review-fixes definition (repeated so the migration stands alone) |
 | `legal_can_admin(uuid)`, `legal_can_edit(uuid)`, `legal_can_view(uuid)` | access tiers (see above) |
+| `legal_attachments_valid(jsonb, uuid, uuid)` | every attachment path must sit under `<company>/requests/<request>/` |
 | `legal_add_business_days(timestamptz, integer)` | adds Mon–Fri days |
 | `legal_sla_deadline(text priority, timestamptz from = now())` | low 10 bd, medium 5 bd, high 2 bd, urgent 24 h |
 | `legal_request_type_label(text)` | request type → label (used in alert titles) |
@@ -151,14 +153,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_legal_requests_source ON public.legal_reque
 
 Triggers (bodies in the migration):
 
-- `trg_legal_requests_before_insert` → `legal_requests_before_insert()`: reference
-  `LEG-<YYYY>-<3-digit seq>` (unchanged from Inkfleet), company from the submitter,
-  `sla_deadline := legal_sla_deadline(priority, created_at)`, `resolved_at` when
-  inserted as completed.
+- `trg_legal_requests_before_insert` → `legal_requests_before_insert()` (SECURITY
+  DEFINER): for callers who are not on the legal team, resets `status`,
+  `assigned_to`, `risk_level`, `resolution_summary`, `resolved_at`, `sla_deadline`,
+  `reference_number`, `source_id` and `created_at` so a request always starts as
+  a fresh submission; then reference `LEG-<YYYY>-<3-digit seq>` (unchanged from
+  Inkfleet), company from the submitter, `sla_deadline := legal_sla_deadline(priority,
+  created_at)`, `resolved_at` when inserted as completed, and every `attachments`
+  path validated with `legal_attachments_valid` (must sit under
+  `<company_id>/requests/<request_id>/`).
 - `trg_legal_requests_before_update` → `legal_requests_before_update()` (SECURITY
   DEFINER): non-team callers may only edit descriptive fields, attachments, and
   cancel while `submitted` / `triaged`; priority change re-derives the SLA unless
-  the caller set `sla_deadline` explicitly; `completed` stamps `resolved_at`.
+  the caller set `sla_deadline` explicitly; `completed` stamps `resolved_at`;
+  changed `attachments` are validated with `legal_attachments_valid`.
 - `trg_legal_requests_after_change` → `legal_requests_after_change()`: writes
   `legal_request_events`.
 - `trg_legal_requests_notify` → `legal_requests_notify()`: inserts STORM `alerts`
@@ -262,8 +270,10 @@ shows as literal text rather than executing).
 
 Additive: `company_id`, `submitted_for_profile_id uuid → profiles(id)`, `source_id`.
 CHECK on `status` (`submitted`, `approved`, `rejected`). Trigger
-`trg_legal_form_submissions_before_write` fills `company_id`, stamps
-`reviewed_at` / `reviewed_by` on approve / reject and `updated_at`.
+`trg_legal_form_submissions_before_write` (SECURITY DEFINER) forces a fresh
+`submitted` state with empty review columns when the inserting user is not on
+the legal team, fills `company_id`, stamps `reviewed_at` / `reviewed_by` on
+approve / reject and `updated_at`.
 
 ```sql
 CREATE TABLE IF NOT EXISTS public.legal_form_submissions (
@@ -289,12 +299,19 @@ for signatures (image is a PNG data URL), `{ id, label }` for references.
 ### Storage bucket
 
 ```sql
-INSERT INTO storage.buckets (id, name, public, file_size_limit)
-VALUES ('legal-attachments', 'legal-attachments', false, 26214400)
-ON CONFLICT (id) DO UPDATE SET public = false, file_size_limit = 26214400;
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('legal-attachments', 'legal-attachments', false, 26214400, ARRAY[
+  'application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain', 'text/csv', 'application/zip', 'message/rfc822', 'application/vnd.ms-outlook'])
+ON CONFLICT (id) DO UPDATE SET public = false, file_size_limit = 26214400, allowed_mime_types = EXCLUDED.allowed_mime_types;
 -- policies: SELECT / INSERT / UPDATE / DELETE WHERE bucket_id = 'legal-attachments'
 --           AND public.legal_attachment_path_allowed(name)
 ```
+
+PDFs and images open inline; every other type is served as a download.
 
 Paths: `<company_id>/requests/<request_id>/<ts>-<rand>.<ext>` and
 `<company_id>/submissions/<submission_id>/…`. Reads use signed URLs.
@@ -304,8 +321,12 @@ Paths: `<company_id>/requests/<request_id>/<ts>-<rand>.<ext>` and
 `legal_requests_notify()` and `legal_generate_alerts()` write to STORM's
 `alerts` table (`source_module = 'legal'`, `related_entity_type = 'legal_request'`,
 `alert_type` in `legal_request_submitted`, `legal_request_assigned`,
-`legal_request_status`, `legal_sla_due`, `legal_sla_breached`). Titles carry only
-the reference number and request type because alerts are visible company-wide.
+`legal_request_status`, `legal_sla_due`, `legal_sla_breached`, `related_entity_id`
+is the request uuid). Alerts are company-visible by default, so the migration
+adds a RESTRICTIVE policy `legal_alerts_scoped` on `public.alerts`: rows with
+`source_module = 'legal'` are only visible to the requester (`owner_user_id`),
+the assignee (`assigned_to_user_id`) and the legal team. Titles still carry only
+the reference number and request type.
 
 ```sql
 -- hourly, when pg_cron is installed

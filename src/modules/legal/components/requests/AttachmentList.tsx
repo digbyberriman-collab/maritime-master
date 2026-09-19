@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { openLegalAttachment, useLegalAttachments } from '@/modules/legal/hooks/useLegalAttachments';
 import { formatBytes, parseAttachments, type LegalRequestRow } from '@/modules/legal/lib/requests';
-import { errorMessage } from '@/modules/legal/lib/storage';
+import { errorMessage, LEGAL_ATTACHMENT_ACCEPT } from '@/modules/legal/lib/storage';
 
 interface AttachmentListProps {
   request: LegalRequestRow;
@@ -26,7 +26,7 @@ export const AttachmentList: React.FC<AttachmentListProps> = ({ request, canEdit
     if (inputRef.current) inputRef.current.value = '';
   };
 
-  const open = (a: (typeof attachments)[number]) => openLegalAttachment(a).catch((e: unknown) => toast.error('Could not open the file', { description: errorMessage(e) }));
+  const open = (a: (typeof attachments)[number]) => openLegalAttachment(a, request).catch((e: unknown) => toast.error('Could not open the file', { description: errorMessage(e) }));
 
   return (
     <Card>
@@ -67,11 +67,11 @@ export const AttachmentList: React.FC<AttachmentListProps> = ({ request, canEdit
         )}
         {canEdit && (
           <div>
-            <input ref={inputRef} type="file" multiple className="hidden" onChange={(e) => onFiles(e.target.files)} aria-label="Choose files to attach" />
+            <input ref={inputRef} type="file" multiple accept={LEGAL_ATTACHMENT_ACCEPT} className="hidden" onChange={(e) => onFiles(e.target.files)} aria-label="Choose files to attach" />
             <Button variant="outline" size="sm" onClick={() => inputRef.current?.click()} disabled={upload.isPending}>
               <Upload className="mr-2 h-4 w-4" /> {upload.isPending ? 'Uploading…' : 'Attach files'}
             </Button>
-            <p className="mt-1 text-xs text-muted-foreground">Up to 25 MB per file. Stored privately; only you and the legal team can open them.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Documents, images, spreadsheets, emails and zip archives up to 25 MB. Stored privately; only you and the legal team can open them.</p>
           </div>
         )}
       </CardContent>

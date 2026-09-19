@@ -42,6 +42,37 @@ INSERT INTO public.role_permissions (role_id, module_key, permission, scope)
 SELECT r.id, 'legal', 'edit'::permission_level, 'fleet'::role_scope_type FROM public.roles r WHERE r.name = 'legal_counsel'
 ON CONFLICT DO NOTHING;
 
+-- Scope-aware RBAC check shared with the HRIS helpers. Identical to the
+-- definition in 20260917190000_hris_review_fixes.sql; repeated here so this
+-- migration stands alone on projects where that file has not been applied.
+CREATE OR REPLACE FUNCTION public.rbac_company_permission(
+  _user_id uuid,
+  _module_key text,
+  _required public.permission_level
+)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT
+    NOT EXISTS (
+      SELECT 1 FROM public.user_permission_overrides upo
+      WHERE upo.user_id = _user_id AND upo.module_key = _module_key
+        AND upo.is_granted = false
+        AND (upo.valid_until IS NULL OR upo.valid_until > now())
+    )
+    AND EXISTS (
+      SELECT 1 FROM public.get_user_rbac_permissions(_user_id) gup
+      WHERE gup.module_key = _module_key
+        AND gup.scope IS DISTINCT FROM 'self'::public.role_scope_type
+        AND (
+          gup.permission = _required
+          OR (_required = 'view' AND gup.permission IN ('view', 'edit', 'admin'))
+          OR (_required = 'edit' AND gup.permission IN ('edit', 'admin'))
+        )
+    );
+$$;
+REVOKE ALL ON FUNCTION public.rbac_company_permission(uuid, text, public.permission_level) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.rbac_company_permission(uuid, text, public.permission_level) TO authenticated, service_role;
+
 -- Mirrors resolveLegalAccess in src/modules/auth/lib/legalAccess.ts.
 CREATE OR REPLACE FUNCTION public.legal_can_admin(_user_id uuid)
 RETURNS boolean
@@ -156,10 +187,46 @@ CREATE INDEX IF NOT EXISTS idx_legal_requests_assigned_to ON public.legal_reques
 CREATE INDEX IF NOT EXISTS idx_legal_requests_sla ON public.legal_requests(sla_deadline) WHERE status NOT IN ('completed', 'cancelled');
 CREATE UNIQUE INDEX IF NOT EXISTS uq_legal_requests_source ON public.legal_requests(company_id, source_id) WHERE source_id IS NOT NULL;
 
+-- Every entry of the attachments index must point inside the request's own
+-- folder in the legal-attachments bucket, so a requester cannot plant a path
+-- to someone else's file for the legal team to open or remove.
+CREATE OR REPLACE FUNCTION public.legal_attachments_valid(p_attachments jsonb, p_company_id uuid, p_request_id uuid)
+RETURNS boolean
+LANGUAGE sql IMMUTABLE AS $$
+  SELECT p_attachments IS NULL OR (
+    jsonb_typeof(p_attachments) = 'array'
+    AND NOT EXISTS (
+      SELECT 1 FROM jsonb_array_elements(p_attachments) AS e
+      WHERE jsonb_typeof(e) <> 'object'
+         OR jsonb_typeof(e -> 'path') <> 'string'
+         OR (e ->> 'path') NOT LIKE (p_company_id::text || '/requests/' || p_request_id::text || '/%')
+         OR (e ->> 'path') LIKE '%/../%'
+    )
+  );
+$$;
+REVOKE ALL ON FUNCTION public.legal_attachments_valid(jsonb, uuid, uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.legal_attachments_valid(jsonb, uuid, uuid) TO authenticated, service_role;
+
 CREATE OR REPLACE FUNCTION public.legal_requests_before_insert()
 RETURNS trigger
-LANGUAGE plpgsql SET search_path = public AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_uid uuid := auth.uid();
 BEGIN
+  -- Requesters cannot pre-set anything the legal team owns: the row always
+  -- starts as a fresh submission. Service-role imports (no auth.uid()) and
+  -- the legal team keep the values they supply.
+  IF v_uid IS NOT NULL AND NOT public.legal_can_edit(v_uid) THEN
+    NEW.status := 'submitted';
+    NEW.assigned_to := NULL;
+    NEW.risk_level := 'medium';
+    NEW.resolution_summary := NULL;
+    NEW.resolved_at := NULL;
+    NEW.sla_deadline := NULL;
+    NEW.reference_number := NULL;
+    NEW.source_id := NULL;
+    NEW.created_at := now();
+  END IF;
   IF NEW.reference_number IS NULL OR NEW.reference_number = '' THEN
     NEW.reference_number := 'LEG-' || to_char(now(), 'YYYY') || '-' ||
       lpad(nextval('public.legal_request_ref_seq')::text, 3, '0');
@@ -172,6 +239,9 @@ BEGIN
   END IF;
   IF NEW.status = 'completed' AND NEW.resolved_at IS NULL THEN
     NEW.resolved_at := now();
+  END IF;
+  IF NOT public.legal_attachments_valid(NEW.attachments, NEW.company_id, NEW.id) THEN
+    RAISE EXCEPTION 'Attachments must be stored under the request''s own folder';
   END IF;
   NEW.updated_at := now();
   RETURN NEW;
@@ -226,6 +296,11 @@ BEGIN
     NEW.resolved_at := COALESCE(NEW.resolved_at, now());
   ELSIF NEW.status <> 'completed' AND OLD.status = 'completed' THEN
     NEW.resolved_at := NULL;
+  END IF;
+
+  IF NEW.attachments IS DISTINCT FROM OLD.attachments
+     AND NOT public.legal_attachments_valid(NEW.attachments, NEW.company_id, NEW.id) THEN
+    RAISE EXCEPTION 'Attachments must be stored under the request''s own folder';
   END IF;
 
   RETURN NEW;
@@ -456,8 +531,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_legal_form_submissions_source ON public.leg
 
 CREATE OR REPLACE FUNCTION public.legal_form_submissions_before_write()
 RETURNS trigger
-LANGUAGE plpgsql SET search_path = public AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_uid uuid := auth.uid();
 BEGIN
+  -- A submitter can never file an already-reviewed submission: the review
+  -- state is only reachable through the team-only UPDATE policy.
+  IF TG_OP = 'INSERT' AND v_uid IS NOT NULL AND NOT public.legal_can_edit(v_uid) THEN
+    NEW.status := 'submitted';
+    NEW.reviewed_by := NULL;
+    NEW.reviewed_at := NULL;
+    NEW.review_notes := NULL;
+    NEW.source_id := NULL;
+  END IF;
   IF TG_OP = 'INSERT' AND NEW.company_id IS NULL THEN
     NEW.company_id := public.get_user_company_id(NEW.submitted_by);
   END IF;
@@ -511,7 +597,7 @@ BEGIN
       NEW.reference_number || ': new ' || v_label || ' request',
       'A ' || lower(NEW.priority) || ' priority legal request is waiting for triage.',
       CASE WHEN NEW.priority = 'urgent' THEN 'ORANGE' ELSE 'YELLOW' END::public.alert_severity,
-      'OPEN', 'legal', 'legal_request', NEW.id::text, NEW.sla_deadline, 'LEGAL',
+      'OPEN', 'legal', 'legal_request', NEW.id, NEW.sla_deadline, 'LEGAL',
       jsonb_build_object('priority', NEW.priority, 'request_type', NEW.request_type));
     RETURN NEW;
   END IF;
@@ -522,7 +608,7 @@ BEGIN
     VALUES (NEW.company_id, NEW.vessel_id, 'legal_request_assigned',
       NEW.reference_number || ': ' || v_label || ' request assigned to you',
       'You have been assigned a legal request. SLA deadline ' || to_char(NEW.sla_deadline, 'DD Mon YYYY HH24:MI') || '.',
-      'YELLOW', 'OPEN', 'legal', 'legal_request', NEW.id::text, NEW.sla_deadline, 'LEGAL', NEW.assigned_to, NEW.assigned_to, now(), true,
+      'YELLOW', 'OPEN', 'legal', 'legal_request', NEW.id, NEW.sla_deadline, 'LEGAL', NEW.assigned_to, NEW.assigned_to, now(), true,
       jsonb_build_object('priority', NEW.priority, 'request_type', NEW.request_type));
   END IF;
 
@@ -533,7 +619,7 @@ BEGIN
     VALUES (NEW.company_id, NEW.vessel_id, 'legal_request_status',
       NEW.reference_number || ': ' || v_label || ' request is now ' || replace(NEW.status, '_', ' '),
       CASE WHEN NEW.status = 'completed' THEN 'Your legal request has been completed.' ELSE 'The status of your legal request changed.' END,
-      v_severity, 'OPEN', 'legal', 'legal_request', NEW.id::text, 'REQUESTER', NEW.submitted_by,
+      v_severity, 'OPEN', 'legal', 'legal_request', NEW.id, 'REQUESTER', NEW.submitted_by,
       jsonb_build_object('status', NEW.status, 'previous_status', OLD.status));
 
     IF NEW.status IN ('completed', 'cancelled') THEN
@@ -541,7 +627,7 @@ BEGIN
         SET status = 'AUTO_DISMISSED', resolved_at = now(), updated_at = now()
         WHERE source_module = 'legal'
           AND related_entity_type = 'legal_request'
-          AND related_entity_id = NEW.id::text
+          AND related_entity_id = NEW.id
           AND alert_type IN ('legal_request_submitted', 'legal_request_assigned', 'legal_sla_due', 'legal_sla_breached')
           AND status IN ('OPEN', 'ACKNOWLEDGED', 'SNOOZED', 'ESCALATED');
     END IF;
@@ -555,6 +641,26 @@ REVOKE ALL ON FUNCTION public.legal_requests_notify() FROM PUBLIC, anon, authent
 DROP TRIGGER IF EXISTS trg_legal_requests_notify ON public.legal_requests;
 CREATE TRIGGER trg_legal_requests_notify AFTER INSERT OR UPDATE ON public.legal_requests
   FOR EACH ROW EXECUTE FUNCTION public.legal_requests_notify();
+
+-- Alerts are company-visible by default. Legal alerts carry who raised a
+-- request and how it is progressing, so they are narrowed to the requester,
+-- the assignee and the legal team (restrictive: ANDed with the existing
+-- company policies; triggers and the sweeper run as SECURITY DEFINER).
+DROP POLICY IF EXISTS "legal_alerts_scoped" ON public.alerts;
+CREATE POLICY "legal_alerts_scoped" ON public.alerts
+  AS RESTRICTIVE FOR ALL TO authenticated
+  USING (
+    source_module IS DISTINCT FROM 'legal'
+    OR owner_user_id = auth.uid()
+    OR assigned_to_user_id = auth.uid()
+    OR public.legal_can_view(auth.uid())
+  )
+  WITH CHECK (
+    source_module IS DISTINCT FROM 'legal'
+    OR owner_user_id = auth.uid()
+    OR assigned_to_user_id = auth.uid()
+    OR public.legal_can_view(auth.uid())
+  );
 
 -- SLA sweeper: raises / refreshes an alert for every open request whose
 -- SLA is due within 24 hours (ORANGE) or already breached (RED), and
@@ -604,12 +710,12 @@ BEGIN
     -- A breach supersedes a due-soon alert for the same request.
     IF v_type = 'legal_sla_breached' THEN
       UPDATE public.alerts SET status = 'AUTO_DISMISSED', resolved_at = now(), updated_at = now()
-      WHERE source_module = 'legal' AND alert_type = 'legal_sla_due' AND related_entity_id = r.id::text
+      WHERE source_module = 'legal' AND alert_type = 'legal_sla_due' AND related_entity_id = r.id
         AND status IN ('OPEN', 'ACKNOWLEDGED', 'SNOOZED', 'ESCALATED');
     END IF;
 
     SELECT id INTO v_existing FROM public.alerts
-    WHERE company_id = r.company_id AND alert_type = v_type AND related_entity_id = r.id::text
+    WHERE company_id = r.company_id AND alert_type = v_type AND related_entity_id = r.id
       AND status IN ('OPEN', 'ACKNOWLEDGED', 'SNOOZED', 'ESCALATED')
     LIMIT 1;
 
@@ -622,7 +728,7 @@ BEGIN
         related_entity_type, related_entity_id, due_at, owner_role, owner_user_id, assigned_to_user_id, metadata)
       VALUES (r.company_id, r.vessel_id, v_type, v_title,
         public.legal_request_type_label(r.request_type) || ' request, ' || r.priority || ' priority. SLA deadline ' || to_char(r.sla_deadline, 'DD Mon YYYY HH24:MI') || '.',
-        v_severity, 'OPEN', 'legal', 'legal_request', r.id::text, r.sla_deadline, 'LEGAL', r.assigned_to, r.assigned_to,
+        v_severity, 'OPEN', 'legal', 'legal_request', r.id, r.sla_deadline, 'LEGAL', r.assigned_to, r.assigned_to,
         jsonb_build_object('priority', r.priority, 'request_type', r.request_type, 'hours_left', round(r.hours_left::numeric, 1)));
       v_count := v_count + 1;
     END IF;
@@ -635,7 +741,7 @@ BEGIN
     AND (v_company IS NULL OR a.company_id = v_company)
     AND NOT EXISTS (
       SELECT 1 FROM public.legal_requests q
-      WHERE q.id::text = a.related_entity_id
+      WHERE q.id = a.related_entity_id
         AND q.status NOT IN ('completed', 'cancelled')
         AND q.sla_deadline <= now() + interval '24 hours'
     );
@@ -660,9 +766,15 @@ END $$;
 --    <company_id>/requests/<request_id>/<file>
 --    <company_id>/submissions/<submission_id>/<file>
 -- ---------------------------------------------------------------
-INSERT INTO storage.buckets (id, name, public, file_size_limit)
-VALUES ('legal-attachments', 'legal-attachments', false, 26214400)
-ON CONFLICT (id) DO UPDATE SET public = false, file_size_limit = 26214400;
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('legal-attachments', 'legal-attachments', false, 26214400, ARRAY[
+  'application/pdf', 'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain', 'text/csv', 'application/zip', 'message/rfc822', 'application/vnd.ms-outlook'
+])
+ON CONFLICT (id) DO UPDATE SET public = false, file_size_limit = 26214400, allowed_mime_types = EXCLUDED.allowed_mime_types;
 
 CREATE OR REPLACE FUNCTION public.legal_attachment_path_allowed(p_name text)
 RETURNS boolean

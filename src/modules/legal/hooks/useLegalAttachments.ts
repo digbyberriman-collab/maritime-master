@@ -5,8 +5,11 @@ import type { Json } from '@/integrations/supabase/types';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { parseAttachments, type LegalAttachment, type LegalRequestRow } from '@/modules/legal/lib/requests';
 import {
+  attachmentBelongsToRequest,
   buildAttachmentPath,
   errorMessage,
+  isAllowedAttachmentType,
+  isInlineViewable,
   LEGAL_ATTACHMENT_MAX_BYTES,
   LEGAL_ATTACHMENTS_BUCKET,
   LEGAL_SIGNED_URL_TTL_SECONDS,
@@ -21,8 +24,13 @@ export const getLegalAttachmentUrl = async (path: string, download?: string | bo
   return data.signedUrl;
 };
 
-export const openLegalAttachment = async (attachment: LegalAttachment): Promise<void> => {
-  const url = await getLegalAttachmentUrl(attachment.path);
+/**
+ * Opens a request attachment: PDFs and images inline, anything else as a
+ * download. Refuses paths outside the request's own folder.
+ */
+export const openLegalAttachment = async (attachment: LegalAttachment, request: Pick<LegalRequestRow, 'id' | 'company_id'>): Promise<void> => {
+  if (!attachmentBelongsToRequest(attachment.path, request.company_id, request.id)) throw new Error('This attachment does not belong to the request');
+  const url = await getLegalAttachmentUrl(attachment.path, isInlineViewable(attachment.mime_type) ? undefined : attachment.name);
   window.open(url, '_blank', 'noopener');
 };
 
@@ -51,6 +59,7 @@ export function useLegalAttachments() {
       if (!user?.id) throw new Error('You must be signed in');
       if (!companyId) throw new Error('Your profile is not linked to a company');
       if (file.size > LEGAL_ATTACHMENT_MAX_BYTES) throw new Error('Files must be 25 MB or smaller');
+      if (!isAllowedAttachmentType(file.type)) throw new Error(`${file.name}: documents, images, spreadsheets, emails and zip archives only`);
       const path = buildAttachmentPath({ companyId, kind: 'requests', recordId: request.id, fileName: file.name });
       const { error } = await supabase.storage.from(LEGAL_ATTACHMENTS_BUCKET).upload(path, file, { contentType: file.type || undefined, upsert: false });
       if (error) throw error;
@@ -77,6 +86,7 @@ export function useLegalAttachments() {
 
   const remove = useMutation({
     mutationFn: async ({ request, attachment }: { request: LegalRequestRow; attachment: LegalAttachment }): Promise<void> => {
+      if (!attachmentBelongsToRequest(attachment.path, request.company_id, request.id)) throw new Error('This attachment does not belong to the request');
       const { data: fresh, error: rErr } = await supabase.from('legal_requests').select('attachments').eq('id', request.id).single();
       if (rErr) throw rErr;
       await writeIndex(request.id, parseAttachments(fresh.attachments).filter((a) => a.path !== attachment.path));

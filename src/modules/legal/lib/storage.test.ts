@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAttachmentPath, errorMessage } from './storage';
+import { attachmentBelongsToRequest, buildAttachmentPath, errorMessage, isAllowedAttachmentType, isInlineViewable } from './storage';
 
 describe('storage helpers', () => {
   it('builds company-scoped paths with a safe extension', () => {
@@ -14,5 +14,21 @@ describe('storage helpers', () => {
     expect(errorMessage('plain')).toBe('plain');
     expect(errorMessage(null, 'fallback')).toBe('fallback');
     expect(errorMessage({ message: '' })).toBe('Unexpected error');
+  });
+
+  it('recognises allowed types and which ones open inline', () => {
+    expect(isAllowedAttachmentType('application/pdf')).toBe(true);
+    expect(isAllowedAttachmentType('text/html')).toBe(false);
+    expect(isAllowedAttachmentType('image/svg+xml')).toBe(false);
+    expect(isInlineViewable('application/pdf')).toBe(true);
+    expect(isInlineViewable('image/png')).toBe(true);
+    expect(isInlineViewable('application/zip')).toBe(false);
+  });
+
+  it('only accepts paths inside the request folder', () => {
+    expect(attachmentBelongsToRequest('co/requests/r1/1-abc.pdf', 'co', 'r1')).toBe(true);
+    expect(attachmentBelongsToRequest('co/requests/r2/1-abc.pdf', 'co', 'r1')).toBe(false);
+    expect(attachmentBelongsToRequest('other/requests/r1/1-abc.pdf', 'co', 'r1')).toBe(false);
+    expect(attachmentBelongsToRequest('co/requests/r1/../r2/x.pdf', 'co', 'r1')).toBe(false);
   });
 });

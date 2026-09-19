@@ -20,7 +20,7 @@ Two tiers, mirrored in SQL and TypeScript so the UI and row level security agree
 - **Legal team** (`legal_can_edit` / `legal_can_admin` in SQL; `resolveLegalAccess` in `src/modules/auth/lib/legalAccess.ts`): admin = superadmin, DPA (RBAC or legacy `profiles.role` dpa / shore_management) or an RBAC `legal` admin grant; edit = the `legal_counsel` role or an RBAC `legal` edit grant. The team reads, triages, assigns, risk-rates and resolves every request in the company, owns templates and forms, and reviews submissions. Admins can also delete requests.
 - **Everyone else** (`self`): raises requests, follows their own (thread, attachments, cancel while still submitted / triaged), reads the document library and fills in published forms. An RBAC `legal` view grant gives read-only oversight of all requests and submissions.
 
-Grant the team from Roles & Permissions by assigning **Legal Counsel** (or a `legal` module permission). `useLegalAccess()` only decides which controls render; the policies and the `legal_requests_before_update` guard are the real boundary. The module never fails open while RBAC is loading.
+Grant the team from Roles & Permissions by assigning **Legal Counsel** (or a `legal` module permission). `useLegalAccess()` only decides which controls render; the policies and the trigger guards are the real boundary: a requester's insert always starts as a fresh submission (status, assignment, risk, SLA, resolution and reference are reset server-side), a submitter can never file an already-reviewed form submission, and attachment paths must sit inside the request's own storage folder. The module never fails open while RBAC is loading.
 
 ## Workflow and SLA
 
@@ -30,7 +30,7 @@ Every status, assignment, risk, priority, SLA, resolution, detail and attachment
 
 ## Notifications
 
-In-app alerts (the notification bell) via STORM's `alerts` table: a new request (owner role LEGAL), an assignment (direct assignment to the team member), a status change (to the requester), and the hourly SLA sweeper `legal_generate_alerts` (due within 24 h → orange, breached → red, auto-dismissed on close). Alert titles carry only the reference number and request type because alerts are company-visible. Email is not wired; the `send-email` edge function can be called from the same trigger points if needed.
+In-app alerts (the notification bell) via STORM's `alerts` table: a new request (owner role LEGAL), an assignment (direct assignment to the team member), a status change (to the requester), and the hourly SLA sweeper `legal_generate_alerts` (due within 24 h → orange, breached → red, auto-dismissed on close). A restrictive policy narrows legal alerts to the requester, the assignee and the legal team, and titles carry only the reference number and request type. Email is not wired; the `send-email` edge function can be called from the same trigger points if needed.
 
 ## Documents and forms
 
@@ -42,7 +42,7 @@ Forms are a `FormSchema` (`{ title, description?, fields }`) stored on the versi
 
 Migration: `supabase/migrations/20260919120000_legal_module.sql` (tables, triggers, RLS, grants, RBAC seeds, `legal-attachments` bucket, RPCs, pg_cron job). Generated types were added by hand to `src/integrations/supabase/types.ts` until the next `supabase gen types` run.
 
-Storage: request attachments go to the private `legal-attachments` bucket under `<company_id>/requests/<request_id>/…` and are indexed in `legal_requests.attachments`; reads use signed URLs (`src/modules/legal/lib/storage.ts`).
+Storage: request attachments go to the private `legal-attachments` bucket under `<company_id>/requests/<request_id>/…` and are indexed in `legal_requests.attachments`; the bucket allowlists documents, images, spreadsheets, emails and zip archives, PDFs and images open inline and everything else downloads, all through signed URLs (`src/modules/legal/lib/storage.ts`).
 
 ## Going live
 
