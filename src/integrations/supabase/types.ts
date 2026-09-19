@@ -90,7 +90,29 @@ export type Database = {
           waist_cm?: number | null
           weight_kg?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "hw_measurements_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_measurements_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_measurements_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       hw_people: {
         Row: {
@@ -183,7 +205,43 @@ export type Database = {
           updated_by?: string | null
           vessel_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "hw_people_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_people_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_people_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_people_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "hw_people_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       hw_practitioner_qualifications: {
         Row: {
@@ -240,7 +298,29 @@ export type Database = {
           verified_at?: string | null
           verified_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "hw_practitioner_qualifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_practitioner_qualifications_practitioner_id_fkey"
+            columns: ["practitioner_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_practitioner_qualifications_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       hw_practitioners: {
         Row: {
@@ -321,7 +401,43 @@ export type Database = {
           updated_by?: string | null
           vessel_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "hw_practitioners_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_practitioners_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_practitioners_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_practitioners_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "hw_practitioners_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       hw_record_access_log: {
         Row: {
@@ -357,7 +473,29 @@ export type Database = {
           record_id?: string | null
           record_type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "hw_record_access_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_record_access_log_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_record_access_log_accessed_by_fkey"
+            columns: ["accessed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       hw_referrals: {
         Row: {
@@ -423,7 +561,43 @@ export type Database = {
           urgency?: string
           vessel_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "hw_referrals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_referrals_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_referrals_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_referrals_referred_by_fkey"
+            columns: ["referred_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "hw_referrals_assigned_practitioner_id_fkey"
+            columns: ["assigned_practitioner_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       hw_settings: {
         Row: {
@@ -498,7 +672,22 @@ export type Database = {
           updated_by?: string | null
           vaccination_warning_days?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "hw_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       med_allergies: {
         Row: {
@@ -555,7 +744,36 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_allergies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_allergies_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_allergies_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_allergies_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       med_conditions: {
         Row: {
@@ -615,7 +833,36 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_conditions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_conditions_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_conditions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_conditions_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       med_consultations: {
         Row: {
@@ -738,7 +985,64 @@ export type Database = {
           updated_by?: string | null
           vessel_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_consultations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_consultations_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_consultations_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_consultations_parent_consultation_id_fkey"
+            columns: ["parent_consultation_id"]
+            isOneToOne: false
+            referencedRelation: "med_consultations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_consultations_attended_by_practitioner_id_fkey"
+            columns: ["attended_by_practitioner_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_consultations_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_consultations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_consultations_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       med_equipment: {
         Row: {
@@ -819,7 +1123,43 @@ export type Database = {
           updated_by?: string | null
           vessel_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_equipment_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_equipment_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_equipment_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "med_supply_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_equipment_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_equipment_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       med_first_aid_kits: {
         Row: {
@@ -879,7 +1219,43 @@ export type Database = {
           updated_by?: string | null
           vessel_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_first_aid_kits_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_first_aid_kits_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_first_aid_kits_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "med_supply_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_first_aid_kits_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_first_aid_kits_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       med_fitness_assessments: {
         Row: {
@@ -951,7 +1327,50 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_fitness_assessments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_fitness_assessments_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_fitness_assessments_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_fitness_assessments_certificate_id_fkey"
+            columns: ["certificate_id"]
+            isOneToOne: false
+            referencedRelation: "crew_certificates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_fitness_assessments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_fitness_assessments_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       med_kit_checks: {
         Row: {
@@ -1002,7 +1421,36 @@ export type Database = {
           notes?: string | null
           result?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_kit_checks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_kit_checks_kit_id_fkey"
+            columns: ["kit_id"]
+            isOneToOne: false
+            referencedRelation: "med_first_aid_kits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_kit_checks_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "med_equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_kit_checks_checked_by_fkey"
+            columns: ["checked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       med_log_entries: {
         Row: {
@@ -1062,7 +1510,50 @@ export type Database = {
           within_limits?: boolean | null
           witnessed_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_log_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_log_entries_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_log_entries_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_log_entries_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "med_supply_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_log_entries_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "med_equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_log_entries_witnessed_by_fkey"
+            columns: ["witnessed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       med_medications: {
         Row: {
@@ -1128,7 +1619,36 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_medications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_medications_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_medications_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_medications_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       med_patient_records: {
         Row: {
@@ -1212,7 +1732,43 @@ export type Database = {
           updated_by?: string | null
           weight_kg?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_patient_records_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_patient_records_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: true
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_patient_records_last_reviewed_by_fkey"
+            columns: ["last_reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_patient_records_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_patient_records_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       med_protocol_acknowledgements: {
         Row: {
@@ -1242,7 +1798,29 @@ export type Database = {
           protocol_id?: string
           version?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_protocol_acknowledgements_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_protocol_acknowledgements_protocol_id_fkey"
+            columns: ["protocol_id"]
+            isOneToOne: false
+            referencedRelation: "med_protocols"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_protocol_acknowledgements_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       med_protocols: {
         Row: {
@@ -1320,7 +1898,50 @@ export type Database = {
           version?: number
           vessel_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_protocols_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_protocols_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_protocols_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_protocols_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_protocols_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_protocols_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       med_screening_answers: {
         Row: {
@@ -1359,7 +1980,29 @@ export type Database = {
           value_options?: string[]
           value_text?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_screening_answers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_screening_answers_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "med_screening_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_screening_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "med_screening_questions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       med_screening_questions: {
         Row: {
@@ -1419,7 +2062,22 @@ export type Database = {
           updated_at?: string
           weight?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_screening_questions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_screening_questions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "med_screening_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       med_screening_records: {
         Row: {
@@ -1488,7 +2146,43 @@ export type Database = {
           total_score?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_screening_records_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_screening_records_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "med_screening_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_screening_records_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_screening_records_reviewed_by_practitioner_id_fkey"
+            columns: ["reviewed_by_practitioner_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_screening_records_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "hw_referrals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       med_screening_templates: {
         Row: {
@@ -1545,7 +2239,29 @@ export type Database = {
           updated_by?: string | null
           version?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_screening_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_screening_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_screening_templates_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       med_supply_items: {
         Row: {
@@ -1632,7 +2348,43 @@ export type Database = {
           updated_by?: string | null
           vessel_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_supply_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_supply_items_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_supply_items_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "med_supply_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_supply_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_supply_items_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       med_supply_locations: {
         Row: {
@@ -1671,7 +2423,22 @@ export type Database = {
           updated_at?: string
           vessel_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_supply_locations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_supply_locations_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       med_supply_transactions: {
         Row: {
@@ -1734,7 +2501,57 @@ export type Database = {
           witness_name?: string | null
           witnessed_by_practitioner_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_supply_transactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_supply_transactions_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "med_supply_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_supply_transactions_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_supply_transactions_consultation_id_fkey"
+            columns: ["consultation_id"]
+            isOneToOne: false
+            referencedRelation: "med_consultations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_supply_transactions_destination_location_id_fkey"
+            columns: ["destination_location_id"]
+            isOneToOne: false
+            referencedRelation: "med_supply_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_supply_transactions_witnessed_by_practitioner_id_fkey"
+            columns: ["witnessed_by_practitioner_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_supply_transactions_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       med_vaccinations: {
         Row: {
@@ -1803,7 +2620,36 @@ export type Database = {
           valid_from?: string | null
           valid_until?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "med_vaccinations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_vaccinations_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_vaccinations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_vaccinations_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       nut_food_log_entries: {
         Row: {
@@ -1866,7 +2712,36 @@ export type Database = {
           updated_at?: string
           water_ml?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "nut_food_log_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_food_log_entries_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_food_log_entries_food_id_fkey"
+            columns: ["food_id"]
+            isOneToOne: false
+            referencedRelation: "nut_foods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_food_log_entries_logged_by_fkey"
+            columns: ["logged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       nut_foods: {
         Row: {
@@ -1944,7 +2819,22 @@ export type Database = {
           sugar_g?: number | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "nut_foods_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_foods_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       nut_goals: {
         Row: {
@@ -2007,7 +2897,29 @@ export type Database = {
           unit?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "nut_goals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_goals_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_goals_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       nut_meal_plans: {
         Row: {
@@ -2070,7 +2982,43 @@ export type Database = {
           updated_at?: string
           vessel_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "nut_meal_plans_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_meal_plans_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_meal_plans_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_meal_plans_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "nut_foods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_meal_plans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       nut_profiles: {
         Row: {
@@ -2139,7 +3087,43 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "nut_profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_profiles_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: true
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_profiles_nutritionist_id_fkey"
+            columns: ["nutritionist_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_profiles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "nut_profiles_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       physio_assessment_items: {
         Row: {
@@ -2190,7 +3174,22 @@ export type Database = {
           value_numeric?: number | null
           value_text?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "physio_assessment_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_assessment_items_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "physio_assessments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       physio_assessments: {
         Row: {
@@ -2271,7 +3270,57 @@ export type Database = {
           updated_by?: string | null
           vessel_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "physio_assessments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_assessments_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_assessments_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_assessments_practitioner_id_fkey"
+            columns: ["practitioner_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_assessments_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "hw_referrals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_assessments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "physio_assessments_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       physio_sessions: {
         Row: {
@@ -2343,7 +3392,50 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "physio_sessions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_sessions_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_sessions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "physio_treatment_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_sessions_practitioner_id_fkey"
+            columns: ["practitioner_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_sessions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "physio_sessions_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       physio_treatment_plans: {
         Row: {
@@ -2412,7 +3504,50 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "physio_treatment_plans_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_treatment_plans_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_treatment_plans_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "physio_assessments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_treatment_plans_practitioner_id_fkey"
+            columns: ["practitioner_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_treatment_plans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "physio_treatment_plans_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       pt_appointments: {
         Row: {
@@ -2475,7 +3610,57 @@ export type Database = {
           updated_by?: string | null
           vessel_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pt_appointments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_appointments_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_appointments_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_appointments_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_appointments_program_session_id_fkey"
+            columns: ["program_session_id"]
+            isOneToOne: false
+            referencedRelation: "pt_program_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_appointments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "pt_appointments_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       pt_exercise_sources: {
         Row: {
@@ -2532,7 +3717,15 @@ export type Database = {
           source_key?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pt_exercise_sources_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pt_exercises: {
         Row: {
@@ -2616,7 +3809,29 @@ export type Database = {
           updated_by?: string | null
           video_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pt_exercises_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_exercises_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "pt_exercises_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       pt_program_sessions: {
         Row: {
@@ -2676,7 +3891,29 @@ export type Database = {
           updated_at?: string
           week_number?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pt_program_sessions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_program_sessions_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "pt_programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_program_sessions_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pt_program_templates: {
         Row: {
@@ -2748,7 +3985,29 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pt_program_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_program_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "pt_program_templates_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       pt_programs: {
         Row: {
@@ -2805,7 +4064,57 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pt_programs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_programs_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_programs_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "pt_program_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_programs_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_programs_physio_plan_id_fkey"
+            columns: ["physio_plan_id"]
+            isOneToOne: false
+            referencedRelation: "physio_treatment_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_programs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "pt_programs_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       pt_session_items: {
         Row: {
@@ -2868,7 +4177,29 @@ export type Database = {
           tempo?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pt_session_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_session_items_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "pt_program_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_session_items_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "pt_exercises"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pt_set_logs: {
         Row: {
@@ -2919,7 +4250,36 @@ export type Database = {
           set_number?: number
           weight_kg?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pt_set_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_set_logs_session_item_id_fkey"
+            columns: ["session_item_id"]
+            isOneToOne: false
+            referencedRelation: "pt_session_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_set_logs_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_set_logs_logged_by_fkey"
+            columns: ["logged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       pt_template_days: {
         Row: {
@@ -2958,7 +4318,22 @@ export type Database = {
           updated_at?: string
           week_number?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pt_template_days_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_template_days_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "pt_program_templates"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pt_template_items: {
         Row: {
@@ -3021,7 +4396,29 @@ export type Database = {
           tempo?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pt_template_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_template_items_day_id_fkey"
+            columns: ["day_id"]
+            isOneToOne: false
+            referencedRelation: "pt_template_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_template_items_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "pt_exercises"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pt_videos: {
         Row: {
@@ -3072,7 +4469,29 @@ export type Database = {
           updated_at?: string
           url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pt_videos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_videos_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "pt_exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_videos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       spa_bookings: {
         Row: {
@@ -3138,7 +4557,64 @@ export type Database = {
           updated_by?: string | null
           vessel_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "spa_bookings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_bookings_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_bookings_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_bookings_treatment_id_fkey"
+            columns: ["treatment_id"]
+            isOneToOne: false
+            referencedRelation: "spa_treatments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_bookings_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_bookings_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "spa_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_bookings_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "spa_bookings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       spa_inventory_items: {
         Row: {
@@ -3201,7 +4677,22 @@ export type Database = {
           updated_at?: string
           vessel_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "spa_inventory_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_inventory_items_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       spa_inventory_transactions: {
         Row: {
@@ -3246,7 +4737,36 @@ export type Database = {
           reason?: string | null
           transaction_type?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "spa_inventory_transactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_inventory_transactions_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "spa_inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_inventory_transactions_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "spa_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_inventory_transactions_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       spa_rooms: {
         Row: {
@@ -3291,7 +4811,22 @@ export type Database = {
           updated_at?: string
           vessel_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "spa_rooms_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_rooms_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       spa_treatments: {
         Row: {
@@ -3357,7 +4892,29 @@ export type Database = {
           updated_at?: string
           updated_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "spa_treatments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_treatments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "spa_treatments_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
       }
       activity_log: {
         Row: {

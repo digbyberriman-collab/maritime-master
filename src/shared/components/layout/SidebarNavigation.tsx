@@ -10,6 +10,10 @@ import { useHrAccess } from '@/modules/auth/hooks/useHrAccess';
 import { hrAccessSatisfies } from '@/modules/auth/lib/hrAccess';
 import { usePayrollAccess } from '@/modules/auth/hooks/usePayrollAccess';
 import { payrollAccessSatisfies } from '@/modules/auth/lib/payrollAccess';
+import { useMedicalAccess } from '@/modules/auth/hooks/useMedicalAccess';
+import { medicalAccessSatisfies } from '@/modules/auth/lib/medicalAccess';
+import { useWellnessAccess } from '@/modules/auth/hooks/useWellnessAccess';
+import { wellnessAccessSatisfies } from '@/modules/auth/lib/wellnessAccess';
 
 interface SidebarNavigationProps {
   moduleId: string | null;
@@ -32,6 +36,8 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
   const rbacInitialized = usePermissionsStore((s) => s.isInitialized);
   const hrAccess = useHrAccess();
   const payrollAccess = usePayrollAccess();
+  const medicalAccess = useMedicalAccess();
+  const wellnessAccess = useWellnessAccess();
   const selectedModule = NAVIGATION_ITEMS.find((item) => item.id === moduleId) ?? null;
 
   // Leaf-level gating: entries with a moduleKey are hidden unless the user
@@ -48,9 +54,20 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
       if (payrollAccess.loading) return false;
       return payrollAccessSatisfies(payrollAccess, required);
     }
+    if (item.moduleKey === 'medical') {
+      if (medicalAccess.loading) return false;
+      // Crew keep the leaves that show their own record.
+      if (medicalAccess.selfOnly) return Boolean(item.selfServe);
+      return medicalAccessSatisfies(medicalAccess, required);
+    }
+    if (item.moduleKey === 'wellness') {
+      if (wellnessAccess.loading) return false;
+      if (wellnessAccess.selfOnly) return Boolean(item.selfServe);
+      return wellnessAccessSatisfies(wellnessAccess, required);
+    }
     if (!rbacInitialized) return true;
     return hasPermission(item.moduleKey, required);
-  }, [hrAccess, payrollAccess, hasPermission, rbacInitialized]);
+  }, [hrAccess, payrollAccess, medicalAccess, wellnessAccess, hasPermission, rbacInitialized]);
 
   const children = useMemo(() => {
     if (!selectedModule?.children) return [];
