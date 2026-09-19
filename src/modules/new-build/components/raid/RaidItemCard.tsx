@@ -57,7 +57,20 @@ export function RaidItemCard({ item, isExpanded, onToggle, onEdit, onDelete, onV
 
   return (
     <Card className={`hover:shadow-md transition-shadow ${isPending ? "opacity-60 border-dashed" : ""}`}>
-      <CardHeader className="cursor-pointer pb-2" onClick={onToggle}>
+      <CardHeader
+        role="button"
+        tabIndex={0}
+        aria-expanded={isExpanded}
+        aria-label={`${isExpanded ? 'Collapse' : 'Expand'} details for ${item.title}`}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+        className="cursor-pointer pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+        onClick={onToggle}
+      >
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">

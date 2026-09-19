@@ -338,7 +338,18 @@ export default function Timeline() {
         <Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>
           <Card className="border-primary/20">
             <CollapsibleTrigger asChild>
-              <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-accent/30 transition-colors">
+              <div
+                role="button"
+                tabIndex={0}
+                aria-expanded={summaryOpen}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSummaryOpen(!summaryOpen);
+                  }
+                }}
+                className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-accent/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+              >
                 <div className="flex items-center gap-3">
                   <Badge className="bg-primary text-primary-foreground text-sm px-3 py-1">
                     Week {currentWeekNum}, {currentWeekYear}

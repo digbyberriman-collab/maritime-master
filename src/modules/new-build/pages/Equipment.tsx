@@ -222,7 +222,17 @@ export default function Equipment() {
           return (
             <Card
               key={key}
-              className={`cursor-pointer transition-all ${statusFilter === key ? "ring-2 ring-primary" : "hover:shadow-md"}`}
+              role="button"
+              tabIndex={0}
+              aria-pressed={statusFilter === key}
+              aria-label={`Filter by ${cfg.label}`}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setStatusFilter(statusFilter === key ? "all" : key);
+                }
+              }}
+              className={`cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${statusFilter === key ? "ring-2 ring-primary" : "hover:shadow-md"}`}
               onClick={() => setStatusFilter(statusFilter === key ? "all" : key)}
             >
               <CardContent className="p-3 flex items-center gap-2">
