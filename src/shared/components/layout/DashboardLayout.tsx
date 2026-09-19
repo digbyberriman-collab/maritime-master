@@ -13,7 +13,7 @@ import { resolveModuleForPath } from '@/shared/lib/moduleNavigation';
 import { DashboardFilterProvider } from '@/modules/dashboard/contexts/DashboardFilterContext';
 import FeedbackPanel from '@/modules/feedback/components/FeedbackPanel';
 import FeedbackResolvedToast from '@/modules/feedback/components/FeedbackResolvedToast';
-import { Menu, X } from 'lucide-react';
+import { Menu, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface DashboardLayoutProps {
@@ -27,6 +27,25 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  // Desktop icon-only (visuals only) mode, persisted across sessions.
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem('storm-sidebar-collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const toggleSidebarCollapsed = React.useCallback(() => {
+    setSidebarCollapsed((current) => {
+      const next = !current;
+      try {
+        window.localStorage.setItem('storm-sidebar-collapsed', String(next));
+      } catch {
+        /* storage unavailable */
+      }
+      return next;
+    });
+  }, []);
   const activeModule = React.useMemo(() => {
     const requestedModule = new URLSearchParams(location.search).get('module');
     return NAVIGATION_ITEMS.find((item) => item.id === requestedModule) ?? resolveModuleForPath(location.pathname);
