@@ -32,7 +32,7 @@ export function isComplianceAlert(alert: Pick<AlertLinkSource, 'source_module' |
 export function getAlertDestination(alert: AlertLinkSource): string {
   const source = `${alert.source_module ?? ''} ${alert.related_entity_type ?? ''}`.toLowerCase();
   const match = ROUTES.find(([term]) => source.includes(term));
-  if (!match) return `/alerts?id=${alert.id}`;
+  if (!match) return `/notifications/center?id=${alert.id}`;
   const [, route] = match;
   if (!alert.related_entity_id) return route;
   const separator = route.includes('?') ? '&' : '?';

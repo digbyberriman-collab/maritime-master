@@ -11,7 +11,7 @@ export type { SitemapLeaf } from './sitemap';
 
 // Admin-only items (shown in Settings or separate admin section)
 export const ADMIN_NAV_ITEMS: NavChild[] = [
-  { id: 'user-management', label: 'User Management', path: '/admin/users', icon: Users },
+  { id: 'user-management', label: 'Users & Access', path: '/users-access', icon: Users },
   { id: 'roles-permissions', label: 'Roles & Permissions', path: '/admin/roles', icon: Shield },
   { id: 'fleet-groups', label: 'Fleet Groups', path: '/admin/fleet-groups', icon: Ship },
   { id: 'alert-configuration', label: 'Alert Configuration', path: '/admin/alerts', icon: Bell },

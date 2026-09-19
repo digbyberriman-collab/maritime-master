@@ -87,7 +87,7 @@ const fleetChildren: NavChild[] = [
   L('Fleet Documents', FLEET_BASE, { existing: '/documents', icon: FileText }),
   L('Fleet Checklists', FLEET_BASE, { existing: '/ism/checklists', icon: CheckSquare, crossLink: true }),
   L('Vessels', FLEET_BASE, { existing: '/vessels/dashboard', icon: Ship }),
-  L('Users & Access', FLEET_BASE, { existing: '/admin/users', icon: Users }),
+  L('Users & Access', FLEET_BASE, { existing: '/users-access', icon: Users }),
   L('Notification Center', FLEET_BASE, { existing: '/notifications/center', icon: Bell }),
   L('Notification Management', FLEET_BASE, { existing: '/admin/notifications', icon: Bell }),
   L('Support Tickets', FLEET_BASE, { icon: LifeBuoy }),
