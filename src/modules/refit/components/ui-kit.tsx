@@ -265,7 +265,7 @@ export function Field({
 }
 
 export const inputCls =
-  "w-full px-3 py-2 bg-white border border-input rounded-sm text-sm focus:outline-none focus:ring-1 focus:ring-ring";
+  "w-full px-3 py-2 bg-white border border-input rounded-sm text-sm focus-visible:outline-none focus:ring-2 focus:ring-ring";
 
 // -------------------- DRAWER ------------------------------------------
 

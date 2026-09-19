@@ -100,7 +100,7 @@ const LineRow: React.FC<LineRowProps> = ({
             value={buffer.occurredAt}
             required
             onChange={(e) => setExtra('occurredAt', e.target.value)}
-            className="w-[11.5rem] rounded border border-input bg-background px-1.5 py-1 text-[13px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-[11.5rem] rounded border border-input bg-background px-1.5 py-1 text-[13px] focus:border-primary focus-visible:outline-none focus:ring-2 focus:ring-primary"
           />
           <small className="block text-[10px] text-muted-foreground">UTC</small>
         </label>
@@ -206,12 +206,12 @@ const LineRow: React.FC<LineRowProps> = ({
                   <div className="mt-1 grid gap-2 sm:grid-cols-2">
                     <label className="block">
                       <span className="text-[11px] text-muted-foreground">Remarks / annex references</span>
-                      <textarea data-line-extra="notes" value={buffer.notes} maxLength={4000} rows={1} onChange={(e) => setExtra('notes', e.target.value)} aria-label={`Remarks · line ${number}`} className="mt-0.5 w-full rounded border border-input bg-background px-1.5 py-1 text-[13px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
+                      <textarea data-line-extra="notes" value={buffer.notes} maxLength={4000} rows={1} onChange={(e) => setExtra('notes', e.target.value)} aria-label={`Remarks · line ${number}`} className="mt-0.5 w-full rounded border border-input bg-background px-1.5 py-1 text-[13px] focus:border-primary focus-visible:outline-none focus:ring-2 focus:ring-primary" />
                     </label>
                     {buffer.sample && (
                       <label className="block">
                         <span className="text-[11px] text-muted-foreground">Reason for changing a captured reading{sourceChanged ? ' *' : ''}</span>
-                        <textarea data-line-extra="overrideReason" value={buffer.overrideReason} maxLength={1000} rows={1} onChange={(e) => setExtra('overrideReason', e.target.value)} aria-label={`Reason for changing a captured reading · line ${number}`} className="mt-0.5 w-full rounded border border-input bg-background px-1.5 py-1 text-[13px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
+                        <textarea data-line-extra="overrideReason" value={buffer.overrideReason} maxLength={1000} rows={1} onChange={(e) => setExtra('overrideReason', e.target.value)} aria-label={`Reason for changing a captured reading · line ${number}`} className="mt-0.5 w-full rounded border border-input bg-background px-1.5 py-1 text-[13px] focus:border-primary focus-visible:outline-none focus:ring-2 focus:ring-primary" />
                       </label>
                     )}
                   </div>
@@ -221,7 +221,7 @@ const LineRow: React.FC<LineRowProps> = ({
                 ) : (
                   <label className="block">
                     <span className="text-[11px] text-muted-foreground">Correction reason *</span>
-                    <textarea data-line-extra="correctionReason" value={buffer.correctionReason} maxLength={1000} rows={1} required onChange={(e) => setExtra('correctionReason', e.target.value)} aria-label={`Correction reason · line ${number}`} className="mt-0.5 w-full rounded border border-input bg-background px-1.5 py-1 text-[13px] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary" />
+                    <textarea data-line-extra="correctionReason" value={buffer.correctionReason} maxLength={1000} rows={1} required onChange={(e) => setExtra('correctionReason', e.target.value)} aria-label={`Correction reason · line ${number}`} className="mt-0.5 w-full rounded border border-input bg-background px-1.5 py-1 text-[13px] focus:border-primary focus-visible:outline-none focus:ring-2 focus:ring-primary" />
                   </label>
                 ))}
                 <div className="flex flex-wrap items-center gap-2">
