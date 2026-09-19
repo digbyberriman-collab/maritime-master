@@ -3,8 +3,15 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import SidebarNavigation from '@/shared/components/layout/SidebarNavigation';
 
+const mocks = vi.hoisted(() => ({
+  order: { map: {} },
+  hrAccess: { loading: false },
+  payrollAccess: { loading: false },
+  badgeCounts: { data: { pendingCompliance: 0, unreadMessages: 0, overdueTasks: 0 } },
+}));
+
 vi.mock('@/shared/hooks/useSidebarOrder', () => ({
-  useSidebarOrder: () => ({ map: {} }),
+  useSidebarOrder: () => mocks.order,
   applySidebarOrder: <T,>(items: T[]) => items,
 }));
 vi.mock('@/modules/auth/store/permissionsStore', () => ({
@@ -13,12 +20,12 @@ vi.mock('@/modules/auth/store/permissionsStore', () => ({
     isInitialized: true,
   }),
 }));
-vi.mock('@/modules/auth/hooks/useHrAccess', () => ({ useHrAccess: () => ({ loading: false }) }));
+vi.mock('@/modules/auth/hooks/useHrAccess', () => ({ useHrAccess: () => mocks.hrAccess }));
 vi.mock('@/modules/auth/lib/hrAccess', () => ({ hrAccessSatisfies: () => true }));
-vi.mock('@/modules/auth/hooks/usePayrollAccess', () => ({ usePayrollAccess: () => ({ loading: false }) }));
+vi.mock('@/modules/auth/hooks/usePayrollAccess', () => ({ usePayrollAccess: () => mocks.payrollAccess }));
 vi.mock('@/modules/auth/lib/payrollAccess', () => ({ payrollAccessSatisfies: () => true }));
 vi.mock('@/shared/hooks/useSidebarBadgeCounts', () => ({
-  useSidebarBadgeCounts: () => ({ data: { pendingCompliance: 0, unreadMessages: 0, overdueTasks: 0 } }),
+  useSidebarBadgeCounts: () => mocks.badgeCounts,
 }));
 
 const LocationProbe = () => <output aria-label="Current route">{useLocation().pathname}{useLocation().search}</output>;
