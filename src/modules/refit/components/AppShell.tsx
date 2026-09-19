@@ -25,9 +25,9 @@ export function PageHeader({
   children?: ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 mb-6 pb-4 border-b border-border">
+    <div className="flex items-start justify-between gap-3 mb-4 pb-2 border-b border-border">
       <div className="min-w-0">
-        {title ? <h1 className="text-2xl font-semibold tracking-tight">{title}</h1> : null}
+        {title ? <h1 className="text-xl font-semibold tracking-tight">{title}</h1> : null}
         {(description || subtitle) ? (
           <p className="text-sm text-muted-foreground mt-1">{description ?? subtitle}</p>
         ) : null}

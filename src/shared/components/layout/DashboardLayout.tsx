@@ -210,7 +210,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
       {/* Main content - z-10 to be above watermark */}
       <div className="flex-1 flex flex-col min-w-0 relative z-10">
         {/* Top navbar */}
-        <header className="min-h-16 bg-card border-b border-border flex items-center gap-2 px-3 lg:px-5 py-2 shadow-navbar relative z-20">
+        <header className="min-h-14 bg-card border-b border-border flex items-center gap-2 px-3 lg:px-4 py-1.5 shadow-navbar relative z-20">
           {/* Mobile menu button */}
           <button
             ref={mobileMenuButtonRef}
@@ -228,7 +228,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-4 lg:p-6 overflow-auto">
+        <main className="storm-compact flex-1 p-3 lg:p-4 overflow-auto">
           <PageLocationHeader activeModuleId={activeModule?.id ?? null} />
           {children}
         </main>

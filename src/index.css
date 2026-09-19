@@ -192,6 +192,38 @@
   }
 }
 
+/* Balanced desktop density: retain comfortable mobile touch targets while
+   fitting more operational data into each authenticated workspace. */
+@media (min-width: 768px) {
+  .storm-compact .space-y-8 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 1.25rem;
+  }
+
+  .storm-compact .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 1rem;
+  }
+
+  .storm-compact .space-y-5 > :not([hidden]) ~ :not([hidden]),
+  .storm-compact .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.75rem;
+  }
+
+  .storm-compact .gap-8 { gap: 1.25rem; }
+  .storm-compact .gap-6 { gap: 1rem; }
+  .storm-compact .gap-5,
+  .storm-compact .gap-4 { gap: 0.75rem; }
+
+  .storm-compact .py-8 { padding-top: 1.25rem; padding-bottom: 1.25rem; }
+  .storm-compact .p-8 { padding: 1.25rem; }
+  .storm-compact .p-6 { padding: 1rem; }
+  .storm-compact .px-6 { padding-left: 1rem; padding-right: 1rem; }
+  .storm-compact .py-6 { padding-top: 1rem; padding-bottom: 1rem; }
+  .storm-compact .mb-8 { margin-bottom: 1.25rem; }
+  .storm-compact .mb-6 { margin-bottom: 1rem; }
+  .storm-compact .mt-8 { margin-top: 1.25rem; }
+  .storm-compact .mt-6 { margin-top: 1rem; }
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
