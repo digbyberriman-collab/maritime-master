@@ -108,7 +108,6 @@ const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate }) =
               <DropdownMenuCheckboxItem
                 checked={allSelected}
                 onCheckedChange={selectAll}
-                onSelect={(event) => event.preventDefault()}
               >
                 All vessels
               </DropdownMenuCheckboxItem>
@@ -117,7 +116,6 @@ const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate }) =
                   key={vessel.id}
                   checked={!allSelected && selectedVessel?.id === vessel.id}
                   onCheckedChange={() => selectOnly(vessel.id)}
-                  onSelect={(event) => event.preventDefault()}
                   className="pr-2"
                 >
                   <span className="truncate">{vessel.name}</span>
