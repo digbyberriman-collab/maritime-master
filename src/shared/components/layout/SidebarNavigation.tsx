@@ -124,22 +124,22 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const [announcement, setAnnouncement] = useState('');
 
-  const badgeFor = useCallback((child: NavChild): { count: number; label: string } | null => {
+  const badgeFor = useCallback((child: NavChild): { count: number; label: string; destination: string } | null => {
     const pathname = child.path.split('?')[0];
     if (pathname === '/vessel/safety') {
       const count = badgeCounts?.pendingCompliance ?? 0;
-      return count > 0 ? { count, label: badgeLabel(count, 'pending compliance item') } : null;
+      return count > 0 ? { count, label: badgeLabel(count, 'pending compliance item'), destination: '/notifications/center?tab=compliance' } : null;
     }
-    if (pathname === '/vessel/general/communications') {
+    if (pathname === '/vessel/general/communications' || (collapsed && pathname === '/vessel/general')) {
       const count = badgeCounts?.unreadMessages ?? 0;
-      return count > 0 ? { count, label: badgeLabel(count, 'unread message') } : null;
+      return count > 0 ? { count, label: badgeLabel(count, 'unread message'), destination: '/notifications/center?tab=messages' } : null;
     }
     if (pathname === '/vessel/technical') {
       const count = badgeCounts?.overdueTasks ?? 0;
-      return count > 0 ? { count, label: badgeLabel(count, 'overdue operational task') } : null;
+      return count > 0 ? { count, label: badgeLabel(count, 'overdue operational task'), destination: '/notifications/center?tab=tasks' } : null;
     }
     return null;
-  }, [badgeCounts]);
+  }, [badgeCounts, collapsed]);
 
   const activeLabel = useMemo(() => {
     if (!selectedModule) {
@@ -233,77 +233,85 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
                 className="absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full border-2 border-sidebar bg-sidebar-primary shadow-[0_0_6px_hsl(var(--sidebar-primary)/0.6)]"
               />
             )}
-            {badge && (
-              <span
-                aria-hidden="true"
-                className="absolute -right-1 -top-1 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-destructive-foreground ring-2 ring-sidebar"
-              >
-                {badge.count > 99 ? '99+' : badge.count}
-              </span>
-            )}
           </button>
+          {badge && (
+            <button
+              type="button"
+              onClick={() => go(badge.destination)}
+              aria-label={`Open ${badge.label}`}
+              title={`Open ${badge.label}`}
+              className="absolute -right-1 -top-1 z-10 flex min-h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold leading-none text-destructive-foreground ring-2 ring-sidebar focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+            >
+              {badge.count > 99 ? '99+' : badge.count}
+            </button>
+          )}
         </div>
       );
     }
 
     if (!hasChildren) {
       return (
-        <button
-          key={child.id}
-          type="button"
-          onClick={() => go(child.path)}
-          aria-current={active ? 'page' : undefined}
-          aria-label={`${child.label}${active ? ', current page' : ''}${badge ? `, ${badge.label}` : ''}`}
-          className={cn(
-            'flex min-h-11 w-full items-center gap-3 rounded-md py-2 pr-3 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar',
-            depthClass,
-            active ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-          )}
-        >
-          <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span className="truncate">{child.label}</span>
+        <div key={child.id} className="flex min-h-11 w-full items-center gap-1">
+          <button
+            type="button"
+            onClick={() => go(child.path)}
+            aria-current={active ? 'page' : undefined}
+            aria-label={`${child.label}${active ? ', current page' : ''}${badge ? `, ${badge.label}` : ''}`}
+            className={cn(
+              'flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-md py-2 pr-3 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar',
+              depthClass,
+              active ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+            )}
+          >
+            <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">{child.label}</span>
+          </button>
           {badge && (
-            <span
-              className="ml-auto inline-flex min-h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold leading-none text-destructive-foreground"
-              aria-label={badge.label}
+            <button
+              type="button"
+              onClick={() => go(badge.destination)}
+              className="inline-flex min-h-7 min-w-7 shrink-0 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold leading-none text-destructive-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+              aria-label={`Open ${badge.label}`}
+              title={`Open ${badge.label}`}
             >
               {badge.count > 99 ? '99+' : badge.count}
-            </span>
+            </button>
           )}
-        </button>
+        </div>
       );
     }
 
     const isOpen = Boolean(openGroups[child.id]);
     return (
-      <Collapsible
-        key={child.id}
-        open={isOpen}
-        onOpenChange={(open) => setGroupOpen(child, open)}
-      >
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            aria-label={`${child.label} section, ${isOpen ? 'expanded' : 'collapsed'}${descendantActive ? ', contains current page' : ''}${badge ? `, ${badge.label}` : ''}`}
-            className={cn(
-              'flex min-h-11 w-full items-center gap-3 rounded-md py-2 pr-3 text-left text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar',
-              depthClass,
-              descendantActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-            )}
-          >
-            <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span className="min-w-0 flex-1 truncate">{child.label}</span>
+      <Collapsible key={child.id} open={isOpen} onOpenChange={(open) => setGroupOpen(child, open)}>
+        <div className="flex min-h-11 w-full items-center gap-1">
+          <CollapsibleTrigger asChild>
+            <button
+              type="button"
+              aria-label={`${child.label} section, ${isOpen ? 'expanded' : 'collapsed'}${descendantActive ? ', contains current page' : ''}${badge ? `, ${badge.label}` : ''}`}
+              className={cn(
+                'flex min-h-11 min-w-0 flex-1 items-center gap-3 rounded-md py-2 pr-3 text-left text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar',
+                depthClass,
+                descendantActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+              )}
+            >
+              <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="min-w-0 flex-1 truncate">{child.label}</span>
+              {isOpen ? <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" /> : <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />}
+            </button>
+          </CollapsibleTrigger>
             {badge && (
-              <span
-                className="inline-flex min-h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold leading-none text-destructive-foreground"
-                aria-hidden="true"
+              <button
+                type="button"
+                onClick={() => go(badge.destination)}
+                className="inline-flex min-h-7 min-w-7 shrink-0 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold leading-none text-destructive-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+                aria-label={`Open ${badge.label}`}
+                title={`Open ${badge.label}`}
               >
                 {badge.count > 99 ? '99+' : badge.count}
-              </span>
+              </button>
             )}
-            {isOpen ? <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" /> : <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />}
-          </button>
-        </CollapsibleTrigger>
+        </div>
         <CollapsibleContent className="mt-1 space-y-1 motion-safe:animate-accordion-down">
           {child.children?.map((nested) => renderChild(nested, depth + 1))}
         </CollapsibleContent>
