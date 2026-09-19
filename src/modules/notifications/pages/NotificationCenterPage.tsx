@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { format, formatDistanceToNowStrict, parseISO } from 'date-fns';
-import { AlertTriangle, Bell, CheckCircle2, ChevronRight, ClipboardCheck, MessageSquare, RefreshCw, Ship } from 'lucide-react';
+import { AlertTriangle, Bell, CheckCircle2, ChevronRight, ClipboardCheck, MessageSquare, RefreshCw, Settings, Ship } from 'lucide-react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
@@ -129,10 +129,18 @@ export default function NotificationCenterPage() {
       <div className="mx-auto max-w-6xl space-y-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <p className="text-sm text-muted-foreground">Items requiring attention in the current vessel scope.</p>
-          <Button variant="outline" onClick={() => refetch()} disabled={isFetching} className="self-start sm:self-auto">
-            <RefreshCw className={cn('h-4 w-4', isFetching && 'motion-safe:animate-spin')} aria-hidden="true" />
-            Refresh
-          </Button>
+          <div className="flex flex-wrap gap-2 self-start sm:self-auto">
+            <Button variant="outline" asChild>
+              <Link to="/notifications">
+                <Settings className="h-4 w-4" aria-hidden="true" />
+                Preferences
+              </Link>
+            </Button>
+            <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+              <RefreshCw className={cn('h-4 w-4', isFetching && 'motion-safe:animate-spin')} aria-hidden="true" />
+              Refresh
+            </Button>
+          </div>
         </div>
 
         <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
