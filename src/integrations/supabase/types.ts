@@ -18417,8 +18417,8 @@ export type Database = {
           email: string
           first_name: string
           last_name: string
+          job_position: string
           level: string
-          position: string
           preferred_name: string
           profile_id: string
           rank: string

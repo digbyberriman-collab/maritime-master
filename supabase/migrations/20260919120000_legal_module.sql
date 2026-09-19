@@ -824,7 +824,7 @@ RETURNS TABLE (
   email text,
   avatar_url text,
   rank text,
-  position text,
+  job_position text,
   level text
 )
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$

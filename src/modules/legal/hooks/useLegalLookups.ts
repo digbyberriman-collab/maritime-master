@@ -69,7 +69,12 @@ export function useLegalTeam() {
     queryFn: async (): Promise<LegalTeamMember[]> => {
       const { data, error } = await supabase.rpc('legal_team_directory');
       if (error) throw error;
-      return (data ?? []).map((m) => ({ ...m, level: (m.level === 'admin' ? 'admin' : 'edit') as 'admin' | 'edit', displayName: personDisplayName(m) }));
+      return (data ?? []).map(({ job_position, ...m }) => ({
+        ...m,
+        position: job_position,
+        level: (m.level === 'admin' ? 'admin' : 'edit') as 'admin' | 'edit',
+        displayName: personDisplayName(m),
+      }));
     },
   });
   return { ...query, members: query.data ?? [] };
