@@ -19437,6 +19437,10 @@ export type Database = {
         }
       }
       my_profile_id: { Args: never; Returns: string }
+      nb_project_in_company: {
+        Args: { p_project_id: string }
+        Returns: boolean
+      }
       onboarding_recompute: {
         Args: { p_record_id: string }
         Returns: undefined
@@ -19482,6 +19486,61 @@ export type Database = {
           p_vessel_id?: string
         }
         Returns: string
+      }
+      search_regulations: {
+        Args: {
+          p_category?: string
+          p_limit?: number
+          p_project_id: string
+          p_query: string
+        }
+        Returns: {
+          category: string
+          content_indexed_at: string
+          created_at: string
+          description: string
+          external_url: string
+          file_name: string
+          headline: string
+          id: string
+          rank: number
+          reference_number: string
+          source: string
+          storage_path: string
+          tags: string
+          title: string
+          uploaded_by: string
+        }[]
+      }
+      search_yard_standards: {
+        Args: {
+          p_category?: string
+          p_limit?: number
+          p_project_id: string
+          p_query: string
+        }
+        Returns: {
+          category: string
+          content_indexed_at: string
+          created_at: string
+          description: string
+          doc_type_code: string
+          document_number: string
+          element_code: string
+          external_url: string
+          file_name: string
+          headline: string
+          id: string
+          material_code: string
+          rank: number
+          revision: string
+          seq_code: string
+          sheet_number: string
+          storage_path: string
+          tags: string
+          title: string
+          uploaded_by: string
+        }[]
       }
       snooze_alert: {
         Args: { p_alert_id: string; p_reason?: string; p_snooze_hours?: number }
