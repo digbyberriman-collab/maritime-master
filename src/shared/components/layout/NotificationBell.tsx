@@ -121,7 +121,7 @@ const getDeepLink = (alert: AlertItem): string => {
   }
 
   // Default to alerts page
-  return '/alerts';
+  return '/notifications/center';
 };
 
 const NotificationBell: React.FC = () => {

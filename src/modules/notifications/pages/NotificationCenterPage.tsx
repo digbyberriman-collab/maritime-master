@@ -128,10 +128,7 @@ export default function NotificationCenterPage() {
     <DashboardLayout>
       <div className="mx-auto max-w-6xl space-y-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Notification Center</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Items requiring attention in the current vessel scope.</p>
-          </div>
+          <p className="text-sm text-muted-foreground">Items requiring attention in the current vessel scope.</p>
           <Button variant="outline" onClick={() => refetch()} disabled={isFetching} className="self-start sm:self-auto">
             <RefreshCw className={cn('h-4 w-4', isFetching && 'motion-safe:animate-spin')} aria-hidden="true" />
             Refresh
