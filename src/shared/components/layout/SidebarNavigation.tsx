@@ -116,6 +116,23 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
   }, [children, matchesPath, location.pathname]);
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [announcement, setAnnouncement] = useState('');
+
+  const activeLabel = useMemo(() => {
+    if (!selectedModule) {
+      return DASHBOARD_LINKS.find((link) => (
+        location.pathname === link.path || (link.path === '/dashboard' && location.pathname === '/')
+      ))?.label ?? null;
+    }
+    let label: string | null = null;
+    const visit = (items: NavChild[]) => items.forEach((item) => {
+      if (label) return;
+      if (!item.children?.length && item.path === activeLeafPath) label = item.label;
+      else if (item.children?.length) visit(item.children);
+    });
+    visit(children);
+    return label;
+  }, [activeLeafPath, children, location.pathname, selectedModule]);
 
   useEffect(() => {
     const next: Record<string, boolean> = {};
@@ -128,6 +145,15 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
     visit(children);
     setOpenGroups(next);
   }, [children, containsCurrentPath, moduleId]);
+
+  useEffect(() => {
+    if (activeLabel) setAnnouncement(`Current page: ${activeLabel}`);
+  }, [activeLabel]);
+
+  const setGroupOpen = (child: NavChild, open: boolean) => {
+    setOpenGroups((current) => ({ ...current, [child.id]: open }));
+    setAnnouncement(`${child.label} section ${open ? 'expanded' : 'collapsed'}`);
+  };
 
   const go = (path: string) => {
     if (moduleId) {
@@ -165,10 +191,12 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
             type="button"
             onClick={() => (hasChildren ? onExpand?.() : go(child.path))}
             aria-current={active ? 'page' : undefined}
-            aria-label={child.label}
+            aria-label={hasChildren
+              ? `${child.label} section${descendantActive ? ', contains current page' : ''}. Expand sidebar to view`
+              : `${child.label}${active ? ', current page' : ''}`}
             title={child.label}
             className={cn(
-              'relative flex h-10 w-10 items-center justify-center rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+              'relative flex h-11 w-11 items-center justify-center rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar',
               active
                 ? 'border border-sidebar-primary/30 bg-sidebar-primary/20 text-sidebar-primary shadow-inner'
                 : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
@@ -193,8 +221,9 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
           type="button"
           onClick={() => go(child.path)}
           aria-current={active ? 'page' : undefined}
+          aria-label={`${child.label}${active ? ', current page' : ''}`}
           className={cn(
-            'flex w-full items-center gap-3 rounded-md py-2 pr-3 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+            'flex min-h-11 w-full items-center gap-3 rounded-md py-2 pr-3 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar',
             depthClass,
             active ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
           )}
@@ -210,20 +239,21 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
       <Collapsible
         key={child.id}
         open={isOpen}
-        onOpenChange={(open) => setOpenGroups((current) => ({ ...current, [child.id]: open }))}
+        onOpenChange={(open) => setGroupOpen(child, open)}
       >
         <CollapsibleTrigger asChild>
           <button
             type="button"
+            aria-label={`${child.label} section, ${isOpen ? 'expanded' : 'collapsed'}${descendantActive ? ', contains current page' : ''}`}
             className={cn(
-              'flex w-full items-center gap-3 rounded-md py-2 pr-3 text-left text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+              'flex min-h-11 w-full items-center gap-3 rounded-md py-2 pr-3 text-left text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar',
               depthClass,
               descendantActive ? 'bg-sidebar-accent text-sidebar-accent-foreground' : 'text-sidebar-foreground/85 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
             )}
           >
             <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span className="min-w-0 flex-1 truncate">{child.label}</span>
-            {isOpen ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
+            {isOpen ? <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" /> : <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />}
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent className="mt-1 space-y-1 motion-safe:animate-accordion-down">
@@ -238,6 +268,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
       aria-label={selectedModule ? `${selectedModule.label} folders` : 'Dashboard shortcuts'}
       className={cn('flex-1 min-h-0 overflow-y-auto py-4', collapsed ? 'px-0' : 'px-3')}
     >
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">{announcement}</p>
       <div
         className={cn(
           'mb-3 flex items-center gap-2 text-xs font-semibold uppercase text-sidebar-foreground/60',
@@ -246,7 +277,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
       >
         {selectedModule ? (
           <>
-            <selectedModule.icon className="h-4 w-4" />
+            <selectedModule.icon className="h-4 w-4" aria-hidden="true" />
             {!collapsed && <span>{selectedModule.label}</span>}
           </>
         ) : (
@@ -272,16 +303,16 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
                       type="button"
                       onClick={() => go(link.path)}
                       aria-current={active ? 'page' : undefined}
-                      aria-label={link.label}
+                      aria-label={`${link.label}${active ? ', current page' : ''}`}
                       title={link.label}
                       className={cn(
-                        'flex h-10 w-10 items-center justify-center rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring',
+                        'flex h-11 w-11 items-center justify-center rounded-xl transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar',
                         active
                           ? 'border border-sidebar-primary/30 bg-sidebar-primary/20 text-sidebar-primary shadow-inner'
                           : 'text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                       )}
                     >
-                      <Icon className="h-[18px] w-[18px]" />
+                      <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
                     </button>
                   </div>
                 );
@@ -292,12 +323,13 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
                   type="button"
                   onClick={() => go(link.path)}
                   aria-current={active ? 'page' : undefined}
+                  aria-label={`${link.label}${active ? ', current page' : ''}`}
                   className={cn(
-                    'flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+                    'flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar',
                     active ? 'bg-sidebar-primary text-sidebar-primary-foreground' : 'text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
                   )}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className="h-4 w-4" aria-hidden="true" />
                   <span>{link.label}</span>
                 </button>
               );
