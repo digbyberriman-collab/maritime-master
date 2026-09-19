@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { renderHrisPage, setupAccess, setupSupabase, baseFixtures, COMPANY_ID } from '@/test/hris/harness';
 import type { SupabaseCall } from '@/test/hris/supabaseMock';
@@ -96,11 +96,21 @@ const openMoreActions = () => {
 
 const findCall = (calls: SupabaseCall[], table: string, op: SupabaseCall['op']) => calls.find((c) => c.table === table && c.op === op);
 
+// The fixtures use fixed dates and the page renders "Nd remaining" from the
+// current date, so freeze the clock (Date only, so waitFor keeps working).
+const TODAY = new Date('2026-09-17T12:00:00Z');
+
 describe('ContractsPage', () => {
   let mock: ReturnType<typeof setupSupabase>;
 
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(TODAY);
     mock = setupSupabase(fixtures());
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it('shows HR admins the company overview with KPIs, expiries and the contract table', async () => {

@@ -298,7 +298,8 @@ const managementOffice: NavChild[] = [
   L('DPA / ISM Office', mgmtBase, { icon: Shield }),
   L('Procurement', mgmtBase, { icon: Truck }),
   L('Finance / Accounts', mgmtBase, { icon: Banknote }),
-  L('Legal', mgmtBase, { icon: ScrollText }),
+  // Legal Support & Ticketing module (src/modules/legal) at /departments/legal.
+  L('Legal', mgmtBase, { existing: '/departments/legal', icon: ScrollText }),
   L('Insurance', mgmtBase, { icon: Umbrella }),
   L('Crewing & Recruitment', mgmtBase, { existing: '/hris/recruitment/vacancies', icon: Users, crossLink: true, moduleKey: 'hr' }),
 ];
