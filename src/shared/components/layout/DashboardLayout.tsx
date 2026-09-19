@@ -27,6 +27,8 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
+  const mobileMenuButtonRef = React.useRef<HTMLButtonElement>(null);
+  const mobileCloseButtonRef = React.useRef<HTMLButtonElement>(null);
   // Desktop icon-only (visuals only) mode, persisted across sessions.
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState<boolean>(() => {
     try {
@@ -46,6 +48,31 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
       return next;
     });
   }, []);
+
+  React.useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname, location.search]);
+
+  React.useEffect(() => {
+    if (!sidebarOpen) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    mobileCloseButtonRef.current?.focus();
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSidebarOpen(false);
+        mobileMenuButtonRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [sidebarOpen]);
   const activeModule = React.useMemo(() => {
     const requestedModule = new URLSearchParams(location.search).get('module');
     return NAVIGATION_ITEMS.find((item) => item.id === requestedModule) ?? resolveModuleForPath(location.pathname);
@@ -79,16 +106,22 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
       
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
-        <div
-          className={cn('fixed inset-0 bg-foreground/50 z-40', !collapseSidebar && 'lg:hidden')}
+        <button
+          type="button"
+          className={cn('fixed inset-0 z-40 cursor-default bg-foreground/50', !collapseSidebar && 'lg:hidden')}
           onClick={() => setSidebarOpen(false)}
+          aria-label="Close navigation drawer"
         />
       )}
 
       {/* Sidebar - z-10 to be above watermark */}
       <aside
+        id="mobile-navigation-drawer"
+        aria-label="Main navigation"
+        aria-modal={sidebarOpen ? true : undefined}
         className={cn(
-          'fixed inset-y-0 left-0 z-50 bg-sidebar transform transition-all duration-200 ease-in-out',
+          'fixed inset-y-0 left-0 z-50 bg-sidebar shadow-xl transform transition-all duration-200 ease-in-out',
+          'max-w-[calc(100vw-3rem)]',
           !collapseSidebar && 'lg:static lg:translate-x-0',
           sidebarCollapsed ? 'w-64 lg:w-16' : 'w-64',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
@@ -126,10 +159,11 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
                 </button>
               )}
               <button
+                ref={mobileCloseButtonRef}
                 type="button"
                 onClick={() => setSidebarOpen(false)}
                 className={cn('text-sidebar-foreground', !collapseSidebar && 'lg:hidden')}
-                aria-label="Close folder panel"
+                aria-label="Close navigation drawer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -161,10 +195,13 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
         <header className="min-h-16 bg-card border-b border-border flex items-center gap-2 px-3 lg:px-5 py-2 shadow-navbar relative z-20">
           {/* Mobile menu button */}
           <button
+            ref={mobileMenuButtonRef}
             type="button"
             onClick={() => setSidebarOpen(true)}
             className={cn('p-2 text-foreground', !collapseSidebar && 'lg:hidden')}
-            aria-label="Open folder panel"
+            aria-label="Open navigation drawer"
+            aria-controls="mobile-navigation-drawer"
+            aria-expanded={sidebarOpen}
           >
             <Menu className="w-5 h-5" />
           </button>
