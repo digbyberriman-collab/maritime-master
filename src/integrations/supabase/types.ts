@@ -18384,10 +18384,39 @@ export type Database = {
       legal_can_admin: { Args: { _user_id: string }; Returns: boolean }
       legal_can_edit: { Args: { _user_id: string }; Returns: boolean }
       legal_can_view: { Args: { _user_id: string }; Returns: boolean }
+      legal_generate_alerts: { Args: { p_company_id?: string }; Returns: number }
+      legal_request_type_label: { Args: { p_type: string }; Returns: string }
+      legal_request_visible: { Args: { p_request_id: string }; Returns: boolean }
+      legal_search_documents: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          headline: string
+          rank: number
+          template_id: string
+          version_id: string
+          version_number: number
+        }[]
+      }
       legal_sla_deadline: {
         Args: { p_from?: string; p_priority: string }
         Returns: string
       }
+      legal_team_directory: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          avatar_url: string
+          email: string
+          first_name: string
+          last_name: string
+          job_position: string
+          level: string
+          preferred_name: string
+          profile_id: string
+          rank: string
+          user_id: string
+        }[]
+      }
+      legal_template_company: { Args: { p_template_id: string }; Returns: string }
       log_permission_change: {
         Args: {
           p_action_type: Database["public"]["Enums"]["audit_action_type"]

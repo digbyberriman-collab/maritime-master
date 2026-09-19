@@ -8,6 +8,7 @@ import ModuleRoute from '@/shared/components/ModuleRoute';
 import { newBuildRoutes } from '@/modules/new-build/routes';
 import { hrisRoutes } from '@/modules/hris/routes';
 import { refitRoutes } from '@/modules/refit/routes';
+import { legalRoutes } from '@/modules/legal/routes';
 import { 
   Ship, Users, Award, Plane, Clock, CalendarDays,
   AlertTriangle, ClipboardList, BookOpen, Shield, FileCheck, Layers, LayoutGrid,
@@ -822,6 +823,9 @@ export const AppRoutes: React.FC = () => {
 
       {/* Refit module (ported from Ship Shape Command). */}
       {refitRoutes}
+
+      {/* Legal Support & Ticketing (department shell at /departments/legal). */}
+      {legalRoutes}
 
       {/* Sitemap-driven placeholders: every Fleet/Vessel/Shoreside/Health/Yard/HRIS
           leaf that doesn't have a real page yet renders a Coming Soon screen.
