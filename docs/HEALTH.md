@@ -93,12 +93,32 @@ MuscleWiki, AnatomyTOOL and Z-Anatomy have no usable public API, so those connec
 - **C.H.E.K.** is built as a configurable health screening and appraisal programme: versioned questionnaire templates with scored sections, campaigns, per-person results and medic review. Confirm the intended meaning and the page can be re-pointed without a schema change.
 - **MSN 1768 Category A** stores are seeded as a starting point with quantities at zero for the medic to count in. Review against the vessel's flag requirement before relying on it.
 
+## Verified against a real database
+
+The migrations were applied to a local PostgreSQL 16 and the engines exercised against it, which is how three defects were caught and fixed. What was proved to work:
+
+- A new or changed profile flows through to its health subject.
+- Stock cannot go negative, and a controlled drug cannot be issued, disposed of or adjusted without a named witness.
+- A stock check records the counted quantity and the balance follows.
+- Consultation numbers sequence per company and year.
+- A fitness certificate mirrors its expiry onto `profiles.medical_expiry`, and the fitness view resolves the right state.
+- Clinical writes register for retention in `hr_record_metadata`.
+- An overlapping spa booking is refused.
+- Food log macros come from the food library.
+- Assigning a template snapshots it, and editing the template afterwards leaves the athlete's programme untouched.
+- `hw_generate_alerts` raises the right alerts and raises nothing on a second run.
+
+Two pre-existing HRIS issues surfaced during that replay and are **not** fixed here, because they belong to that module:
+
+- `hr_generate_alerts` compared a uuid column against text and therefore never raised an HR alert. This one **is** fixed, in `20260919150000_fix_hr_generate_alerts_uuid.sql`, because the health generator was built from it and shares the `alerts` table.
+- `20260917113000_hris_phase1_followups.sql` and `20260917150000_hris_phase5_retention.sql` both fail to replay from scratch on the same uuid-against-text mistake in the `audit_logs` policy (`m.record_id::text = audit_logs.entity_id`, where both columns are uuid). The live project is unaffected, because the Lovable copies applied later create a working version of that policy, but a clean rebuild of the database would stop there. Worth correcting when HRIS is next touched.
+
 ## Go-live checklist
 
 1. Apply the five migrations to the live Supabase project in order, after the HRIS migrations.
 2. Regenerate `src/integrations/supabase/types.ts` from the live project (`supabase gen types typescript --project-id pfvtrtkqkvjbnbaabgpv > src/integrations/supabase/types.ts`). The file is hand-patched for the new tables, views and functions and will drift otherwise.
 3. Deploy the edge function `pt-exercise-import`.
-4. Add `hw_generate_alerts` to the daily sweep, alongside the HR alert generation.
+4. Add `hw_generate_alerts` to the daily sweep, alongside the HR alert generation. The HR generator starts working again with the same deployment, so expect a backlog of HR alerts on its first run.
 5. Put the ship's medics on the practitioner roster at Medical › Staff and link their crew profiles. Nobody has clinical access until this is done, including the DPA's own medic.
 6. Review the seeded `role_permissions` for the `medical` and `wellness` modules per company.
 7. Set `hw_settings` per company: units, warning windows, telemedicine provider, controlled drug witnessing, spa hours.
