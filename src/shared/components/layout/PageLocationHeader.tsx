@@ -26,7 +26,7 @@ const PageLocationHeader: React.FC<PageLocationHeaderProps> = ({ activeModuleId 
   }, [page.title]);
 
   return (
-    <div className="mb-5 border-b border-border pb-4">
+    <div className="mb-3 border-b border-border pb-2">
       <Breadcrumb>
         <BreadcrumbList className="gap-1 text-xs sm:gap-1.5">
           {page.crumbs.map((crumb, index) => {
@@ -48,7 +48,7 @@ const PageLocationHeader: React.FC<PageLocationHeaderProps> = ({ activeModuleId 
           })}
         </BreadcrumbList>
       </Breadcrumb>
-      <h1 className="mt-1 text-2xl font-semibold text-foreground sm:text-3xl">{page.title}</h1>
+      <h1 className="mt-0.5 text-xl font-semibold text-foreground sm:text-2xl">{page.title}</h1>
     </div>
   );
 };
