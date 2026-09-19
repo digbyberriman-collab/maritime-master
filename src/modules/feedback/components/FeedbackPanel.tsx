@@ -57,6 +57,16 @@ const FeedbackPanel: React.FC = () => {
     }
   }, [panelOpen, user?.id, loadSubmissions]);
 
+  // Escape closes the panel
+  useEffect(() => {
+    if (!panelOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPanelOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [panelOpen, setPanelOpen]);
+
   // Reset form when panel closes
   useEffect(() => {
     if (!panelOpen) {
