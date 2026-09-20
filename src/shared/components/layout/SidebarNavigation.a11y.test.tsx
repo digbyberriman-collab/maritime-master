@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   order: { map: {} },
   hrAccess: { loading: false },
   payrollAccess: { loading: false },
+  medicalAccess: { loading: false, selfOnly: false },
+  wellnessAccess: { loading: false, selfOnly: false },
   badgeCounts: { data: { pendingCompliance: 0, unreadMessages: 0, overdueTasks: 0 } },
   permissions: { hasPermission: () => true, isInitialized: true },
 }));
@@ -22,6 +24,13 @@ vi.mock('@/modules/auth/hooks/useHrAccess', () => ({ useHrAccess: () => mocks.hr
 vi.mock('@/modules/auth/lib/hrAccess', () => ({ hrAccessSatisfies: () => true }));
 vi.mock('@/modules/auth/hooks/usePayrollAccess', () => ({ usePayrollAccess: () => mocks.payrollAccess }));
 vi.mock('@/modules/auth/lib/payrollAccess', () => ({ payrollAccessSatisfies: () => true }));
+// Health access is mocked for the same reason as HR and payroll: the real
+// hooks reach the auth context and the Supabase client, which this
+// accessibility test has no business booting.
+vi.mock('@/modules/auth/hooks/useMedicalAccess', () => ({ useMedicalAccess: () => mocks.medicalAccess }));
+vi.mock('@/modules/auth/lib/medicalAccess', () => ({ medicalAccessSatisfies: () => true }));
+vi.mock('@/modules/auth/hooks/useWellnessAccess', () => ({ useWellnessAccess: () => mocks.wellnessAccess }));
+vi.mock('@/modules/auth/lib/wellnessAccess', () => ({ wellnessAccessSatisfies: () => true }));
 vi.mock('@/shared/hooks/useSidebarBadgeCounts', () => ({
   useSidebarBadgeCounts: () => mocks.badgeCounts,
 }));

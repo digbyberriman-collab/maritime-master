@@ -17,6 +17,12 @@ export interface NavChild {
   moduleKey?: string;
   minPermission?: NavPermissionLevel;
   /**
+   * Marks a leaf a self-service user may still open, showing only their own
+   * record. Used by the Health section, where crew keep "My training" and
+   * their own medical record but see none of the company-wide pages.
+   */
+  selfServe?: boolean;
+  /**
    * Marks a leaf that points at a page owned by another module. Cross-links
    * are ignored when resolving which module a URL belongs to, so a reload on
    * `/crew/leave` lands in HRIS even though Vessel also links to it.

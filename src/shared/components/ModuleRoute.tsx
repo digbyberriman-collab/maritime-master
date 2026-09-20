@@ -9,6 +9,10 @@ import { useHrAccess } from '@/modules/auth/hooks/useHrAccess';
 import { hrAccessSatisfies } from '@/modules/auth/lib/hrAccess';
 import { usePayrollAccess } from '@/modules/auth/hooks/usePayrollAccess';
 import { payrollAccessSatisfies } from '@/modules/auth/lib/payrollAccess';
+import { useMedicalAccess } from '@/modules/auth/hooks/useMedicalAccess';
+import { medicalAccessSatisfies } from '@/modules/auth/lib/medicalAccess';
+import { useWellnessAccess } from '@/modules/auth/hooks/useWellnessAccess';
+import { wellnessAccessSatisfies } from '@/modules/auth/lib/wellnessAccess';
 import { Button } from '@/components/ui/button';
 
 interface ModuleRouteProps {
@@ -18,6 +22,10 @@ interface ModuleRouteProps {
   hrLevel?: 'view' | 'edit' | 'admin';
   /** Extra finance gate for compensation / payroll pages. */
   payrollLevel?: 'view' | 'edit' | 'admin';
+  /** Extra clinical gate for medical pages. */
+  medicalLevel?: 'view' | 'edit' | 'admin';
+  /** Extra gate for spa / nutrition / physio / training pages. */
+  wellnessLevel?: 'view' | 'edit' | 'admin';
   children: React.ReactNode;
 }
 
@@ -41,14 +49,30 @@ export const AccessDenied: React.FC<{ title?: string; detail?: string }> = ({
   </DashboardLayout>
 );
 
-const Gate: React.FC<ModuleRouteProps> = ({ moduleId, hrLevel, payrollLevel, children }) => {
+const Gate: React.FC<ModuleRouteProps> = ({
+  moduleId,
+  hrLevel,
+  payrollLevel,
+  medicalLevel,
+  wellnessLevel,
+  children,
+}) => {
   const { canAccessModule } = useAuth();
   const rbacInitialized = usePermissionsStore((s) => s.isInitialized);
   const rbacLoading = usePermissionsStore((s) => s.isLoading);
   const hr = useHrAccess();
   const payroll = usePayrollAccess();
+  const medical = useMedicalAccess();
+  const wellness = useWellnessAccess();
 
-  if (!rbacInitialized || rbacLoading || hr.loading || payroll.loading) {
+  if (
+    !rbacInitialized ||
+    rbacLoading ||
+    hr.loading ||
+    payroll.loading ||
+    medical.loading ||
+    wellness.loading
+  ) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -71,6 +95,24 @@ const Gate: React.FC<ModuleRouteProps> = ({ moduleId, hrLevel, payrollLevel, chi
       <AccessDenied
         title="Finance access required"
         detail={`This page needs finance ${payrollLevel} rights. DPA has full access and pursers can edit; fleet managers can view.`}
+      />
+    );
+  }
+
+  if (medicalLevel && !medicalAccessSatisfies(medical, medicalLevel)) {
+    return (
+      <AccessDenied
+        title="Clinical access required"
+        detail={`This page holds medical records and needs ${medicalLevel} access. Ship's medics get it from the practitioner roster; DPA and superadmins have it by role. Captains and HR see fitness to work instead.`}
+      />
+    );
+  }
+
+  if (wellnessLevel && !wellnessAccessSatisfies(wellness, wellnessLevel)) {
+    return (
+      <AccessDenied
+        title="Wellness access required"
+        detail={`This page needs wellness ${wellnessLevel} access. Therapists, trainers and physios get it from the practitioner roster; captains and pursers can edit; heads of department can view.`}
       />
     );
   }

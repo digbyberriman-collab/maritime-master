@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
+import { resolveMedicalAccess } from '@/modules/auth/lib/medicalAccess';
+import { resolveWellnessAccess } from '@/modules/auth/lib/wellnessAccess';
 import { resolveHrAccess } from '@/modules/auth/lib/hrAccess';
 
 interface Profile {
@@ -81,6 +83,11 @@ const MODULE_ACCESS: Record<string, string[]> = {
 // Modules that must never fail open and are resolved by dedicated rules.
 const SENSITIVE_MODULES = new Set(['hris']);
 
+// Health & Wellness holds clinical records, so it is resolved by the
+// wellness rules (which mirror wellness_can_*) rather than the coarse
+// module map. Medical pages carry a further medicalLevel gate.
+const HEALTH_MODULE = 'health';
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -94,6 +101,13 @@ interface AuthContextType {
   hasPermission: (permission: Permission) => boolean;
   canAccessModule: (moduleId: string) => boolean;
   userRole: string | null;
+  /**
+   * Health disciplines this user practises in (`hw_practitioners`). Clinical
+   * and wellness access follow the practitioner roster rather than rank, so
+   * this is loaded with the profile and read by the health access resolvers.
+   */
+  practitionerDisciplines: string[];
+  practitionerDisciplinesLoaded: boolean;
 }
 
 interface SignUpData {
@@ -120,6 +134,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [practitionerDisciplines, setPractitionerDisciplines] = useState<string[]>([]);
+  const [practitionerDisciplinesLoaded, setPractitionerDisciplinesLoaded] = useState(false);
   
   // RBAC store integration
   const {
@@ -148,6 +164,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     return data as Profile | null;
   };
+
+  // Health practitioner roster. An empty list is the safe answer: it means
+  // no clinical access beyond whatever RBAC grants.
+  useEffect(() => {
+    let cancelled = false;
+    const profileId = profile?.id ?? null;
+    if (!profileId) {
+      setPractitionerDisciplines([]);
+      setPractitionerDisciplinesLoaded(!user);
+      return;
+    }
+    setPractitionerDisciplinesLoaded(false);
+    supabase
+      .from('hw_practitioners')
+      .select('discipline, ended_on')
+      .eq('profile_id', profileId)
+      .eq('is_active', true)
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        if (error) {
+          console.warn('[health] practitioner roster lookup failed', error);
+          setPractitionerDisciplines([]);
+        } else {
+          const today = new Date().toISOString().slice(0, 10);
+          setPractitionerDisciplines(
+            (data ?? [])
+              .filter((row) => !row.ended_on || row.ended_on >= today)
+              .map((row) => row.discipline),
+          );
+        }
+        setPractitionerDisciplinesLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.id, user]);
 
   // Check if user has a specific permission
   const hasPermission = useCallback((permission: Permission): boolean => {
@@ -182,6 +234,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return access.level !== 'none';
     }
 
+    if (moduleId === HEALTH_MODULE) {
+      if (!rbacInitialized || rbacLoading || !practitionerDisciplinesLoaded) return false;
+      const rbacRoles = rbacUserRoles.map((r) => r.role_name).filter(Boolean) as string[];
+      const medical = resolveMedicalAccess({
+        rbacInitialized,
+        rbacRoles,
+        medicalPermission: rbacPermissions.find((p) => p.module_key === 'medical') ?? null,
+        legacyRole: userRole,
+        practitionerDisciplines,
+      });
+      const wellness = resolveWellnessAccess({
+        rbacInitialized,
+        rbacRoles,
+        wellnessPermission: rbacPermissions.find((p) => p.module_key === 'wellness') ?? null,
+        legacyRole: userRole,
+        practitionerDisciplines,
+        medical,
+      });
+      // Crew may enter to see their own records; clinical pages add a
+      // medicalLevel gate of their own.
+      return wellness.level !== 'none' || medical.level !== 'none';
+    }
+
     if (!rbacInitialized || rbacLoading) {
       return true;
     }
@@ -198,7 +273,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         'fleet': 'fleet',
         'vessel': 'vessels',
         'shoreside': 'reports',
-        'health': 'crew_roster',
+        'health': 'wellness',
         'yard': 'maintenance',
         'hris': 'hr', // handled by SENSITIVE_MODULES above; kept for completeness
         'fleet-map': 'fleet',
@@ -233,7 +308,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!allowedRoles) return true;
     
     return allowedRoles.includes(userRole);
-  }, [user, userRole, rbacInitialized, rbacLoading, canView, hasRBACRole, rbacPermissions, rbacUserRoles]);
+  }, [user, userRole, rbacInitialized, rbacLoading, canView, hasRBACRole, rbacPermissions, rbacUserRoles, practitionerDisciplines, practitionerDisciplinesLoaded]);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -364,6 +439,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         hasPermission,
         canAccessModule,
         userRole,
+        practitionerDisciplines,
+        practitionerDisciplinesLoaded,
       }}
     >
       {children}
