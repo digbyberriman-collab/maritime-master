@@ -28,5 +28,31 @@
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Watchdog: if the app never takes over the placeholder (fatal startup
+      // error, blocked assets), show an actionable message instead of an
+      // endless "Loading…" screen.
+      (function () {
+        var shown = false;
+        function fail(detail) {
+          if (shown) return;
+          var root = document.getElementById('root');
+          if (!root || !root.querySelector('[data-storm-placeholder]')) return;
+          shown = true;
+          root.innerHTML =
+            '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:ui-sans-serif,system-ui,sans-serif;text-align:center">' +
+            '<div style="max-width:24rem">' +
+            '<div style="font-weight:900;letter-spacing:-0.02em;font-size:1.75rem;color:#0066CC;margin-bottom:0.5rem">STORM</div>' +
+            '<p style="margin:0 0 1rem;color:#64748b;font-size:0.875rem">STORM could not finish loading. This is usually a temporary connection problem.</p>' +
+            '<button type="button" onclick="location.reload()" style="border:0;border-radius:0.5rem;padding:0.625rem 1.25rem;background:#0066CC;color:#fff;font-size:0.875rem;font-weight:600;cursor:pointer">Reload</button>' +
+            (detail ? '<p style="margin:0.75rem 0 0;color:#94a3b8;font-size:0.6875rem">' + detail + '</p>' : '') +
+            '</div></div>';
+        }
+        window.addEventListener('error', function (e) {
+          if (e && e.message) fail(String(e.message).slice(0, 160));
+        });
+        setTimeout(function () { fail(''); }, 12000);
+      })();
+    </script>
   </body>
 </html>
