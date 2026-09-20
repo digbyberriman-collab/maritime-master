@@ -6639,7 +6639,8 @@ export type Database = {
           signer_rank: string | null
           signer_role: string
           signer_user_id: string
-          status: string | null
+          signing_cycle: number
+          status: string
           submission_id: string
           user_agent: string | null
         }
@@ -6658,7 +6659,8 @@ export type Database = {
           signer_rank?: string | null
           signer_role: string
           signer_user_id: string
-          status?: string | null
+          signing_cycle?: number
+          status?: string
           submission_id: string
           user_agent?: string | null
         }
@@ -6677,7 +6679,8 @@ export type Database = {
           signer_rank?: string | null
           signer_role?: string
           signer_user_id?: string
-          status?: string | null
+          signing_cycle?: number
+          status?: string
           submission_id?: string
           user_agent?: string | null
         }
@@ -6701,6 +6704,42 @@ export type Database = {
             columns: ["submission_id"]
             isOneToOne: false
             referencedRelation: "form_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      form_submission_counters: {
+        Row: {
+          company_id: string
+          next_value: number
+          template_id: string
+          year: number
+        }
+        Insert: {
+          company_id: string
+          next_value?: number
+          template_id: string
+          year: number
+        }
+        Update: {
+          company_id?: string
+          next_value?: number
+          template_id?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "form_submission_counters_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "form_submission_counters_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "form_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -6729,7 +6768,8 @@ export type Database = {
           offline_device_id: string | null
           requires_amendment: boolean | null
           schedule_id: string | null
-          status: string | null
+          signing_cycle: number
+          status: string
           submission_number: string
           submitted_at: string | null
           submitted_by: string | null
@@ -6762,7 +6802,8 @@ export type Database = {
           offline_device_id?: string | null
           requires_amendment?: boolean | null
           schedule_id?: string | null
-          status?: string | null
+          signing_cycle?: number
+          status?: string
           submission_number: string
           submitted_at?: string | null
           submitted_by?: string | null
@@ -6795,7 +6836,8 @@ export type Database = {
           offline_device_id?: string | null
           requires_amendment?: boolean | null
           schedule_id?: string | null
-          status?: string | null
+          signing_cycle?: number
+          status?: string
           submission_number?: string
           submitted_at?: string | null
           submitted_by?: string | null
@@ -6968,12 +7010,12 @@ export type Database = {
           next_review_date: string | null
           published_at: string | null
           published_by: string | null
-          required_signers: Json | null
+          required_signers: Json
           review_cycle_days: number | null
           source_file_name: string | null
           source_file_type: string | null
           source_file_url: string | null
-          status: string | null
+          status: string
           supersedes_template_id: string | null
           template_code: string
           template_name: string
@@ -7009,12 +7051,12 @@ export type Database = {
           next_review_date?: string | null
           published_at?: string | null
           published_by?: string | null
-          required_signers?: Json | null
+          required_signers?: Json
           review_cycle_days?: number | null
           source_file_name?: string | null
           source_file_type?: string | null
           source_file_url?: string | null
-          status?: string | null
+          status?: string
           supersedes_template_id?: string | null
           template_code: string
           template_name: string
@@ -7050,12 +7092,12 @@ export type Database = {
           next_review_date?: string | null
           published_at?: string | null
           published_by?: string | null
-          required_signers?: Json | null
+          required_signers?: Json
           review_cycle_days?: number | null
           source_file_name?: string | null
           source_file_type?: string | null
           source_file_url?: string | null
-          status?: string | null
+          status?: string
           supersedes_template_id?: string | null
           template_code?: string
           template_name?: string
@@ -15566,6 +15608,24 @@ export type Database = {
           },
         ]
       }
+      reference_counters: {
+        Row: {
+          next_value: number
+          scope: string
+          updated_at: string
+        }
+        Insert: {
+          next_value?: number
+          scope: string
+          updated_at?: string
+        }
+        Update: {
+          next_value?: number
+          scope?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       risk_assessment_hazards: {
         Row: {
           consequences: string
@@ -18879,6 +18939,48 @@ export type Database = {
         Args: { p_record_id: string }
         Returns: undefined
       }
+      form_next_submission_number: {
+        Args: {
+          p_company_id: string
+          p_created_date: string
+          p_template_id: string
+        }
+        Returns: string
+      }
+      form_normalize_signer_role: { Args: { p_role: string }; Returns: string }
+      form_pending_signatures: {
+        Args: never
+        Returns: {
+          next_signature_order: number
+          submission_id: string
+        }[]
+      }
+      form_reject_submission: {
+        Args: { p_reason: string; p_submission_id: string }
+        Returns: Json
+      }
+      form_sign_submission: {
+        Args: {
+          p_signature_data?: string
+          p_signature_type?: string
+          p_submission_id: string
+        }
+        Returns: Json
+      }
+      form_signature_requirements: {
+        Args: { p_submission_id: string }
+        Returns: {
+          is_mandatory: boolean
+          signature_order: number
+          signed: boolean
+          signed_by: string
+          signer_role: string
+        }[]
+      }
+      form_user_satisfies_signer_role: {
+        Args: { p_role: string; p_user_id: string }
+        Returns: boolean
+      }
       frp_can_edit: { Args: { _user_id: string }; Returns: boolean }
       frp_can_view: { Args: { _user_id: string }; Returns: boolean }
       frp_planner_access: { Args: never; Returns: Json }
@@ -19441,6 +19543,7 @@ export type Database = {
         Args: { p_project_id: string }
         Returns: boolean
       }
+      next_reference_value: { Args: { p_scope: string }; Returns: number }
       onboarding_recompute: {
         Args: { p_record_id: string }
         Returns: undefined
