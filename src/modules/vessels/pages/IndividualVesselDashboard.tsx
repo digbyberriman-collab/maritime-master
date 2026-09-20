@@ -293,7 +293,7 @@ const IndividualVesselDashboard: React.FC = () => {
                   <CheckSquare className="w-4 h-4" /> Start Checklist
                 </Button>
                 <Button variant="outline" className="w-full justify-start gap-2 border-[#1A2740] text-[#94A3B8] hover:text-white"
-                  onClick={() => navigate('/flights-travel')}>
+                  onClick={() => navigate('/crew/flights')}>
                   <Plane className="w-4 h-4" /> Book Travel
                 </Button>
                 <Button variant="outline" className="w-full justify-start gap-2 border-[#1A2740] text-[#94A3B8] hover:text-white"

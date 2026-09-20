@@ -39,8 +39,8 @@ const NotificationsPage: React.FC = () => {
     <DashboardLayout>
       <div className="p-4 lg:p-6 max-w-3xl mx-auto space-y-4">
         <div>
-          <h1 className="text-2xl font-semibold">Notifications</h1>
-          <p className="text-sm text-muted-foreground">Choose which notifications appear in your inbox and arrive by email.</p>
+          <h1 className="text-2xl font-semibold">Notification preferences</h1>
+          <p className="text-sm text-muted-foreground">Choose which notifications and sidebar badges you see.</p>
         </div>
 
         <Tabs defaultValue="preferences">
@@ -84,7 +84,9 @@ const NotificationsPage: React.FC = () => {
                           )}
                         </div>
                         <Switch
+                          aria-label={`${enabled ? 'Hide' : 'Show'} ${t.name}`}
                           checked={enabled}
+                          disabled={toggle.isPending}
                           onCheckedChange={(v) =>
                             toggle.mutate(
                               { typeKey: t.key, enabled: v },

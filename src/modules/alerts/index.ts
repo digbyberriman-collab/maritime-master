@@ -1,8 +1,8 @@
 // Hooks
 export { useAlerts } from './hooks/useAlerts';
 
-// Pages
-export { default as Alerts } from './pages/Alerts';
+// The sample-data /alerts page was removed; /alerts redirects to the
+// notification centre, which reads the real alerts table.
 
 // Constants
 export * from './constants';

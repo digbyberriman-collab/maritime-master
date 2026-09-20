@@ -1,70 +1,64 @@
 import React from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Shield, Anchor, Users, Droplets } from 'lucide-react';
-import ISMTab from '@/modules/compliance/components/ISMTab';
-import ISPSTab from '@/modules/compliance/components/ISPSTab';
-import MLCTab from '@/modules/compliance/components/MLCTab';
-import MARPOLTab from '@/modules/compliance/components/MARPOLTab';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Construction, FileText, ClipboardList, ShieldCheck, Award } from 'lucide-react';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 
-const CompliancePage: React.FC = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const tab = searchParams.get('tab') || 'ism';
-  const { selectedVessel } = useVessel();
+/**
+ * Compliance overview.
+ *
+ * The ISM / ISPS / MLC / MARPOL tabs that used to live here rendered sample
+ * data for one vessel regardless of the selected vessel. Until a real
+ * compliance overview exists this page says so and points at the areas
+ * that hold real records.
+ */
+const REAL_AREAS = [
+  { to: '/ism/forms/templates', label: 'ISM forms and checklists', icon: ClipboardList },
+  { to: '/documents', label: 'Document library and reviews', icon: FileText },
+  { to: '/audits', label: 'Audits and management reviews', icon: ShieldCheck },
+  { to: '/certificates', label: 'Vessel and crew certificates', icon: Award },
+];
 
-  const handleTabChange = (value: string) => {
-    setSearchParams({ tab: value });
-  };
+const CompliancePage: React.FC = () => {
+  const { selectedVessel } = useVessel();
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 animate-fade-in">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Compliance</h1>
           <p className="text-muted-foreground">
-            Compliance management
+            ISM, ISPS, MLC and MARPOL overview
             {selectedVessel && <span className="ml-1">— {selectedVessel.name}</span>}
           </p>
         </div>
 
-        <Tabs value={tab} onValueChange={handleTabChange}>
-          <TabsList>
-            <TabsTrigger value="ism" className="gap-2">
-              <Shield className="w-4 h-4" />
-              ISM Code
-            </TabsTrigger>
-            <TabsTrigger value="isps" className="gap-2">
-              <Anchor className="w-4 h-4" />
-              ISPS
-            </TabsTrigger>
-            <TabsTrigger value="mlc" className="gap-2">
-              <Users className="w-4 h-4" />
-              MLC
-            </TabsTrigger>
-            <TabsTrigger value="marpol" className="gap-2">
-              <Droplets className="w-4 h-4" />
-              MARPOL
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="ism" className="mt-6">
-            <ISMTab />
-          </TabsContent>
-
-          <TabsContent value="isps" className="mt-6">
-            <ISPSTab />
-          </TabsContent>
-
-          <TabsContent value="mlc" className="mt-6">
-            <MLCTab />
-          </TabsContent>
-
-          <TabsContent value="marpol" className="mt-6">
-            <MARPOLTab />
-          </TabsContent>
-        </Tabs>
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle>Compliance overview is not built yet</CardTitle>
+            <CardDescription>
+              The convention-by-convention view will draw on the records below once it exists. Nothing on this page is sample data.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8 text-muted-foreground">
+              <Construction className="w-14 h-14 mx-auto mb-3 opacity-50" />
+              <p className="text-lg font-medium">Coming Soon</p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {REAL_AREAS.map(({ to, label, icon: Icon }) => (
+                <Button key={to} asChild variant="outline" className="justify-start gap-2">
+                  <Link to={to}>
+                    <Icon className="w-4 h-4" />
+                    {label}
+                  </Link>
+                </Button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
     </DashboardLayout>
   );

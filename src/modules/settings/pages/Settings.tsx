@@ -15,9 +15,6 @@ import {
   SupportSection,
   PlaceholderSection,
   IntegrationsSection,
-  EmailTemplatesSection,
-  ComplianceSection,
-  SystemLogsSection,
   VesselAccessSection,
   PermissionsSection,
   AuditModeSection,
@@ -96,10 +93,24 @@ const Settings: React.FC = () => {
         return <HRAuditAccessSection />;
       case 'integrations':
         return <IntegrationsSection />;
+      // The email-template, compliance and system-log sections showed sample
+      // data and saved nothing; they are placeholders until real ones exist.
       case 'templates':
-        return <EmailTemplatesSection />;
+        return (
+          <PlaceholderSection
+            title="Email Templates"
+            description="Editable notification templates are not built yet"
+            icon={Mail}
+          />
+        );
       case 'compliance':
-        return <ComplianceSection />;
+        return (
+          <PlaceholderSection
+            title="Compliance Settings"
+            description="Company-wide compliance settings are not built yet"
+            icon={FileCheck}
+          />
+        );
       case 'billing':
         return (
           <PlaceholderSection 
@@ -109,7 +120,13 @@ const Settings: React.FC = () => {
           />
         );
       case 'logs':
-        return <SystemLogsSection />;
+        return (
+          <PlaceholderSection
+            title="System Logs"
+            description="A log viewer over audit_logs is not built yet"
+            icon={ScrollText}
+          />
+        );
       default:
         return <ProfileSection />;
     }

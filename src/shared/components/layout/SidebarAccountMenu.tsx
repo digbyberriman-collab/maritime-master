@@ -31,9 +31,12 @@ const ROLE_LABELS: Record<string, string> = {
 
 interface SidebarAccountMenuProps {
   onNavigate?: () => void;
+  /** Icon-only rendering: just the avatar, menu unchanged. */
+  collapsed?: boolean;
 }
 
-const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate }) => {
+const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate, collapsed = false }) => {
+  const [menuOpen, setMenuOpen] = React.useState(false);
   const { profile, signOut } = useAuth();
   const { vessels, loading, selectedVessel, setSelectedVesselById } = useVessel();
   const { selectedVesselIds, setSelectedVesselIds } = useDashboardFilter();
@@ -57,41 +60,16 @@ const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate }) =
     onNavigate?.();
   };
 
-  const syncActiveVessel = (ids: string[]) => {
-    if (ids.length === 1) {
-      setSelectedVesselById(ids[0]);
-    } else if (!selectedVessel || !ids.includes(selectedVessel.id)) {
-      if (ids[0]) setSelectedVesselById(ids[0]);
-    }
-  };
-
-  const toggleVessel = (vesselId: string) => {
-    const selected = selectedVesselIds.includes(vesselId);
-    let next = selectedVesselIds;
-    if (selected && selectedVesselIds.length > 1) {
-      next = selectedVesselIds.filter((id) => id !== vesselId);
-    } else if (!selected) {
-      next = [...selectedVesselIds, vesselId];
-    }
-    setSelectedVesselIds(next);
-    syncActiveVessel(next);
-  };
-
   const selectOnly = (vesselId: string) => {
-    setSelectedVesselIds([vesselId]);
     setSelectedVesselById(vesselId);
+    setSelectedVesselIds([vesselId]);
   };
 
-  const toggleAll = () => {
-    if (allSelected) {
-      const firstVessel = vessels[0];
-      if (firstVessel) selectOnly(firstVessel.id);
-      return;
-    }
+  const selectAll = () => {
     const all = vessels.map((vessel) => vessel.id);
-    setSelectedVesselIds(all);
-    syncActiveVessel(all);
+    if (all.length > 0) setSelectedVesselIds(all);
   };
+
 
 
   const handleSignOut = async () => {
@@ -100,10 +78,28 @@ const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate }) =
   };
 
   return (
-    <div className="border-t border-sidebar-border p-3">
-      <DropdownMenu>
+    <div className={collapsed ? 'border-t border-sidebar-border p-2' : 'border-t border-sidebar-border p-3'}>
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-auto w-full justify-start gap-3 px-2 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
+          {collapsed ? (
+            <Button
+              variant="ghost"
+              className="min-h-11 w-full justify-center px-0 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+              aria-label={`Account menu for ${profile?.first_name ?? ''} ${profile?.last_name ?? ''}, ${menuOpen ? 'expanded' : 'collapsed'}`}
+              title={`${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`}
+            >
+              <Avatar className="h-9 w-9 shrink-0">
+                <AvatarFallback className="text-sm text-primary-foreground" style={{ backgroundColor: brandColor }}>
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+            </Button>
+          ) : (
+           <Button
+             variant="ghost"
+             aria-label={`Account and vessel scope menu, ${menuOpen ? 'expanded' : 'collapsed'}`}
+             className="min-h-11 w-full justify-start gap-3 px-2 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+           >
             <Avatar className="h-9 w-9 shrink-0">
               <AvatarFallback className="text-sm text-primary-foreground" style={{ backgroundColor: brandColor }}>
                 {initials}
@@ -122,6 +118,7 @@ const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate }) =
             </span>
             <ChevronUp className="h-4 w-4 shrink-0 text-sidebar-foreground/60" />
           </Button>
+          )}
         </DropdownMenuTrigger>
         <DropdownMenuContent side="top" align="start" className="w-64 bg-popover">
           {!loading && vessels.length > 0 && (
@@ -130,33 +127,23 @@ const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate }) =
                 <Ship className="h-4 w-4" />
                 Vessel scope
               </DropdownMenuLabel>
-              <DropdownMenuCheckboxItem checked={allSelected} onCheckedChange={toggleAll} onSelect={(event) => event.preventDefault()}>
+              <DropdownMenuCheckboxItem
+                checked={allSelected}
+                onCheckedChange={selectAll}
+              >
                 All vessels
               </DropdownMenuCheckboxItem>
               {vessels.map((vessel) => (
                 <DropdownMenuCheckboxItem
                   key={vessel.id}
-                  checked={selectedVesselIds.includes(vessel.id)}
-                  onCheckedChange={() => toggleVessel(vessel.id)}
-                  onSelect={(event) => event.preventDefault()}
+                  checked={!allSelected && selectedVessel?.id === vessel.id}
+                  onCheckedChange={() => selectOnly(vessel.id)}
                   className="pr-2"
                 >
-                  <span className="flex w-full items-center justify-between gap-2">
-                    <span className="truncate">{vessel.name}</span>
-                    <button
-                      type="button"
-                      onClick={(event) => { event.preventDefault(); event.stopPropagation(); selectOnly(vessel.id); }}
-                      className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase ${
-                        selectedVessel?.id === vessel.id
-                          ? 'bg-primary/15 text-primary'
-                          : 'text-muted-foreground hover:bg-accent'
-                      }`}
-                    >
-                      {selectedVessel?.id === vessel.id ? 'Active' : 'Only'}
-                    </button>
-                  </span>
+                  <span className="truncate">{vessel.name}</span>
                 </DropdownMenuCheckboxItem>
               ))}
+
 
               <DropdownMenuSeparator />
             </>

@@ -89,7 +89,8 @@ const fleetChildren: NavChild[] = [
   L('Fleet Documents', FLEET_BASE, { existing: '/documents', icon: FileText }),
   L('Fleet Checklists', FLEET_BASE, { existing: '/ism/checklists', icon: CheckSquare, crossLink: true }),
   L('Vessels', FLEET_BASE, { existing: '/vessels/dashboard', icon: Ship }),
-  L('Users & Access', FLEET_BASE, { existing: '/admin/users', icon: Users }),
+  L('Users & Access', FLEET_BASE, { existing: '/users-access', icon: Users }),
+  L('Notification Center', FLEET_BASE, { existing: '/notifications/center', icon: Bell }),
   L('Notification Management', FLEET_BASE, { existing: '/admin/notifications', icon: Bell }),
   L('Support Tickets', FLEET_BASE, { icon: LifeBuoy }),
   L('Account', FLEET_BASE, { existing: '/account', icon: Settings }),
@@ -104,7 +105,8 @@ const vCrew = `${V}/crew`;
 // HRIS module. Vessel keeps cross-links only, so URL → module resolution
 // always lands in HRIS for those pages.
 const vesselCrew: NavChild[] = [
-  L('Crew List', vCrew, { existing: '/crew/roster', icon: Users }),
+  L('Crew List', vCrew, { existing: '/crew/list', icon: Users }),
+  L('Crew Roster', vCrew, { existing: '/crew/roster', icon: Users }),
   L('Leave', vCrew, { existing: '/crew/leave', icon: CalendarDays, crossLink: true }),
   L('Rotation Planner', vCrew, { existing: '/crew/rotation-planner', icon: Network, crossLink: true }),
   L('Hours of Rest', vCrew, { existing: '/crew/work-rest', icon: Clock }),
@@ -200,15 +202,17 @@ const vesselAccounting: NavChild[] = [
 // Electronic Logbooks
 const vLog = `${V}/logbooks`;
 const vesselLogbooks: NavChild[] = [
-  L('All Logbooks', vLog, { existing: `${V}/logbooks/list`, icon: BookOpen }),
-  L('Deck Log', vLog, { icon: Anchor }),
-  L('Engine Log', vLog, { icon: Wrench }),
-  L('Bell Book', vLog, { icon: Bell }),
-  L('Radio Log', vLog, { icon: MessageSquare }),
-  L('Oil Record Book', vLog, { icon: Beaker }),
-  L('Garbage Record Book', vLog, { icon: Package }),
-  L('Ballast Water Record', vLog, { icon: Waves }),
-  L('Visitor & Guest Log', vLog, { icon: Users, slug: 'visitor-log' }),
+  L('Logbooks', vLog, { existing: vLog, icon: BookOpen }),
+  L('DAGON Engine Room Log', vLog, {
+    icon: Wrench,
+    slug: 'engine-log-dagon',
+    existing: '/vessel/logbooks/engine-log?vessel=dagon',
+  }),
+  L('Review & Sign-off', vLog, { existing: `${vLog}/review`, icon: ClipboardCheck }),
+  L('Vessel Registry', vLog, { existing: `${vLog}/registry`, icon: Ship }),
+  L('Records & Exports', vLog, { existing: `${vLog}/records`, icon: FileText }),
+  L('Connections', vLog, { existing: `${vLog}/connections`, icon: Cpu }),
+  L('Assurance', vLog, { existing: `${vLog}/assurance`, icon: Shield }),
 ];
 
 // Vessel (general)
@@ -296,7 +300,8 @@ const managementOffice: NavChild[] = [
   L('DPA / ISM Office', mgmtBase, { icon: Shield }),
   L('Procurement', mgmtBase, { icon: Truck }),
   L('Finance / Accounts', mgmtBase, { icon: Banknote }),
-  L('Legal', mgmtBase, { icon: ScrollText }),
+  // Legal Support & Ticketing module (src/modules/legal) at /departments/legal.
+  L('Legal', mgmtBase, { existing: '/departments/legal', icon: ScrollText }),
   L('Insurance', mgmtBase, { icon: Umbrella }),
   L('Crewing & Recruitment', mgmtBase, { existing: '/hris/recruitment/vacancies', icon: Users, crossLink: true, moduleKey: 'hr' }),
 ];
@@ -651,11 +656,17 @@ collectLeaves(NAVIGATION_ITEMS, _allLeaves, _groupPaths);
 /** Unique placeholder leaves (only paths under our synthesized section roots).
  *  A path that is a group elsewhere in the tree is not a placeholder: it gets
  *  a section redirect instead (see SECTION_REDIRECTS). */
+/** Leaves handled by real routes elsewhere (dynamic route params, ported
+ *  modules) must never be turned into Coming Soon placeholders — static
+ *  placeholder paths outrank dynamic routes in React Router's ranking. */
+const IMPLEMENTED_PREFIXES = ['/vessel/logbooks/'];
+
 export const PLACEHOLDER_LEAVES: SitemapLeaf[] = (() => {
   const seen = new Set<string>();
   const out: SitemapLeaf[] = [];
   for (const leaf of _allLeaves) {
     if (!PLACEHOLDER_PREFIXES.some((p) => leaf.path.startsWith(p))) continue;
+    if (IMPLEMENTED_PREFIXES.some((p) => leaf.path.startsWith(p))) continue;
     if (seen.has(leaf.path)) continue;
     if (_groupPaths.has(leaf.path.split('?')[0])) continue;
     seen.add(leaf.path);
@@ -663,6 +674,7 @@ export const PLACEHOLDER_LEAVES: SitemapLeaf[] = (() => {
   }
   return out;
 })();
+
 // ─── Section / group redirects ───────────────────────────────────────────
 // `/hris`, `/hris/employee-records`, … have no page of their own. Each one
 // redirects to its first real (non-cross-link) leaf so bookmarks and typed

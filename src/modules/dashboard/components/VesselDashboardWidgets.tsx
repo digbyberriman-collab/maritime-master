@@ -39,7 +39,7 @@ export const AlertsWidget: React.FC<WidgetProps> = ({ data, isLoading }) => {
         'cursor-pointer transition-all hover:shadow-md',
         hasRedAlerts && 'border-destructive/50 bg-destructive/5'
       )}
-      onClick={() => navigate('/alerts')}
+      onClick={() => navigate('/notifications/center')}
     >
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">Open Alerts</CardTitle>

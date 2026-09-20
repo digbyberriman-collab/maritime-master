@@ -57,6 +57,16 @@ const FeedbackPanel: React.FC = () => {
     }
   }, [panelOpen, user?.id, loadSubmissions]);
 
+  // Escape closes the panel
+  useEffect(() => {
+    if (!panelOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setPanelOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [panelOpen, setPanelOpen]);
+
   // Reset form when panel closes
   useEffect(() => {
     if (!panelOpen) {
@@ -157,12 +167,16 @@ const FeedbackPanel: React.FC = () => {
 
       {/* Panel */}
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="feedback-panel-title"
+        aria-hidden={!panelOpen}
         className={cn(
           'fixed bottom-0 left-0 z-50 w-full sm:w-96 h-[85vh] sm:h-[70vh] bg-background border border-border rounded-t-xl sm:rounded-xl shadow-xl transition-all duration-300 ease-in-out flex flex-col',
           'sm:bottom-4 sm:left-[17rem]',
           panelOpen
             ? 'translate-y-0 opacity-100'
-            : 'translate-y-full opacity-0 pointer-events-none'
+            : 'translate-y-full opacity-0 pointer-events-none invisible'
         )}
       >
         {/* Header */}
@@ -170,19 +184,23 @@ const FeedbackPanel: React.FC = () => {
           <div className="flex items-center gap-2">
             {view === 'form' && (
               <button
+                type="button"
+                aria-label="Back to feedback list"
                 onClick={() => { setView('list'); resetForm(); }}
-                className="p-1 hover:bg-muted rounded-md"
+                className="p-1 hover:bg-muted rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
             )}
-            <h2 className="text-sm font-semibold text-foreground">
+            <h2 id="feedback-panel-title" className="text-sm font-semibold text-foreground">
               {view === 'list' ? 'Feedback' : 'Report an Issue'}
             </h2>
           </div>
           <button
+            type="button"
+            aria-label="Close feedback panel"
             onClick={() => setPanelOpen(false)}
-            className="p-1 hover:bg-muted rounded-md"
+            className="p-1 hover:bg-muted rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <X className="w-4 h-4" />
           </button>

@@ -7,6 +7,7 @@ import { AuthProvider } from "@/modules/auth/contexts/AuthContext";
 import { BrandingProvider } from "@/shared/contexts/BrandingContext";
 import { VesselProvider } from "@/modules/vessels/contexts/VesselContext";
 import AppRoutes from "@/routes";
+import AppErrorBoundary from "@/shared/components/AppErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -19,7 +20,9 @@ const App = () => (
         <AuthProvider>
           <BrandingProvider>
             <VesselProvider>
-              <AppRoutes />
+              <AppErrorBoundary>
+                <AppRoutes />
+              </AppErrorBoundary>
             </VesselProvider>
           </BrandingProvider>
         </AuthProvider>

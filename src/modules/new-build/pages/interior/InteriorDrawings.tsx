@@ -89,11 +89,18 @@ export default function InteriorDrawings() {
   };
 
   const SortableHead = ({ field, children, className }: { field: SortField; children: React.ReactNode; className?: string }) => (
-    <TableHead className={`cursor-pointer select-none hover:text-foreground ${className || ""}`} onClick={() => handleSort(field)}>
-      <span className="flex items-center gap-1">
+    <TableHead
+      className={`select-none ${className || ""}`}
+      aria-sort={sortField === field ? (sortAsc ? "ascending" : "descending") : "none"}
+    >
+      <button
+        type="button"
+        onClick={() => handleSort(field)}
+        className="flex items-center gap-1 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+      >
         {children}
         {sortField === field && <ArrowUpDown className="h-3 w-3" />}
-      </span>
+      </button>
     </TableHead>
   );
 

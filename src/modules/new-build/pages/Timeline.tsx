@@ -338,7 +338,18 @@ export default function Timeline() {
         <Collapsible open={summaryOpen} onOpenChange={setSummaryOpen}>
           <Card className="border-primary/20">
             <CollapsibleTrigger asChild>
-              <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-accent/30 transition-colors">
+              <div
+                role="button"
+                tabIndex={0}
+                aria-expanded={summaryOpen}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSummaryOpen(!summaryOpen);
+                  }
+                }}
+                className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-accent/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+              >
                 <div className="flex items-center gap-3">
                   <Badge className="bg-primary text-primary-foreground text-sm px-3 py-1">
                     Week {currentWeekNum}, {currentWeekYear}
@@ -468,14 +479,19 @@ export default function Timeline() {
               return (
                 <Collapsible key={ch} open={isOpen} onOpenChange={() => toggleChapter(ch)}>
                   <Card>
-                    <div className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-accent/30 transition-colors" onClick={() => toggleChapter(ch)}>
+                    <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      className="w-full flex items-center justify-between px-4 py-3 text-left cursor-pointer hover:bg-accent/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                      onClick={() => toggleChapter(ch)}
+                    >
                       <div className="flex items-center gap-2">
                         {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronR className="h-4 w-4" />}
                         <span className="font-semibold text-sm">{ch}. {name}</span>
                         <Badge variant="secondary" className="text-xs">{items.length}</Badge>
                       </div>
                       <Badge variant="outline" className="text-xs">{doneCount}/{items.length} done</Badge>
-                    </div>
+                    </button>
                     <CollapsibleContent>
                       <Table>
                         <TableHeader>

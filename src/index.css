@@ -103,6 +103,14 @@
     --sidebar-border: 224 71% 45%;
     --sidebar-ring: 217 91% 60%;
 
+    /* Chart series (categorical, CVD-validated order; 6 = neutral "other") */
+    --chart-1: 217 91% 60%;
+    --chart-2: 38 92% 50%;
+    --chart-3: 168 76% 42%;
+    --chart-4: 271 91% 65%;
+    --chart-5: 142 76% 36%;
+    --chart-6: 215 16% 47%;
+
     /* Custom gradients */
     --gradient-primary: linear-gradient(135deg, hsl(224 71% 33%), hsl(217 91% 60%));
     --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(210 20% 98%));
@@ -145,6 +153,14 @@
     --sidebar-accent-foreground: 210 40% 98%;
     --sidebar-border: 217 33% 17%;
     --sidebar-ring: 217 91% 60%;
+
+    /* Chart series: deeper steps of the same hues for the dark surface */
+    --chart-1: 217 91% 60%;
+    --chart-2: 32 95% 44%;
+    --chart-3: 168 77% 35%;
+    --chart-4: 271 91% 65%;
+    --chart-5: 142 76% 36%;
+    --chart-6: 215 20% 65%;
   }
 }
 
@@ -174,6 +190,38 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+}
+
+/* Balanced desktop density: retain comfortable mobile touch targets while
+   fitting more operational data into each authenticated workspace. */
+@media (min-width: 768px) {
+  .storm-compact .space-y-8 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 1.25rem;
+  }
+
+  .storm-compact .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 1rem;
+  }
+
+  .storm-compact .space-y-5 > :not([hidden]) ~ :not([hidden]),
+  .storm-compact .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 0.75rem;
+  }
+
+  .storm-compact .gap-8 { gap: 1.25rem; }
+  .storm-compact .gap-6 { gap: 1rem; }
+  .storm-compact .gap-5,
+  .storm-compact .gap-4 { gap: 0.75rem; }
+
+  .storm-compact .py-8 { padding-top: 1.25rem; padding-bottom: 1.25rem; }
+  .storm-compact .p-8 { padding: 1.25rem; }
+  .storm-compact .p-6 { padding: 1rem; }
+  .storm-compact .px-6 { padding-left: 1rem; padding-right: 1rem; }
+  .storm-compact .py-6 { padding-top: 1rem; padding-bottom: 1rem; }
+  .storm-compact .mb-8 { margin-bottom: 1.25rem; }
+  .storm-compact .mb-6 { margin-bottom: 1rem; }
+  .storm-compact .mt-8 { margin-top: 1.25rem; }
+  .storm-compact .mt-6 { margin-top: 1rem; }
 }
 
 /* Custom scrollbar */

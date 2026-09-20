@@ -415,7 +415,7 @@ const RotationPlannerPage: React.FC = () => {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col h-[calc(100vh-8rem)]">
+      <div className="flex flex-col h-[calc(100vh-6.75rem)]">
         <Toolbar
           zoom={zoom} setZoom={setZoom}
           viewStart={viewStart} viewEnd={viewEnd}

@@ -7175,6 +7175,71 @@ export type Database = {
           },
         ]
       }
+      crew_leave_balance_adjustments: {
+        Row: {
+          adjustment_days: number
+          company_id: string
+          created_at: string
+          created_by: string | null
+          crew_id: string
+          effective_date: string
+          id: string
+          reason: string
+          vessel_id: string | null
+        }
+        Insert: {
+          adjustment_days: number
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          crew_id: string
+          effective_date?: string
+          id?: string
+          reason: string
+          vessel_id?: string | null
+        }
+        Update: {
+          adjustment_days?: number
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          crew_id?: string
+          effective_date?: string
+          id?: string
+          reason?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_leave_balance_adjustments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_leave_balance_adjustments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_leave_balance_adjustments_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_leave_balance_adjustments_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crew_leave_carryover: {
         Row: {
           carryover_days: number
@@ -7327,12 +7392,90 @@ export type Database = {
           },
         ]
       }
+      crew_leave_policies: {
+        Row: {
+          accrual_method: string
+          booked_deducts: boolean
+          company_id: string
+          created_at: string
+          default_annual_entitlement: number
+          default_rotation: string | null
+          id: string
+          monthly_accrual_days: number
+          notes: string | null
+          pro_rata: boolean
+          rounding: string
+          scope_label: string
+          sick_affects_balance: boolean
+          training_affects_balance: boolean
+          unpaid_affects_balance: boolean
+          updated_at: string
+          vessel_id: string | null
+        }
+        Insert: {
+          accrual_method?: string
+          booked_deducts?: boolean
+          company_id: string
+          created_at?: string
+          default_annual_entitlement?: number
+          default_rotation?: string | null
+          id?: string
+          monthly_accrual_days?: number
+          notes?: string | null
+          pro_rata?: boolean
+          rounding?: string
+          scope_label?: string
+          sick_affects_balance?: boolean
+          training_affects_balance?: boolean
+          unpaid_affects_balance?: boolean
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          accrual_method?: string
+          booked_deducts?: boolean
+          company_id?: string
+          created_at?: string
+          default_annual_entitlement?: number
+          default_rotation?: string | null
+          id?: string
+          monthly_accrual_days?: number
+          notes?: string | null
+          pro_rata?: boolean
+          rounding?: string
+          scope_label?: string
+          sick_affects_balance?: boolean
+          training_affects_balance?: boolean
+          unpaid_affects_balance?: boolean
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crew_leave_policies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crew_leave_policies_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       crew_leave_requests: {
         Row: {
+          cancellation_reason: string | null
           company_id: string
           created_at: string
           crew_id: string
           end_date: string
+          hod_reviewed_at: string | null
+          hod_reviewed_by: string | null
           id: string
           leave_type: string
           notes: string | null
@@ -7345,10 +7488,13 @@ export type Database = {
           vessel_id: string | null
         }
         Insert: {
+          cancellation_reason?: string | null
           company_id: string
           created_at?: string
           crew_id: string
           end_date: string
+          hod_reviewed_at?: string | null
+          hod_reviewed_by?: string | null
           id?: string
           leave_type: string
           notes?: string | null
@@ -7361,10 +7507,13 @@ export type Database = {
           vessel_id?: string | null
         }
         Update: {
+          cancellation_reason?: string | null
           company_id?: string
           created_at?: string
           crew_id?: string
           end_date?: string
+          hod_reviewed_at?: string | null
+          hod_reviewed_by?: string | null
           id?: string
           leave_type?: string
           notes?: string | null
@@ -7387,6 +7536,13 @@ export type Database = {
           {
             foreignKeyName: "crew_leave_requests_crew_id_fkey"
             columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "crew_leave_requests_hod_reviewed_by_fkey"
+            columns: ["hod_reviewed_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["user_id"]
@@ -13872,6 +14028,429 @@ export type Database = {
           },
         ]
       }
+      legal_document_templates: {
+        Row: {
+          category: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          current_version: number
+          department: string
+          description: string | null
+          document_type: string
+          id: string
+          is_prerequisite_gate: boolean
+          linked_data_key: string | null
+          linked_table: string | null
+          name: string
+          source_id: string | null
+          status: string
+          tags: string[]
+          updated_at: string
+          validity_months: number | null
+        }
+        Insert: {
+          category?: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          current_version?: number
+          department?: string
+          description?: string | null
+          document_type?: string
+          id?: string
+          is_prerequisite_gate?: boolean
+          linked_data_key?: string | null
+          linked_table?: string | null
+          name: string
+          source_id?: string | null
+          status?: string
+          tags?: string[]
+          updated_at?: string
+          validity_months?: number | null
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          current_version?: number
+          department?: string
+          description?: string | null
+          document_type?: string
+          id?: string
+          is_prerequisite_gate?: boolean
+          linked_data_key?: string | null
+          linked_table?: string | null
+          name?: string
+          source_id?: string | null
+          status?: string
+          tags?: string[]
+          updated_at?: string
+          validity_months?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_document_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      legal_document_versions: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          authored_by: string | null
+          change_summary: string | null
+          content: string
+          created_at: string
+          form_schema: Json | null
+          id: string
+          search_vector: unknown
+          source_id: string | null
+          status: string
+          template_id: string
+          version_number: number
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          authored_by?: string | null
+          change_summary?: string | null
+          content?: string
+          created_at?: string
+          form_schema?: Json | null
+          id?: string
+          search_vector?: unknown
+          source_id?: string | null
+          status?: string
+          template_id: string
+          version_number?: number
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          authored_by?: string | null
+          change_summary?: string | null
+          content?: string
+          created_at?: string
+          form_schema?: Json | null
+          id?: string
+          search_vector?: unknown
+          source_id?: string | null
+          status?: string
+          template_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_document_versions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "legal_document_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      legal_form_submissions: {
+        Row: {
+          company_id: string
+          created_at: string
+          form_data: Json
+          id: string
+          review_notes: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          source_id: string | null
+          status: string
+          submitted_by: string
+          submitted_for_name: string | null
+          submitted_for_profile_id: string | null
+          template_id: string
+          updated_at: string
+          version_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          form_data?: Json
+          id?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_id?: string | null
+          status?: string
+          submitted_by: string
+          submitted_for_name?: string | null
+          submitted_for_profile_id?: string | null
+          template_id: string
+          updated_at?: string
+          version_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          form_data?: Json
+          id?: string
+          review_notes?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          source_id?: string | null
+          status?: string
+          submitted_by?: string
+          submitted_for_name?: string | null
+          submitted_for_profile_id?: string | null
+          template_id?: string
+          updated_at?: string
+          version_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_form_submissions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legal_form_submissions_submitted_for_profile_id_fkey"
+            columns: ["submitted_for_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legal_form_submissions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "legal_document_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legal_form_submissions_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "legal_document_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      legal_request_comments: {
+        Row: {
+          author_id: string
+          comment_type: string
+          content: string
+          created_at: string
+          id: string
+          metadata: Json
+          request_id: string
+          source_id: string | null
+        }
+        Insert: {
+          author_id: string
+          comment_type?: string
+          content: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          request_id: string
+          source_id?: string | null
+        }
+        Update: {
+          author_id?: string
+          comment_type?: string
+          content?: string
+          created_at?: string
+          id?: string
+          metadata?: Json
+          request_id?: string
+          source_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_request_comments_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "legal_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      legal_request_events: {
+        Row: {
+          actor_id: string | null
+          company_id: string
+          created_at: string
+          event_type: string
+          field: string | null
+          id: string
+          metadata: Json
+          new_value: string | null
+          old_value: string | null
+          request_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          company_id: string
+          created_at?: string
+          event_type: string
+          field?: string | null
+          id?: string
+          metadata?: Json
+          new_value?: string | null
+          old_value?: string | null
+          request_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          company_id?: string
+          created_at?: string
+          event_type?: string
+          field?: string | null
+          id?: string
+          metadata?: Json
+          new_value?: string | null
+          old_value?: string | null
+          request_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_request_events_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "legal_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      legal_requests: {
+        Row: {
+          assigned_to: string | null
+          attachments: Json
+          cfm_employee_id: number | null
+          company_id: string
+          contract_value: number | null
+          counterparty: string | null
+          created_at: string
+          currency: string | null
+          description: string | null
+          id: string
+          incident_id: string | null
+          jurisdiction: string | null
+          priority: string
+          profile_id: string | null
+          reference_number: string | null
+          request_type: string
+          requested_deadline: string | null
+          requester_department: string | null
+          resolution_summary: string | null
+          resolved_at: string | null
+          risk_level: string | null
+          sla_deadline: string | null
+          source_id: string | null
+          status: string
+          submitted_by: string
+          tags: string[]
+          title: string
+          updated_at: string
+          vessel_id: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          attachments?: Json
+          cfm_employee_id?: number | null
+          company_id: string
+          contract_value?: number | null
+          counterparty?: string | null
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          id?: string
+          incident_id?: string | null
+          jurisdiction?: string | null
+          priority?: string
+          profile_id?: string | null
+          reference_number?: string | null
+          request_type: string
+          requested_deadline?: string | null
+          requester_department?: string | null
+          resolution_summary?: string | null
+          resolved_at?: string | null
+          risk_level?: string | null
+          sla_deadline?: string | null
+          source_id?: string | null
+          status?: string
+          submitted_by: string
+          tags?: string[]
+          title: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          attachments?: Json
+          cfm_employee_id?: number | null
+          company_id?: string
+          contract_value?: number | null
+          counterparty?: string | null
+          created_at?: string
+          currency?: string | null
+          description?: string | null
+          id?: string
+          incident_id?: string | null
+          jurisdiction?: string | null
+          priority?: string
+          profile_id?: string | null
+          reference_number?: string | null
+          request_type?: string
+          requested_deadline?: string | null
+          requester_department?: string | null
+          resolution_summary?: string | null
+          resolved_at?: string | null
+          risk_level?: string | null
+          sla_deadline?: string | null
+          source_id?: string | null
+          status?: string
+          submitted_by?: string
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "legal_requests_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legal_requests_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legal_requests_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "legal_requests_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       logbook_attachments: {
         Row: {
           company_id: string
@@ -13952,30 +14531,43 @@ export type Database = {
           company_id: string
           created_at: string
           data: Json
+          digest: string | null
           entry_at: string
           entry_date: string
           finalized_at: string | null
           finalized_by: string | null
           finalized_by_name: string | null
+          flag_profile: string | null
           id: string
           latitude: number | null
+          line_number: number | null
           logbook_id: string
           longitude: number | null
+          override_reason: string | null
+          page_id: string | null
           page_number: number | null
           position_text: string | null
           recorded_by: string | null
           recorded_by_name: string | null
+          recorded_capacity: string | null
           remarks: string | null
+          schema_snapshot: Json | null
+          section_id: string | null
           signed_at: string | null
           signed_by: string | null
           signed_by_name: string | null
+          source_sample_id: string | null
+          source_snapshot: Json | null
           status: Database["public"]["Enums"]["logbook_entry_status"]
           summary: string | null
+          superseded_by_id: string | null
+          template_revision: string | null
           updated_at: string
           updated_by: string | null
           updated_by_name: string | null
           version: number
           vessel_id: string
+          volume_id: string | null
           watch_period: string | null
         }
         Insert: {
@@ -13984,30 +14576,43 @@ export type Database = {
           company_id: string
           created_at?: string
           data?: Json
+          digest?: string | null
           entry_at?: string
           entry_date?: string
           finalized_at?: string | null
           finalized_by?: string | null
           finalized_by_name?: string | null
+          flag_profile?: string | null
           id?: string
           latitude?: number | null
+          line_number?: number | null
           logbook_id: string
           longitude?: number | null
+          override_reason?: string | null
+          page_id?: string | null
           page_number?: number | null
           position_text?: string | null
           recorded_by?: string | null
           recorded_by_name?: string | null
+          recorded_capacity?: string | null
           remarks?: string | null
+          schema_snapshot?: Json | null
+          section_id?: string | null
           signed_at?: string | null
           signed_by?: string | null
           signed_by_name?: string | null
+          source_sample_id?: string | null
+          source_snapshot?: Json | null
           status?: Database["public"]["Enums"]["logbook_entry_status"]
           summary?: string | null
+          superseded_by_id?: string | null
+          template_revision?: string | null
           updated_at?: string
           updated_by?: string | null
           updated_by_name?: string | null
           version?: number
           vessel_id: string
+          volume_id?: string | null
           watch_period?: string | null
         }
         Update: {
@@ -14016,30 +14621,43 @@ export type Database = {
           company_id?: string
           created_at?: string
           data?: Json
+          digest?: string | null
           entry_at?: string
           entry_date?: string
           finalized_at?: string | null
           finalized_by?: string | null
           finalized_by_name?: string | null
+          flag_profile?: string | null
           id?: string
           latitude?: number | null
+          line_number?: number | null
           logbook_id?: string
           longitude?: number | null
+          override_reason?: string | null
+          page_id?: string | null
           page_number?: number | null
           position_text?: string | null
           recorded_by?: string | null
           recorded_by_name?: string | null
+          recorded_capacity?: string | null
           remarks?: string | null
+          schema_snapshot?: Json | null
+          section_id?: string | null
           signed_at?: string | null
           signed_by?: string | null
           signed_by_name?: string | null
+          source_sample_id?: string | null
+          source_snapshot?: Json | null
           status?: Database["public"]["Enums"]["logbook_entry_status"]
           summary?: string | null
+          superseded_by_id?: string | null
+          template_revision?: string | null
           updated_at?: string
           updated_by?: string | null
           updated_by_name?: string | null
           version?: number
           vessel_id?: string
+          volume_id?: string | null
           watch_period?: string | null
         }
         Relationships: [
@@ -14058,10 +14676,38 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "logbook_entries_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "logbook_pages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logbook_entries_source_sample_id_fkey"
+            columns: ["source_sample_id"]
+            isOneToOne: false
+            referencedRelation: "logbook_samples"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logbook_entries_superseded_by_id_fkey"
+            columns: ["superseded_by_id"]
+            isOneToOne: false
+            referencedRelation: "logbook_entries"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "logbook_entries_vessel_id_fkey"
             columns: ["vessel_id"]
             isOneToOne: false
             referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logbook_entries_volume_id_fkey"
+            columns: ["volume_id"]
+            isOneToOne: false
+            referencedRelation: "logbook_volumes"
             referencedColumns: ["id"]
           },
         ]
@@ -14110,6 +14756,374 @@ export type Database = {
           vessel_id?: string | null
         }
         Relationships: []
+      }
+      logbook_pages: {
+        Row: {
+          company_id: string
+          digest: string
+          digests: string[]
+          entry_ids: string[]
+          id: string
+          logbook_id: string
+          page_number: number
+          sealed_at: string
+          sealed_by: string | null
+          sealed_by_name: string | null
+          section_id: string
+          statement: string | null
+          vessel_id: string
+          volume_id: string
+        }
+        Insert: {
+          company_id: string
+          digest: string
+          digests: string[]
+          entry_ids: string[]
+          id?: string
+          logbook_id: string
+          page_number: number
+          sealed_at?: string
+          sealed_by?: string | null
+          sealed_by_name?: string | null
+          section_id: string
+          statement?: string | null
+          vessel_id: string
+          volume_id: string
+        }
+        Update: {
+          company_id?: string
+          digest?: string
+          digests?: string[]
+          entry_ids?: string[]
+          id?: string
+          logbook_id?: string
+          page_number?: number
+          sealed_at?: string
+          sealed_by?: string | null
+          sealed_by_name?: string | null
+          section_id?: string
+          statement?: string | null
+          vessel_id?: string
+          volume_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logbook_pages_logbook_id_fkey"
+            columns: ["logbook_id"]
+            isOneToOne: false
+            referencedRelation: "logbooks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logbook_pages_volume_id_fkey"
+            columns: ["volume_id"]
+            isOneToOne: false
+            referencedRelation: "logbook_volumes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      logbook_registries: {
+        Row: {
+          auto_populate_cover: boolean
+          book_defaults: Json
+          company_id: string
+          created_at: string
+          fields: Json
+          flag_profile: string
+          id: string
+          saved_by: string | null
+          saved_by_name: string | null
+          updated_at: string
+          version: number
+          vessel_id: string
+        }
+        Insert: {
+          auto_populate_cover?: boolean
+          book_defaults?: Json
+          company_id: string
+          created_at?: string
+          fields?: Json
+          flag_profile: string
+          id?: string
+          saved_by?: string | null
+          saved_by_name?: string | null
+          updated_at?: string
+          version?: number
+          vessel_id: string
+        }
+        Update: {
+          auto_populate_cover?: boolean
+          book_defaults?: Json
+          company_id?: string
+          created_at?: string
+          fields?: Json
+          flag_profile?: string
+          id?: string
+          saved_by?: string | null
+          saved_by_name?: string | null
+          updated_at?: string
+          version?: number
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logbook_registries_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      logbook_samples: {
+        Row: {
+          captured_by: string | null
+          captured_by_name: string | null
+          company_id: string
+          created_at: string
+          id: string
+          mode: string
+          observed_at: string
+          protocol: string | null
+          quality: string | null
+          raw: Json | null
+          received_at: string
+          sample_type: string
+          source: string
+          values: Json
+          vessel_id: string
+        }
+        Insert: {
+          captured_by?: string | null
+          captured_by_name?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          mode: string
+          observed_at: string
+          protocol?: string | null
+          quality?: string | null
+          raw?: Json | null
+          received_at?: string
+          sample_type: string
+          source: string
+          values?: Json
+          vessel_id: string
+        }
+        Update: {
+          captured_by?: string | null
+          captured_by_name?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          mode?: string
+          observed_at?: string
+          protocol?: string | null
+          quality?: string | null
+          raw?: Json | null
+          received_at?: string
+          sample_type?: string
+          source?: string
+          values?: Json
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logbook_samples_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      logbook_signatures: {
+        Row: {
+          actor_capacity: string | null
+          actor_id: string | null
+          actor_name: string | null
+          actor_role: string | null
+          company_id: string
+          digest: string
+          entry_id: string
+          entry_version: number
+          id: string
+          kind: string
+          method: string
+          page_id: string | null
+          signed_at: string
+          statement: string | null
+          vessel_id: string
+          witness_capacity: string | null
+          witness_name: string | null
+        }
+        Insert: {
+          actor_capacity?: string | null
+          actor_id?: string | null
+          actor_name?: string | null
+          actor_role?: string | null
+          company_id: string
+          digest: string
+          entry_id: string
+          entry_version: number
+          id?: string
+          kind: string
+          method?: string
+          page_id?: string | null
+          signed_at?: string
+          statement?: string | null
+          vessel_id: string
+          witness_capacity?: string | null
+          witness_name?: string | null
+        }
+        Update: {
+          actor_capacity?: string | null
+          actor_id?: string | null
+          actor_name?: string | null
+          actor_role?: string | null
+          company_id?: string
+          digest?: string
+          entry_id?: string
+          entry_version?: number
+          id?: string
+          kind?: string
+          method?: string
+          page_id?: string | null
+          signed_at?: string
+          statement?: string | null
+          vessel_id?: string
+          witness_capacity?: string | null
+          witness_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logbook_signatures_entry_id_fkey"
+            columns: ["entry_id"]
+            isOneToOne: false
+            referencedRelation: "logbook_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logbook_signatures_page_id_fkey"
+            columns: ["page_id"]
+            isOneToOne: false
+            referencedRelation: "logbook_pages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      logbook_volumes: {
+        Row: {
+          book_id: string
+          closed_at: string | null
+          closed_by: string | null
+          closed_by_name: string | null
+          closure_place: string | null
+          closure_reason: string | null
+          company_id: string
+          continuation_of: string | null
+          cover_fields: Json
+          created_at: string
+          flag_profile: string
+          id: string
+          label: string
+          logbook_id: string
+          opened_at: string
+          opened_by: string | null
+          opened_by_name: string | null
+          page_count: number
+          particulars: Json
+          registry_source: Json | null
+          sequence: number
+          status: string
+          template: Json
+          template_revision: string
+          updated_at: string
+          version: number
+          vessel_id: string
+        }
+        Insert: {
+          book_id: string
+          closed_at?: string | null
+          closed_by?: string | null
+          closed_by_name?: string | null
+          closure_place?: string | null
+          closure_reason?: string | null
+          company_id: string
+          continuation_of?: string | null
+          cover_fields?: Json
+          created_at?: string
+          flag_profile: string
+          id?: string
+          label: string
+          logbook_id: string
+          opened_at?: string
+          opened_by?: string | null
+          opened_by_name?: string | null
+          page_count?: number
+          particulars?: Json
+          registry_source?: Json | null
+          sequence?: number
+          status?: string
+          template: Json
+          template_revision: string
+          updated_at?: string
+          version?: number
+          vessel_id: string
+        }
+        Update: {
+          book_id?: string
+          closed_at?: string | null
+          closed_by?: string | null
+          closed_by_name?: string | null
+          closure_place?: string | null
+          closure_reason?: string | null
+          company_id?: string
+          continuation_of?: string | null
+          cover_fields?: Json
+          created_at?: string
+          flag_profile?: string
+          id?: string
+          label?: string
+          logbook_id?: string
+          opened_at?: string
+          opened_by?: string | null
+          opened_by_name?: string | null
+          page_count?: number
+          particulars?: Json
+          registry_source?: Json | null
+          sequence?: number
+          status?: string
+          template?: Json
+          template_revision?: string
+          updated_at?: string
+          version?: number
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "logbook_volumes_continuation_of_fkey"
+            columns: ["continuation_of"]
+            isOneToOne: false
+            referencedRelation: "logbook_volumes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logbook_volumes_logbook_id_fkey"
+            columns: ["logbook_id"]
+            isOneToOne: false
+            referencedRelation: "logbooks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "logbook_volumes_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       logbooks: {
         Row: {
@@ -14609,7 +15623,7 @@ export type Database = {
         Insert: {
           approver_id?: string | null
           comment?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           file_id: string
           id?: string
@@ -14652,7 +15666,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           current_focus?: string | null
           description?: string | null
@@ -14699,7 +15713,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           deck_id: string
           description?: string | null
@@ -14761,7 +15775,7 @@ export type Database = {
           actual_end_date?: string | null
           actual_start_date?: string | null
           colour?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -14817,7 +15831,7 @@ export type Database = {
           activity_type: string
           change_order_id: string
           comment?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           from_status?: string | null
@@ -14857,7 +15871,7 @@ export type Database = {
         }
         Insert: {
           change_order_id: string
-          company_id?: string
+          company_id: string
           deliverable_id: string
           deliverable_type: string
           id?: string
@@ -14902,7 +15916,7 @@ export type Database = {
         }
         Insert: {
           area_id?: string | null
-          company_id?: string
+          company_id: string
           cost_impact?: number | null
           created_at?: string
           created_by?: string | null
@@ -14972,7 +15986,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           company?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           display_order?: number
@@ -15050,7 +16064,7 @@ export type Database = {
           area_id?: string | null
           assigned_owner?: string | null
           background?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           date?: string | null
@@ -15153,7 +16167,7 @@ export type Database = {
           bbox_width?: number | null
           bbox_x?: number | null
           bbox_y?: number | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           deck: string
@@ -15232,7 +16246,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           display_order?: number
@@ -15293,7 +16307,7 @@ export type Database = {
           zone_id: string | null
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           deck_number?: number | null
           description?: string | null
@@ -15355,7 +16369,7 @@ export type Database = {
           builder_info_date?: string | null
           chapter_name: string
           chapter_number: number
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           delivery_by_owner?: string | null
@@ -15420,7 +16434,7 @@ export type Database = {
           uploaded_by: string | null
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           drawing_number: string
           drawing_type?: string
@@ -15488,7 +16502,7 @@ export type Database = {
         }
         Insert: {
           code: string
-          company_id?: string
+          company_id: string
           created_at?: string
           description?: string | null
           id?: string
@@ -15541,7 +16555,7 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           area_id?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           delivery_date?: string | null
@@ -15612,7 +16626,7 @@ export type Database = {
         }
         Insert: {
           area_id?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           external_url?: string | null
           id?: string
@@ -15697,7 +16711,7 @@ export type Database = {
           approval_doc_phase_2?: string | null
           approval_doc_phase_3?: string | null
           approval_doc_phase_4_5?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           deck_name?: string | null
           deliverables_materials?: string | null
@@ -15772,7 +16786,7 @@ export type Database = {
         Insert: {
           area_code?: string | null
           block_id?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           description?: string | null
           id?: string
@@ -15823,7 +16837,7 @@ export type Database = {
         Insert: {
           changed_at?: string
           changed_by?: string | null
-          company_id?: string
+          company_id: string
           from_status?: string | null
           id?: string
           material_id: string
@@ -15863,7 +16877,7 @@ export type Database = {
         }
         Insert: {
           area_id?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           id?: string
@@ -15947,7 +16961,7 @@ export type Database = {
           certificate_file_id?: string | null
           certificate_url?: string | null
           colour?: string | null
-          company_id?: string
+          company_id: string
           corrosion_resistance?: string | null
           created_at?: string
           created_by?: string | null
@@ -16061,7 +17075,7 @@ export type Database = {
         }
         Insert: {
           actual_date?: string | null
-          company_id?: string
+          company_id: string
           completed_by?: string | null
           created_at?: string
           created_by?: string | null
@@ -16128,7 +17142,7 @@ export type Database = {
         }
         Insert: {
           block_code: string
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           display_order?: number
@@ -16187,7 +17201,7 @@ export type Database = {
         }
         Insert: {
           code?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           display_order?: number
           has_date_markers?: boolean
@@ -16243,7 +17257,7 @@ export type Database = {
           achieved_week?: number | null
           achieved_year?: number | null
           block_id: string
-          company_id?: string
+          company_id: string
           created_at?: string
           id?: string
           milestone_id: string
@@ -16295,7 +17309,7 @@ export type Database = {
           name: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           description?: string | null
           id?: string
@@ -16325,7 +17339,7 @@ export type Database = {
         Insert: {
           activity_type: string
           comment?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           from_status?: string | null
@@ -16383,7 +17397,7 @@ export type Database = {
           actual_delivery_date?: string | null
           amount?: number | null
           area_id?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -16451,7 +17465,7 @@ export type Database = {
         }
         Insert: {
           assignment: Database["public"]["Enums"]["nb_rasci_value"]
-          company_id?: string
+          company_id: string
           created_at?: string
           element_code_id: string
           id?: string
@@ -16506,7 +17520,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           display_order?: number
           id?: string
@@ -16556,7 +17570,7 @@ export type Database = {
         }
         Insert: {
           category?: string
-          company_id?: string
+          company_id: string
           content_indexed_at?: string | null
           content_text?: string | null
           created_at?: string
@@ -16615,7 +17629,7 @@ export type Database = {
           requirement_id: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           deliverable_id: string
           deliverable_type: string
           id?: string
@@ -16657,7 +17671,7 @@ export type Database = {
         }
         Insert: {
           area_id?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -16714,7 +17728,7 @@ export type Database = {
         }
         Insert: {
           approves_drawing?: boolean
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           creates_detail_booklet?: boolean
@@ -16784,7 +17798,7 @@ export type Database = {
         Insert: {
           baseline_end_date?: string | null
           baseline_start_date?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           duration_days?: number | null
           end_date?: string | null
@@ -16860,7 +17874,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           description?: string | null
           id?: string
@@ -16910,7 +17924,7 @@ export type Database = {
           zone_id: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           description?: string | null
           id?: string
@@ -16963,7 +17977,7 @@ export type Database = {
         Insert: {
           area_id?: string | null
           company?: string | null
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           id?: string
@@ -17014,7 +18028,7 @@ export type Database = {
           row_count: number | null
         }
         Insert: {
-          company_id?: string
+          company_id: string
           id?: string
           imported_at?: string
           imported_by?: string | null
@@ -17054,7 +18068,7 @@ export type Database = {
           supplier_id: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           created_by?: string | null
           email?: string | null
@@ -17113,7 +18127,7 @@ export type Database = {
         }
         Insert: {
           category?: string
-          company_id?: string
+          company_id: string
           content_indexed_at?: string | null
           content_text?: string | null
           created_at?: string
@@ -17184,7 +18198,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
-          company_id?: string
+          company_id: string
           created_at?: string
           description?: string | null
           id?: string
@@ -20351,6 +21365,62 @@ export type Database = {
           },
         ]
       }
+      support_tickets: {
+        Row: {
+          category: string
+          company_id: string
+          created_at: string
+          description: string
+          id: string
+          priority: string
+          reference: string
+          reporter_email: string
+          reporter_id: string
+          reporter_name: string
+          status: string
+          subject: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          company_id: string
+          created_at?: string
+          description: string
+          id?: string
+          priority?: string
+          reference: string
+          reporter_email?: string
+          reporter_id: string
+          reporter_name?: string
+          status?: string
+          subject: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          created_at?: string
+          description?: string
+          id?: string
+          priority?: string
+          reference?: string
+          reporter_email?: string
+          reporter_id?: string
+          reporter_name?: string
+          status?: string
+          subject?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       training_courses: {
         Row: {
           applicable_ranks: string[] | null
@@ -21350,6 +22420,61 @@ export type Database = {
           },
         ]
       }
+      vessel_work_rest_settings: {
+        Row: {
+          cutoff_day_of_month: number
+          default_unmarked_as_rest: boolean
+          reminder_days_before_lock: number
+          rule_set_id: string | null
+          timezone: string | null
+          updated_at: string | null
+          updated_by: string | null
+          vessel_id: string
+        }
+        Insert: {
+          cutoff_day_of_month?: number
+          default_unmarked_as_rest?: boolean
+          reminder_days_before_lock?: number
+          rule_set_id?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          vessel_id: string
+        }
+        Update: {
+          cutoff_day_of_month?: number
+          default_unmarked_as_rest?: boolean
+          reminder_days_before_lock?: number
+          rule_set_id?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vessel_work_rest_settings_rule_set_id_fkey"
+            columns: ["rule_set_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_rule_sets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vessel_work_rest_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "vessel_work_rest_settings_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: true
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vessels: {
         Row: {
           beam: number | null
@@ -21760,6 +22885,630 @@ export type Database = {
             columns: ["vessel_id"]
             isOneToOne: false
             referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_rest_audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          actor_role: string | null
+          created_at: string | null
+          crew_id: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          metadata: Json | null
+          new_value: Json | null
+          old_value: Json | null
+          submission_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string | null
+          crew_id?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
+          submission_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          actor_role?: string | null
+          created_at?: string | null
+          crew_id?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          metadata?: Json | null
+          new_value?: Json | null
+          old_value?: Json | null
+          submission_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_rest_audit_log_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_audit_log_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_audit_log_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_monthly_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_rest_blocks: {
+        Row: {
+          block_type: string
+          category: string | null
+          created_at: string | null
+          created_by: string | null
+          crew_id: string
+          end_minute: number
+          id: string
+          notes: string | null
+          record_id: string
+          start_minute: number
+          updated_at: string | null
+        }
+        Insert: {
+          block_type?: string
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          crew_id: string
+          end_minute: number
+          id?: string
+          notes?: string | null
+          record_id: string
+          start_minute: number
+          updated_at?: string | null
+        }
+        Update: {
+          block_type?: string
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          crew_id?: string
+          end_minute?: number
+          id?: string
+          notes?: string | null
+          record_id?: string
+          start_minute?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_rest_blocks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_blocks_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_blocks_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_rest_compliance_checks: {
+        Row: {
+          check_window: string
+          created_at: string | null
+          crew_id: string
+          id: string
+          passes: boolean
+          rest_minutes: number
+          submission_id: string | null
+          threshold_minutes: number | null
+          window_end: string
+          window_start: string
+          work_minutes: number
+        }
+        Insert: {
+          check_window: string
+          created_at?: string | null
+          crew_id: string
+          id?: string
+          passes: boolean
+          rest_minutes: number
+          submission_id?: string | null
+          threshold_minutes?: number | null
+          window_end: string
+          window_start: string
+          work_minutes: number
+        }
+        Update: {
+          check_window?: string
+          created_at?: string | null
+          crew_id?: string
+          id?: string
+          passes?: boolean
+          rest_minutes?: number
+          submission_id?: string | null
+          threshold_minutes?: number | null
+          window_end?: string
+          window_start?: string
+          work_minutes?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_rest_compliance_checks_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_compliance_checks_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_monthly_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_rest_monthly_submissions: {
+        Row: {
+          captain_reviewed_at: string | null
+          created_at: string | null
+          crew_id: string
+          crew_signed_at: string | null
+          hod_signed_at: string | null
+          id: string
+          is_compliant: boolean | null
+          locked_at: string | null
+          open_non_conformities: number | null
+          period_month: number
+          period_year: number
+          reopen_reason: string | null
+          reopened_at: string | null
+          reopened_by: string | null
+          rule_set_id: string | null
+          status: string
+          submitted_at: string | null
+          total_rest_hours: number | null
+          total_work_hours: number | null
+          updated_at: string | null
+          vessel_id: string
+        }
+        Insert: {
+          captain_reviewed_at?: string | null
+          created_at?: string | null
+          crew_id: string
+          crew_signed_at?: string | null
+          hod_signed_at?: string | null
+          id?: string
+          is_compliant?: boolean | null
+          locked_at?: string | null
+          open_non_conformities?: number | null
+          period_month: number
+          period_year: number
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
+          rule_set_id?: string | null
+          status?: string
+          submitted_at?: string | null
+          total_rest_hours?: number | null
+          total_work_hours?: number | null
+          updated_at?: string | null
+          vessel_id: string
+        }
+        Update: {
+          captain_reviewed_at?: string | null
+          created_at?: string | null
+          crew_id?: string
+          crew_signed_at?: string | null
+          hod_signed_at?: string | null
+          id?: string
+          is_compliant?: boolean | null
+          locked_at?: string | null
+          open_non_conformities?: number | null
+          period_month?: number
+          period_year?: number
+          reopen_reason?: string | null
+          reopened_at?: string | null
+          reopened_by?: string | null
+          rule_set_id?: string | null
+          status?: string
+          submitted_at?: string | null
+          total_rest_hours?: number | null
+          total_work_hours?: number | null
+          updated_at?: string | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_rest_monthly_submissions_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_monthly_submissions_reopened_by_fkey"
+            columns: ["reopened_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_monthly_submissions_rule_set_id_fkey"
+            columns: ["rule_set_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_rule_sets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_rest_monthly_submissions_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_rest_non_conformities: {
+        Row: {
+          created_at: string | null
+          crew_id: string
+          id: string
+          justification: string | null
+          measured_value: number | null
+          reviewed_at: string | null
+          reviewer_id: string | null
+          rule_code: string
+          rule_description: string
+          severity: string
+          status: string
+          submission_id: string | null
+          suggested_correction: string | null
+          threshold_value: number | null
+          updated_at: string | null
+          window_end: string
+          window_start: string
+        }
+        Insert: {
+          created_at?: string | null
+          crew_id: string
+          id?: string
+          justification?: string | null
+          measured_value?: number | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          rule_code: string
+          rule_description: string
+          severity?: string
+          status?: string
+          submission_id?: string | null
+          suggested_correction?: string | null
+          threshold_value?: number | null
+          updated_at?: string | null
+          window_end: string
+          window_start: string
+        }
+        Update: {
+          created_at?: string | null
+          crew_id?: string
+          id?: string
+          justification?: string | null
+          measured_value?: number | null
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          rule_code?: string
+          rule_description?: string
+          severity?: string
+          status?: string
+          submission_id?: string | null
+          suggested_correction?: string | null
+          threshold_value?: number | null
+          updated_at?: string | null
+          window_end?: string
+          window_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_rest_non_conformities_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_non_conformities_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_non_conformities_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_monthly_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_rest_notes: {
+        Row: {
+          author_id: string | null
+          block_id: string | null
+          body: string
+          created_at: string | null
+          id: string
+          record_id: string | null
+          submission_id: string | null
+        }
+        Insert: {
+          author_id?: string | null
+          block_id?: string | null
+          body: string
+          created_at?: string | null
+          id?: string
+          record_id?: string | null
+          submission_id?: string | null
+        }
+        Update: {
+          author_id?: string | null
+          block_id?: string | null
+          body?: string
+          created_at?: string | null
+          id?: string
+          record_id?: string | null
+          submission_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_rest_notes_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_notes_block_id_fkey"
+            columns: ["block_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_blocks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_rest_notes_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_rest_notes_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_monthly_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_rest_records: {
+        Row: {
+          created_at: string | null
+          crew_id: string
+          id: string
+          is_compliant: boolean | null
+          longest_rest_minutes: number | null
+          notes: string | null
+          record_date: string
+          rest_period_count: number | null
+          submission_id: string | null
+          total_rest_minutes: number | null
+          total_work_minutes: number | null
+          updated_at: string | null
+          vessel_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          crew_id: string
+          id?: string
+          is_compliant?: boolean | null
+          longest_rest_minutes?: number | null
+          notes?: string | null
+          record_date: string
+          rest_period_count?: number | null
+          submission_id?: string | null
+          total_rest_minutes?: number | null
+          total_work_minutes?: number | null
+          updated_at?: string | null
+          vessel_id: string
+        }
+        Update: {
+          created_at?: string | null
+          crew_id?: string
+          id?: string
+          is_compliant?: boolean | null
+          longest_rest_minutes?: number | null
+          notes?: string | null
+          record_date?: string
+          rest_period_count?: number | null
+          submission_id?: string | null
+          total_rest_minutes?: number | null
+          total_work_minutes?: number | null
+          updated_at?: string | null
+          vessel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_rest_records_crew_id_fkey"
+            columns: ["crew_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_records_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_monthly_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_rest_records_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_rest_rule_sets: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_default: boolean | null
+          max_interval_between_rest: number
+          max_rest_periods_per_24h: number
+          min_long_rest_block: number
+          min_rest_per_24h: number
+          min_rest_per_7d: number
+          name: string
+          notes: string | null
+          updated_at: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_default?: boolean | null
+          max_interval_between_rest?: number
+          max_rest_periods_per_24h?: number
+          min_long_rest_block?: number
+          min_rest_per_24h?: number
+          min_rest_per_7d?: number
+          name: string
+          notes?: string | null
+          updated_at?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_default?: boolean | null
+          max_interval_between_rest?: number
+          max_rest_periods_per_24h?: number
+          min_long_rest_block?: number
+          min_rest_per_24h?: number
+          min_rest_per_7d?: number
+          name?: string
+          notes?: string | null
+          updated_at?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_rest_rule_sets_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_rest_rule_sets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_rule_sets_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_rest_signatures: {
+        Row: {
+          id: string
+          ip_address: string | null
+          signature_method: string
+          signature_payload: Json | null
+          signed_at: string | null
+          signer_id: string
+          signer_role: string
+          submission_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          id?: string
+          ip_address?: string | null
+          signature_method?: string
+          signature_payload?: Json | null
+          signed_at?: string | null
+          signer_id: string
+          signer_role: string
+          submission_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          id?: string
+          ip_address?: string | null
+          signature_method?: string
+          signature_payload?: Json | null
+          signed_at?: string | null
+          signer_id?: string
+          signer_role?: string
+          submission_id?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_rest_signatures_signer_id_fkey"
+            columns: ["signer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "work_rest_signatures_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "work_rest_monthly_submissions"
             referencedColumns: ["id"]
           },
         ]
@@ -22463,6 +24212,67 @@ export type Database = {
         Returns: string
       }
       legacy_profile_role: { Args: { _user_id: string }; Returns: string }
+      legal_add_business_days: {
+        Args: { p_days: number; p_from: string }
+        Returns: string
+      }
+      legal_attachment_path_allowed: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
+      legal_attachments_valid: {
+        Args: {
+          p_attachments: Json
+          p_company_id: string
+          p_request_id: string
+        }
+        Returns: boolean
+      }
+      legal_can_admin: { Args: { _user_id: string }; Returns: boolean }
+      legal_can_edit: { Args: { _user_id: string }; Returns: boolean }
+      legal_can_view: { Args: { _user_id: string }; Returns: boolean }
+      legal_generate_alerts: {
+        Args: { p_company_id?: string }
+        Returns: number
+      }
+      legal_request_type_label: { Args: { p_type: string }; Returns: string }
+      legal_request_visible: {
+        Args: { p_request_id: string }
+        Returns: boolean
+      }
+      legal_search_documents: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          headline: string
+          rank: number
+          template_id: string
+          version_id: string
+          version_number: number
+        }[]
+      }
+      legal_sla_deadline: {
+        Args: { p_from?: string; p_priority: string }
+        Returns: string
+      }
+      legal_team_directory: {
+        Args: never
+        Returns: {
+          avatar_url: string
+          email: string
+          first_name: string
+          job_position: string
+          last_name: string
+          level: string
+          preferred_name: string
+          profile_id: string
+          rank: string
+          user_id: string
+        }[]
+      }
+      legal_template_company: {
+        Args: { p_template_id: string }
+        Returns: string
+      }
       log_permission_change: {
         Args: {
           p_action_type: Database["public"]["Enums"]["audit_action_type"]
@@ -22485,7 +24295,160 @@ export type Database = {
         Args: { _name: string }
         Returns: boolean
       }
+      logbook_capacity: { Args: { _user_id: string }; Returns: string }
+      logbook_close_volume: {
+        Args: {
+          p_expected_version: number
+          p_place: string
+          p_reason: string
+          p_volume_id: string
+        }
+        Returns: {
+          book_id: string
+          closed_at: string | null
+          closed_by: string | null
+          closed_by_name: string | null
+          closure_place: string | null
+          closure_reason: string | null
+          company_id: string
+          continuation_of: string | null
+          cover_fields: Json
+          created_at: string
+          flag_profile: string
+          id: string
+          label: string
+          logbook_id: string
+          opened_at: string
+          opened_by: string | null
+          opened_by_name: string | null
+          page_count: number
+          particulars: Json
+          registry_source: Json | null
+          sequence: number
+          status: string
+          template: Json
+          template_revision: string
+          updated_at: string
+          version: number
+          vessel_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "logbook_volumes"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      logbook_entry_capacities: {
+        Args: { _entry_id: string }
+        Returns: string[]
+      }
+      logbook_entry_digest: {
+        Args: { e: Database["public"]["Tables"]["logbook_entries"]["Row"] }
+        Returns: string
+      }
+      logbook_missing_signers: {
+        Args: { _capacities: string[]; _policy: string; _with_master?: boolean }
+        Returns: string[]
+      }
+      logbook_refresh_supersession: {
+        Args: { _entry_id: string }
+        Returns: undefined
+      }
+      logbook_seal_page: {
+        Args: {
+          p_entry_ids: string[]
+          p_section_id: string
+          p_volume_id: string
+        }
+        Returns: {
+          company_id: string
+          digest: string
+          digests: string[]
+          entry_ids: string[]
+          id: string
+          logbook_id: string
+          page_number: number
+          sealed_at: string
+          sealed_by: string | null
+          sealed_by_name: string | null
+          section_id: string
+          statement: string | null
+          vessel_id: string
+          volume_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "logbook_pages"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      logbook_sign_entry: {
+        Args: {
+          p_entry_id: string
+          p_expected_version: number
+          p_kind: string
+          p_witness_capacity?: string
+          p_witness_name?: string
+        }
+        Returns: {
+          amended_from_id: string | null
+          amendment_reason: string | null
+          company_id: string
+          created_at: string
+          data: Json
+          digest: string | null
+          entry_at: string
+          entry_date: string
+          finalized_at: string | null
+          finalized_by: string | null
+          finalized_by_name: string | null
+          flag_profile: string | null
+          id: string
+          latitude: number | null
+          line_number: number | null
+          logbook_id: string
+          longitude: number | null
+          override_reason: string | null
+          page_id: string | null
+          page_number: number | null
+          position_text: string | null
+          recorded_by: string | null
+          recorded_by_name: string | null
+          recorded_capacity: string | null
+          remarks: string | null
+          schema_snapshot: Json | null
+          section_id: string | null
+          signed_at: string | null
+          signed_by: string | null
+          signed_by_name: string | null
+          source_sample_id: string | null
+          source_snapshot: Json | null
+          status: Database["public"]["Enums"]["logbook_entry_status"]
+          summary: string | null
+          superseded_by_id: string | null
+          template_revision: string | null
+          updated_at: string
+          updated_by: string | null
+          updated_by_name: string | null
+          version: number
+          vessel_id: string
+          volume_id: string | null
+          watch_period: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "logbook_entries"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       my_profile_id: { Args: never; Returns: string }
+      nb_project_in_company: {
+        Args: { p_project_id: string }
+        Returns: boolean
+      }
       onboarding_recompute: {
         Args: { p_record_id: string }
         Returns: undefined
@@ -22516,6 +24479,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      rbac_company_permission: {
+        Args: {
+          _module_key: string
+          _required: Database["public"]["Enums"]["permission_level"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       recruitment_hire_candidate: {
         Args: {
           p_application_id: string
@@ -22523,6 +24494,61 @@ export type Database = {
           p_vessel_id?: string
         }
         Returns: string
+      }
+      search_regulations: {
+        Args: {
+          p_category?: string
+          p_limit?: number
+          p_project_id: string
+          p_query: string
+        }
+        Returns: {
+          category: string
+          content_indexed_at: string
+          created_at: string
+          description: string
+          external_url: string
+          file_name: string
+          headline: string
+          id: string
+          rank: number
+          reference_number: string
+          source: string
+          storage_path: string
+          tags: string
+          title: string
+          uploaded_by: string
+        }[]
+      }
+      search_yard_standards: {
+        Args: {
+          p_category?: string
+          p_limit?: number
+          p_project_id: string
+          p_query: string
+        }
+        Returns: {
+          category: string
+          content_indexed_at: string
+          created_at: string
+          description: string
+          doc_type_code: string
+          document_number: string
+          element_code: string
+          external_url: string
+          file_name: string
+          headline: string
+          id: string
+          material_code: string
+          rank: number
+          revision: string
+          seq_code: string
+          sheet_number: string
+          storage_path: string
+          tags: string
+          title: string
+          uploaded_by: string
+        }[]
       }
       snooze_alert: {
         Args: { p_alert_id: string; p_reason?: string; p_snooze_hours?: number }
@@ -22669,6 +24695,7 @@ export type Database = {
         | "signed"
         | "amended"
         | "finalized"
+        | "verified"
       logbook_type:
         | "deck_log"
         | "engine_log"
@@ -22678,6 +24705,17 @@ export type Database = {
         | "garbage_record_book"
         | "ballast_water_record"
         | "visitor_log"
+        | "official_log"
+        | "ihm_record"
+        | "orders_book"
+        | "garbage_record_book_2"
+        | "oil_record_book_2"
+        | "cargo_record_book"
+        | "ods_record"
+        | "fuel_record"
+        | "nox_record"
+        | "sewage_record"
+        | "biofouling_record"
       nb_approval_status: "pending" | "approved" | "changes_needed"
       nb_build_phase_status: "planned" | "active" | "completed" | "on_hold"
       nb_change_order_status:
@@ -22989,6 +25027,7 @@ export const Constants = {
         "signed",
         "amended",
         "finalized",
+        "verified",
       ],
       logbook_type: [
         "deck_log",
@@ -22999,6 +25038,17 @@ export const Constants = {
         "garbage_record_book",
         "ballast_water_record",
         "visitor_log",
+        "official_log",
+        "ihm_record",
+        "orders_book",
+        "garbage_record_book_2",
+        "oil_record_book_2",
+        "cargo_record_book",
+        "ods_record",
+        "fuel_record",
+        "nox_record",
+        "sewage_record",
+        "biofouling_record",
       ],
       nb_approval_status: ["pending", "approved", "changes_needed"],
       nb_build_phase_status: ["planned", "active", "completed", "on_hold"],
