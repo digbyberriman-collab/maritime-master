@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import SettingsCard from '../common/SettingsCard';
+import { useConfirm } from '@/hooks/useConfirm';
 
 interface Vessel {
   id: string;
@@ -94,6 +95,7 @@ const VISIBLE_MODULES = [
 ];
 
 const AuditModeSection: React.FC = () => {
+  const { confirm, dialog } = useConfirm();
   const { user, profile } = useAuth();
   const { toast } = useToast();
 
@@ -266,6 +268,14 @@ const AuditModeSection: React.FC = () => {
   };
 
   const deactivateSession = async (sessionId: string) => {
+    const confirmed = await confirm({
+      title: 'Deactivate this audit session?',
+      description: 'The auditor loses access immediately and their link stops working.',
+      confirmLabel: 'Deactivate',
+      destructive: true,
+    });
+    if (!confirmed) return;
+
     try {
       const { error } = await (supabase as any)
         .from('audit_mode_sessions')
@@ -663,6 +673,7 @@ const AuditModeSection: React.FC = () => {
             ))}
         </SettingsCard>
       )}
+      {dialog}
     </div>
   );
 };

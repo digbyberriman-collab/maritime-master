@@ -27,8 +27,10 @@ import {
 } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { INSURANCE_FIELD_ACCESS_LEVELS } from '@/lib/compliance/types';
+import { useConfirm } from '@/hooks/useConfirm';
 
 export const InsuranceAuditModeSection: React.FC = () => {
+  const { confirm, dialog } = useConfirm();
   const { 
     auditSessions, 
     activeSession, 
@@ -36,6 +38,16 @@ export const InsuranceAuditModeSection: React.FC = () => {
     createAuditSession,
     revokeAuditSession 
   } = useInsuranceAuditMode();
+
+  const handleRevoke = async (sessionId: string) => {
+    const confirmed = await confirm({
+      title: 'Revoke this auditor access?',
+      description: 'The auditor loses access to insurance records immediately.',
+      confirmLabel: 'Revoke',
+      destructive: true,
+    });
+    if (confirmed) revokeAuditSession.mutate(sessionId);
+  };
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [newSession, setNewSession] = useState({
@@ -179,7 +191,7 @@ export const InsuranceAuditModeSection: React.FC = () => {
               <Button 
                 variant="destructive" 
                 size="sm"
-                onClick={() => revokeAuditSession.mutate(activeSession.id)}
+                onClick={() => handleRevoke(activeSession.id)}
               >
                 Revoke Access
               </Button>
@@ -279,7 +291,7 @@ export const InsuranceAuditModeSection: React.FC = () => {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => revokeAuditSession.mutate(session.id)}
+                        onClick={() => handleRevoke(session.id)}
                       >
                         Revoke
                       </Button>
@@ -311,6 +323,7 @@ export const InsuranceAuditModeSection: React.FC = () => {
           </div>
         </CardContent>
       </Card>
+      {dialog}
     </div>
   );
 };

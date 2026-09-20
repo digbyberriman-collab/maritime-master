@@ -37,6 +37,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useMaintenance, type SparePart } from '@/hooks/useMaintenance';
 import { useVessels } from '@/hooks/useVessels';
+import { useConfirm } from '@/hooks/useConfirm';
 import {
   getStockStatus as stockStatusOf,
   getStockPercent as stockPercentOf,
@@ -71,6 +72,7 @@ const EMPTY_FORM = {
 export default function SpareParts() {
   const { spareParts, equipment, createSparePart, updateSparePart, isLoading } = useMaintenance();
   const { vessels } = useVessels();
+  const { confirm, dialog } = useConfirm();
 
   const [search, setSearch] = useState('');
   const [vesselFilter, setVesselFilter] = useState('all');
@@ -149,7 +151,14 @@ export default function SpareParts() {
     );
   }
 
-  function handleMarkOrdered(part: SparePart) {
+  async function handleMarkOrdered(part: SparePart) {
+    const confirmed = await confirm({
+      title: 'Mark this part as ordered?',
+      description: `${part.part_name} — ${part.part_number}. This records today as the last order date.`,
+      confirmLabel: 'Mark Ordered',
+    });
+    if (!confirmed) return;
+
     updateSparePart.mutate({
       id: part.id,
       last_ordered_date: format(new Date(), 'yyyy-MM-dd'),
@@ -502,6 +511,7 @@ export default function SpareParts() {
           </div>
         )}
       </div>
+      {dialog}
     </DashboardLayout>
   );
 }

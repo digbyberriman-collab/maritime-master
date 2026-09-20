@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { useConfirm } from '@/hooks/useConfirm';
 
 interface DraftTemplate {
   id: string;
@@ -26,6 +27,7 @@ interface DraftTemplate {
 }
 
 export default function DraftTemplates() {
+  const { confirm, dialog } = useConfirm();
   const [templates, setTemplates] = useState<DraftTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -81,7 +83,13 @@ export default function DraftTemplates() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Are you sure you want to delete this draft?')) return;
+    const confirmed = await confirm({
+      title: 'Delete this draft?',
+      description: 'The draft template and its fields are removed. This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!confirmed) return;
 
     try {
       const { error } = await supabase
@@ -284,6 +292,7 @@ export default function DraftTemplates() {
           </div>
         )}
       </div>
+      {dialog}
     </DashboardLayout>
   );
 }

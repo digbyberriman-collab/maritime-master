@@ -41,6 +41,7 @@ import {
 } from '@/lib/permissions';
 import { useAuth } from '@/contexts/AuthContext';
 import type { CrewMember } from '@/hooks/useCrew';
+import { useConfirm } from '@/hooks/useConfirm';
 
 // Extended form schema with all new fields
 const formSchema = z.object({
@@ -125,6 +126,7 @@ const FullCrewEditModal: React.FC<FullCrewEditModalProps> = ({
   isLoading,
 }) => {
   const { profile, user } = useAuth();
+  const { confirm, dialog } = useConfirm();
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [activeTab, setActiveTab] = useState('personal');
   
@@ -253,11 +255,16 @@ const FullCrewEditModal: React.FC<FullCrewEditModalProps> = ({
     onClose();
   };
 
-  const handleClose = () => {
+  const handleClose = async () => {
     if (hasUnsavedChanges) {
-      if (!confirm('You have unsaved changes. Are you sure you want to close?')) {
-        return;
-      }
+      const confirmed = await confirm({
+        title: 'Discard unsaved changes?',
+        description: 'The edits made to this profile will be lost.',
+        confirmLabel: 'Discard',
+        cancelLabel: 'Keep editing',
+        destructive: true,
+      });
+      if (!confirmed) return;
     }
     onClose();
   };
@@ -279,7 +286,8 @@ const FullCrewEditModal: React.FC<FullCrewEditModalProps> = ({
   if (!crewMember) return null;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
+    <>
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) void handleClose(); }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Crew Profile</DialogTitle>
@@ -831,6 +839,8 @@ const FullCrewEditModal: React.FC<FullCrewEditModalProps> = ({
         </Form>
       </DialogContent>
     </Dialog>
+    {dialog}
+    </>
   );
 };
 

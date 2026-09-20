@@ -67,6 +67,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { useConfirm } from '@/hooks/useConfirm';
 
 interface APIIntegration {
   id: string;
@@ -239,6 +240,7 @@ const mockIntegrations: APIIntegration[] = [
 ];
 
 const APIIntegrations: React.FC = () => {
+  const { confirm, dialog } = useConfirm();
   const { profile } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
@@ -337,15 +339,30 @@ const APIIntegrations: React.FC = () => {
   };
 
   const deleteWebhookConfig = async (id: string) => {
+    const confirmed = await confirm({
+      title: 'Delete this webhook?',
+      description: 'Events stop being delivered to this endpoint. This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!confirmed) return;
+
     const { error } = await supabase
       .from('webhook_configurations')
       .delete()
       .eq('id', id);
 
-    if (!error) {
-      setWebhookConfigs(webhookConfigs.filter(w => w.id !== id));
-      toast({ title: 'Deleted', description: 'Webhook configuration removed' });
+    if (error) {
+      toast({
+        title: 'Delete failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return;
     }
+
+    setWebhookConfigs(webhookConfigs.filter(w => w.id !== id));
+    toast({ title: 'Deleted', description: 'Webhook configuration removed' });
   };
 
   const copyToClipboard = (text: string) => {
@@ -1190,6 +1207,7 @@ x-webhook-secret: whsec_your_secret_here
           </TabsContent>
         </Tabs>
       </div>
+      {dialog}
     </DashboardLayout>
   );
 };

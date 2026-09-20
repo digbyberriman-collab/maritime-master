@@ -12,6 +12,7 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { useConfirm } from '@/hooks/useConfirm';
 
 interface TravelRecord {
   id: string;
@@ -68,6 +69,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function TravelRecordDetail() {
+  const { confirm, dialog } = useConfirm();
   const { id } = useParams();
   const navigate = useNavigate();
   const [record, setRecord] = useState<TravelRecord | null>(null);
@@ -165,7 +167,13 @@ export default function TravelRecordDetail() {
   }, [id, loadRecord, loadFlights, loadDocuments]);
 
   async function handleDelete() {
-    if (!confirm('Are you sure you want to delete this travel record?')) return;
+    const confirmed = await confirm({
+      title: 'Delete this travel record?',
+      description: 'The record and its flight and document links are removed. This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!confirmed) return;
 
     try {
       const { error } = await supabase
@@ -452,6 +460,7 @@ export default function TravelRecordDetail() {
           </Card>
         </TabsContent>
       </Tabs>
+      {dialog}
     </div>
   );
 }

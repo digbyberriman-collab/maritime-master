@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { format, formatDistanceToNow } from 'date-fns';
 import { z } from 'zod';
+import { useConfirm } from '@/hooks/useConfirm';
 
 interface Session {
   id: string;
@@ -43,6 +44,7 @@ const passwordSchema = z.object({
 });
 
 const SecuritySection: React.FC = () => {
+  const { confirm, dialog } = useConfirm();
   const { toast } = useToast();
   const { user } = useAuth();
   
@@ -266,6 +268,14 @@ const SecuritySection: React.FC = () => {
   };
 
   const revokeSession = async (sessionId: string) => {
+    const confirmed = await confirm({
+      title: 'Revoke this session?',
+      description: 'That device is signed out immediately and has to sign in again.',
+      confirmLabel: 'Revoke',
+      destructive: true,
+    });
+    if (!confirmed) return;
+
     try {
       const { error } = await supabase
         .from('user_sessions')
@@ -737,6 +747,7 @@ const SecuritySection: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {dialog}
     </div>
   );
 };

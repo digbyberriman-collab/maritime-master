@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { useConfirm } from '@/hooks/useConfirm';
 
 interface FormSchedule {
   id: string;
@@ -41,6 +42,7 @@ const frequencyLabels: Record<string, string> = {
 };
 
 export default function FormSchedules() {
+  const { confirm, dialog } = useConfirm();
   const [schedules, setSchedules] = useState<FormSchedule[]>([]);
   const [templates, setTemplates] = useState<{ id: string; name: string }[]>([]);
   const [vessels, setVessels] = useState<{ id: string; name: string }[]>([]);
@@ -139,7 +141,13 @@ export default function FormSchedules() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm('Are you sure you want to delete this schedule?')) return;
+    const confirmed = await confirm({
+      title: 'Delete this schedule?',
+      description: 'The schedule stops generating forms. This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!confirmed) return;
 
     try {
       const { error } = await supabase
@@ -452,6 +460,7 @@ export default function FormSchedules() {
           </div>
         )}
       </div>
+      {dialog}
     </DashboardLayout>
   );
 }

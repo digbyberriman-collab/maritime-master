@@ -31,9 +31,11 @@ import { useCrewTasks, CrewTask, TaskStatus } from '@/hooks/useCrewTasks';
 import { AssignTaskModal } from '@/components/crew/AssignTaskModal';
 import { useAuth } from '@/contexts/AuthContext';
 import { format, formatDistanceToNow, isPast } from 'date-fns';
+import { useConfirm } from '@/hooks/useConfirm';
 
 export default function CrewTasksPage() {
   const { user } = useAuth();
+  const { confirm, dialog } = useConfirm();
   const [activeTab, setActiveTab] = useState<'my-tasks' | 'assigned-by-me'>('my-tasks');
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -59,6 +61,19 @@ export default function CrewTasksPage() {
   } = useCrewTasks({ 
     assignedByMe: true 
   });
+
+  const handleDeleteTask = async (taskId: string) => {
+    const task = assignedTasks.find(t => t.id === taskId) ?? myTasks.find(t => t.id === taskId);
+    const confirmed = await confirm({
+      title: 'Delete this task?',
+      description: task
+        ? `"${task.title}" is removed for whoever it was assigned to. This cannot be undone.`
+        : 'The task is removed for whoever it was assigned to. This cannot be undone.',
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (confirmed) await deleteTask(taskId);
+  };
 
   const displayTasks = activeTab === 'my-tasks' ? myTasks : assignedTasks;
   const loading = activeTab === 'my-tasks' ? loadingMyTasks : loadingAssigned;
@@ -185,7 +200,7 @@ export default function CrewTasksPage() {
               viewMode="assignee"
               onStart={handleStartTask}
               onComplete={(id) => setCompleteTaskId(id)}
-              onDelete={deleteTask}
+              onDelete={handleDeleteTask}
             />
           </TabsContent>
 
@@ -195,7 +210,7 @@ export default function CrewTasksPage() {
               loading={loading}
               viewMode="assigner"
               onVerify={handleVerifyTask}
-              onDelete={deleteTask}
+              onDelete={handleDeleteTask}
             />
           </TabsContent>
         </Tabs>
@@ -237,6 +252,8 @@ export default function CrewTasksPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {dialog}
     </DashboardLayout>
   );
 }
