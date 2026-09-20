@@ -6,6 +6,16 @@ import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useToast } from '@/shared/hooks/use-toast';
 
 export type Referral = Tables<'hw_referrals'>;
+
+/**
+ * Mirrors `hw_referrals_clinical_notes_clinical_only`: clinical background may
+ * only travel between clinical disciplines, because RLS cannot mask a column
+ * and the whole row reaches whoever sits at either end of the referral.
+ */
+const CLINICAL_FROM = ['medical', 'physio'];
+const CLINICAL_TO = ['medical', 'physio', 'specialist', 'shoreside'];
+export const clinicalReferral = (from?: string | null, to?: string | null) =>
+  !!from && !!to && CLINICAL_FROM.includes(from) && CLINICAL_TO.includes(to);
 export type ExpiryItem = Tables<'hw_expiry_items'>;
 
 export interface ReferralEntry extends Referral {
@@ -107,15 +117,22 @@ export function useReferrals(options: { personId?: string | null; toDiscipline?:
   const save = useMutation({
     mutationFn: async (values: Partial<Referral> & { person_id?: string; reason?: string }) => {
       if (!companyId) throw new Error('No company on your profile');
-      if (values.id) {
-        const { error } = await supabase.from('hw_referrals').update(values).eq('id', values.id);
+      // The row is readable by the practitioner at either end, so the database
+      // only accepts clinical notes when both ends are clinical. Mirror that
+      // here rather than letting a constraint violation reach the user.
+      const scrubbed = { ...values };
+      if (scrubbed.clinical_notes && !clinicalReferral(scrubbed.from_discipline, scrubbed.to_discipline)) {
+        scrubbed.clinical_notes = null;
+      }
+      if (scrubbed.id) {
+        const { error } = await supabase.from('hw_referrals').update(scrubbed).eq('id', scrubbed.id);
         if (error) throw error;
         return;
       }
-      const target = values.person_id ?? personId;
+      const target = scrubbed.person_id ?? personId;
       if (!target) throw new Error('No person selected');
       const { error } = await supabase.from('hw_referrals').insert({
-        ...values,
+        ...scrubbed,
         person_id: target,
         company_id: companyId,
         referred_by: user?.id ?? null,
@@ -134,16 +151,15 @@ export function useReferrals(options: { personId?: string | null; toDiscipline?:
   const respond = useMutation({
     mutationFn: async (input: { id: string; status: string; response_notes?: string | null; outcome?: string | null }) => {
       const now = new Date().toISOString();
-      const { error } = await supabase
-        .from('hw_referrals')
-        .update({
-          status: input.status,
-          response_notes: input.response_notes ?? null,
-          outcome: input.outcome ?? null,
-          responded_at: now,
-          completed_at: input.status === 'completed' ? now : null,
-        })
-        .eq('id', input.id);
+      // Only the fields the responder actually supplied are written, so
+      // re-responding to a referral does not wipe the notes or the outcome it
+      // already carries. completed_at is stamped on completion and cleared
+      // only when the referral leaves the completed state.
+      const patch: Record<string, unknown> = { status: input.status, responded_at: now };
+      if (input.response_notes !== undefined) patch.response_notes = input.response_notes ?? null;
+      if (input.outcome !== undefined) patch.outcome = input.outcome ?? null;
+      patch.completed_at = input.status === 'completed' ? now : null;
+      const { error } = await supabase.from('hw_referrals').update(patch).eq('id', input.id);
       if (error) throw error;
     },
     onSuccess: () => {

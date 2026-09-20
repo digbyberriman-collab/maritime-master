@@ -6,6 +6,11 @@ import { useToast } from '@/shared/hooks/use-toast';
 
 export type PatientRecord = Tables<'med_patient_records'>;
 export type Allergy = Tables<'med_allergies'>;
+
+/** Clinical order for `med_allergies.severity`; anything unknown sorts last. */
+const SEVERITY_ORDER = ['mild', 'moderate', 'severe', 'anaphylaxis'];
+const severityRank = (value: string | null | undefined) =>
+  SEVERITY_ORDER.indexOf(String(value ?? '').toLowerCase());
 export type Condition = Tables<'med_conditions'>;
 export type Medication = Tables<'med_medications'>;
 export type Vaccination = Tables<'med_vaccinations'>;
@@ -161,13 +166,17 @@ export function useAllergies({ personId, activeOnly = false }: ListOptions = {})
         .from('med_allergies')
         .select('*')
         .eq('company_id', companyId as string)
-        .order('severity', { ascending: false })
         .order('allergen');
       if (personId) request = request.eq('person_id', personId);
       if (activeOnly) request = request.eq('is_active', true);
       const { data, error } = await request;
       if (error) throw error;
-      return data ?? [];
+      // severity is a text column, so ordering it in the database is
+      // alphabetical and puts anaphylaxis below mild. This is a safety list
+      // read by the galley and the spa: the worst has to be at the top.
+      return [...(data ?? [])].sort(
+        (a, b) => severityRank(b.severity) - severityRank(a.severity) || a.allergen.localeCompare(b.allergen),
+      );
     },
   });
 

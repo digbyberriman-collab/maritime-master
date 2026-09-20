@@ -6,6 +6,8 @@ import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useToast } from '@/shared/hooks/use-toast';
 import { useHealthPeople } from '@/modules/health/hooks/useHealthPeople';
+import { localDayOf } from '@/modules/health/lib/format';
+import { NUT_GOALS_KEY, NUT_PROFILE_KEY } from '@/modules/health/hooks/useNutrition';
 
 export type PtProgram = Tables<'pt_programs'>;
 export type PtProgramSession = Tables<'pt_program_sessions'>;
@@ -20,7 +22,10 @@ export const PT_SESSIONS_KEY = ['health', 'pt-sessions'] as const;
 export const PT_SET_LOGS_KEY = ['health', 'pt-set-logs'] as const;
 export const PT_APPOINTMENTS_KEY = ['health', 'pt-appointments'] as const;
 export const HW_MEASUREMENTS_KEY = ['health', 'measurements'] as const;
-export const TRAINING_GOALS_KEY = ['health', 'training-goals'] as const;
+// nut_goals is one table with two front doors: the trainer sets a goal here
+// and the nutritionist sees it on their own page. Sharing the key means
+// either side's save refreshes both; two keys left each stale to the other.
+export const TRAINING_GOALS_KEY = NUT_GOALS_KEY;
 
 export const PROGRAM_STATUSES = [
   { value: 'draft', label: 'Draft' },
@@ -1397,7 +1402,9 @@ export function usePtDashboard(): PtDashboardData {
   const roster = useAthleteRoster();
 
   const todayAppointments = useMemo(
-    () => appointments.appointments.filter((a) => a.starts_at.slice(0, 10) === today),
+    // Compared on the local day, not the stored UTC one: otherwise "today"
+    // shows tomorrow's early sessions and hides tonight's.
+    () => appointments.appointments.filter((a) => localDayOf(a.starts_at) === today),
     [appointments.appointments, today],
   );
 
@@ -1436,7 +1443,8 @@ export function usePtDashboard(): PtDashboardData {
 
 export type AthletePreferences = Tables<'nut_profiles'>;
 
-export const ATHLETE_PREFERENCES_KEY = ['health', 'athlete-preferences'] as const;
+/** Same table as the nutrition profile, so the same key. */
+export const ATHLETE_PREFERENCES_KEY = NUT_PROFILE_KEY;
 
 export const TRAINING_GOAL_TYPES = [
   { value: 'maintain', label: 'Maintain' },

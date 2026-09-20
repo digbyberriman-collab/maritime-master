@@ -42,6 +42,8 @@ Two resolvers, each mirrored in SQL and TypeScript so the UI and RLS agree.
 
 Rank grants nothing. A ship's medic gets clinical access by being on the practitioner roster (`hw_practitioners`), which is why the Staff page states that consequence in the form. Captains, pursers and heads of department are deliberately absent.
 
+Because the roster *is* the grant, writing to it is itself privileged: only a medical admin may put anyone on the medical roster, and a wellness admin may manage the other disciplines. HR edit rights do not reach it — otherwise a purser could add themselves as a medic and read every clinical record, which is exactly the escalation the rest of this model exists to prevent. `hw_is_practitioner` is company-scoped and a trigger refuses a roster row naming a profile from another company, so a row written in one company cannot grant rights in another.
+
 **Fitness to work** (`med_fitness_can_view`; `resolveFitnessAccess`) is the one medical surface the bridge and HR can read: medical staff, anyone with HR view, captains and fleet masters. It carries status, restrictions and dates and no clinical detail, which is why fitness lives in its own table rather than on the consultation.
 
 **Wellness** (`wellness_can_*`; `resolveWellnessAccess`) covers spa, nutrition, physiotherapy and training:
@@ -52,6 +54,15 @@ Rank grants nothing. A ship's medic gets clinical access by being on the practit
 - self: RBAC `wellness` with scope `self`, or legacy `crew`
 
 Physiotherapy notes are the exception inside wellness: they are treated as clinical and gated on medical access, the `physio` discipline or wellness admin (`canAccessPhysio`, and the matching `physio_*` RLS policies).
+
+Four more places where the wellness population is deliberately held back, because RLS cannot mask a column and the whole row goes to whoever can read it:
+
+- **Consent.** `hw_people.consent_share_safety_flags` gates who sees a person's allergies. Wellness edit rights reach every `hw_people` row, so without a guard the same population the consent gates could grant itself the consent. A trigger restricts that one column to the person it concerns and to medical admins; everything else on the row stays editable.
+- **Referral notes.** `hw_referrals.clinical_notes` is constrained to referrals whose two ends are both clinical (`medical`/`physio` out, `medical`/`physio`/`specialist`/`shoreside` in). A spa, nutrition or PT referral carries `reason` and nothing more. `clinicalReferral()` in `useReferrals.ts` mirrors the constraint so the UI never trips it.
+- **Telemedicine and handover logs.** `med_log_entries` is otherwise operational, but those two log types are consultation notes by another name, so wellness readers see every other type and not those.
+- **Settings.** `hw_settings` carries the telemedicine provider account and the controlled-drug witness rule, so it is gated on wellness or medical view, both on the table and in `hw_settings_for`.
+
+**Alerts.** `public.alerts` is company-visible by default, which is wrong for a module whose alerts name a person and the thing that is expiring. A restrictive policy (`health_alerts_scoped`) narrows `source_module = 'health'`: vaccination and screening items to clinical readers, fitness items to the `med_fitness_can_view` set, and stock, equipment, kit, protocol and licence items to the wellness team. The subject always sees their own. Without it, a deckhand would read *"J. Smith: Hepatitis B validity due in 45 days"* off the company alert feed.
 
 `ModuleRoute` gains `medicalLevel` and `wellnessLevel` alongside the existing HR and payroll gates. The rule used in `src/modules/health/routes.tsx` is that a page carries a level only when nobody outside that level has business opening it; pages a crew member opens to see their own record carry no level, because the database returns their row and nothing else. Sidebar leaves carry `moduleKey` (`medical` or `wellness`) and `selfServe`, so a crew member keeps their own record and their own training while company-wide pages disappear.
 
@@ -86,6 +97,8 @@ Retention: clinical records are registered in `hr_record_metadata` as `medical_r
 
 `supabase/functions/pt-exercise-import` imports into `pt_exercises` from wger or ExerciseDB. It runs server side for one reason: the ExerciseDB connector needs a RapidAPI key, and that key must never reach the browser. It is held in `pt_exercise_sources.credential`, a table only a wellness admin can read, and used only in that function. wger needs no key and is licensed CC-BY-SA 4.0, which the imported rows carry as attribution.
 
+Every outbound request is pinned to an allowlisted host over https, and the wger pagination cursor — which is remote input — must stay on the host the import started from. Neither the stored `base_url` nor the cursor is trusted: without the pin, a rewritten base URL would carry the RapidAPI key wherever it pointed, and a hostile upstream could walk the loop onto an internal address and have the response written back into a company-readable table under the service-role key.
+
 MuscleWiki, AnatomyTOOL and Z-Anatomy have no usable public API, so those connectors are file imports: upload a JSON or CSV export, map the columns and confirm you are licensed to use it.
 
 ## Assumptions to confirm
@@ -108,6 +121,8 @@ The migrations were applied to a local PostgreSQL 16 and the engines exercised a
 - Assigning a template snapshots it, and editing the template afterwards leaves the athlete's programme untouched.
 - `hw_generate_alerts` raises the right alerts and raises nothing on a second run.
 
+The same harness was used to prove the access fixes from the security review, with seven users across six roles and two companies: a purser and a captain are refused when they try to join the medical roster and a DPA is not; a purser cannot flip another person's consent but can still edit the rest of the row; a captain, a purser and a trainer read none of the vaccination alerts while the subject and the medic read theirs; a referral carrying clinical notes to the spa is refused and the same referral to physiotherapy is accepted; a trainer and a purser see the fridge log and not the telemedicine call; a roster row naming another company's profile is refused; a crew member cannot read settings, run the alert sweeper, or write an access-log row about someone else's record. The captain still reads the fitness board, which is the availability half of the same change.
+
 Two pre-existing HRIS issues surfaced during that replay and are **not** fixed here, because they belong to that module:
 
 - `hr_generate_alerts` compared a uuid column against text and therefore never raised an HR alert. This one **is** fixed, in `20260919150000_fix_hr_generate_alerts_uuid.sql`, because the health generator was built from it and shares the `alerts` table.
@@ -119,11 +134,16 @@ Two pre-existing HRIS issues surfaced during that replay and are **not** fixed h
 2. Regenerate `src/integrations/supabase/types.ts` from the live project (`supabase gen types typescript --project-id pfvtrtkqkvjbnbaabgpv > src/integrations/supabase/types.ts`). The file is hand-patched for the new tables, views and functions and will drift otherwise.
 3. Deploy the edge function `pt-exercise-import`.
 4. Add `hw_generate_alerts` to the daily sweep, alongside the HR alert generation. The HR generator starts working again with the same deployment, so expect a backlog of HR alerts on its first run.
-5. Put the ship's medics on the practitioner roster at Medical › Staff and link their crew profiles. Nobody has clinical access until this is done, including the DPA's own medic.
+5. Put the ship's medics on the practitioner roster at Medical › Staff and link their crew profiles. Nobody has clinical access until this is done, including the DPA's own medic. Only a medical admin can do it — a captain or purser cannot, by design.
 6. Review the seeded `role_permissions` for the `medical` and `wellness` modules per company.
 7. Set `hw_settings` per company: units, warning windows, telemedicine provider, controlled drug witnessing, spa hours.
 8. Seed the starting data you want from the pages themselves: Category A stores per vessel, the screening template, the spa treatment menu and the exercise connectors.
 
 ## Testing
 
-`npm run check` runs lint, typecheck and the unit tests. Health-specific suites: `src/test/lib/medicalAccess.test.ts`, `src/test/lib/wellnessAccess.test.ts`, and the Health invariants in `src/test/config/sitemap.test.ts`, which assert that every sitemap leaf is gated and that `HEALTH_PATHS` matches the sitemap exactly, so a new leaf cannot silently fall back to a placeholder.
+`npm run check` runs lint, typecheck and the unit tests. Health-specific suites:
+
+- `src/test/lib/medicalAccess.test.ts` and `src/test/lib/wellnessAccess.test.ts` — the two resolvers.
+- `src/test/config/sitemap.test.ts` — the Health invariants: every sitemap leaf is gated, and `HEALTH_PATHS` matches the sitemap exactly, so a new leaf cannot silently fall back to a placeholder.
+- `src/test/health/pages.smoke.test.tsx` — every page rendered against empty and populated fixtures, so no page's empty state is assumed rather than known.
+- `src/test/health/fixes.test.ts` — the regressions from the review: local versus UTC calendar days, the `datetime-local` round trip, template scoring modes and the referral clinical-notes rule. The timezone cases run in Dubai and New York, because the bugs they cover were invisible from London and wrong everywhere else.

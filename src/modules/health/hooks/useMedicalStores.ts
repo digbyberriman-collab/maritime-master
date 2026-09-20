@@ -14,6 +14,7 @@ export interface SupplyItemEntry extends SupplyItem {
   location_name: string | null;
   vessel_name: string | null;
   isLow: boolean;
+  isOutOfStock: boolean;
   isExpired: boolean;
   isExpiringSoon: boolean;
   daysToExpiry: number | null;
@@ -161,7 +162,10 @@ export function useSupplyItems({ vesselId, locationId, controlledOnly }: ItemOpt
           ...typed,
           location_name: typed.med_supply_locations?.name ?? null,
           vessel_name: typed.vessels?.name ?? null,
-          isLow: typed.quantity < typed.minimum_quantity,
+          // minimum_quantity defaults to 0, so a bare `<` never flags an item
+          // that has simply run out. Empty is always low.
+          isLow: typed.quantity <= 0 || typed.quantity < typed.minimum_quantity,
+          isOutOfStock: typed.quantity <= 0,
           isExpired: days !== null && days < 0,
           isExpiringSoon: days !== null && days >= 0 && days <= 90,
           daysToExpiry: days,
@@ -245,6 +249,7 @@ export function useSupplyItems({ vesselId, locationId, controlledOnly }: ItemOpt
     return {
       total: rows.length,
       low: rows.filter((r) => r.isLow).length,
+      outOfStock: rows.filter((r) => r.isOutOfStock).length,
       expired: rows.filter((r) => r.isExpired).length,
       expiringSoon: rows.filter((r) => r.isExpiringSoon).length,
       controlled: rows.filter((r) => r.is_controlled).length,

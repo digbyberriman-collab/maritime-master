@@ -69,10 +69,39 @@ const stripHtml = (value: string | null | undefined): string | null => {
   return text || null;
 };
 
+// The connector base URL comes out of the database and the pagination cursor
+// comes out of the remote response, so neither is trusted. Every outbound
+// request is pinned to the connector's own host over https: without this a
+// hostile upstream could walk the loop onto a link-local metadata address and
+// have the result written back with the service-role key, and a rewritten
+// base_url would carry the RapidAPI key to a host of the attacker's choosing.
+const ALLOWED_HOSTS: Record<string, string[]> = {
+  wger: ['wger.de', 'www.wger.de'],
+  exercisedb: ['exercisedb.p.rapidapi.com'],
+};
+
+function assertAllowedUrl(sourceKey: string, candidate: string): URL {
+  let url: URL;
+  try {
+    url = new URL(candidate);
+  } catch {
+    throw new Error(`${candidate} is not a valid URL`);
+  }
+  if (url.protocol !== 'https:') {
+    throw new Error(`${sourceKey} must be reached over https`);
+  }
+  const allowed = ALLOWED_HOSTS[sourceKey] ?? [];
+  if (!allowed.includes(url.hostname.toLowerCase())) {
+    throw new Error(`${url.hostname} is not an approved host for ${sourceKey}`);
+  }
+  return url;
+}
+
 async function fetchWger(companyId: string, baseUrl: string, limit: number, language: string) {
   const rows: ExerciseRow[] = [];
   const errors: string[] = [];
   const pageSize = Math.min(limit, 100);
+  const origin = assertAllowedUrl('wger', baseUrl);
   let url: string | null =
     `${baseUrl.replace(/\/$/, '')}/exercisebaseinfo/?limit=${pageSize}&offset=0`;
 
@@ -115,7 +144,18 @@ async function fetchWger(companyId: string, baseUrl: string, limit: number, lang
         is_rehab: false,
       });
     }
-    url = rows.length < limit ? payload.next ?? null : null;
+    // The cursor is remote input: keep it on the host we started from.
+    const next = rows.length < limit ? (payload.next ?? null) : null;
+    if (next) {
+      const nextUrl = assertAllowedUrl('wger', String(next));
+      if (nextUrl.host !== origin.host) {
+        errors.push('wger returned a pagination link on another host; stopping.');
+        break;
+      }
+      url = nextUrl.toString();
+    } else {
+      url = null;
+    }
   }
 
   return { rows, errors };
@@ -127,7 +167,7 @@ async function fetchExerciseDb(
   credential: string,
   limit: number,
 ) {
-  const host = new URL(baseUrl).host;
+  const host = assertAllowedUrl('exercisedb', baseUrl).host;
   const response = await fetch(`${baseUrl.replace(/\/$/, '')}/exercises?limit=${limit}`, {
     headers: {
       'X-RapidAPI-Key': credential,

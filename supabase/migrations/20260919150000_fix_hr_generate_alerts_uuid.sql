@@ -87,3 +87,9 @@ BEGIN
 END;
 $$;
 
+
+-- The original definition left the function executable by PUBLIC. It carries a
+-- caller guard, but an unauthenticated role has no business reaching a
+-- SECURITY DEFINER sweeper at all.
+REVOKE ALL ON FUNCTION public.hr_generate_alerts(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.hr_generate_alerts(uuid) TO authenticated, service_role;

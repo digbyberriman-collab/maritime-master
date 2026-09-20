@@ -124,7 +124,49 @@ export const formatMacros = (row: {
   return `${kcal} kcal · ${p}P ${c}C ${f}F`;
 };
 
-export const todayIso = (): string => new Date().toISOString().slice(0, 10);
+/**
+ * The calendar day in the browser's timezone as `YYYY-MM-DD`.
+ *
+ * Everything in this module that stores a day — a food log entry, a spa
+ * booking, a scheduled session — stores the day the user was living in, not
+ * the UTC day. `toISOString().slice(0, 10)` gets that wrong for most of the
+ * planet for part of every day, so nothing here uses it.
+ */
+export const localDayIso = (date: Date = new Date()): string => {
+  const y = date.getFullYear();
+  const m = `${date.getMonth() + 1}`.padStart(2, '0');
+  const d = `${date.getDate()}`.padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+/** The local calendar day a stored timestamp falls on. */
+export const localDayOf = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : localDayIso(d);
+};
+
+/**
+ * A `<input type="datetime-local">` value for a stored timestamp, in the
+ * browser's timezone. The input has no zone designator, so it must be fed and
+ * read as local time or every save shifts the record by the UTC offset.
+ */
+export const toLocalDateTimeInput = (value?: string | Date | null): string => {
+  const d = value ? new Date(value) : new Date();
+  if (Number.isNaN(d.getTime())) return '';
+  const hh = `${d.getHours()}`.padStart(2, '0');
+  const mm = `${d.getMinutes()}`.padStart(2, '0');
+  return `${localDayIso(d)}T${hh}:${mm}`;
+};
+
+/** The stored timestamp for a `datetime-local` value, read as local time. */
+export const fromLocalDateTimeInput = (value: string | null | undefined): string | null => {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+};
+
+export const todayIso = (): string => localDayIso();
 
 export const addDaysIso = (iso: string, days: number): string => {
   const d = new Date(`${iso}T00:00:00Z`);

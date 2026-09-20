@@ -19,7 +19,7 @@ import {
   usePtPrograms,
   weekStartIso,
 } from '@/modules/health/hooks/usePtPrograms';
-import { formatDate } from '@/modules/health/lib/format';
+import { formatDate, todayIso } from '@/modules/health/lib/format';
 
 /** Charts and personal bests, so progress is visible rather than remembered. */
 const MyProgressPage: React.FC = () => {
@@ -40,11 +40,17 @@ const MyProgressPage: React.FC = () => {
     [setLogs.volumeByWeek],
   );
 
+  // Adherence is a record of what happened, so only sessions whose date has
+  // passed can be counted as missed. Bucketing future weeks too filled the
+  // chart with red bars for sessions nobody had had the chance to do yet, and
+  // pushed the weeks that actually happened off the end of the 16-week window.
   const adherenceChart = useMemo(() => {
+    const today = todayIso();
     const buckets = new Map<string, { due: number; done: number }>();
     for (const program of programs.programs) {
       for (const session of program.sessions) {
         if (!session.scheduled_on) continue;
+        if (session.scheduled_on > today && session.status !== 'completed') continue;
         const week = weekStartIso(session.scheduled_on);
         const bucket = buckets.get(week) ?? { due: 0, done: 0 };
         bucket.due += 1;

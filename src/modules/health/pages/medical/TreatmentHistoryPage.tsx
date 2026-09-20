@@ -60,7 +60,15 @@ import {
   useConsultations,
   type Consultation,
 } from '@/modules/health/hooks/useConsultations';
-import { addDaysIso, formatDate, formatDateTime, todayIso, toneClass } from '@/modules/health/lib/format';
+import {
+  addDaysIso,
+  formatDate,
+  formatDateTime,
+  fromLocalDateTimeInput,
+  todayIso,
+  toLocalDateTimeInput,
+  toneClass,
+} from '@/modules/health/lib/format';
 
 /**
  * The treatment and consultation log. Every clinical contact on board, the
@@ -406,7 +414,7 @@ const ConsultationDialog: React.FC<{
   const [raiseReferral, setRaiseReferral] = useState(false);
 
   const [form, setForm] = useState({
-    occurred_at: new Date().toISOString().slice(0, 16),
+    occurred_at: toLocalDateTimeInput(),
     consultation_type: 'walk_in',
     location: '',
     presenting_complaint: '',
@@ -442,7 +450,7 @@ const ConsultationDialog: React.FC<{
     setRaiseReferral(false);
     if (consultation) {
       setForm({
-        occurred_at: consultation.occurred_at.slice(0, 16),
+        occurred_at: toLocalDateTimeInput(consultation.occurred_at),
         consultation_type: consultation.consultation_type,
         location: consultation.location ?? '',
         presenting_complaint: consultation.presenting_complaint ?? '',
@@ -474,7 +482,7 @@ const ConsultationDialog: React.FC<{
     } else {
       setForm((prev) => ({
         ...prev,
-        occurred_at: new Date().toISOString().slice(0, 16),
+        occurred_at: toLocalDateTimeInput(),
         presenting_complaint: '',
         history: '',
         observations: '',
@@ -511,7 +519,7 @@ const ConsultationDialog: React.FC<{
     await onSubmit({
       ...(consultation ? { id: consultation.id } : {}),
       person_id: target,
-      occurred_at: new Date(form.occurred_at).toISOString(),
+      occurred_at: fromLocalDateTimeInput(form.occurred_at) ?? new Date().toISOString(),
       consultation_type: form.consultation_type,
       location: form.location || null,
       presenting_complaint: form.presenting_complaint || null,

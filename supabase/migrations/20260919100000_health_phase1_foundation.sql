@@ -103,6 +103,9 @@ COMMENT ON TABLE public.hw_practitioners IS 'Medical staff, spa therapists, phys
 -- ---------------------------------------------------------------
 
 -- True when the user is an active practitioner in the given discipline.
+-- The roster row must sit in the same company as the profile it points at:
+-- without that predicate a roster row written in one company would grant
+-- clinical rights over another company's records.
 CREATE OR REPLACE FUNCTION public.hw_is_practitioner(_user_id uuid, _discipline text)
 RETURNS boolean
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
@@ -111,6 +114,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
     FROM public.hw_practitioners pr
     JOIN public.profiles p ON p.id = pr.profile_id
     WHERE p.user_id = _user_id
+      AND p.company_id = pr.company_id
       AND pr.is_active
       AND (_discipline IS NULL OR pr.discipline = _discipline)
       AND (pr.ended_on IS NULL OR pr.ended_on >= CURRENT_DATE)
@@ -332,6 +336,9 @@ BEGIN
   IF NOT public.user_belongs_to_company(auth.uid(), p_company_id) THEN
     RAISE EXCEPTION 'not permitted';
   END IF;
+  IF NOT (public.wellness_can_view(auth.uid()) OR public.medical_can_view(auth.uid())) THEN
+    RAISE EXCEPTION 'not permitted';
+  END IF;
 
   SELECT * INTO v_row FROM public.hw_settings WHERE company_id = p_company_id;
   IF NOT FOUND THEN
@@ -356,8 +363,10 @@ CREATE TABLE IF NOT EXISTS public.hw_referrals (
   from_discipline text NOT NULL CHECK (from_discipline IN ('medical','spa','physio','nutrition','pt','self','hr')),
   to_discipline text NOT NULL CHECK (to_discipline IN ('medical','spa','physio','nutrition','pt','shoreside','specialist')),
   reason text NOT NULL,
-  -- Clinical background is only populated on medical referrals and is
-  -- masked in the UI for non-clinical readers.
+  -- Clinical background. RLS has no column masking and the row is readable by
+  -- the practitioner at either end, so the column is constrained below to
+  -- referrals whose two ends are both clinical. A spa, nutrition or PT
+  -- referral carries `reason` and nothing more.
   clinical_notes text,
   urgency text NOT NULL DEFAULT 'routine' CHECK (urgency IN ('routine','soon','urgent','emergency')),
   status text NOT NULL DEFAULT 'open' CHECK (status IN ('open','accepted','declined','completed','cancelled')),
@@ -369,7 +378,12 @@ CREATE TABLE IF NOT EXISTS public.hw_referrals (
   completed_at timestamptz,
   outcome text,
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT hw_referrals_clinical_notes_clinical_only CHECK (
+    clinical_notes IS NULL
+    OR (from_discipline IN ('medical','physio')
+        AND to_discipline IN ('medical','physio','specialist','shoreside'))
+  )
 );
 CREATE INDEX IF NOT EXISTS idx_hw_referrals_person ON public.hw_referrals(person_id, status);
 CREATE INDEX IF NOT EXISTS idx_hw_referrals_company ON public.hw_referrals(company_id, status, urgency);
@@ -398,12 +412,17 @@ COMMENT ON TABLE public.hw_record_access_log IS 'Clinical record reads. Insert-o
 -- ---------------------------------------------------------------
 ALTER TABLE public.hw_people ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "hw_people_select" ON public.hw_people;
+-- med_fitness_can_view is here so a captain or an HR viewer can resolve the
+-- person behind a fitness certificate. hw_people carries identity only, so
+-- this grants no clinical detail; without it hw_fitness_status joins to
+-- nothing and the fitness board looks empty to the people who need it.
 CREATE POLICY "hw_people_select" ON public.hw_people
   FOR SELECT USING (
     public.user_belongs_to_company(auth.uid(), company_id)
     AND (
       public.wellness_can_view(auth.uid())
       OR public.medical_can_view(auth.uid())
+      OR public.med_fitness_can_view(auth.uid())
       OR profile_id = public.my_profile_id()
     )
   );
@@ -429,22 +448,25 @@ CREATE POLICY "hw_practitioners_select" ON public.hw_practitioners
       OR profile_id = public.my_profile_id()
     )
   );
+-- The roster is the grant mechanism for clinical access, so writing to it is
+-- itself a privileged act. HR edit rights (captain, purser, master) must not
+-- reach it: that would let a purser add themselves as a medic and read every
+-- clinical record. A wellness admin manages the spa, gym and galley
+-- disciplines; only a medical admin may put anyone on the medical roster.
 DROP POLICY IF EXISTS "hw_practitioners_write" ON public.hw_practitioners;
 CREATE POLICY "hw_practitioners_write" ON public.hw_practitioners
   FOR ALL USING (
     public.user_belongs_to_company(auth.uid(), company_id)
     AND (
-      public.wellness_can_admin(auth.uid())
-      OR public.medical_can_admin(auth.uid())
-      OR public.hr_can_edit(auth.uid())
+      public.medical_can_admin(auth.uid())
+      OR (public.wellness_can_admin(auth.uid()) AND discipline <> 'medical')
     )
   )
   WITH CHECK (
     public.user_belongs_to_company(auth.uid(), company_id)
     AND (
-      public.wellness_can_admin(auth.uid())
-      OR public.medical_can_admin(auth.uid())
-      OR public.hr_can_edit(auth.uid())
+      public.medical_can_admin(auth.uid())
+      OR (public.wellness_can_admin(auth.uid()) AND discipline <> 'medical')
     )
   );
 
@@ -479,9 +501,14 @@ CREATE POLICY "hw_measurements_write" ON public.hw_measurements
   );
 
 ALTER TABLE public.hw_settings ENABLE ROW LEVEL SECURITY;
+-- Settings carry the telemedicine provider account and the controlled-drug
+-- witness rule, so they are not company-wide reading.
 DROP POLICY IF EXISTS "hw_settings_select" ON public.hw_settings;
 CREATE POLICY "hw_settings_select" ON public.hw_settings
-  FOR SELECT USING (public.user_belongs_to_company(auth.uid(), company_id));
+  FOR SELECT USING (
+    public.user_belongs_to_company(auth.uid(), company_id)
+    AND (public.wellness_can_view(auth.uid()) OR public.medical_can_view(auth.uid()))
+  );
 DROP POLICY IF EXISTS "hw_settings_write" ON public.hw_settings;
 CREATE POLICY "hw_settings_write" ON public.hw_settings
   FOR ALL USING (
@@ -529,10 +556,17 @@ CREATE POLICY "hw_referrals_write" ON public.hw_referrals
 
 ALTER TABLE public.hw_record_access_log ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "hw_record_access_log_insert" ON public.hw_record_access_log;
+-- A reader may only log a read they could actually have performed, so the
+-- GDPR trail cannot be padded with rows naming people the writer never saw.
 CREATE POLICY "hw_record_access_log_insert" ON public.hw_record_access_log
   FOR INSERT WITH CHECK (
     public.user_belongs_to_company(auth.uid(), company_id)
     AND accessed_by = auth.uid()
+    AND (
+      public.medical_can_view(auth.uid())
+      OR public.wellness_can_view(auth.uid())
+      OR public.hw_person_is_self(auth.uid(), person_id)
+    )
   );
 DROP POLICY IF EXISTS "hw_record_access_log_select" ON public.hw_record_access_log;
 CREATE POLICY "hw_record_access_log_select" ON public.hw_record_access_log
@@ -585,6 +619,7 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+REVOKE ALL ON FUNCTION public.hw_sync_person_from_profile() FROM PUBLIC, anon;
 
 DROP TRIGGER IF EXISTS trg_profiles_sync_hw_person ON public.profiles;
 CREATE TRIGGER trg_profiles_sync_hw_person
@@ -617,7 +652,56 @@ JOIN public.crew_assignments a ON a.user_id = p.user_id AND a.is_current
 WHERE hp.profile_id = p.id AND hp.vessel_id IS NULL;
 
 -- ---------------------------------------------------------------
--- 11. updated_at triggers
+-- 11. Integrity triggers RLS cannot express
+-- ---------------------------------------------------------------
+
+-- Consent to share safety flags belongs to the person it is about. Wellness
+-- edit rights reach every hw_people row, and the same population is the one
+-- the consent gates, so without this a spa manager or purser could grant
+-- themselves sight of a crew member's allergies.
+CREATE OR REPLACE FUNCTION public.hw_people_guard_consent()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NEW.consent_share_safety_flags IS DISTINCT FROM OLD.consent_share_safety_flags
+     AND auth.uid() IS NOT NULL
+     AND NOT public.hw_person_is_self(auth.uid(), NEW.id)
+     AND NOT public.medical_can_admin(auth.uid()) THEN
+    RAISE EXCEPTION 'consent_share_safety_flags may only be changed by the person it concerns or a medical administrator';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.hw_people_guard_consent() FROM PUBLIC, anon;
+
+DROP TRIGGER IF EXISTS trg_hw_people_guard_consent ON public.hw_people;
+CREATE TRIGGER trg_hw_people_guard_consent BEFORE UPDATE ON public.hw_people
+  FOR EACH ROW EXECUTE FUNCTION public.hw_people_guard_consent();
+
+-- A roster row grants access inside its own company, so the profile it points
+-- at must live in that company. A CHECK cannot look the profile up.
+CREATE OR REPLACE FUNCTION public.hw_practitioners_guard_company()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NEW.profile_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.profiles p
+    WHERE p.id = NEW.profile_id AND p.company_id = NEW.company_id
+  ) THEN
+    RAISE EXCEPTION 'practitioner profile % does not belong to company %', NEW.profile_id, NEW.company_id;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.hw_practitioners_guard_company() FROM PUBLIC, anon;
+
+DROP TRIGGER IF EXISTS trg_hw_practitioners_guard_company ON public.hw_practitioners;
+CREATE TRIGGER trg_hw_practitioners_guard_company
+  BEFORE INSERT OR UPDATE ON public.hw_practitioners
+  FOR EACH ROW EXECUTE FUNCTION public.hw_practitioners_guard_company();
+
+-- ---------------------------------------------------------------
+-- 12. updated_at triggers
 -- ---------------------------------------------------------------
 DROP TRIGGER IF EXISTS trg_hw_people_updated_at ON public.hw_people;
 CREATE TRIGGER trg_hw_people_updated_at BEFORE UPDATE ON public.hw_people
@@ -636,7 +720,7 @@ CREATE TRIGGER trg_hw_referrals_updated_at BEFORE UPDATE ON public.hw_referrals
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- ---------------------------------------------------------------
--- 12. Grants
+-- 13. Grants
 -- ---------------------------------------------------------------
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.hw_people TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.hw_practitioners TO authenticated;

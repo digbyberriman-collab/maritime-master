@@ -333,6 +333,21 @@ BEGIN
     RAISE EXCEPTION 'template % not found', p_template_id;
   END IF;
 
+  -- Both optional references are stored on the programme, so neither may
+  -- point outside the subject's company.
+  IF p_trainer_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.hw_practitioners pr
+    WHERE pr.id = p_trainer_id AND pr.company_id = v_company_id
+  ) THEN
+    RAISE EXCEPTION 'trainer % not found', p_trainer_id;
+  END IF;
+  IF p_physio_plan_id IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.physio_treatment_plans pl
+    WHERE pl.id = p_physio_plan_id AND pl.company_id = v_company_id
+  ) THEN
+    RAISE EXCEPTION 'physio plan % not found', p_physio_plan_id;
+  END IF;
+
   v_end_date := (p_start_date + make_interval(weeks => v_template.duration_weeks))::date;
 
   INSERT INTO public.pt_programs (

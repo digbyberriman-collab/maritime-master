@@ -354,7 +354,10 @@ const MedicalSuppliesPage: React.FC = () => {
           icon={AlertTriangle}
           label="Below minimum"
           value={items.isLoading ? null : items.summary.low}
-          tone={items.summary.low > 0 ? 'warning' : 'good'}
+          hint={
+            items.summary.outOfStock > 0 ? `${items.summary.outOfStock} of them at zero` : undefined
+          }
+          tone={items.summary.outOfStock > 0 ? 'critical' : items.summary.low > 0 ? 'warning' : 'good'}
         />
         <StatTile
           icon={PackageX}

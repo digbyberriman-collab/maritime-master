@@ -18,6 +18,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Slider } from '@/components/ui/slider';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -50,7 +51,7 @@ import {
   RISK_BANDS,
   SCREENING_CATEGORIES,
   recordStatusLabel,
-  riskBandForScore,
+  riskBandFor,
   scoreScreening,
   screeningCategoryLabel,
   useScreeningAnswers,
@@ -632,9 +633,13 @@ const ScreeningRunner: React.FC<{
     setRecommendations(record.recommendations ?? '');
   }, [record]);
 
+  // The template decides how it is scored: summed, averaged or not at all.
+  // Hard-coding 'sum' stored a 12x total on an averaged template and banded
+  // the person high when they were low.
+  const scoringMode = record?.scoring_mode ?? 'sum';
   const scored = useMemo(
-    () => scoreScreening(questions.questions, answers.byQuestion, 'sum'),
-    [questions.questions, answers.byQuestion],
+    () => scoreScreening(questions.questions, answers.byQuestion, scoringMode),
+    [questions.questions, answers.byQuestion, scoringMode],
   );
 
   const completion = questions.questions.length
@@ -647,8 +652,8 @@ const ScreeningRunner: React.FC<{
       id: record.id,
       status: 'submitted',
       completed_on: todayIso(),
-      total_score: scored.total,
-      risk_band: riskBandForScore(scored.total),
+      total_score: scoringMode === 'none' ? null : scored.total,
+      risk_band: riskBandFor(scored.total, scoringMode),
     });
     onOpenChange(false);
   };
@@ -661,8 +666,8 @@ const ScreeningRunner: React.FC<{
       reviewed_on: todayIso(),
       summary: summary || null,
       recommendations: recommendations || null,
-      total_score: scored.total,
-      risk_band: riskBandForScore(scored.total),
+      total_score: scoringMode === 'none' ? null : scored.total,
+      risk_band: riskBandFor(scored.total, scoringMode),
     });
     onOpenChange(false);
   };
@@ -762,11 +767,18 @@ const ScreeningRunner: React.FC<{
 
 const AnswerField: React.FC<{
   question: ScreeningQuestion;
-  value: { value_numeric: number | null; value_text: string | null; is_flagged: boolean } | null;
+  value: {
+    value_numeric: number | null;
+    value_text: string | null;
+    value_options: string[];
+    is_flagged: boolean;
+  } | null;
   disabled: boolean;
   onChange: (values: Record<string, unknown>) => void;
 }> = ({ question, value, disabled, onChange }) => {
   const numeric = value?.value_numeric ?? null;
+  const chosen = value?.value_options ?? [];
+  const options = question.options ?? [];
 
   return (
     <div className="space-y-2 rounded-lg border p-3">
@@ -824,6 +836,56 @@ const AnswerField: React.FC<{
           value={value?.value_text ?? ''}
           onChange={(e) => onChange({ value_text: e.target.value || null })}
         />
+      )}
+
+      {question.answer_type === 'single_choice' && (
+        <RadioGroup
+          value={chosen[0] ?? ''}
+          disabled={disabled}
+          onValueChange={(v) => onChange({ value_options: v ? [v] : [], value_text: v || null })}
+          className="space-y-1.5"
+        >
+          {options.length === 0 && (
+            <p className="text-xs text-muted-foreground">This question has no options set.</p>
+          )}
+          {options.map((option) => (
+            <div key={option} className="flex items-center gap-2">
+              <RadioGroupItem value={option} id={`${question.id}-${option}`} />
+              <Label htmlFor={`${question.id}-${option}`} className="text-sm font-normal">
+                {option}
+              </Label>
+            </div>
+          ))}
+        </RadioGroup>
+      )}
+
+      {question.answer_type === 'multi_choice' && (
+        <div className="space-y-1.5">
+          {options.length === 0 && (
+            <p className="text-xs text-muted-foreground">This question has no options set.</p>
+          )}
+          {options.map((option) => {
+            const checked = chosen.includes(option);
+            return (
+              <div key={option} className="flex items-center gap-2">
+                <Checkbox
+                  id={`${question.id}-${option}`}
+                  checked={checked}
+                  disabled={disabled}
+                  onCheckedChange={(next) => {
+                    const values = next === true
+                      ? [...chosen, option]
+                      : chosen.filter((o) => o !== option);
+                    onChange({ value_options: values, value_text: values.join(', ') || null });
+                  }}
+                />
+                <Label htmlFor={`${question.id}-${option}`} className="text-sm font-normal">
+                  {option}
+                </Label>
+              </div>
+            );
+          })}
+        </div>
       )}
 
       {question.answer_type === 'date' && (

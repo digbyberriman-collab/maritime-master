@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useToast } from '@/shared/hooks/use-toast';
-import { daysUntil } from '@/modules/health/lib/format';
+import { daysUntil, localDayIso } from '@/modules/health/lib/format';
 
 export type SpaTreatment = Tables<'spa_treatments'>;
 export type SpaRoom = Tables<'spa_rooms'>;
@@ -387,13 +387,8 @@ export interface BookingFormData {
   cancelled_reason: string | null;
 }
 
-/** Local `YYYY-MM-DD` for a date, avoiding the UTC shift `toISOString` adds. */
-export const localDayIso = (date: Date): string => {
-  const y = date.getFullYear();
-  const m = `${date.getMonth() + 1}`.padStart(2, '0');
-  const d = `${date.getDate()}`.padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
+/** Re-exported so spa callers keep one import; the implementation is shared. */
+export { localDayIso };
 
 /** Combines a local day and a `HH:mm` time into a timestamptz string. */
 export const combineDayAndTime = (dayIso: string, time: string): string => {
@@ -574,14 +569,16 @@ export function useSpaBookings(options: BookingOptions = {}) {
       status: string;
       cancelledReason?: string | null;
     }) => {
-      const { error } = await supabase
-        .from('spa_bookings')
-        .update({
-          status,
-          cancelled_reason: blankToNull(cancelledReason),
-          updated_by: user?.id ?? null,
-        })
-        .eq('id', id);
+      // Only touch the cancellation reason when the caller supplied one, or
+      // when the booking is leaving the cancelled state. Writing it
+      // unconditionally erased the recorded reason on every other transition.
+      const patch: Record<string, unknown> = { status, updated_by: user?.id ?? null };
+      if (cancelledReason !== undefined) {
+        patch.cancelled_reason = blankToNull(cancelledReason);
+      } else if (status !== 'cancelled') {
+        patch.cancelled_reason = null;
+      }
+      const { error } = await supabase.from('spa_bookings').update(patch).eq('id', id);
       if (error) throw error;
       return status;
     },
@@ -717,7 +714,11 @@ export function useSpaInventory(
         return {
           ...typed,
           vessel_name: typed.vessels?.name ?? null,
-          isLow: Number(typed.quantity) < Number(typed.minimum_quantity),
+          // minimum_quantity defaults to 0, so a bare `<` never flags an item
+          // that has simply run out. Empty is always low.
+          isLow:
+            Number(typed.quantity) <= 0 ||
+            Number(typed.quantity) < Number(typed.minimum_quantity),
           isExpired: days !== null && days < 0,
           isExpiringSoon: days !== null && days >= 0 && days <= warningDays,
           daysToExpiry: days,

@@ -227,6 +227,8 @@ export function useScreeningQuestions(templateId: string | null | undefined) {
 export interface ScreeningRecordEntry extends ScreeningRecord {
   person_name: string | null;
   template_name: string | null;
+  /** From the template, so the record is scored the way its author meant. */
+  scoring_mode: string;
 }
 
 export function useScreeningRecords(options: { personId?: string | null; templateId?: string | null } = {}) {
@@ -243,7 +245,9 @@ export function useScreeningRecords(options: { personId?: string | null; templat
     queryFn: async (): Promise<ScreeningRecordEntry[]> => {
       let request = supabase
         .from('med_screening_records')
-        .select('*, hw_people(first_name, last_name, preferred_name), med_screening_templates(name)')
+        .select(
+          '*, hw_people(first_name, last_name, preferred_name), med_screening_templates(name, scoring_mode)',
+        )
         .eq('company_id', companyId as string)
         .order('due_on', { ascending: true, nullsFirst: false });
       if (personId) request = request.eq('person_id', personId);
@@ -253,13 +257,14 @@ export function useScreeningRecords(options: { personId?: string | null; templat
       return (data ?? []).map((row) => {
         const typed = row as ScreeningRecord & {
           hw_people?: { first_name: string; last_name: string; preferred_name: string | null } | null;
-          med_screening_templates?: { name: string } | null;
+          med_screening_templates?: { name: string; scoring_mode: string } | null;
         };
         const p = typed.hw_people;
         return {
           ...typed,
           person_name: p ? `${p.preferred_name ?? p.first_name} ${p.last_name}` : null,
           template_name: typed.med_screening_templates?.name ?? null,
+          scoring_mode: typed.med_screening_templates?.scoring_mode ?? 'sum',
         };
       });
     },
@@ -450,7 +455,15 @@ export function scoreScreening(
   return { total: Math.round(total * 100) / 100, answered, flagged };
 }
 
-/** The band a total score falls in, using the default 0-15-30-45 thresholds. */
+/**
+ * The band a total score falls in, using the default 0-15-30-45 thresholds.
+ * An unscored template (`scoring_mode = 'none'`) has no band at all: banding
+ * its zero as "low" would put a clinical judgement on the record that nobody
+ * made.
+ */
+export const riskBandFor = (score: number, mode: string): string | null =>
+  mode === 'none' ? null : riskBandForScore(score);
+
 export const riskBandForScore = (score: number): string => {
   if (score <= 15) return 'low';
   if (score <= 30) return 'moderate';

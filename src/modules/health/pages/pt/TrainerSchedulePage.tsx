@@ -20,7 +20,7 @@ import {
   weekStartIso,
   type PtAppointmentEntry,
 } from '@/modules/health/hooks/usePtPrograms';
-import { formatDate, formatTime } from '@/modules/health/lib/format';
+import { formatDate, formatTime, localDayOf } from '@/modules/health/lib/format';
 
 const DAY_LABELS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -50,7 +50,12 @@ const TrainerSchedulePage: React.FC = () => {
     const map = new Map<string, PtAppointmentEntry[]>();
     for (let i = 0; i < 7; i += 1) map.set(addDaysIsoDate(weekStart, i), []);
     for (const appointment of diary.appointments) {
-      const key = appointment.starts_at.slice(0, 10);
+      // The columns are local days, so the appointment has to be bucketed by
+      // its local day too. Slicing the stored UTC timestamp drops an evening
+      // session west of Greenwich into tomorrow's column, and since only the
+      // seven local keys are rendered, off-grid keys disappear from the diary.
+      const key = localDayOf(appointment.starts_at);
+      if (!key || !map.has(key)) continue;
       map.set(key, [...(map.get(key) ?? []), appointment]);
     }
     return map;

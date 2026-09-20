@@ -150,6 +150,17 @@ DECLARE
   v_existing uuid;
   v_window integer;
 BEGIN
+  -- Runs unattended from pg_cron (auth.uid() null) or on demand from the UI,
+  -- where the caller must be entitled to the module.
+  IF auth.uid() IS NOT NULL
+     AND NOT (public.medical_can_edit(auth.uid()) OR public.wellness_can_admin(auth.uid())) THEN
+    RAISE EXCEPTION 'not permitted';
+  END IF;
+  IF auth.uid() IS NOT NULL AND p_company_id IS NOT NULL
+     AND NOT public.user_belongs_to_company(auth.uid(), p_company_id) THEN
+    RAISE EXCEPTION 'not permitted';
+  END IF;
+
   FOR item IN
     SELECT e.*, COALESCE(s.fitness_expiry_warning_days, 90) AS warn_fitness,
            COALESCE(s.vaccination_warning_days, 60) AS warn_vaccination,
@@ -219,7 +230,9 @@ BEGIN
     AND (p_company_id IS NULL OR a.company_id = p_company_id)
     AND NOT EXISTS (
       SELECT 1 FROM public.hw_expiry_items e
-      WHERE e.record_id = a.related_entity_id AND e.days_remaining <= 90
+      WHERE e.record_id = a.related_entity_id
+        AND e.company_id = a.company_id
+        AND e.days_remaining <= 90
     );
 
   RETURN v_count;
@@ -227,6 +240,56 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.hw_generate_alerts(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.hw_generate_alerts(uuid) TO service_role;
+
+-- Reads a person_id out of alert metadata without ever casting a value that
+-- is not a uuid: a restrictive policy evaluates its branches in no fixed
+-- order, so another module's metadata must not be able to raise here.
+CREATE OR REPLACE FUNCTION public.hw_alert_person_id(_metadata jsonb)
+RETURNS uuid
+LANGUAGE sql IMMUTABLE AS $$
+  SELECT CASE
+    WHEN _metadata->>'person_id' ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+      THEN (_metadata->>'person_id')::uuid
+  END;
+$$;
+REVOKE ALL ON FUNCTION public.hw_alert_person_id(jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.hw_alert_person_id(jsonb) TO authenticated, service_role;
+
+-- Alerts are company-visible by default, which is wrong for this module: a
+-- health alert names a person and the thing that is expiring, so left alone
+-- it would tell the whole company that a named crew member's hepatitis B
+-- booster is due. Restrictive, so it ANDs with the existing company policy.
+-- Person-level items follow the table they came from; kit, stock, equipment,
+-- protocol and practitioner-licence items are the wellness team's work.
+DROP POLICY IF EXISTS "health_alerts_scoped" ON public.alerts;
+CREATE POLICY "health_alerts_scoped" ON public.alerts
+  AS RESTRICTIVE FOR ALL TO authenticated
+  USING (
+    source_module IS DISTINCT FROM 'health'
+    OR public.medical_can_view(auth.uid())
+    OR (related_entity_type = 'fitness' AND public.med_fitness_can_view(auth.uid()))
+    OR (
+      related_entity_type IN (
+        'practitioner_licence','practitioner_qualification','medical_stock',
+        'medical_equipment','medical_equipment_service','first_aid_kit','protocol_review'
+      )
+      AND public.wellness_can_view(auth.uid())
+    )
+    OR public.hw_person_is_self(auth.uid(), public.hw_alert_person_id(metadata))
+  )
+  WITH CHECK (
+    source_module IS DISTINCT FROM 'health'
+    OR public.medical_can_view(auth.uid())
+    OR (related_entity_type = 'fitness' AND public.med_fitness_can_view(auth.uid()))
+    OR (
+      related_entity_type IN (
+        'practitioner_licence','practitioner_qualification','medical_stock',
+        'medical_equipment','medical_equipment_service','first_aid_kit','protocol_review'
+      )
+      AND public.wellness_can_view(auth.uid())
+    )
+    OR public.hw_person_is_self(auth.uid(), public.hw_alert_person_id(metadata))
+  );
 
 GRANT SELECT ON public.hw_expiry_items TO authenticated;
 GRANT SELECT ON public.hw_fitness_status TO authenticated;

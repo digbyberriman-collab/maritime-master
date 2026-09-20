@@ -260,9 +260,16 @@ export function usePractitionerQualifications(practitionerId: string | null | un
     mutationFn: async (values: Partial<PractitionerQualification> & { name: string }) => {
       if (!companyId || !practitionerId) throw new Error('No practitioner selected');
       if (values.id) {
+        // verified_by is the audit trail for who checked the certificate, not
+        // a general "last edited by" column. It moves only when the row is
+        // actually being verified, and verified_at moves with it.
+        const patch: Record<string, unknown> = { ...values };
+        if (values.verified_at && !values.verified_by) {
+          patch.verified_by = user?.id ?? null;
+        }
         const { error } = await supabase
           .from('hw_practitioner_qualifications')
-          .update({ ...values, verified_by: user?.id ?? null })
+          .update(patch)
           .eq('id', values.id);
         if (error) throw error;
         return;

@@ -848,7 +848,7 @@ DECLARE
   t text;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
-    'med_supply_locations','med_supply_items','med_equipment','med_first_aid_kits','med_log_entries'
+    'med_supply_locations','med_supply_items','med_equipment','med_first_aid_kits'
   ] LOOP
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_select', t);
@@ -868,6 +868,33 @@ BEGIN
       )$f$, t || '_write', t);
   END LOOP;
 END $$;
+
+-- med_log_entries is the same operational loop, except that two of its log
+-- types are not operational at all: a telemedicine call record and a clinical
+-- handover are consultation notes by another name, so wellness readers see
+-- every other type and not those.
+ALTER TABLE public.med_log_entries ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "med_log_entries_select" ON public.med_log_entries;
+CREATE POLICY "med_log_entries_select" ON public.med_log_entries
+  FOR SELECT USING (
+    public.user_belongs_to_company(auth.uid(), company_id)
+    AND (
+      public.medical_can_view(auth.uid())
+      OR (
+        public.wellness_can_view(auth.uid())
+        AND log_type NOT IN ('telemedicine', 'handover')
+      )
+    )
+  );
+DROP POLICY IF EXISTS "med_log_entries_write" ON public.med_log_entries;
+CREATE POLICY "med_log_entries_write" ON public.med_log_entries
+  FOR ALL USING (
+    public.user_belongs_to_company(auth.uid(), company_id)
+    AND public.medical_can_edit(auth.uid())
+  ) WITH CHECK (
+    public.user_belongs_to_company(auth.uid(), company_id)
+    AND public.medical_can_edit(auth.uid())
+  );
 
 -- Stock movements name a patient, so they are clinical.
 ALTER TABLE public.med_supply_transactions ENABLE ROW LEVEL SECURITY;
@@ -1023,14 +1050,15 @@ CREATE POLICY "hw_pract_quals_select" ON public.hw_practitioner_qualifications
       )
     )
   );
+-- Same rule as the roster itself: HR edit rights do not reach it.
 DROP POLICY IF EXISTS "hw_pract_quals_write" ON public.hw_practitioner_qualifications;
 CREATE POLICY "hw_pract_quals_write" ON public.hw_practitioner_qualifications
   FOR ALL USING (
     public.user_belongs_to_company(auth.uid(), company_id)
-    AND (public.wellness_can_admin(auth.uid()) OR public.medical_can_admin(auth.uid()) OR public.hr_can_edit(auth.uid()))
+    AND (public.wellness_can_admin(auth.uid()) OR public.medical_can_admin(auth.uid()))
   ) WITH CHECK (
     public.user_belongs_to_company(auth.uid(), company_id)
-    AND (public.wellness_can_admin(auth.uid()) OR public.medical_can_admin(auth.uid()) OR public.hr_can_edit(auth.uid()))
+    AND (public.wellness_can_admin(auth.uid()) OR public.medical_can_admin(auth.uid()))
   );
 
 -- ---------------------------------------------------------------

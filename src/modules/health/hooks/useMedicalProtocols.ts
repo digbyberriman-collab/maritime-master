@@ -53,17 +53,24 @@ export function useMedicalProtocols() {
     queryFn: async (): Promise<ProtocolEntry[]> => {
       const { data, error } = await supabase
         .from('med_protocols')
-        .select('*, med_protocol_acknowledgements(id)')
+        .select('*, med_protocol_acknowledgements(id, version)')
         .eq('company_id', companyId as string)
         .order('category')
         .order('title');
       if (error) throw error;
       return (data ?? []).map((row) => {
-        const typed = row as Protocol & { med_protocol_acknowledgements?: { id: string }[] };
+        const typed = row as Protocol & {
+          med_protocol_acknowledgements?: { id: string; version: number }[];
+        };
         const days = daysUntil(typed.review_due);
         return {
           ...typed,
-          acknowledgementCount: typed.med_protocol_acknowledgements?.length ?? 0,
+          // Publishing bumps the version, and an acknowledgement of version 2
+          // says nothing about version 3. Counting every historic row reported
+          // the crew as having read a protocol they have never seen.
+          acknowledgementCount: (typed.med_protocol_acknowledgements ?? []).filter(
+            (a) => a.version === typed.version,
+          ).length,
           reviewOverdue: days !== null && days < 0,
           daysToReview: days,
         };
