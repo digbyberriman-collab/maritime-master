@@ -37,7 +37,7 @@ Domain breakdown (261 tables): Crew/HR/Payroll/Recruitment ~61, New Build (`nb_*
 ## 3. Auth / RBAC model
 
 Four overlapping systems coexist, confirmed still unreconciled:
-1. `profiles.role` (7 values)
+1. `profiles.role` (6 values: master, chief_engineer, chief_officer, crew, dpa, shore_management — corrected from an earlier "7 values" assumption in AUDIT_CONFIG.md, per Phase 2 docs-consistency findings)
 2. `user_roles` / `app_role` enum (14 values: superadmin, dpa, fleet_master, captain, purser, chief_officer, chief_engineer, hod, officer, crew, auditor_flag, auditor_class, travel_agent, employer_api) — the actual Postgres root of trust (`has_role()`), gating RLS writes on RBAC tables and `admin-actions`
 3. `roles` / `role_permissions`
 4. `modules` / `user_permission_overrides`

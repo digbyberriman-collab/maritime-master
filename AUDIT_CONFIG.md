@@ -7,7 +7,9 @@ TECH_STACK:           React 18 + Vite 5 + TypeScript 5.8 (strict: false) + Tailw
                        Query 5 + Zustand 5 + React Router 6, Supabase (Postgres 17.6, Lovable Cloud
                        managed), deployed via Lovable's own pipeline (not a VPS/Docker deploy for
                        this repo, per supabase/config.toml and the absence of any Dockerfile)
-AUTH_MODEL:           Supabase Auth. Four overlapping RBAC systems coexist: profiles.role (7 values),
+AUTH_MODEL:           Supabase Auth. Four overlapping RBAC systems coexist: profiles.role (6 values:
+                       master, chief_engineer, chief_officer, crew, dpa, shore_management — corrected
+                       by Phase 2 docs-consistency findings from an earlier "7 values" assumption),
                        user_roles/app_role enum (14 values: superadmin, dpa, fleet_master, captain,
                        purser, chief_officer, chief_engineer, hod, officer, crew, auditor_flag,
                        auditor_class, travel_agent, employer_api), roles/role_permissions, and
