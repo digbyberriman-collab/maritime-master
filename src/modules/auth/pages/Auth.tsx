@@ -11,6 +11,8 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { z } from 'zod';
 import InkfishWatermark from '@/shared/components/InkfishWatermark';
 import { lovable } from '@/integrations/lovable';
+import { supabase } from '@/integrations/supabase/client';
+
 
 type AuthMode = 'login' | 'register' | 'forgot-password';
 
