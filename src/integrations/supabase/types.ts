@@ -6633,7 +6633,6 @@ export type Database = {
           rejection_reason: string | null
           signature_data: string | null
           signature_order: number
-          signing_cycle: number
           signature_type: string | null
           signed_at: string | null
           signer_name: string
@@ -6654,7 +6653,6 @@ export type Database = {
           rejection_reason?: string | null
           signature_data?: string | null
           signature_order: number
-          signing_cycle?: number
           signature_type?: string | null
           signed_at?: string | null
           signer_name: string
@@ -6675,7 +6673,6 @@ export type Database = {
           rejection_reason?: string | null
           signature_data?: string | null
           signature_order?: number
-          signing_cycle?: number
           signature_type?: string | null
           signed_at?: string | null
           signer_name?: string
