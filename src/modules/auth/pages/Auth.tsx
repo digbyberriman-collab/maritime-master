@@ -58,34 +58,41 @@ const Auth: React.FC = () => {
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
+    setAuthError(null);
+    const fail = (message: string) => {
+      setAuthError(message);
+      toast({ title: 'Google sign-in failed', description: message, variant: 'destructive' });
+      setIsLoading(false);
+    };
     try {
       const result = await lovable.auth.signInWithOAuth('google', {
         redirect_uri: window.location.origin,
         extraParams: {
-          hd: 'ink.fish',
           prompt: 'select_account',
         },
       });
       if (result.error) {
-        toast({
-          title: 'Google sign-in failed',
-          description: result.error.message ?? 'Please try again.',
-          variant: 'destructive',
-        });
-        setIsLoading(false);
+        fail(result.error.message ?? 'Please try again.');
         return;
       }
       if (result.redirected) return;
+
+      // No redirect and no error: confirm a session actually exists before
+      // navigating, otherwise the protected route bounces straight back here
+      // and the button is left spinning forever.
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data.user) {
+        fail(
+          'Google did not return a signed-in session. Try again, or sign in with your email and password.',
+        );
+        return;
+      }
       navigate('/dashboard');
     } catch (err) {
-      toast({
-        title: 'Google sign-in failed',
-        description: err instanceof Error ? err.message : 'Please try again.',
-        variant: 'destructive',
-      });
-      setIsLoading(false);
+      fail(err instanceof Error ? err.message : 'Please try again.');
     }
   };
+
 
   useEffect(() => {
     if (user) {
