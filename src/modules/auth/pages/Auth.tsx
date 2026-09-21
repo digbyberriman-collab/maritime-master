@@ -67,12 +67,27 @@ const Auth: React.FC = () => {
       setIsLoading(false);
     };
     try {
-      const result = await lovable.auth.signInWithOAuth('google', {
-        redirect_uri: window.location.origin,
-        extraParams: {
-          prompt: 'select_account',
-        },
-      });
+      // Watchdog: if the Google flow neither redirects nor answers, stop
+      // spinning and tell the user instead of hanging on the loading state.
+      const timeout = new Promise<'timeout'>((resolve) =>
+        window.setTimeout(() => resolve('timeout'), 20000),
+      );
+      const result = await Promise.race([
+        lovable.auth.signInWithOAuth('google', {
+          redirect_uri: window.location.origin,
+          extraParams: {
+            prompt: 'select_account',
+          },
+        }),
+        timeout,
+      ]);
+      if (result === 'timeout') {
+        fail(
+          'Google sign-in did not respond. Check that pop-ups are allowed, or sign in with your email and password.',
+        );
+        return;
+      }
+
       if (result.error) {
         fail(result.error.message ?? 'Please try again.');
         return;
