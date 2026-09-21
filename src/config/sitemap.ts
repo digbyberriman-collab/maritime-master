@@ -36,7 +36,7 @@ const slug = (s: string): string =>
 
 /** Build a leaf NavChild under a base path. Pass `existing` to point at
  *  an already-implemented route; otherwise a synthesized path is used. */
-type GateOpts = Pick<NavChild, 'moduleKey' | 'minPermission' | 'crossLink'>;
+type GateOpts = Pick<NavChild, 'moduleKey' | 'minPermission' | 'crossLink' | 'selfServe'>;
 
 function L(
   label: string,
@@ -53,6 +53,7 @@ function L(
     ...(opts.moduleKey ? { moduleKey: opts.moduleKey } : {}),
     ...(opts.minPermission ? { minPermission: opts.minPermission } : {}),
     ...(opts.crossLink ? { crossLink: true } : {}),
+    ...(opts.selfServe ? { selfServe: true } : {}),
   };
 }
 
@@ -72,6 +73,7 @@ function G(
     children,
     ...(opts.moduleKey ? { moduleKey: opts.moduleKey } : {}),
     ...(opts.minPermission ? { minPermission: opts.minPermission } : {}),
+    ...(opts.selfServe ? { selfServe: true } : {}),
   };
 }
 
@@ -323,57 +325,65 @@ const shoresideChildren: NavChild[] = [
 ];
 
 // ─── HEALTH & WELLNESS ───────────────────────────────────────────────────
+// Medical leaves carry moduleKey `medical` and are hidden from anyone
+// without clinical access. Spa / nutrition / physio / training carry
+// `wellness`. Leaves a crew member may open to see only their own record
+// are marked selfServe.
 const H = '/health';
+const MED: GateOpts = { moduleKey: 'medical' };
+const MED_SELF: GateOpts = { moduleKey: 'medical', selfServe: true };
+const WELL: GateOpts = { moduleKey: 'wellness' };
+const WELL_SELF: GateOpts = { moduleKey: 'wellness', selfServe: true };
 
 const medBase = `${H}/medical`;
 const personnelMedBase = `${medBase}/personnel`;
 const healthMedical: NavChild[] = [
-  L('Dashboard', medBase, { icon: LayoutGrid }),
-  L('Patients', medBase, { icon: Users }),
-  L('Staff', medBase, { icon: Users }),
-  L('Supplies', medBase, { icon: Package }),
-  L('First Aid', medBase, { icon: LifeBuoy }),
-  L('Equipment', medBase, { icon: Wrench }),
-  L('Protocols', medBase, { icon: BookOpen }),
-  L('Logs', medBase, { icon: FileText }),
-  L('C.H.E.K.', medBase, { icon: GraduationCap, slug: 'chek' }),
+  L('Dashboard', medBase, { icon: LayoutGrid, ...MED }),
+  L('Patients', medBase, { icon: Users, ...MED }),
+  L('Staff', medBase, { icon: Stethoscope, ...MED }),
+  L('Supplies', medBase, { icon: Package, ...MED }),
+  L('First Aid', medBase, { icon: LifeBuoy, ...MED }),
+  L('Equipment', medBase, { icon: Wrench, ...MED }),
+  L('Protocols', medBase, { icon: BookOpen, ...MED }),
+  L('Logs', medBase, { icon: FileText, ...MED }),
+  L('C.H.E.K.', medBase, { icon: GraduationCap, slug: 'chek', ...MED_SELF }),
   G('Personnel Medical Data', medBase, [
-    L('Crew Medical Records', personnelMedBase),
-    L('Fitness-to-Work / ENG1', personnelMedBase),
-    L('Vaccinations & Immunisations', personnelMedBase),
-    L('Allergies & Conditions', personnelMedBase),
-    L('Medications', personnelMedBase),
-    L('Medical Certificates', personnelMedBase),
-    L('Next of Kin / Emergency', personnelMedBase),
-    L('Incident & Treatment History', personnelMedBase),
-  ], { icon: ClipboardCheck, slug: 'personnel' }),
+    L('Crew Medical Records', personnelMedBase, MED_SELF),
+    L('Fitness-to-Work / ENG1', personnelMedBase, MED_SELF),
+    L('Vaccinations & Immunisations', personnelMedBase, MED_SELF),
+    L('Allergies & Conditions', personnelMedBase, MED_SELF),
+    L('Medications', personnelMedBase, MED_SELF),
+    L('Medical Certificates', personnelMedBase, MED_SELF),
+    L('Next of Kin / Emergency', personnelMedBase, MED_SELF),
+    L('Incident & Treatment History', personnelMedBase, MED_SELF),
+  ], { icon: ClipboardCheck, slug: 'personnel', ...MED }),
 ];
 
 const spaBase = `${H}/spa`;
 const healthSpa: NavChild[] = [
-  L('Dashboard', spaBase, { icon: LayoutGrid }),
-  L('Calendar', spaBase, { icon: Calendar }),
-  L('Clients', spaBase, { icon: Users }),
-  L('Treatments', spaBase, { icon: Heart }),
-  L('Inventory', spaBase, { icon: Package }),
+  L('Dashboard', spaBase, { icon: LayoutGrid, ...WELL }),
+  L('Calendar', spaBase, { icon: Calendar, ...WELL_SELF }),
+  L('Clients', spaBase, { icon: Users, ...WELL }),
+  L('Treatments', spaBase, { icon: Heart, ...WELL_SELF }),
+  L('Inventory', spaBase, { icon: Package, ...WELL }),
 ];
 
 const nutBase = `${H}/nutrition`;
 const healthNutrition: NavChild[] = [
-  L('Overview', nutBase, { icon: LayoutGrid }),
-  L('Food Log', nutBase, { icon: FileText }),
-  L('Calendar', nutBase, { icon: Calendar }),
-  L('Goals', nutBase, { icon: ListChecks }),
-  L('Settings', nutBase, { icon: Settings }),
+  L('Overview', nutBase, { icon: LayoutGrid, ...WELL_SELF }),
+  L('Food Log', nutBase, { icon: FileText, ...WELL_SELF }),
+  L('Calendar', nutBase, { icon: Calendar, ...WELL_SELF }),
+  L('Goals', nutBase, { icon: ListChecks, ...WELL_SELF }),
+  L('Settings', nutBase, { icon: Settings, moduleKey: 'wellness', minPermission: 'admin' }),
 ];
 
 const physioBase = `${H}/physio`;
 const healthPhysio: NavChild[] = [
-  L('Rehab Protocols', physioBase, { icon: BookOpen }),
-  L('Assessments', physioBase, { icon: ClipboardList }),
-  L('Treatment Plans', physioBase, { icon: ClipboardCheck }),
-  L('Session Log', physioBase, { icon: FileText }),
-  L('Referrals', physioBase, { icon: MessageSquare }),
+  L('Rehab Protocols', physioBase, { icon: BookOpen, ...WELL }),
+  L('Assessments', physioBase, { icon: ClipboardList, ...WELL }),
+  L('Treatment Plans', physioBase, { icon: ClipboardCheck, ...WELL }),
+  L('Session Log', physioBase, { icon: FileText, ...WELL }),
+  L('Referrals', physioBase, { icon: MessageSquare, ...WELL }),
 ];
 
 const ptBase = `${H}/personal-training`;
@@ -385,44 +395,44 @@ const trainerSourcesBase = `${trainerAdminBase}/sources`;
 const athleteBase = `${ptBase}/athlete`;
 const healthPT: NavChild[] = [
   G('Trainer', ptBase, [
-    L('Dashboard', trainerBase, { icon: LayoutGrid }),
-    L('Schedule', trainerBase, { icon: Calendar }),
+    L('Dashboard', trainerBase, { icon: LayoutGrid, ...WELL }),
+    L('Schedule', trainerBase, { icon: Calendar, ...WELL }),
     G('Athletes', trainerBase, [
-      L('Roster', trainerAthletesBase),
-      L('Athlete Workspace', trainerAthletesBase),
-      L('Active Programs', trainerAthletesBase),
-    ], { icon: Users, slug: 'athletes' }),
+      L('Roster', trainerAthletesBase, WELL),
+      L('Athlete Workspace', trainerAthletesBase, WELL),
+      L('Active Programs', trainerAthletesBase, WELL),
+    ], { icon: Users, slug: 'athletes', ...WELL }),
     G('Programming', trainerBase, [
-      L('Templates', trainerProgrammingBase),
-      L('Exercises', trainerProgrammingBase),
-      L('Rehab Protocols', trainerProgrammingBase),
-      L('Videos', trainerProgrammingBase),
-    ], { icon: Dumbbell, slug: 'programming' }),
+      L('Templates', trainerProgrammingBase, WELL),
+      L('Exercises', trainerProgrammingBase, WELL_SELF),
+      L('Rehab Protocols', trainerProgrammingBase, WELL),
+      L('Videos', trainerProgrammingBase, WELL_SELF),
+    ], { icon: Dumbbell, slug: 'programming', ...WELL }),
     G('Admin', trainerBase, [
-      L('Trainers', trainerAdminBase),
+      L('Trainers', trainerAdminBase, WELL),
       G('Sources', trainerAdminBase, [
-        L('ExerciseDB Import', trainerSourcesBase),
-        L('wger', trainerSourcesBase),
-        L('ExerciseDB API', trainerSourcesBase),
-        L('MuscleWiki', trainerSourcesBase),
-        L('AnatomyTOOL', trainerSourcesBase),
-        L('Z-Anatomy', trainerSourcesBase),
-      ], { icon: Layers, slug: 'sources' }),
-    ], { icon: Settings, slug: 'admin' }),
-  ], { icon: Dumbbell, slug: 'trainer' }),
+        L('ExerciseDB Import', trainerSourcesBase, { moduleKey: 'wellness', minPermission: 'admin' }),
+        L('wger', trainerSourcesBase, { moduleKey: 'wellness', minPermission: 'admin' }),
+        L('ExerciseDB API', trainerSourcesBase, { moduleKey: 'wellness', minPermission: 'admin' }),
+        L('MuscleWiki', trainerSourcesBase, { moduleKey: 'wellness', minPermission: 'admin' }),
+        L('AnatomyTOOL', trainerSourcesBase, { moduleKey: 'wellness', minPermission: 'admin' }),
+        L('Z-Anatomy', trainerSourcesBase, { moduleKey: 'wellness', minPermission: 'admin' }),
+      ], { icon: Layers, slug: 'sources', moduleKey: 'wellness', minPermission: 'admin' }),
+    ], { icon: Settings, slug: 'admin', moduleKey: 'wellness', minPermission: 'admin' }),
+  ], { icon: Dumbbell, slug: 'trainer', ...WELL }),
   G('Athlete', ptBase, [
-    L('My Training', athleteBase),
-    L('Progress', athleteBase),
-    L('Profile', athleteBase),
-  ], { icon: Activity, slug: 'athlete' }),
+    L('My Training', athleteBase, WELL_SELF),
+    L('Progress', athleteBase, WELL_SELF),
+    L('Profile', athleteBase, WELL_SELF),
+  ], { icon: Activity, slug: 'athlete', ...WELL_SELF }),
 ];
 
 const healthChildren: NavChild[] = [
-  G('Medical', H, healthMedical, { icon: Stethoscope, slug: 'medical' }),
-  G('Spa', H, healthSpa, { icon: Heart, slug: 'spa' }),
-  G('Nutrition', H, healthNutrition, { icon: Utensils, slug: 'nutrition' }),
-  G('Physio', H, healthPhysio, { icon: Activity, slug: 'physio' }),
-  G('Personal Training', H, healthPT, { icon: Dumbbell, slug: 'personal-training' }),
+  G('Medical', H, healthMedical, { icon: Stethoscope, slug: 'medical', ...MED_SELF }),
+  G('Spa', H, healthSpa, { icon: Heart, slug: 'spa', ...WELL_SELF }),
+  G('Nutrition', H, healthNutrition, { icon: Utensils, slug: 'nutrition', ...WELL_SELF }),
+  G('Physio', H, healthPhysio, { icon: Activity, slug: 'physio', ...WELL }),
+  G('Personal Training', H, healthPT, { icon: Dumbbell, slug: 'personal-training', ...WELL_SELF }),
 ];
 
 // ─── YARD ────────────────────────────────────────────────────────────────
