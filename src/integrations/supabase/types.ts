@@ -19101,37 +19101,6 @@ export type Database = {
           vessel_name: string
         }[]
       }
-      form_next_submission_number: {
-        Args: { p_company_id: string; p_created_date: string; p_template_id: string }
-        Returns: string
-      }
-      form_normalize_signer_role: { Args: { p_role: string }; Returns: string }
-      form_pending_signatures: {
-        Args: Record<PropertyKey, never>
-        Returns: { next_signature_order: number; submission_id: string }[]
-      }
-      form_reject_submission: {
-        Args: { p_reason: string; p_submission_id: string }
-        Returns: Json
-      }
-      form_sign_submission: {
-        Args: { p_signature_data?: string; p_signature_type?: string; p_submission_id: string }
-        Returns: Json
-      }
-      form_signature_requirements: {
-        Args: { p_submission_id: string }
-        Returns: {
-          is_mandatory: boolean
-          signature_order: number
-          signed: boolean
-          signed_by: string
-          signer_role: string
-        }[]
-      }
-      form_user_satisfies_signer_role: {
-        Args: { p_role: string; p_user_id: string }
-        Returns: boolean
-      }
       get_user_company_id: { Args: { _user_id: string }; Returns: string }
       get_user_permissions_full: {
         Args: { p_user_id: string }
