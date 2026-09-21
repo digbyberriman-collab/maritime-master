@@ -134,7 +134,6 @@ const FormTemplates: React.FC = () => {
   const getStatusBadge = (status: string) => {
     const variants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
       DRAFT: 'secondary',
-      UNDER_REVIEW: 'outline',
       PUBLISHED: 'default',
       ARCHIVED: 'destructive'
     };
@@ -562,7 +561,6 @@ const FormTemplates: React.FC = () => {
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="PUBLISHED">Published</SelectItem>
                   <SelectItem value="DRAFT">Draft</SelectItem>
-                  <SelectItem value="UNDER_REVIEW">Under Review</SelectItem>
                   <SelectItem value="ARCHIVED">Archived</SelectItem>
                 </SelectContent>
               </Select>

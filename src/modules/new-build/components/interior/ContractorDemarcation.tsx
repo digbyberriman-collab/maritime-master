@@ -163,7 +163,7 @@ export default function ContractorDemarcation() {
     if (!activeDeck) { setDeckUrl(null); return; }
     (async () => {
       const { data } = await supabase.storage
-        .from("deck-plans")
+        .from("nb-deck-plans")
         .createSignedUrl(activeDeck.image_storage_path, 3600);
       setDeckUrl(data?.signedUrl ?? null);
     })();

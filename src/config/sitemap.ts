@@ -85,15 +85,15 @@ const fleetChildren: NavChild[] = [
   L('Fleet Tracker', FLEET_BASE, { existing: '/fleet-map', icon: MapIcon }),
   L('Fleet Reports', FLEET_BASE, { icon: ClipboardList }),
   L('Fleet Calendar', FLEET_BASE, { existing: '/itinerary/timeline', icon: Calendar }),
-  L('Fleet Rotation Planner', FLEET_BASE, { icon: Network }),
+  L('Fleet Rotation Planner', FLEET_BASE, { existing: '/crew/rotation-planner', icon: Network, crossLink: true }),
   L('Fleet Documents', FLEET_BASE, { existing: '/documents', icon: FileText }),
   L('Fleet Checklists', FLEET_BASE, { existing: '/ism/checklists', icon: CheckSquare, crossLink: true }),
   L('Vessels', FLEET_BASE, { existing: '/vessels/dashboard', icon: Ship }),
   L('Users & Access', FLEET_BASE, { existing: '/users-access', icon: Users }),
   L('Notification Center', FLEET_BASE, { existing: '/notifications/center', icon: Bell }),
-  L('Notification Management', FLEET_BASE, { existing: '/admin/notifications', icon: Bell }),
-  L('Support Tickets', FLEET_BASE, { icon: LifeBuoy }),
-  L('Account', FLEET_BASE, { existing: '/account', icon: Settings }),
+  L('Notification Management', FLEET_BASE, { existing: '/settings/notifications', icon: Bell }),
+  L('Support Tickets', FLEET_BASE, { existing: '/help/support', icon: LifeBuoy, crossLink: true }),
+  L('Account', FLEET_BASE, { existing: '/settings', icon: Settings }),
 ];
 
 // ─── VESSEL ───────────────────────────────────────────────────────────────

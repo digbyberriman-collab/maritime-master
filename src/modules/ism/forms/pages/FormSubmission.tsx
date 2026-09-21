@@ -20,7 +20,6 @@ import FormProgressBar from '@/modules/ism/forms/components/FormProgressBar';
 import { 
   getFormTypeInfo, 
   getSubmissionStatusConfig,
-  generateContentHash,
   type FormField,
   type FormSchema,
   type RequiredSigner
@@ -297,36 +296,40 @@ const FormSubmissionPage: React.FC = () => {
     setSubmitting(true);
 
     try {
-      const contentHash = generateContentHash(formData as Record<string, unknown>);
-
-      const { error } = await supabase
+      // Submitting sets one column. The database stamps submitted_at,
+      // submitted_by, the lock and the sha256 content hash, and completes the
+      // submission outright when its template needs no signatures. This used
+      // to set status = 'SIGNED' and write its own hash, which meant the
+      // signed record and the hash attesting to it came from the same
+      // browser that filled the form in.
+      const { data: updated, error } = await supabase
         .from('form_submissions')
         .update({
           form_data: formData as unknown as Json,
-          status: requiredSigners.length > 0 ? 'PENDING_SIGNATURE' : 'SIGNED',
-          submitted_at: new Date().toISOString(),
-          submitted_by: user?.id,
-          content_hash: contentHash,
-          is_locked: requiredSigners.length === 0,
-          locked_at: requiredSigners.length === 0 ? new Date().toISOString() : null,
+          status: 'PENDING_SIGNATURE',
         })
-        .eq('id', submission.id);
+        .eq('id', submission.id)
+        .select('status')
+        .single();
 
       if (error) throw error;
 
+      const completed = updated?.status === 'SIGNED';
       toast({
-        title: 'Submitted',
-        description: requiredSigners.length > 0 
-          ? 'Form submitted for signature' 
-          : 'Form completed successfully',
+        title: completed ? 'Completed' : 'Submitted',
+        description: completed
+          ? 'This form needs no signatures and is now complete'
+          : 'Form submitted for signature',
       });
 
-      navigate(requiredSigners.length > 0 ? '/ism/forms/pending' : '/ism/forms/submissions');
+      navigate(completed ? '/ism/forms/submissions' : '/ism/forms/pending');
     } catch (error) {
       console.error('Failed to submit:', error);
+      // The workflow guard explains what it refused and why; showing our own
+      // wording instead would hide it.
       toast({
-        title: 'Error',
-        description: 'Failed to submit form',
+        title: 'Could not submit',
+        description: error instanceof Error ? error.message : 'Failed to submit form',
         variant: 'destructive',
       });
     } finally {

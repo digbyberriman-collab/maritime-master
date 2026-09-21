@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -18,23 +19,31 @@ import {
   PenTool,
   FileText,
   CheckCircle,
+  Undo2,
   Ship,
   User,
   Calendar,
   Loader2,
   Eye,
 } from 'lucide-react';
-import { usePendingSignatures, useSignSubmission } from '@/modules/ism/forms/hooks/useFormSubmissions';
+import {
+  usePendingSignatures,
+  useSignSubmission,
+  useRejectSubmission,
+} from '@/modules/ism/forms/hooks/useFormSubmissions';
 import { format } from 'date-fns';
 
 const PendingSignatures: React.FC = () => {
   const navigate = useNavigate();
   const { data: pendingSubmissions = [], isLoading } = usePendingSignatures();
   const signMutation = useSignSubmission();
+  const rejectMutation = useRejectSubmission();
 
   const [signDialogOpen, setSignDialogOpen] = useState(false);
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [selectedSubmission, setSelectedSubmission] = useState<any>(null);
   const [typedName, setTypedName] = useState('');
+  const [rejectReason, setRejectReason] = useState('');
 
   const handleOpenSign = (submission: any) => {
     setSelectedSubmission(submission);
@@ -42,11 +51,20 @@ const PendingSignatures: React.FC = () => {
     setSignDialogOpen(true);
   };
 
+  const handleOpenReject = (submission: any) => {
+    setSelectedSubmission(submission);
+    setRejectReason('');
+    setRejectDialogOpen(true);
+  };
+
   const handleSign = async () => {
     if (!selectedSubmission || !typedName.trim()) return;
 
+    // The typed name is the attestation, recorded against the signature. The
+    // signer's identity, role and position in the order come from the server.
     await signMutation.mutateAsync({
       submissionId: selectedSubmission.id,
+      typedName: typedName.trim(),
     });
 
     setSignDialogOpen(false);
@@ -54,8 +72,23 @@ const PendingSignatures: React.FC = () => {
     setTypedName('');
   };
 
+  const handleReject = async () => {
+    if (!selectedSubmission || !rejectReason.trim()) return;
+
+    await rejectMutation.mutateAsync({
+      submissionId: selectedSubmission.id,
+      reason: rejectReason.trim(),
+    });
+
+    setRejectDialogOpen(false);
+    setSelectedSubmission(null);
+    setRejectReason('');
+  };
+
   const getSignatureProgress = (submission: any) => {
-    const signatures = submission.signatures || [];
+    const signatures = (submission.signatures || []).filter(
+      (sig: any) => sig.status === 'SIGNED' && sig.signing_cycle === submission.signing_cycle,
+    );
     const requiredSigners = (submission.template?.required_signers as any[]) || [];
     const required = requiredSigners.filter((r: any) => r.is_mandatory !== false).length;
     return { collected: signatures.length, required };
@@ -146,6 +179,10 @@ const PendingSignatures: React.FC = () => {
                           <Eye className="h-4 w-4 mr-2" />
                           Review
                         </Button>
+                        <Button variant="outline" onClick={() => handleOpenReject(submission)}>
+                          <Undo2 className="h-4 w-4 mr-2" />
+                          Send back
+                        </Button>
                         <Button onClick={() => handleOpenSign(submission)}>
                           <PenTool className="h-4 w-4 mr-2" />
                           Sign
@@ -209,6 +246,60 @@ const PendingSignatures: React.FC = () => {
                   <PenTool className="h-4 w-4 mr-2" />
                 )}
                 Confirm Signature
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Send back dialog */}
+        <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Send this form back</DialogTitle>
+              <DialogDescription>
+                The form reopens for correction and your reason goes on its record. The next
+                submission starts a fresh round of signatures; this round stays on file.
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedSubmission && (
+              <div className="space-y-4">
+                <div className="p-4 bg-muted rounded-lg">
+                  <div className="font-medium">{selectedSubmission.template?.template_name}</div>
+                  <div className="text-sm text-muted-foreground font-mono">
+                    {selectedSubmission.submission_number}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="reject-reason">What needs correcting?</Label>
+                  <Textarea
+                    id="reject-reason"
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    placeholder="e.g. Section 4 was left blank"
+                    rows={3}
+                    autoFocus
+                  />
+                </div>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleReject}
+                disabled={!rejectReason.trim() || rejectMutation.isPending}
+              >
+                {rejectMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Undo2 className="h-4 w-4 mr-2" />
+                )}
+                Send back
               </Button>
             </DialogFooter>
           </DialogContent>

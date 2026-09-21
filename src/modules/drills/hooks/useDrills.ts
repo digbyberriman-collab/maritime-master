@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useToast } from '@/shared/hooks/use-toast';
-import { generateDrillNumber } from '@/modules/drills/constants';
 
 export interface DrillType {
   id: string;
@@ -191,11 +190,13 @@ export function useDrills() {
   // Add drill mutation
   const addDrillMutation = useMutation({
     mutationFn: async (drillData: Omit<Drill, 'id' | 'drill_number' | 'created_at' | 'updated_at' | 'vessel' | 'drill_type' | 'conducted_by'>) => {
-      const drillNumber = generateDrillNumber(drills.length);
-
+      // drill_number is set by trg_drills_set_number, per vessel and year.
+      // The client used to derive it from the length of the array this hook
+      // happened to be holding, so the count restarted with every filter and
+      // collided on the unique constraint.
       const { data, error } = await supabase
         .from('drills')
-        .insert([{ ...drillData, drill_number: drillNumber }])
+        .insert([drillData])
         .select()
         .single();
 

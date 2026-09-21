@@ -27,11 +27,12 @@ const ChecklistsPage: React.FC = () => {
   
   const { data: templates = [], isLoading } = useFormTemplates();
 
-  // Filter templates that are checklists (by category or naming)
+  // Filter templates that are checklists (by category or naming).
+  // form_type is stored upper case ('CHECKLIST'), so compare case-insensitively.
   const checklistTemplates = templates.filter(
-    t => t.category?.name?.toLowerCase().includes('checklist') || 
+    t => t.category?.name?.toLowerCase().includes('checklist') ||
          t.template_name?.toLowerCase().includes('checklist') ||
-         t.form_type === 'checklist'
+         t.form_type?.toLowerCase() === 'checklist'
   );
 
   const filteredTemplates = checklistTemplates.filter(
@@ -41,7 +42,8 @@ const ChecklistsPage: React.FC = () => {
   );
 
   // Stats
-  const activeTemplates = checklistTemplates.filter(t => t.status === 'active').length;
+  // form_templates.status is DRAFT / PUBLISHED / ARCHIVED; 'active' was never a value.
+  const activeTemplates = checklistTemplates.filter(t => t.status === 'PUBLISHED').length;
   const totalTemplates = checklistTemplates.length;
 
   return (
@@ -162,7 +164,7 @@ const ChecklistsPage: React.FC = () => {
                           <ClipboardList className="h-5 w-5 text-primary" />
                           <CardTitle className="text-base">{template.template_name}</CardTitle>
                         </div>
-                        <Badge variant={template.status === 'active' ? 'default' : 'secondary'}>
+                        <Badge variant={template.status === 'PUBLISHED' ? 'default' : 'secondary'}>
                           {template.status}
                         </Badge>
                       </div>

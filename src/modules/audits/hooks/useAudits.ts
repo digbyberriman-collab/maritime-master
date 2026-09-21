@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useToast } from '@/shared/hooks/use-toast';
-import { generateAuditNumber, generateFindingNumber } from '@/modules/audits/constants';
 import type { Json } from '@/integrations/supabase/types';
 
 export interface Audit {
@@ -148,11 +147,14 @@ export function useAudits() {
   // Add audit mutation
   const addAuditMutation = useMutation({
     mutationFn: async (auditData: Omit<Audit, 'id' | 'audit_number' | 'created_at' | 'updated_at' | 'vessel' | 'lead_auditor'>) => {
-      const auditNumber = generateAuditNumber(audits.length);
-      
+      // audit_number is set by trg_audits_set_number, per company and year.
+      // The client used to derive it from the length of the array this hook
+      // happened to be holding, which is filtered by vessel and capped at a
+      // page, so the count restarted with every filter and two people
+      // scheduling at once both got AUD-YYYY-001.
       const { data, error } = await supabase
         .from('audits')
-        .insert([{ ...auditData, audit_number: auditNumber }])
+        .insert([auditData])
         .select()
         .single();
 
@@ -208,13 +210,12 @@ export function useAudits() {
   // Add finding mutation
   const addFindingMutation = useMutation({
     mutationFn: async (findingData: Omit<AuditFinding, 'id' | 'finding_number' | 'created_at' | 'updated_at'>) => {
-      const audit = audits.find(a => a.id === findingData.audit_id);
-      const auditFindings = findings.filter(f => f.audit_id === findingData.audit_id);
-      const findingNumber = generateFindingNumber(audit?.audit_number || 'AUD-0000-000', auditFindings.length);
-
+      // finding_number is set by trg_audit_findings_set_number, per audit, and
+      // is now unique per audit. The client's version fell back to
+      // 'AUD-0000-000' whenever the parent audit was not in the loaded page.
       const { data, error } = await supabase
         .from('audit_findings')
-        .insert([{ ...findingData, finding_number: findingNumber }])
+        .insert([findingData])
         .select()
         .single();
 

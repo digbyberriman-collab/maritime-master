@@ -150,7 +150,7 @@ export function BulkUpload({ projectId, userId, onComplete, onCancel }: BulkUplo
       try {
         const path = `${projectId}/${Date.now()}-${item.file.name}`;
         const { error: uploadErr } = await supabase.storage
-          .from("yard-standards")
+          .from("nb-yard-standards")
           .upload(path, item.file);
         if (uploadErr) throw uploadErr;
 
@@ -177,7 +177,7 @@ export function BulkUpload({ projectId, userId, onComplete, onCancel }: BulkUplo
         }
 
         const { data: insertData, error: insertErr } = await (supabase
-          .from("yard_standards" as any)
+          .from("nb_yard_standards")
           .insert(record)
           .select("id")
           .single() as any);
