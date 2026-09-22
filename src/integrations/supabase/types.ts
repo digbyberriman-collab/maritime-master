@@ -18342,6 +18342,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "physio_treatment_plans_protocol_template_id_fkey"
+            columns: ["protocol_template_id"]
+            isOneToOne: false
+            referencedRelation: "pt_program_templates"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "physio_treatment_plans_updated_by_fkey"
             columns: ["updated_by"]
             isOneToOne: false
@@ -18885,6 +18892,950 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: true
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pt_appointments: {
+        Row: {
+          capacity: number | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          ends_at: string
+          id: string
+          location: string | null
+          notes: string | null
+          person_id: string | null
+          program_session_id: string | null
+          session_type: string
+          starts_at: string
+          status: string
+          title: string | null
+          trainer_id: string | null
+          updated_at: string
+          updated_by: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          capacity?: number | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          ends_at: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          person_id?: string | null
+          program_session_id?: string | null
+          session_type?: string
+          starts_at: string
+          status?: string
+          title?: string | null
+          trainer_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          capacity?: number | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string
+          id?: string
+          location?: string | null
+          notes?: string | null
+          person_id?: string | null
+          program_session_id?: string | null
+          session_type?: string
+          starts_at?: string
+          status?: string
+          title?: string | null
+          trainer_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pt_appointments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_appointments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "pt_appointments_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_appointments_program_session_id_fkey"
+            columns: ["program_session_id"]
+            isOneToOne: false
+            referencedRelation: "pt_program_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_appointments_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_appointments_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "pt_appointments_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pt_exercise_sources: {
+        Row: {
+          attribution: string | null
+          base_url: string | null
+          company_id: string
+          created_at: string
+          credential: string | null
+          id: string
+          imported_count: number
+          is_enabled: boolean
+          label: string
+          last_sync_message: string | null
+          last_sync_status: string | null
+          last_synced_at: string | null
+          licence: string | null
+          notes: string | null
+          source_key: string
+          updated_at: string
+        }
+        Insert: {
+          attribution?: string | null
+          base_url?: string | null
+          company_id: string
+          created_at?: string
+          credential?: string | null
+          id?: string
+          imported_count?: number
+          is_enabled?: boolean
+          label: string
+          last_sync_message?: string | null
+          last_sync_status?: string | null
+          last_synced_at?: string | null
+          licence?: string | null
+          notes?: string | null
+          source_key: string
+          updated_at?: string
+        }
+        Update: {
+          attribution?: string | null
+          base_url?: string | null
+          company_id?: string
+          created_at?: string
+          credential?: string | null
+          id?: string
+          imported_count?: number
+          is_enabled?: boolean
+          label?: string
+          last_sync_message?: string | null
+          last_sync_status?: string | null
+          last_synced_at?: string | null
+          licence?: string | null
+          notes?: string | null
+          source_key?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pt_exercise_sources_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pt_exercises: {
+        Row: {
+          attribution: string | null
+          body_part: string | null
+          category: string
+          coaching_cues: string | null
+          company_id: string
+          contraindications: string | null
+          created_at: string
+          created_by: string | null
+          difficulty: string | null
+          equipment: string | null
+          id: string
+          image_url: string | null
+          instructions: string | null
+          is_active: boolean
+          is_rehab: boolean
+          name: string
+          notes: string | null
+          secondary_muscles: string[]
+          source: string
+          source_id: string | null
+          source_licence: string | null
+          target_muscle: string | null
+          updated_at: string
+          updated_by: string | null
+          video_url: string | null
+        }
+        Insert: {
+          attribution?: string | null
+          body_part?: string | null
+          category?: string
+          coaching_cues?: string | null
+          company_id: string
+          contraindications?: string | null
+          created_at?: string
+          created_by?: string | null
+          difficulty?: string | null
+          equipment?: string | null
+          id?: string
+          image_url?: string | null
+          instructions?: string | null
+          is_active?: boolean
+          is_rehab?: boolean
+          name: string
+          notes?: string | null
+          secondary_muscles?: string[]
+          source?: string
+          source_id?: string | null
+          source_licence?: string | null
+          target_muscle?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          video_url?: string | null
+        }
+        Update: {
+          attribution?: string | null
+          body_part?: string | null
+          category?: string
+          coaching_cues?: string | null
+          company_id?: string
+          contraindications?: string | null
+          created_at?: string
+          created_by?: string | null
+          difficulty?: string | null
+          equipment?: string | null
+          id?: string
+          image_url?: string | null
+          instructions?: string | null
+          is_active?: boolean
+          is_rehab?: boolean
+          name?: string
+          notes?: string | null
+          secondary_muscles?: string[]
+          source?: string
+          source_id?: string | null
+          source_licence?: string | null
+          target_muscle?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pt_exercises_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_exercises_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "pt_exercises_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      pt_program_sessions: {
+        Row: {
+          athlete_notes: string | null
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          day_number: number
+          duration_minutes: number | null
+          focus: string | null
+          id: string
+          person_id: string
+          program_id: string
+          scheduled_on: string | null
+          session_rpe: number | null
+          status: string
+          title: string
+          trainer_notes: string | null
+          updated_at: string
+          week_number: number
+        }
+        Insert: {
+          athlete_notes?: string | null
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          day_number?: number
+          duration_minutes?: number | null
+          focus?: string | null
+          id?: string
+          person_id: string
+          program_id: string
+          scheduled_on?: string | null
+          session_rpe?: number | null
+          status?: string
+          title?: string
+          trainer_notes?: string | null
+          updated_at?: string
+          week_number?: number
+        }
+        Update: {
+          athlete_notes?: string | null
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          day_number?: number
+          duration_minutes?: number | null
+          focus?: string | null
+          id?: string
+          person_id?: string
+          program_id?: string
+          scheduled_on?: string | null
+          session_rpe?: number | null
+          status?: string
+          title?: string
+          trainer_notes?: string | null
+          updated_at?: string
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pt_program_sessions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_program_sessions_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_program_sessions_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "pt_programs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pt_program_templates: {
+        Row: {
+          body_region: string | null
+          category: string
+          clinical_notes: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          difficulty: string | null
+          duration_weeks: number
+          equipment_needed: string | null
+          goals: string | null
+          id: string
+          is_active: boolean
+          is_rehab: boolean
+          name: string
+          notes: string | null
+          sessions_per_week: number
+          stage: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          body_region?: string | null
+          category?: string
+          clinical_notes?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          difficulty?: string | null
+          duration_weeks?: number
+          equipment_needed?: string | null
+          goals?: string | null
+          id?: string
+          is_active?: boolean
+          is_rehab?: boolean
+          name: string
+          notes?: string | null
+          sessions_per_week?: number
+          stage?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          body_region?: string | null
+          category?: string
+          clinical_notes?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          difficulty?: string | null
+          duration_weeks?: number
+          equipment_needed?: string | null
+          goals?: string | null
+          id?: string
+          is_active?: boolean
+          is_rehab?: boolean
+          name?: string
+          notes?: string | null
+          sessions_per_week?: number
+          stage?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pt_program_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_program_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "pt_program_templates_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      pt_programs: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          end_date: string | null
+          goals: string | null
+          id: string
+          name: string
+          notes: string | null
+          person_id: string
+          physio_plan_id: string | null
+          start_date: string
+          status: string
+          template_id: string | null
+          trainer_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          goals?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          person_id: string
+          physio_plan_id?: string | null
+          start_date?: string
+          status?: string
+          template_id?: string | null
+          trainer_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          goals?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          person_id?: string
+          physio_plan_id?: string | null
+          start_date?: string
+          status?: string
+          template_id?: string | null
+          trainer_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pt_programs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_programs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "pt_programs_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_programs_physio_plan_id_fkey"
+            columns: ["physio_plan_id"]
+            isOneToOne: false
+            referencedRelation: "physio_treatment_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_programs_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "pt_program_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_programs_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_programs_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      pt_session_items: {
+        Row: {
+          block: string | null
+          company_id: string
+          created_at: string
+          distance_m: number | null
+          duration_seconds: number | null
+          exercise_id: string | null
+          exercise_name: string
+          id: string
+          notes: string | null
+          position: number
+          prescribed_load: string | null
+          prescribed_reps: string | null
+          prescribed_sets: number | null
+          rest_seconds: number | null
+          rpe: number | null
+          session_id: string
+          tempo: string | null
+          updated_at: string
+        }
+        Insert: {
+          block?: string | null
+          company_id: string
+          created_at?: string
+          distance_m?: number | null
+          duration_seconds?: number | null
+          exercise_id?: string | null
+          exercise_name: string
+          id?: string
+          notes?: string | null
+          position?: number
+          prescribed_load?: string | null
+          prescribed_reps?: string | null
+          prescribed_sets?: number | null
+          rest_seconds?: number | null
+          rpe?: number | null
+          session_id: string
+          tempo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          block?: string | null
+          company_id?: string
+          created_at?: string
+          distance_m?: number | null
+          duration_seconds?: number | null
+          exercise_id?: string | null
+          exercise_name?: string
+          id?: string
+          notes?: string | null
+          position?: number
+          prescribed_load?: string | null
+          prescribed_reps?: string | null
+          prescribed_sets?: number | null
+          rest_seconds?: number | null
+          rpe?: number | null
+          session_id?: string
+          tempo?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pt_session_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_session_items_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "pt_exercises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_session_items_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "pt_program_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pt_set_logs: {
+        Row: {
+          company_id: string
+          completed: boolean
+          distance_m: number | null
+          duration_seconds: number | null
+          id: string
+          logged_at: string
+          logged_by: string | null
+          notes: string | null
+          person_id: string
+          reps: number | null
+          rpe: number | null
+          session_item_id: string
+          set_number: number
+          weight_kg: number | null
+        }
+        Insert: {
+          company_id: string
+          completed?: boolean
+          distance_m?: number | null
+          duration_seconds?: number | null
+          id?: string
+          logged_at?: string
+          logged_by?: string | null
+          notes?: string | null
+          person_id: string
+          reps?: number | null
+          rpe?: number | null
+          session_item_id: string
+          set_number?: number
+          weight_kg?: number | null
+        }
+        Update: {
+          company_id?: string
+          completed?: boolean
+          distance_m?: number | null
+          duration_seconds?: number | null
+          id?: string
+          logged_at?: string
+          logged_by?: string | null
+          notes?: string | null
+          person_id?: string
+          reps?: number | null
+          rpe?: number | null
+          session_item_id?: string
+          set_number?: number
+          weight_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pt_set_logs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_set_logs_logged_by_fkey"
+            columns: ["logged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "pt_set_logs_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_set_logs_session_item_id_fkey"
+            columns: ["session_item_id"]
+            isOneToOne: false
+            referencedRelation: "pt_session_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pt_template_days: {
+        Row: {
+          company_id: string
+          created_at: string
+          day_number: number
+          focus: string | null
+          id: string
+          notes: string | null
+          template_id: string
+          title: string
+          updated_at: string
+          week_number: number
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          day_number?: number
+          focus?: string | null
+          id?: string
+          notes?: string | null
+          template_id: string
+          title?: string
+          updated_at?: string
+          week_number?: number
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          day_number?: number
+          focus?: string | null
+          id?: string
+          notes?: string | null
+          template_id?: string
+          title?: string
+          updated_at?: string
+          week_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pt_template_days_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_template_days_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "pt_program_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pt_template_items: {
+        Row: {
+          block: string | null
+          company_id: string
+          created_at: string
+          day_id: string
+          distance_m: number | null
+          duration_seconds: number | null
+          exercise_id: string | null
+          exercise_name: string
+          id: string
+          load_prescription: string | null
+          notes: string | null
+          position: number
+          reps: string | null
+          rest_seconds: number | null
+          rpe: number | null
+          sets: number | null
+          tempo: string | null
+          updated_at: string
+        }
+        Insert: {
+          block?: string | null
+          company_id: string
+          created_at?: string
+          day_id: string
+          distance_m?: number | null
+          duration_seconds?: number | null
+          exercise_id?: string | null
+          exercise_name: string
+          id?: string
+          load_prescription?: string | null
+          notes?: string | null
+          position?: number
+          reps?: string | null
+          rest_seconds?: number | null
+          rpe?: number | null
+          sets?: number | null
+          tempo?: string | null
+          updated_at?: string
+        }
+        Update: {
+          block?: string | null
+          company_id?: string
+          created_at?: string
+          day_id?: string
+          distance_m?: number | null
+          duration_seconds?: number | null
+          exercise_id?: string | null
+          exercise_name?: string
+          id?: string
+          load_prescription?: string | null
+          notes?: string | null
+          position?: number
+          reps?: string | null
+          rest_seconds?: number | null
+          rpe?: number | null
+          sets?: number | null
+          tempo?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pt_template_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_template_items_day_id_fkey"
+            columns: ["day_id"]
+            isOneToOne: false
+            referencedRelation: "pt_template_days"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_template_items_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "pt_exercises"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pt_videos: {
+        Row: {
+          category: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          duration_seconds: number | null
+          exercise_id: string | null
+          id: string
+          is_active: boolean
+          storage_path: string | null
+          tags: string[]
+          title: string
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          category?: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          duration_seconds?: number | null
+          exercise_id?: string | null
+          id?: string
+          is_active?: boolean
+          storage_path?: string | null
+          tags?: string[]
+          title: string
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          duration_seconds?: number | null
+          exercise_id?: string | null
+          id?: string
+          is_active?: boolean
+          storage_path?: string | null
+          tags?: string[]
+          title?: string
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pt_videos_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pt_videos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "pt_videos_exercise_id_fkey"
+            columns: ["exercise_id"]
+            isOneToOne: false
+            referencedRelation: "pt_exercises"
             referencedColumns: ["id"]
           },
         ]
@@ -23590,6 +24541,17 @@ export type Database = {
           p_self_ratings: Json
         }
         Returns: undefined
+      }
+      pt_assign_template: {
+        Args: {
+          p_name?: string
+          p_person_id: string
+          p_physio_plan_id?: string
+          p_start_date?: string
+          p_template_id: string
+          p_trainer_id?: string
+        }
+        Returns: string
       }
       rbac_company_permission: {
         Args: {
