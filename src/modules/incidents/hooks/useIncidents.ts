@@ -402,12 +402,15 @@ export function useCreateCorrectiveAction() {
 
 export function useUploadIncidentAttachment() {
   const { toast } = useToast();
+  const { profile } = useAuth();
 
   return useMutation({
     mutationFn: async (file: File) => {
+      if (!profile?.company_id) throw new Error("Your profile has no company; cannot upload files");
+
       const fileExt = file.name.split(".").pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `incidents/${fileName}`;
+      const filePath = `${profile.company_id}/incidents/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from("incident-attachments")

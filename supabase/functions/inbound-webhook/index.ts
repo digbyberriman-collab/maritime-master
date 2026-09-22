@@ -1,6 +1,26 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.2';
-import * as crypto from 'https://deno.land/std@0.190.0/crypto/mod.ts';
+
+async function hmacSha256Hex(key: string, message: string): Promise<string> {
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(key),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+  const signature = await crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(message));
+  return Array.from(new Uint8Array(signature)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function timingSafeEqualHex(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -73,8 +93,27 @@ serve(async (req: Request) => {
 
     // Parse the request body
     const body = await req.text();
+
+    // Verify the HMAC signature whenever the caller sends one -- the
+    // header and a crypto import have existed here since this endpoint
+    // was written, but nothing ever checked it, so a leaked
+    // webhook_secret alone was full forge capability. Signature is not
+    // yet made mandatory (some configured integrations may predate it
+    // and only send the shared secret), but any signature that IS sent
+    // must now actually be correct.
+    if (webhookSignature) {
+      const expectedSignature = await hmacSha256Hex(webhookConfig.webhook_secret, body);
+      if (!timingSafeEqualHex(webhookSignature.toLowerCase(), expectedSignature)) {
+        console.error('Webhook signature mismatch');
+        return new Response(
+          JSON.stringify({ error: 'Invalid webhook signature' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     let payload: WebhookPayload;
-    
+
     try {
       payload = JSON.parse(body);
     } catch {

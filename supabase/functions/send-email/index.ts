@@ -129,7 +129,6 @@ interface SendEmailRequest {
   variables: Record<string, string>;
   idempotencyKey: string;
   cc?: string[];
-  from?: string;
 }
 
 serve(async (req: Request) => {
@@ -150,6 +149,22 @@ serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
+
+    // Verify the calling user -- this function sends real transactional
+    // email (including password-reset and alert-escalation links) from
+    // the company's own domain/Resend account, so it must never be
+    // reachable anonymously.
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claims, error: claimsError } = await supabaseAdmin.auth.getClaims(token);
+
+    if (claimsError || !claims?.claims) {
+      throw new Error('Unauthorized');
+    }
 
     const body: SendEmailRequest = await req.json();
 
@@ -189,9 +204,10 @@ serve(async (req: Request) => {
     const subject = renderTemplate(template.subject, body.variables);
     const html = renderTemplate(template.htmlBody, body.variables);
 
-    // Send email
-    const fromAddress = body.from || Deno.env.get('EMAIL_FROM') || 'STORM <noreply@storm-maritime.com>';
-    
+    // Send email -- `from` is never caller-controlled, only ever the
+    // company's own configured sender.
+    const fromAddress = Deno.env.get('EMAIL_FROM') || 'STORM <noreply@storm-maritime.com>';
+
     const emailResponse = await resend.emails.send({
       from: fromAddress,
       to: [body.to],

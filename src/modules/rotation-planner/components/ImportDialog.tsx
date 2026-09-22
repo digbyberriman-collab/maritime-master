@@ -114,6 +114,7 @@ const ImportDialog: React.FC<Props> = ({ open, onClose, vessels, crew, lanes, on
           const key = `frp-${vesselId}-${c.externalId ?? c.fullName?.toLowerCase().replace(/[^a-z0-9]+/g, '-') ?? i}`;
           byKey.set(key, {
             airtable_id: key,
+            company_id,
             crew_id: c.externalId ? Number(c.externalId) || null : null,
             vessel: vesselName,
             first_name: c.firstName ?? null,
@@ -131,7 +132,7 @@ const ImportDialog: React.FC<Props> = ({ open, onClose, vessels, crew, lanes, on
         });
         const crewPayload = Array.from(byKey.values());
         const { error: crewErr } = await (supabase as any)
-          .from('crew_import').upsert(crewPayload, { onConflict: 'airtable_id' });
+          .from('crew_import').upsert(crewPayload, { onConflict: 'company_id,airtable_id' });
         if (crewErr) {
           console.warn('crew_import upsert failed', crewErr);
           toast({ title: 'Crew staging failed', description: crewErr.message, variant: 'destructive' });

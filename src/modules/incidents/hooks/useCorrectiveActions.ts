@@ -303,12 +303,15 @@ export function useVerifyCAPAction() {
 
 export function useUploadCAPAEvidence() {
   const { toast } = useToast();
+  const { profile } = useAuth();
 
   return useMutation({
     mutationFn: async (file: File) => {
+      if (!profile?.company_id) throw new Error("Your profile has no company; cannot upload files");
+
       const fileExt = file.name.split(".").pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `capa-evidence/${fileName}`;
+      const filePath = `${profile.company_id}/capa-evidence/${fileName}`;
 
       const { error: uploadError } = await supabase.storage
         .from("incident-attachments")
