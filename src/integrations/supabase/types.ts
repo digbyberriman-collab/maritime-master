@@ -8247,6 +8247,688 @@ export type Database = {
           },
         ]
       }
+      hw_measurements: {
+        Row: {
+          arm_cm: number | null
+          blood_pressure_diastolic: number | null
+          blood_pressure_systolic: number | null
+          body_fat_pct: number | null
+          calf_cm: number | null
+          chest_cm: number | null
+          company_id: string
+          created_at: string
+          height_cm: number | null
+          hip_cm: number | null
+          id: string
+          measured_on: string
+          muscle_mass_kg: number | null
+          neck_cm: number | null
+          notes: string | null
+          person_id: string
+          recorded_by: string | null
+          resting_hr: number | null
+          source: string
+          thigh_cm: number | null
+          updated_at: string
+          waist_cm: number | null
+          weight_kg: number | null
+        }
+        Insert: {
+          arm_cm?: number | null
+          blood_pressure_diastolic?: number | null
+          blood_pressure_systolic?: number | null
+          body_fat_pct?: number | null
+          calf_cm?: number | null
+          chest_cm?: number | null
+          company_id: string
+          created_at?: string
+          height_cm?: number | null
+          hip_cm?: number | null
+          id?: string
+          measured_on?: string
+          muscle_mass_kg?: number | null
+          neck_cm?: number | null
+          notes?: string | null
+          person_id: string
+          recorded_by?: string | null
+          resting_hr?: number | null
+          source?: string
+          thigh_cm?: number | null
+          updated_at?: string
+          waist_cm?: number | null
+          weight_kg?: number | null
+        }
+        Update: {
+          arm_cm?: number | null
+          blood_pressure_diastolic?: number | null
+          blood_pressure_systolic?: number | null
+          body_fat_pct?: number | null
+          calf_cm?: number | null
+          chest_cm?: number | null
+          company_id?: string
+          created_at?: string
+          height_cm?: number | null
+          hip_cm?: number | null
+          id?: string
+          measured_on?: string
+          muscle_mass_kg?: number | null
+          neck_cm?: number | null
+          notes?: string | null
+          person_id?: string
+          recorded_by?: string | null
+          resting_hr?: number | null
+          source?: string
+          thigh_cm?: number | null
+          updated_at?: string
+          waist_cm?: number | null
+          weight_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hw_measurements_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_measurements_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_measurements_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      hw_people: {
+        Row: {
+          arrived_on: string | null
+          cabin: string | null
+          company_id: string
+          consent_share_safety_flags: boolean
+          created_at: string
+          created_by: string | null
+          date_of_birth: string | null
+          departed_on: string | null
+          department: string | null
+          email: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          first_name: string
+          gender: string | null
+          id: string
+          is_active: boolean
+          language: string | null
+          last_name: string
+          nationality: string | null
+          notes: string | null
+          person_type: string
+          phone: string | null
+          preferred_name: string | null
+          profile_id: string | null
+          rank: string | null
+          updated_at: string
+          updated_by: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          arrived_on?: string | null
+          cabin?: string | null
+          company_id: string
+          consent_share_safety_flags?: boolean
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          departed_on?: string | null
+          department?: string | null
+          email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          first_name: string
+          gender?: string | null
+          id?: string
+          is_active?: boolean
+          language?: string | null
+          last_name: string
+          nationality?: string | null
+          notes?: string | null
+          person_type?: string
+          phone?: string | null
+          preferred_name?: string | null
+          profile_id?: string | null
+          rank?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          arrived_on?: string | null
+          cabin?: string | null
+          company_id?: string
+          consent_share_safety_flags?: boolean
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          departed_on?: string | null
+          department?: string | null
+          email?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          first_name?: string
+          gender?: string | null
+          id?: string
+          is_active?: boolean
+          language?: string | null
+          last_name?: string
+          nationality?: string | null
+          notes?: string | null
+          person_type?: string
+          phone?: string | null
+          preferred_name?: string | null
+          profile_id?: string | null
+          rank?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hw_people_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_people_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "hw_people_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_people_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "hw_people_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hw_practitioner_qualifications: {
+        Row: {
+          category: string | null
+          company_id: string
+          created_at: string
+          document_name: string | null
+          document_path: string | null
+          expiry_date: string | null
+          id: string
+          issue_date: string | null
+          issuing_authority: string | null
+          name: string
+          notes: string | null
+          practitioner_id: string
+          reference: string | null
+          updated_at: string
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          category?: string | null
+          company_id: string
+          created_at?: string
+          document_name?: string | null
+          document_path?: string | null
+          expiry_date?: string | null
+          id?: string
+          issue_date?: string | null
+          issuing_authority?: string | null
+          name: string
+          notes?: string | null
+          practitioner_id: string
+          reference?: string | null
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          category?: string | null
+          company_id?: string
+          created_at?: string
+          document_name?: string | null
+          document_path?: string | null
+          expiry_date?: string | null
+          id?: string
+          issue_date?: string | null
+          issuing_authority?: string | null
+          name?: string
+          notes?: string | null
+          practitioner_id?: string
+          reference?: string | null
+          updated_at?: string
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hw_practitioner_qualifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_practitioner_qualifications_practitioner_id_fkey"
+            columns: ["practitioner_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_practitioner_qualifications_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      hw_practitioners: {
+        Row: {
+          bio: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          discipline: string
+          email: string | null
+          ended_on: string | null
+          full_name: string
+          id: string
+          is_active: boolean
+          license_authority: string | null
+          license_expiry: string | null
+          license_number: string | null
+          notes: string | null
+          phone: string | null
+          profile_id: string | null
+          rank_code: string | null
+          role_title: string | null
+          seniority: string | null
+          specialisms: string[]
+          started_on: string | null
+          updated_at: string
+          updated_by: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          bio?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          discipline: string
+          email?: string | null
+          ended_on?: string | null
+          full_name: string
+          id?: string
+          is_active?: boolean
+          license_authority?: string | null
+          license_expiry?: string | null
+          license_number?: string | null
+          notes?: string | null
+          phone?: string | null
+          profile_id?: string | null
+          rank_code?: string | null
+          role_title?: string | null
+          seniority?: string | null
+          specialisms?: string[]
+          started_on?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          bio?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          discipline?: string
+          email?: string | null
+          ended_on?: string | null
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          license_authority?: string | null
+          license_expiry?: string | null
+          license_number?: string | null
+          notes?: string | null
+          phone?: string | null
+          profile_id?: string | null
+          rank_code?: string | null
+          role_title?: string | null
+          seniority?: string | null
+          specialisms?: string[]
+          started_on?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hw_practitioners_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_practitioners_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "hw_practitioners_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_practitioners_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "hw_practitioners_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hw_record_access_log: {
+        Row: {
+          accessed_at: string
+          accessed_by: string | null
+          action: string
+          company_id: string
+          context: string | null
+          id: string
+          person_id: string | null
+          record_id: string | null
+          record_type: string
+        }
+        Insert: {
+          accessed_at?: string
+          accessed_by?: string | null
+          action?: string
+          company_id: string
+          context?: string | null
+          id?: string
+          person_id?: string | null
+          record_id?: string | null
+          record_type: string
+        }
+        Update: {
+          accessed_at?: string
+          accessed_by?: string | null
+          action?: string
+          company_id?: string
+          context?: string | null
+          id?: string
+          person_id?: string | null
+          record_id?: string | null
+          record_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hw_record_access_log_accessed_by_fkey"
+            columns: ["accessed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "hw_record_access_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_record_access_log_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hw_referrals: {
+        Row: {
+          assigned_practitioner_id: string | null
+          clinical_notes: string | null
+          company_id: string
+          completed_at: string | null
+          consultation_id: string | null
+          created_at: string
+          from_discipline: string
+          id: string
+          outcome: string | null
+          person_id: string
+          reason: string
+          referred_by: string | null
+          responded_at: string | null
+          response_notes: string | null
+          status: string
+          to_discipline: string
+          updated_at: string
+          urgency: string
+          vessel_id: string | null
+        }
+        Insert: {
+          assigned_practitioner_id?: string | null
+          clinical_notes?: string | null
+          company_id: string
+          completed_at?: string | null
+          consultation_id?: string | null
+          created_at?: string
+          from_discipline: string
+          id?: string
+          outcome?: string | null
+          person_id: string
+          reason: string
+          referred_by?: string | null
+          responded_at?: string | null
+          response_notes?: string | null
+          status?: string
+          to_discipline: string
+          updated_at?: string
+          urgency?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          assigned_practitioner_id?: string | null
+          clinical_notes?: string | null
+          company_id?: string
+          completed_at?: string | null
+          consultation_id?: string | null
+          created_at?: string
+          from_discipline?: string
+          id?: string
+          outcome?: string | null
+          person_id?: string
+          reason?: string
+          referred_by?: string | null
+          responded_at?: string | null
+          response_notes?: string | null
+          status?: string
+          to_discipline?: string
+          updated_at?: string
+          urgency?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hw_referrals_assigned_practitioner_id_fkey"
+            columns: ["assigned_practitioner_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_referrals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_referrals_consultation_id_fkey"
+            columns: ["consultation_id"]
+            isOneToOne: false
+            referencedRelation: "med_consultations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_referrals_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_referrals_referred_by_fkey"
+            columns: ["referred_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "hw_referrals_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      hw_settings: {
+        Row: {
+          allow_crew_view_own_records: boolean
+          allow_self_logging: boolean
+          company_id: string
+          controlled_drugs_require_witness: boolean
+          created_at: string
+          default_currency: string
+          equipment_check_warning_days: number
+          fitness_expiry_warning_days: number
+          id: string
+          medical_stores_category: string | null
+          notes: string | null
+          spa_booking_lead_hours: number
+          spa_closing_time: string
+          spa_opening_time: string
+          stock_expiry_warning_days: number
+          telemedicine_account_ref: string | null
+          telemedicine_contact: string | null
+          telemedicine_provider: string | null
+          units: string
+          updated_at: string
+          updated_by: string | null
+          vaccination_warning_days: number
+        }
+        Insert: {
+          allow_crew_view_own_records?: boolean
+          allow_self_logging?: boolean
+          company_id: string
+          controlled_drugs_require_witness?: boolean
+          created_at?: string
+          default_currency?: string
+          equipment_check_warning_days?: number
+          fitness_expiry_warning_days?: number
+          id?: string
+          medical_stores_category?: string | null
+          notes?: string | null
+          spa_booking_lead_hours?: number
+          spa_closing_time?: string
+          spa_opening_time?: string
+          stock_expiry_warning_days?: number
+          telemedicine_account_ref?: string | null
+          telemedicine_contact?: string | null
+          telemedicine_provider?: string | null
+          units?: string
+          updated_at?: string
+          updated_by?: string | null
+          vaccination_warning_days?: number
+        }
+        Update: {
+          allow_crew_view_own_records?: boolean
+          allow_self_logging?: boolean
+          company_id?: string
+          controlled_drugs_require_witness?: boolean
+          created_at?: string
+          default_currency?: string
+          equipment_check_warning_days?: number
+          fitness_expiry_warning_days?: number
+          id?: string
+          medical_stores_category?: string | null
+          notes?: string | null
+          spa_booking_lead_hours?: number
+          spa_closing_time?: string
+          spa_opening_time?: string
+          stock_expiry_warning_days?: number
+          telemedicine_account_ref?: string | null
+          telemedicine_contact?: string | null
+          telemedicine_provider?: string | null
+          units?: string
+          updated_at?: string
+          updated_by?: string | null
+          vaccination_warning_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hw_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       incident_investigation: {
         Row: {
           approved_by: string | null
@@ -10615,6 +11297,1975 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      med_allergies: {
+        Row: {
+          allergen: string
+          allergy_type: string
+          carries_autoinjector: boolean
+          company_id: string
+          created_at: string
+          created_by: string | null
+          diagnosed_on: string | null
+          id: string
+          is_active: boolean
+          notes: string | null
+          person_id: string
+          reaction: string | null
+          severity: string
+          treatment: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          allergen: string
+          allergy_type?: string
+          carries_autoinjector?: boolean
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          diagnosed_on?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          person_id: string
+          reaction?: string | null
+          severity?: string
+          treatment?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          allergen?: string
+          allergy_type?: string
+          carries_autoinjector?: boolean
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          diagnosed_on?: string | null
+          id?: string
+          is_active?: boolean
+          notes?: string | null
+          person_id?: string
+          reaction?: string | null
+          severity?: string
+          treatment?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_allergies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_allergies_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_allergies_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_allergies_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      med_conditions: {
+        Row: {
+          affects_fitness: boolean
+          category: string | null
+          company_id: string
+          condition_name: string
+          created_at: string
+          created_by: string | null
+          diagnosed_on: string | null
+          id: string
+          notes: string | null
+          person_id: string
+          requires_medication: boolean
+          resolved_on: string | null
+          severity: string | null
+          status: string
+          treatment_summary: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          affects_fitness?: boolean
+          category?: string | null
+          company_id: string
+          condition_name: string
+          created_at?: string
+          created_by?: string | null
+          diagnosed_on?: string | null
+          id?: string
+          notes?: string | null
+          person_id: string
+          requires_medication?: boolean
+          resolved_on?: string | null
+          severity?: string | null
+          status?: string
+          treatment_summary?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          affects_fitness?: boolean
+          category?: string | null
+          company_id?: string
+          condition_name?: string
+          created_at?: string
+          created_by?: string | null
+          diagnosed_on?: string | null
+          id?: string
+          notes?: string | null
+          person_id?: string
+          requires_medication?: boolean
+          resolved_on?: string | null
+          severity?: string | null
+          status?: string
+          treatment_summary?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_conditions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_conditions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_conditions_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_conditions_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      med_consultations: {
+        Row: {
+          assessment: string | null
+          attended_by_practitioner_id: string | null
+          blood_pressure_diastolic: number | null
+          blood_pressure_systolic: number | null
+          company_id: string
+          consultation_number: string
+          consultation_type: string
+          created_at: string
+          created_by: string | null
+          days_off_work: number | null
+          fit_for_duty: string | null
+          follow_up_on: string | null
+          history: string | null
+          id: string
+          incident_id: string | null
+          is_confidential: boolean
+          is_work_related: boolean
+          location: string | null
+          medication_given: string | null
+          notes: string | null
+          observations: string | null
+          occurred_at: string
+          outcome: string
+          oxygen_saturation: number | null
+          pain_score: number | null
+          parent_consultation_id: string | null
+          person_id: string
+          presenting_complaint: string | null
+          pulse_bpm: number | null
+          respiratory_rate: number | null
+          telemedicine_case_ref: string | null
+          telemedicine_provider: string | null
+          telemedicine_used: boolean
+          temperature_c: number | null
+          treatment_given: string | null
+          updated_at: string
+          updated_by: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          assessment?: string | null
+          attended_by_practitioner_id?: string | null
+          blood_pressure_diastolic?: number | null
+          blood_pressure_systolic?: number | null
+          company_id: string
+          consultation_number: string
+          consultation_type?: string
+          created_at?: string
+          created_by?: string | null
+          days_off_work?: number | null
+          fit_for_duty?: string | null
+          follow_up_on?: string | null
+          history?: string | null
+          id?: string
+          incident_id?: string | null
+          is_confidential?: boolean
+          is_work_related?: boolean
+          location?: string | null
+          medication_given?: string | null
+          notes?: string | null
+          observations?: string | null
+          occurred_at?: string
+          outcome?: string
+          oxygen_saturation?: number | null
+          pain_score?: number | null
+          parent_consultation_id?: string | null
+          person_id: string
+          presenting_complaint?: string | null
+          pulse_bpm?: number | null
+          respiratory_rate?: number | null
+          telemedicine_case_ref?: string | null
+          telemedicine_provider?: string | null
+          telemedicine_used?: boolean
+          temperature_c?: number | null
+          treatment_given?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          assessment?: string | null
+          attended_by_practitioner_id?: string | null
+          blood_pressure_diastolic?: number | null
+          blood_pressure_systolic?: number | null
+          company_id?: string
+          consultation_number?: string
+          consultation_type?: string
+          created_at?: string
+          created_by?: string | null
+          days_off_work?: number | null
+          fit_for_duty?: string | null
+          follow_up_on?: string | null
+          history?: string | null
+          id?: string
+          incident_id?: string | null
+          is_confidential?: boolean
+          is_work_related?: boolean
+          location?: string | null
+          medication_given?: string | null
+          notes?: string | null
+          observations?: string | null
+          occurred_at?: string
+          outcome?: string
+          oxygen_saturation?: number | null
+          pain_score?: number | null
+          parent_consultation_id?: string | null
+          person_id?: string
+          presenting_complaint?: string | null
+          pulse_bpm?: number | null
+          respiratory_rate?: number | null
+          telemedicine_case_ref?: string | null
+          telemedicine_provider?: string | null
+          telemedicine_used?: boolean
+          temperature_c?: number | null
+          treatment_given?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_consultations_attended_by_practitioner_id_fkey"
+            columns: ["attended_by_practitioner_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_consultations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_consultations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_consultations_incident_id_fkey"
+            columns: ["incident_id"]
+            isOneToOne: false
+            referencedRelation: "incidents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_consultations_parent_consultation_id_fkey"
+            columns: ["parent_consultation_id"]
+            isOneToOne: false
+            referencedRelation: "med_consultations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_consultations_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_consultations_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_consultations_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      med_equipment: {
+        Row: {
+          asset_reference: string | null
+          check_interval_days: number | null
+          commissioned_on: string | null
+          company_id: string
+          consumable_expiry: string | null
+          created_at: string
+          created_by: string | null
+          defect_notes: string | null
+          equipment_type: string
+          id: string
+          last_check_on: string | null
+          last_service_on: string | null
+          location_id: string | null
+          manufacturer: string | null
+          model: string | null
+          name: string
+          next_check_due: string | null
+          next_service_due: string | null
+          notes: string | null
+          serial_number: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          asset_reference?: string | null
+          check_interval_days?: number | null
+          commissioned_on?: string | null
+          company_id: string
+          consumable_expiry?: string | null
+          created_at?: string
+          created_by?: string | null
+          defect_notes?: string | null
+          equipment_type?: string
+          id?: string
+          last_check_on?: string | null
+          last_service_on?: string | null
+          location_id?: string | null
+          manufacturer?: string | null
+          model?: string | null
+          name: string
+          next_check_due?: string | null
+          next_service_due?: string | null
+          notes?: string | null
+          serial_number?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          asset_reference?: string | null
+          check_interval_days?: number | null
+          commissioned_on?: string | null
+          company_id?: string
+          consumable_expiry?: string | null
+          created_at?: string
+          created_by?: string | null
+          defect_notes?: string | null
+          equipment_type?: string
+          id?: string
+          last_check_on?: string | null
+          last_service_on?: string | null
+          location_id?: string | null
+          manufacturer?: string | null
+          model?: string | null
+          name?: string
+          next_check_due?: string | null
+          next_service_due?: string | null
+          notes?: string | null
+          serial_number?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_equipment_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_equipment_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_equipment_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "med_supply_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_equipment_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_equipment_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      med_first_aid_kits: {
+        Row: {
+          company_id: string
+          contents_reference: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          inspection_interval_days: number
+          kit_type: string
+          last_inspection_on: string | null
+          location_id: string | null
+          name: string
+          next_inspection_due: string | null
+          notes: string | null
+          seal_number: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          company_id: string
+          contents_reference?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inspection_interval_days?: number
+          kit_type?: string
+          last_inspection_on?: string | null
+          location_id?: string | null
+          name: string
+          next_inspection_due?: string | null
+          notes?: string | null
+          seal_number?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          contents_reference?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inspection_interval_days?: number
+          kit_type?: string
+          last_inspection_on?: string | null
+          location_id?: string | null
+          name?: string
+          next_inspection_due?: string | null
+          notes?: string | null
+          seal_number?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_first_aid_kits_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_first_aid_kits_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_first_aid_kits_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "med_supply_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_first_aid_kits_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_first_aid_kits_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      med_fitness_assessments: {
+        Row: {
+          assessment_type: string
+          certificate_id: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          document_name: string | null
+          document_path: string | null
+          examiner_name: string | null
+          examiner_reference: string | null
+          expires_on: string | null
+          id: string
+          issued_on: string | null
+          issuing_country: string | null
+          notes: string | null
+          person_id: string
+          profile_id: string | null
+          restriction_review_on: string | null
+          restrictions: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          assessment_type?: string
+          certificate_id?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          document_name?: string | null
+          document_path?: string | null
+          examiner_name?: string | null
+          examiner_reference?: string | null
+          expires_on?: string | null
+          id?: string
+          issued_on?: string | null
+          issuing_country?: string | null
+          notes?: string | null
+          person_id: string
+          profile_id?: string | null
+          restriction_review_on?: string | null
+          restrictions?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          assessment_type?: string
+          certificate_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          document_name?: string | null
+          document_path?: string | null
+          examiner_name?: string | null
+          examiner_reference?: string | null
+          expires_on?: string | null
+          id?: string
+          issued_on?: string | null
+          issuing_country?: string | null
+          notes?: string | null
+          person_id?: string
+          profile_id?: string | null
+          restriction_review_on?: string | null
+          restrictions?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_fitness_assessments_certificate_id_fkey"
+            columns: ["certificate_id"]
+            isOneToOne: false
+            referencedRelation: "crew_certificates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_fitness_assessments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_fitness_assessments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_fitness_assessments_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_fitness_assessments_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_fitness_assessments_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      med_kit_checks: {
+        Row: {
+          actions: string | null
+          checked_by: string | null
+          checked_by_name: string | null
+          checked_on: string
+          company_id: string
+          created_at: string
+          equipment_id: string | null
+          findings: string | null
+          id: string
+          items_replaced: string | null
+          kit_id: string | null
+          next_due: string | null
+          notes: string | null
+          result: string
+        }
+        Insert: {
+          actions?: string | null
+          checked_by?: string | null
+          checked_by_name?: string | null
+          checked_on?: string
+          company_id: string
+          created_at?: string
+          equipment_id?: string | null
+          findings?: string | null
+          id?: string
+          items_replaced?: string | null
+          kit_id?: string | null
+          next_due?: string | null
+          notes?: string | null
+          result?: string
+        }
+        Update: {
+          actions?: string | null
+          checked_by?: string | null
+          checked_by_name?: string | null
+          checked_on?: string
+          company_id?: string
+          created_at?: string
+          equipment_id?: string | null
+          findings?: string | null
+          id?: string
+          items_replaced?: string | null
+          kit_id?: string | null
+          next_due?: string | null
+          notes?: string | null
+          result?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_kit_checks_checked_by_fkey"
+            columns: ["checked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_kit_checks_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_kit_checks_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "med_equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_kit_checks_kit_id_fkey"
+            columns: ["kit_id"]
+            isOneToOne: false
+            referencedRelation: "med_first_aid_kits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      med_log_entries: {
+        Row: {
+          action_taken: string | null
+          company_id: string
+          created_at: string
+          equipment_id: string | null
+          id: string
+          location_id: string | null
+          log_type: string
+          notes: string | null
+          recorded_at: string
+          recorded_by: string | null
+          recorded_by_name: string | null
+          value_numeric: number | null
+          value_text: string | null
+          value_unit: string | null
+          vessel_id: string | null
+          within_limits: boolean | null
+          witnessed_by: string | null
+        }
+        Insert: {
+          action_taken?: string | null
+          company_id: string
+          created_at?: string
+          equipment_id?: string | null
+          id?: string
+          location_id?: string | null
+          log_type: string
+          notes?: string | null
+          recorded_at?: string
+          recorded_by?: string | null
+          recorded_by_name?: string | null
+          value_numeric?: number | null
+          value_text?: string | null
+          value_unit?: string | null
+          vessel_id?: string | null
+          within_limits?: boolean | null
+          witnessed_by?: string | null
+        }
+        Update: {
+          action_taken?: string | null
+          company_id?: string
+          created_at?: string
+          equipment_id?: string | null
+          id?: string
+          location_id?: string | null
+          log_type?: string
+          notes?: string | null
+          recorded_at?: string
+          recorded_by?: string | null
+          recorded_by_name?: string | null
+          value_numeric?: number | null
+          value_text?: string | null
+          value_unit?: string | null
+          vessel_id?: string | null
+          within_limits?: boolean | null
+          witnessed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_log_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_log_entries_equipment_id_fkey"
+            columns: ["equipment_id"]
+            isOneToOne: false
+            referencedRelation: "med_equipment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_log_entries_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "med_supply_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_log_entries_recorded_by_fkey"
+            columns: ["recorded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_log_entries_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_log_entries_witnessed_by_fkey"
+            columns: ["witnessed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      med_medications: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          dosage: string | null
+          end_date: string | null
+          frequency: string | null
+          id: string
+          is_active: boolean
+          is_regular: boolean
+          medication_name: string
+          notes: string | null
+          person_id: string
+          prescriber: string | null
+          reason: string | null
+          route: string | null
+          start_date: string | null
+          supply_item_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          dosage?: string | null
+          end_date?: string | null
+          frequency?: string | null
+          id?: string
+          is_active?: boolean
+          is_regular?: boolean
+          medication_name: string
+          notes?: string | null
+          person_id: string
+          prescriber?: string | null
+          reason?: string | null
+          route?: string | null
+          start_date?: string | null
+          supply_item_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          dosage?: string | null
+          end_date?: string | null
+          frequency?: string | null
+          id?: string
+          is_active?: boolean
+          is_regular?: boolean
+          medication_name?: string
+          notes?: string | null
+          person_id?: string
+          prescriber?: string | null
+          reason?: string | null
+          route?: string | null
+          start_date?: string | null
+          supply_item_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_medications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_medications_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_medications_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_medications_supply_item_id_fkey"
+            columns: ["supply_item_id"]
+            isOneToOne: false
+            referencedRelation: "med_supply_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_medications_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      med_patient_records: {
+        Row: {
+          alcohol_units_week: number | null
+          blood_group: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          critical_alert: string | null
+          family_history: string | null
+          gp_contact: string | null
+          gp_name: string | null
+          height_cm: number | null
+          id: string
+          insurance_contact: string | null
+          insurance_policy_number: string | null
+          insurance_provider: string | null
+          last_reviewed_by: string | null
+          last_reviewed_on: string | null
+          medical_history: string | null
+          notes: string | null
+          organ_donor: boolean | null
+          person_id: string
+          smoker: string | null
+          surgical_history: string | null
+          updated_at: string
+          updated_by: string | null
+          weight_kg: number | null
+        }
+        Insert: {
+          alcohol_units_week?: number | null
+          blood_group?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          critical_alert?: string | null
+          family_history?: string | null
+          gp_contact?: string | null
+          gp_name?: string | null
+          height_cm?: number | null
+          id?: string
+          insurance_contact?: string | null
+          insurance_policy_number?: string | null
+          insurance_provider?: string | null
+          last_reviewed_by?: string | null
+          last_reviewed_on?: string | null
+          medical_history?: string | null
+          notes?: string | null
+          organ_donor?: boolean | null
+          person_id: string
+          smoker?: string | null
+          surgical_history?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          weight_kg?: number | null
+        }
+        Update: {
+          alcohol_units_week?: number | null
+          blood_group?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          critical_alert?: string | null
+          family_history?: string | null
+          gp_contact?: string | null
+          gp_name?: string | null
+          height_cm?: number | null
+          id?: string
+          insurance_contact?: string | null
+          insurance_policy_number?: string | null
+          insurance_provider?: string | null
+          last_reviewed_by?: string | null
+          last_reviewed_on?: string | null
+          medical_history?: string | null
+          notes?: string | null
+          organ_donor?: boolean | null
+          person_id?: string
+          smoker?: string | null
+          surgical_history?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          weight_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_patient_records_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_patient_records_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_patient_records_last_reviewed_by_fkey"
+            columns: ["last_reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_patient_records_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: true
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_patient_records_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      med_protocol_acknowledgements: {
+        Row: {
+          acknowledged_at: string
+          company_id: string
+          id: string
+          notes: string | null
+          profile_id: string
+          protocol_id: string
+          version: number
+        }
+        Insert: {
+          acknowledged_at?: string
+          company_id: string
+          id?: string
+          notes?: string | null
+          profile_id: string
+          protocol_id: string
+          version?: number
+        }
+        Update: {
+          acknowledged_at?: string
+          company_id?: string
+          id?: string
+          notes?: string | null
+          profile_id?: string
+          protocol_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_protocol_acknowledgements_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_protocol_acknowledgements_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_protocol_acknowledgements_protocol_id_fkey"
+            columns: ["protocol_id"]
+            isOneToOne: false
+            referencedRelation: "med_protocols"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      med_protocols: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          category: string
+          company_id: string
+          content: string | null
+          created_at: string
+          created_by: string | null
+          document_id: string | null
+          document_name: string | null
+          document_path: string | null
+          effective_from: string | null
+          id: string
+          notes: string | null
+          reference: string | null
+          requires_acknowledgement: boolean
+          review_due: string | null
+          status: string
+          summary: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+          version: number
+          vessel_id: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          category?: string
+          company_id: string
+          content?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_id?: string | null
+          document_name?: string | null
+          document_path?: string | null
+          effective_from?: string | null
+          id?: string
+          notes?: string | null
+          reference?: string | null
+          requires_acknowledgement?: boolean
+          review_due?: string | null
+          status?: string
+          summary?: string | null
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+          vessel_id?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          category?: string
+          company_id?: string
+          content?: string | null
+          created_at?: string
+          created_by?: string | null
+          document_id?: string | null
+          document_name?: string | null
+          document_path?: string | null
+          effective_from?: string | null
+          id?: string
+          notes?: string | null
+          reference?: string | null
+          requires_acknowledgement?: boolean
+          review_due?: string | null
+          status?: string
+          summary?: string | null
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_protocols_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_protocols_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_protocols_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_protocols_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_protocols_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_protocols_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      med_screening_answers: {
+        Row: {
+          answered_at: string
+          company_id: string
+          id: string
+          is_flagged: boolean
+          question_id: string
+          record_id: string
+          value_date: string | null
+          value_numeric: number | null
+          value_options: string[]
+          value_text: string | null
+        }
+        Insert: {
+          answered_at?: string
+          company_id: string
+          id?: string
+          is_flagged?: boolean
+          question_id: string
+          record_id: string
+          value_date?: string | null
+          value_numeric?: number | null
+          value_options?: string[]
+          value_text?: string | null
+        }
+        Update: {
+          answered_at?: string
+          company_id?: string
+          id?: string
+          is_flagged?: boolean
+          question_id?: string
+          record_id?: string
+          value_date?: string | null
+          value_numeric?: number | null
+          value_options?: string[]
+          value_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_screening_answers_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_screening_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "med_screening_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_screening_answers_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "med_screening_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      med_screening_questions: {
+        Row: {
+          answer_type: string
+          company_id: string
+          created_at: string
+          flag_when: string | null
+          help_text: string | null
+          id: string
+          is_required: boolean
+          max_value: number | null
+          min_value: number | null
+          options: string[]
+          position: number
+          prompt: string
+          section: string
+          template_id: string
+          unit: string | null
+          updated_at: string
+          weight: number
+        }
+        Insert: {
+          answer_type?: string
+          company_id: string
+          created_at?: string
+          flag_when?: string | null
+          help_text?: string | null
+          id?: string
+          is_required?: boolean
+          max_value?: number | null
+          min_value?: number | null
+          options?: string[]
+          position?: number
+          prompt: string
+          section?: string
+          template_id: string
+          unit?: string | null
+          updated_at?: string
+          weight?: number
+        }
+        Update: {
+          answer_type?: string
+          company_id?: string
+          created_at?: string
+          flag_when?: string | null
+          help_text?: string | null
+          id?: string
+          is_required?: boolean
+          max_value?: number | null
+          min_value?: number | null
+          options?: string[]
+          position?: number
+          prompt?: string
+          section?: string
+          template_id?: string
+          unit?: string | null
+          updated_at?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_screening_questions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_screening_questions_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "med_screening_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      med_screening_records: {
+        Row: {
+          company_id: string
+          completed_on: string | null
+          created_at: string
+          due_on: string | null
+          follow_up_on: string | null
+          id: string
+          invited_on: string | null
+          notes: string | null
+          person_id: string
+          recommendations: string | null
+          referral_id: string | null
+          reviewed_by_practitioner_id: string | null
+          reviewed_on: string | null
+          risk_band: string | null
+          status: string
+          summary: string | null
+          template_id: string
+          template_version: number
+          total_score: number | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          completed_on?: string | null
+          created_at?: string
+          due_on?: string | null
+          follow_up_on?: string | null
+          id?: string
+          invited_on?: string | null
+          notes?: string | null
+          person_id: string
+          recommendations?: string | null
+          referral_id?: string | null
+          reviewed_by_practitioner_id?: string | null
+          reviewed_on?: string | null
+          risk_band?: string | null
+          status?: string
+          summary?: string | null
+          template_id: string
+          template_version?: number
+          total_score?: number | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          completed_on?: string | null
+          created_at?: string
+          due_on?: string | null
+          follow_up_on?: string | null
+          id?: string
+          invited_on?: string | null
+          notes?: string | null
+          person_id?: string
+          recommendations?: string | null
+          referral_id?: string | null
+          reviewed_by_practitioner_id?: string | null
+          reviewed_on?: string | null
+          risk_band?: string | null
+          status?: string
+          summary?: string | null
+          template_id?: string
+          template_version?: number
+          total_score?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_screening_records_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_screening_records_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_screening_records_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "hw_referrals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_screening_records_reviewed_by_practitioner_id_fkey"
+            columns: ["reviewed_by_practitioner_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_screening_records_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "med_screening_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      med_screening_templates: {
+        Row: {
+          category: string
+          code: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          interpretation: string | null
+          is_self_serve: boolean
+          name: string
+          review_interval_months: number | null
+          scoring_mode: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          category?: string
+          code?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          interpretation?: string | null
+          is_self_serve?: boolean
+          name: string
+          review_interval_months?: number | null
+          scoring_mode?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Update: {
+          category?: string
+          code?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          interpretation?: string | null
+          is_self_serve?: boolean
+          name?: string
+          review_interval_months?: number | null
+          scoring_mode?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_screening_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_screening_templates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_screening_templates_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      med_supply_items: {
+        Row: {
+          batch_number: string | null
+          category: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          expiry_date: string | null
+          form: string | null
+          generic_name: string | null
+          id: string
+          is_active: boolean
+          is_controlled: boolean
+          last_checked_on: string | null
+          location_id: string | null
+          minimum_quantity: number
+          msn_category: string | null
+          name: string
+          notes: string | null
+          order_reference: string | null
+          quantity: number
+          storage_requirements: string | null
+          strength: string | null
+          supplier: string | null
+          unit: string
+          updated_at: string
+          updated_by: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          batch_number?: string | null
+          category?: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          expiry_date?: string | null
+          form?: string | null
+          generic_name?: string | null
+          id?: string
+          is_active?: boolean
+          is_controlled?: boolean
+          last_checked_on?: string | null
+          location_id?: string | null
+          minimum_quantity?: number
+          msn_category?: string | null
+          name: string
+          notes?: string | null
+          order_reference?: string | null
+          quantity?: number
+          storage_requirements?: string | null
+          strength?: string | null
+          supplier?: string | null
+          unit?: string
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          batch_number?: string | null
+          category?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          expiry_date?: string | null
+          form?: string | null
+          generic_name?: string | null
+          id?: string
+          is_active?: boolean
+          is_controlled?: boolean
+          last_checked_on?: string | null
+          location_id?: string | null
+          minimum_quantity?: number
+          msn_category?: string | null
+          name?: string
+          notes?: string | null
+          order_reference?: string | null
+          quantity?: number
+          storage_requirements?: string | null
+          strength?: string | null
+          supplier?: string | null
+          unit?: string
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_supply_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_supply_items_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_supply_items_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "med_supply_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_supply_items_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_supply_items_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      med_supply_locations: {
+        Row: {
+          category: string
+          company_id: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean
+          is_controlled_store: boolean
+          name: string
+          updated_at: string
+          vessel_id: string | null
+        }
+        Insert: {
+          category?: string
+          company_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_controlled_store?: boolean
+          name: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_controlled_store?: boolean
+          name?: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_supply_locations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_supply_locations_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      med_supply_transactions: {
+        Row: {
+          batch_number: string | null
+          company_id: string
+          consultation_id: string | null
+          created_at: string
+          destination_location_id: string | null
+          expiry_date: string | null
+          id: string
+          item_id: string
+          notes: string | null
+          occurred_at: string
+          performed_by: string | null
+          person_id: string | null
+          quantity_after: number | null
+          quantity_delta: number
+          reason: string | null
+          transaction_type: string
+          witness_name: string | null
+          witnessed_by_practitioner_id: string | null
+        }
+        Insert: {
+          batch_number?: string | null
+          company_id: string
+          consultation_id?: string | null
+          created_at?: string
+          destination_location_id?: string | null
+          expiry_date?: string | null
+          id?: string
+          item_id: string
+          notes?: string | null
+          occurred_at?: string
+          performed_by?: string | null
+          person_id?: string | null
+          quantity_after?: number | null
+          quantity_delta: number
+          reason?: string | null
+          transaction_type: string
+          witness_name?: string | null
+          witnessed_by_practitioner_id?: string | null
+        }
+        Update: {
+          batch_number?: string | null
+          company_id?: string
+          consultation_id?: string | null
+          created_at?: string
+          destination_location_id?: string | null
+          expiry_date?: string | null
+          id?: string
+          item_id?: string
+          notes?: string | null
+          occurred_at?: string
+          performed_by?: string | null
+          person_id?: string | null
+          quantity_after?: number | null
+          quantity_delta?: number
+          reason?: string | null
+          transaction_type?: string
+          witness_name?: string | null
+          witnessed_by_practitioner_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_supply_transactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_supply_transactions_consultation_id_fkey"
+            columns: ["consultation_id"]
+            isOneToOne: false
+            referencedRelation: "med_consultations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_supply_transactions_destination_location_id_fkey"
+            columns: ["destination_location_id"]
+            isOneToOne: false
+            referencedRelation: "med_supply_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_supply_transactions_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "med_supply_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_supply_transactions_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_supply_transactions_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_supply_transactions_witnessed_by_practitioner_id_fkey"
+            columns: ["witnessed_by_practitioner_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      med_vaccinations: {
+        Row: {
+          administered_by: string | null
+          administered_on: string | null
+          batch_number: string | null
+          certificate_name: string | null
+          certificate_path: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          dose_label: string | null
+          exemption_reason: string | null
+          id: string
+          is_required: boolean
+          notes: string | null
+          person_id: string
+          site: string | null
+          updated_at: string
+          updated_by: string | null
+          vaccine: string
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          administered_by?: string | null
+          administered_on?: string | null
+          batch_number?: string | null
+          certificate_name?: string | null
+          certificate_path?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          dose_label?: string | null
+          exemption_reason?: string | null
+          id?: string
+          is_required?: boolean
+          notes?: string | null
+          person_id: string
+          site?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vaccine: string
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          administered_by?: string | null
+          administered_on?: string | null
+          batch_number?: string | null
+          certificate_name?: string | null
+          certificate_path?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          dose_label?: string | null
+          exemption_reason?: string | null
+          id?: string
+          is_required?: boolean
+          notes?: string | null
+          person_id?: string
+          site?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vaccine?: string
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "med_vaccinations_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_vaccinations_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "med_vaccinations_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_vaccinations_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -13523,6 +16174,480 @@ export type Database = {
         }
         Relationships: []
       }
+      nut_food_log_entries: {
+        Row: {
+          calories: number
+          carbs_g: number
+          company_id: string
+          created_at: string
+          description: string
+          fat_g: number
+          food_id: string | null
+          id: string
+          logged_by: string | null
+          logged_on: string
+          meal: string
+          notes: string | null
+          person_id: string
+          protein_g: number
+          quantity: number
+          unit: string
+          updated_at: string
+          water_ml: number | null
+        }
+        Insert: {
+          calories?: number
+          carbs_g?: number
+          company_id: string
+          created_at?: string
+          description: string
+          fat_g?: number
+          food_id?: string | null
+          id?: string
+          logged_by?: string | null
+          logged_on?: string
+          meal?: string
+          notes?: string | null
+          person_id: string
+          protein_g?: number
+          quantity?: number
+          unit?: string
+          updated_at?: string
+          water_ml?: number | null
+        }
+        Update: {
+          calories?: number
+          carbs_g?: number
+          company_id?: string
+          created_at?: string
+          description?: string
+          fat_g?: number
+          food_id?: string | null
+          id?: string
+          logged_by?: string | null
+          logged_on?: string
+          meal?: string
+          notes?: string | null
+          person_id?: string
+          protein_g?: number
+          quantity?: number
+          unit?: string
+          updated_at?: string
+          water_ml?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nut_food_log_entries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_food_log_entries_food_id_fkey"
+            columns: ["food_id"]
+            isOneToOne: false
+            referencedRelation: "nut_foods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_food_log_entries_logged_by_fkey"
+            columns: ["logged_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "nut_food_log_entries_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nut_foods: {
+        Row: {
+          allergens: string[]
+          brand: string | null
+          calories: number
+          carbs_g: number
+          category: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          fat_g: number
+          fibre_g: number | null
+          id: string
+          is_active: boolean
+          is_recipe: boolean
+          name: string
+          notes: string | null
+          protein_g: number
+          recipe_method: string | null
+          serving_description: string
+          serving_grams: number
+          sodium_mg: number | null
+          source: string
+          sugar_g: number | null
+          updated_at: string
+        }
+        Insert: {
+          allergens?: string[]
+          brand?: string | null
+          calories?: number
+          carbs_g?: number
+          category?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          fat_g?: number
+          fibre_g?: number | null
+          id?: string
+          is_active?: boolean
+          is_recipe?: boolean
+          name: string
+          notes?: string | null
+          protein_g?: number
+          recipe_method?: string | null
+          serving_description?: string
+          serving_grams?: number
+          sodium_mg?: number | null
+          source?: string
+          sugar_g?: number | null
+          updated_at?: string
+        }
+        Update: {
+          allergens?: string[]
+          brand?: string | null
+          calories?: number
+          carbs_g?: number
+          category?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          fat_g?: number
+          fibre_g?: number | null
+          id?: string
+          is_active?: boolean
+          is_recipe?: boolean
+          name?: string
+          notes?: string | null
+          protein_g?: number
+          recipe_method?: string | null
+          serving_description?: string
+          serving_grams?: number
+          sodium_mg?: number | null
+          source?: string
+          sugar_g?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nut_foods_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_foods_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      nut_goals: {
+        Row: {
+          achieved_on: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          current_value: number | null
+          direction: string
+          id: string
+          metric: string
+          notes: string | null
+          person_id: string
+          start_date: string
+          start_value: number | null
+          status: string
+          target_date: string | null
+          target_value: number | null
+          title: string
+          unit: string | null
+          updated_at: string
+        }
+        Insert: {
+          achieved_on?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          current_value?: number | null
+          direction?: string
+          id?: string
+          metric?: string
+          notes?: string | null
+          person_id: string
+          start_date?: string
+          start_value?: number | null
+          status?: string
+          target_date?: string | null
+          target_value?: number | null
+          title: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Update: {
+          achieved_on?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          current_value?: number | null
+          direction?: string
+          id?: string
+          metric?: string
+          notes?: string | null
+          person_id?: string
+          start_date?: string
+          start_value?: number | null
+          status?: string
+          target_date?: string | null
+          target_value?: number | null
+          title?: string
+          unit?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nut_goals_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_goals_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "nut_goals_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nut_meal_plans: {
+        Row: {
+          allergens: string[]
+          calories: number | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          meal: string
+          notes: string | null
+          person_id: string | null
+          plan_date: string
+          prepared_by: string | null
+          recipe_id: string | null
+          serves: number | null
+          status: string
+          title: string
+          updated_at: string
+          vessel_id: string | null
+        }
+        Insert: {
+          allergens?: string[]
+          calories?: number | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          meal?: string
+          notes?: string | null
+          person_id?: string | null
+          plan_date: string
+          prepared_by?: string | null
+          recipe_id?: string | null
+          serves?: number | null
+          status?: string
+          title: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          allergens?: string[]
+          calories?: number | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          meal?: string
+          notes?: string | null
+          person_id?: string | null
+          plan_date?: string
+          prepared_by?: string | null
+          recipe_id?: string | null
+          serves?: number | null
+          status?: string
+          title?: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nut_meal_plans_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_meal_plans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "nut_meal_plans_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_meal_plans_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "nut_foods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_meal_plans_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nut_profiles: {
+        Row: {
+          activity_level: string
+          company_id: string
+          created_at: string
+          created_by: string | null
+          dietary_preferences: string[]
+          dislikes: string | null
+          goal_type: string
+          id: string
+          notes: string | null
+          nutritionist_id: string | null
+          person_id: string
+          supplements: string | null
+          target_calories: number | null
+          target_carbs_g: number | null
+          target_fat_g: number | null
+          target_fibre_g: number | null
+          target_protein_g: number | null
+          target_water_ml: number | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          activity_level?: string
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          dietary_preferences?: string[]
+          dislikes?: string | null
+          goal_type?: string
+          id?: string
+          notes?: string | null
+          nutritionist_id?: string | null
+          person_id: string
+          supplements?: string | null
+          target_calories?: number | null
+          target_carbs_g?: number | null
+          target_fat_g?: number | null
+          target_fibre_g?: number | null
+          target_protein_g?: number | null
+          target_water_ml?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          activity_level?: string
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          dietary_preferences?: string[]
+          dislikes?: string | null
+          goal_type?: string
+          id?: string
+          notes?: string | null
+          nutritionist_id?: string | null
+          person_id?: string
+          supplements?: string | null
+          target_calories?: number | null
+          target_carbs_g?: number | null
+          target_fat_g?: number | null
+          target_fibre_g?: number | null
+          target_protein_g?: number | null
+          target_water_ml?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nut_profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_profiles_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "nut_profiles_nutritionist_id_fkey"
+            columns: ["nutritionist_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_profiles_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: true
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nut_profiles_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
       onboarding_items: {
         Row: {
           company_id: string
@@ -14798,6 +17923,430 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "work_permits"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      physio_assessment_items: {
+        Row: {
+          assessment_id: string
+          category: string
+          company_id: string
+          created_at: string
+          id: string
+          is_flagged: boolean
+          label: string
+          normal_range: string | null
+          notes: string | null
+          position: number
+          side: string
+          unit: string | null
+          value_numeric: number | null
+          value_text: string | null
+        }
+        Insert: {
+          assessment_id: string
+          category?: string
+          company_id: string
+          created_at?: string
+          id?: string
+          is_flagged?: boolean
+          label: string
+          normal_range?: string | null
+          notes?: string | null
+          position?: number
+          side?: string
+          unit?: string | null
+          value_numeric?: number | null
+          value_text?: string | null
+        }
+        Update: {
+          assessment_id?: string
+          category?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_flagged?: boolean
+          label?: string
+          normal_range?: string | null
+          notes?: string | null
+          position?: number
+          side?: string
+          unit?: string | null
+          value_numeric?: number | null
+          value_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "physio_assessment_items_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "physio_assessments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_assessment_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      physio_assessments: {
+        Row: {
+          aggravating_factors: string | null
+          assessed_on: string
+          assessment_type: string
+          chief_complaint: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          diagnosis: string | null
+          easing_factors: string | null
+          fit_for_duty: string | null
+          history: string | null
+          id: string
+          notes: string | null
+          observations: string | null
+          pain_location: string | null
+          pain_score: number | null
+          person_id: string
+          plan: string | null
+          practitioner_id: string | null
+          red_flags: string | null
+          referral_id: string | null
+          updated_at: string
+          updated_by: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          aggravating_factors?: string | null
+          assessed_on?: string
+          assessment_type?: string
+          chief_complaint?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          diagnosis?: string | null
+          easing_factors?: string | null
+          fit_for_duty?: string | null
+          history?: string | null
+          id?: string
+          notes?: string | null
+          observations?: string | null
+          pain_location?: string | null
+          pain_score?: number | null
+          person_id: string
+          plan?: string | null
+          practitioner_id?: string | null
+          red_flags?: string | null
+          referral_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          aggravating_factors?: string | null
+          assessed_on?: string
+          assessment_type?: string
+          chief_complaint?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          diagnosis?: string | null
+          easing_factors?: string | null
+          fit_for_duty?: string | null
+          history?: string | null
+          id?: string
+          notes?: string | null
+          observations?: string | null
+          pain_location?: string | null
+          pain_score?: number | null
+          person_id?: string
+          plan?: string | null
+          practitioner_id?: string | null
+          red_flags?: string | null
+          referral_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "physio_assessments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_assessments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "physio_assessments_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_assessments_practitioner_id_fkey"
+            columns: ["practitioner_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_assessments_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "hw_referrals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_assessments_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "physio_assessments_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      physio_sessions: {
+        Row: {
+          company_id: string
+          created_at: string
+          created_by: string | null
+          duration_minutes: number | null
+          home_exercise: string | null
+          id: string
+          next_session_on: string | null
+          notes: string | null
+          objective: string | null
+          pain_after: number | null
+          pain_before: number | null
+          person_id: string
+          plan_id: string | null
+          practitioner_id: string | null
+          session_date: string
+          starts_at: string | null
+          status: string
+          subjective: string | null
+          treatment_given: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          duration_minutes?: number | null
+          home_exercise?: string | null
+          id?: string
+          next_session_on?: string | null
+          notes?: string | null
+          objective?: string | null
+          pain_after?: number | null
+          pain_before?: number | null
+          person_id: string
+          plan_id?: string | null
+          practitioner_id?: string | null
+          session_date?: string
+          starts_at?: string | null
+          status?: string
+          subjective?: string | null
+          treatment_given?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          duration_minutes?: number | null
+          home_exercise?: string | null
+          id?: string
+          next_session_on?: string | null
+          notes?: string | null
+          objective?: string | null
+          pain_after?: number | null
+          pain_before?: number | null
+          person_id?: string
+          plan_id?: string | null
+          practitioner_id?: string | null
+          session_date?: string
+          starts_at?: string | null
+          status?: string
+          subjective?: string | null
+          treatment_given?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "physio_sessions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_sessions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "physio_sessions_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_sessions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "physio_treatment_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_sessions_practitioner_id_fkey"
+            columns: ["practitioner_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_sessions_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      physio_treatment_plans: {
+        Row: {
+          assessment_id: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          diagnosis: string | null
+          discharge_summary: string | null
+          end_date: string | null
+          frequency: string | null
+          goals: string | null
+          id: string
+          notes: string | null
+          person_id: string
+          practitioner_id: string | null
+          protocol_template_id: string | null
+          review_date: string | null
+          start_date: string
+          status: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          assessment_id?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          diagnosis?: string | null
+          discharge_summary?: string | null
+          end_date?: string | null
+          frequency?: string | null
+          goals?: string | null
+          id?: string
+          notes?: string | null
+          person_id: string
+          practitioner_id?: string | null
+          protocol_template_id?: string | null
+          review_date?: string | null
+          start_date?: string
+          status?: string
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          assessment_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          diagnosis?: string | null
+          discharge_summary?: string | null
+          end_date?: string | null
+          frequency?: string | null
+          goals?: string | null
+          id?: string
+          notes?: string | null
+          person_id?: string
+          practitioner_id?: string | null
+          protocol_template_id?: string | null
+          review_date?: string | null
+          start_date?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "physio_treatment_plans_assessment_id_fkey"
+            columns: ["assessment_id"]
+            isOneToOne: false
+            referencedRelation: "physio_assessments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_treatment_plans_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_treatment_plans_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "physio_treatment_plans_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_treatment_plans_practitioner_id_fkey"
+            columns: ["practitioner_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "physio_treatment_plans_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -16458,6 +20007,429 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "sms_templates"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      spa_bookings: {
+        Row: {
+          booking_source: string
+          cancelled_reason: string | null
+          client_notes: string | null
+          company_id: string
+          contraindications_checked: boolean
+          created_at: string
+          created_by: string | null
+          ends_at: string
+          id: string
+          person_id: string
+          room_id: string | null
+          starts_at: string
+          status: string
+          therapist_id: string | null
+          therapist_notes: string | null
+          treatment_id: string | null
+          updated_at: string
+          updated_by: string | null
+          vessel_id: string | null
+        }
+        Insert: {
+          booking_source?: string
+          cancelled_reason?: string | null
+          client_notes?: string | null
+          company_id: string
+          contraindications_checked?: boolean
+          created_at?: string
+          created_by?: string | null
+          ends_at: string
+          id?: string
+          person_id: string
+          room_id?: string | null
+          starts_at: string
+          status?: string
+          therapist_id?: string | null
+          therapist_notes?: string | null
+          treatment_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Update: {
+          booking_source?: string
+          cancelled_reason?: string | null
+          client_notes?: string | null
+          company_id?: string
+          contraindications_checked?: boolean
+          created_at?: string
+          created_by?: string | null
+          ends_at?: string
+          id?: string
+          person_id?: string
+          room_id?: string | null
+          starts_at?: string
+          status?: string
+          therapist_id?: string | null
+          therapist_notes?: string | null
+          treatment_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spa_bookings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_bookings_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "spa_bookings_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_bookings_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "spa_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_bookings_therapist_id_fkey"
+            columns: ["therapist_id"]
+            isOneToOne: false
+            referencedRelation: "hw_practitioners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_bookings_treatment_id_fkey"
+            columns: ["treatment_id"]
+            isOneToOne: false
+            referencedRelation: "spa_treatments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_bookings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "spa_bookings_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spa_inventory_items: {
+        Row: {
+          brand: string | null
+          category: string
+          company_id: string
+          created_at: string
+          currency: string | null
+          expiry_date: string | null
+          id: string
+          is_active: boolean
+          minimum_quantity: number
+          name: string
+          notes: string | null
+          quantity: number
+          storage_location: string | null
+          supplier: string | null
+          unit: string
+          unit_cost_minor: number | null
+          updated_at: string
+          vessel_id: string | null
+        }
+        Insert: {
+          brand?: string | null
+          category?: string
+          company_id: string
+          created_at?: string
+          currency?: string | null
+          expiry_date?: string | null
+          id?: string
+          is_active?: boolean
+          minimum_quantity?: number
+          name: string
+          notes?: string | null
+          quantity?: number
+          storage_location?: string | null
+          supplier?: string | null
+          unit?: string
+          unit_cost_minor?: number | null
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          brand?: string | null
+          category?: string
+          company_id?: string
+          created_at?: string
+          currency?: string | null
+          expiry_date?: string | null
+          id?: string
+          is_active?: boolean
+          minimum_quantity?: number
+          name?: string
+          notes?: string | null
+          quantity?: number
+          storage_location?: string | null
+          supplier?: string | null
+          unit?: string
+          unit_cost_minor?: number | null
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spa_inventory_items_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_inventory_items_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spa_inventory_transactions: {
+        Row: {
+          booking_id: string | null
+          company_id: string
+          created_at: string
+          id: string
+          item_id: string
+          notes: string | null
+          occurred_at: string
+          performed_by: string | null
+          quantity_after: number | null
+          quantity_delta: number
+          reason: string | null
+          transaction_type: string
+        }
+        Insert: {
+          booking_id?: string | null
+          company_id: string
+          created_at?: string
+          id?: string
+          item_id: string
+          notes?: string | null
+          occurred_at?: string
+          performed_by?: string | null
+          quantity_after?: number | null
+          quantity_delta: number
+          reason?: string | null
+          transaction_type: string
+        }
+        Update: {
+          booking_id?: string | null
+          company_id?: string
+          created_at?: string
+          id?: string
+          item_id?: string
+          notes?: string | null
+          occurred_at?: string
+          performed_by?: string | null
+          quantity_after?: number | null
+          quantity_delta?: number
+          reason?: string | null
+          transaction_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spa_inventory_transactions_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "spa_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_inventory_transactions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_inventory_transactions_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "spa_inventory_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_inventory_transactions_performed_by_fkey"
+            columns: ["performed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+        ]
+      }
+      spa_rooms: {
+        Row: {
+          capacity: number
+          company_id: string
+          created_at: string
+          deck: string | null
+          equipment: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          room_type: string
+          updated_at: string
+          vessel_id: string | null
+        }
+        Insert: {
+          capacity?: number
+          company_id: string
+          created_at?: string
+          deck?: string | null
+          equipment?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          room_type?: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Update: {
+          capacity?: number
+          company_id?: string
+          created_at?: string
+          deck?: string | null
+          equipment?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          room_type?: string
+          updated_at?: string
+          vessel_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spa_rooms_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_rooms_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      spa_treatments: {
+        Row: {
+          buffer_minutes: number
+          category: string
+          company_id: string
+          contraindications: string | null
+          created_at: string
+          created_by: string | null
+          currency: string | null
+          description: string | null
+          duration_minutes: number
+          equipment_required: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          price_minor: number | null
+          products_used: string | null
+          requires_room: boolean
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          buffer_minutes?: number
+          category?: string
+          company_id: string
+          contraindications?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          description?: string | null
+          duration_minutes?: number
+          equipment_required?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          price_minor?: number | null
+          products_used?: string | null
+          requires_room?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          buffer_minutes?: number
+          category?: string
+          company_id?: string
+          contraindications?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string | null
+          description?: string | null
+          duration_minutes?: number
+          equipment_required?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          price_minor?: number | null
+          products_used?: string | null
+          requires_room?: boolean
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "spa_treatments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "spa_treatments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "spa_treatments_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }
@@ -19301,6 +23273,47 @@ export type Database = {
         }
         Returns: string
       }
+      hw_is_practitioner: {
+        Args: { _discipline: string; _user_id: string }
+        Returns: boolean
+      }
+      hw_person_is_self: {
+        Args: { _person_id: string; _user_id: string }
+        Returns: boolean
+      }
+      hw_settings_for: {
+        Args: { p_company_id: string }
+        Returns: {
+          allow_crew_view_own_records: boolean
+          allow_self_logging: boolean
+          company_id: string
+          controlled_drugs_require_witness: boolean
+          created_at: string
+          default_currency: string
+          equipment_check_warning_days: number
+          fitness_expiry_warning_days: number
+          id: string
+          medical_stores_category: string | null
+          notes: string | null
+          spa_booking_lead_hours: number
+          spa_closing_time: string
+          spa_opening_time: string
+          stock_expiry_warning_days: number
+          telemedicine_account_ref: string | null
+          telemedicine_contact: string | null
+          telemedicine_provider: string | null
+          units: string
+          updated_at: string
+          updated_by: string | null
+          vaccination_warning_days: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "hw_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       initialize_vessel_emergency_from_defaults: {
         Args: { p_company_id: string; p_vessel_id: string }
         Returns: string
@@ -19538,6 +23551,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      med_fitness_can_view: { Args: { _user_id: string }; Returns: boolean }
+      medical_can_admin: { Args: { _user_id: string }; Returns: boolean }
+      medical_can_edit: { Args: { _user_id: string }; Returns: boolean }
+      medical_can_view: { Args: { _user_id: string }; Returns: boolean }
       my_profile_id: { Args: never; Returns: string }
       nb_project_in_company: {
         Args: { p_project_id: string }
@@ -19689,6 +23706,9 @@ export type Database = {
         }
         Returns: boolean
       }
+      wellness_can_admin: { Args: { _user_id: string }; Returns: boolean }
+      wellness_can_edit: { Args: { _user_id: string }; Returns: boolean }
+      wellness_can_view: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
       alert_severity: "RED" | "ORANGE" | "YELLOW" | "GREEN"
