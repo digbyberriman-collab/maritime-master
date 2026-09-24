@@ -23840,6 +23840,70 @@ export type Database = {
         }
         Relationships: []
       }
+      hw_expiry_items: {
+        Row: {
+          company_id: string | null
+          days_remaining: number | null
+          due_date: string | null
+          item_type: string | null
+          label: string | null
+          person_id: string | null
+          person_name: string | null
+          profile_id: string | null
+          record_id: string | null
+          vessel_id: string | null
+        }
+        Relationships: []
+      }
+      hw_fitness_status: {
+        Row: {
+          assessment_id: string | null
+          assessment_type: string | null
+          company_id: string | null
+          days_remaining: number | null
+          department: string | null
+          expires_on: string | null
+          fitness_state: string | null
+          issued_on: string | null
+          person_id: string | null
+          person_name: string | null
+          profile_id: string | null
+          rank: string | null
+          restrictions: string | null
+          status: string | null
+          vessel_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "hw_people_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "hw_people_vessel_id_fkey"
+            columns: ["vessel_id"]
+            isOneToOne: false
+            referencedRelation: "vessels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_fitness_assessments_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "med_fitness_assessments_person_id_fkey"
+            columns: ["person_id"]
+            isOneToOne: false
+            referencedRelation: "hw_people"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       acknowledge_alert_action: {
@@ -24224,6 +24288,8 @@ export type Database = {
         }
         Returns: string
       }
+      hw_alert_person_id: { Args: { _metadata: Json }; Returns: string }
+      hw_generate_alerts: { Args: { p_company_id?: string }; Returns: number }
       hw_is_practitioner: {
         Args: { _discipline: string; _user_id: string }
         Returns: boolean
@@ -24503,6 +24569,14 @@ export type Database = {
         }
       }
       med_fitness_can_view: { Args: { _user_id: string }; Returns: boolean }
+      med_seed_msn1768_category_a: {
+        Args: { p_vessel_id: string }
+        Returns: number
+      }
+      med_seed_screening_template: {
+        Args: { p_company_id: string }
+        Returns: string
+      }
       medical_can_admin: { Args: { _user_id: string }; Returns: boolean }
       medical_can_edit: { Args: { _user_id: string }; Returns: boolean }
       medical_can_view: { Args: { _user_id: string }; Returns: boolean }
@@ -24552,6 +24626,10 @@ export type Database = {
           p_trainer_id?: string
         }
         Returns: string
+      }
+      pt_seed_exercise_sources: {
+        Args: { p_company_id: string }
+        Returns: number
       }
       rbac_company_permission: {
         Args: {
@@ -24627,6 +24705,10 @@ export type Database = {
       snooze_alert: {
         Args: { p_alert_id: string; p_reason?: string; p_snooze_hours?: number }
         Returns: Json
+      }
+      spa_seed_treatment_menu: {
+        Args: { p_company_id: string }
+        Returns: number
       }
       sync_crew_import_to_profiles: {
         Args: { p_company_id?: string }
