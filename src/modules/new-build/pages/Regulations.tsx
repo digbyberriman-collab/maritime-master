@@ -492,15 +492,17 @@ export default function Regulations() {
                       </TableCell>
                       <TableCell>
                         {r.storage_path ? (
-                          <a
-                            href={getDownloadUrl(r.storage_path)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                            {r.file_name || "Download"}
-                          </a>
+                          getDownloadUrl(r.storage_path) && (
+                            <a
+                              href={getDownloadUrl(r.storage_path)!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              {r.file_name || "Download"}
+                            </a>
+                          )
                         ) : r.external_url ? (
                           <a
                             href={r.external_url}
