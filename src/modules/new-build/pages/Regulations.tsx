@@ -118,6 +118,10 @@ export default function Regulations() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
+  // The nb_regulations bucket is private, so downloads need short-lived
+  // signed URLs (public URLs return an error for a private bucket).
+  const [signedDocUrls, setSignedDocUrls] = useState<Record<string, string>>({});
+  const pendingDocPaths = useRef<Set<string>>(new Set());
   const [form, setForm] = useState<FormData>(emptyForm);
   const [file, setFile] = useState<File | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
