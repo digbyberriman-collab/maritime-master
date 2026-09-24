@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { useAuth } from "@/modules/auth/contexts/AuthContext";
 import { supabase } from "@/modules/new-build/lib/supabase";
@@ -118,6 +118,10 @@ export default function Regulations() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [dialogOpen, setDialogOpen] = useState(false);
+  // The nb_regulations bucket is private, so downloads need short-lived
+  // signed URLs (public URLs return an error for a private bucket).
+  const [signedDocUrls, setSignedDocUrls] = useState<Record<string, string>>({});
+  const pendingDocPaths = useRef<Set<string>>(new Set());
   const [form, setForm] = useState<FormData>(emptyForm);
   const [file, setFile] = useState<File | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -295,9 +299,22 @@ export default function Regulations() {
     }
   }, [projectId, queryClient, toast]);
 
-  const getDownloadUrl = (storagePath: string) => {
-    const { data } = supabase.storage.from("nb_regulations").getPublicUrl(storagePath);
-    return data.publicUrl;
+  const getDownloadUrl = (storagePath: string): string | null => {
+    const cached = signedDocUrls[storagePath];
+    if (cached) return cached;
+    if (!pendingDocPaths.current.has(storagePath)) {
+      pendingDocPaths.current.add(storagePath);
+      supabase.storage
+        .from("nb_regulations")
+        .createSignedUrl(storagePath, 3600)
+        .then(({ data, error }) => {
+          if (!error && data?.signedUrl) {
+            setSignedDocUrls((prev) => (prev[storagePath] === data.signedUrl ? prev : { ...prev, [storagePath]: data.signedUrl }));
+          }
+        })
+        .catch(() => { /* leave unresolved — the link hides */ });
+    }
+    return null;
   };
 
   const closeDialog = () => {
@@ -475,15 +492,17 @@ export default function Regulations() {
                       </TableCell>
                       <TableCell>
                         {r.storage_path ? (
-                          <a
-                            href={getDownloadUrl(r.storage_path)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                            {r.file_name || "Download"}
-                          </a>
+                          getDownloadUrl(r.storage_path) && (
+                            <a
+                              href={getDownloadUrl(r.storage_path)!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              {r.file_name || "Download"}
+                            </a>
+                          )
                         ) : r.external_url ? (
                           <a
                             href={r.external_url}
