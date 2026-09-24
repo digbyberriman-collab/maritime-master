@@ -299,9 +299,22 @@ export default function Regulations() {
     }
   }, [projectId, queryClient, toast]);
 
-  const getDownloadUrl = (storagePath: string) => {
-    const { data } = supabase.storage.from("nb_regulations").getPublicUrl(storagePath);
-    return data.publicUrl;
+  const getDownloadUrl = (storagePath: string): string | null => {
+    const cached = signedDocUrls[storagePath];
+    if (cached) return cached;
+    if (!pendingDocPaths.current.has(storagePath)) {
+      pendingDocPaths.current.add(storagePath);
+      supabase.storage
+        .from("nb_regulations")
+        .createSignedUrl(storagePath, 3600)
+        .then(({ data, error }) => {
+          if (!error && data?.signedUrl) {
+            setSignedDocUrls((prev) => (prev[storagePath] === data.signedUrl ? prev : { ...prev, [storagePath]: data.signedUrl }));
+          }
+        })
+        .catch(() => { /* leave unresolved — the link hides */ });
+    }
+    return null;
   };
 
   const closeDialog = () => {
