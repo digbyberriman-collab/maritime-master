@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useProject } from "@/modules/new-build/contexts/NewBuildProjectContext";
 import { useAuth } from "@/modules/auth/contexts/AuthContext";
 import { supabase } from "@/modules/new-build/lib/supabase";
