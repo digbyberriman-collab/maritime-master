@@ -558,7 +558,7 @@ export type Database = {
           closeout_evidence_urls?: string[] | null
           created_at?: string
           finding_description: string
-          finding_number: string
+          finding_number?: string
           finding_type: string
           id?: string
           ism_section: number
@@ -793,7 +793,7 @@ export type Database = {
         Insert: {
           actual_end_date?: string | null
           actual_start_date?: string | null
-          audit_number: string
+          audit_number?: string
           audit_report_url?: string | null
           audit_scope: string
           audit_team?: string[] | null
@@ -5168,7 +5168,7 @@ export type Database = {
           drill_date_actual?: string | null
           drill_date_scheduled: string
           drill_duration_minutes?: number | null
-          drill_number: string
+          drill_number?: string
           drill_type_id: string
           id?: string
           lessons_learned_improvement?: string | null
