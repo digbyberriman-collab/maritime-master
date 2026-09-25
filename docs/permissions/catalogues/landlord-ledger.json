@@ -1,0 +1,874 @@
+{
+  "pmsVersion": "1.0",
+  "app": {
+    "id": "landlord-ledger",
+    "name": "Landlord Ledger",
+    "repo": "digbyberriman-collab/landlord-ledger",
+    "status": "DRAFT"
+  },
+  "unitLabel": "Property / Entity",
+  "scopes": [
+    {
+      "code": "S",
+      "key": "self",
+      "label": "Self",
+      "description": "Own lease / own tenant record / own assigned jobs"
+    },
+    {
+      "code": "P",
+      "key": "property",
+      "label": "Property",
+      "description": "Assigned property(ies)"
+    },
+    {
+      "code": "E",
+      "key": "entity",
+      "label": "Entity",
+      "description": "All properties held by an assigned ownership entity"
+    },
+    {
+      "code": "A",
+      "key": "account",
+      "label": "Account",
+      "description": "The whole owner account (portfolio)"
+    }
+  ],
+  "levels": {
+    "self": "S",
+    "group": "P",
+    "unit": "E",
+    "all": "A"
+  },
+  "sensitivityNotes": {
+    "T0": "anyone with any role on the account",
+    "T1": "operational property records",
+    "T2": "tenant PII, rent, leases, finance — audited, reason required",
+    "T3": "personal finance (fin_*), tenant ID / screening — owner only or named holders"
+  },
+  "actionNotes": {
+    "sign": "sign a lease",
+    "settle": "record a payment / mark paid",
+    "assign": "assign a contractor / invite a team member"
+  },
+  "defaults": {
+    "tier": "T1",
+    "actions": "read"
+  },
+  "departments": [
+    {
+      "key": "ownership",
+      "label": "Ownership",
+      "signOffBy": "Owner",
+      "roles": [
+        {
+          "key": "owner",
+          "label": "Owner (account holder)",
+          "tier": "command",
+          "reach": "all",
+          "appRole": "owner"
+        },
+        {
+          "key": "co_owner",
+          "label": "Co-owner / Entity Director",
+          "tier": "command",
+          "reach": "unit"
+        }
+      ]
+    },
+    {
+      "key": "management",
+      "label": "Management",
+      "signOffBy": "Owner",
+      "roles": [
+        {
+          "key": "property_manager",
+          "label": "Property Manager",
+          "tier": "hod",
+          "levelCodes": {
+            "unit": "P"
+          },
+          "appRole": "agent"
+        },
+        {
+          "key": "letting_agent",
+          "label": "Letting Agent",
+          "tier": "officer",
+          "levelCodes": {
+            "unit": "P"
+          },
+          "appRole": "agent"
+        }
+      ]
+    },
+    {
+      "key": "finance",
+      "label": "Finance",
+      "signOffBy": "Owner",
+      "roles": [
+        {
+          "key": "accountant",
+          "label": "Accountant",
+          "tier": "hod",
+          "reach": "all",
+          "appRole": "accountant"
+        },
+        {
+          "key": "bookkeeper",
+          "label": "Bookkeeper",
+          "tier": "officer",
+          "reach": "all"
+        }
+      ]
+    },
+    {
+      "key": "operations",
+      "label": "Operations",
+      "signOffBy": "Property Manager",
+      "roles": [
+        {
+          "key": "maintenance_contractor",
+          "label": "Maintenance Contractor",
+          "tier": "rating",
+          "levelCodes": {
+            "group": "S",
+            "unit": "S"
+          }
+        }
+      ]
+    },
+    {
+      "key": "occupants",
+      "label": "Occupants",
+      "signOffBy": "Owner",
+      "roles": [
+        {
+          "key": "tenant",
+          "label": "Tenant",
+          "tier": "rating",
+          "levelCodes": {
+            "group": "S",
+            "unit": "S"
+          },
+          "appRole": "tenant"
+        },
+        {
+          "key": "guarantor",
+          "label": "Guarantor",
+          "tier": "external",
+          "levelCodes": {
+            "unit": "S"
+          }
+        }
+      ]
+    },
+    {
+      "key": "oversight",
+      "label": "Oversight",
+      "description": "Current team \"viewer\" (is_team_viewer)",
+      "signOffBy": "Owner",
+      "roles": [
+        {
+          "key": "viewer",
+          "label": "Team Viewer",
+          "tier": "external",
+          "reach": "all",
+          "appRole": "team_members.role = viewer"
+        }
+      ]
+    },
+    {
+      "key": "platform",
+      "label": "Platform",
+      "description": "Operator console only",
+      "signOffBy": "Platform operator",
+      "roles": [
+        {
+          "key": "platform_admin",
+          "label": "Platform Admin",
+          "tier": "admin",
+          "reach": "all",
+          "appRole": "platform_admins"
+        }
+      ]
+    }
+  ],
+  "accessSets": [
+    {
+      "key": "owner",
+      "label": "Owner",
+      "tier": "command",
+      "reach": "all",
+      "description": "Account holder"
+    },
+    {
+      "key": "co_owner",
+      "label": "Co-owner",
+      "tier": "command",
+      "reach": "unit",
+      "description": "Entity director"
+    },
+    {
+      "key": "manager",
+      "label": "Manager",
+      "tier": "hod",
+      "description": "Property manager"
+    },
+    {
+      "key": "agent",
+      "label": "Agent",
+      "tier": "officer",
+      "description": "Letting agent"
+    },
+    {
+      "key": "accountant",
+      "label": "Accountant",
+      "tier": "hod",
+      "reach": "all",
+      "description": "Accountant / bookkeeper"
+    },
+    {
+      "key": "contractor",
+      "label": "Contractor",
+      "tier": "rating",
+      "levelCodes": {
+        "group": "S",
+        "unit": "S"
+      },
+      "description": "Own jobs only"
+    },
+    {
+      "key": "tenant",
+      "label": "Tenant",
+      "tier": "rating",
+      "levelCodes": {
+        "group": "S",
+        "unit": "S"
+      },
+      "description": "Own lease only"
+    },
+    {
+      "key": "viewer",
+      "label": "Viewer",
+      "tier": "external",
+      "reach": "all",
+      "description": "Current team viewer"
+    }
+  ],
+  "separationOfDuties": [
+    {
+      "id": "SOD-01",
+      "a": "property.money.expenses.approve",
+      "b": "property.money.expenses.settle",
+      "level": "role",
+      "approverTiers": [
+        "command"
+      ],
+      "description": "Expense approver cannot mark it paid."
+    },
+    {
+      "id": "SOD-02",
+      "a": "account.settings.permission_matrix_import.approve",
+      "b": "account.settings.permission_matrix_import.create",
+      "level": "record",
+      "description": "Uploader and applier differ when a co-owner exists; a sole owner may do both (logged)."
+    },
+    {
+      "id": "SOD-03",
+      "a": "property.operations.maintenance.edit",
+      "b": "property.operations.maintenance.approve",
+      "level": "record",
+      "description": "Contractor who updates a job cannot approve its completion."
+    },
+    {
+      "id": "SOD-04",
+      "a": "account.settings.team_access.assign",
+      "b": "account.settings.team_access.admin",
+      "level": "record",
+      "description": "Nobody grants access to themselves."
+    }
+  ],
+  "signOffExtras": [
+    {
+      "area": "Personal Finance (never shared)",
+      "by": "Owner"
+    },
+    {
+      "area": "Tenant data (T2 / T3)",
+      "by": "Owner (data controller)"
+    }
+  ],
+  "domains": [
+    {
+      "key": "core",
+      "label": "Core",
+      "modules": [
+        {
+          "key": "home",
+          "label": "Home",
+          "defaults": {
+            "owners": [
+              "ownership"
+            ]
+          },
+          "subcategories": [
+            {
+              "key": "dashboard",
+              "label": "Dashboard",
+              "actions": "dash",
+              "route": "/dashboard",
+              "tier": "T0"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "property",
+      "label": "Property",
+      "defaults": {
+        "owners": [
+          "ownership",
+          "management"
+        ],
+        "entitlement": "property",
+        "auditVisible": true
+      },
+      "modules": [
+        {
+          "key": "portfolio",
+          "label": "Portfolio",
+          "subcategories": [
+            {
+              "key": "properties",
+              "label": "Properties & Units",
+              "actions": "record",
+              "route": "/properties"
+            },
+            {
+              "key": "valuations",
+              "label": "Valuations",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "export"
+              ],
+              "tier": "T2",
+              "owners": [
+                "ownership",
+                "finance"
+              ]
+            },
+            {
+              "key": "entities",
+              "label": "Entities",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "delete"
+              ],
+              "route": "/entities",
+              "tier": "T2",
+              "owners": [
+                "ownership"
+              ]
+            },
+            {
+              "key": "mortgages_loans",
+              "label": "Mortgages, Loans & Liabilities",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "export"
+              ],
+              "tier": "T2",
+              "owners": [
+                "ownership",
+                "finance"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "tenancy",
+          "label": "Tenancy",
+          "defaults": {
+            "owners": [
+              "management",
+              "ownership"
+            ],
+            "tier": "T2",
+            "selfRoles": [
+              "tenant"
+            ]
+          },
+          "subcategories": [
+            {
+              "key": "tenants",
+              "label": "Tenants",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "export"
+              ],
+              "route": "/tenants",
+              "labels": {
+                "view_own": "View own tenant record"
+              },
+              "grants": {
+                "view": {
+                  "accountant": "A",
+                  "bookkeeper": "A"
+                }
+              }
+            },
+            {
+              "key": "tenant_screening",
+              "label": "Tenant Screening & ID (Right to Rent / FICA)",
+              "actions": [
+                "view",
+                "create",
+                "edit"
+              ],
+              "tier": "T3",
+              "owners": [
+                "management"
+              ],
+              "t3Holders": {
+                "owner": [
+                  "view"
+                ]
+              },
+              "notes": "Identity documents, credit checks — T3; retain only as long as the law requires."
+            },
+            {
+              "key": "leases",
+              "label": "Leases",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "delete",
+                "export"
+              ],
+              "route": "/leases",
+              "labels": {
+                "sign": "Sign lease"
+              },
+              "selfRoles": [
+                "tenant",
+                "guarantor"
+              ],
+              "grants": {
+                "sign": {
+                  "tenant": "S",
+                  "guarantor": "S"
+                }
+              }
+            },
+            {
+              "key": "deposits",
+              "label": "Deposit Protection",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "export"
+              ],
+              "notes": "UK tenancy deposit schemes (prescribed information) / SA RHA interest-bearing account."
+            }
+          ]
+        },
+        {
+          "key": "money",
+          "label": "Rent & Money",
+          "defaults": {
+            "owners": [
+              "finance",
+              "management",
+              "ownership"
+            ],
+            "tier": "T2",
+            "selfRoles": [
+              "tenant"
+            ]
+          },
+          "subcategories": [
+            {
+              "key": "invoices",
+              "label": "Invoices",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "settle",
+                "export"
+              ],
+              "route": "/invoices",
+              "labels": {
+                "settle": "Record payment"
+              }
+            },
+            {
+              "key": "payments",
+              "label": "Payments",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "export"
+              ],
+              "route": "/payments",
+              "labels": {
+                "create": "Make / log a payment"
+              },
+              "grants": {
+                "create": {
+                  "tenant": "S"
+                }
+              }
+            },
+            {
+              "key": "expenses",
+              "label": "Expenses",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "settle",
+                "export"
+              ],
+              "route": "/expenses",
+              "hodEdits": true,
+              "labels": {
+                "settle": "Mark paid"
+              }
+            },
+            {
+              "key": "bank_transactions",
+              "label": "Bank Transactions (property)",
+              "actions": [
+                "view",
+                "edit",
+                "export"
+              ],
+              "owners": [
+                "finance",
+                "ownership"
+              ]
+            },
+            {
+              "key": "tax",
+              "label": "Tax",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "export"
+              ],
+              "route": "/tax",
+              "owners": [
+                "finance",
+                "ownership"
+              ]
+            },
+            {
+              "key": "reports",
+              "label": "Reports",
+              "actions": [
+                "view",
+                "export"
+              ],
+              "route": "/reports",
+              "owners": [
+                "finance",
+                "ownership"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "operations",
+          "label": "Operations",
+          "defaults": {
+            "owners": [
+              "management",
+              "ownership"
+            ],
+            "selfRoles": [
+              "tenant",
+              "maintenance_contractor"
+            ]
+          },
+          "subcategories": [
+            {
+              "key": "maintenance",
+              "label": "Maintenance",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "assign",
+                "approve",
+                "export"
+              ],
+              "route": "/maintenance",
+              "crewCreates": "self",
+              "labels": {
+                "create": "Report / raise a maintenance request",
+                "edit": "Update job",
+                "assign": "Assign contractor",
+                "approve": "Approve quote / completion"
+              },
+              "grants": {
+                "edit": {
+                  "maintenance_contractor": "S"
+                },
+                "view": {
+                  "maintenance_contractor": "S"
+                }
+              }
+            },
+            {
+              "key": "compliance",
+              "label": "Compliance (Gas Safety, EICR, EPC, SA CoC)",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "export"
+              ],
+              "route": "/compliance",
+              "labels": {
+                "view_own": "View own property certificates"
+              },
+              "notes": "Tenants are legally entitled to copies of gas safety / EICR / EPC — view_own on their property."
+            },
+            {
+              "key": "documents",
+              "label": "Documents",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "export"
+              ],
+              "route": "/documents",
+              "tier": "T2"
+            },
+            {
+              "key": "contacts",
+              "label": "Contacts",
+              "actions": "record",
+              "route": "/contacts"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "personal_finance",
+      "label": "Personal Finance",
+      "defaults": {
+        "owners": [
+          "ownership"
+        ],
+        "tier": "T3",
+        "entitlement": "finance",
+        "onlyRoles": [
+          "owner"
+        ]
+      },
+      "modules": [
+        {
+          "key": "finance",
+          "label": "Finance (never shared)",
+          "subcategories": [
+            {
+              "key": "overview",
+              "label": "Finance Overview",
+              "actions": [
+                "view",
+                "export"
+              ],
+              "route": "/finance",
+              "notes": "fin_* tables — never shareable, not even with Team Viewers."
+            },
+            {
+              "key": "accounts",
+              "label": "Accounts",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "export"
+              ],
+              "route": "/finance/accounts"
+            },
+            {
+              "key": "transactions",
+              "label": "Transactions",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "export"
+              ],
+              "route": "/finance/transactions"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "account",
+      "label": "Account",
+      "defaults": {
+        "owners": [
+          "ownership"
+        ],
+        "tier": "T2"
+      },
+      "modules": [
+        {
+          "key": "settings",
+          "label": "Settings",
+          "subcategories": [
+            {
+              "key": "billing",
+              "label": "Billing & Plans",
+              "actions": [
+                "view",
+                "admin"
+              ],
+              "route": "/billing",
+              "onlyRoles": [
+                "owner"
+              ]
+            },
+            {
+              "key": "profile",
+              "label": "Profile",
+              "actions": [
+                "view_own"
+              ],
+              "route": "/settings",
+              "tier": "T0"
+            },
+            {
+              "key": "team_access",
+              "label": "Team Access",
+              "actions": [
+                "view",
+                "assign",
+                "admin",
+                "export"
+              ],
+              "route": "/settings",
+              "entitlement": "team",
+              "labels": {
+                "assign": "Invite / revoke team member",
+                "admin": "Manage access sets"
+              }
+            },
+            {
+              "key": "tax_settings",
+              "label": "Tax Settings",
+              "actions": "config",
+              "owners": [
+                "ownership",
+                "finance"
+              ]
+            },
+            {
+              "key": "notifications",
+              "label": "Notifications & Reminders",
+              "actions": "config",
+              "tier": "T1"
+            },
+            {
+              "key": "permission_matrix_import",
+              "label": "Permission Matrix Import",
+              "actions": [
+                "view",
+                "create",
+                "approve"
+              ],
+              "labels": {
+                "create": "Upload matrix workbook",
+                "approve": "Apply import"
+              },
+              "onlyRoles": [
+                "owner",
+                "co_owner"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "platform",
+      "label": "Platform",
+      "defaults": {
+        "owners": [
+          "platform"
+        ],
+        "tier": "T2"
+      },
+      "modules": [
+        {
+          "key": "console",
+          "label": "Operator Console",
+          "subcategories": [
+            {
+              "key": "accounts_admin",
+              "label": "Accounts",
+              "actions": [
+                "view",
+                "edit"
+              ],
+              "route": "/admin"
+            },
+            {
+              "key": "vouchers",
+              "label": "Vouchers",
+              "actions": "config"
+            },
+            {
+              "key": "payment_status",
+              "label": "Payment Status",
+              "actions": [
+                "view"
+              ]
+            },
+            {
+              "key": "platform_audit",
+              "label": "Platform Audit",
+              "actions": [
+                "view",
+                "export"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

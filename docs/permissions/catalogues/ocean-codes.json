@@ -1,0 +1,1850 @@
+{
+  "pmsVersion": "1.0",
+  "app": {
+    "id": "ocean-codes",
+    "name": "Ocean Codes (OceancOS)",
+    "repo": "digbyberriman-collab/oceancos-33a83542",
+    "status": "DRAFT"
+  },
+  "unitLabel": "Vessel / Project",
+  "scopes": [
+    {
+      "code": "S",
+      "key": "self",
+      "label": "Self",
+      "description": "The holder's own records only"
+    },
+    {
+      "code": "D",
+      "key": "department",
+      "label": "Department",
+      "description": "Vessel department (DECK / ENG / INT / GAL …) of the holder"
+    },
+    {
+      "code": "C",
+      "key": "company",
+      "label": "Company",
+      "description": "The holder's own contractor / supplier company (profiles.contractor_id)"
+    },
+    {
+      "code": "P",
+      "key": "project",
+      "label": "Project",
+      "description": "Assigned project(s) — user_can_access_project()"
+    },
+    {
+      "code": "V",
+      "key": "vessel",
+      "label": "Vessel",
+      "description": "Assigned vessel(s) — user_roles.vessel_id / user_can_access_vessel()"
+    },
+    {
+      "code": "G",
+      "key": "global",
+      "label": "Global",
+      "description": "Every vessel and project (user_roles.vessel_id IS NULL)"
+    }
+  ],
+  "levels": {
+    "self": "S",
+    "group": "D",
+    "unit": "V",
+    "all": "G"
+  },
+  "sensitivityNotes": {
+    "T0": "any signed-in user with vessel access",
+    "T1": "operational project records",
+    "T2": "commercial: budget, quotes, invoices, POs, contractor terms — audited",
+    "T3": "none catalogued yet — add if crew medical / personal data enters Ocean Codes"
+  },
+  "actionNotes": {
+    "approve": "first-line approval / a named approval-chain stage",
+    "final_approve": "final acceptance (e.g. accept completed works)",
+    "sign": "countersign",
+    "settle": "record payment",
+    "assign": "triage / route to an owner"
+  },
+  "defaults": {
+    "tier": "T1",
+    "actions": "read"
+  },
+  "departments": [
+    {
+      "key": "owner_side",
+      "label": "Owner Side",
+      "signOffBy": "Owner / Owner's Rep",
+      "roles": [
+        {
+          "key": "owner",
+          "label": "Owner",
+          "tier": "command",
+          "appRole": "owner"
+        },
+        {
+          "key": "owner_rep",
+          "label": "Owner's Representative",
+          "tier": "command",
+          "appRole": "owner_rep"
+        },
+        {
+          "key": "shore_management",
+          "label": "Shore Management",
+          "tier": "command",
+          "appRole": "shore_management"
+        },
+        {
+          "key": "technical_manager",
+          "label": "Technical Manager",
+          "tier": "hod",
+          "reach": "unit",
+          "appRole": "technical_manager"
+        },
+        {
+          "key": "finance_controller",
+          "label": "Finance Controller",
+          "tier": "hod",
+          "reach": "unit",
+          "appRole": "finance_controller"
+        },
+        {
+          "key": "auditor",
+          "label": "Auditor",
+          "tier": "external",
+          "appRole": "auditor"
+        }
+      ]
+    },
+    {
+      "key": "vessel_side",
+      "label": "Vessel Side",
+      "signOffBy": "Captain",
+      "roles": [
+        {
+          "key": "captain",
+          "label": "Captain",
+          "tier": "command",
+          "appRole": "captain"
+        },
+        {
+          "key": "chief_officer",
+          "label": "Chief Officer",
+          "tier": "hod",
+          "appRole": "chief_officer"
+        },
+        {
+          "key": "chief_engineer",
+          "label": "Chief Engineer",
+          "tier": "hod",
+          "appRole": "chief_engineer"
+        },
+        {
+          "key": "purser",
+          "label": "Purser",
+          "tier": "hod",
+          "reach": "unit",
+          "appRole": "purser"
+        },
+        {
+          "key": "hod",
+          "label": "Head of Department",
+          "tier": "hod",
+          "appRole": "hod"
+        },
+        {
+          "key": "crew_member",
+          "label": "Crew Member",
+          "tier": "rating",
+          "appRole": "crew_member"
+        }
+      ]
+    },
+    {
+      "key": "project_management",
+      "label": "Project Management",
+      "signOffBy": "Project Manager",
+      "roles": [
+        {
+          "key": "project_manager",
+          "label": "Project Manager",
+          "tier": "command",
+          "appRole": "project_manager"
+        }
+      ]
+    },
+    {
+      "key": "yard_side",
+      "label": "Yard Side",
+      "signOffBy": "Yard PM",
+      "roles": [
+        {
+          "key": "yard_pm",
+          "label": "Yard Project Manager",
+          "tier": "hod",
+          "reach": "unit",
+          "levelCodes": {
+            "unit": "P"
+          },
+          "appRole": "yard_pm"
+        },
+        {
+          "key": "yard_trade_lead",
+          "label": "Yard Trade Lead",
+          "tier": "officer",
+          "levelCodes": {
+            "group": "C",
+            "unit": "P"
+          },
+          "appRole": "yard_trade_lead"
+        },
+        {
+          "key": "contractor",
+          "label": "Contractor",
+          "tier": "rating",
+          "levelCodes": {
+            "group": "C",
+            "unit": "P"
+          },
+          "appRole": "contractor"
+        },
+        {
+          "key": "supplier",
+          "label": "Supplier",
+          "tier": "rating",
+          "levelCodes": {
+            "group": "C",
+            "unit": "P"
+          },
+          "appRole": "supplier"
+        }
+      ]
+    },
+    {
+      "key": "authority",
+      "label": "Authority",
+      "description": "Class / flag — time-bounded",
+      "signOffBy": "Shore Management",
+      "roles": [
+        {
+          "key": "class_surveyor",
+          "label": "Class Surveyor",
+          "tier": "external",
+          "levelCodes": {
+            "unit": "P"
+          },
+          "appRole": "class_surveyor"
+        },
+        {
+          "key": "flag_surveyor",
+          "label": "Flag Surveyor",
+          "tier": "external",
+          "levelCodes": {
+            "unit": "P"
+          },
+          "appRole": "flag_surveyor"
+        }
+      ]
+    },
+    {
+      "key": "platform",
+      "label": "Platform",
+      "signOffBy": "Shore Management",
+      "roles": [
+        {
+          "key": "super_admin",
+          "label": "Super Admin",
+          "tier": "command",
+          "reach": "all",
+          "appRole": "super_admin"
+        },
+        {
+          "key": "guest",
+          "label": "Guest (read-only)",
+          "tier": "trainee",
+          "appRole": "guest"
+        }
+      ]
+    }
+  ],
+  "accessSets": [
+    {
+      "key": "owner_full",
+      "label": "Owner (full)",
+      "tier": "command",
+      "reach": "unit",
+      "description": "Owner / Owner's Rep / Shore Mgmt"
+    },
+    {
+      "key": "pm",
+      "label": "Project lead",
+      "tier": "command",
+      "reach": "unit",
+      "description": "Project Manager"
+    },
+    {
+      "key": "hod",
+      "label": "HOD / Manager",
+      "tier": "hod",
+      "description": "Vessel HODs, Technical / Finance managers"
+    },
+    {
+      "key": "officer",
+      "label": "Trade lead",
+      "tier": "officer",
+      "description": "Yard trade leads"
+    },
+    {
+      "key": "crew",
+      "label": "Crew / Contractor",
+      "tier": "rating",
+      "description": "Crew members, contractors, suppliers"
+    },
+    {
+      "key": "read_only",
+      "label": "Read only",
+      "tier": "trainee",
+      "description": "Guest"
+    },
+    {
+      "key": "authority",
+      "label": "Authority / Audit",
+      "tier": "external",
+      "description": "Class, flag, auditor — time-bounded"
+    },
+    {
+      "key": "platform",
+      "label": "Super admin",
+      "tier": "command",
+      "reach": "all",
+      "description": "Platform operator"
+    }
+  ],
+  "separationOfDuties": [
+    {
+      "id": "SOD-01",
+      "a": "project.invoices_payments.invoices.approve",
+      "b": "project.invoices_payments.payments.settle",
+      "level": "role",
+      "approverTiers": [
+        "command"
+      ],
+      "description": "Invoice approver cannot record the payment."
+    },
+    {
+      "id": "SOD-02",
+      "a": "governance.finance.purchase_orders.approve",
+      "b": "governance.finance.purchase_orders.create",
+      "level": "role",
+      "approverTiers": [
+        "command"
+      ],
+      "description": "PO raiser cannot approve POs (live grants give Finance Controller + Shore Management both — draft resolves)."
+    },
+    {
+      "id": "SOD-03",
+      "a": "project.jobs.job_quotes.approve",
+      "b": "project.jobs.job_quotes.create",
+      "level": "record",
+      "description": "The party that quotes cannot accept its own quote."
+    },
+    {
+      "id": "SOD-04",
+      "a": "governance.change_orders.change_orders.create",
+      "b": "governance.change_orders.approval_finance.approve",
+      "level": "record",
+      "description": "Raiser of a change order cannot give the finance approval on it."
+    },
+    {
+      "id": "SOD-05",
+      "a": "admin.settings.permission_matrix_import.approve",
+      "b": "admin.settings.permission_matrix_import.create",
+      "level": "role",
+      "approverTiers": [
+        "command"
+      ],
+      "description": "Uploader cannot apply the import (four-eyes)."
+    },
+    {
+      "id": "SOD-06",
+      "a": "project.jobs.job_progress.edit",
+      "b": "project.jobs.job_progress.final_approve",
+      "level": "record",
+      "description": "Whoever reports progress cannot accept the completed works."
+    }
+  ],
+  "signOffExtras": [
+    {
+      "area": "Approval chain (Change Orders)",
+      "by": "Owner's Rep + Project Manager"
+    },
+    {
+      "area": "Commercial (T2)",
+      "by": "Finance Controller"
+    }
+  ],
+  "domains": [
+    {
+      "key": "project",
+      "label": "Project",
+      "defaults": {
+        "owners": [
+          "project_management"
+        ]
+      },
+      "modules": [
+        {
+          "key": "workspace",
+          "label": "Workspace",
+          "subcategories": [
+            {
+              "key": "home",
+              "label": "Home",
+              "actions": "dash",
+              "route": "/",
+              "tier": "T0"
+            },
+            {
+              "key": "inbox",
+              "label": "Inbox",
+              "actions": [
+                "view_own"
+              ],
+              "route": "/inbox",
+              "tier": "T0"
+            },
+            {
+              "key": "favourites",
+              "label": "Favourites",
+              "actions": [
+                "view_own"
+              ],
+              "route": "/favourites",
+              "tier": "T0"
+            },
+            {
+              "key": "search",
+              "label": "Search",
+              "actions": "read",
+              "route": "/search",
+              "tier": "T0"
+            }
+          ]
+        },
+        {
+          "key": "jobs",
+          "label": "Quotes & Requests",
+          "defaults": {
+            "owners": [
+              "project_management",
+              "vessel_side"
+            ],
+            "alignsWith": "storm: yard.refit_workflow.works_orders"
+          },
+          "subcategories": [
+            {
+              "key": "job_requests",
+              "label": "Job Requests",
+              "actions": [
+                "view",
+                "create",
+                "delete",
+                "export"
+              ],
+              "route": "/jobs?view=requests",
+              "labels": {
+                "create": "Request a job",
+                "delete": "Cancel a job"
+              },
+              "legacy": {
+                "create": "job.request",
+                "delete": "job.cancel"
+              },
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "captain",
+                  "chief_officer",
+                  "chief_engineer",
+                  "purser",
+                  "hod",
+                  "project_manager",
+                  "owner_rep",
+                  "technical_manager",
+                  "owner",
+                  "shore_management"
+                ],
+                "delete": [
+                  "super_admin",
+                  "project_manager",
+                  "owner_rep",
+                  "yard_pm",
+                  "owner",
+                  "shore_management"
+                ]
+              }
+            },
+            {
+              "key": "job_quotes",
+              "label": "Quotes",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "sign"
+              ],
+              "route": "/jobs?view=pending",
+              "tier": "T2",
+              "owners": [
+                "yard_side",
+                "project_management"
+              ],
+              "labels": {
+                "create": "Quote a job",
+                "approve": "Accept quote",
+                "sign": "Countersign accepted quote"
+              },
+              "legacy": {
+                "approve": "job.accept",
+                "sign": "job.countersign",
+                "create": "job.quote"
+              },
+              "grants": {
+                "approve": [
+                  "super_admin",
+                  "owner",
+                  "owner_rep",
+                  "captain",
+                  "project_manager",
+                  "finance_controller",
+                  "shore_management"
+                ],
+                "sign": [
+                  "super_admin",
+                  "yard_pm",
+                  "contractor",
+                  "project_manager"
+                ],
+                "create": [
+                  "super_admin",
+                  "yard_pm",
+                  "yard_trade_lead",
+                  "contractor",
+                  "supplier",
+                  "project_manager"
+                ],
+                "edit": [
+                  "super_admin",
+                  "yard_pm",
+                  "yard_trade_lead",
+                  "contractor",
+                  "supplier",
+                  "project_manager"
+                ]
+              },
+              "notes": "Legacy job.quote covers: create, edit."
+            },
+            {
+              "key": "job_progress",
+              "label": "Accepted Jobs & Progress",
+              "actions": [
+                "view",
+                "edit",
+                "final_approve"
+              ],
+              "route": "/jobs?view=accepted",
+              "owners": [
+                "yard_side",
+                "project_management"
+              ],
+              "labels": {
+                "edit": "Update progress",
+                "final_approve": "Accept completed works"
+              },
+              "legacy": {
+                "edit": "job.progress",
+                "final_approve": "job.works_accept"
+              },
+              "grants": {
+                "edit": [
+                  "super_admin",
+                  "yard_pm",
+                  "yard_trade_lead",
+                  "contractor",
+                  "supplier",
+                  "project_manager"
+                ],
+                "final_approve": [
+                  "super_admin",
+                  "captain",
+                  "chief_engineer",
+                  "chief_officer",
+                  "project_manager",
+                  "owner_rep",
+                  "owner"
+                ]
+              }
+            },
+            {
+              "key": "worklist",
+              "label": "Worklist",
+              "actions": [
+                "view",
+                "create",
+                "export"
+              ],
+              "route": "/worklist",
+              "labels": {
+                "create": "Import worklist"
+              },
+              "legacy": {
+                "create": "job.import"
+              },
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "yard_pm"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "key": "after_sales",
+          "label": "After Sales",
+          "subcategories": [
+            {
+              "key": "warranty_claims",
+              "label": "Warranty Claims",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "export"
+              ],
+              "route": "/after-sales",
+              "owners": [
+                "project_management",
+                "yard_side"
+              ],
+              "labels": {
+                "edit": "Manage claim"
+              },
+              "legacy": {
+                "create": "claim.create",
+                "edit": "claim.manage"
+              },
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "captain",
+                  "chief_officer",
+                  "chief_engineer",
+                  "purser",
+                  "hod",
+                  "crew_member",
+                  "project_manager",
+                  "owner_rep",
+                  "technical_manager"
+                ],
+                "edit": [
+                  "super_admin",
+                  "project_manager",
+                  "yard_pm",
+                  "captain",
+                  "owner_rep",
+                  "shore_management",
+                  "contractor"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "key": "invoices_payments",
+          "label": "Invoices & Payments",
+          "defaults": {
+            "owners": [
+              "owner_side",
+              "project_management"
+            ],
+            "tier": "T2"
+          },
+          "subcategories": [
+            {
+              "key": "invoices",
+              "label": "Invoices",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "export"
+              ],
+              "route": "/invoices",
+              "legacy": {
+                "create": "invoice.manage",
+                "approve": "invoice.approve"
+              },
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "finance_controller",
+                  "project_manager",
+                  "shore_management",
+                  "yard_pm",
+                  "contractor",
+                  "supplier"
+                ],
+                "edit": [
+                  "super_admin",
+                  "finance_controller",
+                  "project_manager",
+                  "shore_management",
+                  "yard_pm",
+                  "contractor",
+                  "supplier"
+                ],
+                "approve": [
+                  "super_admin",
+                  "finance_controller",
+                  "owner",
+                  "owner_rep",
+                  "shore_management"
+                ]
+              },
+              "notes": "Legacy invoice.manage covers: create, edit."
+            },
+            {
+              "key": "payments",
+              "label": "Payments",
+              "actions": [
+                "view",
+                "settle",
+                "export"
+              ],
+              "route": "/invoices",
+              "labels": {
+                "settle": "Record payment"
+              },
+              "legacy": {
+                "settle": "payment.manage"
+              },
+              "grants": {
+                "settle": [
+                  "super_admin",
+                  "finance_controller",
+                  "project_manager",
+                  "shore_management"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "key": "records",
+          "label": "Project Records",
+          "subcategories": [
+            {
+              "key": "minutes",
+              "label": "Minutes",
+              "actions": "doc",
+              "route": "/minutes",
+              "legacy": {
+                "create": "meeting.manage"
+              },
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "captain",
+                  "yard_pm",
+                  "owner_rep"
+                ],
+                "edit": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "captain",
+                  "yard_pm",
+                  "owner_rep"
+                ],
+                "delete": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "captain",
+                  "yard_pm",
+                  "owner_rep"
+                ]
+              },
+              "notes": "Legacy meeting.manage covers: create, edit, delete."
+            },
+            {
+              "key": "locations",
+              "label": "Locations",
+              "actions": [
+                "view",
+                "edit"
+              ],
+              "route": "/locations",
+              "owners": [
+                "project_management",
+                "yard_side",
+                "vessel_side"
+              ],
+              "legacy": {
+                "edit": "location.edit"
+              },
+              "grants": {
+                "edit": [
+                  "super_admin",
+                  "project_manager",
+                  "yard_pm",
+                  "captain",
+                  "chief_engineer",
+                  "chief_officer",
+                  "yard_trade_lead"
+                ]
+              }
+            },
+            {
+              "key": "planning",
+              "label": "Planning",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "export"
+              ],
+              "route": "/schedule",
+              "labels": {
+                "create": "Import schedule"
+              },
+              "legacy": {
+                "create": "schedule.import",
+                "edit": "schedule.manage"
+              },
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "project_manager",
+                  "yard_pm",
+                  "shore_management"
+                ],
+                "edit": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "yard_pm",
+                  "captain"
+                ]
+              }
+            },
+            {
+              "key": "forms",
+              "label": "Forms",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "admin"
+              ],
+              "route": "/forms",
+              "crewCreates": "group",
+              "legacy": {
+                "admin": "forms.manage"
+              },
+              "grants": {
+                "admin": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management"
+                ]
+              }
+            },
+            {
+              "key": "key_contacts",
+              "label": "Key Contacts",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "delete"
+              ],
+              "route": "/contacts",
+              "legacy": {
+                "create": "contacts.manage"
+              },
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "yard_pm",
+                  "owner_rep"
+                ],
+                "edit": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "yard_pm",
+                  "owner_rep"
+                ],
+                "delete": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "yard_pm",
+                  "owner_rep"
+                ]
+              },
+              "notes": "Legacy contacts.manage covers: create, edit, delete."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "governance",
+      "label": "Governance",
+      "defaults": {
+        "owners": [
+          "project_management",
+          "owner_side"
+        ]
+      },
+      "modules": [
+        {
+          "key": "approvals",
+          "label": "Approvals",
+          "subcategories": [
+            {
+              "key": "approvals_centre",
+              "label": "Approvals Centre",
+              "actions": [
+                "view",
+                "approve"
+              ],
+              "route": "/approvals"
+            }
+          ]
+        },
+        {
+          "key": "change_orders",
+          "label": "Change Orders",
+          "defaults": {
+            "tier": "T2",
+            "alignsWith": "storm: yard.refit_workflow.change_orders"
+          },
+          "subcategories": [
+            {
+              "key": "change_orders",
+              "label": "Change Orders",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "export"
+              ],
+              "route": "/change-orders",
+              "labels": {
+                "create": "Raise a change order"
+              },
+              "legacy": {
+                "create": "change_order.create"
+              },
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "captain",
+                  "chief_officer",
+                  "chief_engineer",
+                  "hod",
+                  "project_manager",
+                  "yard_pm",
+                  "shore_management",
+                  "owner_rep",
+                  "technical_manager"
+                ]
+              }
+            },
+            {
+              "key": "approval_captain",
+              "label": "CO Approval — Captain stage",
+              "actions": [
+                "approve"
+              ],
+              "legacy": {
+                "approve": "change_order.approve.captain"
+              },
+              "grants": {
+                "approve": [
+                  "super_admin",
+                  "captain",
+                  "chief_officer"
+                ]
+              }
+            },
+            {
+              "key": "approval_owner_rep",
+              "label": "CO Approval — Owner's Rep stage",
+              "actions": [
+                "approve"
+              ],
+              "legacy": {
+                "approve": "change_order.approve.owner_rep"
+              },
+              "grants": {
+                "approve": [
+                  "super_admin",
+                  "owner",
+                  "owner_rep"
+                ]
+              }
+            },
+            {
+              "key": "approval_yard",
+              "label": "CO Approval — Yard stage",
+              "actions": [
+                "approve"
+              ],
+              "legacy": {
+                "approve": "change_order.approve.yard"
+              },
+              "grants": {
+                "approve": [
+                  "super_admin",
+                  "yard_pm",
+                  "project_manager"
+                ]
+              }
+            },
+            {
+              "key": "approval_finance",
+              "label": "CO Approval — Finance stage",
+              "actions": [
+                "approve"
+              ],
+              "legacy": {
+                "approve": "change_order.approve.finance"
+              },
+              "grants": {
+                "approve": [
+                  "super_admin",
+                  "finance_controller",
+                  "owner",
+                  "owner_rep",
+                  "shore_management"
+                ]
+              }
+            },
+            {
+              "key": "approval_technical",
+              "label": "CO Approval — Technical stage",
+              "actions": [
+                "approve"
+              ],
+              "legacy": {
+                "approve": "change_order.approve.technical"
+              },
+              "grants": {
+                "approve": [
+                  "super_admin",
+                  "technical_manager",
+                  "project_manager"
+                ]
+              }
+            },
+            {
+              "key": "approval_class_flag",
+              "label": "CO Approval — Class / Flag stage",
+              "actions": [
+                "approve"
+              ],
+              "legacy": {
+                "approve": "change_order.approve.class_flag"
+              },
+              "grants": {
+                "approve": [
+                  "super_admin",
+                  "class_surveyor",
+                  "flag_surveyor"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "key": "crew_requests",
+          "label": "Crew Requests",
+          "subcategories": [
+            {
+              "key": "crew_requests",
+              "label": "Crew Requests",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "assign"
+              ],
+              "route": "/crew-requests",
+              "owners": [
+                "vessel_side",
+                "project_management"
+              ],
+              "labels": {
+                "assign": "Triage crew requests"
+              },
+              "legacy": {
+                "create": "crew_request.create",
+                "assign": "crew_request.triage"
+              },
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "crew_member",
+                  "hod",
+                  "captain",
+                  "chief_officer",
+                  "chief_engineer",
+                  "purser",
+                  "project_manager",
+                  "owner_rep"
+                ],
+                "assign": [
+                  "super_admin",
+                  "hod",
+                  "captain",
+                  "chief_officer",
+                  "chief_engineer",
+                  "project_manager",
+                  "shore_management"
+                ]
+              },
+              "alignsWith": "storm: yard.refit_workflow.crew_requests"
+            }
+          ]
+        },
+        {
+          "key": "meetings_risk",
+          "label": "Meetings & Risk",
+          "subcategories": [
+            {
+              "key": "meetings",
+              "label": "Meetings",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "export"
+              ],
+              "route": "/meetings",
+              "legacy": {},
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "captain",
+                  "yard_pm",
+                  "owner_rep"
+                ],
+                "edit": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "captain",
+                  "yard_pm",
+                  "owner_rep"
+                ],
+                "delete": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "captain",
+                  "yard_pm",
+                  "owner_rep"
+                ]
+              },
+              "notes": "Legacy meeting.manage covers: create, edit, delete."
+            },
+            {
+              "key": "risk_register",
+              "label": "Risk Register",
+              "actions": "record",
+              "route": "/risks",
+              "legacy": {
+                "create": "risk.manage"
+              },
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "captain",
+                  "chief_engineer",
+                  "technical_manager",
+                  "owner_rep"
+                ],
+                "edit": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "captain",
+                  "chief_engineer",
+                  "technical_manager",
+                  "owner_rep"
+                ],
+                "delete": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "captain",
+                  "chief_engineer",
+                  "technical_manager",
+                  "owner_rep"
+                ]
+              },
+              "notes": "Legacy risk.manage covers: create, edit, delete."
+            }
+          ]
+        },
+        {
+          "key": "finance",
+          "label": "Budget & Purchasing",
+          "defaults": {
+            "owners": [
+              "owner_side",
+              "project_management"
+            ],
+            "tier": "T2"
+          },
+          "subcategories": [
+            {
+              "key": "budget",
+              "label": "Budget",
+              "actions": [
+                "view",
+                "edit",
+                "export"
+              ],
+              "route": "/budget",
+              "legacy": {
+                "view": "budget.view",
+                "edit": "budget.edit"
+              },
+              "grants": {
+                "view": [
+                  "super_admin",
+                  "finance_controller",
+                  "project_manager",
+                  "owner",
+                  "owner_rep",
+                  "shore_management",
+                  "technical_manager",
+                  "captain",
+                  "auditor"
+                ],
+                "edit": [
+                  "super_admin",
+                  "finance_controller",
+                  "project_manager",
+                  "shore_management"
+                ]
+              }
+            },
+            {
+              "key": "purchase_orders",
+              "label": "Purchase Orders",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "export"
+              ],
+              "route": "/purchase-orders",
+              "legacy": {
+                "create": "po.create",
+                "approve": "po.approve"
+              },
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "finance_controller",
+                  "project_manager",
+                  "shore_management"
+                ],
+                "edit": [
+                  "super_admin",
+                  "finance_controller",
+                  "project_manager",
+                  "shore_management"
+                ],
+                "approve": [
+                  "super_admin",
+                  "finance_controller",
+                  "owner",
+                  "owner_rep",
+                  "shore_management"
+                ]
+              },
+              "notes": "Legacy po.create covers: create, edit."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "vessel",
+      "label": "Vessel",
+      "defaults": {
+        "owners": [
+          "owner_side",
+          "vessel_side"
+        ]
+      },
+      "modules": [
+        {
+          "key": "profile",
+          "label": "Vessel Profile",
+          "subcategories": [
+            {
+              "key": "vessel_profiles",
+              "label": "Vessel Profiles",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "admin"
+              ],
+              "route": "/vessels",
+              "tier": "T0",
+              "legacy": {
+                "create": "vessel.manage"
+              },
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "owner",
+                  "shore_management"
+                ],
+                "edit": [
+                  "super_admin",
+                  "owner",
+                  "shore_management"
+                ],
+                "delete": [
+                  "super_admin",
+                  "owner",
+                  "shore_management"
+                ]
+              },
+              "notes": "Legacy vessel.manage covers: create, edit, delete."
+            }
+          ]
+        },
+        {
+          "key": "technical_docs",
+          "label": "Drawings & Documents",
+          "defaults": {
+            "auditVisible": true
+          },
+          "subcategories": [
+            {
+              "key": "drawings_plans",
+              "label": "Drawings & Plans",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "export"
+              ],
+              "route": "/drawings",
+              "labels": {
+                "create": "Upload drawings / certificates",
+                "edit": "Review drawings"
+              },
+              "legacy": {
+                "create": "vessel.documents",
+                "edit": "drawing.review",
+                "approve": "drawing.approve"
+              },
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "owner",
+                  "shore_management",
+                  "project_manager",
+                  "yard_pm"
+                ],
+                "edit": [
+                  "super_admin",
+                  "project_manager",
+                  "technical_manager",
+                  "captain",
+                  "chief_engineer",
+                  "class_surveyor",
+                  "flag_surveyor",
+                  "shore_management"
+                ],
+                "approve": [
+                  "super_admin",
+                  "project_manager",
+                  "technical_manager",
+                  "owner_rep",
+                  "shore_management",
+                  "class_surveyor",
+                  "flag_surveyor"
+                ]
+              }
+            },
+            {
+              "key": "document_control",
+              "label": "Document Control",
+              "actions": "doc",
+              "route": "/document-control",
+              "legacy": {
+                "create": "document.manage"
+              },
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "captain",
+                  "purser"
+                ],
+                "edit": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "captain",
+                  "purser"
+                ],
+                "delete": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "captain",
+                  "purser"
+                ]
+              },
+              "notes": "Legacy document.manage covers: create, edit, delete."
+            }
+          ]
+        },
+        {
+          "key": "operations",
+          "label": "Vessel Operations",
+          "subcategories": [
+            {
+              "key": "inventory_equipment",
+              "label": "Inventory & Equipment",
+              "actions": "record",
+              "route": "/inventory",
+              "legacy": {
+                "create": "inventory.manage"
+              },
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "project_manager",
+                  "captain",
+                  "chief_officer",
+                  "chief_engineer",
+                  "purser",
+                  "hod"
+                ],
+                "edit": [
+                  "super_admin",
+                  "project_manager",
+                  "captain",
+                  "chief_officer",
+                  "chief_engineer",
+                  "purser",
+                  "hod"
+                ],
+                "delete": [
+                  "super_admin",
+                  "project_manager",
+                  "captain",
+                  "chief_officer",
+                  "chief_engineer",
+                  "purser",
+                  "hod"
+                ]
+              },
+              "notes": "Legacy inventory.manage covers: create, edit, delete."
+            },
+            {
+              "key": "logistics",
+              "label": "Logistics",
+              "actions": "record",
+              "route": "/logistics",
+              "legacy": {
+                "create": "logistics.manage"
+              },
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "project_manager",
+                  "captain",
+                  "chief_officer",
+                  "purser",
+                  "shore_management"
+                ],
+                "edit": [
+                  "super_admin",
+                  "project_manager",
+                  "captain",
+                  "chief_officer",
+                  "purser",
+                  "shore_management"
+                ],
+                "delete": [
+                  "super_admin",
+                  "project_manager",
+                  "captain",
+                  "chief_officer",
+                  "purser",
+                  "shore_management"
+                ]
+              },
+              "notes": "Legacy logistics.manage covers: create, edit, delete."
+            },
+            {
+              "key": "contractors_suppliers",
+              "label": "Contractors & Suppliers",
+              "actions": "record",
+              "route": "/contractors",
+              "tier": "T2",
+              "owners": [
+                "project_management",
+                "owner_side"
+              ],
+              "legacy": {
+                "create": "contractor.manage"
+              },
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "yard_pm"
+                ],
+                "edit": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "yard_pm"
+                ],
+                "delete": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "yard_pm"
+                ]
+              },
+              "notes": "Legacy contractor.manage covers: create, edit, delete."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "account",
+      "label": "Account",
+      "defaults": {
+        "owners": [
+          "platform"
+        ]
+      },
+      "modules": [
+        {
+          "key": "self_service",
+          "label": "My Account",
+          "subcategories": [
+            {
+              "key": "profile_notifications",
+              "label": "Profile & Notifications",
+              "actions": [
+                "view_own"
+              ],
+              "route": "/profile",
+              "tier": "T0"
+            },
+            {
+              "key": "access_profile",
+              "label": "Access Profile",
+              "actions": [
+                "view_own"
+              ],
+              "route": "/access",
+              "tier": "T0"
+            },
+            {
+              "key": "access_check",
+              "label": "Access Check",
+              "actions": [
+                "view_own"
+              ],
+              "route": "/access-check",
+              "tier": "T0"
+            },
+            {
+              "key": "diagnostics",
+              "label": "Diagnostics",
+              "actions": [
+                "view_own"
+              ],
+              "route": "/session-diagnostics",
+              "tier": "T0"
+            }
+          ]
+        },
+        {
+          "key": "insight",
+          "label": "Reporting & Audit",
+          "defaults": {
+            "owners": [
+              "owner_side",
+              "project_management"
+            ],
+            "tier": "T2"
+          },
+          "subcategories": [
+            {
+              "key": "reporting",
+              "label": "Reporting",
+              "actions": [
+                "view",
+                "export"
+              ],
+              "route": "/reporting",
+              "legacy": {
+                "export": "report.export"
+              },
+              "grants": {
+                "export": [
+                  "super_admin",
+                  "shore_management",
+                  "project_manager",
+                  "owner",
+                  "owner_rep",
+                  "finance_controller",
+                  "auditor"
+                ]
+              }
+            },
+            {
+              "key": "audit_log",
+              "label": "Audit Log",
+              "actions": [
+                "view",
+                "export"
+              ],
+              "route": "/audit-log",
+              "auditVisible": true,
+              "auditExport": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "admin",
+      "label": "Admin",
+      "defaults": {
+        "owners": [
+          "platform"
+        ],
+        "tier": "T2"
+      },
+      "modules": [
+        {
+          "key": "settings",
+          "label": "Settings",
+          "subcategories": [
+            {
+              "key": "project_settings",
+              "label": "Project Settings",
+              "actions": [
+                "view",
+                "admin"
+              ],
+              "route": "/project-settings",
+              "owners": [
+                "platform",
+                "project_management"
+              ],
+              "legacy": {
+                "admin": "project.manage"
+              },
+              "grants": {
+                "admin": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "owner",
+                  "owner_rep",
+                  "technical_manager"
+                ]
+              }
+            },
+            {
+              "key": "admin_settings",
+              "label": "Admin & Settings",
+              "actions": [
+                "view",
+                "admin"
+              ],
+              "route": "/admin",
+              "legacy": {
+                "admin": "admin.manage_settings"
+              },
+              "grants": {
+                "admin": [
+                  "super_admin",
+                  "shore_management",
+                  "project_manager"
+                ]
+              }
+            },
+            {
+              "key": "users_access",
+              "label": "Users & Access",
+              "actions": [
+                "view",
+                "assign",
+                "admin",
+                "export"
+              ],
+              "route": "/admin",
+              "labels": {
+                "assign": "Grant / revoke access",
+                "admin": "Manage access sets & permission grid"
+              },
+              "legacy": {
+                "assign": "admin.manage_users"
+              },
+              "grants": {
+                "assign": [
+                  "super_admin",
+                  "shore_management",
+                  "project_manager"
+                ],
+                "admin": [
+                  "super_admin",
+                  "shore_management",
+                  "project_manager"
+                ]
+              },
+              "notes": "Legacy admin.manage_users covers: assign, admin."
+            },
+            {
+              "key": "permission_matrix_import",
+              "label": "Permission Matrix Import",
+              "actions": [
+                "view",
+                "create",
+                "approve"
+              ],
+              "labels": {
+                "create": "Upload matrix workbook",
+                "approve": "Apply import (Review & save)"
+              },
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "shore_management",
+                  "project_manager"
+                ],
+                "approve": [
+                  "super_admin",
+                  "owner",
+                  "owner_rep"
+                ]
+              }
+            },
+            {
+              "key": "import_worklist",
+              "label": "Import Worklist",
+              "actions": [
+                "view",
+                "create"
+              ],
+              "route": "/import",
+              "notes": "Same capability family as project.jobs.worklist.create (job.import).",
+              "grants": {
+                "create": [
+                  "super_admin",
+                  "project_manager",
+                  "shore_management",
+                  "yard_pm"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "key": "diagnostics",
+          "label": "Diagnostics & Security",
+          "subcategories": [
+            {
+              "key": "login_diagnostics",
+              "label": "Login Diagnostics",
+              "actions": "config",
+              "route": "/login-diagnostics"
+            },
+            {
+              "key": "security_audit",
+              "label": "Security Diagnostics Audit",
+              "actions": [
+                "view",
+                "export"
+              ],
+              "route": "/security-audit",
+              "auditVisible": true
+            },
+            {
+              "key": "support_tickets",
+              "label": "Support Tickets",
+              "actions": [
+                "view_own",
+                "create",
+                "view",
+                "edit"
+              ],
+              "tier": "T1",
+              "crewCreates": "self",
+              "legacy": {
+                "edit": "support.manage"
+              },
+              "grants": {
+                "view": [
+                  "super_admin",
+                  "owner",
+                  "shore_management"
+                ],
+                "edit": [
+                  "super_admin",
+                  "owner",
+                  "shore_management"
+                ]
+              },
+              "notes": "Legacy support.manage covers: view, edit."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

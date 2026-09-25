@@ -1,0 +1,4570 @@
+{
+  "pmsVersion": "1.0",
+  "app": {
+    "id": "storm",
+    "name": "STORM (Maritime Master)",
+    "repo": "digbyberriman-collab/maritime-master",
+    "status": "DRAFT"
+  },
+  "unitLabel": "Vessel",
+  "scopes": [
+    {
+      "code": "S",
+      "key": "self",
+      "label": "Self",
+      "description": "The holder's own records only"
+    },
+    {
+      "code": "D",
+      "key": "department",
+      "label": "Department",
+      "description": "Records of the holder's department on their assigned vessel(s)"
+    },
+    {
+      "code": "V",
+      "key": "vessel",
+      "label": "Vessel",
+      "description": "All records on the assigned vessel(s)"
+    },
+    {
+      "code": "F",
+      "key": "fleet",
+      "label": "Fleet",
+      "description": "All vessels in the company"
+    }
+  ],
+  "levels": {
+    "self": "S",
+    "group": "D",
+    "unit": "V",
+    "all": "F"
+  },
+  "sensitivityNotes": {
+    "T0": "visible to any authenticated crew on the vessel",
+    "T1": "operational records; department/vessel scoped",
+    "T2": "commercial, finance, employment, guest PII — grant needs a reason, audited",
+    "T3": "health, disciplinary, bank, legal privilege (UK GDPR Art. 9, MLC 4.1) — owning department + named holders only"
+  },
+  "actionNotes": {
+    "view_own": "own record only (self-serve)",
+    "approve": "first-line approval (HOD / budget owner)",
+    "final_approve": "second-line approval (Master / DPA / budget holder)",
+    "sign": "attestation — sign an entry, acknowledge, complete a checklist",
+    "settle": "record payment / mark paid",
+    "admin": "configure the subcategory (templates, settings)"
+  },
+  "defaults": {
+    "tier": "T1",
+    "actions": "read"
+  },
+  "departments": [
+    {
+      "key": "bridge",
+      "label": "Bridge",
+      "signOffBy": "Master",
+      "roles": [
+        {
+          "key": "master",
+          "label": "Master",
+          "tier": "command",
+          "reach": "unit",
+          "appRole": "captain"
+        },
+        {
+          "key": "staff_captain",
+          "label": "Staff Captain",
+          "tier": "hod",
+          "appRole": "officer"
+        },
+        {
+          "key": "second_officer",
+          "label": "2nd Officer",
+          "tier": "officer",
+          "appRole": "officer"
+        },
+        {
+          "key": "third_officer",
+          "label": "3rd Officer",
+          "tier": "officer",
+          "appRole": "officer"
+        },
+        {
+          "key": "deck_cadet",
+          "label": "Deck Cadet",
+          "tier": "trainee",
+          "appRole": "crew"
+        }
+      ]
+    },
+    {
+      "key": "deck",
+      "label": "Deck",
+      "signOffBy": "Chief Officer",
+      "roles": [
+        {
+          "key": "chief_officer",
+          "label": "Chief Officer",
+          "tier": "hod",
+          "appRole": "chief_officer"
+        },
+        {
+          "key": "bosun",
+          "label": "Bosun",
+          "tier": "officer",
+          "appRole": "hod"
+        },
+        {
+          "key": "lead_deckhand",
+          "label": "Lead Deckhand",
+          "tier": "rating",
+          "appRole": "crew"
+        },
+        {
+          "key": "ab_seaman",
+          "label": "AB Seaman",
+          "tier": "rating",
+          "appRole": "crew"
+        },
+        {
+          "key": "deckhand",
+          "label": "Deckhand",
+          "tier": "rating",
+          "appRole": "crew"
+        },
+        {
+          "key": "os_seaman",
+          "label": "OS Seaman",
+          "tier": "trainee",
+          "appRole": "crew"
+        }
+      ]
+    },
+    {
+      "key": "engineering",
+      "label": "Engineering",
+      "signOffBy": "Chief Engineer",
+      "roles": [
+        {
+          "key": "chief_engineer",
+          "label": "Chief Engineer",
+          "tier": "hod",
+          "appRole": "chief_engineer"
+        },
+        {
+          "key": "second_engineer",
+          "label": "2nd Engineer",
+          "tier": "officer",
+          "appRole": "officer"
+        },
+        {
+          "key": "third_engineer",
+          "label": "3rd Engineer",
+          "tier": "officer",
+          "appRole": "officer"
+        },
+        {
+          "key": "eto",
+          "label": "ETO",
+          "tier": "officer",
+          "appRole": "officer"
+        },
+        {
+          "key": "motorman",
+          "label": "Motorman",
+          "tier": "rating",
+          "appRole": "crew"
+        },
+        {
+          "key": "oiler",
+          "label": "Oiler",
+          "tier": "rating",
+          "appRole": "crew"
+        },
+        {
+          "key": "engine_cadet",
+          "label": "Engine Cadet",
+          "tier": "trainee",
+          "appRole": "crew"
+        }
+      ]
+    },
+    {
+      "key": "interior",
+      "label": "Interior",
+      "signOffBy": "Chief Steward/ess",
+      "roles": [
+        {
+          "key": "chief_stew",
+          "label": "Chief Steward/ess",
+          "tier": "hod",
+          "appRole": "hod"
+        },
+        {
+          "key": "head_housekeeper",
+          "label": "Head of Housekeeping",
+          "tier": "officer",
+          "appRole": "crew"
+        },
+        {
+          "key": "head_of_service",
+          "label": "Head of Service",
+          "tier": "officer",
+          "appRole": "crew"
+        },
+        {
+          "key": "steward",
+          "label": "Steward/ess",
+          "tier": "rating",
+          "appRole": "crew"
+        },
+        {
+          "key": "laundry",
+          "label": "Laundry",
+          "tier": "rating",
+          "appRole": "crew"
+        }
+      ]
+    },
+    {
+      "key": "purser_office",
+      "label": "Purser's Office",
+      "signOffBy": "Purser",
+      "roles": [
+        {
+          "key": "purser",
+          "label": "Purser",
+          "tier": "hod",
+          "reach": "unit",
+          "appRole": "purser"
+        },
+        {
+          "key": "admin_assistant",
+          "label": "Admin Assistant",
+          "tier": "officer",
+          "appRole": "crew"
+        }
+      ]
+    },
+    {
+      "key": "galley",
+      "label": "Galley",
+      "signOffBy": "Head Chef",
+      "roles": [
+        {
+          "key": "head_chef",
+          "label": "Head Chef",
+          "tier": "hod",
+          "appRole": "hod"
+        },
+        {
+          "key": "sous_chef",
+          "label": "Sous Chef",
+          "tier": "officer",
+          "appRole": "crew"
+        },
+        {
+          "key": "crew_chef",
+          "label": "Crew Chef",
+          "tier": "officer",
+          "appRole": "crew"
+        },
+        {
+          "key": "cook",
+          "label": "Cook",
+          "tier": "rating",
+          "appRole": "crew"
+        },
+        {
+          "key": "galley_hand",
+          "label": "Galley Hand",
+          "tier": "trainee",
+          "appRole": "crew"
+        }
+      ]
+    },
+    {
+      "key": "medical",
+      "label": "Medical",
+      "signOffBy": "Ship's Doctor + DPA",
+      "roles": [
+        {
+          "key": "ships_doctor",
+          "label": "Ship's Doctor",
+          "tier": "hod",
+          "appRole": "hod"
+        },
+        {
+          "key": "medic",
+          "label": "Medic / Nurse",
+          "tier": "officer",
+          "appRole": "crew"
+        }
+      ]
+    },
+    {
+      "key": "dive",
+      "label": "Dive",
+      "signOffBy": "Dive Manager / DSO",
+      "roles": [
+        {
+          "key": "dive_manager",
+          "label": "Dive Manager / DSO",
+          "tier": "hod",
+          "appRole": "hod"
+        },
+        {
+          "key": "dive_instructor",
+          "label": "Dive Instructor",
+          "tier": "officer",
+          "appRole": "crew"
+        },
+        {
+          "key": "divemaster",
+          "label": "Divemaster",
+          "tier": "rating",
+          "appRole": "crew"
+        }
+      ]
+    },
+    {
+      "key": "media",
+      "label": "Media",
+      "signOffBy": "Media Lead",
+      "roles": [
+        {
+          "key": "media_lead",
+          "label": "Media Lead",
+          "tier": "hod",
+          "appRole": "hod"
+        },
+        {
+          "key": "photographer",
+          "label": "Photographer / Videographer",
+          "tier": "rating",
+          "appRole": "crew"
+        }
+      ]
+    },
+    {
+      "key": "it_av",
+      "label": "IT & AV",
+      "signOffBy": "AV/IT Officer",
+      "roles": [
+        {
+          "key": "av_it_officer",
+          "label": "AV/IT Officer",
+          "tier": "hod",
+          "appRole": "hod"
+        },
+        {
+          "key": "av_it_technician",
+          "label": "AV/IT Technician",
+          "tier": "rating",
+          "appRole": "crew"
+        }
+      ]
+    },
+    {
+      "key": "spa_wellness",
+      "label": "Spa & Wellness",
+      "signOffBy": "Spa Manager",
+      "roles": [
+        {
+          "key": "spa_manager",
+          "label": "Spa Manager",
+          "tier": "hod",
+          "appRole": "hod"
+        },
+        {
+          "key": "physiotherapist",
+          "label": "Physiotherapist",
+          "tier": "officer",
+          "appRole": "crew"
+        },
+        {
+          "key": "personal_trainer",
+          "label": "Personal Trainer",
+          "tier": "officer",
+          "appRole": "crew"
+        },
+        {
+          "key": "therapist",
+          "label": "Therapist",
+          "tier": "rating",
+          "appRole": "crew"
+        }
+      ]
+    },
+    {
+      "key": "shore_ops",
+      "label": "Shore – Fleet Ops & DPA",
+      "description": "Designated Person Ashore, fleet management, technical",
+      "signOffBy": "DPA",
+      "roles": [
+        {
+          "key": "dpa",
+          "label": "DPA",
+          "tier": "command",
+          "reach": "all",
+          "appRole": "dpa"
+        },
+        {
+          "key": "fleet_manager",
+          "label": "Fleet Manager",
+          "tier": "command",
+          "reach": "all",
+          "appRole": "fleet_master"
+        },
+        {
+          "key": "technical_superintendent",
+          "label": "Technical Superintendent",
+          "tier": "hod",
+          "reach": "all"
+        }
+      ]
+    },
+    {
+      "key": "shore_hr",
+      "label": "Shore – HR & Crewing",
+      "signOffBy": "HR Manager",
+      "roles": [
+        {
+          "key": "hr_manager",
+          "label": "HR Manager",
+          "tier": "hod",
+          "reach": "all"
+        },
+        {
+          "key": "crewing_coordinator",
+          "label": "Crewing Coordinator",
+          "tier": "officer",
+          "reach": "all"
+        }
+      ]
+    },
+    {
+      "key": "shore_finance",
+      "label": "Shore – Finance & Procurement",
+      "signOffBy": "Finance Controller",
+      "roles": [
+        {
+          "key": "finance_controller",
+          "label": "Finance Controller",
+          "tier": "hod",
+          "reach": "all"
+        },
+        {
+          "key": "procurement_officer",
+          "label": "Procurement Officer",
+          "tier": "officer",
+          "reach": "all"
+        }
+      ]
+    },
+    {
+      "key": "shore_legal",
+      "label": "Shore – Legal",
+      "signOffBy": "Legal Counsel",
+      "roles": [
+        {
+          "key": "legal_counsel",
+          "label": "Legal Counsel",
+          "tier": "hod",
+          "reach": "all"
+        }
+      ]
+    },
+    {
+      "key": "platform",
+      "label": "Platform",
+      "description": "System administration (configures, does not operate)",
+      "signOffBy": "DPA",
+      "roles": [
+        {
+          "key": "system_admin",
+          "label": "System Administrator",
+          "tier": "admin",
+          "reach": "all",
+          "appRole": "superadmin"
+        }
+      ]
+    },
+    {
+      "key": "external",
+      "label": "External",
+      "description": "Time-bounded external access",
+      "signOffBy": "DPA",
+      "roles": [
+        {
+          "key": "flag_auditor",
+          "label": "Flag State Auditor",
+          "tier": "external",
+          "appRole": "auditor_flag"
+        },
+        {
+          "key": "class_surveyor",
+          "label": "Class Surveyor",
+          "tier": "external",
+          "appRole": "auditor_class"
+        },
+        {
+          "key": "travel_agent",
+          "label": "Travel Agent",
+          "tier": "external",
+          "appRole": "travel_agent"
+        },
+        {
+          "key": "employer_api",
+          "label": "Employer API",
+          "tier": "external",
+          "appRole": "employer_api"
+        }
+      ]
+    }
+  ],
+  "accessSets": [
+    {
+      "key": "full_fleet",
+      "label": "Full (Fleet)",
+      "tier": "command",
+      "reach": "all",
+      "description": "DPA / Fleet Manager"
+    },
+    {
+      "key": "full_vessel",
+      "label": "Full (Vessel)",
+      "tier": "command",
+      "reach": "unit",
+      "description": "Master"
+    },
+    {
+      "key": "hod",
+      "label": "HOD",
+      "tier": "hod",
+      "description": "Head of Department"
+    },
+    {
+      "key": "officer",
+      "label": "Officer",
+      "tier": "officer",
+      "description": "Officers / supervisors"
+    },
+    {
+      "key": "crew",
+      "label": "Crew",
+      "tier": "rating",
+      "description": "Ratings"
+    },
+    {
+      "key": "view_only",
+      "label": "View only",
+      "tier": "trainee",
+      "description": "Cadets, trainees, day workers"
+    },
+    {
+      "key": "external_audit",
+      "label": "External audit",
+      "tier": "external",
+      "description": "Flag / class — time-bounded"
+    },
+    {
+      "key": "system_admin",
+      "label": "System admin",
+      "tier": "admin",
+      "reach": "all",
+      "description": "Configures, does not operate"
+    }
+  ],
+  "separationOfDuties": [
+    {
+      "id": "SOD-01",
+      "a": "hris.compensation.payroll.approve",
+      "b": "hris.compensation.payroll.create",
+      "level": "role",
+      "approverTiers": [
+        "command"
+      ],
+      "description": "Whoever runs payroll cannot approve it."
+    },
+    {
+      "id": "SOD-02",
+      "a": "vessel.accounting.invoices.approve",
+      "b": "vessel.accounting.invoices.settle",
+      "level": "role",
+      "approverTiers": [
+        "command"
+      ],
+      "description": "Invoice approver cannot record the payment."
+    },
+    {
+      "id": "SOD-03",
+      "a": "vessel.accounting.expenses.approve",
+      "b": "vessel.accounting.expenses.settle",
+      "level": "role",
+      "approverTiers": [
+        "command"
+      ],
+      "description": "Expense approver cannot mark it paid."
+    },
+    {
+      "id": "SOD-04",
+      "a": "yard.refit_finance.invoices.approve",
+      "b": "yard.refit_finance.invoices.settle",
+      "level": "role",
+      "approverTiers": [
+        "command"
+      ],
+      "description": "Refit invoice approver cannot record the payment."
+    },
+    {
+      "id": "SOD-05",
+      "a": "admin.access.permission_matrix_import.approve",
+      "b": "admin.access.permission_matrix_import.create",
+      "level": "role",
+      "approverTiers": [
+        "command"
+      ],
+      "description": "Whoever uploads a matrix import cannot apply it (four-eyes)."
+    },
+    {
+      "id": "SOD-06",
+      "a": "hris.training_development.crew_training.approve",
+      "b": "hris.training_development.crew_training.final_approve",
+      "level": "record",
+      "description": "HOD approval and final approval must be different people on the same record."
+    },
+    {
+      "id": "SOD-07",
+      "a": "vessel.logbooks.logbooks.sign",
+      "b": "vessel.logbooks.logbooks.final_approve",
+      "level": "record",
+      "description": "Officer who signs an entry cannot countersign it."
+    },
+    {
+      "id": "SOD-08",
+      "a": "vessel.crew.hours_of_rest.create",
+      "b": "vessel.crew.hours_of_rest.approve",
+      "level": "record",
+      "description": "Nobody approves their own hours of rest."
+    },
+    {
+      "id": "SOD-09",
+      "a": "vessel.technical.purchase_orders.create",
+      "b": "vessel.technical.purchase_orders.final_approve",
+      "level": "record",
+      "description": "Raiser of a PO cannot give final approval."
+    },
+    {
+      "id": "SOD-10",
+      "a": "admin.access.users_access.assign",
+      "b": "admin.access.users_access.admin",
+      "level": "record",
+      "description": "Nobody grants access to themselves; T2/T3 grants need a reason."
+    },
+    {
+      "id": "SOD-11",
+      "a": "hris.leave_rotation.leave_requests.create",
+      "b": "hris.leave_rotation.leave_requests.approve",
+      "level": "record",
+      "description": "Nobody approves their own leave."
+    },
+    {
+      "id": "SOD-12",
+      "a": "vessel.safety.permit_to_work.create",
+      "b": "vessel.safety.permit_to_work.approve",
+      "level": "record",
+      "description": "Permit issuer cannot authorise their own permit."
+    }
+  ],
+  "signOffExtras": [
+    {
+      "area": "ISM / SMS areas (Vessel › Safety, Certificates, Logbooks)",
+      "by": "DPA"
+    },
+    {
+      "area": "MLC areas (HoR, leave, employment, medical)",
+      "by": "DPA + HR Manager"
+    },
+    {
+      "area": "All T3 grants",
+      "by": "DPA + Data Protection lead"
+    }
+  ],
+  "domains": [
+    {
+      "key": "fleet",
+      "label": "Fleet",
+      "defaults": {
+        "owners": [
+          "shore_ops"
+        ]
+      },
+      "modules": [
+        {
+          "key": "operations",
+          "label": "Fleet Operations",
+          "subcategories": [
+            {
+              "key": "fleet_dashboard",
+              "label": "Fleet Dashboard",
+              "route": "/dashboard",
+              "actions": "dash",
+              "tier": "T0"
+            },
+            {
+              "key": "fleet_scheduler",
+              "label": "Fleet Scheduler",
+              "actions": "record"
+            },
+            {
+              "key": "fleet_tracker",
+              "label": "Fleet Tracker",
+              "route": "/fleet-map",
+              "actions": "read",
+              "crewVisible": true
+            },
+            {
+              "key": "fleet_reports",
+              "label": "Fleet Reports",
+              "actions": "dash"
+            },
+            {
+              "key": "fleet_calendar",
+              "label": "Fleet Calendar",
+              "route": "/itinerary/timeline",
+              "actions": "record",
+              "crewVisible": true
+            },
+            {
+              "key": "fleet_documents",
+              "label": "Fleet Documents",
+              "route": "/documents",
+              "actions": "doc",
+              "crewVisible": true,
+              "auditVisible": true
+            },
+            {
+              "key": "fleet_checklists",
+              "label": "Fleet Checklists",
+              "route": "/ism/checklists",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "admin",
+                "export"
+              ],
+              "labels": {
+                "admin": "Manage fleet checklist templates"
+              }
+            },
+            {
+              "key": "vessels",
+              "label": "Vessels",
+              "route": "/vessels/dashboard",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "admin"
+              ],
+              "tier": "T0"
+            }
+          ]
+        },
+        {
+          "key": "administration",
+          "label": "Fleet Administration",
+          "subcategories": [
+            {
+              "key": "notification_center",
+              "label": "Notification Center",
+              "route": "/notifications/center",
+              "actions": [
+                "view_own"
+              ],
+              "tier": "T0"
+            },
+            {
+              "key": "notification_management",
+              "label": "Notification Management",
+              "route": "/settings/notifications",
+              "actions": "config"
+            },
+            {
+              "key": "support_tickets",
+              "label": "Support Tickets",
+              "route": "/help/support",
+              "actions": [
+                "view_own",
+                "create",
+                "view",
+                "edit"
+              ],
+              "owners": [
+                "platform"
+              ],
+              "crewCreates": "self"
+            },
+            {
+              "key": "account",
+              "label": "Account",
+              "route": "/settings",
+              "actions": "config",
+              "tier": "T2",
+              "owners": [
+                "platform"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "vessel",
+      "label": "Vessel",
+      "modules": [
+        {
+          "key": "crew",
+          "label": "Crew",
+          "defaults": {
+            "owners": [
+              "purser_office",
+              "shore_hr"
+            ],
+            "deptScoped": true
+          },
+          "subcategories": [
+            {
+              "key": "crew_list",
+              "label": "Crew List",
+              "route": "/crew/list",
+              "actions": [
+                "view",
+                "export"
+              ],
+              "deptScoped": false,
+              "crewVisible": true,
+              "labels": {
+                "view": "See crew list"
+              },
+              "legacy": {
+                "view": "crew.see_crew_list"
+              }
+            },
+            {
+              "key": "crew_profiles",
+              "label": "Crew Profiles",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "export"
+              ],
+              "hodEdits": true,
+              "labels": {
+                "view": "View profiles",
+                "edit": "Edit profiles"
+              },
+              "legacy": {
+                "view": "crew.view_crew_profiles",
+                "edit": "crew.edit_crew_profiles"
+              }
+            },
+            {
+              "key": "crew_roster",
+              "label": "Crew Roster",
+              "route": "/crew/roster",
+              "actions": "record",
+              "hodEdits": true
+            },
+            {
+              "key": "crew_scheduling",
+              "label": "Crew Scheduling",
+              "actions": [
+                "view",
+                "edit",
+                "export"
+              ],
+              "hodEdits": true,
+              "labels": {
+                "view": "Scheduling"
+              },
+              "legacy": {
+                "view": "crew.view_scheduling"
+              }
+            },
+            {
+              "key": "crew_certificates",
+              "label": "Crew Certificates",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "export"
+              ],
+              "hodEdits": true,
+              "hodApproves": true,
+              "auditVisible": true
+            },
+            {
+              "key": "crew_assignments",
+              "label": "Crew Transfers & Assignments",
+              "actions": [
+                "view",
+                "assign",
+                "approve"
+              ],
+              "owners": [
+                "shore_hr",
+                "purser_office"
+              ],
+              "labels": {
+                "assign": "Transfer crew",
+                "approve": "Approve transfer"
+              },
+              "notes": "New capability (screenshot column \"Transfer crew\"); replaces Permission.TRANSFER_CREW in src/modules/auth/lib/permissions.ts."
+            },
+            {
+              "key": "hours_of_rest",
+              "label": "Hours of Rest",
+              "route": "/crew/work-rest",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "final_approve",
+                "export"
+              ],
+              "owners": [
+                "bridge"
+              ],
+              "crewCreates": "self",
+              "hodApproves": true,
+              "auditVisible": true,
+              "auditExport": true,
+              "labels": {
+                "create": "Submit hours of rest",
+                "approve": "Approve HoR",
+                "final_approve": "Final HoR approval (Master)"
+              },
+              "legacy": {
+                "approve": "crew.approve_hours_of_rest"
+              },
+              "notes": "MLC Reg 2.3 / STCW A-VIII/1 — crew always see their own record; flag inspectors need export."
+            },
+            {
+              "key": "familiarisation",
+              "label": "Familiarisation",
+              "route": "/training",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "approve"
+              ],
+              "owners": [
+                "bridge"
+              ],
+              "crewSigns": true,
+              "hodApproves": true,
+              "auditVisible": true,
+              "labels": {
+                "sign": "Acknowledge familiarisation"
+              }
+            }
+          ]
+        },
+        {
+          "key": "safety",
+          "label": "Safety",
+          "defaults": {
+            "owners": [
+              "bridge",
+              "shore_ops"
+            ],
+            "crewVisible": true,
+            "auditVisible": true
+          },
+          "subcategories": [
+            {
+              "key": "sms_summary",
+              "label": "SMS Summary",
+              "actions": "dash"
+            },
+            {
+              "key": "drills",
+              "label": "Drills",
+              "route": "/ism/drills",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "sign",
+                "export"
+              ],
+              "owners": [
+                "bridge",
+                "deck"
+              ],
+              "crewSigns": true,
+              "labels": {
+                "sign": "Record drill attendance"
+              }
+            },
+            {
+              "key": "permit_to_work",
+              "label": "Permit to Work",
+              "route": "/ism/permits-to-work",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "final_approve",
+                "sign",
+                "export"
+              ],
+              "owners": [
+                "bridge",
+                "deck",
+                "engineering"
+              ],
+              "crewSigns": true,
+              "labels": {
+                "approve": "Authorise permit",
+                "final_approve": "Master countersign",
+                "sign": "Sign on / off permit"
+              }
+            },
+            {
+              "key": "sms_forms",
+              "label": "SMS Forms",
+              "route": "/ism/miscellaneous",
+              "actions": "record",
+              "crewCreates": "group"
+            },
+            {
+              "key": "checklists",
+              "label": "Checklists",
+              "route": "/ism/checklists",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "admin",
+                "export"
+              ],
+              "crewSigns": true,
+              "hodAdmin": true,
+              "labels": {
+                "admin": "Manage checklists",
+                "sign": "Complete checklist"
+              },
+              "notes": "Screenshot column \"Manage checklists\" = admin."
+            },
+            {
+              "key": "risk_assessments",
+              "label": "Risk Assessments",
+              "route": "/ism/risk-assessments",
+              "actions": "approvable",
+              "crewCreates": "group",
+              "hodApproves": true
+            },
+            {
+              "key": "vessel_specific_manuals",
+              "label": "Vessel Specific Manuals",
+              "actions": "doc"
+            },
+            {
+              "key": "crew_duties_responsibilities",
+              "label": "Crew Duties & Responsibilities",
+              "actions": "doc"
+            },
+            {
+              "key": "masters_standing_orders",
+              "label": "Master's Standing Orders",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "export"
+              ],
+              "owners": [
+                "bridge"
+              ],
+              "crewSigns": true,
+              "labels": {
+                "sign": "Acknowledge standing orders"
+              }
+            },
+            {
+              "key": "chief_engineers_standing_orders",
+              "label": "Chief Engineer's Standing Orders",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "export"
+              ],
+              "owners": [
+                "engineering"
+              ],
+              "crewSigns": true,
+              "labels": {
+                "sign": "Acknowledge standing orders"
+              }
+            },
+            {
+              "key": "muster_list",
+              "label": "Muster List",
+              "actions": "doc",
+              "owners": [
+                "bridge",
+                "deck"
+              ]
+            },
+            {
+              "key": "safety_management_manual",
+              "label": "Safety Management Manual",
+              "actions": "doc",
+              "owners": [
+                "shore_ops"
+              ]
+            },
+            {
+              "key": "safety_documents",
+              "label": "Safety Documents",
+              "actions": "doc"
+            },
+            {
+              "key": "sops_bridge",
+              "label": "Bridge SOPs",
+              "actions": "doc",
+              "owners": [
+                "bridge"
+              ]
+            },
+            {
+              "key": "sops_deck",
+              "label": "Deck SOPs",
+              "actions": "doc",
+              "owners": [
+                "deck"
+              ]
+            },
+            {
+              "key": "sops_engineering",
+              "label": "Engineering SOPs",
+              "actions": "doc",
+              "owners": [
+                "engineering"
+              ]
+            },
+            {
+              "key": "sops_galley",
+              "label": "Galley SOPs",
+              "actions": "doc",
+              "owners": [
+                "galley"
+              ]
+            },
+            {
+              "key": "sops_interior",
+              "label": "Interior SOPs",
+              "actions": "doc",
+              "owners": [
+                "interior"
+              ]
+            },
+            {
+              "key": "sops_medical",
+              "label": "Medic SOPs",
+              "actions": "doc",
+              "owners": [
+                "medical"
+              ]
+            },
+            {
+              "key": "pollution",
+              "label": "Pollution",
+              "actions": "record",
+              "owners": [
+                "engineering",
+                "deck"
+              ]
+            },
+            {
+              "key": "emergency_response",
+              "label": "Emergency Response",
+              "route": "/ism/erm",
+              "actions": "doc"
+            },
+            {
+              "key": "flag_policy_advice",
+              "label": "Flag Policy & Advice",
+              "actions": "doc",
+              "owners": [
+                "shore_ops"
+              ],
+              "crewVisible": false
+            },
+            {
+              "key": "agent_information",
+              "label": "Agent Information",
+              "actions": "doc"
+            },
+            {
+              "key": "ntvrp_opa90",
+              "label": "NTVRP / OPA 90",
+              "actions": "doc"
+            },
+            {
+              "key": "incidents",
+              "label": "Incident Reports",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "final_approve",
+                "export"
+              ],
+              "tier": "T2",
+              "crewVisible": false,
+              "crewCreates": "group",
+              "hodVisible": true,
+              "hodApproves": true,
+              "actionTiers": {
+                "create": "T1"
+              },
+              "notes": "Injury detail revealing health data is T3 and lives in health.personnel_medical.incident_treatment_history."
+            },
+            {
+              "key": "investigations",
+              "label": "Investigations",
+              "actions": "approvable",
+              "tier": "T2",
+              "crewVisible": false
+            },
+            {
+              "key": "capa",
+              "label": "Corrective & Preventive Actions",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "assign",
+                "approve",
+                "export"
+              ],
+              "crewVisible": false,
+              "hodEdits": true
+            },
+            {
+              "key": "non_conformities",
+              "label": "Non-Conformities",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "final_approve",
+                "export"
+              ],
+              "crewVisible": false
+            },
+            {
+              "key": "observations",
+              "label": "Safety Observations",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "export"
+              ],
+              "crewCreates": "group"
+            },
+            {
+              "key": "audits_surveys",
+              "label": "ISM Audits & Surveys",
+              "actions": "record",
+              "crewVisible": false,
+              "auditExport": true
+            },
+            {
+              "key": "safety_meetings",
+              "label": "Safety Meetings",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "export"
+              ],
+              "crewSigns": true,
+              "labels": {
+                "sign": "Sign meeting attendance"
+              }
+            }
+          ]
+        },
+        {
+          "key": "certificates",
+          "label": "Certificates",
+          "defaults": {
+            "owners": [
+              "bridge",
+              "shore_ops"
+            ],
+            "auditVisible": true,
+            "auditExport": true
+          },
+          "subcategories": [
+            {
+              "key": "status_summary",
+              "label": "Status Summary",
+              "actions": "dash"
+            },
+            {
+              "key": "registration",
+              "label": "Registration",
+              "actions": "doc"
+            },
+            {
+              "key": "class_tonnage_loadline",
+              "label": "Class / Tonnage / Loadline",
+              "actions": "doc"
+            },
+            {
+              "key": "safety_certificates",
+              "label": "Safety Certificates",
+              "actions": "doc",
+              "navLabels": [
+                "Safety"
+              ]
+            },
+            {
+              "key": "security_certificates",
+              "label": "Security (ISPS)",
+              "actions": "doc",
+              "tier": "T2",
+              "navLabels": [
+                "Security"
+              ]
+            },
+            {
+              "key": "mlc_certificates",
+              "label": "Maritime Labour Compliance",
+              "actions": "doc"
+            },
+            {
+              "key": "environment_certificates",
+              "label": "Environment",
+              "actions": "doc",
+              "navLabels": [
+                "Environment"
+              ]
+            },
+            {
+              "key": "radio_certificates",
+              "label": "Radio",
+              "actions": "doc"
+            },
+            {
+              "key": "insurance_certificates",
+              "label": "Insurance Certificates",
+              "actions": "doc",
+              "tier": "T2",
+              "navLabels": [
+                "Insurance"
+              ]
+            },
+            {
+              "key": "fiscal_certificates",
+              "label": "Fiscal",
+              "actions": "doc",
+              "tier": "T2"
+            },
+            {
+              "key": "lsa_ffe_medical",
+              "label": "LSA / FFE / Medical",
+              "actions": "doc"
+            },
+            {
+              "key": "fleet_certificates",
+              "label": "Fleet Certificates",
+              "route": "/certificates",
+              "actions": "doc",
+              "owners": [
+                "shore_ops"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "technical",
+          "label": "Technical",
+          "defaults": {
+            "owners": [
+              "engineering"
+            ]
+          },
+          "subcategories": [
+            {
+              "key": "maintenance_summary",
+              "label": "Maintenance Summary",
+              "route": "/maintenance/dashboard",
+              "actions": "dash"
+            },
+            {
+              "key": "tasks",
+              "label": "Maintenance Tasks",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "assign",
+                "sign",
+                "export"
+              ],
+              "owners": [
+                "engineering",
+                "deck",
+                "interior",
+                "it_av"
+              ],
+              "deptScoped": true,
+              "ratingEdits": true,
+              "labels": {
+                "sign": "Sign off task"
+              },
+              "navLabels": [
+                "Tasks"
+              ]
+            },
+            {
+              "key": "operational_checklists",
+              "label": "Operational Checklists",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "admin"
+              ],
+              "owners": [
+                "engineering",
+                "deck"
+              ],
+              "ratingEdits": true
+            },
+            {
+              "key": "equipment",
+              "label": "Equipment",
+              "route": "/maintenance/critical",
+              "actions": "record"
+            },
+            {
+              "key": "inventory",
+              "label": "Inventory & Spares",
+              "actions": "record",
+              "owners": [
+                "engineering",
+                "deck",
+                "interior"
+              ],
+              "deptScoped": true,
+              "navLabels": [
+                "Inventory"
+              ]
+            },
+            {
+              "key": "purchase_orders",
+              "label": "Purchase Orders",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "final_approve",
+                "export"
+              ],
+              "tier": "T2",
+              "owners": [
+                "engineering",
+                "purser_office",
+                "shore_finance"
+              ],
+              "deptScoped": true,
+              "hodEdits": true,
+              "hodVisible": true,
+              "labels": {
+                "final_approve": "Final approval (budget holder)"
+              }
+            },
+            {
+              "key": "maintenance_periods",
+              "label": "Maintenance Periods",
+              "actions": "record",
+              "owners": [
+                "engineering",
+                "shore_ops"
+              ]
+            },
+            {
+              "key": "surveys",
+              "label": "Class & Statutory Surveys",
+              "actions": "record",
+              "owners": [
+                "engineering",
+                "shore_ops"
+              ],
+              "auditVisible": true,
+              "navLabels": [
+                "Surveys"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "charter",
+          "label": "Charter",
+          "defaults": {
+            "owners": [
+              "interior",
+              "bridge",
+              "purser_office"
+            ],
+            "tier": "T2",
+            "hodVisible": true
+          },
+          "subcategories": [
+            {
+              "key": "charters",
+              "label": "Charters",
+              "actions": "record"
+            },
+            {
+              "key": "guest_list",
+              "label": "Guest List",
+              "actions": "record",
+              "notes": "Guest passport data T2; guest allergy/medical fields are T3 — enforce at column level."
+            },
+            {
+              "key": "charter_checklists",
+              "label": "Charter Checklists",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign"
+              ],
+              "tier": "T1",
+              "crewSigns": true,
+              "navLabels": [
+                "Checklists"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "accounting",
+          "label": "Accounting",
+          "defaults": {
+            "owners": [
+              "purser_office",
+              "shore_finance"
+            ],
+            "tier": "T2"
+          },
+          "subcategories": [
+            {
+              "key": "accounting_dashboard",
+              "label": "Accounting Dashboard",
+              "actions": "dash"
+            },
+            {
+              "key": "expenses",
+              "label": "Expenses",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "settle",
+                "export"
+              ],
+              "crewCreates": "self",
+              "hodApproves": true,
+              "actionTiers": {
+                "create": "T1"
+              },
+              "labels": {
+                "create": "Submit expense",
+                "approve": "Approve expenses",
+                "settle": "Mark expenses paid"
+              },
+              "legacy": {
+                "approve": "crew.approve_expenses",
+                "settle": "crew.mark_expenses_paid"
+              }
+            },
+            {
+              "key": "invoices",
+              "label": "Invoices",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "settle",
+                "export"
+              ],
+              "labels": {
+                "approve": "Approve invoices",
+                "settle": "Record invoice payments"
+              },
+              "legacy": {
+                "approve": "crew.approve_invoices",
+                "settle": "crew.record_invoice_payments"
+              }
+            },
+            {
+              "key": "apa_management",
+              "label": "APA Management",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "settle",
+                "export"
+              ],
+              "owners": [
+                "purser_office",
+                "shore_finance",
+                "bridge"
+              ]
+            },
+            {
+              "key": "budgets_reporting",
+              "label": "Budgets & Reporting",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "final_approve",
+                "export"
+              ],
+              "hodVisible": true
+            }
+          ]
+        },
+        {
+          "key": "general",
+          "label": "Vessel",
+          "defaults": {
+            "owners": [
+              "bridge"
+            ]
+          },
+          "subcategories": [
+            {
+              "key": "movement_reports",
+              "label": "Movement Reports",
+              "actions": "record",
+              "crewVisible": true
+            },
+            {
+              "key": "movement_checklists",
+              "label": "Movement Checklists",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign"
+              ],
+              "crewSigns": true
+            },
+            {
+              "key": "vessel_details",
+              "label": "Vessel Details",
+              "route": "/vessels/list",
+              "actions": [
+                "view",
+                "edit",
+                "admin"
+              ],
+              "tier": "T0"
+            },
+            {
+              "key": "communications",
+              "label": "Communications",
+              "actions": "record"
+            },
+            {
+              "key": "emergency_contact",
+              "label": "Emergency Contact",
+              "route": "/vessels/emergency-details",
+              "actions": "doc",
+              "crewVisible": true
+            },
+            {
+              "key": "management_company",
+              "label": "Management Company",
+              "route": "/vessels/company-details",
+              "actions": "doc",
+              "tier": "T0",
+              "owners": [
+                "shore_ops"
+              ]
+            },
+            {
+              "key": "flag_class",
+              "label": "Flag & Class",
+              "actions": "doc",
+              "auditVisible": true
+            },
+            {
+              "key": "vessel_insurance",
+              "label": "Vessel Insurance",
+              "actions": "doc",
+              "tier": "T2",
+              "owners": [
+                "shore_ops",
+                "bridge"
+              ],
+              "navLabels": [
+                "Insurance"
+              ]
+            },
+            {
+              "key": "billing",
+              "label": "Billing",
+              "actions": "config",
+              "tier": "T2",
+              "owners": [
+                "platform"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "logbooks",
+          "label": "Electronic Logbooks",
+          "defaults": {
+            "owners": [
+              "bridge",
+              "engineering"
+            ],
+            "auditVisible": true,
+            "auditExport": true
+          },
+          "subcategories": [
+            {
+              "key": "logbooks",
+              "label": "Logbooks",
+              "route": "/vessel/logbooks",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "final_approve",
+                "export"
+              ],
+              "owners": [
+                "bridge",
+                "deck",
+                "engineering"
+              ],
+              "labels": {
+                "sign": "Sign log entry",
+                "final_approve": "Countersign (Master / Chief Engineer)"
+              }
+            },
+            {
+              "key": "engine_room_log",
+              "label": "Engine Room Log",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "final_approve",
+                "export"
+              ],
+              "owners": [
+                "engineering"
+              ],
+              "labels": {
+                "sign": "Sign log entry",
+                "final_approve": "Chief Engineer countersign"
+              },
+              "navLabels": [
+                "DAGON Engine Room Log"
+              ]
+            },
+            {
+              "key": "review_signoff",
+              "label": "Review & Sign-off",
+              "actions": [
+                "view",
+                "approve",
+                "final_approve"
+              ]
+            },
+            {
+              "key": "vessel_registry",
+              "label": "Vessel Registry",
+              "actions": "config"
+            },
+            {
+              "key": "records_exports",
+              "label": "Records & Exports",
+              "actions": [
+                "view",
+                "export"
+              ]
+            },
+            {
+              "key": "connections",
+              "label": "Connections",
+              "actions": "config",
+              "owners": [
+                "it_av",
+                "engineering"
+              ]
+            },
+            {
+              "key": "assurance",
+              "label": "Assurance",
+              "actions": [
+                "view",
+                "export"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "dept_bridge",
+          "label": "Departments › Bridge",
+          "defaults": {
+            "owners": [
+              "bridge"
+            ],
+            "ownerOnly": true
+          },
+          "subcategories": [
+            {
+              "key": "handover",
+              "label": "Handover / Notes",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign"
+              ],
+              "ratingEdits": true
+            },
+            {
+              "key": "work_lists",
+              "label": "Work Lists / Job Cards",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "assign",
+                "sign",
+                "export"
+              ],
+              "ratingEdits": true
+            },
+            {
+              "key": "rotas_watchkeeping",
+              "label": "Rotas & Watchkeeping",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve"
+              ]
+            },
+            {
+              "key": "inventory_equipment",
+              "label": "Inventory & Equipment",
+              "actions": "record",
+              "ratingEdits": true
+            },
+            {
+              "key": "checklists",
+              "label": "Checklists",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "admin"
+              ],
+              "crewSigns": true
+            },
+            {
+              "key": "notes_reference",
+              "label": "Notes / Reference",
+              "actions": "doc"
+            }
+          ]
+        },
+        {
+          "key": "dept_deck",
+          "label": "Departments › Deck",
+          "defaults": {
+            "owners": [
+              "deck"
+            ],
+            "ownerOnly": true
+          },
+          "subcategories": [
+            {
+              "key": "handover",
+              "label": "Handover / Notes",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign"
+              ],
+              "ratingEdits": true
+            },
+            {
+              "key": "work_lists",
+              "label": "Work Lists / Job Cards",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "assign",
+                "sign",
+                "export"
+              ],
+              "ratingEdits": true
+            },
+            {
+              "key": "rotas_watchkeeping",
+              "label": "Rotas & Watchkeeping",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve"
+              ]
+            },
+            {
+              "key": "inventory_equipment",
+              "label": "Inventory & Equipment",
+              "actions": "record",
+              "ratingEdits": true
+            },
+            {
+              "key": "checklists",
+              "label": "Checklists",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "admin"
+              ],
+              "crewSigns": true
+            },
+            {
+              "key": "notes_reference",
+              "label": "Notes / Reference",
+              "actions": "doc"
+            }
+          ]
+        },
+        {
+          "key": "dept_engineering",
+          "label": "Departments › Engineering",
+          "defaults": {
+            "owners": [
+              "engineering"
+            ],
+            "ownerOnly": true
+          },
+          "subcategories": [
+            {
+              "key": "handover",
+              "label": "Handover / Notes",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign"
+              ],
+              "ratingEdits": true
+            },
+            {
+              "key": "work_lists",
+              "label": "Work Lists / Job Cards",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "assign",
+                "sign",
+                "export"
+              ],
+              "ratingEdits": true
+            },
+            {
+              "key": "rotas_watchkeeping",
+              "label": "Rotas & Watchkeeping",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve"
+              ]
+            },
+            {
+              "key": "inventory_equipment",
+              "label": "Inventory & Equipment",
+              "actions": "record",
+              "ratingEdits": true
+            },
+            {
+              "key": "checklists",
+              "label": "Checklists",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "admin"
+              ],
+              "crewSigns": true
+            },
+            {
+              "key": "notes_reference",
+              "label": "Notes / Reference",
+              "actions": "doc"
+            }
+          ]
+        },
+        {
+          "key": "dept_interior",
+          "label": "Departments › Interior",
+          "defaults": {
+            "owners": [
+              "interior"
+            ],
+            "ownerOnly": true
+          },
+          "subcategories": [
+            {
+              "key": "handover",
+              "label": "Handover / Notes",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign"
+              ],
+              "ratingEdits": true
+            },
+            {
+              "key": "work_lists",
+              "label": "Work Lists / Job Cards",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "assign",
+                "sign",
+                "export"
+              ],
+              "ratingEdits": true
+            },
+            {
+              "key": "rotas_watchkeeping",
+              "label": "Rotas & Watchkeeping",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve"
+              ]
+            },
+            {
+              "key": "inventory_equipment",
+              "label": "Inventory & Equipment",
+              "actions": "record",
+              "ratingEdits": true
+            },
+            {
+              "key": "checklists",
+              "label": "Checklists",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "admin"
+              ],
+              "crewSigns": true
+            },
+            {
+              "key": "notes_reference",
+              "label": "Notes / Reference",
+              "actions": "doc"
+            }
+          ]
+        },
+        {
+          "key": "dept_galley",
+          "label": "Departments › Galley",
+          "defaults": {
+            "owners": [
+              "galley"
+            ],
+            "ownerOnly": true
+          },
+          "subcategories": [
+            {
+              "key": "daily_menus",
+              "label": "Daily Menus",
+              "actions": "record",
+              "ownerOnly": false,
+              "crewVisible": true
+            },
+            {
+              "key": "trip_planner",
+              "label": "Trip Planner",
+              "actions": "record"
+            },
+            {
+              "key": "galley_logs",
+              "label": "Galley Logs",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign"
+              ],
+              "ratingEdits": true,
+              "auditVisible": true
+            },
+            {
+              "key": "chef_handover",
+              "label": "Chef Handover",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign"
+              ]
+            },
+            {
+              "key": "provisioning",
+              "label": "Provisioning",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "export"
+              ],
+              "ownerOnly": false
+            },
+            {
+              "key": "galley_sops",
+              "label": "Galley SOPs",
+              "actions": "doc"
+            },
+            {
+              "key": "recipe_library",
+              "label": "Recipe Library",
+              "actions": "doc",
+              "ownerOnly": false,
+              "crewVisible": true
+            },
+            {
+              "key": "projects",
+              "label": "Projects",
+              "actions": "record"
+            },
+            {
+              "key": "rotation_schedule",
+              "label": "Rotation Schedule",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve"
+              ]
+            },
+            {
+              "key": "feedback_requests",
+              "label": "Feedback & Requests",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit"
+              ],
+              "ownerOnly": false,
+              "crewCreates": "self"
+            },
+            {
+              "key": "nutrition",
+              "label": "Nutrition",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit"
+              ],
+              "tier": "T2",
+              "notes": "Allergy / medical-diet data is T3 and lives in health.personnel_medical.allergies_conditions."
+            },
+            {
+              "key": "candidate_records",
+              "label": "Candidate Records",
+              "actions": "record",
+              "tier": "T2",
+              "owners": [
+                "galley",
+                "shore_hr"
+              ]
+            },
+            {
+              "key": "professional_development",
+              "label": "Professional Development",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "dept_media",
+          "label": "Departments › Media",
+          "defaults": {
+            "owners": [
+              "media"
+            ],
+            "ownerOnly": true
+          },
+          "subcategories": [
+            {
+              "key": "handover",
+              "label": "Handover / Notes",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign"
+              ],
+              "ratingEdits": true
+            },
+            {
+              "key": "work_lists",
+              "label": "Work Lists / Job Cards",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "assign",
+                "sign",
+                "export"
+              ],
+              "ratingEdits": true
+            },
+            {
+              "key": "rotas_watchkeeping",
+              "label": "Rotas & Watchkeeping",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve"
+              ]
+            },
+            {
+              "key": "inventory_equipment",
+              "label": "Inventory & Equipment",
+              "actions": "record",
+              "ratingEdits": true
+            },
+            {
+              "key": "checklists",
+              "label": "Checklists",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "admin"
+              ],
+              "crewSigns": true
+            },
+            {
+              "key": "notes_reference",
+              "label": "Notes / Reference",
+              "actions": "doc"
+            }
+          ]
+        },
+        {
+          "key": "dept_it_av",
+          "label": "Departments › IT & AV",
+          "defaults": {
+            "owners": [
+              "it_av"
+            ],
+            "ownerOnly": true
+          },
+          "subcategories": [
+            {
+              "key": "handover",
+              "label": "Handover / Notes",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign"
+              ],
+              "ratingEdits": true
+            },
+            {
+              "key": "work_lists",
+              "label": "Work Lists / Job Cards",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "assign",
+                "sign",
+                "export"
+              ],
+              "ratingEdits": true
+            },
+            {
+              "key": "rotas_watchkeeping",
+              "label": "Rotas & Watchkeeping",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve"
+              ]
+            },
+            {
+              "key": "inventory_equipment",
+              "label": "Inventory & Equipment",
+              "actions": "record",
+              "ratingEdits": true
+            },
+            {
+              "key": "checklists",
+              "label": "Checklists",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "admin"
+              ],
+              "crewSigns": true
+            },
+            {
+              "key": "notes_reference",
+              "label": "Notes / Reference",
+              "actions": "doc"
+            }
+          ]
+        },
+        {
+          "key": "dept_dive",
+          "label": "Departments › Dive",
+          "defaults": {
+            "owners": [
+              "dive"
+            ],
+            "ownerOnly": true
+          },
+          "subcategories": [
+            {
+              "key": "handover",
+              "label": "Handover / Notes",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign"
+              ],
+              "ratingEdits": true
+            },
+            {
+              "key": "work_lists",
+              "label": "Work Lists / Job Cards",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "assign",
+                "sign",
+                "export"
+              ],
+              "ratingEdits": true
+            },
+            {
+              "key": "rotas_watchkeeping",
+              "label": "Rotas & Watchkeeping",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve"
+              ]
+            },
+            {
+              "key": "inventory_equipment",
+              "label": "Inventory & Equipment",
+              "actions": "record",
+              "ratingEdits": true
+            },
+            {
+              "key": "checklists",
+              "label": "Checklists",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "admin"
+              ],
+              "crewSigns": true
+            },
+            {
+              "key": "notes_reference",
+              "label": "Notes / Reference",
+              "actions": "doc"
+            },
+            {
+              "key": "dive_ops_procedures",
+              "label": "Dive Ops Procedures",
+              "actions": "doc",
+              "ownerOnly": false,
+              "crewVisible": true
+            },
+            {
+              "key": "dive_logs",
+              "label": "Dive Logs",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "final_approve",
+                "export"
+              ],
+              "ratingEdits": true,
+              "auditVisible": true,
+              "labels": {
+                "final_approve": "DSO countersign"
+              }
+            },
+            {
+              "key": "gas_cylinder_tracking",
+              "label": "Gas & Cylinder Tracking",
+              "actions": "record",
+              "ratingEdits": true
+            },
+            {
+              "key": "emergency_procedures",
+              "label": "Dive Emergency Procedures",
+              "actions": "doc",
+              "ownerOnly": false,
+              "crewVisible": true,
+              "navLabels": [
+                "Emergency Procedures"
+              ]
+            },
+            {
+              "key": "chamber_evac",
+              "label": "Chamber & Evac",
+              "actions": "doc",
+              "ownerOnly": false,
+              "crewVisible": true
+            },
+            {
+              "key": "dive_emergency_contacts",
+              "label": "Dive Emergency Contacts",
+              "actions": "doc",
+              "ownerOnly": false,
+              "crewVisible": true,
+              "navLabels": [
+                "Emergency Contacts"
+              ]
+            },
+            {
+              "key": "equipment_register",
+              "label": "Dive Equipment Register",
+              "actions": "record",
+              "navLabels": [
+                "Equipment Register"
+              ]
+            },
+            {
+              "key": "servicing_tests",
+              "label": "Servicing & Tests",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "export"
+              ],
+              "ratingEdits": true
+            },
+            {
+              "key": "spares",
+              "label": "Dive Spares",
+              "actions": "record",
+              "navLabels": [
+                "Spares"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "management",
+          "label": "Departments › Management / Office",
+          "defaults": {
+            "owners": [
+              "shore_ops"
+            ],
+            "tier": "T2"
+          },
+          "subcategories": [
+            {
+              "key": "dpa_ism_office",
+              "label": "DPA / ISM Office",
+              "actions": "doc",
+              "auditVisible": true
+            },
+            {
+              "key": "procurement",
+              "label": "Procurement",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "final_approve",
+                "export"
+              ],
+              "owners": [
+                "shore_finance",
+                "purser_office"
+              ],
+              "hodEdits": true
+            },
+            {
+              "key": "finance_accounts",
+              "label": "Finance / Accounts",
+              "actions": "dash",
+              "owners": [
+                "shore_finance"
+              ]
+            },
+            {
+              "key": "legal",
+              "label": "Legal",
+              "route": "/departments/legal",
+              "actions": [
+                "view_own",
+                "create",
+                "view",
+                "edit",
+                "assign",
+                "admin",
+                "export"
+              ],
+              "tier": "T3",
+              "owners": [
+                "shore_legal"
+              ],
+              "crewCreates": "self",
+              "actionTiers": {
+                "view_own": "T1",
+                "create": "T1"
+              },
+              "labels": {
+                "create": "Raise legal request"
+              },
+              "notes": "Legal privilege — requester sees own requests; Legal sees all."
+            },
+            {
+              "key": "office_insurance",
+              "label": "Insurance (Office)",
+              "actions": "doc",
+              "navLabels": [
+                "Insurance"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "shoreside",
+      "label": "Shoreside",
+      "defaults": {
+        "owners": [
+          "shore_ops"
+        ],
+        "actions": [
+          "view",
+          "create",
+          "edit",
+          "admin"
+        ]
+      },
+      "modules": [
+        {
+          "key": "ventures",
+          "label": "Shoreside Ventures",
+          "subcategories": [
+            {
+              "key": "embrace",
+              "label": "Embrace",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "admin"
+              ]
+            },
+            {
+              "key": "lungfish",
+              "label": "Lungfish",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "admin"
+              ]
+            },
+            {
+              "key": "bonefish",
+              "label": "Bonefish",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "admin"
+              ]
+            },
+            {
+              "key": "inkwell",
+              "label": "InkWELL",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "admin"
+              ]
+            },
+            {
+              "key": "medink",
+              "label": "MedINK",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "admin"
+              ],
+              "tier": "T2"
+            },
+            {
+              "key": "crew_concierge",
+              "label": "Crew Concierge",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "admin"
+              ],
+              "crewCreates": "self"
+            },
+            {
+              "key": "cosmic_frontier_labs",
+              "label": "Cosmic Frontier Labs",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "admin"
+              ]
+            },
+            {
+              "key": "dark_ocean",
+              "label": "Dark Ocean",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "admin"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "health",
+      "label": "Health & Wellness",
+      "modules": [
+        {
+          "key": "medical",
+          "label": "Medical",
+          "defaults": {
+            "owners": [
+              "medical"
+            ],
+            "tier": "T3"
+          },
+          "subcategories": [
+            {
+              "key": "medical_dashboard",
+              "label": "Medical Dashboard",
+              "actions": "dash",
+              "navLabels": [
+                "Dashboard",
+                "Medical"
+              ]
+            },
+            {
+              "key": "patients",
+              "label": "Patients",
+              "actions": "record"
+            },
+            {
+              "key": "medical_staff",
+              "label": "Medical Staff",
+              "actions": [
+                "view",
+                "edit",
+                "admin"
+              ],
+              "tier": "T2",
+              "navLabels": [
+                "Staff"
+              ]
+            },
+            {
+              "key": "medical_supplies",
+              "label": "Medical Supplies",
+              "actions": "record",
+              "tier": "T1",
+              "navLabels": [
+                "Supplies"
+              ]
+            },
+            {
+              "key": "first_aid",
+              "label": "First Aid",
+              "actions": "record",
+              "tier": "T1",
+              "crewVisible": true
+            },
+            {
+              "key": "medical_equipment",
+              "label": "Medical Equipment",
+              "actions": "record",
+              "tier": "T1",
+              "navLabels": [
+                "Equipment"
+              ]
+            },
+            {
+              "key": "medical_protocols",
+              "label": "Medical Protocols",
+              "actions": "doc",
+              "tier": "T1",
+              "crewVisible": true,
+              "navLabels": [
+                "Protocols"
+              ]
+            },
+            {
+              "key": "medical_logs",
+              "label": "Medical Logs",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "export"
+              ],
+              "navLabels": [
+                "Logs"
+              ]
+            },
+            {
+              "key": "chek",
+              "label": "C.H.E.K.",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "personnel_medical",
+          "label": "Personnel Medical Data",
+          "defaults": {
+            "owners": [
+              "medical"
+            ],
+            "tier": "T3",
+            "actions": [
+              "view_own",
+              "view",
+              "create",
+              "edit",
+              "export"
+            ]
+          },
+          "subcategories": [
+            {
+              "key": "crew_medical_records",
+              "label": "Crew Medical Records",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "export"
+              ],
+              "t3Holders": {
+                "master": [
+                  "view"
+                ]
+              },
+              "labels": {
+                "view": "View medical",
+                "edit": "Edit medical"
+              },
+              "legacy": {
+                "view": "crew.view_medical",
+                "edit": "crew.edit_medical"
+              },
+              "notes": "Current Ink Fleet-style \"Full\" preset gives Captains edit medical; PMS draft limits Master to view (MLC 4.1 confidentiality). Confirm."
+            },
+            {
+              "key": "fitness_to_work",
+              "label": "Fitness-to-Work / ENG1",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "export"
+              ],
+              "t3Holders": {
+                "master": [
+                  "view"
+                ],
+                "hr_manager": [
+                  "view"
+                ],
+                "crewing_coordinator": [
+                  "view"
+                ]
+              }
+            },
+            {
+              "key": "vaccinations",
+              "label": "Vaccinations & Immunisations",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "export"
+              ]
+            },
+            {
+              "key": "allergies_conditions",
+              "label": "Allergies & Conditions",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "export"
+              ],
+              "t3Holders": {
+                "head_chef": [
+                  "view"
+                ]
+              },
+              "notes": "Head Chef sees allergy flags only (column-level) for food safety."
+            },
+            {
+              "key": "medications",
+              "label": "Medications",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "export"
+              ]
+            },
+            {
+              "key": "medical_certificates",
+              "label": "Medical Certificates",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "export"
+              ],
+              "t3Holders": {
+                "master": [
+                  "view"
+                ],
+                "crewing_coordinator": [
+                  "view"
+                ]
+              }
+            },
+            {
+              "key": "next_of_kin",
+              "label": "Next of Kin / Emergency",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "export"
+              ],
+              "tier": "T2",
+              "hodVisible": true
+            },
+            {
+              "key": "incident_treatment_history",
+              "label": "Incident & Treatment History",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "export"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "spa",
+          "label": "Spa",
+          "defaults": {
+            "owners": [
+              "spa_wellness"
+            ]
+          },
+          "subcategories": [
+            {
+              "key": "spa_dashboard",
+              "label": "Spa Dashboard",
+              "actions": "dash",
+              "navLabels": [
+                "Dashboard",
+                "Spa"
+              ]
+            },
+            {
+              "key": "spa_calendar",
+              "label": "Spa Calendar",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit"
+              ],
+              "crewCreates": "self",
+              "navLabels": [
+                "Calendar"
+              ]
+            },
+            {
+              "key": "spa_clients",
+              "label": "Spa Clients",
+              "actions": "record",
+              "tier": "T2",
+              "navLabels": [
+                "Clients"
+              ]
+            },
+            {
+              "key": "treatments",
+              "label": "Treatments",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit"
+              ],
+              "crewCreates": "self"
+            },
+            {
+              "key": "spa_inventory",
+              "label": "Spa Inventory",
+              "actions": "record",
+              "navLabels": [
+                "Inventory"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "nutrition",
+          "label": "Nutrition",
+          "defaults": {
+            "owners": [
+              "spa_wellness",
+              "galley"
+            ],
+            "tier": "T2"
+          },
+          "subcategories": [
+            {
+              "key": "nutrition_overview",
+              "label": "Nutrition Overview",
+              "actions": [
+                "view_own",
+                "view"
+              ],
+              "navLabels": [
+                "Overview"
+              ]
+            },
+            {
+              "key": "food_log",
+              "label": "Food Log",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit"
+              ],
+              "crewCreates": "self",
+              "actionTiers": {
+                "create": "T1"
+              }
+            },
+            {
+              "key": "nutrition_calendar",
+              "label": "Nutrition Calendar",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit"
+              ],
+              "navLabels": [
+                "Calendar"
+              ]
+            },
+            {
+              "key": "goals",
+              "label": "Nutrition Goals",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit"
+              ],
+              "navLabels": [
+                "Goals"
+              ]
+            },
+            {
+              "key": "nutrition_settings",
+              "label": "Nutrition Settings",
+              "actions": "config",
+              "tier": "T1",
+              "navLabels": [
+                "Settings"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "physio",
+          "label": "Physio",
+          "defaults": {
+            "owners": [
+              "spa_wellness",
+              "medical"
+            ],
+            "tier": "T3"
+          },
+          "subcategories": [
+            {
+              "key": "rehab_protocols",
+              "label": "Rehab Protocols",
+              "actions": "doc",
+              "tier": "T1"
+            },
+            {
+              "key": "assessments",
+              "label": "Physio Assessments",
+              "actions": "record",
+              "navLabels": [
+                "Assessments"
+              ]
+            },
+            {
+              "key": "treatment_plans",
+              "label": "Treatment Plans",
+              "actions": "record"
+            },
+            {
+              "key": "session_log",
+              "label": "Session Log",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "sign"
+              ]
+            },
+            {
+              "key": "referrals",
+              "label": "Referrals",
+              "actions": [
+                "view",
+                "create",
+                "edit"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "personal_training",
+          "label": "Personal Training",
+          "defaults": {
+            "owners": [
+              "spa_wellness"
+            ]
+          },
+          "subcategories": [
+            {
+              "key": "trainer_dashboard",
+              "label": "Trainer Dashboard",
+              "actions": "dash",
+              "navLabels": [
+                "Dashboard"
+              ]
+            },
+            {
+              "key": "trainer_schedule",
+              "label": "Trainer Schedule",
+              "actions": "record",
+              "navLabels": [
+                "Schedule"
+              ]
+            },
+            {
+              "key": "athlete_roster",
+              "label": "Athlete Roster",
+              "actions": "record",
+              "tier": "T2",
+              "navLabels": [
+                "Roster"
+              ]
+            },
+            {
+              "key": "athlete_workspace",
+              "label": "Athlete Workspace",
+              "actions": "record",
+              "tier": "T2"
+            },
+            {
+              "key": "active_programs",
+              "label": "Active Programs",
+              "actions": "record"
+            },
+            {
+              "key": "programme_templates",
+              "label": "Programme Templates",
+              "actions": "doc",
+              "navLabels": [
+                "Templates"
+              ]
+            },
+            {
+              "key": "exercises",
+              "label": "Exercises",
+              "actions": "doc",
+              "crewVisible": true
+            },
+            {
+              "key": "pt_rehab_protocols",
+              "label": "PT Rehab Protocols",
+              "actions": "doc",
+              "navLabels": [
+                "Rehab Protocols"
+              ]
+            },
+            {
+              "key": "videos",
+              "label": "Videos",
+              "actions": "doc",
+              "crewVisible": true
+            },
+            {
+              "key": "trainers",
+              "label": "Trainers",
+              "actions": "config"
+            },
+            {
+              "key": "exercise_sources",
+              "label": "Exercise Sources",
+              "actions": "config",
+              "navLabels": [
+                "ExerciseDB Import",
+                "wger",
+                "ExerciseDB API",
+                "MuscleWiki",
+                "AnatomyTOOL",
+                "Z-Anatomy"
+              ]
+            },
+            {
+              "key": "athlete_self_service",
+              "label": "My Training / Progress / Profile",
+              "actions": [
+                "view_own"
+              ],
+              "navLabels": [
+                "My Training",
+                "Progress",
+                "Profile"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "yard",
+      "label": "Yard",
+      "defaults": {
+        "owners": [
+          "shore_ops",
+          "engineering"
+        ]
+      },
+      "modules": [
+        {
+          "key": "refit_overview",
+          "label": "Refit › Overview",
+          "subcategories": [
+            {
+              "key": "refit_dashboard",
+              "label": "Refit Dashboard",
+              "actions": "dash",
+              "navLabels": [
+                "Dashboard"
+              ]
+            },
+            {
+              "key": "approvals_centre",
+              "label": "Approvals Centre",
+              "actions": [
+                "view",
+                "approve",
+                "final_approve"
+              ]
+            },
+            {
+              "key": "refit_notifications",
+              "label": "Refit Notifications",
+              "actions": [
+                "view_own"
+              ],
+              "navLabels": [
+                "Notifications"
+              ]
+            },
+            {
+              "key": "refit_search",
+              "label": "Refit Search",
+              "actions": "read",
+              "navLabels": [
+                "Search"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "refit_workflow",
+          "label": "Refit › Workflow",
+          "subcategories": [
+            {
+              "key": "change_orders",
+              "label": "Change Orders",
+              "actions": "approvable",
+              "tier": "T2",
+              "hodEdits": true
+            },
+            {
+              "key": "crew_requests",
+              "label": "Crew Requests",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve"
+              ],
+              "crewCreates": "group",
+              "hodApproves": true
+            },
+            {
+              "key": "snags_warranty",
+              "label": "Snags & Warranty",
+              "actions": "record",
+              "ratingEdits": true
+            },
+            {
+              "key": "works_orders",
+              "label": "Works Orders",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "export"
+              ]
+            },
+            {
+              "key": "meetings",
+              "label": "Refit Meetings",
+              "actions": "doc",
+              "navLabels": [
+                "Meetings"
+              ]
+            },
+            {
+              "key": "risk_register",
+              "label": "Risk Register",
+              "actions": "record"
+            }
+          ]
+        },
+        {
+          "key": "refit_project",
+          "label": "Refit › Project",
+          "subcategories": [
+            {
+              "key": "schedule",
+              "label": "Refit Schedule",
+              "actions": "record",
+              "navLabels": [
+                "Schedule"
+              ]
+            },
+            {
+              "key": "logistics",
+              "label": "Logistics",
+              "actions": "record"
+            },
+            {
+              "key": "inventory_equipment",
+              "label": "Refit Inventory & Equipment",
+              "actions": "record",
+              "navLabels": [
+                "Inventory & Equipment"
+              ]
+            },
+            {
+              "key": "contractors",
+              "label": "Contractors",
+              "actions": "record",
+              "tier": "T2"
+            },
+            {
+              "key": "suppliers",
+              "label": "Suppliers",
+              "actions": "record",
+              "tier": "T2"
+            }
+          ]
+        },
+        {
+          "key": "refit_documents",
+          "label": "Refit › Documents",
+          "subcategories": [
+            {
+              "key": "drawings_plans",
+              "label": "Drawings & Plans",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "export"
+              ]
+            },
+            {
+              "key": "document_control",
+              "label": "Document Control",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "export"
+              ]
+            },
+            {
+              "key": "files",
+              "label": "Refit Files",
+              "actions": "doc",
+              "navLabels": [
+                "Files"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "refit_finance",
+          "label": "Refit › Finance",
+          "defaults": {
+            "owners": [
+              "shore_finance"
+            ],
+            "tier": "T2"
+          },
+          "subcategories": [
+            {
+              "key": "budget",
+              "label": "Refit Budget",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "final_approve",
+                "export"
+              ],
+              "navLabels": [
+                "Budget"
+              ],
+              "grants": {
+                "view": [
+                  "master",
+                  "chief_engineer",
+                  "purser",
+                  "dpa",
+                  "fleet_manager",
+                  "technical_superintendent",
+                  "finance_controller",
+                  "procurement_officer"
+                ],
+                "approve": [
+                  "master",
+                  "dpa",
+                  "fleet_manager",
+                  "technical_superintendent"
+                ]
+              }
+            },
+            {
+              "key": "purchase_orders",
+              "label": "Refit Purchase Orders",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "final_approve",
+                "export"
+              ],
+              "navLabels": [
+                "Purchase Orders"
+              ],
+              "grants": {
+                "view": [
+                  "master",
+                  "chief_engineer",
+                  "purser",
+                  "dpa",
+                  "fleet_manager",
+                  "technical_superintendent",
+                  "finance_controller",
+                  "procurement_officer"
+                ],
+                "approve": [
+                  "master",
+                  "dpa",
+                  "fleet_manager",
+                  "technical_superintendent"
+                ]
+              }
+            },
+            {
+              "key": "invoices",
+              "label": "Refit Invoices",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "settle",
+                "export"
+              ],
+              "navLabels": [
+                "Invoices"
+              ],
+              "grants": {
+                "view": [
+                  "master",
+                  "chief_engineer",
+                  "purser",
+                  "dpa",
+                  "fleet_manager",
+                  "technical_superintendent",
+                  "finance_controller",
+                  "procurement_officer"
+                ],
+                "approve": [
+                  "master",
+                  "dpa",
+                  "fleet_manager",
+                  "technical_superintendent"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "key": "refit_compliance",
+          "label": "Refit › Compliance",
+          "subcategories": [
+            {
+              "key": "compliance",
+              "label": "Refit Compliance",
+              "actions": "record",
+              "auditVisible": true,
+              "navLabels": [
+                "Compliance"
+              ]
+            },
+            {
+              "key": "crew_certification",
+              "label": "Crew & Certification",
+              "actions": "record"
+            },
+            {
+              "key": "audit_log",
+              "label": "Refit Audit Log",
+              "actions": [
+                "view",
+                "export"
+              ],
+              "tier": "T2",
+              "auditVisible": true,
+              "auditExport": true,
+              "navLabels": [
+                "Audit Log"
+              ]
+            },
+            {
+              "key": "reporting",
+              "label": "Refit Reporting",
+              "actions": "dash",
+              "navLabels": [
+                "Reporting"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "refit_projects",
+          "label": "Refit › Refit / Projects",
+          "subcategories": [
+            {
+              "key": "refit_periods",
+              "label": "Refit Periods",
+              "actions": "record"
+            },
+            {
+              "key": "work_packages",
+              "label": "Work Packages / Scopes",
+              "actions": "record"
+            },
+            {
+              "key": "defect_snag_lists",
+              "label": "Defect & Snag Lists",
+              "actions": "record",
+              "ratingEdits": true
+            },
+            {
+              "key": "contractors_subcontractors",
+              "label": "Contractors & Subcontractors",
+              "actions": "record",
+              "tier": "T2"
+            },
+            {
+              "key": "refit_inventory",
+              "label": "Refit Inventory",
+              "actions": "record"
+            },
+            {
+              "key": "project_documents",
+              "label": "Project Documents & Drawings",
+              "actions": "doc"
+            }
+          ]
+        },
+        {
+          "key": "refit_account",
+          "label": "Refit › Account & Admin",
+          "defaults": {
+            "owners": [
+              "platform",
+              "shore_ops"
+            ]
+          },
+          "subcategories": [
+            {
+              "key": "access_profile",
+              "label": "Access Profile",
+              "actions": [
+                "view_own"
+              ]
+            },
+            {
+              "key": "communications",
+              "label": "Refit Communications",
+              "actions": "record",
+              "navLabels": [
+                "Communications"
+              ]
+            },
+            {
+              "key": "diagnostics",
+              "label": "Diagnostics",
+              "actions": "read"
+            },
+            {
+              "key": "access_check",
+              "label": "Access Check",
+              "actions": [
+                "view_own"
+              ]
+            },
+            {
+              "key": "admin_settings",
+              "label": "Admin & Settings",
+              "actions": "config"
+            },
+            {
+              "key": "import_api",
+              "label": "Import & API",
+              "actions": [
+                "view",
+                "create",
+                "admin"
+              ],
+              "tier": "T2"
+            },
+            {
+              "key": "login_diagnostics",
+              "label": "Login Diagnostics",
+              "actions": "config",
+              "tier": "T2"
+            }
+          ]
+        },
+        {
+          "key": "nb_overview",
+          "label": "New Build › Overview",
+          "subcategories": [
+            {
+              "key": "nb_dashboard",
+              "label": "New Build Dashboard",
+              "actions": "dash",
+              "navLabels": [
+                "Dashboard"
+              ]
+            },
+            {
+              "key": "build_phases",
+              "label": "Build Phases",
+              "actions": "record"
+            },
+            {
+              "key": "requirements",
+              "label": "Requirements",
+              "actions": "record"
+            },
+            {
+              "key": "onboarding",
+              "label": "New Build Onboarding",
+              "actions": "record",
+              "navLabels": [
+                "Onboarding"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "nb_workflow",
+          "label": "New Build › Workflow",
+          "subcategories": [
+            {
+              "key": "change_orders",
+              "label": "New Build Change Orders",
+              "actions": "approvable",
+              "tier": "T2",
+              "navLabels": [
+                "Change Orders"
+              ]
+            },
+            {
+              "key": "raid_log",
+              "label": "RAID Log",
+              "actions": "record"
+            },
+            {
+              "key": "approvals",
+              "label": "New Build Approvals",
+              "actions": [
+                "view",
+                "approve",
+                "final_approve"
+              ],
+              "navLabels": [
+                "Approvals"
+              ]
+            },
+            {
+              "key": "schedule",
+              "label": "New Build Schedule",
+              "actions": "record",
+              "navLabels": [
+                "Schedule"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "nb_disciplines",
+          "label": "New Build › Disciplines",
+          "subcategories": [
+            {
+              "key": "areas",
+              "label": "Areas",
+              "actions": "record"
+            },
+            {
+              "key": "interior",
+              "label": "Interior (New Build)",
+              "actions": "record",
+              "owners": [
+                "shore_ops",
+                "interior"
+              ],
+              "navLabels": [
+                "Interior"
+              ]
+            },
+            {
+              "key": "naval_architecture",
+              "label": "Naval Architecture",
+              "actions": "record"
+            },
+            {
+              "key": "piping",
+              "label": "Piping",
+              "actions": "record"
+            },
+            {
+              "key": "deck_plan",
+              "label": "Deck Plan",
+              "actions": "record",
+              "owners": [
+                "shore_ops",
+                "deck"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "nb_equipment",
+          "label": "New Build › Equipment & Procurement",
+          "subcategories": [
+            {
+              "key": "equipment",
+              "label": "New Build Equipment",
+              "actions": "record",
+              "navLabels": [
+                "Equipment"
+              ]
+            },
+            {
+              "key": "purchase_orders",
+              "label": "New Build Purchase Orders",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "final_approve",
+                "export"
+              ],
+              "tier": "T2",
+              "owners": [
+                "shore_ops",
+                "shore_finance"
+              ],
+              "navLabels": [
+                "Purchase Orders"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "nb_documents",
+          "label": "New Build › Documents",
+          "subcategories": [
+            {
+              "key": "files",
+              "label": "New Build Files",
+              "actions": "doc",
+              "navLabels": [
+                "Files"
+              ]
+            },
+            {
+              "key": "drawings",
+              "label": "Drawings",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "export"
+              ]
+            },
+            {
+              "key": "yard_standards",
+              "label": "Yard Standards",
+              "actions": "doc"
+            },
+            {
+              "key": "regulations",
+              "label": "Regulations",
+              "actions": "doc"
+            }
+          ]
+        },
+        {
+          "key": "nb_configuration",
+          "label": "New Build › Configuration",
+          "defaults": {
+            "owners": [
+              "shore_ops"
+            ]
+          },
+          "subcategories": [
+            {
+              "key": "locations",
+              "label": "Locations",
+              "actions": "config"
+            },
+            {
+              "key": "rasci",
+              "label": "RASCI",
+              "actions": "config"
+            },
+            {
+              "key": "suppliers",
+              "label": "New Build Suppliers",
+              "actions": "record",
+              "tier": "T2",
+              "navLabels": [
+                "Suppliers"
+              ]
+            },
+            {
+              "key": "contacts",
+              "label": "Contacts",
+              "actions": "record"
+            },
+            {
+              "key": "import",
+              "label": "New Build Import",
+              "actions": [
+                "view",
+                "create"
+              ],
+              "navLabels": [
+                "Import"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "hris",
+      "label": "HRIS",
+      "defaults": {
+        "owners": [
+          "shore_hr"
+        ],
+        "tier": "T2"
+      },
+      "modules": [
+        {
+          "key": "overview",
+          "label": "HR",
+          "subcategories": [
+            {
+              "key": "hr_dashboard",
+              "label": "HR Dashboard",
+              "route": "/hr",
+              "actions": "dash",
+              "navLabels": [
+                "HR"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "employee_records",
+          "label": "Employee Records",
+          "defaults": {
+            "deptScoped": true,
+            "hodVisible": true
+          },
+          "subcategories": [
+            {
+              "key": "personal_details",
+              "label": "Personal Details",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "export"
+              ]
+            },
+            {
+              "key": "contracts_employment",
+              "label": "Contracts & Employment",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "export"
+              ],
+              "hodVisible": false,
+              "labels": {
+                "view": "Access employment records"
+              },
+              "legacy": {
+                "view": "crew.access_employment_records"
+              }
+            },
+            {
+              "key": "documents_certificates",
+              "label": "Documents & Certificates",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "export"
+              ]
+            },
+            {
+              "key": "next_of_kin",
+              "label": "Next of Kin / Emergency (HR)",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "export"
+              ],
+              "navLabels": [
+                "Next of Kin / Emergency"
+              ]
+            },
+            {
+              "key": "employment_history",
+              "label": "Employment History",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "export"
+              ],
+              "hodVisible": false
+            }
+          ]
+        },
+        {
+          "key": "compensation",
+          "label": "Compensation",
+          "defaults": {
+            "owners": [
+              "shore_finance",
+              "purser_office"
+            ]
+          },
+          "subcategories": [
+            {
+              "key": "salaries_compensation",
+              "label": "Salaries & Compensation",
+              "actions": [
+                "view_own",
+                "view",
+                "edit",
+                "export"
+              ],
+              "legacy": {
+                "view": "finance.view_compensation",
+                "edit": "finance.edit_compensation"
+              }
+            },
+            {
+              "key": "payroll",
+              "label": "Payroll",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "final_approve",
+                "export"
+              ],
+              "labels": {
+                "view_own": "View own payslips",
+                "create": "Run payroll",
+                "approve": "Approve payroll"
+              },
+              "legacy": {
+                "create": "finance.run_payroll",
+                "approve": "crew.approve_payroll"
+              },
+              "navLabels": [
+                "Payroll"
+              ]
+            },
+            {
+              "key": "gratuities",
+              "label": "Gratuities",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "export"
+              ]
+            },
+            {
+              "key": "pay_reviews",
+              "label": "Pay Reviews",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "final_approve"
+              ]
+            },
+            {
+              "key": "compensation_settings",
+              "label": "Compensation Settings",
+              "actions": "config"
+            },
+            {
+              "key": "bank_details",
+              "label": "Bank Details",
+              "actions": [
+                "view_own",
+                "view",
+                "edit"
+              ],
+              "tier": "T3",
+              "notes": "Split out of salaries so bank data is T3."
+            }
+          ]
+        },
+        {
+          "key": "performance",
+          "label": "Performance",
+          "defaults": {
+            "deptScoped": true,
+            "hodVisible": true,
+            "hodApproves": true,
+            "hodEdits": true
+          },
+          "subcategories": [
+            {
+              "key": "annual_evaluations",
+              "label": "Annual Evaluations",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "approve",
+                "final_approve",
+                "export"
+              ],
+              "crewSigns": true,
+              "labels": {
+                "view": "View appraisals",
+                "create": "Conduct appraisals",
+                "sign": "Acknowledge appraisal"
+              },
+              "legacy": {
+                "view": "crew.view_appraisals",
+                "create": "crew.conduct_appraisals"
+              }
+            },
+            {
+              "key": "annual_reviews",
+              "label": "Annual Reviews",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "approve",
+                "final_approve",
+                "export"
+              ],
+              "crewSigns": true
+            },
+            {
+              "key": "end_of_rotation",
+              "label": "End of Rotation",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "sign",
+                "approve",
+                "final_approve",
+                "export"
+              ],
+              "crewSigns": true
+            },
+            {
+              "key": "objectives_pdps",
+              "label": "Objectives & PDPs",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve"
+              ]
+            },
+            {
+              "key": "disciplinary_matters",
+              "label": "Disciplinary Matters",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "final_approve",
+                "export"
+              ],
+              "tier": "T3",
+              "hodVisible": false,
+              "hodApproves": false,
+              "hodEdits": false,
+              "t3Holders": {
+                "master": [
+                  "view",
+                  "create",
+                  "edit",
+                  "approve"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "key": "recruitment",
+          "label": "Recruitment",
+          "defaults": {
+            "hodVisible": true
+          },
+          "subcategories": [
+            {
+              "key": "vacancies",
+              "label": "Vacancies",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "export"
+              ],
+              "tier": "T1",
+              "hodEdits": true
+            },
+            {
+              "key": "candidates",
+              "label": "Candidates",
+              "actions": "record",
+              "navLabels": [
+                "Crewing & Recruitment"
+              ]
+            },
+            {
+              "key": "onboarding",
+              "label": "Onboarding",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "sign"
+              ],
+              "crewSigns": true
+            }
+          ]
+        },
+        {
+          "key": "leave_rotation",
+          "label": "Leave & Rotation",
+          "defaults": {
+            "tier": "T1",
+            "deptScoped": true,
+            "owners": [
+              "shore_hr",
+              "purser_office"
+            ]
+          },
+          "subcategories": [
+            {
+              "key": "leave_planner",
+              "label": "Leave Planner",
+              "route": "/crew/leave",
+              "actions": [
+                "view",
+                "edit",
+                "export"
+              ],
+              "hodVisible": true,
+              "labels": {
+                "view": "Leave records"
+              },
+              "legacy": {
+                "view": "crew.access_leave_records"
+              },
+              "navLabels": [
+                "Leave"
+              ]
+            },
+            {
+              "key": "leave_requests",
+              "label": "Leave Requests",
+              "route": "/crew/leave/requests",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "approve",
+                "final_approve",
+                "export"
+              ],
+              "crewCreates": "self",
+              "hodApproves": true,
+              "labels": {
+                "create": "Request leave",
+                "approve": "Approve leave",
+                "final_approve": "Final leave approval"
+              },
+              "legacy": {
+                "approve": "crew.approve_leave"
+              }
+            },
+            {
+              "key": "leave_calculator",
+              "label": "Leave Calculator",
+              "route": "/crew/leave/calculator",
+              "actions": [
+                "view_own",
+                "view"
+              ]
+            },
+            {
+              "key": "rotation_planner",
+              "label": "Rotation Planner",
+              "route": "/crew/rotation-planner",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "export"
+              ],
+              "owners": [
+                "shore_hr"
+              ],
+              "hodApproves": true,
+              "navLabels": [
+                "Fleet Rotation Planner"
+              ]
+            }
+          ]
+        },
+        {
+          "key": "training_development",
+          "label": "Training & Development",
+          "defaults": {
+            "tier": "T1",
+            "deptScoped": true
+          },
+          "subcategories": [
+            {
+              "key": "crew_training",
+              "label": "Crew Training",
+              "route": "/development/crew-training",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "final_approve",
+                "export"
+              ],
+              "crewCreates": "self",
+              "hodApproves": true,
+              "auditVisible": true,
+              "labels": {
+                "view": "View training",
+                "create": "Request training",
+                "approve": "Approve training (HOD)",
+                "final_approve": "Final training approval"
+              },
+              "navLabels": [
+                "Training & Development"
+              ]
+            },
+            {
+              "key": "development_pathways",
+              "label": "Development Pathways",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "admin"
+              ],
+              "crewVisible": true,
+              "deptScoped": false
+            }
+          ]
+        },
+        {
+          "key": "compliance",
+          "label": "Compliance",
+          "subcategories": [
+            {
+              "key": "right_to_work",
+              "label": "Compliance & Right to Work",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "export"
+              ],
+              "auditVisible": true
+            }
+          ]
+        },
+        {
+          "key": "reporting",
+          "label": "Reporting",
+          "subcategories": [
+            {
+              "key": "hr_analytics",
+              "label": "Reporting & Analytics",
+              "actions": "dash"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "admin",
+      "label": "Administration",
+      "defaults": {
+        "owners": [
+          "platform"
+        ],
+        "tier": "T2"
+      },
+      "modules": [
+        {
+          "key": "access",
+          "label": "Access Control",
+          "subcategories": [
+            {
+              "key": "users_access",
+              "label": "Users & Access",
+              "route": "/users-access",
+              "actions": [
+                "view",
+                "assign",
+                "admin",
+                "export"
+              ],
+              "labels": {
+                "assign": "Grant / revoke user access",
+                "admin": "Manage access sets"
+              }
+            },
+            {
+              "key": "roles_permissions",
+              "label": "Roles & Permissions",
+              "route": "/admin/roles",
+              "actions": "config"
+            },
+            {
+              "key": "permission_matrix_import",
+              "label": "Permission Matrix Import",
+              "actions": [
+                "view",
+                "create",
+                "approve"
+              ],
+              "labels": {
+                "create": "Upload matrix workbook",
+                "approve": "Apply import (Review & save)"
+              }
+            },
+            {
+              "key": "permission_audit_log",
+              "label": "Permission Audit Log",
+              "actions": [
+                "view",
+                "export"
+              ],
+              "auditVisible": true,
+              "auditExport": true
+            }
+          ]
+        },
+        {
+          "key": "system",
+          "label": "System",
+          "subcategories": [
+            {
+              "key": "fleet_groups",
+              "label": "Fleet Groups",
+              "actions": "config",
+              "tier": "T1"
+            },
+            {
+              "key": "alerts",
+              "label": "Alerts",
+              "actions": "config",
+              "tier": "T1"
+            },
+            {
+              "key": "api_integrations",
+              "label": "API Integrations",
+              "actions": "config"
+            },
+            {
+              "key": "feedback",
+              "label": "Feedback",
+              "actions": [
+                "view_own",
+                "create",
+                "view"
+              ],
+              "tier": "T1",
+              "crewCreates": "self"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
