@@ -43,7 +43,7 @@ Work in the phases in §10. Commit at the end of each phase. Stop and report whe
 
 `maritime-master` is public, so you can fetch raw files directly:
 `https://raw.githubusercontent.com/digbyberriman-collab/maritime-master/<branch>/docs/permissions/...`
-Use `main` once this work is merged, otherwise the branch named in the addendum. Copy the catalogue JSON and the generator into this repo, under `docs/permissions/` and `scripts/permissions/`, so the repo is self-contained.
+Use `main` once this work is merged, otherwise the branch `claude/gracious-volta-g42f6s`. Copy the catalogue JSON and the generator into this repo, under `docs/permissions/` and `scripts/permissions/`, so the repo is self-contained.
 
 ---
 
