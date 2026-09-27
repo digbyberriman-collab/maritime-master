@@ -257,8 +257,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return wellness.level !== 'none' || medical.level !== 'none';
     }
 
+    // Fails closed while RBAC is still loading: ModuleRoute already blanks the
+    // screen with a spinner for this exact window on the pages that must
+    // never render for the wrong role, so nav filtering doing the same thing
+    // is consistent, not a new restriction -- it used to allow everything
+    // here instead, however briefly (audit finding H7).
     if (!rbacInitialized || rbacLoading) {
-      return true;
+      return false;
     }
 
     if (hasRBACRole('superadmin') || hasRBACRole('dpa') || hasRBACRole('fleet_master')) {
@@ -303,9 +308,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!userRole) return false;
     
     const allowedRoles = MODULE_ACCESS[moduleId];
-    
-    // If module is not in the access list, allow by default
-    if (!allowedRoles) return true;
+
+    // A module missing from this map is a module nobody has explicitly
+    // decided to open, not one to open by default (audit finding H7): every
+    // real destination is either in RBAC's module catalogue (handled above)
+    // or listed here.
+    if (!allowedRoles) return false;
     
     return allowedRoles.includes(userRole);
   }, [user, userRole, rbacInitialized, rbacLoading, canView, hasRBACRole, rbacPermissions, rbacUserRoles, practitionerDisciplines, practitionerDisciplinesLoaded]);
