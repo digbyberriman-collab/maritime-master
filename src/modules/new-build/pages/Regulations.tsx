@@ -121,6 +121,7 @@ export default function Regulations() {
   // The nb_regulations bucket is private, so downloads need short-lived
   // signed URLs (public URLs return an error for a private bucket).
   const [signedDocUrls, setSignedDocUrls] = useState<Record<string, { url: string; expiresAt: number }>>({});
+  const [, setUrlRetryTick] = useState(0);
   const pendingDocPaths = useRef<Set<string>>(new Set());
   const [form, setForm] = useState<FormData>(emptyForm);
   const [file, setFile] = useState<File | null>(null);
@@ -302,6 +303,7 @@ export default function Regulations() {
   const getDownloadUrl = (storagePath: string): string | null => {
     const entry = signedDocUrls[storagePath];
     const cached = entry && entry.expiresAt > Date.now() ? entry.url : null;
+    if (cached) return cached;
     if (!pendingDocPaths.current.has(storagePath)) {
       pendingDocPaths.current.add(storagePath);
       supabase.storage
@@ -310,11 +312,12 @@ export default function Regulations() {
         .then(({ data, error }) => {
           if (!error && data?.signedUrl) {
             setSignedDocUrls((prev) => ({ ...prev, [storagePath]: { url: data.signedUrl, expiresAt: Date.now() + 55 * 60 * 1000 } }));
+            pendingDocPaths.current.delete(storagePath);
           } else {
-            setTimeout(() => pendingDocPaths.current.delete(storagePath), 5000);
+            setTimeout(() => { pendingDocPaths.current.delete(storagePath); setUrlRetryTick((t) => t + 1); }, 5000);
           }
         })
-        .catch(() => { /* leave unresolved — the link hides */ });
+        .catch(() => { setTimeout(() => { pendingDocPaths.current.delete(storagePath); setUrlRetryTick((t) => t + 1); }, 5000); });
     }
     return null;
   };
