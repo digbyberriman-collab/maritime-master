@@ -226,7 +226,8 @@ export default function InteriorMaterials() {
   const [swatchUploading, setSwatchUploading] = useState(false);
   // The swatch bucket is private, so images must be served via short-lived
   // signed URLs (public URLs return an error for a private bucket).
-  const [signedSwatchUrls, setSignedSwatchUrls] = useState<Record<string, string>>({});
+  const [signedSwatchUrls, setSignedSwatchUrls] = useState<Record<string, { url: string; expiresAt: number }>>({});
+  const [, setUrlRetryTick] = useState(0);
   const pendingSwatchPaths = useRef<Set<string>>(new Set());
 
   const saveMaterial = useMutation({
@@ -557,7 +558,8 @@ export default function InteriorMaterials() {
 
   const swatchUrl = (path?: string | null): string | null => {
     if (!path) return null;
-    const cached = signedSwatchUrls[path];
+    const entry = signedSwatchUrls[path];
+    const cached = entry && entry.expiresAt > Date.now() ? entry.url : null;
     if (cached) return cached;
     if (!pendingSwatchPaths.current.has(path)) {
       pendingSwatchPaths.current.add(path);
@@ -566,10 +568,13 @@ export default function InteriorMaterials() {
         .createSignedUrl(path, 3600)
         .then(({ data, error }) => {
           if (!error && data?.signedUrl) {
-            setSignedSwatchUrls((prev) => (prev[path] === data.signedUrl ? prev : { ...prev, [path]: data.signedUrl }));
+            setSignedSwatchUrls((prev) => ({ ...prev, [path]: { url: data.signedUrl, expiresAt: Date.now() + 55 * 60 * 1000 } }));
+            pendingSwatchPaths.current.delete(path);
+          } else {
+            setTimeout(() => { pendingSwatchPaths.current.delete(path); setUrlRetryTick((t) => t + 1); }, 5000);
           }
         })
-        .catch(() => { /* leave unresolved — the placeholder shows */ });
+        .catch(() => { setTimeout(() => { pendingSwatchPaths.current.delete(path); setUrlRetryTick((t) => t + 1); }, 5000); });
     }
     return null;
   };
@@ -676,7 +681,7 @@ export default function InteriorMaterials() {
       <Card key={m.id} className={`overflow-hidden cursor-pointer hover:shadow-md transition-shadow ${isChecked ? "ring-2 ring-primary" : ""} ${isChild ? "ml-6 border-l-2 border-l-primary/20" : ""}`} onClick={() => setDetailMaterialId(m.id)}>
         <div className="flex">
           {m.swatch_storage_path ? (
-            <img src={swatchUrl(m.swatch_storage_path)!} alt={m.name} className="h-24 w-24 object-cover shrink-0" />
+            <img src={swatchUrl(m.swatch_storage_path) ?? undefined} alt={m.name} className="h-24 w-24 object-cover shrink-0" />
           ) : (
            <div className={`h-24 w-24 flex flex-col items-center justify-center shrink-0 ${categoryPlaceholder(m.category).bg}`}>
               <span className={`text-[10px] font-semibold uppercase tracking-wider ${categoryPlaceholder(m.category).text}`}>{categoryPlaceholder(m.category).label}</span>
@@ -813,7 +818,7 @@ export default function InteriorMaterials() {
                       <div className="flex items-center gap-3">
                         {materialForm.swatch_storage_path ? (
                           <div className="relative group">
-                            <img src={swatchUrl(materialForm.swatch_storage_path)!} alt="Swatch" className="h-16 w-16 object-cover rounded border" />
+                            <img src={swatchUrl(materialForm.swatch_storage_path) ?? undefined} alt="Swatch" className="h-16 w-16 object-cover rounded border" />
                             <button
                               type="button"
                               onClick={handleRemoveSwatch}
@@ -1057,7 +1062,7 @@ export default function InteriorMaterials() {
                       <ChevronRight className={`h-4 w-4 shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
                       {isExpanded ? <FolderOpen className="h-5 w-5 text-primary shrink-0" /> : <Folder className="h-5 w-5 text-muted-foreground shrink-0" />}
                       {m.swatch_storage_path && (
-                        <img src={swatchUrl(m.swatch_storage_path)!} alt="" className="h-8 w-8 rounded object-cover shrink-0" />
+                        <img src={swatchUrl(m.swatch_storage_path) ?? undefined} alt="" className="h-8 w-8 rounded object-cover shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate">{m.name}</p>
@@ -1119,7 +1124,7 @@ export default function InteriorMaterials() {
                       <ChevronRight className={`h-4 w-4 shrink-0 transition-transform ${isExpanded ? "rotate-90" : ""}`} />
                       {isExpanded ? <FolderOpen className="h-5 w-5 text-primary shrink-0" /> : <Folder className="h-5 w-5 text-muted-foreground shrink-0" />}
                       {m.swatch_storage_path && (
-                        <img src={swatchUrl(m.swatch_storage_path)!} alt="" className="h-8 w-8 rounded object-cover shrink-0" />
+                        <img src={swatchUrl(m.swatch_storage_path) ?? undefined} alt="" className="h-8 w-8 rounded object-cover shrink-0" />
                       )}
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-sm truncate">{m.name}</p>
@@ -1373,7 +1378,7 @@ export default function InteriorMaterials() {
                                 onClick={() => setDetailMaterialId(child.id)}
                               >
                                 {child.swatch_storage_path ? (
-                                  <img src={swatchUrl(child.swatch_storage_path)!} alt="" className="h-8 w-8 rounded object-cover shrink-0" />
+                                  <img src={swatchUrl(child.swatch_storage_path) ?? undefined} alt="" className="h-8 w-8 rounded object-cover shrink-0" />
                                 ) : (
                                   <div className={`h-8 w-8 rounded shrink-0 ${categoryPlaceholder(child.category).bg} flex items-center justify-center`}>
                                     <span className={`text-[8px] font-semibold ${categoryPlaceholder(child.category).text}`}>{(child.category || "M")[0]}</span>
@@ -1536,7 +1541,7 @@ export default function InteriorMaterials() {
                       onClick={() => assignExistingChild.mutate({ materialId: m.id, parentId })}
                     >
                       {m.swatch_storage_path ? (
-                        <img src={swatchUrl(m.swatch_storage_path)!} alt="" className="h-9 w-9 rounded object-cover shrink-0" />
+                        <img src={swatchUrl(m.swatch_storage_path) ?? undefined} alt="" className="h-9 w-9 rounded object-cover shrink-0" />
                       ) : (
                         <div className={`h-9 w-9 rounded shrink-0 ${categoryPlaceholder(m.category).bg} flex items-center justify-center`}>
                           <span className={`text-[9px] font-semibold ${categoryPlaceholder(m.category).text}`}>{(m.category || "M")[0]}</span>
@@ -1582,7 +1587,7 @@ export default function InteriorMaterials() {
                               </div>
                               <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => toggleCompare(m.id)}><Trash2 className="h-3 w-3" /></Button>
                             </div>
-                            {m.swatch_storage_path && <img src={swatchUrl(m.swatch_storage_path)!} alt="" className="h-16 w-full object-cover rounded mt-1" />}
+                            {m.swatch_storage_path && <img src={swatchUrl(m.swatch_storage_path) ?? undefined} alt="" className="h-16 w-full object-cover rounded mt-1" />}
                           </th>
                         ))}
                       </tr>
