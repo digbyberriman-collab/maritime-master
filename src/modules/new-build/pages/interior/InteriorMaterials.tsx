@@ -226,7 +226,7 @@ export default function InteriorMaterials() {
   const [swatchUploading, setSwatchUploading] = useState(false);
   // The swatch bucket is private, so images must be served via short-lived
   // signed URLs (public URLs return an error for a private bucket).
-  const [signedSwatchUrls, setSignedSwatchUrls] = useState<Record<string, string>>({});
+  const [signedSwatchUrls, setSignedSwatchUrls] = useState<Record<string, { url: string; expiresAt: number }>>({});
   const pendingSwatchPaths = useRef<Set<string>>(new Set());
 
   const saveMaterial = useMutation({
@@ -557,8 +557,8 @@ export default function InteriorMaterials() {
 
   const swatchUrl = (path?: string | null): string | null => {
     if (!path) return null;
-    const cached = signedSwatchUrls[path];
-    if (cached) return cached;
+    const entry = signedSwatchUrls[path];
+    const cached = entry && entry.expiresAt > Date.now() ? entry.url : null;
     if (!pendingSwatchPaths.current.has(path)) {
       pendingSwatchPaths.current.add(path);
       supabase.storage
@@ -566,7 +566,9 @@ export default function InteriorMaterials() {
         .createSignedUrl(path, 3600)
         .then(({ data, error }) => {
           if (!error && data?.signedUrl) {
-            setSignedSwatchUrls((prev) => (prev[path] === data.signedUrl ? prev : { ...prev, [path]: data.signedUrl }));
+            setSignedSwatchUrls((prev) => ({ ...prev, [path]: { url: data.signedUrl, expiresAt: Date.now() + 55 * 60 * 1000 } }));
+          } else {
+            setTimeout(() => pendingSwatchPaths.current.delete(path), 5000);
           }
         })
         .catch(() => { /* leave unresolved — the placeholder shows */ });

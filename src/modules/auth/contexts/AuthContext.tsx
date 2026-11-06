@@ -78,6 +78,12 @@ const MODULE_ACCESS: Record<string, string[]> = {
   'settings': ['dpa', 'shore_management', 'master', 'chief_engineer', 'chief_officer', 'crew'],
   'admin': ['dpa', 'shore_management'],
   'hris': ['dpa', 'shore_management', 'master', 'chief_officer', 'chief_engineer'],
+  // Top-level module bar sections: role-based fallback so the workspace still
+  // opens when RBAC permission rows are missing or failed to load.
+  'fleet': ['dpa', 'shore_management', 'master', 'chief_engineer', 'chief_officer', 'crew'],
+  'vessel': ['dpa', 'shore_management', 'master', 'chief_engineer', 'chief_officer', 'crew'],
+  'shoreside': ['dpa', 'shore_management'],
+  'yard': ['dpa', 'shore_management', 'master', 'chief_engineer'],
 };
 
 // Modules that must never fail open and are resolved by dedicated rules.
