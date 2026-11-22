@@ -129,10 +129,11 @@ Updated by the build loop in the same commit as the work. Newest last.
 | Date | Item(s) | Commit | Notes |
 |---|---|---|---|
 | 2026-11-22 | Gap series 00–10, critic 99, DECISIONS, BUILD-PLAN, MASTER-PROMPT | (this commit) | Baseline: lint 0 errors / 839 warnings; typecheck OK; 938/938 tests; build OK |
+| 2026-11-22 | Phase 0: A1–A10, B1–B10, C1–C3; visual harness | `4e10708` (Lane C), `00ca0a1` (Lane A), `9e42f7a` (Lane B), `c22ae13` (visual harness), `1bf6fac` (integration) | Gates: lint 0 errors / 814 warnings (baseline 839); typecheck OK; 2600/2600 tests in 122 files; build OK. Visual harness: 92/92 captures ok (23 routes × dark/light × 1440/390, incl. `/fleet/dashboard`, `/fleet/tracker`, `/v/dra`, `/v/dra/crew/list`, `/v/dra/safety`, `/v/hyd/certificates`, `/me`). Palette ratchet 268 files / 2689 palette / 108 hex / 270 `dark:` at seed → 265 / 2669 / 104 / 266. Decisions D-19–D-29. Owner actions: undeploy the `sign-submission` edge function (source removed); P1 must land before P3 tightens vessel RLS (D-25); Phase 2 adds `user_preferences.density`/`show_roadmap` and a `dark` theme default (D-19, D-29). Open: `/me/<section>` is not URL-routed yet (Settings keeps its section in state); the legacy compatibility layer stays until H1. |
 
 ### Phase status
 
-- Phase 0: Lane A `[ ]` A1–A10 · Lane B `[ ]` B1–B10 · Lane C `[ ]` C1–C3
+- Phase 0: Lane A `[x]` A1–A10 · Lane B `[x]` B1–B10 · Lane C `[x]` C1–C3
 - Phase 1: `[ ]` S1–S7
 - Phase 2: `[ ]` P1–P6
 - Phase 3: `[ ]` X1 · `[ ]` X2 · `[ ]` X3 · `[ ]` X4 · `[ ]` X5 · `[ ]` X6
