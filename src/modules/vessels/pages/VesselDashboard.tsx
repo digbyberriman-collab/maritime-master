@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
+import { useScope } from '@/app/router/scopeContext';
 import { useVesselDashboard } from '@/modules/vessels/hooks/useVesselDashboard';
 import { useRBACPermissions } from '@/modules/auth/hooks/useRBACPermissions';
 import { useDashboardStore } from '@/modules/dashboard/store/dashboardStore';
@@ -57,10 +58,15 @@ const VesselDashboard: React.FC = () => {
   const { canView, isInitialized } = useRBACPermissions();
   const { data: recentIncidents } = useRecentIncidents(5);
   const [searchParams, setSearchParams] = useSearchParams();
+  // In the vessel scope (/v/:vesselCode) this page is the vessel's home: the
+  // shell's scope control is the way to the Fleet view (gap/10 IA3), so the
+  // page's own Vessel / Fleet toggle is left out there.
+  const inVesselScope = useScope().scope === 'vessel';
 
   // View toggle: 'vessel' | 'fleet'. URL takes precedence, then sessionStorage,
   // then default to fleet when the user has multi-vessel access and "All Vessels" is selected.
   const initialView: 'vessel' | 'fleet' = (() => {
+    if (inVesselScope) return 'vessel';
     const fromUrl = searchParams.get('view');
     if (fromUrl === 'fleet' || fromUrl === 'vessel') return fromUrl;
     if (typeof window !== 'undefined') {
@@ -76,11 +82,13 @@ const VesselDashboard: React.FC = () => {
   }, [view]);
 
   useEffect(() => {
+    if (inVesselScope) return;
     const fromUrl = searchParams.get('view');
     if ((fromUrl === 'fleet' || fromUrl === 'vessel') && fromUrl !== view) {
       setView(fromUrl);
     }
-  }, [searchParams, view]);
+  }, [searchParams, view, inVesselScope]);
+  const showFleetView = view === 'fleet' && !inVesselScope;
 
   // Initialize the dashboard store
   const {
@@ -126,7 +134,7 @@ const VesselDashboard: React.FC = () => {
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
         {/* View toggle: Vessel vs Fleet */}
-        {canAccessAllVessels && (
+        {canAccessAllVessels && !inVesselScope && (
           <div className="inline-flex rounded-md border bg-card p-0.5 shadow-sm">
             {(['vessel', 'fleet'] as const).map((v) => (
               <button
@@ -146,7 +154,7 @@ const VesselDashboard: React.FC = () => {
           </div>
         )}
 
-        {view === 'fleet' ? (
+        {showFleetView ? (
           <FleetDashboardView />
         ) : (
           <>
@@ -156,7 +164,6 @@ const VesselDashboard: React.FC = () => {
             data={dashboardData}
             isLoading={isLoading}
             isAllVessels={isAllVessels}
-            onRefresh={handleRefresh}
             userName={profile?.first_name}
           />
           

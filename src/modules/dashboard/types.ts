@@ -1,3 +1,5 @@
+import type { Tone } from '@/components/ui/tones';
+
 // Dashboard Types for Vessel Dashboard
 
 export interface DashboardSummary {
@@ -151,32 +153,36 @@ export const getWidgetsForRole = (role: string | null | undefined): WidgetKey[] 
   return roleWidgetVisibility[normalizedRole] || [];
 };
 
-// Activity type icons and labels
-export const activityTypeConfig: Record<string, { label: string; color: string }> = {
-  form_submitted: { label: 'Form Submitted', color: 'text-blue-500' },
-  form_approved: { label: 'Form Approved', color: 'text-green-500' },
-  form_rejected: { label: 'Form Rejected', color: 'text-red-500' },
-  incident_logged: { label: 'Incident Logged', color: 'text-orange-500' },
-  incident_closed: { label: 'Incident Closed', color: 'text-green-500' },
-  certificate_uploaded: { label: 'Certificate Uploaded', color: 'text-blue-500' },
-  certificate_expired: { label: 'Certificate Expired', color: 'text-red-500' },
-  certificate_renewed: { label: 'Certificate Renewed', color: 'text-green-500' },
-  crew_joined: { label: 'Crew Joined', color: 'text-green-500' },
-  crew_left: { label: 'Crew Left', color: 'text-amber-500' },
-  crew_status_changed: { label: 'Crew Status Changed', color: 'text-blue-500' },
-  drill_completed: { label: 'Drill Completed', color: 'text-green-500' },
-  drill_overdue: { label: 'Drill Overdue', color: 'text-red-500' },
-  maintenance_completed: { label: 'Maintenance Completed', color: 'text-green-500' },
-  defect_raised: { label: 'Defect Raised', color: 'text-orange-500' },
-  defect_closed: { label: 'Defect Closed', color: 'text-green-500' },
-  audit_completed: { label: 'Audit Completed', color: 'text-green-500' },
-  nc_raised: { label: 'NC Raised', color: 'text-red-500' },
-  nc_closed: { label: 'NC Closed', color: 'text-green-500' },
-  capa_opened: { label: 'CAPA Opened', color: 'text-orange-500' },
-  capa_closed: { label: 'CAPA Closed', color: 'text-green-500' },
-  alert_created: { label: 'Alert Created', color: 'text-amber-500' },
-  alert_acknowledged: { label: 'Alert Acknowledged', color: 'text-blue-500' },
-  alert_resolved: { label: 'Alert Resolved', color: 'text-green-500' },
-  document_uploaded: { label: 'Document Uploaded', color: 'text-blue-500' },
-  task_completed: { label: 'Task Completed', color: 'text-green-500' },
+/**
+ * Activity types: label and status tone (gap/10 §A.8). Render the tone with
+ * TONE_TEXT / TONE_SURFACE from `@/components/ui/tones`; never a raw palette
+ * class (gap/10 C.3).
+ */
+export const activityTypeConfig: Record<string, { label: string; tone: Tone }> = {
+  form_submitted: { label: 'Form Submitted', tone: 'info' },
+  form_approved: { label: 'Form Approved', tone: 'ok' },
+  form_rejected: { label: 'Form Rejected', tone: 'danger' },
+  incident_logged: { label: 'Incident Logged', tone: 'orange' },
+  incident_closed: { label: 'Incident Closed', tone: 'ok' },
+  certificate_uploaded: { label: 'Certificate Uploaded', tone: 'info' },
+  certificate_expired: { label: 'Certificate Expired', tone: 'danger' },
+  certificate_renewed: { label: 'Certificate Renewed', tone: 'ok' },
+  crew_joined: { label: 'Crew Joined', tone: 'ok' },
+  crew_left: { label: 'Crew Left', tone: 'warn' },
+  crew_status_changed: { label: 'Crew Status Changed', tone: 'info' },
+  drill_completed: { label: 'Drill Completed', tone: 'ok' },
+  drill_overdue: { label: 'Drill Overdue', tone: 'danger' },
+  maintenance_completed: { label: 'Maintenance Completed', tone: 'ok' },
+  defect_raised: { label: 'Defect Raised', tone: 'orange' },
+  defect_closed: { label: 'Defect Closed', tone: 'ok' },
+  audit_completed: { label: 'Audit Completed', tone: 'ok' },
+  nc_raised: { label: 'NC Raised', tone: 'danger' },
+  nc_closed: { label: 'NC Closed', tone: 'ok' },
+  capa_opened: { label: 'CAPA Opened', tone: 'orange' },
+  capa_closed: { label: 'CAPA Closed', tone: 'ok' },
+  alert_created: { label: 'Alert Created', tone: 'warn' },
+  alert_acknowledged: { label: 'Alert Acknowledged', tone: 'info' },
+  alert_resolved: { label: 'Alert Resolved', tone: 'ok' },
+  document_uploaded: { label: 'Document Uploaded', tone: 'info' },
+  task_completed: { label: 'Task Completed', tone: 'ok' },
 };

@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from '@/components/ui/dialog';
 import { FileText, Download, History, Upload, CheckCircle2, Eye, FileUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { TONE_SURFACE } from '@/components/ui/tones';
 
 interface Version {
   version: string;
@@ -21,17 +22,17 @@ interface Version {
 }
 
 const VERSIONS: Version[] = [
-  { version: 'v4.2', status: 'current', effectiveDate: '2026-04-12', approvedBy: 'DPA — J. Marsden', changeSummary: 'Updated enclosed-space entry procedure; added new PPE matrix; revised emergency contact list per IMO MSC.1/Circ.1638.', fileSize: '4.2 MB', pageCount: 184 },
-  { version: 'v4.1', status: 'superseded', effectiveDate: '2025-11-01', approvedBy: 'DPA — J. Marsden', changeSummary: 'Annual review; minor wording corrections; updated company address.', fileSize: '4.1 MB', pageCount: 182 },
-  { version: 'v4.0', status: 'superseded', effectiveDate: '2025-03-15', approvedBy: 'DPA — K. Roberts', changeSummary: 'Major revision: added MLC 2006 amendments, restructured Section 7 (Crew Welfare), new flowcharts.', fileSize: '4.0 MB', pageCount: 178 },
-  { version: 'v3.3', status: 'superseded', effectiveDate: '2024-08-22', approvedBy: 'DPA — K. Roberts', changeSummary: 'Hot-work permit revision; added drone operation procedure.', fileSize: '3.8 MB', pageCount: 165 },
-  { version: 'v3.2', status: 'superseded', effectiveDate: '2024-01-10', approvedBy: 'DPA — K. Roberts', changeSummary: 'Updated emergency response checklists; ISPS Annex B refresh.', fileSize: '3.7 MB', pageCount: 162 },
+  { version: 'v4.2', status: 'current', effectiveDate: '2026-04-12', approvedBy: 'DPA', changeSummary: 'Updated enclosed-space entry procedure; added new PPE matrix; revised emergency contact list per IMO MSC.1/Circ.1638.', fileSize: '4.2 MB', pageCount: 184 },
+  { version: 'v4.1', status: 'superseded', effectiveDate: '2025-11-01', approvedBy: 'DPA', changeSummary: 'Annual review; minor wording corrections; updated company address.', fileSize: '4.1 MB', pageCount: 182 },
+  { version: 'v4.0', status: 'superseded', effectiveDate: '2025-03-15', approvedBy: 'Deputy DPA', changeSummary: 'Major revision: added MLC 2006 amendments, restructured Section 7 (Crew Welfare), new flowcharts.', fileSize: '4.0 MB', pageCount: 178 },
+  { version: 'v3.3', status: 'superseded', effectiveDate: '2024-08-22', approvedBy: 'Deputy DPA', changeSummary: 'Hot-work permit revision; added drone operation procedure.', fileSize: '3.8 MB', pageCount: 165 },
+  { version: 'v3.2', status: 'superseded', effectiveDate: '2024-01-10', approvedBy: 'Deputy DPA', changeSummary: 'Updated emergency response checklists; ISPS Annex B refresh.', fileSize: '3.7 MB', pageCount: 162 },
 ];
 
 const statusStyle = (s: Version['status']) =>
-  s === 'current' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40'
-  : s === 'draft' ? 'bg-yellow-400/20 text-yellow-700 dark:text-yellow-300 border-yellow-400/40'
-  : 'bg-muted text-muted-foreground border-border';
+  s === 'current' ? TONE_SURFACE.ok
+  : s === 'draft' ? TONE_SURFACE.warn
+  : TONE_SURFACE.neutral;
 
 const SafetyDocumentVersioning: React.FC = () => {
   const [showUpload, setShowUpload] = useState(false);
@@ -82,12 +83,12 @@ const SafetyDocumentVersioning: React.FC = () => {
           </Dialog>
         </div>
 
-        <Card className="border-emerald-500/40 bg-gradient-to-br from-emerald-500/5 to-transparent">
+        <Card className="border-success/40 border-l-[3px] border-l-success">
           <CardHeader>
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-lg bg-emerald-500/15 flex items-center justify-center">
-                  <FileText className="w-6 h-6 text-emerald-600" />
+                <div className="w-12 h-12 rounded-lg bg-success/15 flex items-center justify-center">
+                  <FileText className="w-6 h-6 text-success" />
                 </div>
                 <div>
                   <CardTitle className="text-lg flex items-center gap-2">

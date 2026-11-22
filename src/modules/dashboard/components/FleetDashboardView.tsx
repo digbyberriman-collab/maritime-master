@@ -7,7 +7,7 @@ import type { VesselDashboardData } from '@/modules/vessels/hooks/useVesselDashb
 import { Skeleton } from '@/components/ui/skeleton';
 import FleetSubNav from './fleet/FleetSubNav';
 import RegionMapCard from './fleet/RegionMapCard';
-import FleetKPITiles from './fleet/FleetKPITiles';
+import FleetKPITiles, { type FleetKPI } from './fleet/FleetKPITiles';
 import VesselHealthMatrix from './fleet/VesselHealthMatrix';
 import { FLEET_REGIONS, regionForFlag, type FleetRegion } from './fleet/regionUtils';
 
@@ -33,7 +33,12 @@ function useFleetVesselSummaries(vesselIds: string[]) {
 const FleetDashboardView: React.FC = () => {
   const { vessels, isLoading: vesselsLoading } = useVessels();
   const vesselIds = useMemo(() => vessels.map((v) => v.id), [vessels]);
-  const { data: summaries, isLoading: summariesLoading } = useFleetVesselSummaries(vesselIds);
+  const {
+    data: summaries,
+    isLoading: summariesLoading,
+    isError: summariesError,
+    refetch: refetchSummaries,
+  } = useFleetVesselSummaries(vesselIds);
 
   const summaryByVessel = useMemo(() => {
     const m = new Map<string, VesselDashboardData>();
@@ -57,32 +62,25 @@ const FleetDashboardView: React.FC = () => {
     }));
   }, [vessels]);
 
-  // Aggregate KPIs across all vessels.
-  const kpi = useMemo(() => {
-    const list = summaries || [];
+  // Aggregate the counts the summary RPC returns. Hours of rest, leave and
+  // accounting are not in it; FleetKPITiles shows them as not tracked yet.
+  const kpi = useMemo((): FleetKPI | null => {
+    // No vessels in reach: the summary query never runs, and every count is a real 0.
+    const list = vesselIds.length === 0 && !vesselsLoading ? [] : summaries;
+    if (!list) return null;
     const sum = (f: (d: VesselDashboardData) => number) =>
       list.reduce((acc, d) => acc + (f(d) || 0), 0);
     const docAlerts = sum((d) => d.certs_expiring_90d);
-    const safety = sum((d) => d.red_alerts_count) + sum((d) => d.open_capas_count);
-    const technical = sum((d) => d.overdue_maintenance_count) + sum((d) => d.critical_defects_count);
+    const red = sum((d) => d.red_alerts_count);
+    const capas = sum((d) => d.open_capas_count);
+    const overdue = sum((d) => d.overdue_maintenance_count);
+    const defects = sum((d) => d.critical_defects_count);
     return {
-      documentAlerts: {
-        value: docAlerts,
-        sub: docAlerts === 0 ? 'All documents in date' : `${docAlerts} expiring within 90 days`,
-      },
-      hoursOfRest: { value: 0, sub: 'All compliant' },
-      leaveOverdue: { value: 0, sub: 'All crew within MLC limits' },
-      safety: {
-        value: safety,
-        sub: safety === 0 ? 'All clear' : `${sum((d) => d.red_alerts_count)} red · ${sum((d) => d.open_capas_count)} open CAPAs`,
-      },
-      technical: {
-        value: technical,
-        sub: technical === 0 ? 'All clear' : `${sum((d) => d.overdue_maintenance_count)} overdue · ${sum((d) => d.critical_defects_count)} defects`,
-      },
-      accounting: { value: 0, sub: '0 overdue invoices' },
+      documentAlerts: { value: docAlerts, sub: `${docAlerts} expiring within 90 days` },
+      safety: { value: red + capas, sub: `${red} red alerts · ${capas} open CAPAs` },
+      technical: { value: overdue + defects, sub: `${overdue} overdue · ${defects} critical defects` },
     };
-  }, [summaries]);
+  }, [summaries, vesselIds.length, vesselsLoading]);
 
   const matrixRows = useMemo(
     () =>
@@ -101,7 +99,7 @@ const FleetDashboardView: React.FC = () => {
 
       <div className="flex-1 min-w-0 space-y-6">
         <div>
-          <h2 className="text-2xl font-bold text-foreground">Fleet Dashboard</h2>
+          <h2 className="type-title text-foreground">Fleet overview</h2>
           <p className="text-sm text-muted-foreground">
             {vessels.length} {vessels.length === 1 ? 'vessel' : 'vessels'} across {regionsWithVessels.length}{' '}
             {regionsWithVessels.length === 1 ? 'region' : 'regions'}
@@ -126,8 +124,11 @@ const FleetDashboardView: React.FC = () => {
           </div>
         ) : null}
 
-        {/* Pastel KPI tile row */}
-        <FleetKPITiles kpi={kpi} />
+        <FleetKPITiles
+          kpi={vesselsLoading ? null : kpi}
+          error={summariesError}
+          onRetry={() => void refetchSummaries()}
+        />
 
         {/* Vessel Health Matrix */}
         <VesselHealthMatrix rows={matrixRows} />

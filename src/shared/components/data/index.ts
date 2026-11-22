@@ -38,3 +38,4 @@ export {
   type SortDirection,
   type TableSort,
 } from './tableModel';
+export { useMinWidth, TABLET_MIN_WIDTH } from './useMinWidth';

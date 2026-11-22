@@ -16,11 +16,11 @@ export const itemTypeLabels: Record<RaidItemType, string> = {
 };
 
 export const itemTypeColors: Record<RaidItemType, string> = {
-  decision: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400",
-  assumption: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400",
-  risk: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  issue: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400",
-  key_project_risk: "bg-red-200 text-red-900 dark:bg-red-900/50 dark:text-red-300",
+  decision: "bg-info-muted text-info",
+  assumption: "bg-purple-muted text-purple",
+  risk: "bg-critical-muted text-critical",
+  issue: "bg-warning-muted text-warning",
+  key_project_risk: "bg-critical-muted text-critical",
 };
 
 export const raidStatusLabels: Record<RaidStatus, string> = {
@@ -34,13 +34,13 @@ export const raidStatusLabels: Record<RaidStatus, string> = {
 };
 
 export const raidStatusColors: Record<RaidStatus, string> = {
-  current: "bg-primary/15 text-primary",
-  accepted: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
+  current: "bg-signal-muted text-primary",
+  accepted: "bg-success-muted text-success",
   closed: "bg-muted text-muted-foreground",
-  superseded: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-  action: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  rejected: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
-  question_asked: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400",
+  superseded: "bg-orange-muted text-orange",
+  action: "bg-warning-muted text-warning",
+  rejected: "bg-critical-muted text-critical",
+  question_asked: "bg-indigo-muted text-indigo",
 };
 
 interface RaidItemCardProps {
@@ -90,7 +90,7 @@ export function RaidItemCard({ item, isExpanded, onToggle, onEdit, onDelete, onV
                 <Badge variant="outline" className="text-xs">{item.areas.name}</Badge>
               )}
               {isPending && (
-                <Badge variant="outline" className="text-xs border-yellow-400 text-yellow-600 dark:text-yellow-400">
+                <Badge variant="outline" className="text-xs border-warning text-warning">
                   <Clock className="h-3 w-3 mr-1" /> Pending Validation
                 </Badge>
               )}

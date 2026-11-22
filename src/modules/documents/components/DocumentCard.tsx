@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Document } from '@/modules/documents/hooks/useDocuments';
-import { DOCUMENT_STATUSES } from '@/modules/documents/constants';
+import { StatusPill } from '@/shared/components/status';
 import { format } from 'date-fns';
 import {
   MoreVertical,
@@ -51,32 +51,35 @@ const DocumentCard: React.FC<DocumentCardProps> = ({
   onDownload,
   onDelete,
 }) => {
-  const statusConfig = DOCUMENT_STATUSES.find((s) => s.value === document.status);
   const IconComponent = document.category?.icon
     ? iconMap[document.category.icon] || FileText
     : FileText;
 
   return (
-    <Card className="group hover:shadow-md transition-shadow cursor-pointer" onClick={() => onView(document)}>
+    <Card
+      className="group cursor-pointer transition-colors duration-quick hover:border-primary/40 motion-reduce:transition-none"
+      onClick={() => onView(document)}
+    >
       <CardContent className="p-4">
-        <div className="flex items-start justify-between mb-3">
-          <div
-            className="w-10 h-10 rounded-lg flex items-center justify-center"
-            style={{ backgroundColor: `${document.category?.color}20` }}
-          >
-            <IconComponent
-              className="w-5 h-5"
-              style={{ color: document.category?.color }}
-            />
+        <div className="mb-3 flex items-start justify-between gap-2">
+          {/* Category colour is tenant data: it tints only the icon, on a neutral tile. */}
+          <div aria-hidden="true" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border bg-muted">
+            <IconComponent className="h-5 w-5" style={{ color: document.category?.color }} />
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs font-mono">
+          <div className="flex min-w-0 items-center gap-1">
+            <Badge variant="outline" className="min-w-0 truncate font-mono text-xs">
               {document.document_number}
             </Badge>
             <DropdownMenu>
               <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <MoreVertical className="w-4 h-4" />
+                {/* Always visible on touch; on a mouse it appears on hover or keyboard focus. */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Actions for ${document.title}`}
+                  className="shrink-0 transition-opacity duration-quick motion-reduce:transition-none [@media(pointer:fine)]:opacity-0 [@media(pointer:fine)]:focus-visible:opacity-100 [@media(pointer:fine)]:group-hover:opacity-100 [@media(pointer:fine)]:data-[state=open]:opacity-100"
+                >
+                  <MoreVertical aria-hidden="true" className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-popover">
@@ -105,30 +108,33 @@ const DocumentCard: React.FC<DocumentCardProps> = ({
           </div>
         </div>
 
-        <h3 className="font-semibold text-foreground mb-2 line-clamp-2">
-          {document.title}
+        <h3 className="mb-2 type-subtitle text-foreground">
+          {/* The title is the keyboard and screen-reader way in; the card click is a mouse shortcut. */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onView(document);
+            }}
+            className="line-clamp-2 rounded-sm text-left focus-ring"
+          >
+            {document.title}
+          </button>
         </h3>
 
-        <div className="flex items-center gap-2 flex-wrap mb-3">
-          <Badge variant="secondary" className="text-xs">
-            {document.revision}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <Badge variant="secondary" className="font-mono text-xs">
+            Rev {document.revision}
           </Badge>
-          {statusConfig && (
-            <Badge className={`text-xs ${statusConfig.color}`}>
-              {statusConfig.label}
-            </Badge>
-          )}
+          {document.status ? <StatusPill domain="document" status={document.status} /> : null}
           {document.is_mandatory_read && (
-            <Badge variant="destructive" className="text-xs flex items-center gap-1">
-              <AlertCircle className="w-3 h-3" />
-              Required
-            </Badge>
+            <StatusPill tone="danger" icon={AlertCircle} label="Required reading" />
           )}
         </div>
 
-        <div className="text-xs text-muted-foreground">
-          Updated {format(new Date(document.updated_at), 'MMM d, yyyy')}
-        </div>
+        <p className="text-xs text-muted-foreground">
+          Updated {format(new Date(document.updated_at), 'd MMM yyyy')}
+        </p>
       </CardContent>
     </Card>
   );

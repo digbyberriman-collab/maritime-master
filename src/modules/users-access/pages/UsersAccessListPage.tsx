@@ -32,14 +32,14 @@ const UsersAccessListPage: React.FC = () => {
             <h1 className="text-2xl font-semibold tracking-tight">Users &amp; Access</h1>
             <p className="text-sm text-muted-foreground">Manage who can see and do what across the fleet.</p>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <div className="relative w-full sm:w-auto">
               <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search by name or position…"
-                className="pl-8 w-64"
+                className="w-full pl-8 sm:w-64"
               />
             </div>
           </div>
@@ -51,9 +51,10 @@ const UsersAccessListPage: React.FC = () => {
             <div className="p-6 text-sm text-muted-foreground">No users match your search.</div>
           )}
           {filtered.map((r) => (
-            <div key={r.userId} className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/30 transition-colors">
+            // Below 768 px a row wraps (position, preset and chips under the name) instead of overflowing the page.
+            <div key={r.userId} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5 transition-colors hover:bg-muted/30 md:flex-nowrap">
               <Checkbox aria-label={`Select ${r.firstName}`} />
-              <div className="min-w-[180px]">
+              <div className="min-w-0 flex-1 md:min-w-[180px] md:flex-none">
                 <div className="font-semibold text-sm text-foreground">
                   {r.firstName} {r.lastName}
                 </div>
@@ -61,11 +62,11 @@ const UsersAccessListPage: React.FC = () => {
                   {r.status}
                 </Badge>
               </div>
-              <div className="min-w-[160px] text-sm text-muted-foreground truncate">{r.position || '—'}</div>
-              <div className="min-w-[140px]">
+              <div className="min-w-0 basis-full truncate pl-7 text-sm text-muted-foreground md:min-w-[160px] md:basis-auto md:pl-0">{r.position || '—'}</div>
+              <div className="pl-7 md:min-w-[140px] md:pl-0">
                 <PresetBadge preset={r.preset} />
               </div>
-              <div className="flex flex-wrap gap-1 flex-1">
+              <div className="flex min-w-0 flex-1 flex-wrap gap-1">
                 {r.chips.map((c) => (
                   <ModulePermChip key={c.label} label={c.label} level={c.level} />
                 ))}

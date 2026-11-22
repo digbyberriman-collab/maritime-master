@@ -50,6 +50,22 @@ describe('ready', () => {
   });
 });
 
+describe('text values', () => {
+  it('a name or word uses the smaller display type on one truncated line, with the full text as title', () => {
+    render(<KpiTile label="Master" value="A very long name for a person in command" textValue state="ready" sub="In command" />);
+    const value = document.querySelector('[data-kpi-value]') as HTMLElement;
+    expect(value.className).toContain('type-display');
+    expect(value.className).toContain('truncate');
+    expect(value.className).not.toContain('type-kpi');
+    expect(value).toHaveAttribute('title', 'A very long name for a person in command');
+  });
+
+  it('numbers keep the KPI numerals', () => {
+    render(<KpiTile label="Crew" value={12} />);
+    expect((document.querySelector('[data-kpi-value]') as HTMLElement).className).toContain('type-kpi');
+  });
+});
+
 describe('states', () => {
   it('zero: "0" and All clear', () => {
     const { container } = render(<KpiTile label="Breaches" value={0} tone="danger" />);

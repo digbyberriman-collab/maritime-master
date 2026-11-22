@@ -25,6 +25,8 @@ export interface KpiTileProps {
   value?: number | string | null;
   /** Unit after the value in muted text ("%", "h"). */
   unit?: string;
+  /** A word or name rather than a number (e.g. the master's name): smaller display type, one line, truncated. */
+  textValue?: boolean;
   /** One-line breakdown: "7 certificates · 3 crew documents". */
   sub?: React.ReactNode;
   delta?: KpiDelta;
@@ -92,6 +94,7 @@ export function KpiTile({
   icon: Icon,
   value,
   unit,
+  textValue = false,
   sub,
   delta,
   tone,
@@ -175,7 +178,11 @@ export function KpiTile({
           <>
             <span
               data-kpi-value=""
-              className={cn('type-kpi', hasAlert && tone ? TONE_TEXT[tone] : showValue ? 'text-foreground' : 'text-muted-foreground')}
+              className={cn(
+                textValue ? 'type-display min-w-0 truncate' : 'type-kpi',
+                hasAlert && tone ? TONE_TEXT[tone] : showValue ? 'text-foreground' : 'text-muted-foreground',
+              )}
+              title={textValue && typeof value === 'string' ? value : undefined}
             >
               {showValue ? formatValue(resolved === 'zero' && (value === undefined || value === null) ? 0 : value) : '—'}
             </span>

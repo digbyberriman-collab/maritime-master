@@ -374,14 +374,14 @@ const APIIntegrations: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
-      active: 'bg-green-100 text-green-800 border-green-200',
-      inactive: 'bg-gray-100 text-gray-800 border-gray-200',
-      error: 'bg-red-100 text-red-800 border-red-200',
-      testing: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      active: 'bg-success-muted text-success border-success/25',
+      inactive: 'bg-muted text-foreground border-border',
+      error: 'bg-critical-muted text-critical border-critical/25',
+      testing: 'bg-warning-muted text-warning border-warning/25',
     };
 
     return (
-      <Badge className={colors[status] || 'bg-gray-100 text-gray-800 border-gray-200'}>
+      <Badge className={colors[status] || 'bg-muted text-foreground border-border'}>
         {statusLabels[status] || status}
       </Badge>
     );
@@ -390,13 +390,13 @@ const APIIntegrations: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'active':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CheckCircle className="w-4 h-4 text-success" />;
       case 'inactive':
         return <XCircle className="w-4 h-4 text-muted-foreground" />;
       case 'error':
-        return <AlertTriangle className="w-4 h-4 text-red-500" />;
+        return <AlertTriangle className="w-4 h-4 text-critical" />;
       case 'testing':
-        return <TestTube className="w-4 h-4 text-yellow-500" />;
+        return <TestTube className="w-4 h-4 text-warning" />;
       default:
         return <Clock className="w-4 h-4 text-muted-foreground" />;
     }
@@ -405,19 +405,19 @@ const APIIntegrations: React.FC = () => {
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'ais':
-        return <Satellite className="w-4 h-4 text-blue-500" />;
+        return <Satellite className="w-4 h-4 text-primary" />;
       case 'weather':
-        return <Globe className="w-4 h-4 text-green-500" />;
+        return <Globe className="w-4 h-4 text-success" />;
       case 'email':
-        return <Mail className="w-4 h-4 text-purple-500" />;
+        return <Mail className="w-4 h-4 text-purple" />;
       case 'maintenance':
-        return <Wrench className="w-4 h-4 text-orange-500" />;
+        return <Wrench className="w-4 h-4 text-orange" />;
       case 'navigation':
-        return <Ship className="w-4 h-4 text-cyan-500" />;
+        return <Ship className="w-4 h-4 text-cyan" />;
       case 'port':
-        return <Database className="w-4 h-4 text-indigo-500" />;
+        return <Database className="w-4 h-4 text-indigo" />;
       case 'regulatory':
-        return <Settings className="w-4 h-4 text-red-500" />;
+        return <Settings className="w-4 h-4 text-critical" />;
       default:
         return <Globe className="w-4 h-4 text-muted-foreground" />;
     }
@@ -653,9 +653,9 @@ const APIIntegrations: React.FC = () => {
                             <div className="text-xs text-muted-foreground">
                               of {integration.request_limit.toLocaleString()}
                             </div>
-                            <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
+                            <div className="w-full bg-secondary rounded-full h-1 mt-1">
                               <div
-                                className="bg-blue-600 h-1 rounded-full"
+                                className="bg-primary h-1 rounded-full"
                                 style={{
                                   width: `${Math.min((integration.monthly_requests / integration.request_limit) * 100, 100)}%`
                                 }}
@@ -940,13 +940,13 @@ const APIIntegrations: React.FC = () => {
                             <Badge variant="outline" className="capitalize">{event.data_type}</Badge>
                           </TableCell>
                           <TableCell className="text-sm">
-                            <span className="text-green-600">+{event.records_created}</span>
+                            <span className="text-success">+{event.records_created}</span>
                             {' / '}
-                            <span className="text-blue-600">~{event.records_updated}</span>
+                            <span className="text-primary">~{event.records_updated}</span>
                             {event.records_failed > 0 && (
                               <>
                                 {' / '}
-                                <span className="text-red-600">✗{event.records_failed}</span>
+                                <span className="text-critical">✗{event.records_failed}</span>
                               </>
                             )}
                           </TableCell>
@@ -1126,7 +1126,7 @@ x-webhook-secret: whsec_your_secret_here
                     {[1, 2, 3, 4, 5].map((_, index) => (
                       <div key={index} className="flex items-center justify-between py-2 border-b last:border-0">
                         <div className="flex items-center gap-3">
-                          <div className="w-2 h-2 bg-green-500 rounded-full" />
+                          <div className="w-2 h-2 bg-success rounded-full" />
                           <div>
                             <p className="text-sm font-medium">AIS Position Update</p>
                             <p className="text-xs text-muted-foreground">
@@ -1134,7 +1134,7 @@ x-webhook-secret: whsec_your_secret_here
                             </p>
                           </div>
                         </div>
-                        <Badge className="bg-green-100 text-green-800 text-xs">
+                        <Badge className="bg-success-muted text-success text-xs">
                           200 OK
                         </Badge>
                       </div>
@@ -1152,7 +1152,7 @@ x-webhook-secret: whsec_your_secret_here
                   <div className="space-y-4">
                     <div className="flex items-center justify-between py-2 border-b">
                       <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 bg-red-500 rounded-full" />
+                        <div className="w-2 h-2 bg-critical rounded-full" />
                         <div>
                           <p className="text-sm font-medium">IDEA API Timeout</p>
                           <p className="text-xs text-muted-foreground">
@@ -1160,14 +1160,14 @@ x-webhook-secret: whsec_your_secret_here
                           </p>
                         </div>
                       </div>
-                      <Badge className="bg-red-100 text-red-800 text-xs">
+                      <Badge className="bg-critical-muted text-critical text-xs">
                         504
                       </Badge>
                     </div>
 
                     <div className="flex items-center justify-between py-2 border-b">
                       <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 bg-yellow-500 rounded-full" />
+                        <div className="w-2 h-2 bg-warning rounded-full" />
                         <div>
                           <p className="text-sm font-medium">Rate limit exceeded</p>
                           <p className="text-xs text-muted-foreground">
@@ -1175,7 +1175,7 @@ x-webhook-secret: whsec_your_secret_here
                           </p>
                         </div>
                       </div>
-                      <Badge className="bg-yellow-100 text-yellow-800 text-xs">
+                      <Badge className="bg-warning-muted text-warning text-xs">
                         429
                       </Badge>
                     </div>

@@ -223,14 +223,14 @@ const Policies: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
-      active: 'bg-green-100 text-green-800 border-green-200',
-      under_review: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      draft: 'bg-blue-100 text-blue-800 border-blue-200',
-      retired: 'bg-gray-100 text-gray-800 border-gray-200',
+      active: 'bg-success-muted text-success border-success/25',
+      under_review: 'bg-warning-muted text-warning border-warning/25',
+      draft: 'bg-info-muted text-info border-info/25',
+      retired: 'bg-muted text-foreground border-border',
     };
 
     return (
-      <Badge className={colors[status] || 'bg-gray-100 text-gray-800 border-gray-200'}>
+      <Badge className={colors[status] || 'bg-muted text-foreground border-border'}>
         {statusLabels[status] || status}
       </Badge>
     );
@@ -239,13 +239,13 @@ const Policies: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'active':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CheckCircle className="w-4 h-4 text-success" />;
       case 'under_review':
-        return <Clock className="w-4 h-4 text-yellow-500" />;
+        return <Clock className="w-4 h-4 text-warning" />;
       case 'draft':
-        return <Edit className="w-4 h-4 text-blue-500" />;
+        return <Edit className="w-4 h-4 text-primary" />;
       case 'retired':
-        return <AlertTriangle className="w-4 h-4 text-gray-500" />;
+        return <AlertTriangle className="w-4 h-4 text-muted-foreground" />;
       default:
         return <FileCheck className="w-4 h-4 text-muted-foreground" />;
     }
@@ -254,11 +254,11 @@ const Policies: React.FC = () => {
   const getApplicabilityIcon = (applicability: string) => {
     switch (applicability) {
       case 'company':
-        return <Building className="w-4 h-4 text-blue-500" />;
+        return <Building className="w-4 h-4 text-primary" />;
       case 'vessel':
-        return <Ship className="w-4 h-4 text-green-500" />;
+        return <Ship className="w-4 h-4 text-success" />;
       case 'shore':
-        return <Users className="w-4 h-4 text-purple-500" />;
+        return <Users className="w-4 h-4 text-purple" />;
       default:
         return <Building className="w-4 h-4 text-muted-foreground" />;
     }
@@ -487,7 +487,7 @@ const Policies: React.FC = () => {
                             className="h-1"
                           />
                           {policy.acknowledgment_stats.pending > 0 && (
-                            <div className="text-xs text-amber-600">
+                            <div className="text-xs text-warning">
                               {policy.acknowledgment_stats.pending} pending
                             </div>
                           )}
@@ -499,12 +499,12 @@ const Policies: React.FC = () => {
                     <TableCell>
                       <div className="text-sm">
                         <div className={`flex items-center gap-1 ${
-                          isReviewOverdue(policy.next_review_date, policy.status) ? 'text-red-600' : ''
+                          isReviewOverdue(policy.next_review_date, policy.status) ? 'text-critical' : ''
                         }`}>
                           <Calendar className="w-3 h-3" />
                           {new Date(policy.next_review_date).toLocaleDateString()}
                           {isReviewOverdue(policy.next_review_date, policy.status) && (
-                            <AlertTriangle className="w-3 h-3 text-red-500 ml-1" />
+                            <AlertTriangle className="w-3 h-3 text-critical ml-1" />
                           )}
                         </div>
                       </div>

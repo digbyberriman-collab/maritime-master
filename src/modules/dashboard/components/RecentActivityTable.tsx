@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/table';
 import { useDashboardStore } from '@/modules/dashboard/store/dashboardStore';
 import { activityTypeConfig } from '@/modules/dashboard/types';
+import { TONE_FILL } from '@/components/ui/tones';
+import { cn } from '@/lib/utils';
 
 const moduleFromType = (type: string): string => {
   if (type.startsWith('incident')) return 'Safety';
@@ -55,14 +57,14 @@ export const RecentActivityTable: React.FC = () => {
             </TableHeader>
             <TableBody>
               {recentActivity.slice(0, 12).map((item) => {
-                const cfg = activityTypeConfig[item.activity_type] || { label: item.activity_type, color: 'text-muted-foreground' };
+                const tone = activityTypeConfig[item.activity_type]?.tone ?? 'neutral';
                 return (
                   <TableRow key={item.id}>
                     <TableCell className="text-sm text-muted-foreground">
                       {moduleFromType(item.activity_type)}
                     </TableCell>
                     <TableCell className="text-sm">
-                      <span className={`inline-block w-1.5 h-1.5 rounded-full mr-2 align-middle ${cfg.color.replace('text-', 'bg-')}`} />
+                      <span aria-hidden="true" className={cn('mr-2 inline-block h-1.5 w-1.5 rounded-full align-middle', TONE_FILL[tone])} />
                       <span className="font-medium">{item.title}</span>
                       {item.description && (
                         <span className="text-muted-foreground"> — {item.description}</span>

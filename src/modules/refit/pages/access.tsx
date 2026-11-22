@@ -327,7 +327,7 @@ export default function AccessPage() {
             <button
               onClick={runProbes}
               disabled={running}
-              className="text-xs uppercase tracking-wider px-3 py-2 border border-black/15 rounded-sm hover:bg-secondary disabled:opacity-50"
+              className="text-xs uppercase tracking-wider px-3 py-2 border border-input rounded-sm hover:bg-secondary disabled:opacity-50"
             >
               {running ? "Probing…" : "Re-run validation"}
             </button>
@@ -336,14 +336,14 @@ export default function AccessPage() {
 
         {/* Identity card */}
         <section className="grid md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white border border-black/10 p-5 rounded-sm">
+          <div className="bg-card border border-border p-5 rounded-sm">
             <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
               Signed in as
             </div>
             <div className="font-mono text-sm break-all">{user.email}</div>
             <div className="text-xs text-muted-foreground mt-1">UID {user.id.slice(0, 8)}…</div>
           </div>
-          <div className="bg-white border border-black/10 p-5 rounded-sm">
+          <div className="bg-card border border-border p-5 rounded-sm">
             <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
               Assigned role
             </div>
@@ -358,7 +358,7 @@ export default function AccessPage() {
               </div>
             )}
           </div>
-          <div className="bg-white border border-black/10 p-5 rounded-sm">
+          <div className="bg-card border border-border p-5 rounded-sm">
             <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">
               Vessel
             </div>
@@ -378,8 +378,8 @@ export default function AccessPage() {
         </section>
 
         {/* Matrix */}
-        <section className="bg-white border border-black/10 rounded-sm overflow-hidden">
-          <div className="px-5 py-3 border-b border-black/10 flex items-center justify-between">
+        <section className="bg-card border border-border rounded-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-border flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wider">Module access matrix</h2>
             <div className="text-xs text-muted-foreground">
               Live-tested against database row-level security
@@ -406,7 +406,7 @@ export default function AccessPage() {
                   return (
                     <tr
                       key={spec.key}
-                      className={`border-t border-black/5 ${mismatch ? "bg-destructive/5" : ""}`}
+                      className={`border-t border-border ${mismatch ? "bg-destructive/5" : ""}`}
                     >
                       <td className="px-5 py-3">
                         <div className="font-medium">{spec.label}</div>
@@ -613,10 +613,10 @@ function TroubleshootingPanel({
         : "warn";
 
   return (
-    <section className="bg-white border border-black/10 rounded-sm overflow-hidden mt-8">
+    <section className="bg-card border border-border rounded-sm overflow-hidden mt-8">
       <div
-        className={`px-5 py-3 border-b border-black/10 flex items-center justify-between ${
-          tone === "danger" ? "bg-destructive/5" : tone === "warn" ? "bg-amber-50" : "bg-emerald-50"
+        className={`px-5 py-3 border-b border-border flex items-center justify-between ${
+          tone === "danger" ? "bg-destructive/5" : tone === "warn" ? "bg-warning-muted" : "bg-success-muted"
         }`}
       >
         <div>
@@ -631,8 +631,8 @@ function TroubleshootingPanel({
             tone === "danger"
               ? "bg-destructive/10 text-destructive border-destructive/30"
               : tone === "warn"
-                ? "bg-amber-100 text-amber-800 border-amber-300"
-                : "bg-emerald-100 text-emerald-800 border-emerald-300"
+                ? "bg-warning-muted text-warning border-warning/25"
+                : "bg-success-muted text-success border-success/25"
           }`}
         >
           {failing.length === 0
@@ -641,13 +641,13 @@ function TroubleshootingPanel({
         </span>
       </div>
 
-      <ul className="divide-y divide-black/5">
+      <ul className="divide-y divide-border">
         {checks.map((c) => (
           <li key={c.id} className="px-5 py-4">
             <div className="flex items-start gap-3">
               <span
                 className={`mt-1 inline-block size-2 rounded-full shrink-0 ${
-                  c.ok ? "bg-emerald-600" : "bg-amber-500"
+                  c.ok ? "bg-success" : "bg-warning"
                 }`}
                 aria-hidden
               />
@@ -657,8 +657,8 @@ function TroubleshootingPanel({
                   <span
                     className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded-sm ${
                       c.ok
-                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                        : "bg-amber-50 text-amber-800 border border-amber-200"
+                        ? "bg-success-muted text-success border border-success/25"
+                        : "bg-warning-muted text-warning border border-warning/25"
                     }`}
                   >
                     {c.ok ? "OK" : "Action needed"}
@@ -668,7 +668,7 @@ function TroubleshootingPanel({
 
                 {!c.ok && (
                   <div className="mt-3 grid md:grid-cols-2 gap-3">
-                    <div className="bg-secondary/40 border border-black/10 rounded-sm p-3">
+                    <div className="bg-secondary/40 border border-border rounded-sm p-3">
                       <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
                         Inspect
                       </div>
@@ -687,7 +687,7 @@ function TroubleshootingPanel({
                                   {insp.tables.map((t, j) => (
                                     <code
                                       key={t}
-                                      className="font-mono bg-white border border-black/10 px-1 py-0.5 rounded-sm mr-1"
+                                      className="font-mono bg-card border border-border px-1 py-0.5 rounded-sm mr-1"
                                     >
                                       {t}
                                       {j < insp.tables.length - 1 ? "" : ""}
@@ -701,7 +701,7 @@ function TroubleshootingPanel({
                                   {insp.policies.map((p) => (
                                     <code
                                       key={p}
-                                      className="font-mono bg-white border border-black/10 px-1 py-0.5 rounded-sm mr-1"
+                                      className="font-mono bg-card border border-border px-1 py-0.5 rounded-sm mr-1"
                                     >
                                       {p}
                                     </code>
@@ -713,7 +713,7 @@ function TroubleshootingPanel({
                         </ul>
                       )}
                     </div>
-                    <div className="bg-secondary/40 border border-black/10 rounded-sm p-3">
+                    <div className="bg-secondary/40 border border-border rounded-sm p-3">
                       <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">
                         Suggested fix
                       </div>
@@ -727,7 +727,7 @@ function TroubleshootingPanel({
         ))}
       </ul>
 
-      <div className="px-5 py-3 border-t border-black/10 bg-secondary/30 text-[11px] text-muted-foreground">
+      <div className="px-5 py-3 border-t border-border bg-secondary/30 text-[11px] text-muted-foreground">
         Tip: RLS denials show error code <code className="font-mono">42501</code> in PostgreSQL
         logs. If a query returns rows but the UI looks empty, suspect a vessel mismatch (
         <code className="font-mono">vessel_id</code>) before suspecting a policy.
@@ -749,10 +749,10 @@ function Stat({
     tone === "danger"
       ? "text-destructive"
       : tone === "ok"
-        ? "text-emerald-700"
+        ? "text-success"
         : "text-muted-foreground";
   return (
-    <div className="bg-white border border-black/10 p-5 rounded-sm">
+    <div className="bg-card border border-border p-5 rounded-sm">
       <div className="text-xs uppercase tracking-wider text-muted-foreground mb-2">{label}</div>
       <div className={`text-3xl font-semibold ${toneCls}`}>{value}</div>
     </div>
@@ -764,8 +764,8 @@ function Badge({ ok, children }: { ok: boolean; children: React.ReactNode }) {
     <span
       className={`inline-block text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-sm ${
         ok
-          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-          : "bg-secondary text-muted-foreground border border-black/10"
+          ? "bg-success-muted text-success border border-success/25"
+          : "bg-secondary text-muted-foreground border border-border"
       }`}
     >
       {children}
@@ -779,8 +779,8 @@ function ProbePill({ probe }: { probe: ProbeResult }) {
   }
   if (probe.status === "allowed") {
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700">
-        <span className="size-1.5 rounded-full bg-emerald-600" />
+      <span className="inline-flex items-center gap-1.5 text-xs text-success">
+        <span className="size-1.5 rounded-full bg-success" />
         Allowed · {probe.rowsVisible} row{probe.rowsVisible === 1 ? "" : "s"} visible
       </span>
     );

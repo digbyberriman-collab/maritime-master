@@ -13,7 +13,8 @@ import { useDocumentCategories, DocumentFilters as Filters } from '@/modules/doc
 import { useVessels } from '@/modules/vessels/hooks/useVessels';
 import { DOCUMENT_STATUSES, ISM_SECTIONS } from '@/modules/documents/constants';
 import { X, ClipboardList, Settings, FileText, BarChart3, BookOpen, Award } from 'lucide-react';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { StatusPill } from '@/shared/components/status';
+import { activeFilterCount } from '@/modules/documents/lib/documentFilters';
 
 const iconMap: Record<string, React.ReactNode> = {
   'clipboard-list': <ClipboardList className="w-4 h-4" />,
@@ -27,9 +28,15 @@ const iconMap: Record<string, React.ReactNode> = {
 interface DocumentFiltersProps {
   filters: Filters;
   onFiltersChange: (filters: Filters) => void;
+  /**
+   * `sidebar` (default): the 256 px column beside the list on wide screens.
+   * `panel`: the same controls in a sheet on phones and tablets; the sheet
+   * scrolls, so no inner scroll area and no fixed width.
+   */
+  variant?: 'sidebar' | 'panel';
 }
 
-const DocumentFilters: React.FC<DocumentFiltersProps> = ({ filters, onFiltersChange }) => {
+const DocumentFilters: React.FC<DocumentFiltersProps> = ({ filters, onFiltersChange, variant = 'sidebar' }) => {
   const { data: categories = [] } = useDocumentCategories();
   const { vessels = [] } = useVessels();
 
@@ -68,29 +75,13 @@ const DocumentFilters: React.FC<DocumentFiltersProps> = ({ filters, onFiltersCha
     });
   };
 
-  const hasActiveFilters =
-    filters.categories.length > 0 ||
-    filters.statuses.length > 0 ||
-    filters.ismSections.length > 0 ||
-    filters.vesselId !== null;
+  const hasActiveFilters = activeFilterCount(filters) > 0;
 
-  return (
-    <aside className="w-64 border-r border-border bg-card p-4 flex flex-col h-full">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-semibold text-foreground">Filters</h3>
-        {hasActiveFilters && (
-          <Button variant="ghost" size="sm" onClick={clearAllFilters} className="h-8 px-2">
-            <X className="w-4 h-4 mr-1" />
-            Clear All
-          </Button>
-        )}
-      </div>
-
-      <ScrollArea className="flex-1">
+  const body = (
         <div className="space-y-6">
           {/* Categories */}
           <div>
-            <h4 className="text-sm font-medium text-muted-foreground mb-3">Categories</h4>
+            <h3 className="type-eyebrow mb-3 text-muted-foreground">Categories</h3>
             <div className="space-y-2">
               {categories.map((category) => (
                 <div key={category.id} className="flex items-center space-x-2">
@@ -115,7 +106,7 @@ const DocumentFilters: React.FC<DocumentFiltersProps> = ({ filters, onFiltersCha
 
           {/* Status */}
           <div>
-            <h4 className="text-sm font-medium text-muted-foreground mb-3">Status</h4>
+            <h3 className="type-eyebrow mb-3 text-muted-foreground">Status</h3>
             <div className="space-y-2">
               {DOCUMENT_STATUSES.map((status) => (
                 <div key={status.value} className="flex items-center space-x-2">
@@ -124,13 +115,8 @@ const DocumentFilters: React.FC<DocumentFiltersProps> = ({ filters, onFiltersCha
                     checked={filters.statuses.includes(status.value)}
                     onCheckedChange={() => handleStatusToggle(status.value)}
                   />
-                  <Label
-                    htmlFor={`status-${status.value}`}
-                    className="flex items-center gap-2 text-sm cursor-pointer"
-                  >
-                    <span className={`px-2 py-0.5 rounded text-xs ${status.color}`}>
-                      {status.label}
-                    </span>
+                  <Label htmlFor={`status-${status.value}`} className="flex cursor-pointer items-center gap-2 text-sm">
+                    <StatusPill domain="document" status={status.value} />
                   </Label>
                 </div>
               ))}
@@ -139,9 +125,9 @@ const DocumentFilters: React.FC<DocumentFiltersProps> = ({ filters, onFiltersCha
 
           {/* Vessel */}
           <div>
-            <h4 className="text-sm font-medium text-muted-foreground mb-3">Vessel</h4>
+            <h3 className="type-eyebrow mb-3 text-muted-foreground">Vessel</h3>
             <Select value={filters.vesselId || 'all'} onValueChange={handleVesselChange}>
-              <SelectTrigger className="bg-background">
+              <SelectTrigger aria-label="Vessel" className="bg-background">
                 <SelectValue placeholder="All Vessels" />
               </SelectTrigger>
               <SelectContent className="bg-popover">
@@ -157,10 +143,10 @@ const DocumentFilters: React.FC<DocumentFiltersProps> = ({ filters, onFiltersCha
 
           {/* ISM Sections */}
           <div>
-            <h4 className="text-sm font-medium text-muted-foreground mb-3">ISM Section</h4>
+            <h3 className="type-eyebrow mb-3 text-muted-foreground">ISM Section</h3>
             <div className="space-y-2">
               {ISM_SECTIONS.map((section) => (
-                <div key={section.value} className="flex items-center space-x-2">
+                <div key={section.value} className="flex min-w-0 items-center space-x-2">
                   <Checkbox
                     id={`ism-${section.value}`}
                     checked={filters.ismSections.includes(section.value)}
@@ -168,7 +154,7 @@ const DocumentFilters: React.FC<DocumentFiltersProps> = ({ filters, onFiltersCha
                   />
                   <Label
                     htmlFor={`ism-${section.value}`}
-                    className="text-sm cursor-pointer truncate"
+                    className="min-w-0 cursor-pointer truncate text-sm"
                     title={section.label}
                   >
                     {section.label}
@@ -178,7 +164,34 @@ const DocumentFilters: React.FC<DocumentFiltersProps> = ({ filters, onFiltersCha
             </div>
           </div>
         </div>
-      </ScrollArea>
+  );
+
+  const header = (
+    <div className="mb-4 flex min-h-8 items-center justify-between gap-2">
+      <h2 className="type-subtitle text-foreground">Filters</h2>
+      {hasActiveFilters && (
+        <Button variant="ghost" size="sm" onClick={clearAllFilters} className="h-8 px-2 [@media(pointer:coarse)]:min-h-11">
+          <X aria-hidden="true" className="mr-1 h-4 w-4" />
+          Clear all
+        </Button>
+      )}
+    </div>
+  );
+
+  if (variant === 'panel') {
+    return (
+      <div data-document-filters="panel">
+        {header}
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <aside aria-label="Document filters" className="flex h-full w-64 shrink-0 flex-col border-r border-border p-4">
+      {header}
+      {/* A plain scroller, not ScrollArea: its table-layout viewport let long ISM labels and the vessel select overflow the column. */}
+      <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">{body}</div>
     </aside>
   );
 };

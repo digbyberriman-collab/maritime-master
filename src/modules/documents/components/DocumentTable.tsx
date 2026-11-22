@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Document } from '@/modules/documents/hooks/useDocuments';
-import { DOCUMENT_STATUSES } from '@/modules/documents/constants';
+import { StatusPill } from '@/shared/components/status';
 import { format } from 'date-fns';
 import { MoreVertical, Eye, Edit, Download, Trash2 } from 'lucide-react';
 
@@ -37,7 +37,7 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
   onDelete,
 }) => {
   return (
-    <div className="rounded-md border">
+    <div className="overflow-x-auto rounded-md border bg-card">
       <Table>
         <TableHeader>
           <TableRow>
@@ -60,18 +60,26 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
             </TableRow>
           ) : (
             documents.map((document) => {
-              const statusConfig = DOCUMENT_STATUSES.find((s) => s.value === document.status);
               return (
                 <TableRow
                   key={document.id}
-                  className="cursor-pointer hover:bg-muted/50"
+                  className="cursor-pointer hover:bg-accent"
                   onClick={() => onView(document)}
                 >
                   <TableCell className="font-mono text-sm">
                     {document.document_number}
                   </TableCell>
-                  <TableCell className="font-medium max-w-[300px] truncate">
-                    {document.title}
+                  <TableCell className="max-w-[300px] font-medium">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onView(document);
+                      }}
+                      className="block max-w-full truncate rounded-sm text-left focus-ring"
+                    >
+                      {document.title}
+                    </button>
                   </TableCell>
                   <TableCell>
                     <Badge
@@ -88,25 +96,21 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
                     <Badge variant="secondary">{document.revision}</Badge>
                   </TableCell>
                   <TableCell>
-                    {statusConfig && (
-                      <Badge className={`text-xs ${statusConfig.color}`}>
-                        {statusConfig.label}
-                      </Badge>
-                    )}
+                    {document.status ? <StatusPill domain="document" status={document.status} /> : null}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {document.vessel?.name || 'Company-wide'}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="whitespace-nowrap text-muted-foreground">
                     {document.next_review_date
-                      ? format(new Date(document.next_review_date), 'MMM d, yyyy')
-                      : '-'}
+                      ? format(new Date(document.next_review_date), 'd MMM yyyy')
+                      : '–'}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="w-4 h-4" />
+                        <Button variant="ghost" size="icon" aria-label={`Actions for ${document.title}`}>
+                          <MoreVertical aria-hidden="true" className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-popover">

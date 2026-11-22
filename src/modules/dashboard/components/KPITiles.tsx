@@ -1,14 +1,12 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
-import { 
-  AlertTriangle, Users, Anchor, Award, 
+import {
+  AlertTriangle, Users, Anchor, Award,
   GraduationCap, Wrench, ClipboardCheck,
-  FileSignature, Target
+  FileSignature, Target, type LucideIcon,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
-import type { DashboardSummary } from '@/modules/dashboard/types';
-import type { WidgetKey } from '@/modules/dashboard/types';
+import { KpiTile } from '@/shared/components/data';
+import type { Tone } from '@/components/ui/tones';
+import type { DashboardSummary, WidgetKey } from '@/modules/dashboard/types';
 
 interface KPITilesProps {
   summary: DashboardSummary | null;
@@ -18,144 +16,131 @@ interface KPITilesProps {
 interface TileConfig {
   key: WidgetKey;
   label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  getValue: (s: DashboardSummary) => number | string;
+  icon: LucideIcon;
   href: string;
-  colorClass: string;
-  statusClass: (s: DashboardSummary) => string;
+  value: (s: DashboardSummary) => number | string;
+  /** Alert tone when the number needs attention; `undefined` = no alert bar. */
+  tone: (s: DashboardSummary) => Tone | undefined;
+  sub?: (s: DashboardSummary) => string | undefined;
+  /** Counts where 0 is not good news (crew on board) show a plain 0, not "All clear". */
+  plainZero?: boolean;
+  textValue?: boolean;
 }
 
-const tiles: TileConfig[] = [
+const certsExpiring = (s: DashboardSummary) => s.certs_expiring_90d + s.crew_certs_expiring_90d;
+const openNcCapa = (s: DashboardSummary) => s.open_ncs_count + s.open_capas_count;
+
+const TILES: TileConfig[] = [
   {
     key: 'kpi_alerts',
-    label: 'Open Alerts',
+    label: 'Open alerts',
     icon: AlertTriangle,
-    getValue: (s) => s.open_alerts_count,
     href: '/notifications/center',
-    colorClass: 'text-destructive bg-destructive/10',
-    statusClass: (s) => s.red_alerts_count > 0 ? 'border-l-destructive' : s.open_alerts_count > 0 ? 'border-l-warning' : 'border-l-green-500',
+    value: (s) => s.open_alerts_count,
+    tone: (s) => (s.red_alerts_count > 0 ? 'danger' : s.open_alerts_count > 0 ? 'warn' : undefined),
+    sub: (s) => (s.red_alerts_count > 0 ? `${s.red_alerts_count} red` : undefined),
   },
   {
     key: 'kpi_crew',
-    label: 'Crew Onboard',
+    label: 'Crew on board',
     icon: Users,
-    getValue: (s) => s.crew_onboard_count,
     href: '/crew',
-    colorClass: 'text-blue-600 bg-blue-50 dark:bg-blue-950/50',
-    statusClass: () => 'border-l-blue-500',
+    value: (s) => s.crew_onboard_count,
+    tone: () => undefined,
+    plainZero: true,
   },
   {
     key: 'kpi_captain',
-    label: 'Captain',
+    label: 'Master',
     icon: Anchor,
-    getValue: (s) => s.current_captain || 'Not assigned',
     href: '/crew',
-    colorClass: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/50',
-    statusClass: (s) => s.current_captain ? 'border-l-green-500' : 'border-l-warning',
+    value: (s) => s.current_captain || '—',
+    tone: (s) => (s.current_captain ? undefined : 'warn'),
+    sub: (s) => (s.current_captain ? 'In command' : 'Not assigned'),
+    textValue: true,
   },
   {
     key: 'kpi_certs',
-    label: 'Certs Expiring (90d)',
+    label: 'Certificates expiring',
     icon: Award,
-    getValue: (s) => s.certs_expiring_90d + s.crew_certs_expiring_90d,
     href: '/certificates/alerts',
-    colorClass: 'text-orange-600 bg-orange-50 dark:bg-orange-950/50',
-    statusClass: (s) => (s.certs_expiring_90d + s.crew_certs_expiring_90d) > 5 ? 'border-l-destructive' : (s.certs_expiring_90d + s.crew_certs_expiring_90d) > 0 ? 'border-l-warning' : 'border-l-green-500',
+    value: certsExpiring,
+    tone: (s) => (certsExpiring(s) > 5 ? 'danger' : certsExpiring(s) > 0 ? 'warn' : undefined),
+    sub: () => 'Within 90 days',
   },
   {
     key: 'kpi_drills',
-    label: 'Overdue Drills',
+    label: 'Overdue drills',
     icon: Target,
-    getValue: (s) => s.overdue_drills_count,
     href: '/ism/drills',
-    colorClass: 'text-purple-600 bg-purple-50 dark:bg-purple-950/50',
-    statusClass: (s) => s.overdue_drills_count > 0 ? 'border-l-destructive' : 'border-l-green-500',
+    value: (s) => s.overdue_drills_count,
+    tone: (s) => (s.overdue_drills_count > 0 ? 'danger' : undefined),
   },
   {
     key: 'kpi_training',
-    label: 'Training Gaps',
+    label: 'Training gaps',
     icon: GraduationCap,
-    getValue: (s) => s.training_gaps_count,
     href: '/training',
-    colorClass: 'text-violet-600 bg-violet-50 dark:bg-violet-950/50',
-    statusClass: (s) => s.training_gaps_count > 0 ? 'border-l-warning' : 'border-l-green-500',
+    value: (s) => s.training_gaps_count,
+    tone: (s) => (s.training_gaps_count > 0 ? 'warn' : undefined),
   },
   {
     key: 'kpi_maintenance',
-    label: 'Overdue Maintenance',
+    label: 'Overdue maintenance',
     icon: Wrench,
-    getValue: (s) => s.overdue_maintenance_count,
     href: '/maintenance',
-    colorClass: 'text-gray-600 bg-gray-50 dark:bg-gray-800/50',
-    statusClass: (s) => s.critical_defects_count > 0 ? 'border-l-destructive' : s.overdue_maintenance_count > 0 ? 'border-l-warning' : 'border-l-green-500',
+    value: (s) => s.overdue_maintenance_count,
+    tone: (s) => (s.critical_defects_count > 0 ? 'danger' : s.overdue_maintenance_count > 0 ? 'warn' : undefined),
+    sub: (s) =>
+      s.critical_defects_count > 0
+        ? `${s.critical_defects_count} critical defect${s.critical_defects_count === 1 ? '' : 's'}`
+        : undefined,
   },
   {
     key: 'kpi_compliance',
-    label: 'Open NCs/CAPAs',
+    label: 'Open NCs / CAPAs',
     icon: ClipboardCheck,
-    getValue: (s) => s.open_ncs_count + s.open_capas_count,
     href: '/ism/audits',
-    colorClass: 'text-amber-600 bg-amber-50 dark:bg-amber-950/50',
-    statusClass: (s) => (s.open_ncs_count + s.open_capas_count) > 0 ? 'border-l-warning' : 'border-l-green-500',
+    value: openNcCapa,
+    tone: (s) => (openNcCapa(s) > 0 ? 'warn' : undefined),
+    sub: (s) => `${s.open_ncs_count} NCs · ${s.open_capas_count} CAPAs`,
   },
   {
     key: 'kpi_signatures',
-    label: 'Pending Signatures',
+    label: 'Pending signatures',
     icon: FileSignature,
-    getValue: (s) => s.pending_signatures_count,
     href: '/ism/forms/pending',
-    colorClass: 'text-primary bg-primary/10',
-    statusClass: (s) => s.pending_signatures_count > 0 ? 'border-l-primary' : 'border-l-green-500',
+    value: (s) => s.pending_signatures_count,
+    tone: (s) => (s.pending_signatures_count > 0 ? 'signal' : undefined),
   },
 ];
 
+/**
+ * Vessel dashboard KPI row (gap/10 DS13, §A.9) on the shared `KpiTile`: each
+ * tile links to its filtered list, carries an alert bar in its tone when
+ * there is something to do, and shows "0 · All clear" only for a real zero.
+ * The caller renders it once the summary has loaded.
+ */
 export const KPITiles: React.FC<KPITilesProps> = ({ summary, visibleWidgets }) => {
   if (!summary) return null;
 
-  const visibleTiles = tiles.filter(t => visibleWidgets.includes(t.key));
+  const visibleTiles = TILES.filter((t) => visibleWidgets.includes(t.key));
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-      {visibleTiles.map(tile => (
-        <KPITile key={tile.key} tile={tile} summary={summary} />
+    <section aria-label="Vessel indicators" className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      {visibleTiles.map((tile) => (
+        <KpiTile
+          key={tile.key}
+          label={tile.label}
+          icon={tile.icon}
+          href={tile.href}
+          value={tile.value(summary)}
+          tone={tile.tone(summary)}
+          sub={tile.sub?.(summary)}
+          state={tile.plainZero || tile.textValue ? 'ready' : undefined}
+          textValue={tile.textValue}
+        />
       ))}
-    </div>
-  );
-};
-
-interface KPITileProps {
-  tile: TileConfig;
-  summary: DashboardSummary;
-}
-
-const KPITile: React.FC<KPITileProps> = ({ tile, summary }) => {
-  const Icon = tile.icon;
-  const value = tile.getValue(summary);
-  const statusClass = tile.statusClass(summary);
-
-  return (
-    <Link to={tile.href}>
-      <Card className={cn(
-        'transition-all hover:shadow-md cursor-pointer border-l-4',
-        statusClass
-      )}>
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between">
-            <div className={cn('p-2 rounded-lg', tile.colorClass)}>
-              <Icon className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3">
-            <p className={cn(
-              'text-2xl font-bold tabular-nums',
-              typeof value === 'string' && 'text-base'
-            )}>
-              {typeof value === 'number' ? value.toLocaleString() : value}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">{tile.label}</p>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+    </section>
   );
 };

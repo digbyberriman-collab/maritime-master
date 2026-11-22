@@ -1,11 +1,10 @@
 import React from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Ship, Anchor, MapPin, Award, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { VesselDashboardData } from '@/modules/vessels/hooks/useVesselDashboard';
 import { format } from 'date-fns';
+import { Award, MapPin, RefreshCw } from 'lucide-react';
+import PageHeader from '@/shared/components/layout/PageHeader';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { VesselDashboardData } from '@/modules/vessels/hooks/useVesselDashboard';
 
 interface VesselHeaderProps {
   data: VesselDashboardData | null;
@@ -15,121 +14,77 @@ interface VesselHeaderProps {
   userName?: string;
 }
 
-const VesselHeader: React.FC<VesselHeaderProps> = ({
-  data,
-  isLoading,
-  isAllVessels,
-  onRefresh,
-  userName,
-}) => {
+function RefreshAction({ refreshedAt, onRefresh }: { refreshedAt?: string | null; onRefresh?: () => void }) {
+  if (!refreshedAt && !onRefresh) return null;
+  return (
+    <div className="flex items-center gap-2">
+      {refreshedAt ? (
+        <span className="text-xs tabular-nums text-muted-foreground">Updated {format(new Date(refreshedAt), 'HH:mm')}</span>
+      ) : null}
+      {onRefresh ? (
+        <Button variant="outline" size="icon" onClick={onRefresh} aria-label="Refresh dashboard" title="Refresh dashboard">
+          <RefreshCw aria-hidden="true" className="h-4 w-4" />
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * The vessel dashboard's page heading (Phase 1 S7): `PageHeader` with the
+ * vessel name as the page's only h1, IMO as the reference chip and flag /
+ * class society underneath. It replaces the gradient hero card.
+ */
+const VesselHeader: React.FC<VesselHeaderProps> = ({ data, isLoading, isAllVessels, onRefresh }) => {
   if (isLoading) {
     return (
-      <Card className="gradient-primary text-primary-foreground border-0">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <Skeleton className="w-14 h-14 rounded-xl bg-primary-foreground/20" />
-            <div className="space-y-2">
-              <Skeleton className="h-7 w-48 bg-primary-foreground/20" />
-              <Skeleton className="h-4 w-64 bg-primary-foreground/20" />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <div role="status" aria-busy="true" className="mb-4 min-w-0 flex-1 space-y-2">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="h-7 w-56" />
+        <Skeleton className="h-4 w-72 max-w-full" />
+        <span className="sr-only">Loading vessel</span>
+      </div>
     );
   }
 
   if (isAllVessels) {
     return (
-      <Card className="gradient-primary text-primary-foreground border-0">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-primary-foreground/20 flex items-center justify-center">
-                <Anchor className="w-7 h-7" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">Fleet Overview</h1>
-                <p className="text-primary-foreground/80">
-                  {userName ? `Welcome, ${userName}` : 'All vessels at a glance'}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {data?.data_refreshed_at && (
-                <span className="text-xs text-primary-foreground/60">
-                  Updated {format(new Date(data.data_refreshed_at), 'HH:mm')}
-                </span>
-              )}
-              {onRefresh && (
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  onClick={onRefresh}
-                  className="h-8 w-8"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      <PageHeader
+        className="min-w-0 flex-1"
+        eyebrow="All vessels"
+        title="Fleet overview"
+        description="Every vessel you can reach, at a glance."
+        actions={<RefreshAction refreshedAt={data?.data_refreshed_at} onRefresh={onRefresh} />}
+      />
     );
   }
 
+  const particulars = [
+    data?.flag_state ? { icon: MapPin, text: data.flag_state, label: 'Flag state' } : null,
+    data?.classification_society ? { icon: Award, text: data.classification_society, label: 'Class society' } : null,
+  ].filter((item): item is NonNullable<typeof item> => item !== null);
+
   return (
-    <Card className="gradient-primary text-primary-foreground border-0">
-      <CardContent className="pt-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl bg-primary-foreground/20 flex items-center justify-center">
-              <Ship className="w-7 h-7" />
-            </div>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold">{data?.vessel_name || 'Unknown Vessel'}</h1>
-                {data?.imo_number && (
-                  <Badge variant="secondary" className="text-xs">
-                    IMO {data.imo_number}
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-4 mt-1 text-primary-foreground/80 text-sm">
-                {data?.flag_state && (
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-3 h-3" />
-                    {data.flag_state}
-                  </span>
-                )}
-                {data?.classification_society && (
-                  <span className="flex items-center gap-1">
-                    <Award className="w-3 h-3" />
-                    {data.classification_society}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {data?.data_refreshed_at && (
-              <span className="text-xs text-primary-foreground/60">
-                Updated {format(new Date(data.data_refreshed_at), 'HH:mm')}
+    <PageHeader
+      className="min-w-0 flex-1"
+      eyebrow="Vessel"
+      title={data?.vessel_name || 'Unknown vessel'}
+      reference={data?.imo_number ? `IMO ${data.imo_number}` : undefined}
+      description={
+        particulars.length > 0 ? (
+          <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            {particulars.map(({ icon: Icon, text, label }) => (
+              <span key={label} className="inline-flex items-center gap-1">
+                <Icon aria-hidden="true" className="h-3.5 w-3.5" />
+                <span className="sr-only">{label}: </span>
+                {text}
               </span>
-            )}
-            {onRefresh && (
-              <Button
-                variant="secondary"
-                size="icon"
-                onClick={onRefresh}
-                className="h-8 w-8"
-              >
-                <RefreshCw className="w-4 h-4" />
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+            ))}
+          </span>
+        ) : undefined
+      }
+      actions={<RefreshAction refreshedAt={data?.data_refreshed_at} onRefresh={onRefresh} />}
+    />
   );
 };
 

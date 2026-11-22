@@ -139,7 +139,7 @@ const InsuranceTabContent: React.FC<InsuranceTabContentProps> = ({ tab, isAuditM
                     <label className="text-xs text-muted-foreground flex items-center gap-1">
                       {field}
                       {isHidden && (
-                        <EyeOff className="w-3 h-3 text-amber-500" />
+                        <EyeOff className="w-3 h-3 text-warning" />
                       )}
                     </label>
                     {shouldRedact ? (
@@ -201,17 +201,17 @@ const InsuranceTabContent: React.FC<InsuranceTabContentProps> = ({ tab, isAuditM
                     key={doc} 
                     className={`flex items-center justify-between p-3 border rounded-lg ${
                       shouldRedact 
-                        ? 'border-red-200 dark:border-red-800 bg-red-50/30 dark:bg-red-950/10' 
+                        ? 'border-critical/25 bg-critical-muted/30' 
                         : 'border-dashed border-border bg-muted/30'
                     }`}
                   >
                     <div className="flex items-center gap-2">
                       {shouldRedact ? (
-                        <EyeOff className="w-4 h-4 text-red-500" />
+                        <EyeOff className="w-4 h-4 text-critical" />
                       ) : (
                         <FileText className="w-4 h-4 text-muted-foreground" />
                       )}
-                      <span className={`text-sm ${shouldRedact ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+                      <span className={`text-sm ${shouldRedact ? 'text-critical' : 'text-muted-foreground'}`}>
                         {shouldRedact ? '[Restricted]' : doc}
                       </span>
                     </div>
@@ -228,26 +228,26 @@ const InsuranceTabContent: React.FC<InsuranceTabContentProps> = ({ tab, isAuditM
           </div>
 
           {/* Audit Visibility Summary */}
-          <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-            <p className="text-xs text-amber-800 dark:text-amber-200 mb-2">
+          <div className="p-3 bg-warning-muted border border-warning/25 rounded-lg">
+            <p className="text-xs text-warning mb-2">
               <strong>Audit Visibility Rules:</strong>
             </p>
             <div className="grid grid-cols-2 gap-4 text-xs">
               <div>
-                <p className="flex items-center gap-1 text-green-700 dark:text-green-300">
+                <p className="flex items-center gap-1 text-success">
                   <Eye className="w-3 h-3" />
                   Visible to Auditors:
                 </p>
-                <p className="text-amber-700 dark:text-amber-300 ml-4">
+                <p className="text-warning ml-4">
                   {tab.visibleToAuditor.join(', ')}
                 </p>
               </div>
               <div>
-                <p className="flex items-center gap-1 text-red-700 dark:text-red-300">
+                <p className="flex items-center gap-1 text-critical">
                   <EyeOff className="w-3 h-3" />
                   Hidden from Auditors:
                 </p>
-                <p className="text-amber-700 dark:text-amber-300 ml-4">
+                <p className="text-warning ml-4">
                   {tab.hiddenFromAuditor.join(', ')}
                 </p>
               </div>
@@ -321,8 +321,8 @@ const InsurancePage: React.FC = () => {
         </Alert>
 
         {/* Audit Logging Notice */}
-        <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-          <p className="text-xs text-blue-800 dark:text-blue-200 flex items-center gap-2">
+        <div className="p-3 bg-info-muted border border-info/25 rounded-lg">
+          <p className="text-xs text-primary flex items-center gap-2">
             <Shield className="w-4 h-4" />
             <strong>Compliance:</strong> All access to insurance data is logged. 
             No hard deletes permitted. Changes tracked with full audit trail.

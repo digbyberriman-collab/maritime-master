@@ -105,9 +105,9 @@ const MaintenanceWidgets: React.FC = () => {
 
       {/* Critical Defects Alert */}
       {criticalDefects.length > 0 && (
-        <Card className="shadow-card border-destructive/50 bg-destructive/5">
+        <Card className="border-critical/25 border-l-[3px] border-l-critical">
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-destructive">
+            <CardTitle className="flex items-center gap-2 type-subtitle text-critical">
               <AlertTriangle className="h-5 w-5" />
               Critical Defects ({stats.criticalDefects})
             </CardTitle>
@@ -202,9 +202,9 @@ const MaintenanceWidgets: React.FC = () => {
 
       {/* Low Stock Alert */}
       {lowStockParts.length > 0 && (
-        <Card className="shadow-card border-warning/50 bg-warning/5">
+        <Card className="border-warning/25 border-l-[3px] border-l-warning">
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-warning">
+            <CardTitle className="flex items-center gap-2 type-subtitle text-warning">
               <Package className="h-5 w-5" />
               Low Stock Spare Parts
             </CardTitle>

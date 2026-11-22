@@ -28,9 +28,9 @@ type PhaseStatus = "planned" | "active" | "completed" | "on_hold";
 
 const STATUS_META: Record<PhaseStatus, { label: string; icon: typeof Clock; className: string }> = {
   planned: { label: "Planned", icon: Clock, className: "bg-muted text-muted-foreground" },
-  active: { label: "Active", icon: Target, className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
-  completed: { label: "Completed", icon: CheckCircle2, className: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
-  on_hold: { label: "On Hold", icon: Pause, className: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" },
+  active: { label: "Active", icon: Target, className: "bg-info-muted text-info" },
+  completed: { label: "Completed", icon: CheckCircle2, className: "bg-success-muted text-success" },
+  on_hold: { label: "On Hold", icon: Pause, className: "bg-warning-muted text-warning" },
 };
 
 export default function Phases() {
@@ -211,7 +211,7 @@ export default function Phases() {
                   <div className="flex items-center gap-1.5 mb-1">
                     <div
                       className="w-2.5 h-2.5 rounded-full shrink-0"
-                      style={{ backgroundColor: phase.colour || "#2563EB" }}
+                      style={{ backgroundColor: phase.colour || "hsl(var(--primary))" }}
                     />
                     <span className="text-xs font-semibold truncate">{phase.name}</span>
                   </div>
@@ -514,7 +514,7 @@ function MilestoneRow({
   return (
     <div
       className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
-        ms.is_completed ? "bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900" : "bg-card"
+        ms.is_completed ? "bg-success-muted border-success/25" : "bg-card"
       }`}
     >
       <button
@@ -523,7 +523,7 @@ function MilestoneRow({
       >
         <CheckCircle2
           className={`h-5 w-5 transition-colors ${
-            ms.is_completed ? "text-green-600 fill-green-600" : "text-muted-foreground/40 hover:text-primary"
+            ms.is_completed ? "fill-success text-card" : "text-muted-foreground/40 hover:text-primary"
           }`}
         />
       </button>
@@ -571,7 +571,7 @@ function MilestoneRow({
               </span>
             )}
             {ms.actual_date && (
-              <Badge variant="outline" className="text-[10px] bg-green-50 dark:bg-green-950">
+              <Badge variant="outline" className="text-[10px] bg-success-muted">
                 ✓ {format(new Date(ms.actual_date), "dd MMM")}
               </Badge>
             )}

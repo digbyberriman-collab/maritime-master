@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { Award, ClipboardCheck, AlertCircle, ChevronRight, User } from 'lucide-react';
 import { useDashboardStore } from '@/modules/dashboard/store/dashboardStore';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { StatusPill } from '@/shared/components/status';
+import type { Tone } from '@/components/ui/tones';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
@@ -11,11 +12,12 @@ import { cn } from '@/lib/utils';
 export const ComplianceSnapshot: React.FC = () => {
   const { summary, expiringCerts, upcomingAudits, isAllVessels } = useDashboardStore();
 
-  const getDaysColor = (days: number) => {
-    if (days <= 7) return 'bg-destructive text-destructive-foreground';
-    if (days <= 30) return 'bg-orange-500 text-white';
-    if (days <= 60) return 'bg-yellow-500 text-black';
-    return 'bg-muted text-muted-foreground';
+  // Days-left tiers (gap/10 §A.8 expiry tiers): ≤ 7 danger, ≤ 30 orange, ≤ 60 warn.
+  const daysTone = (days: number): Tone => {
+    if (days <= 7) return 'danger';
+    if (days <= 30) return 'orange';
+    if (days <= 60) return 'warn';
+    return 'neutral';
   };
 
   return (
@@ -100,9 +102,7 @@ export const ComplianceSnapshot: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                    <Badge className={cn('ml-2 flex-shrink-0', getDaysColor(cert.days_until_expiry))}>
-                      {cert.days_until_expiry}d
-                    </Badge>
+                    <StatusPill className="ml-2" tone={daysTone(cert.days_until_expiry)} label={`${cert.days_until_expiry}d`} />
                   </Link>
                 ))}
               </div>
@@ -136,9 +136,7 @@ export const ComplianceSnapshot: React.FC = () => {
                         <p className="text-xs text-muted-foreground truncate">{audit.vessel_name}</p>
                       )}
                     </div>
-                    <Badge className={cn('ml-2 flex-shrink-0', getDaysColor(audit.days_until_due))}>
-                      {audit.days_until_due}d
-                    </Badge>
+                    <StatusPill className="ml-2" tone={daysTone(audit.days_until_due)} label={`${audit.days_until_due}d`} />
                   </Link>
                 ))}
               </div>

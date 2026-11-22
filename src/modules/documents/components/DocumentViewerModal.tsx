@@ -18,6 +18,7 @@ import {
   useCompanyCrew,
 } from '@/modules/auth/hooks/useAcknowledgments';
 import { DOCUMENT_STATUSES, ISM_SECTIONS, formatFileSize } from '@/modules/documents/constants';
+import { StatusPill } from '@/shared/components/status';
 import { format, formatDistanceToNow } from 'date-fns';
 import {
   X,
@@ -110,22 +111,20 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] max-h-[95vh] h-[95vh] p-0 gap-0">
         {/* Top Bar */}
-        <div className="flex items-center justify-between px-6 py-4 border-b bg-background">
-          <div className="flex items-center gap-3">
-            <FileText className="w-6 h-6 text-muted-foreground" />
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold">{document.title}</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b bg-popover px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <FileText aria-hidden="true" className="h-6 w-6 shrink-0 text-muted-foreground" />
+            <div className="min-w-0">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <h2 className="min-w-0 break-words type-title">{document.title}</h2>
                 <Badge variant="outline" className="font-mono text-xs">
                   {document.document_number}
                 </Badge>
-                {statusConfig && (
-                  <Badge className={statusConfig.color}>{statusConfig.label}</Badge>
-                )}
+                {statusConfig ? <StatusPill domain="document" status={statusConfig.value} /> : null}
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="sm" onClick={handleDownload}>
               <Download className="w-4 h-4 mr-2" />
               Download
@@ -134,28 +133,28 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
               <Printer className="w-4 h-4 mr-2" />
               Print
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
-              <X className="w-5 h-5" />
+            <Button variant="ghost" size="icon" aria-label="Close document" onClick={() => onOpenChange(false)}>
+              <X aria-hidden="true" className="h-5 w-5" />
             </Button>
           </div>
         </div>
 
         {/* Acknowledgment Banner */}
         {needsAcknowledgment && (
-          <div className="flex items-center justify-between px-6 py-3 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-warning/25 bg-warning-muted px-4 py-3 sm:px-6">
             <div className="flex items-center gap-3">
-              <AlertCircle className="w-5 h-5 text-yellow-600 dark:text-yellow-500" />
-              <span className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+              <AlertCircle aria-hidden="true" className="h-5 w-5 shrink-0 text-warning" />
+              <span className="text-sm font-medium text-warning">
                 You must acknowledge reading this document
               </span>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <Checkbox
                   checked={hasRead}
                   onCheckedChange={(checked) => setHasRead(!!checked)}
                 />
-                <span className="text-sm text-yellow-800 dark:text-yellow-200">
+                <span className="text-sm text-foreground">
                   I have read and understood this document
                 </span>
               </label>
@@ -430,9 +429,9 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
                           >
                             <div className="flex items-center gap-3">
                               {member.acknowledged ? (
-                                <CheckCircle className="w-5 h-5 text-green-500" />
+                                <CheckCircle aria-hidden="true" className="h-5 w-5 text-success" />
                               ) : (
-                                <Clock className="w-5 h-5 text-yellow-500" />
+                                <Clock aria-hidden="true" className="h-5 w-5 text-warning" />
                               )}
                               <div>
                                 <p className="text-sm font-medium">
@@ -444,7 +443,7 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
                                   </p>
                                 )}
                                 {!member.acknowledged && (
-                                  <p className="text-xs text-yellow-600">Not yet read</p>
+                                  <p className="text-xs font-medium text-warning">Not yet read</p>
                                 )}
                               </div>
                             </div>

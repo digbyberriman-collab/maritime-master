@@ -16,31 +16,31 @@ const statusConfig: Record<RetentionStatus, { label: string; icon: React.ReactNo
   active: {
     label: 'Active',
     icon: <CheckCircle className="w-3 h-3" />,
-    className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+    className: 'bg-success-muted text-success',
     description: 'Record is within retention period',
   },
   expiring_soon: {
     label: 'Expiring Soon',
     icon: <AlertTriangle className="w-3 h-3" />,
-    className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300',
+    className: 'bg-warning-muted text-warning',
     description: 'Record will expire within 90 days',
   },
   expired: {
     label: 'Expired',
     icon: <Clock className="w-3 h-3" />,
-    className: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+    className: 'bg-critical-muted text-critical',
     description: 'Retention period has ended - pending archival',
   },
   archived: {
     label: 'Archived',
     icon: <Archive className="w-3 h-3" />,
-    className: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300',
+    className: 'bg-muted text-foreground',
     description: 'Record is archived and access-restricted',
   },
   pending_deletion: {
     label: 'Pending Deletion',
     icon: <Trash2 className="w-3 h-3" />,
-    className: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300',
+    className: 'bg-purple-muted text-purple',
     description: 'Awaiting DPA approval for deletion',
   },
 };

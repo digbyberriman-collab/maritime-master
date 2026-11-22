@@ -90,9 +90,9 @@ const ReviewDashboard: React.FC = () => {
       case 'overdue':
         return <Badge variant="destructive">Overdue</Badge>;
       case 'urgent':
-        return <Badge className="bg-orange-500 hover:bg-orange-600">Due &lt;30 days</Badge>;
+        return <Badge className="bg-orange hover:bg-orange/90">Due &lt;30 days</Badge>;
       case 'warning':
-        return <Badge className="bg-yellow-500 hover:bg-yellow-600">Due &lt;60 days</Badge>;
+        return <Badge className="bg-warning hover:bg-warning/90">Due &lt;60 days</Badge>;
       default:
         return <Badge variant="secondary">Upcoming</Badge>;
     }
@@ -218,14 +218,14 @@ const ReviewDashboard: React.FC = () => {
           <Card
             className={cn(
               'cursor-pointer transition-all hover:shadow-md',
-              activeTab === 'urgent' && 'ring-2 ring-orange-500'
+              activeTab === 'urgent' && 'ring-2 ring-orange'
             )}
             onClick={() => setActiveTab('urgent')}
           >
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-orange-500" />
+                <div className="w-12 h-12 rounded-lg bg-orange-muted flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-orange" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{urgentReviews.length}</p>
@@ -238,14 +238,14 @@ const ReviewDashboard: React.FC = () => {
           <Card
             className={cn(
               'cursor-pointer transition-all hover:shadow-md',
-              activeTab === 'warning' && 'ring-2 ring-yellow-500'
+              activeTab === 'warning' && 'ring-2 ring-warning'
             )}
             onClick={() => setActiveTab('warning')}
           >
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
-                  <CalendarIcon className="w-6 h-6 text-yellow-500" />
+                <div className="w-12 h-12 rounded-lg bg-warning-muted flex items-center justify-center">
+                  <CalendarIcon className="w-6 h-6 text-warning" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{warningReviews.length}</p>

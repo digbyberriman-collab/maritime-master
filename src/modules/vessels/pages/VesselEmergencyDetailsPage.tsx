@@ -81,9 +81,9 @@ export default function VesselEmergencyDetailsPage() {
   if (!contacts) {
     return (
       <DashboardLayout>
-        <div className="p-6">
+        <div className="sm:p-6">
           <Card className="border-dashed">
-            <CardContent className="p-12 text-center">
+            <CardContent className="px-4 py-10 text-center sm:p-12">
               <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
               <h2 className="text-xl font-semibold mb-2">
                 No Emergency Contacts Configured
@@ -93,7 +93,7 @@ export default function VesselEmergencyDetailsPage() {
                 {canEdit ? ' Set them up now to ensure critical contact information is available during emergencies.' : ''}
               </p>
               {canEdit && (
-                <div className="flex justify-center gap-4">
+                <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
                   <Button onClick={() => setIsEditOpen(true)}>
                     Set Up Emergency Contacts
                   </Button>

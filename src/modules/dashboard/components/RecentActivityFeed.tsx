@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { activityTypeConfig } from '@/modules/dashboard/types';
+import { TONE_SURFACE } from '@/components/ui/tones';
 
 const activityIcons: Record<string, React.ComponentType<{ className?: string }>> = {
   form_submitted: FileText,
@@ -63,22 +64,21 @@ export const RecentActivityFeed: React.FC = () => {
             <div className="space-y-1">
               {recentActivity.map(item => {
                 const Icon = activityIcons[item.activity_type] || Activity;
-                const config = activityTypeConfig[item.activity_type] || { 
-                  label: item.activity_type, 
-                  color: 'text-muted-foreground' 
-                };
+                const tone = activityTypeConfig[item.activity_type]?.tone ?? 'neutral';
                 
                 return (
                   <div 
                     key={item.id}
                     className="flex gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors"
                   >
-                    <div className={cn(
-                      'flex items-center justify-center w-8 h-8 rounded-full flex-shrink-0',
-                      config.color.replace('text-', 'bg-').replace('-500', '-100'),
-                      'dark:bg-opacity-20'
-                    )}>
-                      <Icon className={cn('w-4 h-4', config.color)} />
+                    <div
+                      aria-hidden="true"
+                      className={cn(
+                        'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border',
+                        TONE_SURFACE[tone],
+                      )}
+                    >
+                      <Icon className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{item.title}</p>

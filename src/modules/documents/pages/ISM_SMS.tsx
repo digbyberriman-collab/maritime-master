@@ -155,8 +155,8 @@ export default function ISM_SMS() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <FileText className="w-5 h-5 text-blue-600" />
+                <div className="p-2 bg-info-muted rounded-lg">
+                  <FileText className="w-5 h-5 text-primary" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{documents.length}</p>
@@ -168,8 +168,8 @@ export default function ISM_SMS() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
+                <div className="p-2 bg-success-muted rounded-lg">
+                  <CheckCircle className="w-5 h-5 text-success" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
@@ -246,7 +246,7 @@ export default function ISM_SMS() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
                             <p className="font-medium">{doc.title}</p>
-                            <Badge variant="outline" className="bg-green-50 text-green-700">
+                            <Badge variant="outline" className="bg-success-muted text-success">
                               {doc.status}
                             </Badge>
                           </div>
@@ -298,7 +298,7 @@ export default function ISM_SMS() {
                   <CardContent className="p-4">
                     <div className="flex items-start gap-4">
                       <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-lg font-bold ${
-                        section.hasDocuments ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                        section.hasDocuments ? 'bg-success-muted text-success' : 'bg-muted text-muted-foreground'
                       }`}>
                         {section.id}
                       </div>
@@ -310,7 +310,7 @@ export default function ISM_SMS() {
                         </p>
                       </div>
                       {section.hasDocuments && (
-                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <CheckCircle className="w-5 h-5 text-success" />
                       )}
                     </div>
                   </CardContent>

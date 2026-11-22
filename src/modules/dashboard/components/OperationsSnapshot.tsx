@@ -78,9 +78,9 @@ export const OperationsSnapshot: React.FC = () => {
                 >
                   <div className="flex items-center gap-2">
                     {movement.movement_type === 'join' ? (
-                      <UserPlus className="w-4 h-4 text-green-500" />
+                      <UserPlus className="w-4 h-4 text-success" />
                     ) : (
-                      <UserMinus className="w-4 h-4 text-orange-500" />
+                      <UserMinus className="w-4 h-4 text-orange" />
                     )}
                     <div>
                       <p className="text-sm font-medium">{movement.crew_name}</p>

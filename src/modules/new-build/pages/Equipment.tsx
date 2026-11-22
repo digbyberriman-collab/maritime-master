@@ -51,11 +51,11 @@ const emptyForm: EquipmentForm = {
 
 const statusConfig: Record<EquipmentStatus, { label: string; color: string; icon: typeof Package }> = {
   proposed: { label: "Proposed", color: "bg-muted text-muted-foreground", icon: CircleDot },
-  approved: { label: "Approved", color: "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300", icon: CheckCircle2 },
-  ordered: { label: "Ordered", color: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300", icon: ShoppingCart },
-  shipped: { label: "Shipped", color: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300", icon: Truck },
-  delivered: { label: "Delivered", color: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300", icon: Package },
-  installed: { label: "Installed", color: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300", icon: Wrench },
+  approved: { label: "Approved", color: "bg-info-muted text-info", icon: CheckCircle2 },
+  ordered: { label: "Ordered", color: "bg-warning-muted text-warning", icon: ShoppingCart },
+  shipped: { label: "Shipped", color: "bg-purple-muted text-purple", icon: Truck },
+  delivered: { label: "Delivered", color: "bg-success-muted text-success", icon: Package },
+  installed: { label: "Installed", color: "bg-success-muted text-success", icon: Wrench },
 };
 
 export default function Equipment() {

@@ -1,3 +1,6 @@
+import { statusMeta } from '@/shared/components/status/statusTone';
+import { TONE_SURFACE } from '@/components/ui/tones';
+
 // ISM Code sections
 export const ISM_SECTIONS = [
   { value: 1, label: 'Section 1: General' },
@@ -15,11 +18,23 @@ export const ISM_SECTIONS = [
   { value: 13, label: 'Section 13: Certification & Verification' },
 ];
 
+/**
+ * Controlled-document statuses. Tone and label come from the status registry
+ * (`statusTone('document', …)`, gap/10 §A.8); render them with
+ * `<StatusPill domain="document" status={doc.status} />`. `color` is the same
+ * tone as a tinted pill class string, for callers that still build their own
+ * badge.
+ */
+const documentStatus = (value: string) => {
+  const meta = statusMeta('document', value);
+  return { value, label: meta.label, tone: meta.tone, color: TONE_SURFACE[meta.tone] };
+};
+
 export const DOCUMENT_STATUSES = [
-  { value: 'Draft', label: 'Draft', color: 'bg-muted text-muted-foreground' },
-  { value: 'Under_Review', label: 'Under Review', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' },
-  { value: 'Approved', label: 'Approved', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' },
-  { value: 'Obsolete', label: 'Obsolete', color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' },
+  documentStatus('Draft'),
+  documentStatus('Under_Review'),
+  documentStatus('Approved'),
+  documentStatus('Obsolete'),
 ];
 
 export const LANGUAGES = [

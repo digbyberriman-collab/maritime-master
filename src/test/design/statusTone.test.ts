@@ -27,6 +27,7 @@ import { PERMIT_STATUS_OPTIONS, RA_STATUS_OPTIONS } from '@/modules/risk-assessm
 import { SUBMISSION_STATUSES } from '@/modules/ism/constants';
 import { CERTIFICATE_STATUS } from '@/modules/certificates/constants';
 import { APPLICATION_STATUS_CONFIG } from '@/modules/development/constants';
+import { DOCUMENT_STATUSES } from '@/modules/documents/constants';
 import type { NCStatus, SubmissionStatus as WorkRestSubmissionStatus } from '@/modules/work-rest/types';
 import type { FeedbackStatus } from '@/modules/feedback/types';
 
@@ -62,6 +63,7 @@ const COVERAGE: Array<[StatusDomain, readonly string[]]> = [
   ['work_rest_submission', WORK_REST_SUBMISSION],
   ['work_rest_nc', WORK_REST_NC],
   ['certificate', Object.keys(CERTIFICATE_STATUS)],
+  ['document', DOCUMENT_STATUSES.map((s) => s.value)],
   ['crew', CREW_STATUSES],
   ['crew_account', CREW_ACCOUNT_STATUSES],
   ['support', [...SUPPORT_LIVE, ...SUPPORT_TARGET]],
@@ -145,6 +147,10 @@ describe('meanings (gap/10 §A.8)', () => {
     // legacy "Expiring_Soon" (inside the 90-day alert window) is warn, not the ≤ 30 d tier
     ['certificate', 'Expiring_Soon', 'warn'],
     ['training', 'Expiring_Soon', 'warn'],
+    // controlled documents: review is live work, obsolete is withdrawn (inactive)
+    ['document', 'Under_Review', 'signal'],
+    ['document', 'Approved', 'ok'],
+    ['document', 'Obsolete', 'neutral'],
   ])('%s %s → %s', (domain, status, tone) => {
     expect(statusTone(domain, status)).toBe(tone);
   });

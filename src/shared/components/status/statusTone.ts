@@ -206,6 +206,16 @@ export const STATUS_REGISTRY = {
 
   // ── Certificates and documents ──
   /**
+   * Controlled documents (`documents.status`, `DOCUMENT_STATUSES`). Obsolete
+   * is withdrawn from use: inactive (neutral), like a superseded certificate.
+   */
+  document: vocab({
+    draft: ['neutral', 'Draft'],
+    under_review: ['signal', 'Under review'],
+    approved: ['ok', 'Approved'],
+    obsolete: ['neutral', 'Obsolete'],
+  }),
+  /**
    * Stored certificate statuses (`CERTIFICATE_STATUS`). Legacy rows say
    * `Expiring_Soon` for "inside the alert window" (90 days by default), which
    * is C5's `expiring`, so it reads as warn "Expiring soon" here. New code

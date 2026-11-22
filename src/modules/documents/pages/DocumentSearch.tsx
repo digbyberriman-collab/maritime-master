@@ -204,7 +204,7 @@ const DocumentSearch: React.FC = () => {
     const parts = text.split(new RegExp(`(${query})`, 'gi'));
     return parts.map((part, i) =>
       part.toLowerCase() === query.toLowerCase() ? (
-        <mark key={i} className="bg-yellow-200 dark:bg-yellow-800 px-0.5 rounded">
+        <mark key={i} className="bg-warning-muted px-0.5 rounded">
           {part}
         </mark>
       ) : (

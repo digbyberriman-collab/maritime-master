@@ -20,10 +20,10 @@ interface GDPRCompliancePanelProps {
 }
 
 const lawfulBasisLabels: Record<string, { label: string; color: string }> = {
-  contractual: { label: 'Contractual Obligation', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' },
-  legal_obligation: { label: 'Legal Obligation', color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300' },
-  legitimate_interest: { label: 'Legitimate Interest', color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' },
-  consent: { label: 'Consent', color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300' },
+  contractual: { label: 'Contractual Obligation', color: 'bg-info-muted text-info' },
+  legal_obligation: { label: 'Legal Obligation', color: 'bg-purple-muted text-purple' },
+  legitimate_interest: { label: 'Legitimate Interest', color: 'bg-success-muted text-success' },
+  consent: { label: 'Consent', color: 'bg-warning-muted text-warning' },
 };
 
 const GDPRCompliancePanel: React.FC<GDPRCompliancePanelProps> = ({ mapping, recordType, compact = false }) => {
@@ -41,7 +41,7 @@ const GDPRCompliancePanel: React.FC<GDPRCompliancePanelProps> = ({ mapping, reco
           {mapping.retentionPeriod}
         </Badge>
         {mapping.redactedForAuditors && (
-          <Badge variant="outline" className="bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300">
+          <Badge variant="outline" className="bg-critical-muted text-critical">
             <EyeOff className="w-3 h-3 mr-1" />
             Auditor Restricted
           </Badge>
@@ -124,8 +124,8 @@ const GDPRCompliancePanel: React.FC<GDPRCompliancePanelProps> = ({ mapping, reco
 
         {/* Auditor Access */}
         {mapping.redactedForAuditors && (
-          <div className="p-2 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-md">
-            <p className="text-xs text-red-800 dark:text-red-200 flex items-center gap-1">
+          <div className="p-2 bg-critical-muted border border-critical/25 rounded-md">
+            <p className="text-xs text-critical flex items-center gap-1">
               <EyeOff className="w-3 h-3" />
               <strong>Auditor Access:</strong> This data is redacted from auditor views by default.
             </p>

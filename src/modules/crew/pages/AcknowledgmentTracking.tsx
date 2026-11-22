@@ -109,8 +109,8 @@ const AcknowledgmentTracking: React.FC = () => {
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold flex items-center gap-2">
               <FileCheck className="w-6 h-6" />
               Acknowledgment Tracking
@@ -119,7 +119,7 @@ const AcknowledgmentTracking: React.FC = () => {
               Monitor mandatory document acknowledgments across your fleet
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" disabled={selectedDocuments.size === 0}>
               <Send className="w-4 h-4 mr-2" />
               Send Bulk Reminder ({selectedDocuments.size})
@@ -150,8 +150,8 @@ const AcknowledgmentTracking: React.FC = () => {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                  <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+                <div className="w-12 h-12 rounded-lg bg-success-muted flex items-center justify-center">
+                  <CheckCircle className="w-6 h-6 text-success" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{fullyAcknowledged}</p>
@@ -164,8 +164,8 @@ const AcknowledgmentTracking: React.FC = () => {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-yellow-600 dark:text-yellow-400" />
+                <div className="w-12 h-12 rounded-lg bg-warning-muted flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-warning" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{partiallyAcknowledged}</p>
@@ -178,8 +178,8 @@ const AcknowledgmentTracking: React.FC = () => {
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                  <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+                <div className="w-12 h-12 rounded-lg bg-critical-muted flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-critical" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{notStarted}</p>
@@ -193,10 +193,10 @@ const AcknowledgmentTracking: React.FC = () => {
         {/* Filters */}
         <Card>
           <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-3">
               <Filter className="w-4 h-4 text-muted-foreground" />
               <Select value={vesselFilter} onValueChange={setVesselFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="All Vessels" />
                 </SelectTrigger>
                 <SelectContent>
@@ -210,7 +210,7 @@ const AcknowledgmentTracking: React.FC = () => {
               </Select>
 
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -222,7 +222,7 @@ const AcknowledgmentTracking: React.FC = () => {
               </Select>
 
               <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue placeholder="All Categories" />
                 </SelectTrigger>
                 <SelectContent>
@@ -295,17 +295,17 @@ const AcknowledgmentTracking: React.FC = () => {
                         </div>
                       </TableCell>
                       <TableCell className="text-center">
-                        <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                        <Badge variant="secondary" className="bg-success-muted text-success">
                           {stat.acknowledged}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
                         {stat.pending > 0 ? (
-                          <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                          <Badge variant="secondary" className="bg-warning-muted text-warning">
                             {stat.pending}
                           </Badge>
                         ) : (
-                          <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                          <Badge variant="secondary" className="bg-success-muted text-success">
                             0
                           </Badge>
                         )}

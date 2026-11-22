@@ -98,14 +98,14 @@ const Procedures: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
-      current: 'bg-green-100 text-green-800 border-green-200',
-      under_review: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      draft: 'bg-blue-100 text-blue-800 border-blue-200',
-      archived: 'bg-gray-100 text-gray-800 border-gray-200',
+      current: 'bg-success-muted text-success border-success/25',
+      under_review: 'bg-warning-muted text-warning border-warning/25',
+      draft: 'bg-info-muted text-info border-info/25',
+      archived: 'bg-muted text-foreground border-border',
     };
 
     return (
-      <Badge className={colors[status] || 'bg-gray-100 text-gray-800 border-gray-200'}>
+      <Badge className={colors[status] || 'bg-muted text-foreground border-border'}>
         {statusLabels[status] || status}
       </Badge>
     );
@@ -114,13 +114,13 @@ const Procedures: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'current':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CheckCircle className="w-4 h-4 text-success" />;
       case 'under_review':
-        return <Clock className="w-4 h-4 text-yellow-500" />;
+        return <Clock className="w-4 h-4 text-warning" />;
       case 'draft':
-        return <Edit className="w-4 h-4 text-blue-500" />;
+        return <Edit className="w-4 h-4 text-primary" />;
       case 'archived':
-        return <AlertTriangle className="w-4 h-4 text-gray-500" />;
+        return <AlertTriangle className="w-4 h-4 text-muted-foreground" />;
       default:
         return <FileText className="w-4 h-4 text-muted-foreground" />;
     }
@@ -129,23 +129,23 @@ const Procedures: React.FC = () => {
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'bridge_operations':
-        return <Ship className="w-4 h-4 text-blue-500" />;
+        return <Ship className="w-4 h-4 text-primary" />;
       case 'engine_room':
-        return <Flame className="w-4 h-4 text-orange-500" />;
+        return <Flame className="w-4 h-4 text-orange" />;
       case 'deck_operations':
-        return <Anchor className="w-4 h-4 text-cyan-500" />;
+        return <Anchor className="w-4 h-4 text-cyan" />;
       case 'safety':
-        return <Shield className="w-4 h-4 text-green-500" />;
+        return <Shield className="w-4 h-4 text-success" />;
       case 'emergency':
-        return <AlertTriangle className="w-4 h-4 text-red-500" />;
+        return <AlertTriangle className="w-4 h-4 text-critical" />;
       case 'cargo':
-        return <Package className="w-4 h-4 text-amber-500" />;
+        return <Package className="w-4 h-4 text-warning" />;
       case 'environmental':
-        return <Leaf className="w-4 h-4 text-emerald-500" />;
+        return <Leaf className="w-4 h-4 text-success" />;
       case 'security':
-        return <Lock className="w-4 h-4 text-purple-500" />;
+        return <Lock className="w-4 h-4 text-purple" />;
       case 'administrative':
-        return <Briefcase className="w-4 h-4 text-slate-500" />;
+        return <Briefcase className="w-4 h-4 text-muted-foreground" />;
       default:
         return <FileText className="w-4 h-4 text-muted-foreground" />;
     }
@@ -367,12 +367,12 @@ const Procedures: React.FC = () => {
                     <TableCell>
                       <div className="text-sm">
                         <div className={`flex items-center gap-1 ${
-                          isReviewOverdue(procedure.next_review_date, procedure.status) ? 'text-red-600' : ''
+                          isReviewOverdue(procedure.next_review_date, procedure.status) ? 'text-critical' : ''
                         }`}>
                           <Calendar className="w-3 h-3" />
                           {new Date(procedure.next_review_date).toLocaleDateString()}
                           {isReviewOverdue(procedure.next_review_date, procedure.status) && (
-                            <AlertTriangle className="w-3 h-3 text-red-500 ml-1" />
+                            <AlertTriangle className="w-3 h-3 text-critical ml-1" />
                           )}
                         </div>
                         {procedure.reviewed_by && (

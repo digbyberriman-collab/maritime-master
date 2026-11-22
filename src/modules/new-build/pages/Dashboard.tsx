@@ -201,14 +201,14 @@ export default function Index() {
                 const progress = phaseMilestones.length ? Math.round((completed / phaseMilestones.length) * 100) : 0;
                 const statusColors: Record<string, string> = {
                   planned: "bg-muted text-muted-foreground",
-                  active: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-                  completed: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-                  on_hold: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+                  active: "bg-info-muted text-info",
+                  completed: "bg-success-muted text-success",
+                  on_hold: "bg-warning-muted text-warning",
                 };
                 return (
                   <div key={phase.id} className="flex-1 rounded-lg border p-3">
                     <div className="flex items-center gap-1.5 mb-1.5">
-                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: phase.colour || "#2563EB" }} />
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: phase.colour || "hsl(var(--primary))" }} />
                       <span className="text-xs font-semibold truncate">{phase.name}</span>
                     </div>
                     <Progress value={progress} className="h-1.5 mb-1.5" />
@@ -297,8 +297,8 @@ export default function Index() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="grid grid-cols-3 gap-2 text-center">
-              <MiniStat icon={<CheckCircle2 className="h-3.5 w-3.5 text-green-600" />} label="Approved" value={coStats.approved} />
-              <MiniStat icon={<AlertTriangle className="h-3.5 w-3.5 text-yellow-600" />} label="Pending" value={coStats.pending} />
+              <MiniStat icon={<CheckCircle2 className="h-3.5 w-3.5 text-success" />} label="Approved" value={coStats.approved} />
+              <MiniStat icon={<AlertTriangle className="h-3.5 w-3.5 text-warning" />} label="Pending" value={coStats.pending} />
               <MiniStat icon={<XCircle className="h-3.5 w-3.5 text-destructive" />} label="Rejected" value={coStats.rejected} />
             </div>
             <Separator />
@@ -332,9 +332,9 @@ export default function Index() {
           <CardContent className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
               <StatusPill label="Ideas" count={decisionStats.idea} className="bg-muted text-muted-foreground" />
-              <StatusPill label="Active" count={decisionStats.active} className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" />
-              <StatusPill label="Final" count={decisionStats.final} className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" />
-              <StatusPill label="Changed" count={decisionStats.changed} className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" />
+              <StatusPill label="Active" count={decisionStats.active} className="bg-info-muted text-info" />
+              <StatusPill label="Final" count={decisionStats.final} className="bg-success-muted text-success" />
+              <StatusPill label="Changed" count={decisionStats.changed} className="bg-warning-muted text-warning" />
             </div>
             <Separator />
             <p className="text-xs text-muted-foreground">Recent decisions</p>
@@ -363,7 +363,7 @@ export default function Index() {
           <CardContent>
             {approvalStats.pending === 0 ? (
               <div className="py-4 text-center text-sm text-muted-foreground">
-                <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-green-500 opacity-60" />
+                <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-success opacity-60" />
                 All caught up — no pending approvals
               </div>
             ) : (
@@ -385,8 +385,8 @@ export default function Index() {
               </ScrollArea>
             )}
             <div className="flex gap-3 mt-3 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-green-600" /> {approvalStats.approved} approved</span>
-              <span className="flex items-center gap-1"><AlertTriangle className="h-3 w-3 text-yellow-600" /> {approvalStats.changesNeeded} changes needed</span>
+              <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-success" /> {approvalStats.approved} approved</span>
+              <span className="flex items-center gap-1"><AlertTriangle className="h-3 w-3 text-warning" /> {approvalStats.changesNeeded} changes needed</span>
             </div>
           </CardContent>
         </Card>

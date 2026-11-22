@@ -37,11 +37,10 @@ const SRC = join(ROOT, 'src');
  * fix: danger → destructive, ocean → primary, slate-deep → foreground (or
  * secondary-foreground on a secondary chip), navy → primary (sidebar-coloured
  * controls → sidebar), paper → card / background / muted, ink → foreground.
- * `ring-dashed` is not a utility at all (a dashed ring needs an outline or
- * border style).
+ * (DashboardGrid's `ring-dashed`, never a utility, became a dashed border in
+ * Phase 1 L2c.)
  */
 const KNOWN_UNDEFINED: readonly string[] = [
-  'src/modules/dashboard/components/DashboardGrid.tsx: ring-dashed',
   'src/modules/refit/components/AuthBanner.tsx: bg-danger',
   'src/modules/refit/components/AuthBanner.tsx: bg-danger/10',
   'src/modules/refit/components/AuthBanner.tsx: bg-ocean',

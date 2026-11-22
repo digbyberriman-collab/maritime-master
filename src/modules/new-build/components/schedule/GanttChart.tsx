@@ -21,36 +21,28 @@ interface GanttChartProps {
   items: GanttItem[];
 }
 
-/* Use inline hex colors so Tailwind purging doesn't strip them */
-const CHAPTER_COLORS: Record<number, string> = {
-  1: "#3b82f6",
-  2: "#6366f1",
-  3: "#8b5cf6",
-  4: "#a855f7",
-  5: "#d946ef",
-  6: "#ec4899",
-  7: "#f43f5e",
-  8: "#f97316",
-  9: "#f59e0b",
-  14: "#ca8a04",
-  15: "#10b981",
-  16: "#14b8a6",
+/*
+ * Chapter colours come from the chart palette (gap/10 DS18, DS25), never from
+ * the status hues: red stays "overdue" and green "done". Twelve chapters share
+ * the five category slots in order (the legend names each); a chapter outside
+ * the list uses the neutral slot. Bars take the colour inline from the CSS
+ * variable, the legend dots use the matching `bg-chart-N` class.
+ */
+const CHAPTER_ORDER = [1, 2, 3, 4, 5, 6, 7, 8, 9, 14, 15, 16] as const;
+type ChartSlot = 1 | 2 | 3 | 4 | 5 | 6;
+const CHART_DOT: Record<ChartSlot, string> = {
+  1: "bg-chart-1",
+  2: "bg-chart-2",
+  3: "bg-chart-3",
+  4: "bg-chart-4",
+  5: "bg-chart-5",
+  6: "bg-chart-6",
 };
-
-const CHAPTER_BG_CLASSES: Record<number, string> = {
-  1: "bg-blue-500",
-  2: "bg-indigo-500",
-  3: "bg-violet-500",
-  4: "bg-purple-500",
-  5: "bg-fuchsia-500",
-  6: "bg-pink-500",
-  7: "bg-rose-500",
-  8: "bg-orange-500",
-  9: "bg-amber-500",
-  14: "bg-yellow-600",
-  15: "bg-emerald-500",
-  16: "bg-teal-500",
+const chapterSlot = (chapter: number): ChartSlot => {
+  const index = (CHAPTER_ORDER as readonly number[]).indexOf(chapter);
+  return index < 0 ? 6 : (((index % 5) + 1) as ChartSlot);
 };
+const chapterColor = (chapter: number): string => `hsl(var(--chart-${chapterSlot(chapter)}))`;
 
 export function GanttChart({ items }: GanttChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -93,10 +85,10 @@ export function GanttChart({ items }: GanttChartProps) {
   const zoom = (dir: number) => setDayWidth((w) => Math.max(1, Math.min(12, w + dir)));
 
   const getBarColor = (item: GanttItem): string => {
-    if (item.resolved) return "#22c55e"; // green
+    if (item.resolved) return "hsl(var(--success))";
     const isPast = item.owner_date && item.owner_date < today;
-    if (isPast) return "#ef4444"; // red / destructive
-    return CHAPTER_COLORS[item.chapter_number] || "#6b7280";
+    if (isPast) return "hsl(var(--critical))";
+    return chapterColor(item.chapter_number);
   };
 
   return (
@@ -112,18 +104,18 @@ export function GanttChart({ items }: GanttChartProps) {
 
       {/* Legend */}
       <div className="flex flex-wrap gap-3 px-3 py-2 border-b bg-muted/20 text-[10px]">
-        {Object.entries(CHAPTER_BG_CLASSES).map(([ch, cls]) => {
-          const item = items.find((i) => i.chapter_number === Number(ch));
+        {CHAPTER_ORDER.map((ch) => {
+          const item = items.find((i) => i.chapter_number === ch);
           if (!item) return null;
           return (
             <span key={ch} className="flex items-center gap-1">
-              <span className={`w-2 h-2 rounded-full ${cls}`} />
+              <span className={`w-2 h-2 rounded-full ${CHART_DOT[chapterSlot(ch)]}`} />
               {item.chapter_name}
             </span>
           );
         })}
         <span className="flex items-center gap-1 ml-auto">
-          <span className="w-2 h-2 rounded-full bg-green-500" /> Done
+          <span className="w-2 h-2 rounded-full bg-success" /> Done
           <span className="w-2 h-2 rounded-full bg-destructive/60 ml-2" /> Overdue
           <span className="w-px h-3 bg-destructive/60 ml-2" /> Today
         </span>
@@ -143,7 +135,7 @@ export function GanttChart({ items }: GanttChartProps) {
               >
                 <span
                   className="inline-block w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: CHAPTER_COLORS[it.chapter_number] || "#6b7280" }}
+                  style={{ backgroundColor: chapterColor(it.chapter_number) }}
                 />
                 <span className="truncate">{it.description}</span>
               </div>

@@ -260,15 +260,15 @@ const CriticalEquipment: React.FC = () => {
 
   const getMaintenanceStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
-      excellent: 'bg-green-100 text-green-800 border-green-200',
-      good: 'bg-blue-100 text-blue-800 border-blue-200',
-      fair: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      poor: 'bg-orange-100 text-orange-800 border-orange-200',
-      critical: 'bg-red-100 text-red-800 border-red-200',
+      excellent: 'bg-success-muted text-success border-success/25',
+      good: 'bg-info-muted text-info border-info/25',
+      fair: 'bg-warning-muted text-warning border-warning/25',
+      poor: 'bg-orange-muted text-orange border-orange/25',
+      critical: 'bg-critical-muted text-critical border-critical/25',
     };
 
     return (
-      <Badge className={colors[status] || 'bg-gray-100 text-gray-800 border-gray-200'}>
+      <Badge className={colors[status] || 'bg-muted text-foreground border-border'}>
         {statusLabels[status] || status}
       </Badge>
     );
@@ -276,15 +276,15 @@ const CriticalEquipment: React.FC = () => {
 
   const getSparePartsStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
-      adequate: 'bg-green-100 text-green-800 border-green-200',
-      good: 'bg-blue-100 text-blue-800 border-blue-200',
-      low: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      critical: 'bg-red-100 text-red-800 border-red-200',
-      none: 'bg-gray-100 text-gray-800 border-gray-200',
+      adequate: 'bg-success-muted text-success border-success/25',
+      good: 'bg-info-muted text-info border-info/25',
+      low: 'bg-warning-muted text-warning border-warning/25',
+      critical: 'bg-critical-muted text-critical border-critical/25',
+      none: 'bg-muted text-foreground border-border',
     };
 
     return (
-      <Badge className={colors[status] || 'bg-gray-100 text-gray-800 border-gray-200'}>
+      <Badge className={colors[status] || 'bg-muted text-foreground border-border'}>
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </Badge>
     );
@@ -293,13 +293,13 @@ const CriticalEquipment: React.FC = () => {
   const getTestStatusIcon = (status: string) => {
     switch (status) {
       case 'passed':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CheckCircle className="w-4 h-4 text-success" />;
       case 'failed':
-        return <AlertTriangle className="w-4 h-4 text-red-500" />;
+        return <AlertTriangle className="w-4 h-4 text-critical" />;
       case 'overdue':
-        return <Clock className="w-4 h-4 text-orange-500" />;
+        return <Clock className="w-4 h-4 text-orange" />;
       case 'pending':
-        return <Clock className="w-4 h-4 text-blue-500" />;
+        return <Clock className="w-4 h-4 text-primary" />;
       default:
         return <Activity className="w-4 h-4 text-muted-foreground" />;
     }
@@ -486,14 +486,14 @@ const CriticalEquipment: React.FC = () => {
                         <div className="flex flex-col items-center gap-1">
                           <Wrench className="w-4 h-4 text-muted-foreground" />
                           {equipment.ism_critical && (
-                            <Shield className="w-3 h-3 text-red-500" />
+                            <Shield className="w-3 h-3 text-critical" />
                           )}
                         </div>
                         <div>
                           <div className="font-medium flex items-center gap-2">
                             {equipment.equipment_name}
                             {equipment.ism_critical && (
-                              <Badge className="bg-red-100 text-red-800 border-red-200 text-xs">
+                              <Badge className="bg-critical-muted text-critical border-critical/25 text-xs">
                                 ISM Critical
                               </Badge>
                             )}
@@ -527,20 +527,20 @@ const CriticalEquipment: React.FC = () => {
                       {getMaintenanceStatusBadge(equipment.maintenance_status)}
                       {equipment.condition_monitoring && (
                         <div className="flex items-center gap-1 mt-1">
-                          <Activity className="w-3 h-3 text-blue-500" />
-                          <span className="text-xs text-blue-600">Monitored</span>
+                          <Activity className="w-3 h-3 text-primary" />
+                          <span className="text-xs text-primary">Monitored</span>
                         </div>
                       )}
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">
                         <div className={`flex items-center gap-1 ${
-                          isMaintenanceOverdue(equipment.next_maintenance) ? 'text-red-600' : ''
+                          isMaintenanceOverdue(equipment.next_maintenance) ? 'text-critical' : ''
                         }`}>
                           <Calendar className="w-3 h-3" />
                           {new Date(equipment.next_maintenance).toLocaleDateString()}
                           {isMaintenanceOverdue(equipment.next_maintenance) && (
-                            <AlertTriangle className="w-3 h-3 text-red-500 ml-1" />
+                            <AlertTriangle className="w-3 h-3 text-critical ml-1" />
                           )}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
@@ -648,13 +648,13 @@ const CriticalEquipment: React.FC = () => {
                       </div>
                       <div className="flex items-center gap-2">
                         {equipment.maintenance_status === 'critical' && (
-                          <Badge className="bg-red-100 text-red-800 text-xs">Critical</Badge>
+                          <Badge className="bg-critical-muted text-critical text-xs">Critical</Badge>
                         )}
                         {isMaintenanceOverdue(equipment.next_maintenance) && (
-                          <Badge className="bg-orange-100 text-orange-800 text-xs">Overdue</Badge>
+                          <Badge className="bg-orange-muted text-orange text-xs">Overdue</Badge>
                         )}
                         {(equipment.spare_parts_status === 'critical' || equipment.spare_parts_status === 'none') && (
-                          <Badge className="bg-yellow-100 text-yellow-800 text-xs">No Spares</Badge>
+                          <Badge className="bg-warning-muted text-warning text-xs">No Spares</Badge>
                         )}
                       </div>
                     </div>

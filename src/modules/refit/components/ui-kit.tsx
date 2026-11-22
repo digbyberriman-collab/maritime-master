@@ -1,83 +1,89 @@
 import { ReactNode } from "react";
 import { Link  } from "react-router-dom";
+import { TONE_SURFACE, type Tone } from "@/components/ui/tones";
 
 /* =========================================================================
- * Shared UI primitives for the OceancOS operational module pages.
- * All modules use these so look + feel + state semantics stay consistent.
+ * Shared UI primitives for the Refit workspace pages.
+ * Every Refit page uses these, so look, feel and status meaning stay
+ * consistent; they are on STORM tokens (gap/10 C.2 item 13, D-40), so the
+ * pages inherit the Abyss and Daylight themes from here.
  * ========================================================================= */
 
 // -------------------- STATUS / PRIORITY BADGES --------------------------
 
-const STATUS_TONES: Record<string, string> = {
+/** Refit status → STORM status tone (gap/10 §A.8). Unknown values read as neutral. */
+const STATUS_TONES: Record<string, Tone> = {
   // generic
-  draft: "bg-slate-200 text-slate-700",
-  submitted: "bg-blue-50 text-blue-700",
-  under_review: "bg-blue-50 text-blue-700",
-  more_info_required: "bg-amber-50 text-amber-700",
-  approved: "bg-emerald-50 text-emerald-700",
-  rejected: "bg-red-50 text-red-700",
-  in_progress: "bg-blue-100 text-blue-800",
-  completed: "bg-emerald-50 text-emerald-700",
-  closed: "bg-slate-100 text-slate-600",
-  cancelled: "bg-slate-100 text-slate-500 line-through",
+  draft: "neutral",
+  submitted: "info",
+  under_review: "info",
+  more_info_required: "warn",
+  approved: "ok",
+  rejected: "danger",
+  in_progress: "signal",
+  completed: "ok",
+  closed: "neutral",
+  cancelled: "neutral",
   // crew request specific
-  new: "bg-violet-50 text-violet-700",
-  triaged: "bg-blue-50 text-blue-700",
-  assigned: "bg-blue-50 text-blue-700",
-  blocked: "bg-amber-100 text-amber-800",
-  awaiting_approval: "bg-amber-50 text-amber-800",
+  new: "purple",
+  triaged: "info",
+  assigned: "info",
+  blocked: "warn",
+  awaiting_approval: "warn",
   // PO specific
-  sent: "bg-blue-50 text-blue-700",
-  received: "bg-emerald-50 text-emerald-700",
+  sent: "info",
+  received: "ok",
   // invoice specific
-  paid: "bg-emerald-100 text-emerald-800",
-  disputed: "bg-amber-100 text-amber-800",
+  paid: "ok",
+  disputed: "warn",
   // logistics
-  planned: "bg-slate-200 text-slate-700",
-  booked: "bg-blue-50 text-blue-700",
-  in_transit: "bg-blue-100 text-blue-800",
-  arrived: "bg-emerald-50 text-emerald-700",
+  planned: "neutral",
+  booked: "info",
+  in_transit: "signal",
+  arrived: "ok",
   // inventory
-  in_stock: "bg-emerald-50 text-emerald-700",
-  low_stock: "bg-amber-50 text-amber-800",
-  reorder: "bg-amber-100 text-amber-800",
-  on_order: "bg-blue-50 text-blue-700",
-  out_of_stock: "bg-red-50 text-red-700",
-  retired: "bg-slate-100 text-slate-600",
+  in_stock: "ok",
+  low_stock: "warn",
+  reorder: "warn",
+  on_order: "info",
+  out_of_stock: "danger",
+  retired: "neutral",
   // risk
-  open: "bg-amber-50 text-amber-800",
-  mitigating: "bg-blue-50 text-blue-700",
-  accepted: "bg-slate-100 text-slate-700",
+  open: "warn",
+  mitigating: "signal",
+  accepted: "neutral",
   // contractor
-  prospect: "bg-slate-200 text-slate-700",
-  active: "bg-emerald-50 text-emerald-700",
-  suspended: "bg-amber-100 text-amber-800",
-  terminated: "bg-red-50 text-red-700",
+  prospect: "neutral",
+  active: "ok",
+  suspended: "warn",
+  terminated: "danger",
 };
 
 export function StatusBadge({ value }: { value: string | null | undefined }) {
   const v = value ?? "—";
-  const tone = STATUS_TONES[v] ?? "bg-slate-100 text-slate-700";
+  const tone = STATUS_TONES[v] ?? "neutral";
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm ${tone}`}
+      data-tone={tone}
+      className={`inline-flex items-center px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm border ${TONE_SURFACE[tone]}${v === "cancelled" ? " line-through" : ""}`}
     >
       {v.replace(/_/g, " ")}
     </span>
   );
 }
 
-const PRIORITY_TONES: Record<string, string> = {
-  low: "bg-slate-100 text-slate-700",
-  medium: "bg-blue-50 text-blue-700",
-  high: "bg-amber-50 text-amber-800",
-  critical: "bg-red-50 text-red-700",
+const PRIORITY_TONES: Record<string, Tone> = {
+  low: "neutral",
+  medium: "info",
+  high: "warn",
+  critical: "danger",
 };
 export function PriorityBadge({ value }: { value: string | null | undefined }) {
   const v = value ?? "medium";
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm ${PRIORITY_TONES[v] ?? "bg-slate-100"}`}
+      data-tone={PRIORITY_TONES[v] ?? "neutral"}
+      className={`inline-flex items-center px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-sm border ${TONE_SURFACE[PRIORITY_TONES[v] ?? "neutral"]}`}
     >
       {v}
     </span>
@@ -88,7 +94,7 @@ export function PriorityBadge({ value }: { value: string | null | undefined }) {
 
 export function ListShell({ children }: { children: ReactNode }) {
   return (
-    <div className="bg-card border border-black/5 rounded-sm shadow-sm overflow-hidden">
+    <div className="bg-card border border-border rounded-sm shadow-sm overflow-hidden">
       {children}
     </div>
   );
@@ -96,7 +102,7 @@ export function ListShell({ children }: { children: ReactNode }) {
 
 export function ListHeader({ children }: { children: ReactNode }) {
   return (
-    <div className="grid bg-muted/50 border-b border-black/5 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+    <div className="grid bg-muted/50 border-b border-border px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
       {children}
     </div>
   );
@@ -112,7 +118,7 @@ export function ListRow({
   onClick?: () => void;
 }) {
   const cls =
-    "grid items-center px-4 py-3 border-b border-black/5 hover:bg-muted/50 transition cursor-pointer text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset";
+    "grid items-center px-4 py-3 border-b border-border hover:bg-muted/50 transition cursor-pointer text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset";
   if (to)
     return (
       <Link to={to} className={cls}>
@@ -141,7 +147,7 @@ export function EmptyState({
 }) {
   return (
     <div className="p-10 text-center">
-      <div className="mx-auto mb-3 size-10 rounded-full bg-muted border border-black/5 flex items-center justify-center text-muted-foreground">
+      <div className="mx-auto mb-3 size-10 rounded-full bg-muted border border-border flex items-center justify-center text-muted-foreground">
         ∅
       </div>
       <div className="text-sm font-medium">{title}</div>
@@ -153,7 +159,7 @@ export function EmptyState({
 
 export function LoadingRow({ cols = 5 }: { cols?: number }) {
   return (
-    <div className="px-4 py-3 border-b border-black/5">
+    <div className="px-4 py-3 border-b border-border">
       <div className="animate-pulse h-4 bg-muted rounded-sm" style={{ width: `${cols * 12}%` }} />
     </div>
   );
@@ -206,7 +212,7 @@ export function GhostBtn({
       type={type ?? "button"}
       onClick={onClick}
       disabled={disabled}
-      className="px-3 py-2 bg-white border border-black/10 rounded-sm text-sm hover:bg-secondary disabled:opacity-50"
+      className="px-3 py-2 bg-card border border-input rounded-sm text-sm hover:bg-secondary disabled:opacity-50"
     >
       {children}
     </button>
@@ -265,7 +271,7 @@ export function Field({
 }
 
 export const inputCls =
-  "w-full px-3 py-2 bg-white border border-input rounded-sm text-sm focus-visible:outline-none focus:ring-2 focus:ring-ring";
+  "w-full px-3 py-2 bg-card border border-input rounded-sm text-sm focus-visible:outline-none focus:ring-2 focus:ring-ring";
 
 // -------------------- DRAWER ------------------------------------------
 
@@ -287,11 +293,11 @@ export function Drawer({
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex">
-      <button aria-label="Close" onClick={onClose} className="flex-1 bg-black/40" />
+      <button aria-label="Close" onClick={onClose} className="flex-1 bg-scrim" />
       <div
-        className={`bg-card border-l border-black/10 shadow-xl flex flex-col w-full ${wide ? "max-w-3xl" : "max-w-md"}`}
+        className={`bg-card border-l border-border shadow-xl flex flex-col w-full ${wide ? "max-w-3xl" : "max-w-md"}`}
       >
-        <div className="flex items-center justify-between px-5 h-12 border-b border-black/10">
+        <div className="flex items-center justify-between px-5 h-12 border-b border-border">
           <div className="text-xs uppercase tracking-[0.25em] text-primary font-semibold truncate">
             {title}
           </div>
@@ -300,7 +306,7 @@ export function Drawer({
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-5">{children}</div>
-        {footer && <div className="border-t border-black/10 p-4 bg-card">{footer}</div>}
+        {footer && <div className="border-t border-border p-4 bg-card">{footer}</div>}
       </div>
     </div>
   );
@@ -335,9 +341,9 @@ export function StatCard({
   sub?: string;
 }) {
   const ring =
-    tone === "bad" ? "ring-1 ring-destructive/30" : tone === "warn" ? "ring-1 ring-warning/30" : "";
+    tone === "bad" ? "border-l-[3px] border-l-critical" : tone === "warn" ? "border-l-[3px] border-l-warning" : "";
   return (
-    <div className={`p-5 bg-card border border-black/5 rounded-sm shadow-sm ${ring}`}>
+    <div className={`p-5 bg-card border border-border rounded-sm shadow-sm ${ring}`}>
       <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wider">{label}</div>
       <div className="text-2xl font-medium tabular-nums">{value}</div>
       {sub && <div className="text-[11px] text-muted-foreground mt-1">{sub}</div>}
@@ -355,7 +361,7 @@ export function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="p-6 bg-card border border-black/5 rounded-sm shadow-sm">
+    <section className="p-6 bg-card border border-border rounded-sm shadow-sm">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-foreground">{title}</h2>
         {action}

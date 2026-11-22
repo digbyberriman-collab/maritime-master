@@ -190,3 +190,6 @@ export function useDashboardLayout(widgetDefs: WidgetDefinition[]) {
     resetToDefaults,
   };
 }
+
+/** What `useDashboardLayout` returns: the page owns it, the grid and its controls read it. */
+export type DashboardLayoutState = ReturnType<typeof useDashboardLayout>;

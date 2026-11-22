@@ -56,10 +56,10 @@ const ERMPage: React.FC = () => {
   const riskScore = Math.max(0, 100 - (highRiskCount * 10) - (openIncidents * 5) - (overdueCAPAs * 8));
 
   const getRiskScoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-600';
-    if (score >= 60) return 'text-yellow-600';
-    if (score >= 40) return 'text-orange-600';
-    return 'text-red-600';
+    if (score >= 80) return 'text-success';
+    if (score >= 60) return 'text-warning';
+    if (score >= 40) return 'text-orange';
+    return 'text-critical';
   };
 
   const getRiskScoreLabel = (score: number) => {
@@ -92,7 +92,7 @@ const ERMPage: React.FC = () => {
         </div>
 
         {/* Overall Risk Score */}
-        <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+        <Card className="border-l-[3px] border-l-primary">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -105,10 +105,9 @@ const ERMPage: React.FC = () => {
                 </div>
                 <Badge className={cn(
                   "mt-2",
-                  riskScore >= 80 ? "bg-green-500" :
-                  riskScore >= 60 ? "bg-yellow-500" :
-                  riskScore >= 40 ? "bg-orange-500" : "bg-red-500",
-                  "text-white"
+                  riskScore >= 80 ? "bg-success text-success-foreground" :
+                  riskScore >= 60 ? "bg-warning text-warning-foreground" :
+                  riskScore >= 40 ? "bg-orange text-orange-foreground" : "bg-critical text-critical-foreground"
                 )}>
                   {getRiskScoreLabel(riskScore)}
                 </Badge>
@@ -126,10 +125,10 @@ const ERMPage: React.FC = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">High/Critical Risks</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-red-500" />
+              <AlertTriangle className="h-4 w-4 text-critical" />
             </CardHeader>
             <CardContent>
-              <div className={cn("text-2xl font-bold", highRiskCount > 0 && "text-red-600")}>
+              <div className={cn("text-2xl font-bold", highRiskCount > 0 && "text-critical")}>
                 {highRiskCount}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -144,10 +143,10 @@ const ERMPage: React.FC = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Open Incidents</CardTitle>
-              <FileWarning className="h-4 w-4 text-orange-500" />
+              <FileWarning className="h-4 w-4 text-orange" />
             </CardHeader>
             <CardContent>
-              <div className={cn("text-2xl font-bold", openIncidents > 0 && "text-orange-600")}>
+              <div className={cn("text-2xl font-bold", openIncidents > 0 && "text-orange")}>
                 {openIncidents}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -162,12 +161,12 @@ const ERMPage: React.FC = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Open Actions</CardTitle>
-              <Clock className="h-4 w-4 text-yellow-500" />
+              <Clock className="h-4 w-4 text-warning" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{openCAPAs}</div>
               <p className="text-xs text-muted-foreground">
-                <span className={overdueCAPAs > 0 ? "text-red-600 font-medium" : ""}>
+                <span className={overdueCAPAs > 0 ? "text-critical font-medium" : ""}>
                   {overdueCAPAs} overdue
                 </span>
               </p>
@@ -180,10 +179,10 @@ const ERMPage: React.FC = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Audit Findings</CardTitle>
-              <Target className="h-4 w-4 text-purple-500" />
+              <Target className="h-4 w-4 text-purple" />
             </CardHeader>
             <CardContent>
-              <div className={cn("text-2xl font-bold", openFindingsCount > 0 && "text-purple-600")}>
+              <div className={cn("text-2xl font-bold", openFindingsCount > 0 && "text-purple")}>
                 {openFindingsCount}
               </div>
               <p className="text-xs text-muted-foreground">
@@ -207,7 +206,7 @@ const ERMPage: React.FC = () => {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-red-500" />
+                    <div className="w-3 h-3 rounded-full bg-critical" />
                     <span>High/Critical</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -217,7 +216,7 @@ const ERMPage: React.FC = () => {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-yellow-500" />
+                    <div className="w-3 h-3 rounded-full bg-warning" />
                     <span>Medium</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -227,7 +226,7 @@ const ERMPage: React.FC = () => {
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-green-500" />
+                    <div className="w-3 h-3 rounded-full bg-success" />
                     <span>Low</span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -245,21 +244,21 @@ const ERMPage: React.FC = () => {
               <CardDescription>Common risk management tasks</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Button variant="outline" className="justify-start">
-                  <AlertTriangle className="w-4 h-4 mr-2 text-red-500" />
+                  <AlertTriangle className="w-4 h-4 mr-2 text-critical" />
                   Report Incident
                 </Button>
                 <Button variant="outline" className="justify-start">
-                  <Shield className="w-4 h-4 mr-2 text-blue-500" />
+                  <Shield className="w-4 h-4 mr-2 text-primary" />
                   New Risk Assessment
                 </Button>
                 <Button variant="outline" className="justify-start">
-                  <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
+                  <CheckCircle className="w-4 h-4 mr-2 text-success" />
                   Create CAPA
                 </Button>
                 <Button variant="outline" className="justify-start">
-                  <TrendingUp className="w-4 h-4 mr-2 text-purple-500" />
+                  <TrendingUp className="w-4 h-4 mr-2 text-purple" />
                   View Trends
                 </Button>
               </div>
@@ -276,25 +275,25 @@ const ERMPage: React.FC = () => {
           <CardContent>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               <div className="text-center">
-                <div className="text-3xl font-bold text-green-600">
+                <div className="text-3xl font-bold text-success">
                   {incidents.length > 0 ? Math.round((incidents.filter(i => i.status === 'Closed').length / incidents.length) * 100) : 100}%
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">Incident Closure Rate</p>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-blue-600">
+                <div className="text-3xl font-bold text-primary">
                   {actions.length > 0 ? Math.round((actions.filter(a => a.status === 'Closed').length / actions.length) * 100) : 100}%
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">CAPA Completion Rate</p>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-purple-600">
+                <div className="text-3xl font-bold text-purple">
                   {audits.length}
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">Audits This Year</p>
               </div>
               <div className="text-center">
-                <div className="text-3xl font-bold text-orange-600">
+                <div className="text-3xl font-bold text-orange">
                   {totalRisks}
                 </div>
                 <p className="text-sm text-muted-foreground mt-1">Active Risk Assessments</p>

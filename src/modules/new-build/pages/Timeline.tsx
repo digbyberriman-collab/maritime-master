@@ -24,14 +24,17 @@ import {
 } from "date-fns";
 import { appendix11Data, parseWeekDate } from "@/modules/new-build/data/appendix11-data";
 import { GanttChart } from "@/modules/new-build/components/schedule/GanttChart";
+import { StatusPill } from "@/shared/components/status";
+import type { Tone } from "@/components/ui/tones";
 
 type ViewMode = "calendar" | "list";
 
-const statusColors: Record<string, string> = {
-  idea: "bg-muted text-muted-foreground",
-  active: "bg-primary/15 text-primary",
-  final: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  changed: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
+/** Decision status → status tone (gap/10 §A.8). */
+const STATUS_TONE: Record<string, Tone> = {
+  idea: "neutral",
+  active: "signal",
+  final: "ok",
+  changed: "orange",
 };
 
 export default function Timeline() {
@@ -265,10 +268,10 @@ export default function Timeline() {
     const status = getDateStatus(dateStr);
     if (!dateStr) return <span className="text-muted-foreground text-xs">—</span>;
     const cls =
-      status === "done" ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300" :
+      status === "done" ? "bg-success-muted text-success" :
       status === "overdue" ? "bg-destructive/15 text-destructive" :
       status === "tbd" ? "bg-muted text-muted-foreground" :
-      status === "reference" ? "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300" :
+      status === "reference" ? "bg-info-muted text-info" :
       "bg-accent text-accent-foreground";
     return <Badge className={`text-[11px] font-normal ${cls}`}>{dateStr}</Badge>;
   };
@@ -390,7 +393,7 @@ export default function Timeline() {
                               item.daysUntil <= 7
                                 ? "bg-destructive/15 text-destructive"
                                 : item.daysUntil <= 14
-                                ? "bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300"
+                                ? "bg-orange-muted text-orange"
                                 : "bg-accent text-accent-foreground"
                             }`}
                           >
@@ -429,7 +432,7 @@ export default function Timeline() {
           {/* Stats + controls */}
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
             <div className="flex gap-4 text-sm">
-              <span className="flex items-center gap-1"><CheckCircle2 className="h-4 w-4 text-green-600" /> {scheduleStats.done}/{scheduleStats.total} resolved</span>
+              <span className="flex items-center gap-1"><CheckCircle2 className="h-4 w-4 text-success" /> {scheduleStats.done}/{scheduleStats.total} resolved</span>
               <span className="flex items-center gap-1"><Link2 className="h-4 w-4 text-primary" /> {scheduleStats.linked} linked to requirements</span>
             </div>
             <div className="flex gap-2 flex-wrap">
@@ -644,9 +647,10 @@ export default function Timeline() {
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-medium">{d.title}</span>
-                              <Badge className={statusColors[d.status] || ""}>
-                                {d.status.charAt(0).toUpperCase() + d.status.slice(1)}
-                              </Badge>
+                              <StatusPill
+                                tone={STATUS_TONE[d.status] ?? "neutral"}
+                                label={d.status.charAt(0).toUpperCase() + d.status.slice(1)}
+                              />
                               {d.areas?.name && <Badge variant="outline" className="text-xs">{d.areas.name}</Badge>}
                             </div>
                             {d.decision_text && <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{d.decision_text}</p>}

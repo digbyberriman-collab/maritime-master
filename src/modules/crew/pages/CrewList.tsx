@@ -4,7 +4,8 @@ import {
   Users, Search, FileText, Download, IdCard, Ship, Building2, HardHat, AlertTriangle,
 } from 'lucide-react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import PageHeader from '@/shared/components/layout/PageHeader';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +22,8 @@ import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import OfficialCrewListDialog from '@/modules/crew/components/OfficialCrewListDialog';
 import PersonnelRecordDialog from '@/modules/crew/components/PersonnelRecordDialog';
 import { personnelToCsv } from '@/modules/crew/lib/crewListPdf';
+import { KpiGrid, KpiTile, TABLET_MIN_WIDTH, useMinWidth } from '@/shared/components/data';
+import { StatusPill } from '@/shared/components/status';
 
 type TypeFilter = 'all' | 'crew' | 'contractor' | 'shoreside';
 
@@ -47,9 +50,22 @@ const passportWarning = (person: CrewMember) => {
   return expiry <= sixMonths;
 };
 
+/** Passport expiry date, flagged when it falls within six months (danger tone plus an icon, never colour alone). */
+function PassportExpiry({ person }: { person: CrewMember }) {
+  const warn = passportWarning(person);
+  return (
+    <span className={warn ? 'inline-flex items-center gap-1 font-medium text-critical' : 'inline-flex items-center gap-1'}>
+      {warn ? <AlertTriangle aria-hidden="true" className="h-3.5 w-3.5" /> : null}
+      {fmt(person.passport_expiry)}
+      {warn ? <span className="sr-only"> (expires within six months)</span> : null}
+    </span>
+  );
+}
+
 const CrewList: React.FC = () => {
   const { crew, isLoading } = useCrew();
   const { vessels, selectedVesselId } = useVessel();
+  const isWide = useMinWidth(TABLET_MIN_WIDTH);
 
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [search, setSearch] = useState('');
@@ -119,43 +135,42 @@ const CrewList: React.FC = () => {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 animate-fade-in">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Crew List</h1>
-            <p className="text-muted-foreground">
-              Every person on the books — crew, contractors and shoreside staff — with the official
-              crew list ready for port and immigration.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleCsv} disabled={filtered.length === 0}>
-              <Download className="mr-2 h-4 w-4" /> Export list
-            </Button>
-            <Button onClick={() => setOfficialOpen(true)} disabled={vessels.length === 0}>
-              <FileText className="mr-2 h-4 w-4" /> Official crew list
-            </Button>
-          </div>
-        </div>
+      <div className="space-y-4">
+        <PageHeader
+          className="max-sm:flex-col max-sm:items-stretch"
+          title="Crew list"
+          description="Every person on the books (crew, contractors and shoreside staff), with the official crew list ready for port and immigration."
+          actions={
+            <>
+              <Button variant="outline" onClick={handleCsv} disabled={filtered.length === 0}>
+                <Download aria-hidden="true" className="mr-2 h-4 w-4" /> Export list
+              </Button>
+              <Button onClick={() => setOfficialOpen(true)} disabled={vessels.length === 0}>
+                <FileText aria-hidden="true" className="mr-2 h-4 w-4" /> Official crew list
+              </Button>
+            </>
+          }
+        />
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {summaryCards.map((card) => (
-            <Card key={card.label} className="shadow-card">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">{card.label}</CardTitle>
-                <card.icon className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <p className="text-2xl font-bold">{isLoading ? '—' : card.value}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <section aria-label="Personnel counts">
+          <KpiGrid className="lg:grid-cols-4 min-[1440px]:grid-cols-4">
+            {summaryCards.map((card) => (
+              <KpiTile
+                key={card.label}
+                label={card.label}
+                icon={card.icon}
+                value={card.value}
+                state={isLoading ? 'loading' : 'ready'}
+              />
+            ))}
+          </KpiGrid>
+        </section>
 
-        <Card className="shadow-card">
+        <Card>
           <CardHeader className="space-y-4">
             <Tabs value={typeFilter} onValueChange={(value) => setTypeFilter(value as TypeFilter)}>
-              <TabsList>
+              {/* Four filters do not fit 390 px: the strip scrolls inside itself, never the page. */}
+              <TabsList className="max-w-full justify-start overflow-x-auto">
                 <TabsTrigger value="all">Everyone ({counts.all})</TabsTrigger>
                 <TabsTrigger value="crew">Crew ({counts.crew})</TabsTrigger>
                 <TabsTrigger value="contractor">Contractors ({counts.contractor})</TabsTrigger>
@@ -163,7 +178,7 @@ const CrewList: React.FC = () => {
               </TabsList>
             </Tabs>
 
-            <div className="grid gap-3 md:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
               <div className="relative md:col-span-2">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -213,7 +228,7 @@ const CrewList: React.FC = () => {
               <p className="py-8 text-center text-sm text-muted-foreground">
                 No personnel match these filters.
               </p>
-            ) : (
+            ) : isWide ? (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -239,7 +254,7 @@ const CrewList: React.FC = () => {
                           <span className="block text-xs text-muted-foreground">{person.email}</span>
                         </TableCell>
                         <TableCell>
-                          <Badge variant={typeOf(person) === 'crew' ? 'default' : 'secondary'}>
+                          <Badge variant={typeOf(person) === 'crew' ? 'secondary' : 'outline'}>
                             {TYPE_LABEL[typeOf(person)] ?? typeOf(person)}
                           </Badge>
                         </TableCell>
@@ -250,19 +265,14 @@ const CrewList: React.FC = () => {
                         </TableCell>
                         <TableCell>{person.nationality ?? '—'}</TableCell>
                         <TableCell className="whitespace-nowrap">
-                          <span className="flex items-center gap-1">
-                            {passportWarning(person) && (
-                              <AlertTriangle className="h-3.5 w-3.5 text-destructive" />
-                            )}
-                            {fmt(person.passport_expiry)}
-                          </span>
+                          <PassportExpiry person={person} />
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{person.status ?? 'unknown'}</Badge>
+                          <StatusPill domain="crew" status={person.status ?? 'unknown'} />
                         </TableCell>
                         <TableCell className="text-right">
                           <Button size="sm" variant="ghost" onClick={() => setRecordPerson(person)}>
-                            <IdCard className="mr-1 h-4 w-4" /> Edit
+                            <IdCard aria-hidden="true" className="mr-1 h-4 w-4" /> Edit
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -270,6 +280,40 @@ const CrewList: React.FC = () => {
                   </TableBody>
                 </Table>
               </div>
+            ) : (
+              <ul aria-label="Personnel" className="divide-y divide-border">
+                {filtered.map((person) => (
+                  <li key={person.id} className="flex items-start gap-3 py-3">
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="truncate font-medium">
+                        {person.last_name}, {person.first_name}
+                      </p>
+                      <p className="truncate text-sm text-muted-foreground">
+                        {[person.rank ?? person.job_title, person.current_assignment?.vessel_name ?? person.office_location]
+                          .filter(Boolean)
+                          .join(' · ') || '—'}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        <StatusPill domain="crew" status={person.status ?? 'unknown'} />
+                        <Badge variant={typeOf(person) === 'crew' ? 'secondary' : 'outline'}>
+                          {TYPE_LABEL[typeOf(person)] ?? typeOf(person)}
+                        </Badge>
+                        <span className="text-xs text-muted-foreground">
+                          Passport <PassportExpiry person={person} />
+                        </span>
+                      </div>
+                    </div>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => setRecordPerson(person)}
+                      aria-label={`Edit personnel record: ${person.first_name} ${person.last_name}`}
+                    >
+                      <IdCard aria-hidden="true" className="h-4 w-4" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
             )}
           </CardContent>
         </Card>

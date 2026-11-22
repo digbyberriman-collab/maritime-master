@@ -81,11 +81,11 @@ const mockEquipment: EquipmentItem[] = [
 ];
 
 const EQUIPMENT_CATEGORIES = [
-  { id: 'life_saving', name: 'Life Saving Appliances', icon: LifeBuoy, color: 'text-blue-500' },
-  { id: 'fire_fighting', name: 'Fire Fighting Equipment', icon: Flame, color: 'text-red-500' },
-  { id: 'navigation', name: 'Navigation Safety', icon: Navigation, color: 'text-green-500' },
-  { id: 'medical', name: 'Medical Equipment', icon: ShieldAlert, color: 'text-pink-500' },
-  { id: 'pollution', name: 'Pollution Response', icon: AlertTriangle, color: 'text-orange-500' },
+  { id: 'life_saving', name: 'Life Saving Appliances', icon: LifeBuoy, color: 'text-primary' },
+  { id: 'fire_fighting', name: 'Fire Fighting Equipment', icon: Flame, color: 'text-critical' },
+  { id: 'navigation', name: 'Navigation Safety', icon: Navigation, color: 'text-success' },
+  { id: 'medical', name: 'Medical Equipment', icon: ShieldAlert, color: 'text-pink' },
+  { id: 'pollution', name: 'Pollution Response', icon: AlertTriangle, color: 'text-orange' },
 ];
 
 const EquipmentReadinessTab: React.FC = () => {
@@ -141,28 +141,28 @@ const EquipmentReadinessTab: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'ready':
-        return <CheckCircle className="h-4 w-4 text-green-500" />;
+        return <CheckCircle className="h-4 w-4 text-success" />;
       case 'service_due':
-        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+        return <AlertCircle className="h-4 w-4 text-warning" />;
       case 'defective':
-        return <XCircle className="h-4 w-4 text-red-500" />;
+        return <XCircle className="h-4 w-4 text-critical" />;
       case 'expired':
-        return <XCircle className="h-4 w-4 text-red-600" />;
+        return <XCircle className="h-4 w-4 text-critical" />;
       default:
-        return <AlertCircle className="h-4 w-4 text-gray-500" />;
+        return <AlertCircle className="h-4 w-4 text-muted-foreground" />;
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'ready':
-        return <Badge className="bg-green-100 text-green-800">Ready</Badge>;
+        return <Badge className="bg-success-muted text-success">Ready</Badge>;
       case 'service_due':
-        return <Badge className="bg-yellow-100 text-yellow-800">Service Due</Badge>;
+        return <Badge className="bg-warning-muted text-warning">Service Due</Badge>;
       case 'defective':
-        return <Badge className="bg-red-100 text-red-800">Defective</Badge>;
+        return <Badge className="bg-critical-muted text-critical">Defective</Badge>;
       case 'expired':
-        return <Badge className="bg-red-100 text-red-800">Expired</Badge>;
+        return <Badge className="bg-critical-muted text-critical">Expired</Badge>;
       default:
         return <Badge variant="outline">Unknown</Badge>;
     }
@@ -209,41 +209,41 @@ const EquipmentReadinessTab: React.FC = () => {
               <Progress 
                 value={stats.readinessRate} 
                 className={`h-4 ${
-                  stats.readinessRate >= 90 ? '[&>div]:bg-green-500' : 
-                  stats.readinessRate >= 70 ? '[&>div]:bg-yellow-500' : 
-                  '[&>div]:bg-red-500'
+                  stats.readinessRate >= 90 ? '[&>div]:bg-success' : 
+                  stats.readinessRate >= 70 ? '[&>div]:bg-warning' : 
+                  '[&>div]:bg-critical'
                 }`}
               />
             </div>
             <span className="text-3xl font-bold">{stats.readinessRate}%</span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200">
-              <CheckCircle className="h-5 w-5 text-green-500" />
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-success-muted border border-success/25">
+              <CheckCircle className="h-5 w-5 text-success" />
               <div>
-                <p className="text-2xl font-bold text-green-700">{stats.ready}</p>
-                <p className="text-xs text-green-600">Ready</p>
+                <p className="text-2xl font-bold text-success">{stats.ready}</p>
+                <p className="text-xs text-success">Ready</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-yellow-50 border border-yellow-200">
-              <AlertCircle className="h-5 w-5 text-yellow-500" />
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-warning-muted border border-warning/25">
+              <AlertCircle className="h-5 w-5 text-warning" />
               <div>
-                <p className="text-2xl font-bold text-yellow-700">{stats.serviceDue}</p>
-                <p className="text-xs text-yellow-600">Service Due</p>
+                <p className="text-2xl font-bold text-warning">{stats.serviceDue}</p>
+                <p className="text-xs text-warning">Service Due</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200">
-              <XCircle className="h-5 w-5 text-red-500" />
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-critical-muted border border-critical/25">
+              <XCircle className="h-5 w-5 text-critical" />
               <div>
-                <p className="text-2xl font-bold text-red-700">{stats.defective}</p>
-                <p className="text-xs text-red-600">Defective</p>
+                <p className="text-2xl font-bold text-critical">{stats.defective}</p>
+                <p className="text-xs text-critical">Defective</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 p-3 rounded-lg bg-gray-50 border border-gray-200">
-              <Wrench className="h-5 w-5 text-gray-500" />
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-muted border border-border">
+              <Wrench className="h-5 w-5 text-muted-foreground" />
               <div>
-                <p className="text-2xl font-bold text-gray-700">{stats.total}</p>
-                <p className="text-xs text-gray-600">Total Items</p>
+                <p className="text-2xl font-bold text-muted-foreground">{stats.total}</p>
+                <p className="text-xs text-muted-foreground">Total Items</p>
               </div>
             </div>
           </div>
@@ -269,9 +269,9 @@ const EquipmentReadinessTab: React.FC = () => {
                   <Progress 
                     value={cat.rate} 
                     className={`h-2 flex-1 ${
-                      cat.rate >= 90 ? '[&>div]:bg-green-500' : 
-                      cat.rate >= 70 ? '[&>div]:bg-yellow-500' : 
-                      '[&>div]:bg-red-500'
+                      cat.rate >= 90 ? '[&>div]:bg-success' : 
+                      cat.rate >= 70 ? '[&>div]:bg-warning' : 
+                      '[&>div]:bg-critical'
                     }`}
                   />
                   <span className="text-sm font-bold">{cat.rate}%</span>
@@ -363,9 +363,9 @@ const EquipmentReadinessTab: React.FC = () => {
                   <div 
                     key={item.id}
                     className={`p-3 rounded-lg border ${
-                      daysUntil <= 7 ? 'bg-red-50 border-red-200' : 
-                      daysUntil <= 14 ? 'bg-yellow-50 border-yellow-200' : 
-                      'bg-gray-50 border-gray-200'
+                      daysUntil <= 7 ? 'bg-critical-muted border-critical/25' : 
+                      daysUntil <= 14 ? 'bg-warning-muted border-warning/25' : 
+                      'bg-muted border-border'
                     }`}
                   >
                     <div className="flex items-start justify-between">
@@ -376,8 +376,8 @@ const EquipmentReadinessTab: React.FC = () => {
                       <Badge 
                         variant="outline"
                         className={
-                          daysUntil <= 7 ? 'border-red-300 text-red-700' : 
-                          daysUntil <= 14 ? 'border-yellow-300 text-yellow-700' : ''
+                          daysUntil <= 7 ? 'border-critical/25 text-critical' : 
+                          daysUntil <= 14 ? 'border-warning/25 text-warning' : ''
                         }
                       >
                         {daysUntil === 0 ? 'Today' : daysUntil === 1 ? 'Tomorrow' : `${daysUntil} days`}
@@ -398,9 +398,9 @@ const EquipmentReadinessTab: React.FC = () => {
 
       {/* Defects & Issues */}
       {stats.defective > 0 && (
-        <Card className="border-red-200">
+        <Card className="border-critical/25">
           <CardHeader>
-            <CardTitle className="text-base text-red-700 flex items-center gap-2">
+            <CardTitle className="text-base text-critical flex items-center gap-2">
               <XCircle className="h-5 w-5" />
               Equipment Defects Requiring Attention
             </CardTitle>
@@ -408,7 +408,7 @@ const EquipmentReadinessTab: React.FC = () => {
           <CardContent>
             <div className="space-y-3">
               {mockEquipment.filter(e => e.status === 'defective').map(item => (
-                <div key={item.id} className="p-4 rounded-lg bg-red-50 border border-red-200">
+                <div key={item.id} className="p-4 rounded-lg bg-critical-muted border border-critical/25">
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="font-medium">{item.name}</p>

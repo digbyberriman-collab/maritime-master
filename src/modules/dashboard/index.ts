@@ -6,7 +6,6 @@ export { default as DPADashboard } from './pages/DPADashboard';
 export { default as FleetMap } from './pages/FleetMap';
 
 // Components
-export { AlertKPITiles } from './components/AlertKPITiles';
 export { ComplianceSnapshot } from './components/ComplianceSnapshot';
 export { DashboardHeader } from './components/DashboardHeader';
 export { FleetFilter } from './components/FleetFilter';

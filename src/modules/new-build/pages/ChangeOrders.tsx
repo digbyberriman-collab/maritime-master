@@ -22,6 +22,8 @@ import {
   XCircle, Eye,
 } from "lucide-react";
 import { format } from "date-fns";
+import { StatusPill } from "@/shared/components/status";
+import type { Tone } from "@/components/ui/tones";
 
 type COStatus = "draft" | "submitted" | "under_review" | "approved" | "in_progress" | "completed" | "rejected";
 
@@ -37,14 +39,15 @@ const STATUS_OPTIONS: { value: COStatus; label: string }[] = [
   { value: "rejected", label: "Rejected" },
 ];
 
-const statusColors: Record<COStatus, string> = {
-  draft: "bg-muted text-muted-foreground",
-  submitted: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  under_review: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-  approved: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  in_progress: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-  completed: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
-  rejected: "bg-destructive/20 text-destructive",
+/** Change-order status → status tone (gap/10 §A.8): review is live work, rejection is danger. */
+const STATUS_TONE: Record<COStatus, Tone> = {
+  draft: "neutral",
+  submitted: "info",
+  under_review: "signal",
+  approved: "ok",
+  in_progress: "signal",
+  completed: "ok",
+  rejected: "danger",
 };
 
 interface COForm {
@@ -375,8 +378,8 @@ export default function ChangeOrders() {
               <TrendingUp className="h-4 w-4" /> Status Breakdown
             </div>
             <div className="flex gap-3 text-sm mt-1">
-              <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-green-600" />{stats.approved}</span>
-              <span className="flex items-center gap-1"><AlertTriangle className="h-3 w-3 text-yellow-600" />{stats.pending}</span>
+              <span className="flex items-center gap-1"><CheckCircle2 className="h-3 w-3 text-success" />{stats.approved}</span>
+              <span className="flex items-center gap-1"><AlertTriangle className="h-3 w-3 text-warning" />{stats.pending}</span>
               <span className="flex items-center gap-1"><XCircle className="h-3 w-3 text-destructive" />{stats.rejected}</span>
             </div>
           </CardContent>
@@ -436,7 +439,7 @@ export default function ChangeOrders() {
                       <div className="font-medium">{co.title}</div>
                       {linkCount > 0 && <span className="text-xs text-muted-foreground">{linkCount} linked</span>}
                     </TableCell>
-                    <TableCell><Badge className={statusColors[co.status as COStatus]}>{co.status.replace("_", " ")}</Badge></TableCell>
+                    <TableCell><StatusPill tone={STATUS_TONE[co.status as COStatus] ?? "neutral"} label={co.status.replace("_", " ")} className="capitalize" /></TableCell>
                     <TableCell className="text-sm">{area?.name || "—"}</TableCell>
                     <TableCell className="text-sm">{co.requested_by_name || "—"}</TableCell>
                     <TableCell className="text-right text-sm font-medium">
@@ -539,7 +542,7 @@ export default function ChangeOrders() {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   {detailCO.title}
-                  <Badge className={statusColors[detailCO.status as COStatus]}>{detailCO.status.replace("_", " ")}</Badge>
+                  <StatusPill tone={STATUS_TONE[detailCO.status as COStatus] ?? "neutral"} label={detailCO.status.replace("_", " ")} className="capitalize" />
                 </DialogTitle>
                 <DialogDescription>{detailCO.description || "No description"}</DialogDescription>
               </DialogHeader>

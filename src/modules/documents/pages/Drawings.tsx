@@ -161,8 +161,8 @@ export default function Drawings() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <FileImage className="w-5 h-5 text-blue-600" />
+                <div className="p-2 bg-info-muted rounded-lg">
+                  <FileImage className="w-5 h-5 text-primary" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">{drawings.length}</p>
@@ -174,8 +174,8 @@ export default function Drawings() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <FolderOpen className="w-5 h-5 text-green-600" />
+                <div className="p-2 bg-success-muted rounded-lg">
+                  <FolderOpen className="w-5 h-5 text-success" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
@@ -189,8 +189,8 @@ export default function Drawings() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Ship className="w-5 h-5 text-purple-600" />
+                <div className="p-2 bg-purple-muted rounded-lg">
+                  <Ship className="w-5 h-5 text-purple" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">
@@ -204,8 +204,8 @@ export default function Drawings() {
           <Card>
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-yellow-100 rounded-lg">
-                  <Layers className="w-5 h-5 text-yellow-600" />
+                <div className="p-2 bg-warning-muted rounded-lg">
+                  <Layers className="w-5 h-5 text-warning" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold">

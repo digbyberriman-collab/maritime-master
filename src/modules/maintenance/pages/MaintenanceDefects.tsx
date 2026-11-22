@@ -233,19 +233,19 @@ const MaintenanceDefects: React.FC = () => {
 
   const getPriorityBadge = (priority: string, ismCritical: boolean) => {
     const colors: Record<string, string> = {
-      low: 'bg-gray-100 text-gray-800 border-gray-200',
-      medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      high: 'bg-orange-100 text-orange-800 border-orange-200',
-      critical: 'bg-red-100 text-red-800 border-red-200',
+      low: 'bg-muted text-foreground border-border',
+      medium: 'bg-warning-muted text-warning border-warning/25',
+      high: 'bg-orange-muted text-orange border-orange/25',
+      critical: 'bg-critical-muted text-critical border-critical/25',
     };
 
     return (
       <div className="flex items-center gap-2">
-        <Badge className={colors[priority] || 'bg-gray-100 text-gray-800 border-gray-200'}>
+        <Badge className={colors[priority] || 'bg-muted text-foreground border-border'}>
           {priorityLabels[priority] || priority}
         </Badge>
         {ismCritical && (
-          <Badge className="bg-red-500 text-white border-red-500">
+          <Badge className="bg-critical text-critical-foreground border-critical">
             <Flag className="w-3 h-3 mr-1" />
             ISM Critical
           </Badge>
@@ -256,15 +256,15 @@ const MaintenanceDefects: React.FC = () => {
 
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
-      open: 'bg-blue-100 text-blue-800 border-blue-200',
-      in_progress: 'bg-purple-100 text-purple-800 border-purple-200',
-      pending_parts: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      completed: 'bg-green-100 text-green-800 border-green-200',
-      cancelled: 'bg-gray-100 text-gray-800 border-gray-200',
+      open: 'bg-info-muted text-info border-info/25',
+      in_progress: 'bg-purple-muted text-purple border-purple/25',
+      pending_parts: 'bg-warning-muted text-warning border-warning/25',
+      completed: 'bg-success-muted text-success border-success/25',
+      cancelled: 'bg-muted text-foreground border-border',
     };
 
     return (
-      <Badge className={colors[status] || 'bg-gray-100 text-gray-800 border-gray-200'}>
+      <Badge className={colors[status] || 'bg-muted text-foreground border-border'}>
         {statusLabels[status] || status}
       </Badge>
     );
@@ -273,15 +273,15 @@ const MaintenanceDefects: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'completed':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CheckCircle className="w-4 h-4 text-success" />;
       case 'in_progress':
-        return <Clock className="w-4 h-4 text-purple-500" />;
+        return <Clock className="w-4 h-4 text-purple" />;
       case 'pending_parts':
-        return <Clock className="w-4 h-4 text-yellow-500" />;
+        return <Clock className="w-4 h-4 text-warning" />;
       case 'cancelled':
-        return <XCircle className="w-4 h-4 text-gray-500" />;
+        return <XCircle className="w-4 h-4 text-muted-foreground" />;
       default:
-        return <AlertTriangle className="w-4 h-4 text-blue-500" />;
+        return <AlertTriangle className="w-4 h-4 text-primary" />;
     }
   };
 
@@ -444,14 +444,14 @@ const MaintenanceDefects: React.FC = () => {
     <DashboardLayout>
       <div className="space-y-6 animate-fade-in">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
             <h1 className="text-2xl font-bold text-foreground">Maintenance Defects</h1>
             <p className="text-muted-foreground">
               Track and manage open defects across your fleet
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={handleResetData} className="gap-2">
               <RefreshCw className="w-4 h-4" />
               Reset Data
@@ -603,12 +603,12 @@ const MaintenanceDefects: React.FC = () => {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className={`text-sm ${isOverdue(defect.target_completion, defect.status) ? 'text-red-600' : ''}`}>
+                      <div className={`text-sm ${isOverdue(defect.target_completion, defect.status) ? 'text-critical' : ''}`}>
                         <div className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
                           {new Date(defect.target_completion).toLocaleDateString()}
                           {isOverdue(defect.target_completion, defect.status) && (
-                            <AlertTriangle className="w-3 h-3 text-red-500 ml-1" />
+                            <AlertTriangle className="w-3 h-3 text-critical ml-1" />
                           )}
                         </div>
                         {defect.completion_date && (
