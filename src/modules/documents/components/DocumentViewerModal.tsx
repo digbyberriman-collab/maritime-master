@@ -192,15 +192,15 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
           <div className="w-[400px] flex flex-col">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
               <TabsList className="w-full justify-start rounded-none border-b px-4 pt-2 h-auto bg-transparent">
-                <TabsTrigger value="details" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+                <TabsTrigger value="details">
                   Details
                 </TabsTrigger>
-                <TabsTrigger value="versions" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+                <TabsTrigger value="versions">
                   <History className="w-4 h-4 mr-1" />
                   Versions
                 </TabsTrigger>
                 {document.is_mandatory_read && (
-                  <TabsTrigger value="acknowledgments" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+                  <TabsTrigger value="acknowledgments">
                     <Users className="w-4 h-4 mr-1" />
                     Acknowledgments
                   </TabsTrigger>

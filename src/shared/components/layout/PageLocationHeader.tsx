@@ -9,6 +9,7 @@ import {
   BreadcrumbSeparator,
 } from '@/components/ui/breadcrumb';
 import { resolvePageNavigation } from '@/shared/lib/pageNavigation';
+import { toNavPathname } from '@/app/router/legacyResolve';
 
 interface PageLocationHeaderProps {
   activeModuleId?: string | null;
@@ -17,7 +18,9 @@ interface PageLocationHeaderProps {
 const PageLocationHeader: React.FC<PageLocationHeaderProps> = ({ activeModuleId }) => {
   const location = useLocation();
   const page = React.useMemo(
-    () => resolvePageNavigation(location.pathname, location.search, activeModuleId),
+    // Vessel URLs (/v/dra/crew/list) resolve as the nav tree's pattern path
+    // (/v/:vesselCode/crew/list), as DashboardLayout and the sidebar do.
+    () => resolvePageNavigation(toNavPathname(location.pathname), location.search, activeModuleId),
     [activeModuleId, location.pathname, location.search],
   );
 

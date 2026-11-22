@@ -10,6 +10,8 @@ import { join } from 'node:path';
 import { NAVIGATION_ITEMS, PLACEHOLDER_LEAVES } from '@/config/sitemap';
 import type { NavChild } from '@/config/navigation-types';
 import { LEGAL_PATHS, LEGAL_TABS } from '@/modules/legal/paths';
+import { LEGAL_ROUTES } from '@/modules/legal/routes';
+import { isRedirectDef } from '@/app/registry/types';
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -57,8 +59,15 @@ const leavesOf = (items: NavChild[], acc: NavChild[] = []): NavChild[] => {
 };
 
 describe('Legal wiring', () => {
-  const vessel = NAVIGATION_ITEMS.find((m) => m.id === 'vessel');
-  const legalLeaf = leavesOf(vessel?.children ?? []).find((l) => l.label === 'Legal');
+  // Legal is a workspace (D-09, R4): the Fleet sidebar reaches it from the
+  // WORKSPACES section (BUILD-PLAN B7).
+  const fleet = NAVIGATION_ITEMS.find((m) => m.id === 'fleet');
+  const legalLeaf = leavesOf(fleet?.children ?? []).find((l) => l.label === 'Legal');
+  const routePaths = new Set(LEGAL_ROUTES.map((r) => r.path));
+  const redirectTo = (path: string) => {
+    const def = LEGAL_ROUTES.find((r) => r.path === path);
+    return def && isRedirectDef(def) ? def.redirectTo : undefined;
+  };
 
   it('sidebar Legal leaf points at the module and is no longer a placeholder', () => {
     expect(legalLeaf?.path).toBe(LEGAL_PATHS.root);
@@ -66,13 +75,16 @@ describe('Legal wiring', () => {
   });
 
   it('every tab and static path has a route, and the legacy path redirects', () => {
-    for (const tab of LEGAL_TABS) expect(routesSource).toContain(`path={LEGAL_PATHS.${tab.id}}`);
-    for (const key of ['root', 'legacyPlaceholder', 'newRequest'] as const) expect(routesSource).toContain(`path={LEGAL_PATHS.${key}}`);
-    expect(routesSource).toContain('/:id');
-    expect(routesSource).toContain('/:templateId/fill');
-    expect(routesSource).toContain('/:templateId/submissions');
-    expect(routesIndex).toContain('{legalRoutes}');
-    expect(routesIndex.indexOf('{legalRoutes}')).toBeLessThan(routesIndex.indexOf('PLACEHOLDER_LEAVES.map'));
+    for (const tab of LEGAL_TABS) expect(routePaths.has(LEGAL_PATHS[tab.id]), tab.id).toBe(true);
+    expect(routePaths.has(LEGAL_PATHS.newRequest)).toBe(true);
+    expect(redirectTo(LEGAL_PATHS.root)).toBe(LEGAL_PATHS.dashboard);
+    expect(redirectTo(LEGAL_PATHS.legacyPlaceholder)).toBe(LEGAL_PATHS.dashboard);
+    expect(routePaths.has(`${LEGAL_PATHS.requests}/:id`)).toBe(true);
+    expect(routePaths.has(`${LEGAL_PATHS.forms}/:templateId/fill`)).toBe(true);
+    expect(routePaths.has(`${LEGAL_PATHS.forms}/:templateId/submissions`)).toBe(true);
+    // Manifest workspace routes are mounted ahead of the sitemap placeholders.
+    expect(routesIndex).toContain('{workspaceManifestRoutes}');
+    expect(routesIndex.indexOf('{workspaceManifestRoutes}')).toBeLessThan(routesIndex.indexOf('PLACEHOLDER_LEAVES.map'));
   });
 
   it('every lazily imported page exists', () => {

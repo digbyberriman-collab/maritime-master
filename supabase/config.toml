@@ -27,9 +27,6 @@ verify_jwt = false
 [functions.submit-form]
 verify_jwt = false
 
-[functions.sign-submission]
-verify_jwt = false
-
 [functions.complete-drill]
 verify_jwt = false
 

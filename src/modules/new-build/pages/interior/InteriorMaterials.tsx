@@ -861,7 +861,7 @@ export default function InteriorMaterials() {
                                   <button
                                     type="button"
                                     onClick={() => handlePromoteToSwatch(p)}
-                                    className="text-[9px] text-white bg-primary px-1.5 py-0.5 rounded hover:bg-primary/80"
+                                    className="text-[9px] text-primary-foreground bg-primary px-1.5 py-0.5 rounded hover:bg-primary/80"
                                     title="Make primary"
                                   >
                                     Set primary
@@ -869,7 +869,7 @@ export default function InteriorMaterials() {
                                   <button
                                     type="button"
                                     onClick={() => handleRemovePhoto(p)}
-                                    className="text-[9px] text-white bg-destructive px-1.5 py-0.5 rounded hover:bg-destructive/80"
+                                    className="text-[9px] text-destructive-foreground bg-destructive px-1.5 py-0.5 rounded hover:bg-destructive/80"
                                   >
                                     Remove
                                   </button>

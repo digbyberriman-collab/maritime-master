@@ -390,7 +390,8 @@ const NotificationBell: React.FC = () => {
         <Button
           variant="ghost"
           size="icon"
-          className="relative min-h-11 min-w-11"
+          // The bell sits on the sidebar, which stays Abyss in both themes (D-DS1).
+          className="relative min-h-11 min-w-11 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-sidebar-ring focus-visible:ring-offset-sidebar"
           aria-label={
             unreadCount > 0
               ? `Open notifications, ${unreadCount} unread`

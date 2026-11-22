@@ -32,7 +32,7 @@ export const KpiTile: React.FC<KpiTileProps> = ({ icon: Icon, label, value, hint
         <Icon className="h-5 w-5" />
       </div>
       <div className="min-w-0">
-        {value === null ? <Skeleton className="h-7 w-10" /> : <p className="text-2xl font-semibold leading-none text-foreground">{value}</p>}
+        {value === null ? <Skeleton className="h-7 w-10" /> : <p className="text-2xl font-semibold leading-none tabular-nums text-foreground">{value}</p>}
         <p className="mt-1 truncate text-xs text-muted-foreground">{label}</p>
         {hint && <p className="truncate text-[11px] text-muted-foreground/80">{hint}</p>}
       </div>

@@ -277,7 +277,7 @@ const ResetPassword: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => navigate('/auth')}
-                  className="text-sm text-secondary hover:underline"
+                  className="text-sm text-primary hover:underline"
                 >
                   Back to Login
                 </button>

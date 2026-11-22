@@ -31,6 +31,8 @@ interface AlertKPITilesProps {
   onTileClick?: (type: string) => void;
 }
 
+// Status tokens only (gap/10 C.3): each tone's text colour passes AA on its
+// own tint in both themes, and fills carry their `-foreground`.
 const colorClasses = {
   red: {
     bg: 'bg-destructive/10 hover:bg-destructive/20',
@@ -40,23 +42,23 @@ const colorClasses = {
     pulse: 'animate-pulse',
   },
   orange: {
-    bg: 'bg-orange-500/10 hover:bg-orange-500/20',
-    border: 'border-orange-500/30',
-    text: 'text-orange-600 dark:text-orange-400',
-    badge: 'bg-orange-500 text-white',
+    bg: 'bg-orange/10 hover:bg-orange/20',
+    border: 'border-orange/30',
+    text: 'text-orange',
+    badge: 'bg-orange text-orange-foreground',
     pulse: '',
   },
   yellow: {
     bg: 'bg-warning/10 hover:bg-warning/20',
     border: 'border-warning/30',
-    text: 'text-warning-foreground dark:text-yellow-400',
+    text: 'text-warning',
     badge: 'bg-warning text-warning-foreground',
     pulse: '',
   },
   green: {
     bg: 'bg-success/10 hover:bg-success/20',
     border: 'border-success/30',
-    text: 'text-success dark:text-green-400',
+    text: 'text-success',
     badge: 'bg-success text-success-foreground',
     pulse: '',
   },
@@ -68,10 +70,10 @@ const colorClasses = {
     pulse: '',
   },
   purple: {
-    bg: 'bg-purple-500/10 hover:bg-purple-500/20',
-    border: 'border-purple-500/30',
-    text: 'text-purple-600 dark:text-purple-400',
-    badge: 'bg-purple-500 text-white',
+    bg: 'bg-purple/10 hover:bg-purple/20',
+    border: 'border-purple/30',
+    text: 'text-purple',
+    badge: 'bg-purple text-purple-foreground',
     pulse: '',
   },
 };
@@ -155,7 +157,7 @@ export const AlertKPITiles: React.FC<AlertKPITilesProps> = ({
               <div className={cn('flex items-center justify-center gap-2 mb-2', colors.text)}>
                 {tile.icon}
               </div>
-              <div className={cn('text-3xl font-bold mb-1', colors.text)}>
+              <div className={cn('text-3xl font-bold tabular-nums mb-1', colors.text)}>
                 {tile.value}
               </div>
               <Badge className={cn('text-xs', colors.badge)}>

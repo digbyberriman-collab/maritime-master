@@ -147,7 +147,7 @@ const KPITile: React.FC<KPITileProps> = ({ tile, summary }) => {
           </div>
           <div className="mt-3">
             <p className={cn(
-              'text-2xl font-bold',
+              'text-2xl font-bold tabular-nums',
               typeof value === 'string' && 'text-base'
             )}>
               {typeof value === 'number' ? value.toLocaleString() : value}

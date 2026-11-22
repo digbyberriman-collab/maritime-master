@@ -22,12 +22,14 @@ const readCount = (): number => {
 const showRecoveryPanel = () => {
   const root = document.getElementById("root");
   if (!root) return;
+  // Styled by the .storm-boot classes in index.html's head <style>, so the
+  // panel follows the theme without the app's CSS.
   root.innerHTML = `
-    <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:ui-sans-serif,system-ui,sans-serif;text-align:center">
+    <div class="storm-boot">
       <div style="max-width:24rem">
-        <div style="font-weight:900;letter-spacing:-0.02em;font-size:1.75rem;margin-bottom:0.5rem">STORM</div>
-        <p style="margin:0 0 1rem;color:#64748b;font-size:0.875rem">We couldn't finish loading STORM. This is usually a temporary connection problem.</p>
-        <button type="button" id="storm-recovery-reload" style="border:0;border-radius:0.5rem;padding:0.625rem 1.25rem;background:#0066CC;color:#fff;font-size:0.875rem;font-weight:600;cursor:pointer">Reload</button>
+        <div class="storm-boot-mark">STORM</div>
+        <p class="storm-boot-text">We couldn't finish loading STORM. This is usually a temporary connection problem.</p>
+        <button type="button" id="storm-recovery-reload" class="storm-boot-button">Reload</button>
       </div>
     </div>`;
   document.getElementById("storm-recovery-reload")?.addEventListener("click", () => {

@@ -201,7 +201,7 @@ export default function Areas() {
                 )}
                 {a.current_focus && (
                   <div className="flex items-start gap-1.5">
-                    <Target className="h-3.5 w-3.5 text-accent mt-0.5 shrink-0" />
+                    <Target className="h-3.5 w-3.5 text-primary mt-0.5 shrink-0" />
                     <div>
                       <p className="text-xs font-medium text-muted-foreground">Current Focus</p>
                       <p className="text-sm">{a.current_focus}</p>

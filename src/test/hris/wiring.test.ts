@@ -10,7 +10,7 @@ import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { NAVIGATION_ITEMS, PLACEHOLDER_LEAVES } from '@/config/sitemap';
 import type { NavChild } from '@/config/navigation-types';
-import { HRIS_PATHS } from '@/modules/hris/paths';
+import { HRIS_ROUTES } from '@/modules/hris/routes';
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -57,9 +57,9 @@ const leavesOf = (items: NavChild[], acc: NavChild[] = []): NavChild[] => {
 describe('HRIS wiring', () => {
   const hris = NAVIGATION_ITEMS.find((m) => m.id === 'hris');
   const hrisLeaves = leavesOf(hris?.children ?? []);
-  const hrisRoutePaths = new Set(
-    Array.from(routesSource.matchAll(/path=\{HRIS_PATHS\.(\w+)\}/g)).map((m) => (HRIS_PATHS as Record<string, string>)[m[1]]),
-  );
+  // HRIS routes are data now (BUILD-PLAN B8): the manifest registers them
+  // and the router mounts them in the HRIS workspace scope.
+  const hrisRoutePaths = new Set(HRIS_ROUTES.map((r) => r.path));
   const explicitRoutes = new Set(Array.from(routesIndex.matchAll(/path="([^"]+)"/g)).map((m) => m[1]));
 
   it('every HRIS nav leaf lands on a registered route, not a placeholder', () => {

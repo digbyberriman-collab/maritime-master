@@ -52,8 +52,9 @@ const SignaturePad: React.FC<SignaturePadProps> = ({
     canvas.height = canvas.offsetHeight * 2;
     ctx.scale(2, 2);
 
-    // Style
-    ctx.strokeStyle = '#1a365d';
+    // Ink: the pad is a Daylight (paper) surface in both themes, so the
+    // stored image reads on printed and exported forms; draw in its foreground.
+    ctx.strokeStyle = getComputedStyle(canvas).color;
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -163,7 +164,7 @@ const SignaturePad: React.FC<SignaturePadProps> = ({
 
   if (isComplete && disabled) {
     return (
-      <Card className="border-accent bg-accent/10">
+      <Card className="border-primary bg-primary/10">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -257,10 +258,10 @@ const SignaturePad: React.FC<SignaturePadProps> = ({
             
             <div className="relative">
               <Label>Draw Your Signature</Label>
-              <div className="mt-1 border-2 border-dashed border-muted rounded-lg bg-background relative">
+              <div className="light mt-1 border-2 border-dashed border-border rounded-lg bg-background relative">
                 <canvas
                   ref={canvasRef}
-                  className="w-full h-32 cursor-crosshair touch-none"
+                  className="w-full h-32 cursor-crosshair touch-none text-foreground"
                   onMouseDown={startDrawing}
                   onMouseMove={draw}
                   onMouseUp={stopDrawing}

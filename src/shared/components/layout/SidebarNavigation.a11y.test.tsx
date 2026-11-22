@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import SidebarNavigation from '@/shared/components/layout/SidebarNavigation';
+import { NavAccessContext, type NavAccess } from '@/app/nav/navAccess';
 
 const mocks = vi.hoisted(() => ({
   order: { map: {} },
@@ -35,14 +36,20 @@ vi.mock('@/shared/hooks/useSidebarBadgeCounts', () => ({
   useSidebarBadgeCounts: () => mocks.badgeCounts,
 }));
 
+// The sidebar fails closed without access facts (src/app/nav/navAccess.ts);
+// these regressions are about ARIA and focus, so every gate is open.
+const OPEN_ACCESS: NavAccess = { ready: true, legacyRole: 'dpa', rbacRoles: [], can: () => true, fleetReach: true, vesselReach: true };
+
 const LocationProbe = () => <output aria-label="Current route">{useLocation().pathname}{useLocation().search}</output>;
 
-function renderSidebar(path = '/vessel/logbooks/review?module=vessel', collapsed = false, onExpand = vi.fn()) {
+function renderSidebar(path = '/v/dra/logbooks/review?module=vessel', collapsed = false, onExpand = vi.fn()) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <SidebarNavigation moduleId="vessel" collapsed={collapsed} onExpand={onExpand} />
-      <LocationProbe />
-    </MemoryRouter>,
+    <NavAccessContext.Provider value={OPEN_ACCESS}>
+      <MemoryRouter initialEntries={[path]}>
+        <SidebarNavigation moduleId="vessel" collapsed={collapsed} onExpand={onExpand} />
+        <LocationProbe />
+      </MemoryRouter>
+    </NavAccessContext.Provider>,
   );
 }
 
@@ -97,11 +104,11 @@ describe('SidebarNavigation accessibility regressions', () => {
 
   it('retains accessible names, active state, and focus styling in icon-only mode', () => {
     const onExpand = vi.fn();
-    renderSidebar('/vessel/logbooks/review?module=vessel', true, onExpand);
+    renderSidebar('/v/dra/logbooks/review?module=vessel', true, onExpand);
     const navigation = screen.getByRole('navigation', { name: 'Vessel folders' });
-    const logbooks = within(navigation).getByRole('button', { name: /Electronic Logbooks section, contains current page.*Expand sidebar to view/i });
+    const logbooks = within(navigation).getByRole('button', { name: /^Logbooks section, contains current page.*Expand sidebar to view/i });
 
-    expect(logbooks).toHaveAccessibleName(/Electronic Logbooks section/i);
+    expect(logbooks).toHaveAccessibleName(/^Logbooks section/i);
     expect(logbooks.className).toContain('focus-visible:ring-2');
     activateWithKeyboard(logbooks);
     expect(logbooks).toHaveFocus();
@@ -109,7 +116,7 @@ describe('SidebarNavigation accessibility regressions', () => {
   });
 
   it('navigates a focused leaf control and keeps its accessible name', async () => {
-    renderSidebar('/vessel/logbooks/review?module=vessel');
+    renderSidebar('/v/dra/logbooks/review?module=vessel');
     const crew = screen.getByRole('button', { name: /Crew section, collapsed/i });
     activateWithKeyboard(crew);
     const crewList = await screen.findByRole('button', { name: 'Crew List' });

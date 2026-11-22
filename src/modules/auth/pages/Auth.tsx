@@ -371,7 +371,7 @@ const Auth: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setMode('forgot-password')}
-                  className="text-sm text-secondary hover:underline"
+                  className="text-sm text-primary hover:underline"
                 >
                   Forgot password?
                 </button>
@@ -430,7 +430,7 @@ const Auth: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setMode('login')}
-                      className="text-secondary hover:underline font-medium"
+                      className="text-primary hover:underline font-medium"
                     >
                       Sign in
                     </button>
@@ -440,7 +440,7 @@ const Auth: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setMode('login')}
-                    className="text-secondary hover:underline font-medium"
+                    className="text-primary hover:underline font-medium"
                   >
                     Back to login
                   </button>

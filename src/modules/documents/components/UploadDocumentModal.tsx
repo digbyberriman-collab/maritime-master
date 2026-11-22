@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -101,7 +101,6 @@ const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
   const [language, setLanguage] = useState('EN');
   const [tagInput, setTagInput] = useState('');
   const [tags, setTags] = useState<string[]>([]);
-  const [tagSuggestions, setTagSuggestions] = useState<string[]>([]);
   const [isMandatoryRead, setIsMandatoryRead] = useState(false);
   const [ismSections, setIsmSections] = useState<number[]>([]);
   const [nextReviewDate, setNextReviewDate] = useState<Date | undefined>(addYears(new Date(), 1));
@@ -141,18 +140,13 @@ const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
     }
   }, [documentNumber]);
 
-  // Filter tag suggestions
-  useEffect(() => {
-    if (tagInput.trim()) {
-      const filtered = existingTags.filter(
-        (tag) =>
-          tag.toLowerCase().includes(tagInput.toLowerCase()) &&
-          !tags.includes(tag)
-      );
-      setTagSuggestions(filtered.slice(0, 5));
-    } else {
-      setTagSuggestions([]);
-    }
+  // Tag suggestions, derived. (An effect that set state here looped forever
+  // while the tags query had no data: `existingTags = []` is a new array on
+  // every render.)
+  const tagSuggestions = useMemo(() => {
+    const query = tagInput.trim().toLowerCase();
+    if (!query) return [];
+    return existingTags.filter((tag) => tag.toLowerCase().includes(query) && !tags.includes(tag)).slice(0, 5);
   }, [tagInput, existingTags, tags]);
 
   const resetForm = () => {
@@ -246,7 +240,6 @@ const UploadDocumentModal: React.FC<UploadDocumentModalProps> = ({
       setTags([...tags, trimmedTag]);
     }
     setTagInput('');
-    setTagSuggestions([]);
   };
 
   const handleTagKeyDown = (e: React.KeyboardEvent) => {

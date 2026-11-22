@@ -57,7 +57,7 @@ export const FleetKPITiles: React.FC<{ kpi: FleetKPI }> = ({ kpi }) => {
             </span>
             <t.icon className="w-4 h-4 opacity-70" />
           </div>
-          <div className={cn('text-3xl font-bold mt-2', VALUE_TONE[t.tone])}>{t.value}</div>
+          <div className={cn('text-3xl font-bold tabular-nums mt-2', VALUE_TONE[t.tone])}>{t.value}</div>
           <div className="text-xs opacity-75 mt-1 line-clamp-2">{t.sub}</div>
         </div>
       ))}

@@ -66,9 +66,13 @@ describe('Work & Rest wiring', () => {
     }
   });
 
-  it('the sidebar leaf and the routes agree on /crew/work-rest', () => {
-    const leaf = leavesOf(NAVIGATION_ITEMS.flatMap((m) => m.children ?? [])).find((l) => l.path === '/crew/work-rest');
-    expect(leaf, 'sidebar leaf for /crew/work-rest').toBeTruthy();
+  it('the sidebar leaf and the routes agree on hours of rest', () => {
+    // The vessel tree (BUILD-PLAN B7) links the vessel HoR board; the legacy
+    // /crew/work-rest pages keep their routes behind LegacyRoute (B6, R8).
+    const leaf = leavesOf(NAVIGATION_ITEMS.flatMap((m) => m.children ?? [])).find((l) => l.path === '/v/:vesselCode/crew/hours-of-rest');
+    expect(leaf, 'sidebar leaf for /v/:vesselCode/crew/hours-of-rest').toBeTruthy();
+    expect(routesIndex).toContain('path="crew/hours-of-rest"');
+    expect(routesIndex).toContain('path="hours-of-rest"');
     expect(routesIndex).toContain('path="/crew/work-rest"');
     expect(routesIndex).toContain('path="/crew/work-rest/overview"');
     expect(routesIndex).toContain("import('@/modules/work-rest/pages/MyWorkRestMonth')");

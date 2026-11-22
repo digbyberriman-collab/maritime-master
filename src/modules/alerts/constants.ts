@@ -144,10 +144,10 @@ export const SEVERITY_COLORS: Record<AlertSeverity, { bg: string; text: string; 
     badge: 'bg-warning text-warning-foreground'
   },
   YELLOW: {
-    bg: 'bg-accent/20',
-    text: 'text-accent-foreground',
-    border: 'border-accent',
-    badge: 'bg-accent text-accent-foreground'
+    bg: 'bg-amber/10',
+    text: 'text-amber',
+    border: 'border-amber',
+    badge: 'bg-amber text-amber-foreground'
   },
   GREEN: {
     bg: 'bg-success/10',

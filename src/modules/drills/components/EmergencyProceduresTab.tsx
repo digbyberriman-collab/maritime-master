@@ -293,9 +293,9 @@ const EmergencyProceduresTab: React.FC = () => {
                       {quickActions.map((action, idx) => (
                         <div 
                           key={idx}
-                          className="bg-white rounded-lg p-4 border relative"
+                          className="bg-card rounded-lg p-4 border relative"
                         >
-                          <div className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold">
+                          <div className="absolute -top-2 -left-2 w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
                             {action.step}
                           </div>
                           <h5 className="font-bold text-sm mb-1 ml-4">{action.title}</h5>
