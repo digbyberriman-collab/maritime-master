@@ -3,66 +3,31 @@
  *
  * `/account` and `/admin/notifications` sat in the sidebar for months with no
  * route behind them: clicking either fell through the catch-all to the
- * dashboard, with no error. This test asserts that each leaf carrying an
- * `existing` target resolves to a declared route, counting the routes that
- * live in module route files and the generated section redirects, not just
- * the literals in the main router.
+ * dashboard, with no error. This test asserts that each leaf with a real
+ * target (every leaf that is not a Coming Soon placeholder) resolves to a
+ * declared route.
+ *
+ * Since the target nav tree (BUILD-PLAN B7), fleet and vessel pages are
+ * nested routes under `/fleet` and `/v/:vesselCode`, which a scan of
+ * `path="…"` literals cannot join. So the check runs on the route tree React
+ * Router itself builds from <AppRoutes/> (src/test/router/routeHarness.ts),
+ * matched with the router's own ranking and with redirects followed.
  */
-import { describe, expect, it } from 'vitest';
-import { readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { NAVIGATION_ITEMS, PLACEHOLDER_LEAVES, SECTION_REDIRECTS } from '@/config/sitemap';
+import { describe, expect, it, vi } from 'vitest';
+
+// Importing the route tree imports the guards, which import the client.
+vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
+
+import { NAVIGATION_ITEMS } from '@/config/sitemap';
 import type { NavChild } from '@/config/navigation-types';
+import {
+  appRouteObjects,
+  isPlaceholderElement,
+  isScopeNotFound,
+  resolveUrl,
+} from '@/test/router/routeHarness';
 
-const ROOT = process.cwd();
-const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
-
-/** Literal `path="..."` values, excluding the `*` catch-all which matches everything. */
-function literalPaths(source: string): string[] {
-  return Array.from(source.matchAll(/path="([^"]+)"/g))
-    .map((m) => m[1])
-    .filter((p) => p !== '*');
-}
-
-/** Paths a module route file mounts, e.g. `path={LEGAL_PATHS.root}`, resolved from its paths module. */
-function modulePaths(): string[] {
-  const out: string[] = [];
-  for (const dir of readdirSync(join(ROOT, 'src/modules'))) {
-    const routesFile = join('src/modules', dir, 'routes.tsx');
-    try {
-      out.push(...literalPaths(read(routesFile)));
-    } catch {
-      continue; // module has no routes file
-    }
-    // Module routers commonly mount a base path plus children; record the base
-    // so leaves pointing at the module root resolve.
-    try {
-      const paths = read(join('src/modules', dir, 'paths.ts'));
-      for (const m of paths.matchAll(/'(\/[a-z0-9/-]+)'/gi)) out.push(m[1]);
-    } catch {
-      // no paths module
-    }
-  }
-  return out;
-}
-
-const declared = new Set<string>([
-  ...literalPaths(read('src/routes/index.tsx')),
-  ...modulePaths(),
-  ...SECTION_REDIRECTS.map((r) => r.from),
-  ...PLACEHOLDER_LEAVES.map((l) => l.path),
-]);
-
-function isDeclared(target: string): boolean {
-  const path = target.split('?')[0];
-  if (declared.has(path)) return true;
-  for (const d of declared) {
-    if (!d.includes(':') && !d.endsWith('/*')) continue;
-    const pattern = '^' + d.replace(/:[^/]+/g, '[^/]+').replace(/\/\*$/, '(/.*)?') + '$';
-    if (new RegExp(pattern).test(path)) return true;
-  }
-  return false;
-}
+const routes = appRouteObjects();
 
 const leaves: NavChild[] = [];
 (function walk(items: NavChild[]) {
@@ -72,8 +37,18 @@ const leaves: NavChild[] = [];
   }
 })(NAVIGATION_ITEMS.flatMap((m) => m.children ?? []));
 
-const placeholderPaths = new Set(PLACEHOLDER_LEAVES.map((l) => l.path));
-const explicitLeaves = leaves.filter((l) => l.path && !placeholderPaths.has(l.path));
+const explicitLeaves = leaves.filter((l) => l.status !== 'planned');
+const target = (label: string, module: string) =>
+  (() => {
+    const found: NavChild[] = [];
+    (function walk(items: NavChild[]) {
+      for (const item of items) {
+        if (item.children?.length) walk(item.children);
+        else if (item.label === label) found.push(item);
+      }
+    })(NAVIGATION_ITEMS.find((m) => m.id === module)?.children ?? []);
+    return found[0]?.path;
+  })();
 
 describe('sitemap targets', () => {
   it('has leaves to check', () => {
@@ -83,17 +58,20 @@ describe('sitemap targets', () => {
 
   it('every leaf with a real target resolves to a declared route', () => {
     const broken = explicitLeaves
-      .filter((l) => !isDeclared(l.path as string))
-      .map((l) => `${l.label} -> ${l.path}`);
+      .map((l) => ({ l, r: resolveUrl(routes, l.path) }))
+      .filter(({ r }) => r.pattern === '*' || isScopeNotFound(r.element) || isPlaceholderElement(r.element) || !r.element)
+      .map(({ l, r }) => `${l.label} -> ${l.path} (matched ${r.pattern || 'nothing'})`);
     expect(broken, `sidebar leaves with no route:\n${broken.join('\n')}`).toEqual([]);
   });
 
-  it('keeps the leaves that were previously dead pointed at their real pages', () => {
-    const target = (label: string) => leaves.find((l) => l.label === label)?.path;
-    expect(target('Notification Management')).toBe('/settings/notifications');
-    expect(target('Account')).toBe('/settings');
-    expect(target('Support Tickets')).toBe('/help/support');
-    expect(target('Fleet Rotation Planner')).toBe('/crew/rotation-planner');
-    expect(target('Users & Access')).toBe('/users-access');
+  it('keeps the leaves that were once dead pointed at real pages, now in their scopes (B7)', () => {
+    expect(target('Notifications', 'fleet')).toBe('/fleet/admin/notifications');
+    expect(target('Users & Access', 'fleet')).toBe('/fleet/admin/users');
+    expect(target('Planner', 'fleet')).toBe('/fleet/planner');
+    // Support and the company Account page are planned in the Fleet tree; the
+    // personal settings and the support form stay reachable from the account
+    // menu and the footer, not the fleet sidebar.
+    expect(target('Account', 'fleet')).toBe('/fleet/admin/account');
+    expect(target('Support', 'fleet')).toBe('/fleet/admin/support');
   });
 });

@@ -1,53 +1,54 @@
-import React from 'react';
-import { Route } from 'react-router-dom';
-import ModuleRoute from '@/shared/components/ModuleRoute';
-import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { LazyLoader } from '@/shared/components/common/LazyLoader';
-
-type Loader = () => Promise<{ default: React.ComponentType }>;
-
-const page = (loader: Loader, gate: { hrLevel?: 'view' | 'edit' | 'admin'; payrollLevel?: 'view' | 'edit' | 'admin' } = {}) => {
-  const C = React.lazy(loader);
-  return (
-    <ModuleRoute moduleId="hris" hrLevel={gate.hrLevel} payrollLevel={gate.payrollLevel}>
-      <DashboardLayout>
-        <React.Suspense fallback={<LazyLoader />}>
-          <C />
-        </React.Suspense>
-      </DashboardLayout>
-    </ModuleRoute>
-  );
-};
-
+import type { AccessLevel, ManifestPageLoader, RouteDef } from '@/app/registry/types';
 import { HRIS_PATHS } from './paths';
 
 /**
- * HRIS routes. Listed in src/routes/index.tsx before the sitemap placeholder
- * routes so they take precedence. Every page is wrapped in ModuleRoute (login
- * + HRIS module access); pages that must never render for self-service users
- * pass an explicit hrLevel.
+ * HRIS routes, as data (BUILD-PLAN B8). The module manifest (./module.ts)
+ * registers them and the router mounts them inside the HRIS workspace scope
+ * (src/app/router/manifestRoutes.tsx), so route order no longer matters.
+ *
+ * Every page is wrapped in ModuleRoute (login + HRIS module access) and the
+ * shell; pages that must never render for self-service users pass an
+ * explicit hrLevel or payrollLevel.
  */
-export const hrisRoutes = (
-  <>
-    <Route path={HRIS_PATHS.personalDetails} element={page(() => import('@/modules/hris/pages/PersonalDetailsPage'))} />
-    <Route path={HRIS_PATHS.contracts} element={page(() => import('@/modules/hris/pages/ContractsPage'))} />
-    <Route path={HRIS_PATHS.documents} element={page(() => import('@/modules/hris/pages/DocumentsPage'))} />
-    <Route path={HRIS_PATHS.nextOfKin} element={page(() => import('@/modules/hris/pages/NextOfKinPage'))} />
-    <Route path={HRIS_PATHS.employmentHistory} element={page(() => import('@/modules/hris/pages/EmploymentHistoryPage'))} />
-    <Route path={HRIS_PATHS.salaries} element={page(() => import('@/modules/hris/pages/SalariesPage'))} />
-    <Route path={HRIS_PATHS.payroll} element={page(() => import('@/modules/hris/pages/PayrollPage'), { payrollLevel: 'view' })} />
-    <Route path={HRIS_PATHS.gratuities} element={page(() => import('@/modules/hris/pages/GratuitiesPage'), { payrollLevel: 'view' })} />
-    <Route path={HRIS_PATHS.payReviews} element={page(() => import('@/modules/hris/pages/PayReviewsPage'), { payrollLevel: 'view' })} />
-    <Route path={HRIS_PATHS.compensationSettings} element={page(() => import('@/modules/hris/pages/CompensationSettingsPage'), { payrollLevel: 'admin' })} />
-    <Route path={HRIS_PATHS.annualEvaluations} element={page(() => import('@/modules/hris/pages/ReviewsPage'))} />
-    <Route path={HRIS_PATHS.annualReviews} element={page(() => import('@/modules/hris/pages/ReviewsPage'))} />
-    <Route path={HRIS_PATHS.endOfRotation} element={page(() => import('@/modules/hris/pages/ReviewsPage'))} />
-    <Route path={HRIS_PATHS.objectives} element={page(() => import('@/modules/hris/pages/ObjectivesPage'))} />
-    <Route path={HRIS_PATHS.disciplinary} element={page(() => import('@/modules/hris/pages/DisciplinaryPage'), { hrLevel: 'edit' })} />
-    <Route path={HRIS_PATHS.reporting} element={page(() => import('@/modules/hris/pages/ReportingPage'), { hrLevel: 'view' })} />
-    <Route path={HRIS_PATHS.vacancies} element={page(() => import('@/modules/hris/pages/VacanciesPage'), { hrLevel: 'view' })} />
-    <Route path={HRIS_PATHS.candidates} element={page(() => import('@/modules/hris/pages/CandidatesPage'), { hrLevel: 'view' })} />
-    <Route path={HRIS_PATHS.onboarding} element={page(() => import('@/modules/hris/pages/OnboardingPage'))} />
-    <Route path={HRIS_PATHS.rightToWork} element={page(() => import('@/modules/hris/pages/RightToWorkPage'))} />
-  </>
-);
+const page = (
+  path: string,
+  loader: ManifestPageLoader,
+  gate: { hrLevel?: AccessLevel; payrollLevel?: AccessLevel } = {},
+): RouteDef => ({
+  scope: 'workspace',
+  workspace: 'hris',
+  path,
+  page: loader,
+  layout: 'dashboard',
+  guard: { kind: 'module', moduleId: 'hris', ...gate },
+});
+
+export const HRIS_ROUTES: readonly RouteDef[] = [
+  page(HRIS_PATHS.personalDetails, () => import('@/modules/hris/pages/PersonalDetailsPage')),
+  page(HRIS_PATHS.contracts, () => import('@/modules/hris/pages/ContractsPage')),
+  page(HRIS_PATHS.documents, () => import('@/modules/hris/pages/DocumentsPage')),
+  page(HRIS_PATHS.nextOfKin, () => import('@/modules/hris/pages/NextOfKinPage')),
+  page(HRIS_PATHS.employmentHistory, () => import('@/modules/hris/pages/EmploymentHistoryPage')),
+  page(HRIS_PATHS.salaries, () => import('@/modules/hris/pages/SalariesPage')),
+  page(HRIS_PATHS.payroll, () => import('@/modules/hris/pages/PayrollPage'), { payrollLevel: 'view' }),
+  page(HRIS_PATHS.gratuities, () => import('@/modules/hris/pages/GratuitiesPage'), { payrollLevel: 'view' }),
+  page(HRIS_PATHS.payReviews, () => import('@/modules/hris/pages/PayReviewsPage'), { payrollLevel: 'view' }),
+  page(HRIS_PATHS.compensationSettings, () => import('@/modules/hris/pages/CompensationSettingsPage'), { payrollLevel: 'admin' }),
+  page(HRIS_PATHS.annualEvaluations, () => import('@/modules/hris/pages/ReviewsPage')),
+  page(HRIS_PATHS.annualReviews, () => import('@/modules/hris/pages/ReviewsPage')),
+  page(HRIS_PATHS.endOfRotation, () => import('@/modules/hris/pages/ReviewsPage')),
+  page(HRIS_PATHS.objectives, () => import('@/modules/hris/pages/ObjectivesPage')),
+  page(HRIS_PATHS.disciplinary, () => import('@/modules/hris/pages/DisciplinaryPage'), { hrLevel: 'edit' }),
+  page(HRIS_PATHS.reporting, () => import('@/modules/hris/pages/ReportingPage'), { hrLevel: 'view' }),
+  page(HRIS_PATHS.vacancies, () => import('@/modules/hris/pages/VacanciesPage'), { hrLevel: 'view' }),
+  page(HRIS_PATHS.candidates, () => import('@/modules/hris/pages/CandidatesPage'), { hrLevel: 'view' }),
+  page(HRIS_PATHS.onboarding, () => import('@/modules/hris/pages/OnboardingPage')),
+  page(HRIS_PATHS.rightToWork, () => import('@/modules/hris/pages/RightToWorkPage')),
+];
+
+/**
+ * The module's public name for its routes (`@/modules/hris`). They are route
+ * definitions now, mounted by the router from the module registry; nothing
+ * renders them directly.
+ */
+export const hrisRoutes = HRIS_ROUTES;

@@ -1,62 +1,54 @@
-import React from "react";
-import { Route } from "react-router-dom";
-import ProtectedRoute from "@/shared/components/ProtectedRoute";
-import RefitShell from "@/modules/refit/components/layout/RefitShell";
+import type { ManifestPageLoader, RouteDef } from '@/app/registry/types';
+import { REFIT_PATHS, REFIT_REDIRECTS } from './paths';
 
-const lazyPage = (loader: () => Promise<{ default: React.ComponentType }>) => {
-  const C = React.lazy(loader);
-  return (
-    <ProtectedRoute>
-      <RefitShell>
-        <React.Suspense
-          fallback={
-            <div className="flex items-center justify-center min-h-[400px]">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-            </div>
-          }
-        >
-          <C />
-        </React.Suspense>
-      </RefitShell>
-    </ProtectedRoute>
-  );
-};
+/**
+ * Refit workspace routes, as data (BUILD-PLAN B8). The module manifest
+ * (./module.ts) registers them and the router mounts them inside the Yard
+ * workspace scope. Every page is signed-in only and renders inside the Refit
+ * shell. The sitemap's Refit leaves point at the same REFIT_PATHS.
+ */
+const page = (path: string, loader: ManifestPageLoader): RouteDef => ({
+  scope: 'workspace',
+  workspace: 'yard',
+  path,
+  page: loader,
+  guard: { kind: 'login' },
+  layout: 'refit-shell',
+});
 
-const B = "/yard/refit";
-
-export const refitRoutes = (
-  <>
-    <Route path={`${B}/overview/dashboard`} element={lazyPage(() => import("./pages/Dashboard"))} />
-    <Route path={`${B}/overview/approvals`} element={lazyPage(() => import("./pages/approvals"))} />
-    <Route path={`${B}/overview/notifications`} element={lazyPage(() => import("./pages/notifications"))} />
-    <Route path={`${B}/overview/search`} element={lazyPage(() => import("./pages/search"))} />
-    <Route path={`${B}/workflow/change-orders`} element={lazyPage(() => import("./pages/change-orders"))} />
-    <Route path={`${B}/workflow/crew-requests`} element={lazyPage(() => import("./pages/crew-requests"))} />
-    <Route path={`${B}/workflow/snags`} element={lazyPage(() => import("./pages/snags"))} />
-    <Route path={`${B}/workflow/works`} element={lazyPage(() => import("./pages/works"))} />
-    <Route path={`${B}/workflow/meetings`} element={lazyPage(() => import("./pages/meetings"))} />
-    <Route path={`${B}/workflow/risks`} element={lazyPage(() => import("./pages/risks"))} />
-    <Route path={`${B}/project/schedule`} element={lazyPage(() => import("./pages/schedule"))} />
-    <Route path={`${B}/project/logistics`} element={lazyPage(() => import("./pages/logistics"))} />
-    <Route path={`${B}/project/inventory`} element={lazyPage(() => import("./pages/inventory"))} />
-    <Route path={`${B}/project/contractors`} element={lazyPage(() => import("./pages/contractors"))} />
-    <Route path={`${B}/project/suppliers`} element={lazyPage(() => import("./pages/suppliers"))} />
-    <Route path={`${B}/documents/drawings`} element={lazyPage(() => import("./pages/drawings"))} />
-    <Route path={`${B}/documents/document-control`} element={lazyPage(() => import("./pages/document-control"))} />
-    <Route path={`${B}/documents/files`} element={lazyPage(() => import("./pages/files"))} />
-    <Route path={`${B}/finance/budget`} element={lazyPage(() => import("./pages/budget"))} />
-    <Route path={`${B}/finance/purchase-orders`} element={lazyPage(() => import("./pages/purchase-orders"))} />
-    <Route path={`${B}/finance/invoices`} element={lazyPage(() => import("./pages/invoices"))} />
-    <Route path={`${B}/compliance/compliance`} element={lazyPage(() => import("./pages/compliance"))} />
-    <Route path={`${B}/compliance/crew`} element={lazyPage(() => import("./pages/crew"))} />
-    <Route path={`${B}/compliance/audit-log`} element={lazyPage(() => import("./pages/audit-log"))} />
-    <Route path={`${B}/compliance/reporting`} element={lazyPage(() => import("./pages/reporting"))} />
-    <Route path={`${B}/account/access`} element={lazyPage(() => import("./pages/access"))} />
-    <Route path={`${B}/account/communications`} element={lazyPage(() => import("./pages/communications"))} />
-    <Route path={`${B}/account/diagnostics`} element={lazyPage(() => import("./pages/session-diagnostics"))} />
-    <Route path={`${B}/account/access-check`} element={lazyPage(() => import("./pages/access-check"))} />
-    <Route path={`${B}/account/admin`} element={lazyPage(() => import("./pages/admin"))} />
-    <Route path={`${B}/account/import`} element={lazyPage(() => import("./pages/import"))} />
-    <Route path={`${B}/account/login-diagnostics`} element={lazyPage(() => import("./pages/login-diagnostics"))} />
-  </>
-);
+export const REFIT_ROUTES: readonly RouteDef[] = [
+  page(REFIT_PATHS.dashboard, () => import('./pages/Dashboard')),
+  page(REFIT_PATHS.approvals, () => import('./pages/approvals')),
+  page(REFIT_PATHS.notifications, () => import('./pages/notifications')),
+  page(REFIT_PATHS.search, () => import('./pages/search')),
+  page(REFIT_PATHS.changeOrders, () => import('./pages/change-orders')),
+  page(REFIT_PATHS.crewRequests, () => import('./pages/crew-requests')),
+  page(REFIT_PATHS.snags, () => import('./pages/snags')),
+  page(REFIT_PATHS.works, () => import('./pages/works')),
+  page(REFIT_PATHS.meetings, () => import('./pages/meetings')),
+  page(REFIT_PATHS.risks, () => import('./pages/risks')),
+  page(REFIT_PATHS.schedule, () => import('./pages/schedule')),
+  page(REFIT_PATHS.logistics, () => import('./pages/logistics')),
+  page(REFIT_PATHS.inventory, () => import('./pages/inventory')),
+  page(REFIT_PATHS.contractors, () => import('./pages/contractors')),
+  page(REFIT_PATHS.suppliers, () => import('./pages/suppliers')),
+  page(REFIT_PATHS.drawings, () => import('./pages/drawings')),
+  page(REFIT_PATHS.documentControl, () => import('./pages/document-control')),
+  page(REFIT_PATHS.files, () => import('./pages/files')),
+  page(REFIT_PATHS.budget, () => import('./pages/budget')),
+  page(REFIT_PATHS.purchaseOrders, () => import('./pages/purchase-orders')),
+  page(REFIT_PATHS.invoices, () => import('./pages/invoices')),
+  page(REFIT_PATHS.compliance, () => import('./pages/compliance')),
+  page(REFIT_PATHS.crew, () => import('./pages/crew')),
+  page(REFIT_PATHS.auditLog, () => import('./pages/audit-log')),
+  page(REFIT_PATHS.reporting, () => import('./pages/reporting')),
+  page(REFIT_PATHS.access, () => import('./pages/access')),
+  page(REFIT_PATHS.communications, () => import('./pages/communications')),
+  page(REFIT_PATHS.diagnostics, () => import('./pages/session-diagnostics')),
+  page(REFIT_PATHS.accessCheck, () => import('./pages/access-check')),
+  page(REFIT_PATHS.admin, () => import('./pages/admin')),
+  page(REFIT_PATHS.import, () => import('./pages/import')),
+  page(REFIT_PATHS.loginDiagnostics, () => import('./pages/login-diagnostics')),
+  // Old or shorthand Refit URLs the ported pages link to (see REFIT_REDIRECTS).
+  ...REFIT_REDIRECTS.map(({ from, to }): RouteDef => ({ scope: 'workspace', workspace: 'yard', path: from, redirectTo: to })),
+];

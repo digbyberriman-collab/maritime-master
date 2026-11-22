@@ -4,413 +4,288 @@ import ProtectedRoute from '@/shared/components/ProtectedRoute';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { PlaceholderPage } from '@/shared/components/common/PlaceholderPage';
 import { PLACEHOLDER_LEAVES, SECTION_REDIRECTS } from '@/config/sitemap';
+import PlaceholderWrapper from '@/app/router/PlaceholderWrapper';
+import { fleetNavRoutes, retiredNavRoutes, vesselNavRoutes } from '@/app/router/navRoutes';
 import ModuleRoute from '@/shared/components/ModuleRoute';
-import { newBuildRoutes } from '@/modules/new-build/routes';
-import { hrisRoutes } from '@/modules/hris/routes';
-import { healthRoutes } from '@/modules/health/routes';
-import { refitRoutes } from '@/modules/refit/routes';
-import { legalRoutes } from '@/modules/legal/routes';
-import { 
-  Ship, Users, Award, Plane, Clock, CalendarDays,
-  AlertTriangle, ClipboardList, BookOpen, Shield, FileCheck, Layers, LayoutGrid,
-  Package, Bell, Settings as SettingsIcon, Building2, Phone, Wrench, FileText, Calendar,
-  Compass
-} from 'lucide-react';
+import { lazyPage, type LazyPageOptions, type PageLoader } from '@/app/router/lazyPage';
+import {
+  FleetScope,
+  HomeRedirect,
+  LegacyRoute,
+  PersonalScope,
+  ScopeNotFound,
+  ScopeShell,
+  VesselScopeRoute,
+} from '@/app/router/scopes';
+import NavAccessProvider from '@/app/nav/NavAccessProvider';
+import {
+  fleetManifestRoutes,
+  personalManifestRoutes,
+  vesselManifestRoutes,
+  workspaceManifestRoutes,
+} from '@/app/router/manifestRoutes';
+import { Building2 } from 'lucide-react';
 
 // Main Pages - Keep critical path pages sync, lazy load the rest
 import Auth from '@/modules/auth/pages/Auth';
 import ResetPassword from '@/modules/auth/pages/ResetPassword';
 import Dashboard from '@/modules/dashboard/pages/Dashboard';
 
-// New module pages - lazy loaded
-const CompliancePage = React.lazy(() => import('@/modules/compliance/pages/CompliancePage'));
-const NewChecklistsPage = React.lazy(() => import('@/modules/ism/pages/ChecklistsPage'));
-const IndividualVesselDashboard = React.lazy(() => import('@/modules/vessels/pages/IndividualVesselDashboard'));
+/**
+ * A signed-in page. Every lazy page in this file is created once, here at
+ * module scope, through lazyPage(): one LazyLoader fallback, one error
+ * boundary per route (reset on navigation), and ProtectedRoute around it.
+ * Pass `layout: DashboardLayout` for pages that do not render the shell
+ * themselves.
+ */
+const protectedPage = <P extends object>(loader: PageLoader<P>, options: Omit<LazyPageOptions, 'guard'> = {}) =>
+  lazyPage(loader, { guard: ProtectedRoute, ...options });
 
-// Lazy loaded pages
-const Vessels = React.lazy(() => import('@/modules/vessels/pages/Vessels'));
-const LogbookWorkspace = React.lazy(() => import('@/modules/logbooks/pages/LogbookWorkspace'));
-const LogbookRegistry = React.lazy(() => import('@/modules/logbooks/pages/LogbookRegistry'));
-const LogbookReview = React.lazy(() => import('@/modules/logbooks/pages/LogbookReview'));
-const LogbookRecords = React.lazy(() => import('@/modules/logbooks/pages/LogbookRecords'));
-const LogbookConnections = React.lazy(() => import('@/modules/logbooks/pages/LogbookConnections'));
-const LogbookAssurance = React.lazy(() => import('@/modules/logbooks/pages/LogbookAssurance'));
-const VesselDashboard = React.lazy(() => import('@/modules/vessels/pages/VesselDashboard'));
-const CrewRoster = React.lazy(() => import('@/modules/crew/pages/CrewRoster'));
-const Documents = React.lazy(() => import('@/modules/documents/pages/Documents'));
-const Certificates = React.lazy(() => import('@/modules/certificates/pages/Certificates'));
-const Incidents = React.lazy(() => import('@/modules/incidents/pages/Incidents'));
-const Audits = React.lazy(() => import('@/modules/audits/pages/Audits'));
-const Drills = React.lazy(() => import('@/modules/drills/pages/Drills'));
-const DrillsAnnualGrid = React.lazy(() => import('@/modules/drills/pages/DrillsAnnualGrid'));
-const Training = React.lazy(() => import('@/modules/training/pages/Training'));
-const Maintenance = React.lazy(() => import('@/modules/maintenance/pages/Maintenance'));
-const FleetMap = React.lazy(() => import('@/modules/dashboard/pages/FleetMap'));
-const RiskAssessments = React.lazy(() => import('@/modules/risk-assessments/pages/RiskAssessments'));
-const RiskAssessmentForm = React.lazy(() => import('@/modules/risk-assessments/pages/RiskAssessmentForm'));
-const SafetyDocumentVersioning = React.lazy(() => import('@/modules/documents/pages/SafetyDocumentVersioning'));
-const Settings = React.lazy(() => import('@/modules/settings/pages/Settings'));
-const NotFound = React.lazy(() => import('@/shared/pages/NotFound'));
-const InsurancePage = React.lazy(() => import('@/modules/compliance/pages/InsurancePage'));
-const HRPage = React.lazy(() => import('@/modules/compliance/pages/HRPage'));
-const HowToGuidesPage = React.lazy(() => import('@/modules/help/pages/HowToGuidesPage'));
-const SupportPage = React.lazy(() => import('@/modules/help/pages/SupportPage'));
-const PrivacyPolicyPage = React.lazy(() => import('@/modules/help/pages/PrivacyPolicyPage'));
-const TermsOfServicePage = React.lazy(() => import('@/modules/help/pages/TermsOfServicePage'));
+/** HRIS module gate for the legacy /hr dashboard. */
+const HrisGuard: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+  <ModuleRoute moduleId="hris">{children}</ModuleRoute>
+);
 
-// ISM Pages - Lazy loaded for better code splitting
-const ERMPage = React.lazy(() => import('@/modules/ism/pages/ERMPage'));
-const ChecklistsPage = React.lazy(() => import('@/modules/ism/pages/ChecklistsPage'));
-const RiskAssessmentsPage = React.lazy(() => import('@/modules/ism/pages/RiskAssessmentsPage'));
-const SOPsPage = React.lazy(() => import('@/modules/ism/pages/SOPsPage'));
-const AuditsSurveysPage = React.lazy(() => import('@/modules/ism/pages/AuditsSurveysPage'));
-const CorrectiveActionsPage = React.lazy(() => import('@/modules/ism/pages/CorrectiveActionsPage'));
-const ISMDrillsPage = React.lazy(() => import('@/modules/ism/pages/DrillsPage'));
-const ISMIncidentsPage = React.lazy(() => import('@/modules/ism/pages/IncidentsPage'));
-const InvestigationsPage = React.lazy(() => import('@/modules/ism/pages/InvestigationsPage'));
-const MeetingsPage = React.lazy(() => import('@/modules/ism/pages/MeetingsPage'));
-const MiscellaneousPage = React.lazy(() => import('@/modules/ism/pages/MiscellaneousPage'));
-const NonConformitiesPage = React.lazy(() => import('@/modules/ism/pages/NonConformitiesPage'));
-const ObservationsPage = React.lazy(() => import('@/modules/ism/pages/ObservationsPage'));
-const PermitsToWorkPage = React.lazy(() => import('@/modules/ism/pages/PermitsToWorkPage'));
-const ISMTrainingPage = React.lazy(() => import('@/modules/ism/pages/TrainingPage'));
+const withShell = { layout: DashboardLayout };
 
-// Document Sub-pages - lazy loaded
-const ReviewQueue = React.lazy(() => import('@/modules/documents/pages/ReviewQueue'));
-const AcknowledgmentTracking = React.lazy(() => import('@/modules/crew/pages/AcknowledgmentTracking'));
-const MasterDocumentIndex = React.lazy(() => import('@/modules/documents/pages/MasterDocumentIndex'));
-const DocumentSearch = React.lazy(() => import('@/modules/documents/pages/DocumentSearch'));
-const ReviewDashboard = React.lazy(() => import('@/modules/documents/pages/ReviewDashboard'));
+/**
+ * An old route that now redirects into a scope (BUILD-PLAN B6). `from` is the
+ * route's own pattern and must have an entry in LEGACY_REDIRECTS; when the
+ * user has no target (no vessel, no fleet reach) the old page renders.
+ */
+const legacy = (from: string, page: React.ReactElement) => <LegacyRoute from={from}>{page}</LegacyRoute>;
 
-// Report Pages - lazy loaded (heavy recharts dependency)
-const IncidentAnalytics = React.lazy(() => import('@/modules/incidents/pages/IncidentAnalytics'));
-const CAPATracker = React.lazy(() => import('@/modules/incidents/pages/CAPATracker'));
-const DrillAnalytics = React.lazy(() => import('@/modules/drills/pages/DrillAnalytics'));
-const CertificateAlerts = React.lazy(() => import('@/modules/certificates/pages/CertificateAlerts'));
+// New module pages
+const CompliancePage = protectedPage(() => import('@/modules/compliance/pages/CompliancePage'));
+const NewChecklistsPage = protectedPage(() => import('@/modules/ism/pages/ChecklistsPage'));
+const IndividualVesselDashboard = protectedPage(() => import('@/modules/vessels/pages/IndividualVesselDashboard'));
 
-// Settings Sub-pages - lazy loaded
-const BrandingSettings = React.lazy(() => import('@/modules/settings/pages/BrandingSettings'));
-const DPADashboard = React.lazy(() => import('@/modules/dashboard/pages/DPADashboard'));
-const RolesPermissionsPage = React.lazy(() => import('@/modules/settings/pages/RolesPermissionsPage'));
+// Core pages
+const Vessels = protectedPage(() => import('@/modules/vessels/pages/Vessels'));
+const LogbookWorkspace = protectedPage(() => import('@/modules/logbooks/pages/LogbookWorkspace'));
+const LogbookRegistry = protectedPage(() => import('@/modules/logbooks/pages/LogbookRegistry'));
+const LogbookReview = protectedPage(() => import('@/modules/logbooks/pages/LogbookReview'));
+const LogbookRecords = protectedPage(() => import('@/modules/logbooks/pages/LogbookRecords'));
+const LogbookConnections = protectedPage(() => import('@/modules/logbooks/pages/LogbookConnections'));
+const LogbookAssurance = protectedPage(() => import('@/modules/logbooks/pages/LogbookAssurance'));
+const VesselDashboard = protectedPage(() => import('@/modules/vessels/pages/VesselDashboard'));
+const CrewRoster = protectedPage(() => import('@/modules/crew/pages/CrewRoster'));
+const Documents = protectedPage(() => import('@/modules/documents/pages/Documents'));
+const Certificates = protectedPage(() => import('@/modules/certificates/pages/Certificates'));
+const Incidents = protectedPage(() => import('@/modules/incidents/pages/Incidents'));
+const Audits = protectedPage(() => import('@/modules/audits/pages/Audits'));
+const Drills = protectedPage(() => import('@/modules/drills/pages/Drills'));
+const DrillsAnnualGrid = protectedPage(() => import('@/modules/drills/pages/DrillsAnnualGrid'));
+const Training = protectedPage(() => import('@/modules/training/pages/Training'));
+const Maintenance = protectedPage(() => import('@/modules/maintenance/pages/Maintenance'));
+const FleetMap = protectedPage(() => import('@/modules/dashboard/pages/FleetMap'));
+const RiskAssessments = protectedPage(() => import('@/modules/risk-assessments/pages/RiskAssessments'));
+const RiskAssessmentForm = protectedPage(() => import('@/modules/risk-assessments/pages/RiskAssessmentForm'));
+const SafetyDocumentVersioning = protectedPage(() => import('@/modules/documents/pages/SafetyDocumentVersioning'));
+const Settings = protectedPage(() => import('@/modules/settings/pages/Settings'));
+const InsurancePage = protectedPage(() => import('@/modules/compliance/pages/InsurancePage'));
+const HRPage = lazyPage(() => import('@/modules/compliance/pages/HRPage'), { guard: HrisGuard });
+const HowToGuidesPage = protectedPage(() => import('@/modules/help/pages/HowToGuidesPage'));
+const SupportPage = protectedPage(() => import('@/modules/help/pages/SupportPage'));
+const PrivacyPolicyPage = protectedPage(() => import('@/modules/help/pages/PrivacyPolicyPage'));
+const TermsOfServicePage = protectedPage(() => import('@/modules/help/pages/TermsOfServicePage'));
 
-// Admin Pages - lazy loaded
-const UsersAccessListPage = React.lazy(() => import('@/modules/users-access/pages/UsersAccessListPage'));
-const UsersAccessDetailPage = React.lazy(() => import('@/modules/users-access/pages/UsersAccessDetailPage'));
-const NotificationManagementPage = React.lazy(() => import('@/modules/notifications-admin/pages/NotificationManagementPage'));
-const NotificationsPage = React.lazy(() => import('@/modules/notifications/pages/NotificationsPage'));
-const NotificationCenterPage = React.lazy(() => import('@/modules/notifications/pages/NotificationCenterPage'));
+// Vessel pages. The two emergency routes keep separate page components, so
+// moving between them remounts the page as it always has.
+const CompanyDetails = protectedPage(() => import('@/modules/vessels/pages/CompanyDetails'));
+const VesselEmergencyDetailsPage = protectedPage(() => import('@/modules/vessels/pages/VesselEmergencyDetailsPage'));
+const VesselEmergencyByIdPage = protectedPage(() => import('@/modules/vessels/pages/VesselEmergencyDetailsPage'));
+
+// ISM pages
+const ERMPage = protectedPage(() => import('@/modules/ism/pages/ERMPage'));
+const ChecklistsPage = protectedPage(() => import('@/modules/ism/pages/ChecklistsPage'));
+const RiskAssessmentsPage = protectedPage(() => import('@/modules/ism/pages/RiskAssessmentsPage'));
+const SOPsPage = protectedPage(() => import('@/modules/ism/pages/SOPsPage'));
+const AuditsSurveysPage = protectedPage(() => import('@/modules/ism/pages/AuditsSurveysPage'));
+const CorrectiveActionsPage = protectedPage(() => import('@/modules/ism/pages/CorrectiveActionsPage'));
+const ISMDrillsPage = protectedPage(() => import('@/modules/ism/pages/DrillsPage'));
+const ISMIncidentsPage = protectedPage(() => import('@/modules/ism/pages/IncidentsPage'));
+const InvestigationsPage = protectedPage(() => import('@/modules/ism/pages/InvestigationsPage'));
+const MeetingsPage = protectedPage(() => import('@/modules/ism/pages/MeetingsPage'));
+const MiscellaneousPage = protectedPage(() => import('@/modules/ism/pages/MiscellaneousPage'));
+const NonConformitiesPage = protectedPage(() => import('@/modules/ism/pages/NonConformitiesPage'));
+const ObservationsPage = protectedPage(() => import('@/modules/ism/pages/ObservationsPage'));
+const PermitsToWorkPage = protectedPage(() => import('@/modules/ism/pages/PermitsToWorkPage'));
+const ISMTrainingPage = protectedPage(() => import('@/modules/ism/pages/TrainingPage'));
+
+// ISM forms. Create/edit and new/view keep separate page components so each
+// pair still remounts when the user moves from one to the other.
+const FormTemplates = protectedPage(() => import('@/modules/ism/forms/pages/FormTemplates'));
+const CreateTemplate = protectedPage(() => import('@/modules/ism/forms/pages/CreateTemplate'));
+const EditTemplate = protectedPage(() => import('@/modules/ism/forms/pages/CreateTemplate'));
+const TemplateDetail = protectedPage(() => import('@/modules/ism/forms/pages/TemplateDetail'));
+const NewFormSubmission = protectedPage(() => import('@/modules/ism/forms/pages/FormSubmission'));
+const ViewFormSubmission = protectedPage(() => import('@/modules/ism/forms/pages/FormSubmission'));
+const SubmissionsList = protectedPage(() => import('@/modules/ism/forms/pages/SubmissionsList'));
+const MyDrafts = protectedPage(() => import('@/modules/ism/forms/pages/MyDrafts'));
+const PendingSignatures = protectedPage(() => import('@/modules/ism/forms/pages/PendingSignatures'));
+const DraftTemplates = protectedPage(() => import('@/modules/ism/forms/pages/DraftTemplates'));
+const FormsArchive = protectedPage(() => import('@/modules/ism/forms/pages/FormsArchive'));
+const FormSchedules = protectedPage(() => import('@/modules/ism/forms/pages/FormSchedules'));
+const FormExports = protectedPage(() => import('@/modules/ism/forms/pages/FormExports'));
+
+// Document pages
+const ReviewQueue = protectedPage(() => import('@/modules/documents/pages/ReviewQueue'));
+const AcknowledgmentTracking = protectedPage(() => import('@/modules/crew/pages/AcknowledgmentTracking'));
+const MasterDocumentIndex = protectedPage(() => import('@/modules/documents/pages/MasterDocumentIndex'));
+const DocumentSearch = protectedPage(() => import('@/modules/documents/pages/DocumentSearch'));
+const ReviewDashboard = protectedPage(() => import('@/modules/documents/pages/ReviewDashboard'));
+const Manuals = protectedPage(() => import('@/modules/documents/pages/Manuals'));
+const Policies = protectedPage(() => import('@/modules/documents/pages/Policies'));
+const Procedures = protectedPage(() => import('@/modules/documents/pages/Procedures'));
+const ISM_SMS = protectedPage(() => import('@/modules/documents/pages/ISM_SMS'));
+const Drawings = protectedPage(() => import('@/modules/documents/pages/Drawings'));
+
+// Report pages (heavy recharts dependency)
+const IncidentAnalytics = protectedPage(() => import('@/modules/incidents/pages/IncidentAnalytics'));
+const CAPATracker = protectedPage(() => import('@/modules/incidents/pages/CAPATracker'));
+const DrillAnalytics = protectedPage(() => import('@/modules/drills/pages/DrillAnalytics'));
+const CertificateAlerts = protectedPage(() => import('@/modules/certificates/pages/CertificateAlerts'));
+
+// Settings and admin pages
+const BrandingSettings = protectedPage(() => import('@/modules/settings/pages/BrandingSettings'));
+const DPADashboard = protectedPage(() => import('@/modules/dashboard/pages/DPADashboard'));
+const RolesPermissionsPage = protectedPage(() => import('@/modules/settings/pages/RolesPermissionsPage'), withShell);
+const UsersAccessListPage = protectedPage(() => import('@/modules/users-access/pages/UsersAccessListPage'));
+const UsersAccessDetailPage = protectedPage(() => import('@/modules/users-access/pages/UsersAccessDetailPage'));
+const NotificationManagementPage = protectedPage(() => import('@/modules/notifications-admin/pages/NotificationManagementPage'));
+const NotificationsPage = protectedPage(() => import('@/modules/notifications/pages/NotificationsPage'));
+const NotificationCenterPage = protectedPage(() => import('@/modules/notifications/pages/NotificationCenterPage'));
 // Honest "not built yet" page for admin areas whose previous pages showed sample data.
-const ComingSoonPage = React.lazy(() => import('@/shared/pages/Placeholder'));
-const APIIntegrations = React.lazy(() => import('@/modules/settings/pages/APIIntegrations'));
-const FeedbackAdmin = React.lazy(() => import('@/modules/feedback/pages/FeedbackAdmin'));
+const ComingSoonPage = protectedPage(() => import('@/shared/pages/Placeholder'));
+const APIIntegrations = protectedPage(() => import('@/modules/settings/pages/APIIntegrations'));
+const FeedbackAdmin = protectedPage(() => import('@/modules/feedback/pages/FeedbackAdmin'), withShell);
 
-// Document Pages - lazy loaded
-const Manuals = React.lazy(() => import('@/modules/documents/pages/Manuals'));
-const Policies = React.lazy(() => import('@/modules/documents/pages/Policies'));
-const Procedures = React.lazy(() => import('@/modules/documents/pages/Procedures'));
-const ISM_SMS = React.lazy(() => import('@/modules/documents/pages/ISM_SMS'));
-const Drawings = React.lazy(() => import('@/modules/documents/pages/Drawings'));
+// Crew pages. /crew/work-rest and /crew/work-rest/:crewId keep separate page
+// components so moving between them remounts the month view as before.
+const CrewList = protectedPage(() => import('@/modules/crew/pages/CrewList'));
+const CrewDocuments = protectedPage(() => import('@/modules/crew/pages/CrewDocuments'));
+const FlightsTravel = protectedPage(() => import('@/modules/crew/pages/FlightsTravel'));
+const MyWorkRestMonth = protectedPage(() => import('@/modules/work-rest/pages/MyWorkRestMonth'));
+const CrewWorkRestMonth = protectedPage(() => import('@/modules/work-rest/pages/MyWorkRestMonth'));
+const WorkRestOverview = protectedPage(() => import('@/modules/work-rest/pages/WorkRestOverview'));
+const VesselCalendar = protectedPage(() => import('@/modules/crew/pages/VesselCalendar'));
+const CrewDashboard = protectedPage(() => import('@/modules/crew/pages/CrewDashboard'));
+const LeavePlannerPage = protectedPage(() => import('@/modules/crew/pages/LeavePlannerPage'));
+const LeaveRequestsPage = protectedPage(() => import('@/modules/crew/pages/LeaveRequestsPage'));
+const LeaveCalculatorPage = protectedPage(() => import('@/modules/crew/pages/LeaveCalculatorPage'));
+const RotationPlannerPage = protectedPage(() => import('@/modules/rotation-planner/pages/RotationPlannerPage'));
+const CrewTasksPage = protectedPage(() => import('@/modules/crew/pages/CrewTasksPage'));
+const DocumentAcknowledgementsPage = protectedPage(() => import('@/modules/crew/pages/DocumentAcknowledgementsPage'));
 
-// Crew Pages - lazy loaded
-const FlightsTravel = React.lazy(() => import('@/modules/crew/pages/FlightsTravel'));
-const LeavePlannerPage = React.lazy(() => import('@/modules/crew/pages/LeavePlannerPage'));
-const LeaveRequestsPage = React.lazy(() => import('@/modules/crew/pages/LeaveRequestsPage'));
-const LeaveCalculatorPage = React.lazy(() => import('@/modules/crew/pages/LeaveCalculatorPage'));
-const TravelRecordDetail = React.lazy(() => import('@/modules/crew/pages/admin/TravelRecordDetail'));
-const QuarantineBookingsPage = React.lazy(() => import('@/modules/crew/pages/admin/QuarantineBookingsPage'));
+// Crew admin pages. Most of these do not render the shell themselves.
+const CrewAdminDashboard = protectedPage(() => import('@/modules/crew/pages/admin/CrewAdminDashboard'), withShell);
+const TravelRecordsPage = protectedPage(() => import('@/modules/crew/pages/admin/TravelRecordsPage'), withShell);
+const CreateTravelRecordPage = protectedPage(() => import('@/modules/crew/pages/admin/CreateTravelRecordPage'), withShell);
+const TravelRecordDetail = protectedPage(() => import('@/modules/crew/pages/admin/TravelRecordDetail'));
+const PreDepartureListPage = protectedPage(() => import('@/modules/crew/pages/admin/PreDepartureListPage'), withShell);
+const PreDepartureDetailPage = protectedPage(() => import('@/modules/crew/pages/admin/PreDepartureDetailPage'), withShell);
+const TravelDocumentsPage = protectedPage(() => import('@/modules/crew/pages/admin/TravelDocumentsPage'), withShell);
+const DocumentUploadPage = protectedPage(() => import('@/modules/crew/pages/admin/DocumentUploadPage'), withShell);
+const QuarantineHousesPage = protectedPage(() => import('@/modules/crew/pages/admin/QuarantineHousesPage'), withShell);
+const QuarantineBookingsPage = protectedPage(() => import('@/modules/crew/pages/admin/QuarantineBookingsPage'), withShell);
+const AddQuarantineHousePage = protectedPage(() => import('@/modules/crew/pages/admin/AddQuarantineHousePage'), withShell);
 
-// Certificate Pages - lazy loaded
-const CrewCertificatesOverview = React.lazy(() => import('@/modules/certificates/pages/CrewCertificatesOverview'));
+// Certificate pages
+const CrewCertificatesOverview = protectedPage(() => import('@/modules/certificates/pages/CrewCertificatesOverview'));
 
-// ISM Forms Pages - lazy loaded
-const DraftTemplates = React.lazy(() => import('@/modules/ism/forms/pages/DraftTemplates'));
-const FormsArchive = React.lazy(() => import('@/modules/ism/forms/pages/FormsArchive'));
-const FormSchedules = React.lazy(() => import('@/modules/ism/forms/pages/FormSchedules'));
-const FormExports = React.lazy(() => import('@/modules/ism/forms/pages/FormExports'));
+// Maintenance pages
+const SpareParts = protectedPage(() => import('@/modules/maintenance/pages/SpareParts'));
+const MaintenanceDefects = protectedPage(() => import('@/modules/maintenance/pages/MaintenanceDefects'));
+const CriticalEquipment = protectedPage(() => import('@/modules/maintenance/pages/CriticalEquipment'));
 
-// Maintenance Pages - lazy loaded
-const SpareParts = React.lazy(() => import('@/modules/maintenance/pages/SpareParts'));
+// Itinerary pages
+const FleetPlanningPage = protectedPage(() => import('@/modules/itinerary/pages/FleetPlanningPage'));
+const FleetTimelinePage = protectedPage(() => import('@/modules/itinerary/pages/FleetTimelinePage'));
+const TripSuggestionsPage = protectedPage(() => import('@/modules/itinerary/pages/TripSuggestionsPage'));
+const PostponedEntriesPage = protectedPage(() => import('@/modules/itinerary/pages/PostponedEntriesPage'));
 
-// Maintenance Pages - lazy loaded
-const MaintenanceDefects = React.lazy(() => import('@/modules/maintenance/pages/MaintenanceDefects'));
-const CriticalEquipment = React.lazy(() => import('@/modules/maintenance/pages/CriticalEquipment'));
-
-// Vessel Pages - lazy loaded
-const CompanyDetails = React.lazy(() => import('@/modules/vessels/pages/CompanyDetails'));
-
-// Loading spinner for lazy components
-const LazyLoader = () => (
-  <div className="flex items-center justify-center min-h-[400px]">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
-  </div>
-);
-
-// Placeholder wrapper with layout
-const PlaceholderWrapper: React.FC<{ 
-  title: string; 
-  description?: string;
-  features?: string[];
-  icon?: React.ReactNode;
-}> = ({ title, description, features, icon }) => (
-  <DashboardLayout>
-    <PlaceholderPage 
-      title={title} 
-      description={description}
-      features={features} 
-      icon={icon}
-      expectedRelease="Phase 2" 
-    />
-  </DashboardLayout>
-);
+// Crew development pages
+const MyDevelopment = protectedPage(() => import('@/modules/development/pages/MyDevelopment'));
+const CourseCatalogue = protectedPage(() => import('@/modules/development/pages/CourseCatalogue'));
+const DevelopmentApplications = protectedPage(() => import('@/modules/development/pages/DevelopmentApplications'));
+const CoursesRegister = protectedPage(() => import('@/modules/development/pages/CoursesRegister'));
+const CrewTraining = protectedPage(() => import('@/modules/development/pages/CrewTraining'));
+const DevelopmentAdmin = protectedPage(() => import('@/modules/development/pages/DevelopmentAdmin'));
 
 export const AppRoutes: React.FC = () => {
   return (
+    <NavAccessProvider>
     <Routes>
       {/* Public Routes */}
-      <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/index" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      {/* Landing (gap/01): fleet users → /fleet/dashboard, vessel users → /v/<code>, others → /me. */}
+      <Route path="/" element={<HomeRedirect />} />
+      <Route path="/index" element={<HomeRedirect />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Dashboard */}
-      <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-      <Route path="/dpa-dashboard" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><DPADashboard /></React.Suspense></ProtectedRoute>} />
+      <Route path="/dashboard" element={<HomeRedirect />} />
+      <Route path="/dpa-dashboard" element={<DPADashboard />} />
 
       {/* Fleet Map */}
-      <Route path="/fleet-map" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><FleetMap /></React.Suspense></ProtectedRoute>} />
+      <Route path="/fleet-map" element={legacy('/fleet-map', <FleetMap />)} />
 
       {/* Help & Legal */}
-      <Route path="/help/how-to-guides" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><HowToGuidesPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/help/support" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><SupportPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/legal/privacy-policy" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><PrivacyPolicyPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/legal/terms-of-service" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><TermsOfServicePage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/help/how-to-guides" element={<HowToGuidesPage />} />
+      <Route path="/help/support" element={<SupportPage />} />
+      <Route path="/legal/privacy-policy" element={<PrivacyPolicyPage />} />
+      <Route path="/legal/terms-of-service" element={<TermsOfServicePage />} />
 
       {/* Electronic Logbooks */}
-      <Route path="/vessel/logbooks" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookWorkspace /></React.Suspense></ProtectedRoute>} />
+      <Route path="/vessel/logbooks" element={legacy('/vessel/logbooks', <LogbookWorkspace />)} />
       <Route path="/vessel/logbooks/list" element={<Navigate to="/vessel/logbooks" replace />} />
-      <Route path="/vessel/logbooks/registry" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookRegistry /></React.Suspense></ProtectedRoute>} />
-      <Route path="/vessel/logbooks/review" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookReview /></React.Suspense></ProtectedRoute>} />
-      <Route path="/vessel/logbooks/records" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookRecords /></React.Suspense></ProtectedRoute>} />
-      <Route path="/vessel/logbooks/connections" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookConnections /></React.Suspense></ProtectedRoute>} />
-      <Route path="/vessel/logbooks/assurance" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookAssurance /></React.Suspense></ProtectedRoute>} />
-      <Route path="/vessel/logbooks/:logbookSlug" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><LogbookWorkspace /></React.Suspense></ProtectedRoute>} />
-
+      <Route path="/vessel/logbooks/registry" element={legacy('/vessel/logbooks/registry', <LogbookRegistry />)} />
+      <Route path="/vessel/logbooks/review" element={legacy('/vessel/logbooks/review', <LogbookReview />)} />
+      <Route path="/vessel/logbooks/records" element={legacy('/vessel/logbooks/records', <LogbookRecords />)} />
+      <Route path="/vessel/logbooks/connections" element={legacy('/vessel/logbooks/connections', <LogbookConnections />)} />
+      <Route path="/vessel/logbooks/assurance" element={legacy('/vessel/logbooks/assurance', <LogbookAssurance />)} />
+      <Route path="/vessel/logbooks/:logbookSlug" element={legacy('/vessel/logbooks/:logbookSlug', <LogbookWorkspace />)} />
 
       {/* Vessels */}
       <Route path="/vessels" element={<Navigate to="/vessels/dashboard" replace />} />
-      <Route path="/vessels/list" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Vessels /></React.Suspense></ProtectedRoute>} />
-      <Route path="/vessels/dashboard" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><VesselDashboard /></React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/vessels/company-details" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CompanyDetails /></React.Suspense></ProtectedRoute>} />
-      <Route path="/vessels/emergency-details" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            {React.createElement(React.lazy(() => import('@/modules/vessels/pages/VesselEmergencyDetailsPage')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/vessels/:vesselId/emergency" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            {React.createElement(React.lazy(() => import('@/modules/vessels/pages/VesselEmergencyDetailsPage')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
+      <Route path="/vessels/list" element={legacy('/vessels/list', <Vessels />)} />
+      <Route path="/vessels/dashboard" element={legacy('/vessels/dashboard', <VesselDashboard />)} />
+      <Route path="/vessels/company-details" element={<CompanyDetails />} />
+      <Route path="/vessels/emergency-details" element={legacy('/vessels/emergency-details', <VesselEmergencyDetailsPage />)} />
+      <Route path="/vessels/:vesselId/emergency" element={legacy('/vessels/:vesselId/emergency', <VesselEmergencyByIdPage />)} />
 
       {/* Crew */}
-      <Route path="/crew" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CrewRoster /></React.Suspense></ProtectedRoute>} />
-      <Route path="/crew/roster" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CrewRoster /></React.Suspense></ProtectedRoute>} />
-      <Route path="/crew/list" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/modules/crew/pages/CrewList')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/certificates" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            {React.createElement(React.lazy(() => import('@/modules/crew/pages/CrewDocuments')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/flights" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><FlightsTravel /></React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/hours-of-rest" element={<Navigate to="/crew/work-rest" replace />} />
-      <Route path="/crew/work-rest" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/modules/work-rest/pages/MyWorkRestMonth')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/work-rest/overview" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/modules/work-rest/pages/WorkRestOverview')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/work-rest/:crewId" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/modules/work-rest/pages/MyWorkRestMonth')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/calendar" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            {React.createElement(React.lazy(() => import('@/modules/crew/pages/VesselCalendar')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/my-dashboard" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            {React.createElement(React.lazy(() => import('@/modules/crew/pages/CrewDashboard')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/leave" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><LeavePlannerPage /></React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/leave/requests" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><LeaveRequestsPage /></React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/leave/calculator" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><LeaveCalculatorPage /></React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/rotation-planner" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/modules/rotation-planner/pages/RotationPlannerPage')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/tasks" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            {React.createElement(React.lazy(() => import('@/modules/crew/pages/CrewTasksPage')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/acknowledgements" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            {React.createElement(React.lazy(() => import('@/modules/crew/pages/DocumentAcknowledgementsPage')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
+      <Route path="/crew" element={legacy('/crew', <CrewRoster />)} />
+      <Route path="/crew/roster" element={legacy('/crew/roster', <CrewRoster />)} />
+      <Route path="/crew/list" element={legacy('/crew/list', <CrewList />)} />
+      <Route path="/crew/certificates" element={legacy('/crew/certificates', <CrewDocuments />)} />
+      <Route path="/crew/flights" element={<FlightsTravel />} />
+      <Route path="/crew/hours-of-rest" element={legacy('/crew/hours-of-rest', <Navigate to="/crew/work-rest" replace />)} />
+      <Route path="/crew/work-rest" element={legacy('/crew/work-rest', <MyWorkRestMonth />)} />
+      <Route path="/crew/work-rest/overview" element={legacy('/crew/work-rest/overview', <WorkRestOverview />)} />
+      <Route path="/crew/work-rest/:crewId" element={legacy('/crew/work-rest/:crewId', <CrewWorkRestMonth />)} />
+      <Route path="/crew/calendar" element={legacy('/crew/calendar', <VesselCalendar />)} />
+      <Route path="/crew/my-dashboard" element={<CrewDashboard />} />
+      <Route path="/crew/leave" element={legacy('/crew/leave', <LeavePlannerPage />)} />
+      <Route path="/crew/leave/requests" element={legacy('/crew/leave/requests', <LeaveRequestsPage />)} />
+      <Route path="/crew/leave/calculator" element={<LeaveCalculatorPage />} />
+      <Route path="/crew/rotation-planner" element={legacy('/crew/rotation-planner', <RotationPlannerPage />)} />
+      <Route path="/crew/tasks" element={<CrewTasksPage />} />
+      <Route path="/crew/acknowledgements" element={<DocumentAcknowledgementsPage />} />
 
       {/* Crew Admin */}
-      <Route path="/crew/admin" element={
-        <ProtectedRoute>
-          <DashboardLayout>
-            <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/CrewAdminDashboard')))}
-            </React.Suspense>
-          </DashboardLayout>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/admin/travel" element={
-        <ProtectedRoute>
-          <DashboardLayout>
-            <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/TravelRecordsPage')))}
-            </React.Suspense>
-          </DashboardLayout>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/admin/travel/new" element={
-        <ProtectedRoute>
-          <DashboardLayout>
-            <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/CreateTravelRecordPage')))}
-            </React.Suspense>
-          </DashboardLayout>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/admin/travel/:id" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><TravelRecordDetail /></React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/admin/pre-departure" element={
-        <ProtectedRoute>
-          <DashboardLayout>
-            <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/PreDepartureListPage')))}
-            </React.Suspense>
-          </DashboardLayout>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/admin/pre-departure/:id" element={
-        <ProtectedRoute>
-          <DashboardLayout>
-            <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/PreDepartureDetailPage')))}
-            </React.Suspense>
-          </DashboardLayout>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/admin/documents" element={
-        <ProtectedRoute>
-          <DashboardLayout>
-            <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/TravelDocumentsPage')))}
-            </React.Suspense>
-          </DashboardLayout>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/admin/documents/upload" element={
-        <ProtectedRoute>
-          <DashboardLayout>
-            <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/DocumentUploadPage')))}
-            </React.Suspense>
-          </DashboardLayout>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/admin/quarantine" element={
-        <ProtectedRoute>
-          <DashboardLayout>
-            <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/QuarantineHousesPage')))}
-            </React.Suspense>
-          </DashboardLayout>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/admin/quarantine/bookings" element={
-        <ProtectedRoute>
-          <DashboardLayout>
-            <React.Suspense fallback={<LazyLoader />}>
-              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/QuarantineBookingsPage')))}
-            </React.Suspense>
-          </DashboardLayout>
-        </ProtectedRoute>
-      } />
-      <Route path="/crew/admin/quarantine/new" element={
-        <ProtectedRoute>
-          <DashboardLayout>
-            <React.Suspense fallback={<LazyLoader />}>
-              {React.createElement(React.lazy(() => import('@/modules/crew/pages/admin/AddQuarantineHousePage')))}
-            </React.Suspense>
-          </DashboardLayout>
-        </ProtectedRoute>
-      } />
+      <Route path="/crew/admin" element={<CrewAdminDashboard />} />
+      <Route path="/crew/admin/travel" element={<TravelRecordsPage />} />
+      <Route path="/crew/admin/travel/new" element={<CreateTravelRecordPage />} />
+      <Route path="/crew/admin/travel/:id" element={<TravelRecordDetail />} />
+      <Route path="/crew/admin/pre-departure" element={<PreDepartureListPage />} />
+      <Route path="/crew/admin/pre-departure/:id" element={<PreDepartureDetailPage />} />
+      <Route path="/crew/admin/documents" element={<TravelDocumentsPage />} />
+      <Route path="/crew/admin/documents/upload" element={<DocumentUploadPage />} />
+      <Route path="/crew/admin/quarantine" element={<QuarantineHousesPage />} />
+      <Route path="/crew/admin/quarantine/bookings" element={<QuarantineBookingsPage />} />
+      <Route path="/crew/admin/quarantine/new" element={<AddQuarantineHousePage />} />
       <Route path="/crew/admin/quarantine/:id" element={
         <ProtectedRoute>
           <DashboardLayout>
@@ -424,405 +299,253 @@ export const AppRoutes: React.FC = () => {
 
       {/* ISM - Forms */}
       <Route path="/ism/forms" element={<Navigate to="/ism/forms/templates" replace />} />
-      <Route path="/ism/forms/templates" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div>Loading...</div>}>
-            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/FormTemplates')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/ism/forms/templates/create" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div>Loading...</div>}>
-            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/CreateTemplate')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/ism/forms/templates/:templateId" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div>Loading...</div>}>
-            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/TemplateDetail')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/ism/forms/templates/:templateId/edit" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div>Loading...</div>}>
-            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/CreateTemplate')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/ism/forms/new" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div>Loading...</div>}>
-            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/FormSubmission')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/ism/forms/submission/:submissionId" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div>Loading...</div>}>
-            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/FormSubmission')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/ism/forms/submissions" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div>Loading...</div>}>
-            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/SubmissionsList')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/ism/forms/drafts" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><DraftTemplates /></React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/ism/forms/my-drafts" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div>Loading...</div>}>
-            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/MyDrafts')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/ism/forms/pending" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div>Loading...</div>}>
-            {React.createElement(React.lazy(() => import('@/modules/ism/forms/pages/PendingSignatures')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/ism/forms/archive" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><FormsArchive /></React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/ism/forms/schedules" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><FormSchedules /></React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/ism/forms/exports" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><FormExports /></React.Suspense>
-        </ProtectedRoute>
-      } />
-      
-      {/* ISM - 15 Flat Routes (Alphabetical) - All lazy loaded */}
-      <Route path="/ism/audits-surveys" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><AuditsSurveysPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/ism/checklists" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><ChecklistsPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/ism/corrective-actions" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><CorrectiveActionsPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/ism/drills" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><ISMDrillsPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/ism/erm" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><ERMPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/ism/incidents" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><ISMIncidentsPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/ism/investigations" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><InvestigationsPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/ism/meetings" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><MeetingsPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/ism/miscellaneous" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><MiscellaneousPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/ism/non-conformities" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><NonConformitiesPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/ism/observations" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><ObservationsPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/ism/permits-to-work" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><PermitsToWorkPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/ism/risk-assessments" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><RiskAssessmentsPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/ism/sops" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><SOPsPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/ism/training" element={<ProtectedRoute><React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}><ISMTrainingPage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/ism/forms/templates" element={<FormTemplates />} />
+      <Route path="/ism/forms/templates/create" element={<CreateTemplate />} />
+      <Route path="/ism/forms/templates/:templateId" element={<TemplateDetail />} />
+      <Route path="/ism/forms/templates/:templateId/edit" element={<EditTemplate />} />
+      <Route path="/ism/forms/new" element={<NewFormSubmission />} />
+      <Route path="/ism/forms/submission/:submissionId" element={<ViewFormSubmission />} />
+      <Route path="/ism/forms/submissions" element={<SubmissionsList />} />
+      <Route path="/ism/forms/drafts" element={<DraftTemplates />} />
+      <Route path="/ism/forms/my-drafts" element={<MyDrafts />} />
+      <Route path="/ism/forms/pending" element={<PendingSignatures />} />
+      <Route path="/ism/forms/archive" element={<FormsArchive />} />
+      <Route path="/ism/forms/schedules" element={<FormSchedules />} />
+      <Route path="/ism/forms/exports" element={<FormExports />} />
+
+      {/* ISM - 15 Flat Routes (Alphabetical) */}
+      <Route path="/ism/audits-surveys" element={<AuditsSurveysPage />} />
+      <Route path="/ism/checklists" element={legacy('/ism/checklists', <ChecklistsPage />)} />
+      <Route path="/ism/corrective-actions" element={<CorrectiveActionsPage />} />
+      <Route path="/ism/drills" element={legacy('/ism/drills', <ISMDrillsPage />)} />
+      <Route path="/ism/erm" element={legacy('/ism/erm', <ERMPage />)} />
+      <Route path="/ism/incidents" element={<ISMIncidentsPage />} />
+      <Route path="/ism/investigations" element={<InvestigationsPage />} />
+      <Route path="/ism/meetings" element={<MeetingsPage />} />
+      <Route path="/ism/miscellaneous" element={legacy('/ism/miscellaneous', <MiscellaneousPage />)} />
+      <Route path="/ism/non-conformities" element={<NonConformitiesPage />} />
+      <Route path="/ism/observations" element={<ObservationsPage />} />
+      <Route path="/ism/permits-to-work" element={<PermitsToWorkPage />} />
+      <Route path="/ism/risk-assessments" element={legacy('/ism/risk-assessments', <RiskAssessmentsPage />)} />
+      <Route path="/ism/sops" element={<SOPsPage />} />
+      <Route path="/ism/training" element={<ISMTrainingPage />} />
 
       {/* ISM - Legacy redirect */}
       <Route path="/ism/capa" element={<Navigate to="/ism/corrective-actions" replace />} />
       <Route path="/ism/audits" element={<Navigate to="/ism/audits-surveys" replace />} />
 
       {/* Certificates */}
-      <Route path="/certificates" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Certificates /></React.Suspense></ProtectedRoute>} />
-      <Route path="/certificates/vessel" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Certificates /></React.Suspense></ProtectedRoute>} />
-      <Route path="/certificates/crew" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><CrewCertificatesOverview /></React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/certificates/alerts" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            <CertificateAlerts />
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
+      <Route path="/certificates" element={legacy('/certificates', <Certificates />)} />
+      <Route path="/certificates/vessel" element={legacy('/certificates/vessel', <Certificates />)} />
+      <Route path="/certificates/crew" element={<CrewCertificatesOverview />} />
+      <Route path="/certificates/alerts" element={<CertificateAlerts />} />
 
       {/* Documents */}
-      <Route path="/documents" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Documents /></React.Suspense></ProtectedRoute>} />
-      <Route path="/documents/manuals" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Manuals /></React.Suspense></ProtectedRoute>} />
-      <Route path="/documents/procedures" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/modules/documents/pages/Procedures')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/documents/ism-sms" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><ISM_SMS /></React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/documents/policies" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Policies /></React.Suspense></ProtectedRoute>} />
-      <Route path="/documents/drawings" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><Drawings /></React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/documents/search" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><DocumentSearch /></React.Suspense></ProtectedRoute>} />
-      <Route path="/documents/master-index" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><MasterDocumentIndex /></React.Suspense></ProtectedRoute>} />
-      <Route path="/documents/reviews" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><ReviewDashboard /></React.Suspense></ProtectedRoute>} />
-      <Route path="/review-queue" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><ReviewQueue /></React.Suspense></ProtectedRoute>} />
-      <Route path="/acknowledgments" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><AcknowledgmentTracking /></React.Suspense></ProtectedRoute>} />
+      <Route path="/documents" element={legacy('/documents', <Documents />)} />
+      <Route path="/documents/manuals" element={<Manuals />} />
+      <Route path="/documents/procedures" element={<Procedures />} />
+      <Route path="/documents/ism-sms" element={<ISM_SMS />} />
+      <Route path="/documents/policies" element={<Policies />} />
+      <Route path="/documents/drawings" element={<Drawings />} />
+      <Route path="/documents/search" element={<DocumentSearch />} />
+      <Route path="/documents/master-index" element={<MasterDocumentIndex />} />
+      <Route path="/documents/reviews" element={<ReviewDashboard />} />
+      <Route path="/review-queue" element={<ReviewQueue />} />
+      <Route path="/acknowledgments" element={<AcknowledgmentTracking />} />
 
       {/* Itinerary */}
       <Route path="/itinerary" element={<Navigate to="/itinerary/planning" replace />} />
-      <Route path="/itinerary/planning" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/modules/itinerary/pages/FleetPlanningPage')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/itinerary/timeline" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/modules/itinerary/pages/FleetTimelinePage')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/itinerary/suggestions" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/modules/itinerary/pages/TripSuggestionsPage')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/itinerary/postponed" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/modules/itinerary/pages/PostponedEntriesPage')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
+      <Route path="/itinerary/planning" element={<FleetPlanningPage />} />
+      <Route path="/itinerary/timeline" element={legacy('/itinerary/timeline', <FleetTimelinePage />)} />
+      <Route path="/itinerary/suggestions" element={<TripSuggestionsPage />} />
+      <Route path="/itinerary/postponed" element={<PostponedEntriesPage />} />
 
       {/* Crew Development */}
       <Route path="/development" element={<Navigate to="/development/my" replace />} />
-      <Route path="/development/my" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/modules/development/pages/MyDevelopment')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/development/catalogue" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/modules/development/pages/CourseCatalogue')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/development/applications" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/modules/development/pages/DevelopmentApplications')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/development/courses-register" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/modules/development/pages/CoursesRegister')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/development/crew-training" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/modules/development/pages/CrewTraining')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/development/admin" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}>
-            {React.createElement(React.lazy(() => import('@/modules/development/pages/DevelopmentAdmin')))}
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
+      <Route path="/development/my" element={legacy('/development/my', <MyDevelopment />)} />
+      <Route path="/development/catalogue" element={<CourseCatalogue />} />
+      <Route path="/development/applications" element={<DevelopmentApplications />} />
+      <Route path="/development/courses-register" element={<CoursesRegister />} />
+      <Route path="/development/crew-training" element={legacy('/development/crew-training', <CrewTraining />)} />
+      <Route path="/development/admin" element={<DevelopmentAdmin />} />
 
       {/* HR */}
-      <Route path="/hr" element={<ModuleRoute moduleId="hris"><React.Suspense fallback={<LazyLoader />}><HRPage /></React.Suspense></ModuleRoute>} />
+      <Route path="/hr" element={<HRPage />} />
 
       {/* Insurance */}
-      <Route path="/insurance" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><InsurancePage /></React.Suspense></ProtectedRoute>} />
+      <Route path="/insurance" element={<InsurancePage />} />
 
       {/* Maintenance */}
-      <Route path="/maintenance" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Maintenance /></React.Suspense></ProtectedRoute>} />
-      <Route path="/maintenance/dashboard" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Maintenance /></React.Suspense></ProtectedRoute>} />
-      <Route path="/maintenance/defects" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><MaintenanceDefects /></React.Suspense></ProtectedRoute>} />
-      <Route path="/maintenance/critical" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><CriticalEquipment /></React.Suspense></ProtectedRoute>} />
-      <Route path="/maintenance/spares" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><SpareParts /></React.Suspense>
-        </ProtectedRoute>
-      } />
+      <Route path="/maintenance" element={legacy('/maintenance', <Maintenance />)} />
+      <Route path="/maintenance/dashboard" element={legacy('/maintenance/dashboard', <Maintenance />)} />
+      <Route path="/maintenance/defects" element={<MaintenanceDefects />} />
+      <Route path="/maintenance/critical" element={<CriticalEquipment />} />
+      <Route path="/maintenance/spares" element={<SpareParts />} />
 
       {/* Alerts */}
       {/* The sample-data alerts page is gone; the notification centre reads the real alerts table. */}
       <Route path="/alerts" element={<Navigate to="/notifications/center" replace />} />
 
       {/* Settings */}
-      <Route path="/settings" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Settings /></React.Suspense></ProtectedRoute>} />
-      <Route path="/settings/*" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Settings /></React.Suspense></ProtectedRoute>} />
-      <Route path="/settings/branding" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><BrandingSettings /></React.Suspense></ProtectedRoute>} />
-      <Route path="/settings/permissions" element={
-        <ProtectedRoute>
-          <DashboardLayout>
-            <React.Suspense fallback={<LazyLoader />}><RolesPermissionsPage /></React.Suspense>
-          </DashboardLayout>
-        </ProtectedRoute>
-      } />
+      <Route path="/settings" element={legacy('/settings', <Settings />)} />
+      <Route path="/settings/*" element={<Settings />} />
+      <Route path="/settings/branding" element={<BrandingSettings />} />
+      <Route path="/settings/permissions" element={legacy('/settings/permissions', <RolesPermissionsPage />)} />
 
       {/* Admin Routes */}
       <Route path="/admin" element={<Navigate to="/users-access" replace />} />
       {/* The localStorage-backed user list is gone; Users & Access is the real editor. */}
       <Route path="/admin/users" element={<Navigate to="/users-access" replace />} />
-      <Route path="/users-access" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><UsersAccessListPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/users-access/:userId" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><UsersAccessDetailPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/settings/notifications" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><NotificationManagementPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/notifications" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><NotificationsPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/notifications/center" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><NotificationCenterPage /></React.Suspense></ProtectedRoute>} />
-      <Route path="/admin/roles" element={
-        <ProtectedRoute>
-          <DashboardLayout>
-            <React.Suspense fallback={<LazyLoader />}><RolesPermissionsPage /></React.Suspense>
-          </DashboardLayout>
-        </ProtectedRoute>
-      } />
-      <Route path="/admin/fleet-groups" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><ComingSoonPage title="Fleet Groups" description="Grouping vessels into fleets is not built yet." /></React.Suspense></ProtectedRoute>} />
-      <Route path="/admin/alerts" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><ComingSoonPage title="Alert Configuration" description="Alert rules and escalation settings are not built yet." /></React.Suspense></ProtectedRoute>} />
-      <Route path="/admin/integrations" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><APIIntegrations /></React.Suspense></ProtectedRoute>} />
-      <Route path="/admin/feedback" element={
-        <ProtectedRoute>
-          <DashboardLayout>
-            <React.Suspense fallback={<LazyLoader />}><FeedbackAdmin /></React.Suspense>
-          </DashboardLayout>
-        </ProtectedRoute>
-      } />
+      <Route path="/users-access" element={legacy('/users-access', <UsersAccessListPage />)} />
+      <Route path="/users-access/:userId" element={legacy('/users-access/:userId', <UsersAccessDetailPage />)} />
+      <Route path="/settings/notifications" element={legacy('/settings/notifications', <NotificationManagementPage />)} />
+      <Route path="/notifications" element={legacy('/notifications', <NotificationsPage />)} />
+      <Route path="/notifications/center" element={<NotificationCenterPage />} />
+      <Route path="/admin/roles" element={legacy('/admin/roles', <RolesPermissionsPage />)} />
+      <Route path="/admin/fleet-groups" element={<ComingSoonPage title="Fleet Groups" description="Grouping vessels into fleets is not built yet." />} />
+      <Route path="/admin/alerts" element={<ComingSoonPage title="Alert Configuration" description="Alert rules and escalation settings are not built yet." />} />
+      <Route path="/admin/integrations" element={<APIIntegrations />} />
+      <Route path="/admin/feedback" element={<FeedbackAdmin />} />
 
       {/* Legacy/Report Routes */}
-      <Route path="/drills" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Drills /></React.Suspense></ProtectedRoute>} />
-      <Route path="/drills/annual-grid" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><DrillsAnnualGrid /></React.Suspense></ProtectedRoute>} />
-      <Route path="/training" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Training /></React.Suspense></ProtectedRoute>} />
-      <Route path="/incidents" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Incidents /></React.Suspense></ProtectedRoute>} />
-      <Route path="/audits" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><Audits /></React.Suspense></ProtectedRoute>} />
-      <Route path="/risk-assessments" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><RiskAssessments /></React.Suspense></ProtectedRoute>} />
-      <Route path="/risk-assessments/new" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><RiskAssessmentForm /></React.Suspense></ProtectedRoute>} />
-      <Route path="/documents/safety-versioning" element={<ProtectedRoute><React.Suspense fallback={<LazyLoader />}><SafetyDocumentVersioning /></React.Suspense></ProtectedRoute>} />
+      <Route path="/drills" element={legacy('/drills', <Drills />)} />
+      <Route path="/drills/annual-grid" element={<DrillsAnnualGrid />} />
+      <Route path="/training" element={legacy('/training', <Training />)} />
+      <Route path="/incidents" element={<Incidents />} />
+      <Route path="/audits" element={<Audits />} />
+      <Route path="/risk-assessments" element={legacy('/risk-assessments', <RiskAssessments />)} />
+      <Route path="/risk-assessments/new" element={legacy('/risk-assessments/new', <RiskAssessmentForm />)} />
+      <Route path="/documents/safety-versioning" element={<SafetyDocumentVersioning />} />
       <Route path="/settings/account-details" element={<Navigate to="/settings" replace />} />
-      <Route path="/reports" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            <IncidentAnalytics />
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/reports/incident-analytics" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            <IncidentAnalytics />
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/reports/capa-tracker" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            <CAPATracker />
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/reports/drill-analytics" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<div className="flex items-center justify-center min-h-[400px]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-            <DrillAnalytics />
-          </React.Suspense>
-        </ProtectedRoute>
-      } />
+      <Route path="/reports" element={legacy('/reports', <IncidentAnalytics />)} />
+      <Route path="/reports/incident-analytics" element={legacy('/reports/incident-analytics', <IncidentAnalytics />)} />
+      <Route path="/reports/capa-tracker" element={legacy('/reports/capa-tracker', <CAPATracker />)} />
+      <Route path="/reports/drill-analytics" element={legacy('/reports/drill-analytics', <DrillAnalytics />)} />
 
       {/* Compliance — ISM / ISPS / MLC */}
-      <Route path="/compliance" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><CompliancePage /></React.Suspense>
-        </ProtectedRoute>
-      } />
+      <Route path="/compliance" element={<CompliancePage />} />
 
       {/* Checklists — department-based */}
-      <Route path="/checklists" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><NewChecklistsPage /></React.Suspense>
-        </ProtectedRoute>
-      } />
+      <Route path="/checklists" element={legacy('/checklists', <NewChecklistsPage />)} />
 
       {/* Flights & Travel: the sample-data page is gone; the crew module's page reads flight_bookings. */}
       <Route path="/flights-travel" element={<Navigate to="/crew/flights" replace />} />
 
       {/* Individual Vessel Dashboards */}
-      <Route path="/vessel/:vesselSlug/dashboard" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><IndividualVesselDashboard /></React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/vessel/:vesselSlug" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><IndividualVesselDashboard /></React.Suspense>
-        </ProtectedRoute>
-      } />
+      <Route path="/vessel/:vesselSlug/dashboard" element={legacy('/vessel/:vesselSlug/dashboard', <IndividualVesselDashboard />)} />
+      <Route path="/vessel/:vesselSlug" element={legacy('/vessel/:vesselSlug', <IndividualVesselDashboard />)} />
       {/* Convenience routes for all 7 vessels */}
-      <Route path="/vessel/:vesselSlug/checklists" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><NewChecklistsPage /></React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/vessel/:vesselSlug/compliance" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><CompliancePage /></React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/vessel/:vesselSlug/compliance/ism" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><CompliancePage /></React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/vessel/:vesselSlug/compliance/isps" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><CompliancePage /></React.Suspense>
-        </ProtectedRoute>
-      } />
-      <Route path="/vessel/:vesselSlug/compliance/mlc" element={
-        <ProtectedRoute>
-          <React.Suspense fallback={<LazyLoader />}><CompliancePage /></React.Suspense>
-        </ProtectedRoute>
-      } />
+      <Route path="/vessel/:vesselSlug/checklists" element={legacy('/vessel/:vesselSlug/checklists', <NewChecklistsPage />)} />
+      <Route path="/vessel/:vesselSlug/compliance" element={<CompliancePage />} />
+      <Route path="/vessel/:vesselSlug/compliance/ism" element={<CompliancePage />} />
+      <Route path="/vessel/:vesselSlug/compliance/isps" element={<CompliancePage />} />
+      <Route path="/vessel/:vesselSlug/compliance/mlc" element={<CompliancePage />} />
 
       {/* The seed-data permission matrix is gone; Users & Access edits real permissions. */}
       <Route path="/settings/user-permissions" element={<Navigate to="/users-access" replace />} />
 
-      {/* New Build module — sits before placeholders so it takes precedence. */}
-      {newBuildRoutes}
+      {/* ── Scopes (BUILD-PLAN B5; gap/00 B2–B3; gap/01 F14; D-02, D-13) ──
+          Each scope renders the shell once around its pages. The pages are the
+          existing components, mounted unchanged: a page that still renders
+          DashboardLayout itself gets the idempotent one. Old URLs redirect here
+          through LegacyRoute (src/app/router/legacyRedirects.ts). */}
 
-      {/* HRIS module — before placeholders so real pages take precedence. */}
-      {hrisRoutes}
+      {/* Fleet view: oversight across every vessel the user can reach. */}
+      <Route path="/fleet" element={<FleetScope />}>
+        <Route index element={<Navigate to="/fleet/dashboard" replace />} />
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="tracker" element={<FleetMap />} />
+        <Route path="calendar" element={<FleetTimelinePage />} />
+        <Route path="planner" element={<RotationPlannerPage />} />
+        <Route path="documents" element={<Documents />} />
+        <Route path="training" element={<CrewTraining />} />
+        <Route path="reports" element={<Navigate to="/fleet/reports/incident-analytics" replace />} />
+        <Route path="reports/incident-analytics" element={<IncidentAnalytics />} />
+        <Route path="reports/capa-tracker" element={<CAPATracker />} />
+        <Route path="reports/drill-analytics" element={<DrillAnalytics />} />
+        <Route path="reports/risk-overview" element={<ERMPage />} />
+        <Route path="admin" element={<Navigate to="/fleet/admin/users/crew" replace />} />
+        <Route path="admin/users" element={<Navigate to="/fleet/admin/users/crew" replace />} />
+        <Route path="admin/users/crew" element={<UsersAccessListPage />} />
+        <Route path="admin/users/people/:userId" element={<UsersAccessDetailPage />} />
+        <Route path="admin/users/sets" element={<RolesPermissionsPage />} />
+        <Route path="admin/vessels" element={<Vessels />} />
+        <Route path="admin/notifications" element={<NotificationManagementPage />} />
+        {/* Fleet routes registered by module manifests (B8). */}
+        {fleetManifestRoutes}
+        {/* Planned Fleet leaves: Coming Soon inside the scope (sitemap, D-06). */}
+        {fleetNavRoutes}
+        <Route path="*" element={<ScopeNotFound />} />
+      </Route>
 
-      {/* Health & Wellness module — before placeholders for the same reason. */}
-      {healthRoutes}
+      {/* Vessel view: one vessel, named by its code in the URL (D-03, C20). */}
+      <Route path="/v/:vesselCode" element={<VesselScopeRoute />}>
+        <Route index element={<VesselDashboard />} />
+        <Route path="crew/list" element={<CrewList />} />
+        <Route path="crew/roster" element={<CrewRoster />} />
+        <Route path="crew/compliance" element={<Navigate to="status" replace />} />
+        <Route path="crew/compliance/status" element={<CrewDocuments />} />
+        <Route path="crew/hours-of-rest" element={<WorkRestOverview />} />
+        <Route path="crew/people/:crewId/hours-of-rest" element={<CrewWorkRestMonth />} />
+        <Route path="crew/planner" element={<Navigate to="timeline" replace />} />
+        <Route path="crew/planner/timeline" element={<RotationPlannerPage />} />
+        <Route path="crew/planner/manning" element={<LeavePlannerPage />} />
+        <Route path="crew/planner/requests" element={<LeaveRequestsPage />} />
+        <Route path="crew/training" element={<CrewTraining />} />
+        <Route path="crew/familiarisation" element={<Training />} />
+        <Route path="safety/drills" element={<ISMDrillsPage />} />
+        <Route path="safety/forms" element={<MiscellaneousPage />} />
+        <Route path="safety/checklists" element={<ChecklistsPage />} />
+        <Route path="safety/risk-assessments" element={<RiskAssessmentsPage />} />
+        <Route path="safety/risk-assessments/new" element={<RiskAssessmentForm />} />
+        <Route path="certificates" element={<Certificates />} />
+        <Route path="technical" element={<Maintenance />} />
+        <Route path="vessel/emergency" element={<VesselEmergencyDetailsPage />} />
+        <Route path="logbooks" element={<LogbookWorkspace />} />
+        <Route path="logbooks/registry" element={<LogbookRegistry />} />
+        <Route path="logbooks/review" element={<LogbookReview />} />
+        <Route path="logbooks/records" element={<LogbookRecords />} />
+        <Route path="logbooks/connections" element={<LogbookConnections />} />
+        <Route path="logbooks/assurance" element={<LogbookAssurance />} />
+        <Route path="logbooks/:logbookSlug" element={<LogbookWorkspace />} />
+        <Route path="calendar" element={<VesselCalendar />} />
+        {/* Vessel routes registered by module manifests (B8), relative to the vessel. */}
+        {vesselManifestRoutes}
+        {/* Module roots with no page of their own (crew, safety, vessel, …)
+            open their first leaf; planned vessel leaves open Coming Soon
+            (sitemap VESSEL_MODULES, D-06). */}
+        {vesselNavRoutes}
+        <Route path="*" element={<ScopeNotFound />} />
+      </Route>
 
-      {/* Refit module (ported from Ship Shape Command). */}
-      {refitRoutes}
+      {/* Personal area. /me (profile and settings) brings its own chrome. */}
+      <Route path="/me" element={<PersonalScope />}>
+        <Route index element={<Settings />} />
+        <Route element={<ScopeShell />}>
+          <Route path="hours-of-rest" element={<MyWorkRestMonth />} />
+          <Route path="training" element={<MyDevelopment />} />
+          <Route path="notifications" element={<NotificationsPage />} />
+          {/* Personal routes registered by module manifests (B8). */}
+          {personalManifestRoutes}
+        </Route>
+      </Route>
 
-      {/* Legal Support & Ticketing (department shell at /departments/legal). */}
-      {legalRoutes}
+      {/* Workspaces keep their URLs, guards and module shells (D-09). Their
+          routes come from the module manifests (src/modules/<m>/module.ts,
+          BUILD-PLAN B8): HRIS, Health & Wellness, Yard (Refit, New Build)
+          and Legal, each inside one WorkspaceScope, so the shell is mounted
+          once per workspace. Placeholders exist only for planned leaves, so
+          no real page depends on route order. */}
+      {workspaceManifestRoutes}
 
-      {/* Sitemap-driven placeholders: every Fleet/Vessel/Shoreside/Health/Yard/HRIS
-          leaf that doesn't have a real page yet renders a Coming Soon screen.
-          Explicit routes above take precedence because they're listed first. */}
+      {/* Coming Soon URLs the old Fleet and Vessel trees made up, retired by
+          the target nav tree (B7): each goes to its replacement for one release. */}
+      {retiredNavRoutes}
+
+      {/* Sitemap-driven placeholders: every planned Shoreside/Health/Yard/HRIS
+          leaf (no real page yet) renders a Coming Soon screen, so bookmarks
+          resolve while the sidebar hides the leaf (D-06). Live leaves never
+          get one. Fleet and vessel placeholders sit inside their scopes. */}
       {PLACEHOLDER_LEAVES.map((leaf) => (
         <Route
           key={leaf.path}
@@ -849,6 +572,7 @@ export const AppRoutes: React.FC = () => {
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
+    </NavAccessProvider>
   );
 };
 

@@ -1,43 +1,43 @@
-import React from 'react';
-import { Navigate, Route } from 'react-router-dom';
-import ProtectedRoute from '@/shared/components/ProtectedRoute';
-import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { LazyLoader } from '@/shared/components/common/LazyLoader';
+import type { ManifestPageLoader, RouteDef } from '@/app/registry/types';
 import { LEGAL_PATHS } from './paths';
 
-type Loader = () => Promise<{ default: React.ComponentType }>;
+/**
+ * Legal module routes under /departments/legal (R4), as data (BUILD-PLAN
+ * B8). The module manifest (./module.ts) registers them and the router
+ * mounts them inside the Legal workspace scope.
+ *
+ * Any signed-in user may enter (everyone can raise a request and fill in
+ * forms); legal-team controls are gated in the pages by useLegalAccess and
+ * enforced by row level security.
+ */
+const page = (path: string, loader: ManifestPageLoader): RouteDef => ({
+  scope: 'workspace',
+  workspace: 'legal',
+  path,
+  page: loader,
+  guard: { kind: 'login' },
+  layout: 'dashboard',
+});
 
-const page = (loader: Loader) => {
-  const C = React.lazy(loader);
-  return (
-    <ProtectedRoute>
-      <DashboardLayout>
-        <React.Suspense fallback={<LazyLoader />}>
-          <C />
-        </React.Suspense>
-      </DashboardLayout>
-    </ProtectedRoute>
-  );
-};
+const redirect = (path: string, redirectTo: string): RouteDef => ({ scope: 'workspace', workspace: 'legal', path, redirectTo });
+
+export const LEGAL_ROUTES: readonly RouteDef[] = [
+  redirect(LEGAL_PATHS.root, LEGAL_PATHS.dashboard),
+  redirect(LEGAL_PATHS.legacyPlaceholder, LEGAL_PATHS.dashboard),
+  page(LEGAL_PATHS.dashboard, () => import('@/modules/legal/pages/LegalDashboardPage')),
+  page(LEGAL_PATHS.requests, () => import('@/modules/legal/pages/LegalRequestsPage')),
+  page(LEGAL_PATHS.newRequest, () => import('@/modules/legal/pages/LegalRequestNewPage')),
+  page(`${LEGAL_PATHS.requests}/:id`, () => import('@/modules/legal/pages/LegalRequestDetailPage')),
+  page(LEGAL_PATHS.documents, () => import('@/modules/legal/pages/LegalDocumentsPage')),
+  page(`${LEGAL_PATHS.documents}/:id`, () => import('@/modules/legal/pages/LegalDocumentEditorPage')),
+  page(LEGAL_PATHS.forms, () => import('@/modules/legal/pages/LegalFormsPage')),
+  page(`${LEGAL_PATHS.forms}/:templateId/fill`, () => import('@/modules/legal/pages/LegalFormFillPage')),
+  page(`${LEGAL_PATHS.forms}/:templateId/submissions`, () => import('@/modules/legal/pages/LegalFormSubmissionsPage')),
+];
 
 /**
- * Legal module routes under /departments/legal. Any signed-in user may enter
- * (everyone can raise a request and fill in forms); legal-team controls are
- * gated in the pages by useLegalAccess and enforced by row level security.
- * Listed in src/routes/index.tsx before the sitemap placeholders.
+ * The module's public name for its routes (`@/modules/legal`). They are route
+ * definitions now, mounted by the router from the module registry; nothing
+ * renders them directly.
  */
-export const legalRoutes = (
-  <>
-    <Route path={LEGAL_PATHS.root} element={<Navigate to={LEGAL_PATHS.dashboard} replace />} />
-    <Route path={LEGAL_PATHS.legacyPlaceholder} element={<Navigate to={LEGAL_PATHS.dashboard} replace />} />
-    <Route path={LEGAL_PATHS.dashboard} element={page(() => import('@/modules/legal/pages/LegalDashboardPage'))} />
-    <Route path={LEGAL_PATHS.requests} element={page(() => import('@/modules/legal/pages/LegalRequestsPage'))} />
-    <Route path={LEGAL_PATHS.newRequest} element={page(() => import('@/modules/legal/pages/LegalRequestNewPage'))} />
-    <Route path={`${LEGAL_PATHS.requests}/:id`} element={page(() => import('@/modules/legal/pages/LegalRequestDetailPage'))} />
-    <Route path={LEGAL_PATHS.documents} element={page(() => import('@/modules/legal/pages/LegalDocumentsPage'))} />
-    <Route path={`${LEGAL_PATHS.documents}/:id`} element={page(() => import('@/modules/legal/pages/LegalDocumentEditorPage'))} />
-    <Route path={LEGAL_PATHS.forms} element={page(() => import('@/modules/legal/pages/LegalFormsPage'))} />
-    <Route path={`${LEGAL_PATHS.forms}/:templateId/fill`} element={page(() => import('@/modules/legal/pages/LegalFormFillPage'))} />
-    <Route path={`${LEGAL_PATHS.forms}/:templateId/submissions`} element={page(() => import('@/modules/legal/pages/LegalFormSubmissionsPage'))} />
-  </>
-);
+export const legalRoutes = LEGAL_ROUTES;

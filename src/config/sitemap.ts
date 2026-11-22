@@ -1,236 +1,342 @@
 /**
- * Inkfleet site map → navigation tree + placeholder route registry.
+ * STORM site map: the assembler of the navigation trees, and the
+ * placeholder and redirect routes generated from them (BUILD-PLAN B3, B7,
+ * B8; gap/00 F0.3; gap/10 "Target information architecture"; DECISIONS R1,
+ * R3, R4, G1, G5, D-06, D-09, D-17).
  *
- * This file is the single source of truth for the sidebar and for
- * placeholder routes registered in `src/routes/index.tsx`. Real pages
- * keep their existing routes (e.g. `/dashboard`, `/ism/drills`); leaves
- * that point at synthesized paths under `/fleet/...`, `/vessel/...`,
- * `/shoreside/...`, `/health/...`, `/yard/...`, `/hris/...` get a
- * generated "Coming Soon" placeholder route until a real page is built.
+ * The trees are slots (src/config/navSlots.ts) filled from two sources: the
+ * platform's own nodes, declared here, and the nav fragments of the module
+ * manifests (src/modules/<m>/module.ts, collected by src/app/registry). A
+ * module adds or moves its leaves in its own manifest, never here.
+ *
+ * - **Fleet** (`/fleet/…`): the Fleet view sidebar, in the section headings
+ *   OVERVIEW, COMPLIANCE, PEOPLE, WORKSPACES, ADMINISTRATION, CONFIGURATION
+ *   (gap/10 IA7, R1). No Feedback inbox leaf (R3).
+ * - **Vessel** (`VESSEL_MODULES`): one entry per vessel tab, in tab order,
+ *   each with the sidebar shown under it. Paths are relative to
+ *   `/v/:vesselCode`; `buildVesselNav(code)` resolves them for one vessel.
+ *   Finance and Departments are planned slots, hidden by default (G1, G5).
+ * - **Workspaces** (HRIS, Health & Wellness, Yard, Shoreside): the STORM
+ *   modules, unchanged (D-09). Their trees come from the HRIS, Health,
+ *   Refit and New Build manifests; Shoreside is still the platform's.
+ *   Legal stays at `/departments/legal` (R4) and is linked from WORKSPACES.
+ *
+ * `NAVIGATION_ITEMS` feeds today's shell (top module rail + sidebar) until
+ * Phase 1 replaces it: its Fleet module is the Fleet tree, and its Vessel
+ * module lists the vessel tabs as groups on the `/v/:vesselCode/…` pattern.
+ * Following such a link opens the current vessel (see VesselScopeRoute).
+ *
+ * Every leaf carries a `status` (D-06, gap/10 IA10):
+ * - `live`: the leaf reaches a real page. A leaf says so (`LIVE`, or
+ *   `existing` for a route served outside the registry), or is live because
+ *   a module manifest registers a route at its path.
+ * - `planned`: no page yet. The sidebar hides it unless an owner or admin
+ *   turns on "Show roadmap", and it gets a Coming Soon placeholder route
+ *   (inside its scope for fleet and vessel leaves), so a link still resolves.
+ * src/test/router/navStatus.test.tsx checks both against the real router,
+ * and src/test/config/registry.test.tsx against the registry.
+ *
+ * Leaves are built with the shared `L(label, …)` builder (navBuilders.ts) so
+ * scripts/permissions/check-storm-coverage.mjs can match every label to the
+ * PMS catalogue.
  */
 import {
   LayoutDashboard, Map as MapIcon, Ship, Users, FileText, Shield, Award,
-  Wrench, Bell, Settings, LayoutGrid, Building2, Phone, Plane, Clock,
+  Wrench, Settings, LayoutGrid, Building2, Phone, Clock,
   CalendarDays, CheckSquare, Siren, GraduationCap, MessageSquare,
-  AlertCircle, Search, Clipboard, Eye, AlertTriangle, ClipboardList,
-  BookOpen, FileCheck, Layers, Package, HardHat, XCircle, Umbrella,
-  Briefcase, Compass, GanttChart, Lightbulb, PauseCircle, Anchor,
-  Heart, Activity, Utensils, Dumbbell, Stethoscope, Hammer, Building,
-  Calendar, ListChecks, CircleDot, Network, Receipt, Banknote, Globe,
+  AlertCircle, AlertTriangle, ClipboardList,
+  BookOpen, FileCheck, Layers, Package, HardHat, Umbrella,
+  Briefcase, Compass, Anchor,
+  Heart, Utensils, Stethoscope, Hammer, Building,
+  Calendar, ListChecks, Network, Receipt, Banknote, Globe,
   Sparkles, Beaker, Waves, LifeBuoy, BookMarked, Headphones, Cpu,
-  Camera, Pickaxe, ScrollText, Truck, ClipboardCheck,
-  type LucideIcon,
+  Camera, ScrollText, Truck, ClipboardCheck,
+  FileBarChart, ShieldAlert, UserCheck, Puzzle, KeyRound, HelpCircle,
+  ShieldCheck, Settings2, Plug, Library, Boxes, Route, Navigation, Radar,
+  FolderOpen, Gauge, Eye,
 } from 'lucide-react';
-import type { NavItem, NavChild } from './navigation-types';
+import type { NavItem, NavChild, VesselModule, VesselModuleNav } from './navigation-types';
+import { G, L, LIVE, S, mergeSlot, resolveNavStatus, withScope, type SlotEntry } from './navBuilders';
+import { WORKSPACE_TREES, vesselSlot, type NavSlotId } from './navSlots';
+import { MODULE_REGISTRY } from '@/app/registry/modules';
+import { HRIS_PATHS } from '@/modules/hris/paths';
+import { VESSEL_SCOPE_PATTERN, vesselPath } from '@/modules/vessels/lib/vesselCode';
 
-const def: LucideIcon = CircleDot;
+export { S } from './navBuilders';
 
-/** Normalize a label into a URL slug. */
-const slug = (s: string): string =>
-  s
-    .toLowerCase()
-    .replace(/&/g, 'and')
-    .replace(/['’`"]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+/**
+ * One slot's children: the platform's own nodes here, merged with the nav
+ * fragments module manifests contribute to that slot (navSlots.ts).
+ */
+const fill = (slot: NavSlotId, base: (NavChild | SlotEntry)[] = []): NavChild[] =>
+  mergeSlot(base, MODULE_REGISTRY.fragmentsFor(slot));
 
-/** Build a leaf NavChild under a base path. Pass `existing` to point at
- *  an already-implemented route; otherwise a synthesized path is used. */
-type GateOpts = Pick<NavChild, 'moduleKey' | 'minPermission' | 'crossLink' | 'selfServe'>;
+/** Whether a registered module route serves an absolute path. */
+const isRouted = (path: string): boolean => MODULE_REGISTRY.hasPage(path);
 
-function L(
-  label: string,
-  base: string,
-  opts: { existing?: string; icon?: LucideIcon; slug?: string } & GateOpts = {},
-): NavChild {
-  const s = opts.slug ?? slug(label);
-  const path = opts.existing ?? `${base}/${s}`;
-  return {
-    id: `${base}-${s}`.replace(/[^a-z0-9-]+/gi, '-').replace(/^-+/, ''),
-    label,
-    path,
-    icon: opts.icon ?? def,
-    ...(opts.moduleKey ? { moduleKey: opts.moduleKey } : {}),
-    ...(opts.minPermission ? { minPermission: opts.minPermission } : {}),
-    ...(opts.crossLink ? { crossLink: true } : {}),
-    ...(opts.selfServe ? { selfServe: true } : {}),
-  };
-}
+/** Absolute path of a vessel-tree path under `base` (a cross-link stays absolute). */
+const underVessel = (base: string, rel: string): string => {
+  if (rel.startsWith('/')) return rel;
+  return rel ? `${base}/${rel}` : base;
+};
 
-/** Build a group (collapsible child with its own children) under a base path. */
-function G(
-  label: string,
-  base: string,
-  children: NavChild[],
-  opts: { icon?: LucideIcon; slug?: string } & GateOpts = {},
-): NavChild {
-  const s = opts.slug ?? slug(label);
-  return {
-    id: `${base}-${s}`.replace(/[^a-z0-9-]+/gi, '-').replace(/^-+/, ''),
-    label,
-    path: `${base}/${s}`,
-    icon: opts.icon ?? def,
-    children,
-    ...(opts.moduleKey ? { moduleKey: opts.moduleKey } : {}),
-    ...(opts.minPermission ? { minPermission: opts.minPermission } : {}),
-    ...(opts.selfServe ? { selfServe: true } : {}),
-  };
-}
+// ─── SHORESIDE ───────────────────────────────────────────────────────────
+const SHORE = '/shoreside';
+const shoresideChildren: NavChild[] = [
+  L('Embrace', SHORE, { icon: Heart }),
+  L('Lungfish', SHORE, { icon: Beaker }),
+  L('Bonefish', SHORE, { icon: Beaker }),
+  L('InkWELL', SHORE, { icon: Sparkles }),
+  L('MedINK', SHORE, { icon: Stethoscope }),
+  L('Crew Concierge', SHORE, { icon: Headphones }),
+  L('Cosmic Frontier Labs', SHORE, { icon: Beaker }),
+  L('Dark Ocean', SHORE, { icon: Waves }),
+];
 
-// ─── FLEET ────────────────────────────────────────────────────────────────
+// ─── FLEET (/fleet/…) ─────────────────────────────────────────────────────
+// gap/10 "Fleet view — left sidebar" is canonical for the grouping (R1); the
+// routes come from the domain docs (02 operations, 03 administration, 05
+// safety queue, 06 catalogues). A leaf is live only where the Fleet scope
+// router mounts a page at its path (src/routes/index.tsx); every other leaf
+// is planned and opens a Coming Soon placeholder inside the Fleet scope.
 const FLEET_BASE = '/fleet';
+const FLEET_ADMIN = `${FLEET_BASE}/admin`;
+
 const fleetChildren: NavChild[] = [
-  L('Fleet Dashboard', FLEET_BASE, { existing: '/dashboard', icon: LayoutDashboard }),
-  L('Fleet Scheduler', FLEET_BASE, { icon: CalendarDays }),
-  L('Fleet Tracker', FLEET_BASE, { existing: '/fleet-map', icon: MapIcon }),
-  L('Fleet Reports', FLEET_BASE, { icon: ClipboardList }),
-  L('Fleet Calendar', FLEET_BASE, { existing: '/itinerary/timeline', icon: Calendar }),
-  L('Fleet Rotation Planner', FLEET_BASE, { existing: '/crew/rotation-planner', icon: Network, crossLink: true }),
-  L('Fleet Documents', FLEET_BASE, { existing: '/documents', icon: FileText }),
-  L('Fleet Checklists', FLEET_BASE, { existing: '/ism/checklists', icon: CheckSquare, crossLink: true }),
-  L('Vessels', FLEET_BASE, { existing: '/vessels/dashboard', icon: Ship }),
-  L('Users & Access', FLEET_BASE, { existing: '/users-access', icon: Users }),
-  L('Notification Center', FLEET_BASE, { existing: '/notifications/center', icon: Bell }),
-  L('Notification Management', FLEET_BASE, { existing: '/settings/notifications', icon: Bell }),
-  L('Support Tickets', FLEET_BASE, { existing: '/help/support', icon: LifeBuoy, crossLink: true }),
-  L('Account', FLEET_BASE, { existing: '/settings', icon: Settings }),
+  S('Overview', FLEET_BASE, fill('fleet.overview', [
+    L('Dashboard', FLEET_BASE, { icon: LayoutDashboard, ...LIVE }),
+    L('Tracker', FLEET_BASE, { icon: MapIcon, ...LIVE }),
+    L('Reports', FLEET_BASE, { icon: FileBarChart, ...LIVE }),
+    L('Calendar', FLEET_BASE, { icon: Calendar, ...LIVE }),
+    // Crew rotation and season planning (gap/04, gap/07); replaces the old
+    // Fleet Scheduler placeholder and the Rotation Planner cross-link.
+    L('Planner', FLEET_BASE, { icon: Network, ...LIVE }),
+    // The Company's whose-move inbox across vessels (gap/05).
+    L('Safety queue', FLEET_BASE, { icon: ShieldAlert, slug: 'safety' }),
+  ]), { icon: LayoutDashboard }),
+  S('Compliance', FLEET_BASE, fill('fleet.compliance', [
+    L('Documents', FLEET_BASE, { icon: FileText, ...LIVE }),
+    L('Forms & Checklists', FLEET_BASE, { icon: CheckSquare, slug: 'forms' }),
+  ]), { icon: ShieldCheck }),
+  S('People', FLEET_BASE, fill('fleet.people', [
+    L('Training', FLEET_BASE, { icon: GraduationCap, ...LIVE }),
+    L('Medical', FLEET_BASE, { icon: Stethoscope }),
+    L('Visits', FLEET_BASE, { icon: UserCheck }),
+    L('Employment', FLEET_BASE, { icon: Briefcase }),
+  ]), { icon: Users }),
+  // The STORM workspaces, the same entries as the Apps menu (D-09). They are
+  // cross-links: each page belongs to its workspace, which keeps its own URL
+  // prefix, shell and gates. The section is workspace-scoped, so it shows to
+  // users without fleet reach too. HRIS (10), Health & Wellness (20) and
+  // Legal (40) come from their module manifests; Yard and Shoreside are
+  // platform workspaces made of several modules or none yet.
+  S('Workspaces', FLEET_BASE, fill('fleet.workspaces', [
+    { order: 30, node: L('Yard', FLEET_BASE, { existing: '/yard', icon: Hammer, crossLink: true, scope: 'workspace', moduleKey: 'maintenance' }) },
+    // D-17: one landing page of service cards. Not built yet, so planned.
+    {
+      order: 50,
+      node: L('Shoreside', FLEET_BASE, { existing: '/shoreside', icon: Waves, crossLink: true, scope: 'workspace', status: 'planned' }),
+    },
+  ]), { icon: LayoutGrid, scope: 'workspace' }),
+  // Owner, admins and shore staff holding an admin capability (gap/03). A
+  // leaf names its PMS key where the catalogue has one; the interim adaptor
+  // fails closed, so a leaf without the capability is hidden.
+  S('Administration', FLEET_BASE, fill('fleet.administration', [
+    L('Users & Access', FLEET_ADMIN, { slug: 'users', icon: Users, capability: 'admin.access.users_access.view', ...LIVE }),
+    L('Notifications', FLEET_ADMIN, {
+      icon: MessageSquare, capability: 'fleet.administration.notification_management.view', ...LIVE,
+    }),
+    // R3: the feedback inbox is retired into Support; there is no Feedback leaf.
+    L('Support', FLEET_ADMIN, { icon: LifeBuoy, capability: 'fleet.administration.support_tickets.view' }),
+    L('Company FAQs', FLEET_ADMIN, { slug: 'faqs', icon: HelpCircle }),
+    L('Data protection', FLEET_ADMIN, { slug: 'gdpr', icon: ShieldCheck }),
+    L('Account', FLEET_ADMIN, { icon: Building2, capability: 'fleet.administration.account.view' }),
+    L('Security', FLEET_ADMIN, { icon: KeyRound }),
+  ]), { icon: Settings }),
+  // Split from Administration so neither list runs past eight (gap/10).
+  S('Configuration', FLEET_BASE, fill('fleet.configuration', [
+    L('Vessels', FLEET_ADMIN, { icon: Ship, capability: 'fleet.operations.vessels.view', ...LIVE }),
+    L('Vessel Settings', FLEET_ADMIN, { icon: Settings2 }),
+    L('Fleet Groups', FLEET_ADMIN, { icon: Layers, capability: 'admin.system.fleet_groups.view' }),
+    L('Add-ons', FLEET_ADMIN, { slug: 'add-ons', icon: Puzzle }),
+    L('Certificate catalogue', FLEET_ADMIN, { slug: 'certificates', icon: Award }),
+    L('Job library', FLEET_ADMIN, { icon: Library }),
+    L('Suppliers', FLEET_ADMIN, { icon: Boxes }),
+    L('Integrations', FLEET_ADMIN, { icon: Plug, capability: 'admin.system.api_integrations.view' }),
+  ]), { icon: Settings2 }),
 ];
 
-// ─── VESSEL ───────────────────────────────────────────────────────────────
-const V = '/vessel';
+// ─── VESSEL (/v/:vesselCode/…) ────────────────────────────────────────────
+// One module per tab, in tab order (gap/10 "Vessel view"). Sub-trees follow
+// the domain docs: crew gap/04, safety gap/05, certificates and technical
+// gap/06, charter and vessel gap/07. Paths are relative to /v/:vesselCode.
+// A leaf is live only where the vessel scope router mounts a page at its
+// path. `moduleSetting` on a module or leaf names the vessel_module_settings
+// key that switches it off for a vessel (G3); until that table is live every
+// module counts as on (D-01).
+//
+// Data-driven sections (certificate sections, vessel document sections, one
+// leaf per logbook, departments) are static seeds here until their providers
+// land (gap/10 IA24).
 
-// Crew
-const vCrew = `${V}/crew`;
-// HR-owned pages (leave, appraisals, employment history, crewing) live in the
-// HRIS module. Vessel keeps cross-links only, so URL → module resolution
-// always lands in HRIS for those pages.
-const vesselCrew: NavChild[] = [
-  L('Crew List', vCrew, { existing: '/crew/list', icon: Users }),
-  L('Crew Roster', vCrew, { existing: '/crew/roster', icon: Users }),
-  L('Leave', vCrew, { existing: '/crew/leave', icon: CalendarDays, crossLink: true }),
-  L('Rotation Planner', vCrew, { existing: '/crew/rotation-planner', icon: Network, crossLink: true }),
-  L('Hours of Rest', vCrew, { existing: '/crew/work-rest', icon: Clock }),
-  L('Crew Training', vCrew, { existing: '/development/crew-training', icon: GraduationCap, crossLink: true }),
-  L('Familiarisation', vCrew, { existing: '/training', icon: FileCheck, crossLink: true }),
+const vCrew: NavChild[] = [
+  L('Crew List', 'crew', { slug: 'list', icon: Users, ...LIVE }),
+  // STORM extra: the roster page stays reachable until gap/04 folds it into
+  // Crew List.
+  L('Crew Roster', 'crew', { slug: 'roster', icon: ClipboardList, ...LIVE }),
+  // Label "Leave" on vessels that rename it (vessel_module_settings).
+  L('Planner', 'crew', { icon: Network, moduleSetting: 'planner', ...LIVE }),
+  L('Crew Compliance', 'crew', { slug: 'compliance', icon: ShieldCheck, ...LIVE }),
+  L('Hours of Rest', 'crew', { icon: Clock, moduleSetting: 'crew_hor', ...LIVE }),
+  L('Crew Medical', 'crew', { slug: 'medical', icon: Stethoscope }),
+  L('Crew Training', 'crew', { slug: 'training', icon: GraduationCap, moduleSetting: 'crew_training', ...LIVE }),
+  L('Familiarisation', 'crew', { icon: FileCheck, ...LIVE }),
+  L('Checklists', 'crew', { icon: CheckSquare }),
+  L('Performance Appraisals', 'crew', { slug: 'appraisals', icon: ClipboardCheck }),
+  L('Visitors & Occasional Workers', 'crew', { slug: 'visitors', icon: UserCheck }),
+  L('Employment History', 'crew', { icon: Briefcase }),
 ];
 
-// Safety
-const vSafety = `${V}/safety`;
-const sopBase = `${vSafety}/sops`;
-const standingBase = `${vSafety}/standing-orders`;
-const vesselSafety: NavChild[] = [
-  L('SMS Summary', vSafety, { icon: Shield }),
-  L('Drills', vSafety, { existing: '/ism/drills', icon: Siren }),
-  L('Permit to Work', vSafety, { existing: '/ism/permits-to-work', icon: HardHat }),
-  L('SMS Forms', vSafety, { existing: '/ism/miscellaneous', icon: FileText }),
-  L('Checklists', vSafety, { existing: '/ism/checklists', icon: CheckSquare }),
-  L('Risk Assessments', vSafety, { existing: '/ism/risk-assessments', icon: AlertTriangle }),
-  L('Vessel Specific Manuals', vSafety, { icon: BookOpen }),
-  L('Crew Duties & Responsibilities', vSafety, { icon: ClipboardList }),
-  G('Standing Orders', vSafety, [
-    L("Master's Standing Orders", standingBase),
-    L("Chief Engineer's Standing Orders", standingBase),
-  ], { icon: ScrollText, slug: 'standing-orders' }),
-  L('Muster List', vSafety, { icon: ListChecks }),
-  L('Safety Management Manual', vSafety, { icon: BookMarked }),
-  L('Safety Documents', vSafety, { icon: FileText }),
-  G('SOPs', vSafety, [
-    L('Bridge SOPs', sopBase),
-    L('Deck SOPs', sopBase),
-    L('Engineering SOPs', sopBase),
-    L('Galley SOPs', sopBase),
-    L('Interior SOPs', sopBase),
-    L('Medic SOPs', sopBase),
-  ], { icon: BookOpen, slug: 'sops' }),
-  L('Pollution', vSafety, { icon: Waves }),
-  L('Emergency Response', vSafety, { existing: '/ism/erm', icon: AlertCircle }),
-  L('Flag Policy & Advice', vSafety, { icon: Globe }),
-  L('Agent Information', vSafety, { icon: Phone }),
-  L('NTVRP / OPA 90', vSafety, { icon: Shield }),
+// Seeded vessel document sections (gap/10: they appear under VESSEL
+// DOCUMENTS once a section has a document; gap/05).
+const vesselDocs = 'safety/vessel-documents';
+const vSafety: NavChild[] = [
+  L('Summary', 'safety', { icon: LayoutGrid }),
+  L('Safety Management Manual', 'safety', { slug: 'manual', icon: BookMarked, moduleSetting: 'safety_manual' }),
+  L('Drills', 'safety', { icon: Siren, ...LIVE }),
+  // The /ism/permits-to-work page holds sample data (gap/00 K1): planned.
+  L('Permits to Work', 'safety', { slug: 'permits', icon: HardHat }),
+  L('SMS Forms', 'safety', { slug: 'forms', icon: FileText, ...LIVE }),
+  // The /ism/observations page holds sample data (gap/00 K1): planned.
+  L('Observations', 'safety', { icon: Eye }),
+  L('Checklists', 'safety', { icon: CheckSquare, ...LIVE }),
+  L('Risk Assessments', 'safety', { icon: AlertTriangle, ...LIVE }),
+  L('Emergency', 'safety', { icon: AlertCircle }),
+  S('Vessel Documents', 'safety', [
+    L('Vessel Specific Manuals', vesselDocs, { icon: BookOpen }),
+    L('Crew Duties & Responsibilities', vesselDocs, { icon: ClipboardList }),
+    L("Master's Standing Orders", vesselDocs, { icon: ScrollText }),
+    L("Chief Engineer's Standing Orders", vesselDocs, { icon: ScrollText }),
+    L('Muster List', vesselDocs, { icon: ListChecks }),
+    L('Safety Documents', vesselDocs, { icon: FileText }),
+    L('Bridge SOPs', vesselDocs, { icon: BookOpen }),
+    L('Deck SOPs', vesselDocs, { icon: BookOpen }),
+    L('Engineering SOPs', vesselDocs, { icon: BookOpen }),
+    L('Galley SOPs', vesselDocs, { icon: BookOpen }),
+    L('Interior SOPs', vesselDocs, { icon: BookOpen }),
+    L('Medic SOPs', vesselDocs, { icon: BookOpen }),
+    L('Pollution', vesselDocs, { icon: Waves }),
+    L('Flag Policy & Advice', vesselDocs, { icon: Globe }),
+    L('Agent Information', vesselDocs, { icon: Phone }),
+    L('NTVRP / OPA 90', vesselDocs, { icon: Shield }),
+  ], { icon: FolderOpen }),
+  L('Fleet Documents', 'safety', { icon: FileText }),
+  L('Settings', 'safety', { icon: Settings }),
 ];
 
-// Certificates
-const vCerts = `${V}/certificates`;
-const vesselCertificates: NavChild[] = [
-  L('Status Summary', vCerts, { icon: LayoutGrid }),
-  L('Registration', vCerts, { icon: FileCheck }),
-  L('Class / Tonnage / Loadline', vCerts, { icon: Layers }),
-  L('Safety', vCerts, { icon: Shield }),
-  L('Security', vCerts, { icon: Anchor }),
-  L('Maritime Labour Compliance', vCerts, { icon: Users }),
-  L('Environment', vCerts, { icon: Waves }),
-  L('Radio', vCerts, { icon: Headphones }),
-  L('Insurance', vCerts, { icon: Umbrella }),
-  L('Fiscal', vCerts, { icon: Receipt }),
-  L('LSA / FFE / Medical', vCerts, { icon: LifeBuoy }),
-  L('Fleet Certificates', vCerts, { existing: '/certificates', icon: Award }),
+// Seeded certificate sections (data-driven per vessel later, gap/06).
+const certSections = 'certificates/s';
+const vCertificates: NavChild[] = [
+  L('Status Summary', 'certificates', { existing: 'certificates', icon: LayoutGrid }),
+  L('Registration', certSections, { icon: FileCheck }),
+  L('Class / Tonnage / Loadline', certSections, { icon: Layers }),
+  L('Safety', certSections, { icon: Shield }),
+  L('Security', certSections, { icon: Anchor }),
+  L('Maritime Labour Compliance', certSections, { icon: Users }),
+  L('Environment', certSections, { icon: Waves }),
+  L('Radio', certSections, { icon: Headphones }),
+  L('Insurance', certSections, { icon: Umbrella }),
+  L('Fiscal', certSections, { icon: Receipt }),
+  L('LSA / FFE / Medical', certSections, { icon: LifeBuoy }),
+  L('Settings', 'certificates', { icon: Settings }),
 ];
 
-// Technical
-const vTech = `${V}/technical`;
-const vesselTechnical: NavChild[] = [
-  L('Maintenance Summary', vTech, { existing: '/maintenance/dashboard', icon: LayoutGrid }),
-  L('Tasks', vTech, { icon: ClipboardList }),
-  L('Operational Checklists', vTech, { icon: CheckSquare }),
-  L('Equipment', vTech, { existing: '/maintenance/critical', icon: Wrench }),
-  L('Inventory', vTech, { icon: Package }),
-  L('Purchase Orders', vTech, { icon: Receipt }),
-  L('Maintenance Periods', vTech, { icon: Calendar }),
-  L('Surveys', vTech, { icon: ClipboardCheck }),
+// Sub-modules a vessel can switch off (gap/06 X2). Equipment stays on.
+const vTechnical: NavChild[] = [
+  L('Overview', 'technical', { existing: 'technical', icon: Gauge }),
+  L('Jobs', 'technical', { icon: ClipboardList, moduleSetting: 'technical.jobs' }),
+  L('Maintenance Periods', 'technical', { slug: 'periods', icon: Calendar, moduleSetting: 'technical.periods' }),
+  L('Surveys', 'technical', { icon: ClipboardCheck, moduleSetting: 'technical.surveys' }),
+  // /maintenance/critical holds sample data (gap/00 K1): planned.
+  L('Equipment', 'technical', { icon: Wrench }),
+  L('Inventory', 'technical', { icon: Package, moduleSetting: 'technical.inventory' }),
+  L('Purchase Orders', 'technical', { icon: Receipt, moduleSetting: 'technical.purchasing' }),
+  L('Rounds', 'technical', { icon: Route, moduleSetting: 'technical.rounds' }),
+  L('Forms & Checklists', 'technical', { slug: 'forms', icon: CheckSquare }),
+  L('Documents & Plans', 'technical', { slug: 'documents', icon: FolderOpen }),
+  // Add-on (G4); gated on its entitlement once add-ons exist (gap/03).
+  L('Deck Plans', 'technical', { icon: Layers, moduleSetting: 'technical.deck_plans' }),
+  L('Viewers', 'technical', { icon: Eye }),
+  L('Settings', 'technical', { icon: Settings }),
 ];
 
-// Charter
-const vCharter = `${V}/charter`;
-const vesselCharter: NavChild[] = [
-  L('Charters', vCharter, { icon: FileText }),
-  L('Guest List', vCharter, { icon: Users }),
-  L('Checklists', vCharter, { icon: CheckSquare }),
+// The module may be renamed "Trip" per vessel (gap/07).
+const vCharter: NavChild[] = [
+  L('Charters', 'charter', { existing: 'charter', icon: FileText, status: 'planned' }),
+  L('Planner', 'charter', { icon: CalendarDays }),
+  L('Guest List', 'charter', { slug: 'guests', icon: Users }),
+  L('Checklists', 'charter', { icon: CheckSquare }),
 ];
 
-// Accounting
-const vAcct = `${V}/accounting`;
-const vesselAccounting: NavChild[] = [
-  L('Accounting Dashboard', vAcct, { icon: LayoutGrid }),
-  L('Expenses', vAcct, { icon: Banknote }),
-  L('Invoices', vAcct, { icon: Receipt }),
-  L('APA Management', vAcct, { icon: FileText }),
-  L('Payroll', vAcct, { icon: Banknote }),
-  L('Gratuities', vAcct, { icon: Sparkles }),
-  L('Budgets & Reporting', vAcct, { icon: ClipboardList }),
+const vVessel: NavChild[] = [
+  S('Operations', 'vessel', [
+    L('Voyage Plans', 'vessel', { slug: 'voyages', icon: Navigation }),
+    L('Tracking', 'vessel', { icon: Radar }),
+    L('Voyage Checklists', 'vessel', { icon: CheckSquare }),
+  ], { icon: Navigation }),
+  S('Vessel Record', 'vessel', [
+    // The vessel's own record; the fleet vessel list is Fleet › Vessels.
+    L('Vessel Details', 'vessel', { slug: 'details', icon: Ship }),
+    L('Communications', 'vessel', { icon: MessageSquare, badgeKey: 'unreadMessages' }),
+    L('Emergency Contact', 'vessel', { slug: 'emergency', icon: Phone, ...LIVE }),
+    L('Documents', 'vessel', { icon: FolderOpen }),
+  ], { icon: Ship }),
+  S('Administration', 'vessel', [
+    // /vessels/company-details holds sample data (gap/00 K1): planned.
+    L('Management Company', 'vessel', { slug: 'management', icon: Building2 }),
+    L('Owner & Employer', 'vessel', { slug: 'owner-employer', icon: Briefcase }),
+    L('Flag & Class', 'vessel', { slug: 'flag-class', icon: Globe }),
+    L('Insurance', 'vessel', { icon: Umbrella }),
+    L('Billing', 'vessel', { icon: Receipt }),
+    L('Settings', 'vessel', { icon: Settings }),
+  ], { icon: Settings }),
 ];
 
-// Electronic Logbooks
-const vLog = `${V}/logbooks`;
-const vesselLogbooks: NavChild[] = [
-  L('Logbooks', vLog, { existing: vLog, icon: BookOpen }),
-  L('DAGON Engine Room Log', vLog, {
-    icon: Wrench,
-    slug: 'engine-log-dagon',
-    existing: '/vessel/logbooks/engine-log?vessel=dagon',
+// One leaf per logbook in the vessel registry comes from data later (gap/10
+// IA24); it replaces the old hard-coded single-vessel engine log leaf.
+const vLogbooks: NavChild[] = [
+  L('Logbooks', 'logbooks', { existing: 'logbooks', icon: BookOpen }),
+  L('Review & Sign-off', 'logbooks', { slug: 'review', icon: ClipboardCheck, ...LIVE }),
+  L('Records & Exports', 'logbooks', { slug: 'records', icon: FileText, ...LIVE }),
+  S('Administration', 'logbooks', [
+    L('Registry', 'logbooks', { icon: Ship, ...LIVE }),
+    L('Connections', 'logbooks', { icon: Cpu, ...LIVE }),
+    L('Assurance', 'logbooks', { icon: Shield, ...LIVE }),
+  ], { icon: Settings }),
+];
+
+// G1: Finance is hidden in this programme. Payroll and gratuities stay in the
+// HRIS workspace; Finance only links to them.
+const vFinance: NavChild[] = [
+  L('Overview', 'finance', { existing: 'finance', icon: LayoutGrid, status: 'planned' }),
+  L('Expenses', 'finance', { icon: Banknote }),
+  L('Invoices', 'finance', { icon: Receipt }),
+  L('APA Management', 'finance', { slug: 'apa', icon: FileText }),
+  L('Budgets & Reporting', 'finance', { slug: 'budgets', icon: ClipboardList }),
+  L('Payroll', 'finance', {
+    existing: HRIS_PATHS.payroll, icon: Banknote, crossLink: true, scope: 'workspace', moduleKey: 'finance',
   }),
-  L('Review & Sign-off', vLog, { existing: `${vLog}/review`, icon: ClipboardCheck }),
-  L('Vessel Registry', vLog, { existing: `${vLog}/registry`, icon: Ship }),
-  L('Records & Exports', vLog, { existing: `${vLog}/records`, icon: FileText }),
-  L('Connections', vLog, { existing: `${vLog}/connections`, icon: Cpu }),
-  L('Assurance', vLog, { existing: `${vLog}/assurance`, icon: Shield }),
+  L('Gratuities', 'finance', {
+    existing: HRIS_PATHS.gratuities, icon: Sparkles, crossLink: true, scope: 'workspace', moduleKey: 'finance',
+  }),
 ];
 
-// Vessel (general)
-const vVessel = `${V}/general`;
-const vesselVessel: NavChild[] = [
-  L('Movement Reports', vVessel, { icon: FileText }),
-  L('Movement Checklists', vVessel, { icon: CheckSquare }),
-  L('Vessel Details', vVessel, { existing: '/vessels/list', icon: Ship }),
-  L('Communications', vVessel, { icon: MessageSquare }),
-  L('Emergency Contact', vVessel, { existing: '/vessels/emergency-details', icon: Phone }),
-  L('Management Company', vVessel, { existing: '/vessels/company-details', icon: Building2 }),
-  L('Flag & Class', vVessel, { icon: Globe }),
-  L('Insurance', vVessel, { icon: Umbrella }),
-  L('Billing', vVessel, { icon: Receipt }),
-];
-
-// Departments
-const vDept = `${V}/departments`;
+// G5: Departments stays hidden until a department page is live. The
+// Management / Office group is gone (gap/10): HR is the HRIS workspace, Legal
+// the Legal workspace, DPA / ISM office the fleet Safety queue, Procurement
+// Technical › Purchase Orders, Finance the Finance tab, Insurance and
+// Management Company the Vessel tab, Crewing the fleet Employment page.
+const DEPT = 'departments';
 const standardDept6 = (base: string): NavChild[] => [
   L('Handover / Notes', base, { icon: FileText }),
   L('Work Lists / Job Cards', base, { icon: ClipboardList }),
@@ -240,9 +346,8 @@ const standardDept6 = (base: string): NavChild[] => [
   L('Notes / Reference', base, { icon: BookOpen }),
 ];
 
-const crewDeptBase = `${vDept}/crew`;
-const galleyBase = `${crewDeptBase}/galley`;
-const diveBase = `${crewDeptBase}/dive`;
+const galleyBase = `${DEPT}/galley`;
+const diveBase = `${DEPT}/dive`;
 
 const galleyChildren: NavChild[] = [
   L('Daily Menus', galleyBase, { icon: Utensils }),
@@ -279,422 +384,216 @@ const diveChildren: NavChild[] = [
   ], { icon: Wrench, slug: 'tools' }),
 ];
 
-const crewDepartments: NavChild[] = [
-  G('Bridge',      crewDeptBase, standardDept6(`${crewDeptBase}/bridge`),      { icon: Anchor,    slug: 'bridge' }),
-  G('Deck',        crewDeptBase, standardDept6(`${crewDeptBase}/deck`),        { icon: Compass,   slug: 'deck' }),
-  G('Engineering', crewDeptBase, standardDept6(`${crewDeptBase}/engineering`), { icon: Wrench,    slug: 'engineering' }),
-  G('Interior',    crewDeptBase, standardDept6(`${crewDeptBase}/interior`),    { icon: Sparkles,  slug: 'interior' }),
-  G('Galley',      crewDeptBase, galleyChildren,                                { icon: Utensils,  slug: 'galley' }),
-  L('Spa', crewDeptBase, { existing: '/health/spa', icon: Heart, slug: 'spa', crossLink: true }),
-  G('Media',       crewDeptBase, standardDept6(`${crewDeptBase}/media`),       { icon: Camera,    slug: 'media' }),
-  G('IT',          crewDeptBase, standardDept6(`${crewDeptBase}/it`),          { icon: Cpu,       slug: 'it' }),
-  L('Medical', crewDeptBase, { existing: '/health/medical', icon: Stethoscope, slug: 'medical', crossLink: true }),
-  G('Dive',        crewDeptBase, diveChildren,                                  { icon: Waves,     slug: 'dive' }),
+const vDepartments: NavChild[] = [
+  G('Bridge',      DEPT, standardDept6(`${DEPT}/bridge`),      { icon: Anchor,    slug: 'bridge' }),
+  G('Deck',        DEPT, standardDept6(`${DEPT}/deck`),        { icon: Compass,   slug: 'deck' }),
+  G('Engineering', DEPT, standardDept6(`${DEPT}/engineering`), { icon: Wrench,    slug: 'engineering' }),
+  G('Interior',    DEPT, standardDept6(`${DEPT}/interior`),    { icon: Sparkles,  slug: 'interior' }),
+  G('Galley',      DEPT, galleyChildren,                       { icon: Utensils,  slug: 'galley' }),
+  // Spa and Medical are Health & Wellness pages (cross-links).
+  L('Spa', DEPT, { existing: '/health/spa', icon: Heart, crossLink: true, scope: 'workspace', moduleKey: 'wellness' }),
+  G('Media',       DEPT, standardDept6(`${DEPT}/media`),       { icon: Camera,    slug: 'media' }),
+  G('IT',          DEPT, standardDept6(`${DEPT}/it`),          { icon: Cpu,       slug: 'it' }),
+  L('Medical', DEPT, { existing: '/health/medical', icon: Stethoscope, crossLink: true, scope: 'workspace', moduleKey: 'medical' }),
+  G('Dive',        DEPT, diveChildren,                         { icon: Waves,     slug: 'dive' }),
 ];
 
-const mgmtBase = `${vDept}/management`;
-const managementOffice: NavChild[] = [
-  // HR records are owned by the HRIS module; this is a cross-link only.
-  L('HR', mgmtBase, { existing: '/hr', icon: Briefcase, slug: 'hr', crossLink: true, moduleKey: 'hr' }),
-  L('Management Company', mgmtBase, { existing: '/vessels/company-details', icon: Building2 }),
-  L('DPA / ISM Office', mgmtBase, { icon: Shield }),
-  L('Procurement', mgmtBase, { icon: Truck }),
-  L('Finance / Accounts', mgmtBase, { icon: Banknote }),
-  // Legal Support & Ticketing module (src/modules/legal) at /departments/legal.
-  L('Legal', mgmtBase, { existing: '/departments/legal', icon: ScrollText }),
-  L('Insurance', mgmtBase, { icon: Umbrella }),
-  L('Crewing & Recruitment', mgmtBase, { existing: '/hris/recruitment/vacancies', icon: Users, crossLink: true, moduleKey: 'hr' }),
-];
+/**
+ * The Vessel view modules in tab order (gap/10): Home · Crew · Safety ·
+ * Certificates · Technical · Charter · Vessel · Logbooks · Finance ·
+ * Departments · Calendar · Reports. Paths are relative to `/v/:vesselCode`.
+ * The tab row and the per-module sidebar (Phase 1, S2/S3) read this through
+ * `buildVesselNav(code)`.
+ */
+const vesselModule = (m: VesselModule): VesselModule => ({
+  ...m,
+  // Each tab's sidebar is its slot (navSlots.ts `vessel.<id>`); a leaf with no
+  // status is live once a vessel route is registered at its path.
+  children: resolveNavStatus(fill(vesselSlot(m.id), m.children), (rel) => isRouted(underVessel(VESSEL_SCOPE_PATTERN, rel))),
+});
 
-const vesselDepartments: NavChild[] = [
-  G('Crew Departments', vDept, crewDepartments, { icon: Users, slug: 'crew' }),
-  G('Management / Office', vDept, managementOffice, { icon: Building, slug: 'management' }),
-];
-
-// ─── SHORESIDE ───────────────────────────────────────────────────────────
-const SHORE = '/shoreside';
-const shoresideChildren: NavChild[] = [
-  L('Embrace', SHORE, { icon: Heart }),
-  L('Lungfish', SHORE, { icon: Beaker }),
-  L('Bonefish', SHORE, { icon: Beaker }),
-  L('InkWELL', SHORE, { icon: Sparkles }),
-  L('MedINK', SHORE, { icon: Stethoscope }),
-  L('Crew Concierge', SHORE, { icon: Headphones }),
-  L('Cosmic Frontier Labs', SHORE, { icon: Beaker }),
-  L('Dark Ocean', SHORE, { icon: Waves }),
-];
-
-// ─── HEALTH & WELLNESS ───────────────────────────────────────────────────
-// Medical leaves carry moduleKey `medical` and are hidden from anyone
-// without clinical access. Spa / nutrition / physio / training carry
-// `wellness`. Leaves a crew member may open to see only their own record
-// are marked selfServe.
-const H = '/health';
-const MED: GateOpts = { moduleKey: 'medical' };
-const MED_SELF: GateOpts = { moduleKey: 'medical', selfServe: true };
-const WELL: GateOpts = { moduleKey: 'wellness' };
-const WELL_SELF: GateOpts = { moduleKey: 'wellness', selfServe: true };
-
-const medBase = `${H}/medical`;
-const personnelMedBase = `${medBase}/personnel`;
-const healthMedical: NavChild[] = [
-  L('Dashboard', medBase, { icon: LayoutGrid, ...MED }),
-  L('Patients', medBase, { icon: Users, ...MED }),
-  L('Staff', medBase, { icon: Stethoscope, ...MED }),
-  L('Supplies', medBase, { icon: Package, ...MED }),
-  L('First Aid', medBase, { icon: LifeBuoy, ...MED }),
-  L('Equipment', medBase, { icon: Wrench, ...MED }),
-  L('Protocols', medBase, { icon: BookOpen, ...MED }),
-  L('Logs', medBase, { icon: FileText, ...MED }),
-  L('C.H.E.K.', medBase, { icon: GraduationCap, slug: 'chek', ...MED_SELF }),
-  G('Personnel Medical Data', medBase, [
-    L('Crew Medical Records', personnelMedBase, MED_SELF),
-    L('Fitness-to-Work / ENG1', personnelMedBase, MED_SELF),
-    L('Vaccinations & Immunisations', personnelMedBase, MED_SELF),
-    L('Allergies & Conditions', personnelMedBase, MED_SELF),
-    L('Medications', personnelMedBase, MED_SELF),
-    L('Medical Certificates', personnelMedBase, MED_SELF),
-    L('Next of Kin / Emergency', personnelMedBase, MED_SELF),
-    L('Incident & Treatment History', personnelMedBase, MED_SELF),
-  ], { icon: ClipboardCheck, slug: 'personnel', ...MED }),
-];
-
-const spaBase = `${H}/spa`;
-const healthSpa: NavChild[] = [
-  L('Dashboard', spaBase, { icon: LayoutGrid, ...WELL }),
-  L('Calendar', spaBase, { icon: Calendar, ...WELL_SELF }),
-  L('Clients', spaBase, { icon: Users, ...WELL }),
-  L('Treatments', spaBase, { icon: Heart, ...WELL_SELF }),
-  L('Inventory', spaBase, { icon: Package, ...WELL }),
-];
-
-const nutBase = `${H}/nutrition`;
-const healthNutrition: NavChild[] = [
-  L('Overview', nutBase, { icon: LayoutGrid, ...WELL_SELF }),
-  L('Food Log', nutBase, { icon: FileText, ...WELL_SELF }),
-  L('Calendar', nutBase, { icon: Calendar, ...WELL_SELF }),
-  L('Goals', nutBase, { icon: ListChecks, ...WELL_SELF }),
-  L('Settings', nutBase, { icon: Settings, moduleKey: 'wellness', minPermission: 'admin' }),
-];
-
-const physioBase = `${H}/physio`;
-const healthPhysio: NavChild[] = [
-  L('Rehab Protocols', physioBase, { icon: BookOpen, ...WELL }),
-  L('Assessments', physioBase, { icon: ClipboardList, ...WELL }),
-  L('Treatment Plans', physioBase, { icon: ClipboardCheck, ...WELL }),
-  L('Session Log', physioBase, { icon: FileText, ...WELL }),
-  L('Referrals', physioBase, { icon: MessageSquare, ...WELL }),
-];
-
-const ptBase = `${H}/personal-training`;
-const trainerBase = `${ptBase}/trainer`;
-const trainerAdminBase = `${trainerBase}/admin`;
-const trainerAthletesBase = `${trainerBase}/athletes`;
-const trainerProgrammingBase = `${trainerBase}/programming`;
-const trainerSourcesBase = `${trainerAdminBase}/sources`;
-const athleteBase = `${ptBase}/athlete`;
-const healthPT: NavChild[] = [
-  G('Trainer', ptBase, [
-    L('Dashboard', trainerBase, { icon: LayoutGrid, ...WELL }),
-    L('Schedule', trainerBase, { icon: Calendar, ...WELL }),
-    G('Athletes', trainerBase, [
-      L('Roster', trainerAthletesBase, WELL),
-      L('Athlete Workspace', trainerAthletesBase, WELL),
-      L('Active Programs', trainerAthletesBase, WELL),
-    ], { icon: Users, slug: 'athletes', ...WELL }),
-    G('Programming', trainerBase, [
-      L('Templates', trainerProgrammingBase, WELL),
-      L('Exercises', trainerProgrammingBase, WELL_SELF),
-      L('Rehab Protocols', trainerProgrammingBase, WELL),
-      L('Videos', trainerProgrammingBase, WELL_SELF),
-    ], { icon: Dumbbell, slug: 'programming', ...WELL }),
-    G('Admin', trainerBase, [
-      L('Trainers', trainerAdminBase, WELL),
-      G('Sources', trainerAdminBase, [
-        L('ExerciseDB Import', trainerSourcesBase, { moduleKey: 'wellness', minPermission: 'admin' }),
-        L('wger', trainerSourcesBase, { moduleKey: 'wellness', minPermission: 'admin' }),
-        L('ExerciseDB API', trainerSourcesBase, { moduleKey: 'wellness', minPermission: 'admin' }),
-        L('MuscleWiki', trainerSourcesBase, { moduleKey: 'wellness', minPermission: 'admin' }),
-        L('AnatomyTOOL', trainerSourcesBase, { moduleKey: 'wellness', minPermission: 'admin' }),
-        L('Z-Anatomy', trainerSourcesBase, { moduleKey: 'wellness', minPermission: 'admin' }),
-      ], { icon: Layers, slug: 'sources', moduleKey: 'wellness', minPermission: 'admin' }),
-    ], { icon: Settings, slug: 'admin', moduleKey: 'wellness', minPermission: 'admin' }),
-  ], { icon: Dumbbell, slug: 'trainer', ...WELL }),
-  G('Athlete', ptBase, [
-    L('My Training', athleteBase, WELL_SELF),
-    L('Progress', athleteBase, WELL_SELF),
-    L('Profile', athleteBase, WELL_SELF),
-  ], { icon: Activity, slug: 'athlete', ...WELL_SELF }),
-];
-
-const healthChildren: NavChild[] = [
-  G('Medical', H, healthMedical, { icon: Stethoscope, slug: 'medical', ...MED_SELF }),
-  G('Spa', H, healthSpa, { icon: Heart, slug: 'spa', ...WELL_SELF }),
-  G('Nutrition', H, healthNutrition, { icon: Utensils, slug: 'nutrition', ...WELL_SELF }),
-  G('Physio', H, healthPhysio, { icon: Activity, slug: 'physio', ...WELL }),
-  G('Personal Training', H, healthPT, { icon: Dumbbell, slug: 'personal-training', ...WELL_SELF }),
-];
-
-// ─── YARD ────────────────────────────────────────────────────────────────
-const Y = '/yard';
-
-const refitBase = `${Y}/refit`;
-const refitOverview = `${refitBase}/overview`;
-const refitWorkflow = `${refitBase}/workflow`;
-const refitProject = `${refitBase}/project`;
-const refitDocs = `${refitBase}/documents`;
-const refitFinance = `${refitBase}/finance`;
-const refitCompliance = `${refitBase}/compliance`;
-const refitProjects = `${refitBase}/projects`;
-const refitAccount = `${refitBase}/account`;
-const yardRefit: NavChild[] = [
-  G('Overview', refitBase, [
-    L('Dashboard', `${refitOverview}/dashboard`, { icon: LayoutGrid }),
-    L('Approvals Centre', `${refitOverview}/approvals`),
-    L('Notifications', `${refitOverview}/notifications`),
-    L('Search', `${refitOverview}/search`),
-  ], { icon: LayoutGrid, slug: 'overview' }),
-  G('Workflow', refitBase, [
-    L('Change Orders', `${refitWorkflow}/change-orders`),
-    L('Crew Requests', `${refitWorkflow}/crew-requests`),
-    L('Snags & Warranty', `${refitWorkflow}/snags`),
-    L('Works Orders', `${refitWorkflow}/works`),
-    L('Meetings', `${refitWorkflow}/meetings`),
-    L('Risk Register', `${refitWorkflow}/risks`),
-  ], { icon: Network, slug: 'workflow' }),
-  G('Project', refitBase, [
-    L('Schedule', `${refitProject}/schedule`),
-    L('Logistics', `${refitProject}/logistics`),
-    L('Inventory & Equipment', `${refitProject}/inventory`),
-    L('Contractors', `${refitProject}/contractors`),
-    L('Suppliers', `${refitProject}/suppliers`),
-  ], { icon: ClipboardList, slug: 'project' }),
-  G('Documents', refitBase, [
-    L('Drawings & Plans', `${refitDocs}/drawings`),
-    L('Document Control', `${refitDocs}/document-control`),
-    L('Files', `${refitDocs}/files`),
-  ], { icon: FileText, slug: 'documents' }),
-  G('Finance', refitBase, [
-    L('Budget', `${refitFinance}/budget`),
-    L('Purchase Orders', `${refitFinance}/purchase-orders`),
-    L('Invoices', `${refitFinance}/invoices`),
-  ], { icon: Banknote, slug: 'finance' }),
-  G('Compliance', refitBase, [
-    L('Compliance', `${refitCompliance}/compliance`),
-    L('Crew & Certification', `${refitCompliance}/crew`),
-    L('Audit Log', `${refitCompliance}/audit-log`),
-    L('Reporting', `${refitCompliance}/reporting`),
-  ], { icon: Shield, slug: 'compliance' }),
-  G('Refit / Projects', refitBase, [
-    L('Refit Periods', refitProjects),
-    L('Work Packages / Scopes', refitProjects),
-    L('Defect & Snag Lists', refitProjects),
-    L('Contractors & Subcontractors', refitProjects),
-    L('Refit Inventory', refitProjects),
-    L('Project Documents & Drawings', refitProjects),
-  ], { icon: Hammer, slug: 'projects' }),
-  G('Account & Admin', refitBase, [
-    L('Access Profile', `${refitAccount}/access`),
-    L('Communications', `${refitAccount}/communications`),
-    L('Diagnostics', `${refitAccount}/diagnostics`),
-    L('Access Check', `${refitAccount}/access-check`),
-    L('Admin & Settings', `${refitAccount}/admin`),
-    L('Import & API', `${refitAccount}/import`),
-    L('Login Diagnostics', `${refitAccount}/login-diagnostics`),
-  ], { icon: Settings, slug: 'account' }),
-];
-
-const newBuildBase = `${Y}/new-build`;
-const nbOverview = `${newBuildBase}/overview`;
-const nbWorkflow = `${newBuildBase}/workflow`;
-const nbDisciplines = `${newBuildBase}/disciplines`;
-const nbEquip = `${newBuildBase}/equipment`;
-const nbDocs = `${newBuildBase}/documents`;
-const nbConfig = `${newBuildBase}/configuration`;
-const yardNewBuild: NavChild[] = [
-  G('Overview', newBuildBase, [
-    L('Dashboard', nbOverview),
-    L('Build Phases', nbOverview),
-    L('Requirements', nbOverview),
-    L('Onboarding', nbOverview),
-  ], { icon: LayoutGrid, slug: 'overview' }),
-  G('Workflow', newBuildBase, [
-    L('Change Orders', nbWorkflow),
-    L('RAID Log', nbWorkflow),
-    L('Approvals', nbWorkflow),
-    L('Schedule', nbWorkflow),
-  ], { icon: Network, slug: 'workflow' }),
-  G('Disciplines', newBuildBase, [
-    L('Areas', nbDisciplines),
-    L('Interior', nbDisciplines),
-    L('Naval Architecture', nbDisciplines),
-    L('Piping', nbDisciplines),
-    L('Deck Plan', nbDisciplines),
-  ], { icon: Layers, slug: 'disciplines' }),
-  G('Equipment & Procurement', newBuildBase, [
-    L('Equipment', nbEquip),
-    L('Purchase Orders', nbEquip),
-  ], { icon: Wrench, slug: 'equipment' }),
-  G('Documents', newBuildBase, [
-    L('Files', nbDocs),
-    L('Drawings', nbDocs),
-    L('Yard Standards', nbDocs),
-    L('Regulations', nbDocs),
-  ], { icon: FileText, slug: 'documents' }),
-  G('Configuration', newBuildBase, [
-    L('Locations', nbConfig),
-    L('RASCI', nbConfig),
-    L('Suppliers', nbConfig),
-    L('Contacts', nbConfig),
-    L('Import', nbConfig),
-  ], { icon: Settings, slug: 'configuration' }),
-];
-
-const yardChildren: NavChild[] = [
-  G('Refit', Y, yardRefit, { icon: Hammer, slug: 'refit' }),
-  G('New Build', Y, yardNewBuild, { icon: Pickaxe, slug: 'new-build' }),
-];
-
-// ─── HRIS ────────────────────────────────────────────────────────────────
-const HR = '/hris';
-const hrisEmpRec = `${HR}/employee-records`;
-const hrisComp = `${HR}/compensation`;
-const hrisPerf = `${HR}/performance`;
-const hrisRecruit = `${HR}/recruitment`;
-const hrisLeave = `${HR}/leave-and-rotation`;
-// Every HR record leaf is gated on the RBAC `hr` module (view by default).
-// Compensation and disciplinary need edit rights; see hr_can_* SQL helpers.
-const hrView: GateOpts = { moduleKey: 'hr' };
-const hrEdit: GateOpts = { moduleKey: 'hr', minPermission: 'edit' };
-const hrisChildren: NavChild[] = [
-  L('HR Dashboard', HR, { existing: '/hr', icon: LayoutGrid, ...hrView }),
-  G('Employee Records', HR, [
-    L('Personal Details', hrisEmpRec, hrView),
-    L('Contracts & Employment', hrisEmpRec, hrView),
-    L('Documents & Certificates', hrisEmpRec, hrView),
-    L('Next of Kin / Emergency', hrisEmpRec, hrView),
-    L('Employment History', hrisEmpRec, hrView),
-  ], { icon: Users, slug: 'employee-records', ...hrView }),
-  // Compensation is gated on the narrower `finance` module (DPA, purser,
-  // fleet manager) rather than HR at large.
-  G('Compensation', HR, [
-    L('Salaries & Compensation', hrisComp, { moduleKey: 'finance' }),
-    L('Payroll', hrisComp, { moduleKey: 'finance' }),
-    L('Gratuities', hrisComp, { moduleKey: 'finance' }),
-    L('Pay Reviews', hrisComp, { moduleKey: 'finance' }),
-    L('Compensation Settings', hrisComp, { moduleKey: 'finance', minPermission: 'admin', icon: Settings }),
-  ], { icon: Banknote, slug: 'compensation', moduleKey: 'finance' }),
-  G('Performance', HR, [
-    L('Annual Evaluations', hrisPerf, hrView),
-    L('Annual Reviews', hrisPerf, hrView),
-    L('End of Rotation', hrisPerf, hrView),
-    L('Objectives & PDPs', hrisPerf, hrView),
-    L('Disciplinary Matters', hrisPerf, hrEdit),
-  ], { icon: ClipboardCheck, slug: 'performance', ...hrView }),
-  G('Recruitment', HR, [
-    L('Vacancies', hrisRecruit, hrView),
-    L('Candidates', hrisRecruit, hrView),
-    L('Onboarding', hrisRecruit, hrView),
-  ], { icon: Search, slug: 'recruitment', ...hrView }),
-  G('Leave & Rotation', HR, [
-    L('Leave Planner', hrisLeave, { existing: '/crew/leave', icon: CalendarDays }),
-    L('Leave Requests', hrisLeave, { existing: '/crew/leave/requests', icon: ClipboardList }),
-    L('Leave Calculator', hrisLeave, { existing: '/crew/leave/calculator', icon: Clock }),
-    L('Rotation Planner', hrisLeave, { existing: '/crew/rotation-planner', icon: Network }),
-  ], { icon: CalendarDays, slug: 'leave-and-rotation' }),
-  L('Training & Development', HR, { existing: '/development', icon: GraduationCap }),
-  L('Compliance & Right to Work', HR, { icon: Shield, ...hrView }),
-  L('Reporting & Analytics', HR, { icon: ClipboardList, ...hrView }),
-];
-
-// ─── TOP-LEVEL ────────────────────────────────────────────────────────────
-export const NAVIGATION_ITEMS: NavItem[] = [
-  { id: 'fleet', label: 'Fleet', icon: Ship, path: FLEET_BASE, permissions: ['all'], defaultOpen: true, children: fleetChildren },
+const VESSEL_MODULE_DEFS: VesselModule[] = [
+  { id: 'home', label: 'Home', icon: LayoutDashboard, root: '', children: [], status: 'live' },
+  { id: 'crew', label: 'Crew', icon: Users, root: 'crew', children: vCrew, moduleSetting: 'crew', status: 'live' },
   {
-    id: 'vessel', label: 'Vessel', icon: Anchor, path: V, permissions: ['all'], defaultOpen: true,
-    children: [
-      G('Crew',         V, vesselCrew,        { icon: Users,      slug: 'crew' }),
-      G('Safety',       V, vesselSafety,      { icon: Shield,     slug: 'safety' }),
-      G('Certificates', V, vesselCertificates,{ icon: Award,      slug: 'certificates' }),
-      G('Technical',    V, vesselTechnical,   { icon: Wrench,     slug: 'technical' }),
-      G('Charter',      V, vesselCharter,     { icon: Compass,    slug: 'charter' }),
-      G('Accounting',   V, vesselAccounting,  { icon: Banknote,   slug: 'accounting' }),
-      G('Vessel',       V, vesselVessel,      { icon: Ship,       slug: 'general' }),
-      G('Electronic Logbooks', V, vesselLogbooks, { icon: BookOpen, slug: 'logbooks' }),
-      G('Departments',  V, vesselDepartments, { icon: Building,   slug: 'departments' }),
-    ],
+    id: 'safety', label: 'Safety', icon: Shield, root: 'safety', children: vSafety, moduleSetting: 'safety',
+    status: 'live', badgeKey: 'pendingCompliance',
   },
-  { id: 'shoreside', label: 'Shoreside', icon: Waves, path: SHORE, permissions: ['all'], children: shoresideChildren },
-  { id: 'health', label: 'Health & Wellness', icon: Heart, path: H, permissions: ['all'], children: healthChildren },
-  { id: 'yard', label: 'Yard', icon: Hammer, path: Y, permissions: ['all'], children: yardChildren },
-  { id: 'hris', label: 'HRIS', icon: Briefcase, path: HR, permissions: ['all'], children: hrisChildren },
+  {
+    id: 'certificates', label: 'Certificates', icon: Award, root: 'certificates', children: vCertificates,
+    moduleSetting: 'certificates', status: 'live',
+  },
+  {
+    id: 'technical', label: 'Technical', icon: Wrench, root: 'technical', children: vTechnical, moduleSetting: 'technical',
+    status: 'live', badgeKey: 'overdueTasks',
+  },
+  // No charter page is built yet, so the whole tab is planned.
+  { id: 'charter', label: 'Charter', icon: Compass, root: 'charter', children: vCharter, moduleSetting: 'charter', status: 'planned' },
+  { id: 'vessel', label: 'Vessel', icon: Ship, root: 'vessel', children: vVessel, moduleSetting: 'vessel', status: 'live' },
+  { id: 'logbooks', label: 'Logbooks', icon: BookOpen, root: 'logbooks', children: vLogbooks, moduleSetting: 'logbooks', status: 'live' },
+  { id: 'finance', label: 'Finance', icon: Banknote, root: 'finance', children: vFinance, moduleSetting: 'finance', status: 'planned' },
+  {
+    id: 'departments', label: 'Departments', icon: Building, root: DEPT, children: vDepartments,
+    moduleSetting: 'departments', status: 'planned',
+  },
+  { id: 'calendar', label: 'Calendar', icon: Calendar, root: 'calendar', children: [], status: 'live' },
+  { id: 'reports', label: 'Reports', icon: FileBarChart, root: 'reports', children: [], status: 'planned' },
 ];
 
-// ─── Flat list of generated placeholder paths ────────────────────────────
-const PLACEHOLDER_PREFIXES = ['/fleet/', '/vessel/', '/shoreside/', '/health/', '/yard/', '/hris/'];
+export const VESSEL_MODULES: readonly VesselModule[] = VESSEL_MODULE_DEFS.map(vesselModule);
+
+/** What `buildVesselNav` needs to know about one vessel (gap/10 W4). */
+export interface VesselNavOptions {
+  /**
+   * Whether a `vessel_module_settings` key is on for the vessel. Defaults to
+   * every key on: the table is not live yet (D-01, BUILD-PLAN S4).
+   */
+  isModuleOn?: (moduleSetting: string) => boolean;
+  /** The vessel's label for a key (Charter → "Trip", Planner → "Leave"); empty keeps the default. */
+  labelFor?: (moduleSetting: string) => string | null | undefined;
+}
+
+function resolveVesselChildren(items: NavChild[], base: string, options: VesselNavOptions): NavChild[] {
+  const on = options.isModuleOn ?? (() => true);
+  return items
+    .filter((item) => !item.moduleSetting || on(item.moduleSetting))
+    .map((item) => {
+      const label = (item.moduleSetting && options.labelFor?.(item.moduleSetting)) || item.label;
+      return {
+        ...item,
+        id: `vessel-${item.id}`,
+        label,
+        path: underVessel(base, item.path),
+        scope: item.scope ?? 'vessel',
+        ...(item.children ? { children: resolveVesselChildren(item.children, base, options) } : {}),
+      };
+    });
+}
+
+/**
+ * The vessel modules with absolute paths under `base`: `/v/dra` for one
+ * vessel, or the `/v/:vesselCode` pattern for the static tree. Modules and
+ * leaves whose `moduleSetting` is off are dropped, and per-vessel labels
+ * applied. Node ids are prefixed `vessel-`, so they are the same for every
+ * vessel (saved sidebar order carries over).
+ */
+export function vesselModuleNav(base: string, options: VesselNavOptions = {}): VesselModuleNav[] {
+  const on = options.isModuleOn ?? (() => true);
+  return VESSEL_MODULES.filter((m) => !m.moduleSetting || on(m.moduleSetting)).map((m) => ({
+    ...m,
+    label: (m.moduleSetting && options.labelFor?.(m.moduleSetting)) || m.label,
+    path: underVessel(base, m.root),
+    children: resolveVesselChildren(m.children, base, options),
+  }));
+}
+
+/** The vessel tab row and sidebars for one vessel: `buildVesselNav('DRA')` → paths under `/v/dra`. */
+export function buildVesselNav(vesselCode: string, options: VesselNavOptions = {}): VesselModuleNav[] {
+  return vesselModuleNav(vesselPath(vesselCode), options);
+}
+
+/**
+ * The module a path inside the vessel scope belongs to, given the part after
+ * `/v/<code>/` (`crew/list` → Crew). The home module answers only the bare
+ * vessel root. Used by the tab row to light the active tab.
+ */
+export function vesselModuleForPath(rest: string): VesselModule | null {
+  const path = rest.replace(/^\/+|\/+$/g, '').split(/[?#]/)[0];
+  if (!path) return VESSEL_MODULES.find((m) => m.root === '') ?? null;
+  let best: VesselModule | null = null;
+  for (const m of VESSEL_MODULES) {
+    if (!m.root) continue;
+    if (path === m.root || path.startsWith(`${m.root}/`)) {
+      if (!best || m.root.length > best.root.length) best = m;
+    }
+  }
+  return best;
+}
+
+/** One vessel module as a node of today's sidebar: a group, or a leaf when it has no sidebar. */
+function vesselModuleNode(m: VesselModuleNav): NavChild {
+  const common: NavChild = {
+    id: `vessel-${m.id}`,
+    label: m.label,
+    path: m.path,
+    icon: m.icon,
+    scope: 'vessel',
+    ...(m.moduleSetting ? { moduleSetting: m.moduleSetting } : {}),
+    ...(m.badgeKey ? { badgeKey: m.badgeKey } : {}),
+  };
+  if (!m.children.length) return { ...common, kind: 'leaf', status: m.status };
+  // A planned module stays hidden even when it holds live cross-links.
+  return { ...common, kind: 'group', children: m.children, ...(m.status === 'planned' ? { status: 'planned' as const } : {}) };
+}
+
+// ─── TOP-LEVEL (today's shell) ────────────────────────────────────────────
+/** The vessel tree on the `/v/:vesselCode` pattern, for the static shell. */
+const vesselPatternModules = vesselModuleNav(VESSEL_SCOPE_PATTERN);
+
+/** The Fleet tree, with each unsettled leaf live only if a fleet route is registered at its path. */
+const fleetTree = resolveNavStatus(fleetChildren, isRouted);
+
+/** The platform's own nodes in a workspace slot; the rest come from module manifests. */
+const WORKSPACE_BASE: Readonly<Record<string, NavChild[]>> = { shoreside: shoresideChildren };
+
+/**
+ * The workspaces with a sidebar tree, after Fleet and Vessel (navSlots.ts
+ * WORKSPACE_TREES). Health & Wellness, Yard (Refit, New Build) and HRIS fill
+ * their slots from their module manifests.
+ */
+const workspaceItems: NavItem[] = WORKSPACE_TREES.map((w) => ({
+  id: w.id,
+  label: w.label,
+  icon: w.icon,
+  path: w.path,
+  permissions: ['all'],
+  scope: 'workspace',
+  children: withScope(resolveNavStatus(fill(w.slot, WORKSPACE_BASE[w.id] ?? []), isRouted), 'workspace'),
+}));
+
+export const NAVIGATION_ITEMS: NavItem[] = [
+  {
+    id: 'fleet', label: 'Fleet', icon: Ship, path: FLEET_BASE, permissions: ['all'], defaultOpen: true, scope: 'fleet',
+    children: withScope(fleetTree, 'fleet'),
+  },
+  {
+    // Each vessel tab is a group here (a leaf when it has no sidebar). Its
+    // links carry the literal `:vesselCode`, which the vessel scope turns
+    // into the current vessel, so the tree works without knowing the code.
+    id: 'vessel', label: 'Vessel', icon: Anchor, path: VESSEL_SCOPE_PATTERN, permissions: ['all'], defaultOpen: true, scope: 'vessel',
+    children: vesselPatternModules.map(vesselModuleNode),
+  },
+  ...workspaceItems,
+];
+
+// ─── Placeholder and redirect routes ─────────────────────────────────────
 
 export interface SitemapLeaf {
   path: string;
   label: string;
 }
 
-function collectLeaves(items: (NavItem | NavChild)[], acc: SitemapLeaf[], groups: Set<string>): void {
-  for (const it of items) {
-    if ('children' in it && it.children?.length) {
-      groups.add(it.path.split('?')[0]);
-      collectLeaves(it.children, acc, groups);
-    } else {
-      acc.push({ path: it.path, label: it.label });
-    }
-  }
-}
-
-const _allLeaves: SitemapLeaf[] = [];
-const _groupPaths = new Set<string>();
-collectLeaves(NAVIGATION_ITEMS, _allLeaves, _groupPaths);
-
-/** Unique placeholder leaves (only paths under our synthesized section roots).
- *  A path that is a group elsewhere in the tree is not a placeholder: it gets
- *  a section redirect instead (see SECTION_REDIRECTS). */
-/** Leaves handled by real routes elsewhere (dynamic route params, ported
- *  modules) must never be turned into Coming Soon placeholders — static
- *  placeholder paths outrank dynamic routes in React Router's ranking. */
-const IMPLEMENTED_PREFIXES = ['/vessel/logbooks/'];
-
-export const PLACEHOLDER_LEAVES: SitemapLeaf[] = (() => {
-  const seen = new Set<string>();
-  const out: SitemapLeaf[] = [];
-  for (const leaf of _allLeaves) {
-    if (!PLACEHOLDER_PREFIXES.some((p) => leaf.path.startsWith(p))) continue;
-    if (IMPLEMENTED_PREFIXES.some((p) => leaf.path.startsWith(p))) continue;
-    if (seen.has(leaf.path)) continue;
-    if (_groupPaths.has(leaf.path.split('?')[0])) continue;
-    seen.add(leaf.path);
-    out.push(leaf);
-  }
-  return out;
-})();
-
-// ─── Section / group redirects ───────────────────────────────────────────
-// `/hris`, `/hris/employee-records`, … have no page of their own. Each one
-// redirects to its first real (non-cross-link) leaf so bookmarks and typed
-// URLs land somewhere useful instead of bouncing to the dashboard.
 export interface SectionRedirect {
   from: string;
   to: string;
 }
 
-function firstLeaf(items: NavChild[] | undefined): string | null {
-  for (const item of items ?? []) {
-    if (item.crossLink) continue;
-    if (item.children?.length) {
-      const nested = firstLeaf(item.children);
-      if (nested) return nested;
-    } else {
-      return item.path;
-    }
+/** True for a leaf with no real page yet (D-06). */
+export const isPlannedLeaf = (item: Pick<NavChild, 'status'>): boolean => item.status === 'planned';
+
+/** Every leaf of a tree (sections and groups are walked, not returned). */
+export function navLeaves(items: (NavItem | NavChild)[], acc: NavChild[] = []): NavChild[] {
+  for (const it of items) {
+    if (it.children?.length) navLeaves(it.children, acc);
+    else if (!('permissions' in it)) acc.push(it);
   }
-  return null;
+  return acc;
+}
+
+/** The first own (non-cross-link) leaf, preferring one with a real page. */
+function firstLeaf(items: NavChild[] | undefined): string | null {
+  const own = navLeaves(items ?? []).filter((leaf) => !leaf.crossLink);
+  return (own.find((leaf) => !isPlannedLeaf(leaf)) ?? own[0])?.path ?? null;
 }
 
 function withModule(path: string, moduleId: string): string {
@@ -704,6 +603,139 @@ function withModule(path: string, moduleId: string): string {
   return `${pathname}?${params.toString()}`;
 }
 
+/** Workspace prefixes whose unbuilt leaves get a top-level placeholder route. */
+const WORKSPACE_PREFIXES = WORKSPACE_TREES.map((w) => `${w.path}/`);
+const WORKSPACE_MODULE_IDS = new Set(WORKSPACE_TREES.map((w) => w.id));
+const workspaceModules = NAVIGATION_ITEMS.filter((m) => WORKSPACE_MODULE_IDS.has(m.id));
+
+function collectGroupPaths(items: (NavItem | NavChild)[], groups: Set<string>): void {
+  for (const it of items) {
+    if (it.children?.length) {
+      groups.add(it.path.split('?')[0]);
+      collectGroupPaths(it.children, groups);
+    }
+  }
+}
+
+const _groupPaths = new Set<string>();
+collectGroupPaths(NAVIGATION_ITEMS, _groupPaths);
+
+const workspaceRoots = new Set(workspaceModules.map((m) => m.path));
+
+/**
+ * One Coming Soon route per planned workspace leaf, so a link to a page that
+ * is not built yet still resolves. A live leaf never gets one: its real route
+ * serves the path, whatever the route order. A path that is a group elsewhere
+ * in the tree is not a placeholder: it gets a section redirect instead (see
+ * SECTION_REDIRECTS). The exception is a workspace root that a planned leaf
+ * names, such as the Shoreside landing (D-17): the root is that page, so it
+ * gets the placeholder and no redirect. Fleet and vessel placeholders live
+ * inside their scopes (FLEET_PLACEHOLDER_LEAVES, VESSEL_PLACEHOLDER_LEAVES).
+ */
+export const PLACEHOLDER_LEAVES: SitemapLeaf[] = (() => {
+  const seen = new Set<string>();
+  const out: SitemapLeaf[] = [];
+  for (const leaf of navLeaves(NAVIGATION_ITEMS)) {
+    if (!isPlannedLeaf(leaf)) continue;
+    const pathname = leaf.path.split('?')[0];
+    const isRoot = workspaceRoots.has(pathname);
+    if (!isRoot && !WORKSPACE_PREFIXES.some((p) => leaf.path.startsWith(p))) continue;
+    if (seen.has(leaf.path)) continue;
+    if (!isRoot && _groupPaths.has(pathname)) continue;
+    seen.add(leaf.path);
+    out.push({ path: leaf.path, label: leaf.label });
+  }
+  return out;
+})();
+
+const _placeholderPaths = new Set(PLACEHOLDER_LEAVES.map((l) => l.path));
+
+/**
+ * Planned Fleet leaves, as paths relative to `/fleet`. The router mounts a
+ * Coming Soon page for each inside FleetScope, so the fleet reach check and
+ * the shell apply to them as to any fleet page.
+ */
+export const FLEET_PLACEHOLDER_LEAVES: SitemapLeaf[] = (() => {
+  const out: SitemapLeaf[] = [];
+  const seen = new Set<string>();
+  for (const leaf of navLeaves(fleetTree)) {
+    if (!isPlannedLeaf(leaf) || leaf.crossLink || !leaf.path.startsWith(`${FLEET_BASE}/`)) continue;
+    const rel = leaf.path.slice(FLEET_BASE.length + 1);
+    if (seen.has(rel)) continue;
+    seen.add(rel);
+    out.push({ path: rel, label: leaf.label });
+  }
+  return out;
+})();
+
+/** Every own (non-cross-link) leaf of the vessel tree, relative paths. */
+function vesselOwnLeaves(): NavChild[] {
+  const out: NavChild[] = [];
+  for (const m of VESSEL_MODULES) {
+    if (!m.children.length) {
+      out.push({ id: `module-${m.id}`, label: m.label, path: m.root, icon: m.icon, status: m.status });
+      continue;
+    }
+    out.push(...navLeaves(m.children).filter((l) => !l.crossLink));
+  }
+  return out;
+}
+
+/**
+ * Planned vessel leaves, as paths relative to `/v/:vesselCode` (`''` is the
+ * vessel home). The router mounts a Coming Soon page for each inside the
+ * vessel scope, so the vessel reach check and the shell apply to them.
+ */
+export const VESSEL_PLACEHOLDER_LEAVES: SitemapLeaf[] = (() => {
+  const out: SitemapLeaf[] = [];
+  const seen = new Set<string>();
+  for (const leaf of vesselOwnLeaves()) {
+    if (!isPlannedLeaf(leaf) || seen.has(leaf.path)) continue;
+    seen.add(leaf.path);
+    out.push({ path: leaf.path, label: leaf.label });
+  }
+  return out;
+})();
+
+/**
+ * Vessel module roots and groups with no page of their own (`crew`,
+ * `departments/bridge`), relative to `/v/:vesselCode`. Each redirects to its
+ * first own leaf, preferring a real page: `crew` → `crew/list`. `to` is
+ * relative to `from`, so it can be the `to` of a nested <Navigate>.
+ * Sections are headings that share their parent's path, so they add nothing.
+ */
+export const VESSEL_ROOT_REDIRECTS: SectionRedirect[] = (() => {
+  const leafPaths = new Set(vesselOwnLeaves().map((l) => l.path));
+  const out: SectionRedirect[] = [];
+  const seen = new Set<string>();
+  const add = (from: string, items: NavChild[]) => {
+    if (leafPaths.has(from) || seen.has(from)) return;
+    const target = firstLeaf(items);
+    if (!target || !target.startsWith(`${from}/`)) return;
+    seen.add(from);
+    out.push({ from, to: target.slice(from.length + 1) });
+  };
+  const visit = (items: NavChild[]) => {
+    for (const item of items) {
+      if (!item.children?.length) continue;
+      if (item.kind !== 'section') add(item.path, item.children);
+      visit(item.children);
+    }
+  };
+  for (const m of VESSEL_MODULES) {
+    if (!m.children.length) continue;
+    add(m.root, m.children);
+    visit(m.children);
+  }
+  return out;
+})();
+
+// ─── Section / group redirects ───────────────────────────────────────────
+// `/hris`, `/hris/employee-records`, … have no page of their own. Each one
+// redirects to its first real (non-cross-link) leaf so bookmarks and typed
+// URLs land somewhere useful instead of bouncing to the dashboard. Fleet
+// headings share the `/fleet` path, which the Fleet scope already sends to
+// its dashboard; vessel roots are VESSEL_ROOT_REDIRECTS.
 export const SECTION_REDIRECTS: SectionRedirect[] = (() => {
   const out: SectionRedirect[] = [];
   const seen = new Set<string>();
@@ -711,21 +743,18 @@ export const SECTION_REDIRECTS: SectionRedirect[] = (() => {
     for (const item of items ?? []) {
       if (!item.children?.length) continue;
       const target = firstLeaf(item.children);
-      if (target && PLACEHOLDER_PREFIXES.some((p) => item.path.startsWith(p)) && !seen.has(item.path)) {
+      if (target && WORKSPACE_PREFIXES.some((p) => item.path.startsWith(p)) && !seen.has(item.path)) {
         seen.add(item.path);
         out.push({ from: item.path, to: withModule(target, moduleId) });
       }
       visit(item.children, moduleId);
     }
   };
-  for (const module of NAVIGATION_ITEMS) {
-    const root = `${module.path}/`;
-    if (PLACEHOLDER_PREFIXES.includes(root)) {
-      const target = firstLeaf(module.children);
-      if (target && !seen.has(module.path)) {
-        seen.add(module.path);
-        out.push({ from: module.path, to: withModule(target, module.id) });
-      }
+  for (const module of workspaceModules) {
+    const target = firstLeaf(module.children);
+    if (target && !seen.has(module.path) && !_placeholderPaths.has(module.path)) {
+      seen.add(module.path);
+      out.push({ from: module.path, to: withModule(target, module.id) });
     }
     visit(module.children, module.id);
   }

@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
+import { assignVesselCodes, resolveVesselByCode } from '@/modules/vessels/lib/vesselCode';
 
 export interface Vessel {
   id: string;
@@ -13,7 +14,14 @@ export interface Vessel {
   gross_tonnage: number | null;
   build_year: number | null;
   status: string | null;
+  /** Rows are read with `select('*')`, so these arrive with every vessel. */
+  created_at?: string | null;
+  /** `vessels.code`, once the column is live (DECISIONS D-03); absent before. */
+  code?: string | null;
 }
+
+/** A vessel of the company as the code derivation needs it (sold ones included). */
+export type CompanyVessel = Pick<Vessel, 'id' | 'name' | 'status' | 'created_at' | 'code'>;
 
 interface VesselContextType {
   selectedVessel: Vessel | null;
@@ -26,6 +34,19 @@ interface VesselContextType {
   loading: boolean;
   refreshVessels: () => Promise<void>;
   canAccessAllVessels: boolean;
+  /**
+   * Every vessel of the company, sold ones included, whether or not the user
+   * can reach it. Vessel codes are derived against this list so every user
+   * sees the same code for a vessel (D-03). Falls back to `vessels` when the
+   * company list cannot be read.
+   */
+  companyVessels: CompanyVessel[];
+  /** Vessel id → code (upper case), per D-03. */
+  vesselCodes: ReadonlyMap<string, string>;
+  /** The code of a vessel (upper case), or null for an unknown id. */
+  getVesselCodeById: (vesselId: string | null | undefined) => string | null;
+  /** The reachable vessel with this code (any case), or undefined. */
+  findVesselByCode: (code: string | null | undefined) => Vessel | undefined;
 }
 
 const VesselContext = createContext<VesselContextType | undefined>(undefined);
@@ -40,6 +61,7 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const { profile } = useAuth();
   const [selectedVessel, setSelectedVesselState] = useState<Vessel | null>(null);
   const [vessels, setVessels] = useState<Vessel[]>([]);
+  const [companyVessels, setCompanyVessels] = useState<CompanyVessel[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAllVessels, setIsAllVessels] = useState(false);
 
@@ -58,26 +80,41 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       let vesselsData: Vessel[] = [];
 
+      // The whole company fleet, sold vessels included, so vessel codes
+      // (D-03) come out the same for every user. A failure here must not
+      // stop the reachable vessels loading: codes then fall back to those.
+      const directoryRequest = supabase
+        .from('vessels')
+        .select('*')
+        .eq('company_id', profile.company_id)
+        .order('name');
+
       // DPA/Shore Management see all company vessels
       if (canAccessAllVessels) {
-        const { data, error } = await supabase
-          .from('vessels')
-          .select('*')
-          .eq('company_id', profile.company_id)
-          .neq('status', 'Sold')
-          .order('name');
+        const { data, error } = await directoryRequest;
 
         if (error) throw error;
-        vesselsData = data || [];
+        const directory: Vessel[] = data || [];
+        setCompanyVessels(directory);
+        // Same rows as `.neq('status', 'Sold')`, which also drops a null status.
+        vesselsData = directory.filter((v) => v.status != null && v.status !== 'Sold');
       } else {
         // Other users see only their assigned vessels
-        const { data: assignments, error: assignmentError } = await supabase
-          .from('crew_assignments')
-          .select('vessel_id')
-          .eq('user_id', profile.user_id)
-          .eq('is_current', true);
+        const [assignmentRes, directoryRes] = await Promise.all([
+          supabase
+            .from('crew_assignments')
+            .select('vessel_id')
+            .eq('user_id', profile.user_id)
+            .eq('is_current', true),
+          directoryRequest,
+        ]);
+        const { data: assignments, error: assignmentError } = assignmentRes;
 
         if (assignmentError) throw assignmentError;
+        if (directoryRes.error) {
+          console.error('Error loading the company vessel list:', directoryRes.error);
+        }
+        const directory: Vessel[] = directoryRes.data || [];
 
         if (assignments && assignments.length > 0) {
           const vesselIds = assignments.map(a => a.vessel_id);
@@ -91,6 +128,7 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           if (error) throw error;
           vesselsData = data || [];
         }
+        setCompanyVessels(directory);
       }
 
       setVessels(vesselsData);
@@ -184,6 +222,25 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     await loadVessels();
   }, [loadVessels]);
 
+  // Codes are derived over the company fleet plus anything reachable that
+  // the company list missed (e.g. when it could not be read).
+  const codeSource = useMemo<CompanyVessel[]>(() => {
+    const known = new Set(companyVessels.map((v) => v.id));
+    return [...companyVessels, ...vessels.filter((v) => !known.has(v.id))];
+  }, [companyVessels, vessels]);
+
+  const vesselCodes = useMemo(() => assignVesselCodes(codeSource), [codeSource]);
+
+  const getVesselCodeById = useCallback(
+    (vesselId: string | null | undefined) => (vesselId ? vesselCodes.get(vesselId) ?? null : null),
+    [vesselCodes],
+  );
+
+  const findVesselByCode = useCallback(
+    (code: string | null | undefined) => resolveVesselByCode(code, vessels, codeSource),
+    [vessels, codeSource],
+  );
+
   const value: VesselContextType = {
     selectedVessel,
     selectedVesselId: selectedVessel?.id || null,
@@ -195,6 +252,10 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     loading,
     refreshVessels,
     canAccessAllVessels,
+    companyVessels: codeSource,
+    vesselCodes,
+    getVesselCodeById,
+    findVesselByCode,
   };
 
   return <VesselContext.Provider value={value}>{children}</VesselContext.Provider>;

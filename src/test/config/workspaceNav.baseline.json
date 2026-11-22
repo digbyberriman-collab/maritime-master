@@ -1,0 +1,1825 @@
+{
+  "shoreside": [
+    {
+      "kind": "leaf",
+      "id": "shoreside-embrace",
+      "label": "Embrace",
+      "path": "/shoreside/embrace",
+      "status": "planned",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "shoreside-lungfish",
+      "label": "Lungfish",
+      "path": "/shoreside/lungfish",
+      "status": "planned",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "shoreside-bonefish",
+      "label": "Bonefish",
+      "path": "/shoreside/bonefish",
+      "status": "planned",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "shoreside-inkwell",
+      "label": "InkWELL",
+      "path": "/shoreside/inkwell",
+      "status": "planned",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "shoreside-medink",
+      "label": "MedINK",
+      "path": "/shoreside/medink",
+      "status": "planned",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "shoreside-crew-concierge",
+      "label": "Crew Concierge",
+      "path": "/shoreside/crew-concierge",
+      "status": "planned",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "shoreside-cosmic-frontier-labs",
+      "label": "Cosmic Frontier Labs",
+      "path": "/shoreside/cosmic-frontier-labs",
+      "status": "planned",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "shoreside-dark-ocean",
+      "label": "Dark Ocean",
+      "path": "/shoreside/dark-ocean",
+      "status": "planned",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    }
+  ],
+  "health": [
+    {
+      "kind": "group",
+      "id": "health-medical",
+      "label": "Medical",
+      "path": "/health/medical"
+    },
+    {
+      "kind": "leaf",
+      "id": "health-medical-dashboard",
+      "label": "Dashboard",
+      "path": "/health/medical/dashboard",
+      "status": "live",
+      "moduleKey": "medical",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-medical-patients",
+      "label": "Patients",
+      "path": "/health/medical/patients",
+      "status": "live",
+      "moduleKey": "medical",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-medical-staff",
+      "label": "Staff",
+      "path": "/health/medical/staff",
+      "status": "live",
+      "moduleKey": "medical",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-medical-supplies",
+      "label": "Supplies",
+      "path": "/health/medical/supplies",
+      "status": "live",
+      "moduleKey": "medical",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-medical-first-aid",
+      "label": "First Aid",
+      "path": "/health/medical/first-aid",
+      "status": "live",
+      "moduleKey": "medical",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-medical-equipment",
+      "label": "Equipment",
+      "path": "/health/medical/equipment",
+      "status": "live",
+      "moduleKey": "medical",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-medical-protocols",
+      "label": "Protocols",
+      "path": "/health/medical/protocols",
+      "status": "live",
+      "moduleKey": "medical",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-medical-logs",
+      "label": "Logs",
+      "path": "/health/medical/logs",
+      "status": "live",
+      "moduleKey": "medical",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-medical-chek",
+      "label": "C.H.E.K.",
+      "path": "/health/medical/chek",
+      "status": "live",
+      "moduleKey": "medical",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "health-medical-personnel",
+      "label": "Personnel Medical Data",
+      "path": "/health/medical/personnel"
+    },
+    {
+      "kind": "leaf",
+      "id": "health-medical-personnel-crew-medical-records",
+      "label": "Crew Medical Records",
+      "path": "/health/medical/personnel/crew-medical-records",
+      "status": "live",
+      "moduleKey": "medical",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-medical-personnel-fitness-to-work-eng1",
+      "label": "Fitness-to-Work / ENG1",
+      "path": "/health/medical/personnel/fitness-to-work-eng1",
+      "status": "live",
+      "moduleKey": "medical",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-medical-personnel-vaccinations-and-immunisations",
+      "label": "Vaccinations & Immunisations",
+      "path": "/health/medical/personnel/vaccinations-and-immunisations",
+      "status": "live",
+      "moduleKey": "medical",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-medical-personnel-allergies-and-conditions",
+      "label": "Allergies & Conditions",
+      "path": "/health/medical/personnel/allergies-and-conditions",
+      "status": "live",
+      "moduleKey": "medical",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-medical-personnel-medications",
+      "label": "Medications",
+      "path": "/health/medical/personnel/medications",
+      "status": "live",
+      "moduleKey": "medical",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-medical-personnel-medical-certificates",
+      "label": "Medical Certificates",
+      "path": "/health/medical/personnel/medical-certificates",
+      "status": "live",
+      "moduleKey": "medical",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-medical-personnel-next-of-kin-emergency",
+      "label": "Next of Kin / Emergency",
+      "path": "/health/medical/personnel/next-of-kin-emergency",
+      "status": "live",
+      "moduleKey": "medical",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-medical-personnel-incident-and-treatment-history",
+      "label": "Incident & Treatment History",
+      "path": "/health/medical/personnel/incident-and-treatment-history",
+      "status": "live",
+      "moduleKey": "medical",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "health-spa",
+      "label": "Spa",
+      "path": "/health/spa"
+    },
+    {
+      "kind": "leaf",
+      "id": "health-spa-dashboard",
+      "label": "Dashboard",
+      "path": "/health/spa/dashboard",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-spa-calendar",
+      "label": "Calendar",
+      "path": "/health/spa/calendar",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-spa-clients",
+      "label": "Clients",
+      "path": "/health/spa/clients",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-spa-treatments",
+      "label": "Treatments",
+      "path": "/health/spa/treatments",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-spa-inventory",
+      "label": "Inventory",
+      "path": "/health/spa/inventory",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "health-nutrition",
+      "label": "Nutrition",
+      "path": "/health/nutrition"
+    },
+    {
+      "kind": "leaf",
+      "id": "health-nutrition-overview",
+      "label": "Overview",
+      "path": "/health/nutrition/overview",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-nutrition-food-log",
+      "label": "Food Log",
+      "path": "/health/nutrition/food-log",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-nutrition-calendar",
+      "label": "Calendar",
+      "path": "/health/nutrition/calendar",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-nutrition-goals",
+      "label": "Goals",
+      "path": "/health/nutrition/goals",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-nutrition-settings",
+      "label": "Settings",
+      "path": "/health/nutrition/settings",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": "admin",
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "health-physio",
+      "label": "Physio",
+      "path": "/health/physio"
+    },
+    {
+      "kind": "leaf",
+      "id": "health-physio-rehab-protocols",
+      "label": "Rehab Protocols",
+      "path": "/health/physio/rehab-protocols",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-physio-assessments",
+      "label": "Assessments",
+      "path": "/health/physio/assessments",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-physio-treatment-plans",
+      "label": "Treatment Plans",
+      "path": "/health/physio/treatment-plans",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-physio-session-log",
+      "label": "Session Log",
+      "path": "/health/physio/session-log",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-physio-referrals",
+      "label": "Referrals",
+      "path": "/health/physio/referrals",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "health-personal-training",
+      "label": "Personal Training",
+      "path": "/health/personal-training"
+    },
+    {
+      "kind": "group",
+      "id": "health-personal-training-trainer",
+      "label": "Trainer",
+      "path": "/health/personal-training/trainer"
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-trainer-dashboard",
+      "label": "Dashboard",
+      "path": "/health/personal-training/trainer/dashboard",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-trainer-schedule",
+      "label": "Schedule",
+      "path": "/health/personal-training/trainer/schedule",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "health-personal-training-trainer-athletes",
+      "label": "Athletes",
+      "path": "/health/personal-training/trainer/athletes"
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-trainer-athletes-roster",
+      "label": "Roster",
+      "path": "/health/personal-training/trainer/athletes/roster",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-trainer-athletes-athlete-workspace",
+      "label": "Athlete Workspace",
+      "path": "/health/personal-training/trainer/athletes/athlete-workspace",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-trainer-athletes-active-programs",
+      "label": "Active Programs",
+      "path": "/health/personal-training/trainer/athletes/active-programs",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "health-personal-training-trainer-programming",
+      "label": "Programming",
+      "path": "/health/personal-training/trainer/programming"
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-trainer-programming-templates",
+      "label": "Templates",
+      "path": "/health/personal-training/trainer/programming/templates",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-trainer-programming-exercises",
+      "label": "Exercises",
+      "path": "/health/personal-training/trainer/programming/exercises",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-trainer-programming-rehab-protocols",
+      "label": "Rehab Protocols",
+      "path": "/health/personal-training/trainer/programming/rehab-protocols",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-trainer-programming-videos",
+      "label": "Videos",
+      "path": "/health/personal-training/trainer/programming/videos",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "health-personal-training-trainer-admin",
+      "label": "Admin",
+      "path": "/health/personal-training/trainer/admin"
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-trainer-admin-trainers",
+      "label": "Trainers",
+      "path": "/health/personal-training/trainer/admin/trainers",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "health-personal-training-trainer-admin-sources",
+      "label": "Sources",
+      "path": "/health/personal-training/trainer/admin/sources"
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-trainer-admin-sources-exercisedb-import",
+      "label": "ExerciseDB Import",
+      "path": "/health/personal-training/trainer/admin/sources/exercisedb-import",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": "admin",
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-trainer-admin-sources-wger",
+      "label": "wger",
+      "path": "/health/personal-training/trainer/admin/sources/wger",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": "admin",
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-trainer-admin-sources-exercisedb-api",
+      "label": "ExerciseDB API",
+      "path": "/health/personal-training/trainer/admin/sources/exercisedb-api",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": "admin",
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-trainer-admin-sources-musclewiki",
+      "label": "MuscleWiki",
+      "path": "/health/personal-training/trainer/admin/sources/musclewiki",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": "admin",
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-trainer-admin-sources-anatomytool",
+      "label": "AnatomyTOOL",
+      "path": "/health/personal-training/trainer/admin/sources/anatomytool",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": "admin",
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-trainer-admin-sources-z-anatomy",
+      "label": "Z-Anatomy",
+      "path": "/health/personal-training/trainer/admin/sources/z-anatomy",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": "admin",
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "health-personal-training-athlete",
+      "label": "Athlete",
+      "path": "/health/personal-training/athlete"
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-athlete-my-training",
+      "label": "My Training",
+      "path": "/health/personal-training/athlete/my-training",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-athlete-progress",
+      "label": "Progress",
+      "path": "/health/personal-training/athlete/progress",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "health-personal-training-athlete-profile",
+      "label": "Profile",
+      "path": "/health/personal-training/athlete/profile",
+      "status": "live",
+      "moduleKey": "wellness",
+      "minPermission": null,
+      "selfServe": true,
+      "crossLink": false
+    }
+  ],
+  "yard": [
+    {
+      "kind": "group",
+      "id": "yard-refit",
+      "label": "Refit",
+      "path": "/yard/refit"
+    },
+    {
+      "kind": "group",
+      "id": "yard-refit-overview",
+      "label": "Overview",
+      "path": "/yard/refit/overview"
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-overview-dashboard-dashboard",
+      "label": "Dashboard",
+      "path": "/yard/refit/overview/dashboard",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-overview-approvals-approvals-centre",
+      "label": "Approvals Centre",
+      "path": "/yard/refit/overview/approvals",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-overview-notifications-notifications",
+      "label": "Notifications",
+      "path": "/yard/refit/overview/notifications",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-overview-search-search",
+      "label": "Search",
+      "path": "/yard/refit/overview/search",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "yard-refit-workflow",
+      "label": "Workflow",
+      "path": "/yard/refit/workflow"
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-workflow-change-orders-change-orders",
+      "label": "Change Orders",
+      "path": "/yard/refit/workflow/change-orders",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-workflow-crew-requests-crew-requests",
+      "label": "Crew Requests",
+      "path": "/yard/refit/workflow/crew-requests",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-workflow-snags-snags-and-warranty",
+      "label": "Snags & Warranty",
+      "path": "/yard/refit/workflow/snags",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-workflow-works-works-orders",
+      "label": "Works Orders",
+      "path": "/yard/refit/workflow/works",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-workflow-meetings-meetings",
+      "label": "Meetings",
+      "path": "/yard/refit/workflow/meetings",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-workflow-risks-risk-register",
+      "label": "Risk Register",
+      "path": "/yard/refit/workflow/risks",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "yard-refit-project",
+      "label": "Project",
+      "path": "/yard/refit/project"
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-project-schedule-schedule",
+      "label": "Schedule",
+      "path": "/yard/refit/project/schedule",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-project-logistics-logistics",
+      "label": "Logistics",
+      "path": "/yard/refit/project/logistics",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-project-inventory-inventory-and-equipment",
+      "label": "Inventory & Equipment",
+      "path": "/yard/refit/project/inventory",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-project-contractors-contractors",
+      "label": "Contractors",
+      "path": "/yard/refit/project/contractors",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-project-suppliers-suppliers",
+      "label": "Suppliers",
+      "path": "/yard/refit/project/suppliers",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "yard-refit-documents",
+      "label": "Documents",
+      "path": "/yard/refit/documents"
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-documents-drawings-drawings-and-plans",
+      "label": "Drawings & Plans",
+      "path": "/yard/refit/documents/drawings",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-documents-document-control-document-control",
+      "label": "Document Control",
+      "path": "/yard/refit/documents/document-control",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-documents-files-files",
+      "label": "Files",
+      "path": "/yard/refit/documents/files",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "yard-refit-finance",
+      "label": "Finance",
+      "path": "/yard/refit/finance"
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-finance-budget-budget",
+      "label": "Budget",
+      "path": "/yard/refit/finance/budget",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-finance-purchase-orders-purchase-orders",
+      "label": "Purchase Orders",
+      "path": "/yard/refit/finance/purchase-orders",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-finance-invoices-invoices",
+      "label": "Invoices",
+      "path": "/yard/refit/finance/invoices",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "yard-refit-compliance",
+      "label": "Compliance",
+      "path": "/yard/refit/compliance"
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-compliance-compliance-compliance",
+      "label": "Compliance",
+      "path": "/yard/refit/compliance/overview",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-compliance-crew-crew-and-certification",
+      "label": "Crew & Certification",
+      "path": "/yard/refit/compliance/crew",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-compliance-audit-log-audit-log",
+      "label": "Audit Log",
+      "path": "/yard/refit/compliance/audit-log",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-compliance-reporting-reporting",
+      "label": "Reporting",
+      "path": "/yard/refit/compliance/reporting",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "yard-refit-projects",
+      "label": "Refit / Projects",
+      "path": "/yard/refit/projects"
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-projects-refit-periods",
+      "label": "Refit Periods",
+      "path": "/yard/refit/projects/refit-periods",
+      "status": "planned",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-projects-work-packages-scopes",
+      "label": "Work Packages / Scopes",
+      "path": "/yard/refit/projects/work-packages-scopes",
+      "status": "planned",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-projects-defect-and-snag-lists",
+      "label": "Defect & Snag Lists",
+      "path": "/yard/refit/projects/defect-and-snag-lists",
+      "status": "planned",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-projects-contractors-and-subcontractors",
+      "label": "Contractors & Subcontractors",
+      "path": "/yard/refit/projects/contractors-and-subcontractors",
+      "status": "planned",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-projects-refit-inventory",
+      "label": "Refit Inventory",
+      "path": "/yard/refit/projects/refit-inventory",
+      "status": "planned",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-projects-project-documents-and-drawings",
+      "label": "Project Documents & Drawings",
+      "path": "/yard/refit/projects/project-documents-and-drawings",
+      "status": "planned",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "yard-refit-account",
+      "label": "Account & Admin",
+      "path": "/yard/refit/account"
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-account-access-access-profile",
+      "label": "Access Profile",
+      "path": "/yard/refit/account/access",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-account-communications-communications",
+      "label": "Communications",
+      "path": "/yard/refit/account/communications",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-account-diagnostics-diagnostics",
+      "label": "Diagnostics",
+      "path": "/yard/refit/account/diagnostics",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-account-access-check-access-check",
+      "label": "Access Check",
+      "path": "/yard/refit/account/access-check",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-account-admin-admin-and-settings",
+      "label": "Admin & Settings",
+      "path": "/yard/refit/account/admin",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-account-import-import-and-api",
+      "label": "Import & API",
+      "path": "/yard/refit/account/import",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-refit-account-login-diagnostics-login-diagnostics",
+      "label": "Login Diagnostics",
+      "path": "/yard/refit/account/login-diagnostics",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "yard-new-build",
+      "label": "New Build",
+      "path": "/yard/new-build"
+    },
+    {
+      "kind": "group",
+      "id": "yard-new-build-overview",
+      "label": "Overview",
+      "path": "/yard/new-build/overview"
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-overview-dashboard",
+      "label": "Dashboard",
+      "path": "/yard/new-build/overview/dashboard",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-overview-build-phases",
+      "label": "Build Phases",
+      "path": "/yard/new-build/overview/build-phases",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-overview-requirements",
+      "label": "Requirements",
+      "path": "/yard/new-build/overview/requirements",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-overview-onboarding",
+      "label": "Onboarding",
+      "path": "/yard/new-build/overview/onboarding",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "yard-new-build-workflow",
+      "label": "Workflow",
+      "path": "/yard/new-build/workflow"
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-workflow-change-orders",
+      "label": "Change Orders",
+      "path": "/yard/new-build/workflow/change-orders",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-workflow-raid-log",
+      "label": "RAID Log",
+      "path": "/yard/new-build/workflow/raid-log",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-workflow-approvals",
+      "label": "Approvals",
+      "path": "/yard/new-build/workflow/approvals",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-workflow-schedule",
+      "label": "Schedule",
+      "path": "/yard/new-build/workflow/schedule",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "yard-new-build-disciplines",
+      "label": "Disciplines",
+      "path": "/yard/new-build/disciplines"
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-disciplines-areas",
+      "label": "Areas",
+      "path": "/yard/new-build/disciplines/areas",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-disciplines-interior",
+      "label": "Interior",
+      "path": "/yard/new-build/disciplines/interior",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-disciplines-naval-architecture",
+      "label": "Naval Architecture",
+      "path": "/yard/new-build/disciplines/naval-architecture",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-disciplines-piping",
+      "label": "Piping",
+      "path": "/yard/new-build/disciplines/piping",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-disciplines-deck-plan",
+      "label": "Deck Plan",
+      "path": "/yard/new-build/disciplines/deck-plan",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "yard-new-build-equipment",
+      "label": "Equipment & Procurement",
+      "path": "/yard/new-build/equipment"
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-equipment-register",
+      "label": "Equipment",
+      "path": "/yard/new-build/equipment/register",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-equipment-purchase-orders",
+      "label": "Purchase Orders",
+      "path": "/yard/new-build/equipment/purchase-orders",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "yard-new-build-documents",
+      "label": "Documents",
+      "path": "/yard/new-build/documents"
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-documents-files",
+      "label": "Files",
+      "path": "/yard/new-build/documents/files",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-documents-drawings",
+      "label": "Drawings",
+      "path": "/yard/new-build/documents/drawings",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-documents-yard-standards",
+      "label": "Yard Standards",
+      "path": "/yard/new-build/documents/yard-standards",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-documents-regulations",
+      "label": "Regulations",
+      "path": "/yard/new-build/documents/regulations",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "yard-new-build-configuration",
+      "label": "Configuration",
+      "path": "/yard/new-build/configuration"
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-configuration-locations",
+      "label": "Locations",
+      "path": "/yard/new-build/configuration/locations",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-configuration-rasci",
+      "label": "RASCI",
+      "path": "/yard/new-build/configuration/rasci",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-configuration-suppliers",
+      "label": "Suppliers",
+      "path": "/yard/new-build/configuration/suppliers",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-configuration-contacts",
+      "label": "Contacts",
+      "path": "/yard/new-build/configuration/contacts",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "yard-new-build-configuration-import",
+      "label": "Import",
+      "path": "/yard/new-build/configuration/import",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    }
+  ],
+  "hris": [
+    {
+      "kind": "leaf",
+      "id": "hris-hr-dashboard",
+      "label": "HR Dashboard",
+      "path": "/hr",
+      "status": "live",
+      "moduleKey": "hr",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "hris-employee-records",
+      "label": "Employee Records",
+      "path": "/hris/employee-records"
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-employee-records-personal-details",
+      "label": "Personal Details",
+      "path": "/hris/employee-records/personal-details",
+      "status": "live",
+      "moduleKey": "hr",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-employee-records-contracts-and-employment",
+      "label": "Contracts & Employment",
+      "path": "/hris/employee-records/contracts-and-employment",
+      "status": "live",
+      "moduleKey": "hr",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-employee-records-documents-and-certificates",
+      "label": "Documents & Certificates",
+      "path": "/hris/employee-records/documents-and-certificates",
+      "status": "live",
+      "moduleKey": "hr",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-employee-records-next-of-kin-emergency",
+      "label": "Next of Kin / Emergency",
+      "path": "/hris/employee-records/next-of-kin-emergency",
+      "status": "live",
+      "moduleKey": "hr",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-employee-records-employment-history",
+      "label": "Employment History",
+      "path": "/hris/employee-records/employment-history",
+      "status": "live",
+      "moduleKey": "hr",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "hris-compensation",
+      "label": "Compensation",
+      "path": "/hris/compensation"
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-compensation-salaries-and-compensation",
+      "label": "Salaries & Compensation",
+      "path": "/hris/compensation/salaries-and-compensation",
+      "status": "live",
+      "moduleKey": "finance",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-compensation-payroll",
+      "label": "Payroll",
+      "path": "/hris/compensation/payroll",
+      "status": "live",
+      "moduleKey": "finance",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-compensation-gratuities",
+      "label": "Gratuities",
+      "path": "/hris/compensation/gratuities",
+      "status": "live",
+      "moduleKey": "finance",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-compensation-pay-reviews",
+      "label": "Pay Reviews",
+      "path": "/hris/compensation/pay-reviews",
+      "status": "live",
+      "moduleKey": "finance",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-compensation-compensation-settings",
+      "label": "Compensation Settings",
+      "path": "/hris/compensation/compensation-settings",
+      "status": "live",
+      "moduleKey": "finance",
+      "minPermission": "admin",
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "hris-performance",
+      "label": "Performance",
+      "path": "/hris/performance"
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-performance-annual-evaluations",
+      "label": "Annual Evaluations",
+      "path": "/hris/performance/annual-evaluations",
+      "status": "live",
+      "moduleKey": "hr",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-performance-annual-reviews",
+      "label": "Annual Reviews",
+      "path": "/hris/performance/annual-reviews",
+      "status": "live",
+      "moduleKey": "hr",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-performance-end-of-rotation",
+      "label": "End of Rotation",
+      "path": "/hris/performance/end-of-rotation",
+      "status": "live",
+      "moduleKey": "hr",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-performance-objectives-and-pdps",
+      "label": "Objectives & PDPs",
+      "path": "/hris/performance/objectives-and-pdps",
+      "status": "live",
+      "moduleKey": "hr",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-performance-disciplinary-matters",
+      "label": "Disciplinary Matters",
+      "path": "/hris/performance/disciplinary-matters",
+      "status": "live",
+      "moduleKey": "hr",
+      "minPermission": "edit",
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "hris-recruitment",
+      "label": "Recruitment",
+      "path": "/hris/recruitment"
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-recruitment-vacancies",
+      "label": "Vacancies",
+      "path": "/hris/recruitment/vacancies",
+      "status": "live",
+      "moduleKey": "hr",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-recruitment-candidates",
+      "label": "Candidates",
+      "path": "/hris/recruitment/candidates",
+      "status": "live",
+      "moduleKey": "hr",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-recruitment-onboarding",
+      "label": "Onboarding",
+      "path": "/hris/recruitment/onboarding",
+      "status": "live",
+      "moduleKey": "hr",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "group",
+      "id": "hris-leave-and-rotation",
+      "label": "Leave & Rotation",
+      "path": "/hris/leave-and-rotation"
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-leave-and-rotation-leave-planner",
+      "label": "Leave Planner",
+      "path": "/crew/leave",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-leave-and-rotation-leave-requests",
+      "label": "Leave Requests",
+      "path": "/crew/leave/requests",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-leave-and-rotation-leave-calculator",
+      "label": "Leave Calculator",
+      "path": "/crew/leave/calculator",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-leave-and-rotation-rotation-planner",
+      "label": "Rotation Planner",
+      "path": "/crew/rotation-planner",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-training-and-development",
+      "label": "Training & Development",
+      "path": "/development",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-compliance-and-right-to-work",
+      "label": "Compliance & Right to Work",
+      "path": "/hris/compliance-and-right-to-work",
+      "status": "live",
+      "moduleKey": "hr",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "hris-reporting-and-analytics",
+      "label": "Reporting & Analytics",
+      "path": "/hris/reporting-and-analytics",
+      "status": "live",
+      "moduleKey": "hr",
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    }
+  ]
+}

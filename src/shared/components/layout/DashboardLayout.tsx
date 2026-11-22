@@ -16,6 +16,8 @@ import FeedbackPanel from '@/modules/feedback/components/FeedbackPanel';
 import FeedbackResolvedToast from '@/modules/feedback/components/FeedbackResolvedToast';
 import { Menu, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ShellContext, type ShellContextValue } from '@/app/shell/ShellContext';
+import { toNavPathname } from '@/app/router/legacyResolve';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -23,10 +25,48 @@ interface DashboardLayoutProps {
   collapseSidebar?: boolean;
 }
 
-const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSidebar = false }) => {
+/**
+ * The app shell. Idempotent (DECISIONS D-13): inside another DashboardLayout
+ * (a scope layout route renders one around its <Outlet/>) it renders its
+ * children only, so a page that still wraps itself in DashboardLayout does
+ * not mount a second shell, and moving between pages of one scope does not
+ * remount the shell.
+ */
+const DashboardLayout: React.FC<DashboardLayoutProps> = (props) => {
+  const outer = React.useContext(ShellContext);
+  if (outer) return <NestedDashboardLayout {...props} shell={outer} />;
+  return <DashboardShell {...props} />;
+};
+
+/** A DashboardLayout under a shell: no chrome, but `collapseSidebar` still reaches the shell. */
+const NestedDashboardLayout: React.FC<DashboardLayoutProps & { shell: ShellContextValue }> = ({
+  children,
+  collapseSidebar = false,
+  shell,
+}) => {
+  React.useEffect(() => (collapseSidebar ? shell.requestSidebarCollapse() : undefined), [collapseSidebar, shell]);
+  return <>{children}</>;
+};
+
+const DashboardShell: React.FC<DashboardLayoutProps> = ({ children, collapseSidebar: collapseSidebarProp = false }) => {
   const { clientDisplayName, clientLogoUrl } = useBrandingContext();
   const navigate = useNavigate();
   const location = useLocation();
+  // Nested layouts (pages under a scope layout route) ask for the wide,
+  // off-canvas sidebar through the shell context.
+  const [collapseRequests, setCollapseRequests] = React.useState(0);
+  const shellValue = React.useMemo<ShellContextValue>(() => ({
+    requestSidebarCollapse: () => {
+      setCollapseRequests((n) => n + 1);
+      let released = false;
+      return () => {
+        if (released) return;
+        released = true;
+        setCollapseRequests((n) => n - 1);
+      };
+    },
+  }), []);
+  const collapseSidebar = collapseSidebarProp || collapseRequests > 0;
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const mobileMenuButtonRef = React.useRef<HTMLButtonElement>(null);
   const mobileCloseButtonRef = React.useRef<HTMLButtonElement>(null);
@@ -93,7 +133,9 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
   }, [sidebarOpen]);
   const activeModule = React.useMemo(() => {
     const requestedModule = new URLSearchParams(location.search).get('module');
-    return NAVIGATION_ITEMS.find((item) => item.id === requestedModule) ?? resolveModuleForPath(location.pathname);
+    // Scoped URLs (/v/dra/crew/list) map back to the old URL the nav tree
+    // still links to, until the target nav tree lands (BUILD-PLAN B7).
+    return NAVIGATION_ITEMS.find((item) => item.id === requestedModule) ?? resolveModuleForPath(toNavPathname(location.pathname));
   }, [location.pathname, location.search]);
 
   const firstLeafPath = React.useCallback((children?: NavChild[]): string | null => {
@@ -117,6 +159,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
   }, [firstLeafPath, navigate]);
 
   return (
+    <ShellContext.Provider value={shellValue}>
     <DashboardFilterProvider>
     <div className="min-h-screen bg-background flex relative">
       {/* Inkfish watermark - renders behind all content */}
@@ -244,6 +287,7 @@ const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, collapseSid
     <FeedbackPanel />
     <FeedbackResolvedToast />
     </DashboardFilterProvider>
+    </ShellContext.Provider>
   );
 };
 
