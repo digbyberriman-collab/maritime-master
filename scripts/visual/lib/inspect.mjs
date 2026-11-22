@@ -59,7 +59,15 @@ export const PHONE_MAX_WIDTH = 768;
 export const RUNAWAY_REQUESTS = 500;
 
 /** Capture notes that mean a wait gave up: the screenshot may show an unfinished page. */
-const WAIT_FAILURE_NOTES = [/^network did not go idle$/, /^a spinner was still showing$/, /^a skeleton was still showing$/, /^waitFor .* not found$/, /^screenshot failed/];
+const WAIT_FAILURE_NOTES = [
+  /^network did not go idle$/,
+  /^a spinner was still showing$/,
+  /^a skeleton was still showing$/,
+  /^waitFor .* not found$/,
+  /^screenshot failed/,
+  // A scripted step that failed (lib/actions.mjs): the screenshot does not show the state it asked for.
+  /^action \d+ \(.*\) failed: /,
+];
 
 /**
  * Warnings for what capture() noticed outside the page: waits that timed out

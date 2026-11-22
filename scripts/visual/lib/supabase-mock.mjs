@@ -106,6 +106,7 @@ export function createMockState({ fixtures, signedIn = true, now = new Date() })
       tables: JSON.parse(JSON.stringify(fixtures.tables)),
       rpc: JSON.parse(JSON.stringify(fixtures.rpc)),
       missingTables: new Set(fixtures.config?.missingTables ?? []),
+      missingRpcs: new Set(fixtures.config?.missingRpcs ?? []),
     },
     /** @type {{ kind: string, method: string, path: string, table?: string, rpc?: string, fixture: boolean, status: number }[]} */
     log: [],

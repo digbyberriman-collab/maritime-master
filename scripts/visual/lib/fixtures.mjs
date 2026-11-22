@@ -5,7 +5,9 @@
  *   fixtures/<table>.json      array of rows answered for /rest/v1/<table>
  *   fixtures/rpc/<fn>.json     value answered for /rest/v1/rpc/<fn>
  *   fixtures/_auth.json        the signed-in auth user (id, email, metadata)
- *   fixtures/_config.json      { "missingTables": ["t"] } answered as PGRST205 (table not live)
+ *   fixtures/_config.json      { "missingTables": ["t"], "missingRpcs": ["fn"] } answered as
+ *                              PGRST205 / PGRST202 (table or function not live)
+ *   fixtures/_personas.json    named variations, applied per capture (lib/personas.mjs)
  *
  * Relative dates keep fixtures realistic on any day. A string value that is
  * exactly one of these tokens is replaced when the fixtures are loaded:
@@ -74,13 +76,13 @@ const readJson = (file) => {
 
 /**
  * Load every fixture under `dir`.
- * @returns {{ tables: Record<string, Record<string, unknown>[]>, rpc: Record<string, unknown>, auth: Record<string, unknown> | null, config: { missingTables: string[] } }}
+ * @returns {{ tables: Record<string, Record<string, unknown>[]>, rpc: Record<string, unknown>, auth: Record<string, unknown> | null, config: { missingTables: string[], missingRpcs: string[] } }}
  */
 export function loadFixtures(dir, now = new Date()) {
   const tables = {};
   const rpc = {};
   let auth = null;
-  let config = { missingTables: [] };
+  let config = { missingTables: [], missingRpcs: [] };
   if (!fs.existsSync(dir)) return { tables, rpc, auth, config };
 
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -88,7 +90,7 @@ export function loadFixtures(dir, now = new Date()) {
     const name = entry.name.slice(0, -'.json'.length);
     const value = resolveTokens(readJson(path.join(dir, entry.name)), now);
     if (name === '_auth') auth = value;
-    else if (name === '_config') config = { missingTables: [], ...value };
+    else if (name === '_config') config = { missingTables: [], missingRpcs: [], ...value };
     else if (name.startsWith('_')) continue;
     else if (!Array.isArray(value)) throw new Error(`Fixture ${entry.name} must be an array of rows`);
     else tables[name] = value;

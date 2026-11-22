@@ -1,0 +1,227 @@
+{
+  "vessel-master": {
+    "note": "The DRAAK master: legacy role master, RBAC captain (the catalogue's vessel master role) on DRAAK only, no fleet-wide role, assigned to DRAAK. No fleet reach (D-26): no Fleet scope anywhere.",
+    "auth": {
+      "id": "a0000000-0000-4000-8000-000000000011",
+      "email": "master.11@demo-fleet.example",
+      "user_metadata": {
+        "first_name": "Demo",
+        "last_name": "Master"
+      }
+    },
+    "tables": {
+      "user_roles": [
+        {
+          "id": "93000000-0000-4000-8000-000000000011",
+          "user_id": "a0000000-0000-4000-8000-000000000011",
+          "company_id": "c0000000-0000-4000-8000-000000000001",
+          "role": "captain",
+          "vessel_id": "e0000000-0000-4000-8000-000000000001",
+          "department": null,
+          "is_active": true,
+          "granted_at": "$ts:-300d",
+          "granted_by": null,
+          "expires_at": null,
+          "metadata": null,
+          "created_at": "$ts:-300d",
+          "updated_at": "$ts:-300d"
+        }
+      ]
+    },
+    "rpc": {
+      "get_user_roles_full": [
+        {
+          "role_id": "90000000-0000-4000-8000-000000000004",
+          "role_name": "captain",
+          "role_display_name": "Captain",
+          "vessel_id": "e0000000-0000-4000-8000-000000000001",
+          "vessel_name": "DRAAK",
+          "department": null,
+          "is_fleet_wide": false
+        }
+      ],
+      "get_user_rbac_permissions": [
+        {
+          "module_key": "dashboard",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "vessels",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "crew",
+          "permission": "edit",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "crew_roster",
+          "permission": "edit",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "certificates",
+          "permission": "edit",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "vessel_certificates",
+          "permission": "edit",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "documents",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "drills",
+          "permission": "edit",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "incidents",
+          "permission": "edit",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "ism",
+          "permission": "edit",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "maintenance",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "logbooks",
+          "permission": "edit",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "training",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "alerts",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "forms",
+          "permission": "edit",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "audits",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "itinerary",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "reports",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "settings",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        }
+      ]
+    }
+  },
+  "module-settings": {
+    "note": "Per-vessel module settings (S4, IA9): DRAAK labels Planner as Leave and Charter as Trip; HYDRA has Technical switched off.",
+    "tables": {
+      "vessel_module_settings": [
+        {
+          "vessel_id": "e0000000-0000-4000-8000-000000000001",
+          "module_key": "planner",
+          "enabled": true,
+          "enabled_from": null,
+          "label_override": "Leave",
+          "settings": null,
+          "updated_by": null,
+          "updated_at": "$ts:-12d"
+        },
+        {
+          "vessel_id": "e0000000-0000-4000-8000-000000000001",
+          "module_key": "charter",
+          "enabled": true,
+          "enabled_from": null,
+          "label_override": "Trip",
+          "settings": null,
+          "updated_by": null,
+          "updated_at": "$ts:-12d"
+        },
+        {
+          "vessel_id": "e0000000-0000-4000-8000-000000000007",
+          "module_key": "technical",
+          "enabled": false,
+          "enabled_from": null,
+          "label_override": null,
+          "settings": null,
+          "updated_by": null,
+          "updated_at": "$ts:-3d"
+        }
+      ]
+    }
+  },
+  "rbac-error": {
+    "note": "The RBAC load fails (D-56): user_roles and the role RPCs are not live, so the permissions store ends in error and the shell offers Retry.",
+    "missingTables": [
+      "user_roles"
+    ],
+    "missingRpcs": [
+      "get_user_roles_full",
+      "get_user_rbac_permissions"
+    ]
+  }
+}

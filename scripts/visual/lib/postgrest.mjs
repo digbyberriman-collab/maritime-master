@@ -423,7 +423,7 @@ export function projectRow(db, table, row, select) {
 // ---------------------------------------------------------------------------
 
 /**
- * @typedef {{ tables: Record<string, Record<string, unknown>[]>, rpc: Record<string, unknown>, missingTables?: Set<string>, now?: () => Date, newId?: () => string }} Db
+ * @typedef {{ tables: Record<string, Record<string, unknown>[]>, rpc: Record<string, unknown>, missingTables?: Set<string>, missingRpcs?: Set<string>, now?: () => Date, newId?: () => string }} Db
  * @typedef {{ method: string, url: URL, headers: Record<string, string>, body: unknown }} RestRequest
  * @typedef {{ status: number, headers: Record<string, string>, body: string, meta: { table?: string, rpc?: string, fixture: boolean, rows?: number } }} RestResponse
  */
@@ -561,10 +561,27 @@ export function handleTable(db, table, request) {
   return { status, headers: JSON_HEADERS, body: JSON.stringify(projected), meta };
 }
 
-/** Answer a `/rest/v1/rpc/<fn>` request: the fixture, else `null`. */
+/**
+ * Answer a `/rest/v1/rpc/<fn>` request: the fixture, else `null`. A function
+ * listed in `db.missingRpcs` answers PostgREST's "function not found"
+ * (PGRST202), as a database without that migration would.
+ */
 export function handleRpc(db, fn, request) {
   const fixture = Object.prototype.hasOwnProperty.call(db.rpc, fn);
   const meta = { rpc: fn, fixture };
+  if (db.missingRpcs?.has(fn)) {
+    return {
+      status: 404,
+      headers: JSON_HEADERS,
+      body: JSON.stringify({
+        code: 'PGRST202',
+        details: `Searched for the function public.${fn} with parameter or with a single unnamed json/jsonb parameter, but no matches were found in the schema cache.`,
+        hint: null,
+        message: `Could not find the function public.${fn} without parameters in the schema cache`,
+      }),
+      meta,
+    };
+  }
   let value = fixture ? clone(db.rpc[fn]) : null;
   if (wantsObject(request.headers) && Array.isArray(value)) {
     if (value.length !== 1) return notSingle(value.length, meta);

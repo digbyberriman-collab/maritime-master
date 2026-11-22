@@ -15,6 +15,12 @@
  *                                   [--no-server] [--base-url URL] [--supabase-url URL]
  *                                   [--out DIR] [--full-page] [--concurrency N]
  *                                   [--external fonts|block|live] [--timeout MS] [--strict] [--list]
+ *                                   [--persona NAME]
+ *
+ * A route may script the page before its screenshot ("actions": press a key,
+ * click, type, wait for a selector; lib/actions.mjs), capture as a persona
+ * ("persona": fixtures/_personas.json; lib/personas.mjs) and choose
+ * prefers-reduced-motion ("reducedMotion").
  */
 
 import { spawn, execFile } from 'node:child_process';
@@ -25,6 +31,8 @@ import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { loadFixtures } from './lib/fixtures.mjs';
+import { loadPersonas, applyPersona, personaFor, captureName } from './lib/personas.mjs';
+import { runActions, DEFAULT_ACTION_TIMEOUT_MS } from './lib/actions.mjs';
 import { createMockState, installSupabaseMock, FAKE_PUBLISHABLE_KEY } from './lib/supabase-mock.mjs';
 import { inspectPage, classify, captureWarnings, isHarnessNoise, isReactDevWarning, formatConsoleArgs } from './lib/inspect.mjs';
 import { parseArgs, normaliseRoutes, selectRoutes, viewportFor, HELP } from './lib/options.mjs';
@@ -163,17 +171,21 @@ async function routeExternal(context, { mode, allowedOrigins, fetchFont, record 
 
 async function capture(browser, job, ctx) {
   const { route, theme, width } = job;
-  const { options, fixtures, fetchFont } = ctx;
+  const { options, fetchFont } = ctx;
+  const persona = personaFor(route, options.persona, ctx.personas);
+  const fixtures = applyPersona(ctx.fixtures, persona ? ctx.personas[persona] : undefined);
   const viewport = viewportFor(width);
   const mobile = width < 768;
   const startedAt = Date.now();
+  // Reduced motion by default keeps screenshots stable; a route may ask for motion.
+  const reducedMotion = route.reducedMotion === false ? 'no-preference' : 'reduce';
   const context = await browser.newContext({
     viewport,
     deviceScaleFactor: 1,
     isMobile: mobile,
     hasTouch: mobile,
     colorScheme: theme === 'light' ? 'light' : 'dark',
-    reducedMotion: 'reduce',
+    reducedMotion,
     locale: 'en-GB',
     timezoneId: 'UTC',
   });
@@ -192,6 +204,7 @@ async function capture(browser, job, ctx) {
   });
 
   const page = await context.newPage();
+  if (typeof route.reducedMotion === 'boolean') await page.emulateMedia({ reducedMotion }).catch(() => {});
   const consoleErrors = [];
   const reactWarnings = [];
   const ignoredConsole = [];
@@ -220,6 +233,8 @@ async function capture(browser, job, ctx) {
   const notes = [];
   let navigationError = null;
   let inspection = null;
+  const steps = route.steps ?? [];
+  let actionsRan = 0;
   const target = new URL(route.path, options.baseUrl).href;
   try {
     await page.goto(target, { waitUntil: 'domcontentloaded', timeout: options.timeout });
@@ -238,6 +253,15 @@ async function capture(browser, job, ctx) {
     await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
     await page.evaluate(() => document.fonts?.ready).catch(() => {});
     await page.waitForTimeout(options.settle);
+    if (steps.length) {
+      // Scripted interaction on the settled page; a failed step is a note (warning), never a crash.
+      const played = await runActions(page, steps, { timeout: Math.min(options.timeout, DEFAULT_ACTION_TIMEOUT_MS) });
+      actionsRan = played.ran;
+      notes.push(...played.notes);
+      await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
+      await page.evaluate(() => document.fonts?.ready).catch(() => {});
+      await page.waitForTimeout(options.settle);
+    }
     inspection = await page.evaluate(inspectPage);
   } catch (error) {
     navigationError = error instanceof Error ? error.message.split('\n')[0] : String(error);
@@ -245,7 +269,7 @@ async function capture(browser, job, ctx) {
 
   let screenshot = null;
   if (!job.warmup) {
-    const file = path.join(options.out, `${theme}-${width}-${route.slug}.png`);
+    const file = path.join(options.out, `${theme}-${width}-${captureName(route, persona)}.png`);
     try {
       await page.screenshot({ path: file, fullPage: options.fullPage, animations: 'disabled', caret: 'hide', timeout: 30_000 });
       screenshot = path.relative(ROOT, file);
@@ -284,6 +308,8 @@ async function capture(browser, job, ctx) {
   return {
     route: route.path,
     slug: route.slug,
+    persona,
+    actions: steps.length ? { total: steps.length, ran: actionsRan } : undefined,
     theme,
     width,
     viewport,
@@ -352,12 +378,18 @@ async function main() {
   const allRoutes = normaliseRoutes(JSON.parse(fs.readFileSync(options.routesFile, 'utf8')));
   const routes = selectRoutes(allRoutes, options.routes);
   if (options.list) {
-    routes.forEach((r) => console.log(`${r.slug.padEnd(32)} ${r.path}${r.auth === false ? '  (signed out)' : ''}`));
+    routes.forEach((r) => {
+      const extras = [r.auth === false ? 'signed out' : null, r.persona ? `persona ${r.persona}` : null, r.steps?.length ? `${r.steps.length} actions` : null].filter(Boolean);
+      console.log(`${r.slug.padEnd(32)} ${r.path}${extras.length ? `  (${extras.join(', ')})` : ''}`);
+    });
     return 0;
   }
   if (routes.length === 0) throw new Error('No routes selected.');
 
   const fixtures = loadFixtures(options.fixturesDir);
+  const personas = loadPersonas(options.fixturesDir);
+  // Unknown personas fail before the server starts.
+  for (const route of routes) personaFor(route, options.persona, personas);
   fs.mkdirSync(options.out, { recursive: true });
 
   let server = null;
@@ -375,7 +407,7 @@ async function main() {
 
     const { chromium } = await loadPlaywright();
     const browser = await chromium.launch();
-    const ctx = { options, fixtures, fetchFont: makeFontFetcher(path.join(options.out, '.cache', 'fonts')) };
+    const ctx = { options, fixtures, personas, fetchFont: makeFontFetcher(path.join(options.out, '.cache', 'fonts')) };
     try {
       // Warm-up (no screenshot): the first load makes Vite optimise
       // dependencies and may reload the page once; keep that out of the captures.
@@ -389,7 +421,10 @@ async function main() {
       }
 
       const jobs = [];
-      for (const route of routes) for (const theme of options.themes) for (const width of options.widths) jobs.push({ route, theme, width });
+      // A route's own `widths` narrows the run's (a phone-only drawer, a tablet-only menu).
+      for (const route of routes)
+        for (const theme of options.themes)
+          for (const width of options.widths) if (!route.widths || route.widths.includes(width)) jobs.push({ route, theme, width });
       const results = new Array(jobs.length);
       let next = 0;
       const worker = async () => {
@@ -398,7 +433,7 @@ async function main() {
           const job = jobs[index];
           const result = await capture(browser, job, ctx);
           results[index] = result;
-          console.log(`${result.status.padEnd(4)} ${job.theme}-${job.width}-${job.route.slug} -> ${result.finalPath ?? '?'} (${result.durationMs} ms)`);
+          console.log(`${result.status.padEnd(4)} ${job.theme}-${job.width}-${captureName(job.route, result.persona)} -> ${result.finalPath ?? '?'} (${result.durationMs} ms)`);
         }
       };
       await Promise.all(Array.from({ length: Math.min(options.concurrency, jobs.length) }, worker));
@@ -411,6 +446,7 @@ async function main() {
         widths: options.widths,
         fullPage: options.fullPage,
         external: options.external,
+        persona: options.persona,
         summary: {
           total: results.length,
           ok: results.filter((r) => r.status === 'ok').length,

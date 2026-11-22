@@ -20,6 +20,12 @@ node scripts/visual/capture.mjs --routes dashboard,crew-list,ism-incidents --the
 # A route that is not in routes.json yet (any path starting with "/")
 node scripts/visual/capture.mjs --routes /fleet/overview --themes dark,light
 
+# The command palette open, and with a query typed (scripted actions)
+node scripts/visual/capture.mjs --routes palette-open,palette-query --widths 1440,390
+
+# Any route as another user or data state (a persona)
+node scripts/visual/capture.mjs --routes /v/dra --persona vessel-master
+
 # List the routes and their slugs
 node scripts/visual/capture.mjs --list
 ```
@@ -57,6 +63,7 @@ A full run (16 routes × 2 themes × 2 widths) takes a minute or two.
 | `--timeout MS` | 45000 | Navigation timeout per capture |
 | `--settle MS` | 400 | Pause before each screenshot |
 | `--strict` | off | Exit 1 when any capture fails (still not a CI gate) |
+| `--persona NAME` | none | Capture every selected route as this persona (see "Personas"); wins over a route's own `persona` |
 | `--routes-file`, `--fixtures` | `scripts/visual/…` | Use another routes file or fixtures folder |
 
 ### Using a server you started yourself
@@ -128,10 +135,11 @@ It is forgiving by design:
 fixtures/<table>.json     array of rows
 fixtures/rpc/<fn>.json    any JSON value
 fixtures/_auth.json       the signed-in auth user (id, email, metadata)
-fixtures/_config.json     { "missingTables": [...] }
+fixtures/_config.json     { "missingTables": [...], "missingRpcs": [...] }
+fixtures/_personas.json   named variations of all of the above (see "Personas")
 ```
 
-Tables listed in `missingTables` answer with the PostgREST "table not found" error (`PGRST205`). Use this to check that a page for a table that is not live yet degrades to its empty or off state (D-01) instead of crashing.
+Tables listed in `missingTables` answer with the PostgREST "table not found" error (`PGRST205`), and functions listed in `missingRpcs` with "function not found" (`PGRST202`). Use them to check that a page for a table or function that is not live yet degrades to its empty or off state (D-01) instead of crashing.
 
 **Relative dates.** A string that is exactly one of these tokens is resolved at load time, so expiry buckets stay meaningful on any day:
 
@@ -189,8 +197,75 @@ The vessel fixtures have no `code` column, which matches the live database befor
 | `expectRedirect` | A path, or `true` for any redirect; without it, a redirect is a warning |
 | `waitFor` | A selector to wait for before the screenshot |
 | `slug` | Overrides the file name, which is otherwise derived from the path |
+| `localStorage` | Values written before any app script runs (`storm-show-roadmap`, `storm-sidebar-collapsed`, …) |
+| `actions` | Scripted steps played on the settled page before the screenshot (see "Actions") |
+| `persona` | Capture as this persona from `fixtures/_personas.json` (see "Personas") |
+| `reducedMotion` | `true` or `false`: sets `prefers-reduced-motion` for this capture (see "Reduced motion") |
+| `widths` | Only these of the run's widths, e.g. `[390, 768]` for the navigation drawer, which exists below 1024 px |
 
 New scopes (`/fleet/…`, `/v/:vesselCode/…`) are added here as they land.
+
+### Actions
+
+A route can open a menu, press a shortcut or type a query before its screenshot:
+
+```json
+{ "path": "/fleet/dashboard", "slug": "palette-query", "actions": [
+  { "press": "Control+k" },
+  { "waitFor": "[data-testid=\"command-palette-input\"]" },
+  { "type": { "selector": "[data-testid=\"command-palette-input\"]", "text": "crew" } },
+  { "wait": 150 }
+] }
+```
+
+| Step | Does |
+|---|---|
+| `{ "click": "<selector>" }` | Clicks the first match |
+| `{ "press": "Control+k" }` | Presses a key or chord (Playwright key names: `Escape`, `ArrowDown`, `Shift+Tab`, …) |
+| `{ "type": { "selector": "<selector>", "text": "crew" } }` | Focuses the element, then types the text key by key |
+| `{ "hover": "<selector>" }` | Moves the pointer over the first match |
+| `{ "waitFor": "<selector>" }` | Waits until the selector is visible |
+| `{ "wait": 300 }` | Pauses, in milliseconds (0 to 30000) |
+
+- Each step has exactly one key. routes.json is checked when it is read (`lib/options.mjs` → `lib/actions.mjs`): an unknown key or a malformed step stops the run before the server starts, naming the route and the step.
+- Steps run in order after the page has settled (network idle, spinners and skeletons gone) and before the screenshot; the page is inspected after them, so the report describes the state on screen.
+- A step that fails (selector not found, a timeout of 10 s) never crashes the run. It becomes a note, `action 2 (click [data-testid="…"]) failed: …`, which grades the capture `warn`, and the later steps are skipped.
+- Use the `data-testid` values from `src/app/shell/testIds.ts` (`SHELL_TEST_IDS`, `PALETTE_TEST_IDS`) in the form `[data-testid="shell-account-trigger"]`. They are a contract: values never change once shipped. `test/actions.test.mjs` checks that every test id in routes.json exists there.
+
+The shipped interaction captures are `auth-error` (sign-in sent with empty fields: inline errors, S6), `palette-open`, `palette-query` (command palette, S5) and `shell-vessel-switcher-open`, `shell-account-menu-open`, `shell-bell-open`, `shell-apps-open` (top bar, S1). The top bar ones grade `warn` ("action 1 (click …) failed") until the Phase 1 top bar that carries those test ids is in the tree.
+
+### Personas
+
+A persona is a named variation of the fixtures: another signed-in user, other rows, tables or functions that are not live. `fixtures/_personas.json`:
+
+```json
+{
+  "vessel-master": {
+    "note": "what it shows",
+    "auth": { "id": "…", "email": "master.11@demo-fleet.example", "user_metadata": { "first_name": "Demo", "last_name": "Master" } },
+    "tables": { "user_roles": [ … ] },
+    "rpc": { "get_user_roles_full": [ … ] },
+    "missingTables": ["…"],
+    "missingRpcs": ["…"]
+  }
+}
+```
+
+- Every key is optional; an unknown key is an error. Each capture gets its own copy, so writes never leak.
+- A persona's table (or RPC answer) **replaces** the base one of the same name; rows are not merged one by one, so what a persona shows is all in one place. `missingTables` and `missingRpcs` add to `_config.json`'s. `auth` replaces `_auth.json`. Date tokens work as in the other fixtures.
+- Choose one per route (`"persona": "vessel-master"`) or for the whole run (`--persona vessel-master`, which wins). A run-wide persona saves `<theme>-<width>-<slug>--<persona>.png`, so it never overwrites the ordinary capture; the report records `persona` per capture.
+
+| Persona | Who / what | Used by |
+|---|---|---|
+| `vessel-master` | The DRAAK master (legacy role `master`, RBAC `captain`, the role catalogue's vessel master role, on DRAAK only, no fleet-wide role, assigned to DRAAK). No fleet reach (D-26), so no Fleet scope anywhere | `vessel-master-dra` |
+| `module-settings` | `vessel_module_settings` rows (pending table, S4): DRAAK `planner` labelled "Leave", DRAAK `charter` labelled "Trip", HYDRA `technical` off | `module-settings-hyd-technical` |
+| `rbac-error` | `user_roles` and the two role RPCs (`get_user_roles_full`, `get_user_rbac_permissions`) are not live, so the permissions store ends in its error state (D-56) and the shell offers Retry | any route, with `--persona rbac-error` |
+
+Same rules as the base fixtures (D-07, D-08): roles not names, emails on the reserved `example` domain, no phone numbers. `test/actions.test.mjs` checks them.
+
+### Reduced motion
+
+Every capture runs with `prefers-reduced-motion: reduce` by default, so animations never blur a screenshot. A route can set it explicitly with `"reducedMotion": true` (the capture also calls `page.emulateMedia({ reducedMotion: 'reduce' })`), or turn it off with `"reducedMotion": false` to capture the full-motion styles (`no-preference`).
 
 ## External requests
 
@@ -206,6 +281,8 @@ Use `--external live` on a machine with direct internet access to load everythin
 node --test scripts/visual/test/*.test.mjs
 ```
 
+(Pass the files: `node --test scripts/visual/test` with a bare directory is not a test file on Node 22.)
+
 CI (`.github/workflows/ci.yml`, job `check`, step "Visual harness unit tests") runs the two suites that need no browser:
 
 ```bash
@@ -219,6 +296,7 @@ The tests cover:
 - the PostgREST look-alike
 - the fixture loader, tokens and shipped fixtures
 - options and routes
+- scripted actions (validation, order, a failing step as a warning) and personas (`actions.test.mjs`, no browser)
 - report grading
 - the auth, storage and functions mock
 - `inspectPage` in a real browser (skipped if Playwright is missing)

@@ -4,6 +4,7 @@
  */
 
 import path from 'node:path';
+import { validateActions } from './actions.mjs';
 
 export const HELP = `STORM visual + route-smoke harness
 
@@ -22,6 +23,7 @@ export const HELP = `STORM visual + route-smoke harness
                         block: stub every external request; live: let the browser go out
   --timeout MS          per-navigation timeout (default: 45000)
   --settle MS           pause before each screenshot (default: 400)
+  --persona NAME        capture every selected route as this persona (fixtures/_personas.json)
   --strict              exit 1 when any capture fails
   --list                print the selected routes and exit
   --help                this text`;
@@ -41,6 +43,7 @@ const DEFAULTS = {
   settle: 400,
   serverTimeout: 180_000,
   strict: false,
+  persona: null,
   list: false,
   help: false,
 };
@@ -95,6 +98,7 @@ export function parseArgs(argv, root) {
       case '--settle': o.settle = Number(value()) || 0; break;
       case '--routes-file': routesFile = value(); break;
       case '--fixtures': fixturesDir = value(); break;
+      case '--persona': o.persona = value(); break;
       case '--strict': o.strict = true; break;
       case '--list': o.list = true; break;
       case '--help':
@@ -119,7 +123,10 @@ export function slugFor(routePath) {
 /**
  * routes.json entries are a path string or an object:
  *   { "path": "/auth", "slug": "sign-in", "auth": false, "expectRedirect": "/dashboard",
- *     "waitFor": "main h1", "localStorage": { "key": "value" }, "note": "why it is here" }
+ *     "waitFor": "main h1", "localStorage": { "key": "value" }, "note": "why it is here",
+ *     "persona": "vessel-master", "reducedMotion": true, "widths": [390, 768],
+ *     "actions": [{ "press": "Control+k" }, { "waitFor": "[data-testid=\"command-palette\"]" }] }
+ * `actions` are checked here (lib/actions.mjs) into `steps`, so a typo fails before the run.
  */
 export function normaliseRoutes(raw) {
   const entries = Array.isArray(raw) ? raw : raw?.routes;
@@ -131,6 +138,14 @@ export function normaliseRoutes(raw) {
     r.slug = r.slug ?? slugFor(r.path);
     if (seen.has(r.slug)) throw new Error(`Duplicate route slug "${r.slug}"`);
     seen.add(r.slug);
+    const where = `Route "${r.slug}"`;
+    // `steps` is the checked form capture.mjs plays; `actions` stays as written.
+    r.steps = validateActions(r.actions, where);
+    if (r.reducedMotion !== undefined && typeof r.reducedMotion !== 'boolean') throw new Error(`${where}: "reducedMotion" must be true or false`);
+    if (r.persona !== undefined && (typeof r.persona !== 'string' || !r.persona)) throw new Error(`${where}: "persona" must be a persona name`);
+    if (r.widths !== undefined && (!Array.isArray(r.widths) || r.widths.length === 0 || !r.widths.every((w) => Number.isInteger(w) && w > 0))) {
+      throw new Error(`${where}: "widths" must be a non-empty array of viewport widths`);
+    }
     return r;
   });
 }
