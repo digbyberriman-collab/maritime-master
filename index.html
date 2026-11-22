@@ -1,11 +1,14 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="dark" style="color-scheme: dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>STORM | Superyacht Technical Operations, Research & Management</title>
     <meta name="description" content="STORM - Superyacht Technical Operations, Research & Management platform for professional yacht management" />
     <meta name="author" content="STORM" />
+    <!-- Abyss is the default; the pre-paint script below switches to Daylight when chosen. -->
+    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#0A0E14" />
 
     <meta property="og:title" content="STORM | Superyacht Technical Operations, Research & Management" />
     <meta property="og:description" content="Professional superyacht management platform for technical operations, research, and fleet management" />
@@ -15,15 +18,67 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@STORM" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <!-- Pre-paint theme and density (no white flash). Mirrors
+         src/components/ui/theme-config.ts; tested in src/test/design/themeRuntime.test.tsx. -->
+    <script data-storm-prepaint>
+      (function () {
+        var d = document.documentElement;
+        var theme = 'dark';
+        var density = null;
+        try {
+          var stored = localStorage.getItem('storm-theme');
+          if (stored === 'light' || stored === 'dark') theme = stored;
+          else if (stored === 'system' && window.matchMedia) {
+            theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          }
+          var sd = localStorage.getItem('storm-density');
+          if (sd === 'comfortable' || sd === 'default' || sd === 'compact') density = sd;
+        } catch (e) {}
+        if (!density) {
+          var coarse = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+          density = coarse && window.innerWidth < 1024 ? 'comfortable' : 'default';
+        }
+        d.classList.remove('dark', 'light');
+        d.classList.add(theme);
+        d.style.colorScheme = theme;
+        d.setAttribute('data-density', density);
+        var meta = document.querySelector('meta[name="theme-color"]');
+        if (meta) meta.setAttribute('content', theme === 'light' ? '#F5F7FA' : '#0A0E14');
+      })();
+    </script>
+    <!-- First-paint colours before the stylesheet arrives (Abyss / Daylight). -->
+    <style>
+      html { background: #0A0E14; color: #EEF1F5; }
+      html.light { background: #F5F7FA; color: #0E141D; }
+      .storm-boot { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+      .storm-boot-mark { font-weight: 800; letter-spacing: 0.06em; font-size: 1.75rem; color: #00AFE6; }
+      .storm-boot-text { margin: 0.5rem 0 0; color: #8A94A6; font-size: 0.875rem; }
+      .storm-boot-detail { margin: 0.75rem 0 0; color: #8A94A6; font-size: 0.6875rem; }
+      .storm-boot-button { margin-top: 1rem; border: 0; border-radius: 0.5rem; padding: 0.625rem 1.25rem; background: #00AFE6; color: #0A0E14; font-size: 0.875rem; font-weight: 600; cursor: pointer; }
+      .storm-boot-button:focus-visible { outline: 2px solid #00AFE6; outline-offset: 2px; }
+      html.light .storm-boot-mark { color: #00648F; }
+      html.light .storm-boot-text, html.light .storm-boot-detail { color: #4D5869; }
+      html.light .storm-boot-button { background: #00648F; color: #FFFFFF; }
+      html.light .storm-boot-button:focus-visible { outline-color: #0089B8; }
+    </style>
+
+    <!-- Fonts (DECISIONS D-DS3): Inter (UI), Barlow Semi Condensed (display), JetBrains Mono (references). -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600&family=Inter:wght@400..700&family=JetBrains+Mono:wght@400;500&display=swap"
+    />
     <link rel="preload" as="image" href="/assets/inkfish-logo.png" fetchpriority="high" />
   </head>
 
   <body>
     <div id="root">
-      <div data-storm-placeholder style="min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:ui-sans-serif,system-ui,sans-serif">
-        <div style="text-align:center">
-          <div style="font-weight:900;letter-spacing:-0.02em;font-size:1.75rem;color:#0066CC">STORM</div>
-          <p style="margin:0.5rem 0 0;color:#64748b;font-size:0.875rem">Loading…</p>
+      <div data-storm-placeholder class="storm-boot">
+        <div>
+          <div class="storm-boot-mark">STORM</div>
+          <p class="storm-boot-text" role="status">Loading…</p>
         </div>
       </div>
     </div>
@@ -31,21 +86,25 @@
     <script>
       // Watchdog: if the app never takes over the placeholder (fatal startup
       // error, blocked assets), show an actionable message instead of an
-      // endless "Loading…" screen.
+      // endless "Loading…" screen. Colours come from the .storm-boot classes.
       (function () {
         var shown = false;
+        function esc(s) {
+          return String(s).replace(/[&<>"']/g, function (c) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+          });
+        }
         function fail(detail) {
           if (shown) return;
           var root = document.getElementById('root');
           if (!root || !root.querySelector('[data-storm-placeholder]')) return;
           shown = true;
           root.innerHTML =
-            '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:ui-sans-serif,system-ui,sans-serif;text-align:center">' +
-            '<div style="max-width:24rem">' +
-            '<div style="font-weight:900;letter-spacing:-0.02em;font-size:1.75rem;color:#0066CC;margin-bottom:0.5rem">STORM</div>' +
-            '<p style="margin:0 0 1rem;color:#64748b;font-size:0.875rem">STORM could not finish loading. This is usually a temporary connection problem.</p>' +
-            '<button type="button" onclick="location.reload()" style="border:0;border-radius:0.5rem;padding:0.625rem 1.25rem;background:#0066CC;color:#fff;font-size:0.875rem;font-weight:600;cursor:pointer">Reload</button>' +
-            (detail ? '<p style="margin:0.75rem 0 0;color:#94a3b8;font-size:0.6875rem">' + detail + '</p>' : '') +
+            '<div class="storm-boot"><div style="max-width:24rem">' +
+            '<div class="storm-boot-mark">STORM</div>' +
+            '<p class="storm-boot-text">STORM could not finish loading. This is usually a temporary connection problem.</p>' +
+            '<button type="button" class="storm-boot-button" onclick="location.reload()">Reload</button>' +
+            (detail ? '<p class="storm-boot-detail">' + esc(detail) + '</p>' : '') +
             '</div></div>';
         }
         window.addEventListener('error', function (e) {

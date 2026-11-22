@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Palette, Sun, Moon, Monitor, Check, Save, LayoutDashboard, Ship, Grid3X3 } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import { Sun, Moon, Monitor, Check, Save, LayoutDashboard, Ship, Rows2, Rows3, Rows4 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -8,10 +9,13 @@ import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/shared/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { DEFAULT_THEME, isThemePreference, type Density, type ThemePreference } from '@/components/ui/theme-config';
+import { useDensity } from '@/components/ui/use-density';
 import SettingsCard from '../common/SettingsCard';
 
+// The theme itself lives in the theme provider (localStorage, applied before
+// first paint); this form only mirrors it into user_preferences.theme.
 interface AppearanceSettings {
-  theme: 'light' | 'dark' | 'system';
   sidebar_collapsed: boolean;
   default_vessel_id: string | null;
   dashboard_widgets: string[];
@@ -38,11 +42,13 @@ const DEFAULT_WIDGETS = ['alerts', 'certificates', 'drills'];
 const AppearanceSection: React.FC = () => {
   const { user, profile } = useAuth();
   const { toast } = useToast();
+  const { theme: activeTheme, setTheme } = useTheme();
+  const theme: ThemePreference = isThemePreference(activeTheme) ? activeTheme : DEFAULT_THEME;
+  const [density, setDensity] = useDensity();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [vessels, setVessels] = useState<Vessel[]>([]);
   const [settings, setSettings] = useState<AppearanceSettings>({
-    theme: 'system',
     sidebar_collapsed: false,
     default_vessel_id: null,
     dashboard_widgets: DEFAULT_WIDGETS
@@ -59,9 +65,9 @@ const AppearanceSection: React.FC = () => {
     if (!user?.id) return;
     
     try {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from('user_preferences')
-        .select('theme, sidebar_collapsed, default_vessel_id, dashboard_widgets')
+        .select('sidebar_collapsed, default_vessel_id, dashboard_widgets')
         .eq('user_id', user.id)
         .maybeSingle();
 
@@ -69,7 +75,6 @@ const AppearanceSection: React.FC = () => {
 
       if (data) {
         setSettings({
-          theme: (data.theme as AppearanceSettings['theme']) || 'system',
           sidebar_collapsed: data.sidebar_collapsed || false,
           default_vessel_id: data.default_vessel_id || null,
           dashboard_widgets: data.dashboard_widgets || DEFAULT_WIDGETS
@@ -101,14 +106,21 @@ const AppearanceSection: React.FC = () => {
     }
   };
 
-  const applyTheme = (theme: 'light' | 'dark' | 'system') => {
-    const root = document.documentElement;
-
-    if (theme === 'system') {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      root.classList.toggle('dark', prefersDark);
-    } else {
-      root.classList.toggle('dark', theme === 'dark');
+  // Applies at once through the provider (and localStorage), then mirrors the
+  // choice to the profile so a new device starts with it (gap/10 W1).
+  const chooseTheme = async (next: ThemePreference) => {
+    setTheme(next);
+    if (!user?.id) return;
+    const { error } = await supabase
+      .from('user_preferences')
+      .upsert({ user_id: user.id, theme: next, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
+    if (error) {
+      console.error('Error saving theme preference:', error);
+      toast({
+        title: 'Theme applied on this device only',
+        description: 'It could not be saved to your profile. Try again later.',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -118,11 +130,11 @@ const AppearanceSection: React.FC = () => {
     setSaving(true);
 
     try {
-      const { error } = await (supabase as any)
+      const { error } = await supabase
         .from('user_preferences')
         .upsert({
           user_id: user.id,
-          theme: settings.theme,
+          theme,
           sidebar_collapsed: settings.sidebar_collapsed,
           default_vessel_id: settings.default_vessel_id,
           dashboard_widgets: settings.dashboard_widgets,
@@ -130,9 +142,6 @@ const AppearanceSection: React.FC = () => {
         }, { onConflict: 'user_id' });
 
       if (error) throw error;
-
-      // Apply theme immediately
-      applyTheme(settings.theme);
 
       toast({
         title: 'Preferences saved',
@@ -165,10 +174,16 @@ const AppearanceSection: React.FC = () => {
     }
   };
 
-  const themes = [
-    { id: 'light' as const, label: 'Light', icon: Sun, description: 'Classic light mode' },
-    { id: 'dark' as const, label: 'Dark', icon: Moon, description: 'Easy on the eyes' },
-    { id: 'system' as const, label: 'System', icon: Monitor, description: 'Match system settings' },
+  const themes: { id: ThemePreference; label: string; icon: typeof Moon; description: string }[] = [
+    { id: 'dark', label: 'Abyss', icon: Moon, description: 'Dark, for bridges and engine rooms (default)' },
+    { id: 'light', label: 'Daylight', icon: Sun, description: 'Light, for bright offices' },
+    { id: 'system', label: 'System', icon: Monitor, description: 'Follow this device' },
+  ];
+
+  const densities: { id: Density; label: string; icon: typeof Rows2; description: string }[] = [
+    { id: 'comfortable', label: 'Comfortable', icon: Rows2, description: 'Larger rows and touch targets' },
+    { id: 'default', label: 'Default', icon: Rows3, description: 'Balanced for desktop' },
+    { id: 'compact', label: 'Compact', icon: Rows4, description: 'More rows in registers and matrices' },
   ];
 
   if (loading) {
@@ -197,21 +212,24 @@ const AppearanceSection: React.FC = () => {
       {/* Theme Selection */}
       <SettingsCard
         title="Theme"
-        description="Select your preferred color theme"
+        description="Applies straight away and is saved to your profile"
       >
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div role="radiogroup" aria-label="Theme" className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {themes.map((t) => {
             const Icon = t.icon;
-            const isSelected = settings.theme === t.id;
+            const isSelected = theme === t.id;
 
             return (
               <button
                 key={t.id}
-                onClick={() => setSettings({ ...settings, theme: t.id })}
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                onClick={() => void chooseTheme(t.id)}
                 className={cn(
-                  'relative flex flex-col items-center gap-3 p-4 rounded-lg border-2 transition-all',
-                  'hover:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/20',
-                  isSelected ? 'border-primary bg-primary/5' : 'border-border'
+                  'relative flex flex-col items-center gap-3 p-4 rounded-lg border-2 transition-colors duration-quick ease-tide focus-ring',
+                  'hover:border-primary/50',
+                  isSelected ? 'border-primary bg-signal-muted' : 'border-border'
                 )}
               >
                 {isSelected && (
@@ -229,6 +247,41 @@ const AppearanceSection: React.FC = () => {
                   <p className="font-medium">{t.label}</p>
                   <p className="text-xs text-muted-foreground">{t.description}</p>
                 </div>
+              </button>
+            );
+          })}
+        </div>
+      </SettingsCard>
+
+      {/* Density */}
+      <SettingsCard
+        title="Density"
+        description="Row and control sizes. Saved on this device."
+      >
+        <div role="radiogroup" aria-label="Density" className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {densities.map((d) => {
+            const Icon = d.icon;
+            const isSelected = density === d.id;
+
+            return (
+              <button
+                key={d.id}
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                onClick={() => setDensity(d.id)}
+                className={cn(
+                  'relative flex items-center gap-3 p-4 rounded-lg border-2 text-left transition-colors duration-quick ease-tide focus-ring',
+                  'hover:border-primary/50',
+                  isSelected ? 'border-primary bg-signal-muted' : 'border-border'
+                )}
+              >
+                <Icon className={cn('h-5 w-5 shrink-0', isSelected ? 'text-primary' : 'text-muted-foreground')} />
+                <div className="min-w-0">
+                  <p className="font-medium">{d.label}</p>
+                  <p className="text-xs text-muted-foreground">{d.description}</p>
+                </div>
+                {isSelected && <Check className="ml-auto h-4 w-4 shrink-0 text-primary" />}
               </button>
             );
           })}

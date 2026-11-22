@@ -1,166 +1,324 @@
+/*
+ * STORM "Abyss" design tokens (gap/10 §A, anchors from DECISIONS §1).
+ *
+ * - Dark is the default theme: the dark semantic set lives in `:root` AND
+ *   `.dark`, so the page is dark even before the theme runtime adds a class.
+ *   Daylight (the optional light theme) lives in `.light`.
+ * - Tailwind keeps `darkMode: ["class"]`; next-themes puts `dark` or `light`
+ *   on <html>, so the existing `dark:` variants keep working.
+ * - Values are HSL triplets for the shadcn `hsl(var(--x))` convention. Raw
+ *   scales (abyss, deep, slate, drift, signal) are theme-independent; module
+ *   code uses the semantic tokens, never the raw steps.
+ * - On dark, every solid fill (primary, status, decorative) carries Abyss text
+ *   (`*-foreground`). White on Signal is 2.5:1 and is never used.
+ * - AA is enforced by src/test/design/contrast.test.ts, which parses this file.
+ */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  /* Raw scales and theme-independent tokens. */
   :root {
-    /* Maritime color scheme */
-    --background: 210 20% 98%;
-    --foreground: 222 47% 11%;
+    /* Abyss: deepest backgrounds (page, top bar, sidebar, overlay base). */
+    --abyss-950: 214.3 36.8% 3.7%;      /* #06090D sidebar, map water */
+    --abyss-900: 216 33.3% 5.9%;        /* #0A0E14 ANCHOR page background, top bar */
+    --abyss-800: 216.9 33.3% 7.6%;      /* #0D121A top bar hover */
+    /* Deep: surfaces (cards, tables, panels, popovers). */
+    --deep-900: 218.8 33.3% 10%;        /* #111722 ANCHOR cards, tables */
+    --deep-850: 217.9 32.2% 11.6%;      /* #141B27 sunken wells, sidebar hover */
+    --deep-800: 217.1 31.3% 13.1%;      /* #171F2C popovers, menus, dialogs */
+    --deep-700: 216.5 29.9% 15.1%;      /* #1B2432 hover / pressed surface */
+    /* Slate: raised surfaces, borders, inputs (Tailwind key `slate-ui`). */
+    --slate-900: 220 33.3% 14.1%;       /* #182030 muted fills: table header, chips */
+    --slate-800: 216.5 29.1% 15.5%;     /* #1C2533 ANCHOR raised surfaces, borders */
+    --slate-700: 216.4 26.9% 20.4%;     /* #263142 strong dividers, scrollbar thumb */
+    --slate-600: 216 24.5% 28%;         /* #364459 disabled fill */
+    --slate-500: 217.5 16.9% 46.3%;     /* #62718A input borders (>= 3:1 on cards) */
+    --slate-400: 217.3 15.5% 53.1%;     /* #75839A disabled icons */
+    /* Drift: text and muted UI. */
+    --drift-600: 219.3 11.6% 48.8%;     /* #6E788B disabled text */
+    --drift-500: 218.6 12.3% 55.3%;     /* #7F899B tertiary text, placeholders, axis labels */
+    --drift-400: 218.6 13.6% 59.6%;     /* #8A94A6 ANCHOR secondary text (muted-foreground) */
+    --drift-300: 218.2 14.3% 69.8%;     /* #A7AFBD */
+    --drift-200: 218.8 16.8% 80.2%;     /* #C4CAD5 sidebar text, secondary values */
+    --drift-100: 218.2 19.3% 88.8%;     /* #DDE1E8 */
+    --drift-50: 214.3 25.9% 94.7%;      /* #EEF1F5 primary text (foreground) */
+    /* Signal: the one luminous accent (interactive, focus, active nav). */
+    --signal-50: 195.7 79.3% 94.3%;     /* #E5F6FC */
+    --signal-100: 195.3 83.6% 88%;      /* #C7EDFA */
+    --signal-200: 195.5 82.9% 77.1%;    /* #94DCF5 pressed-on-dark highlight */
+    --signal-300: 195.2 82.8% 63.5%;    /* #55C8EF */
+    --signal-400: 194.3 84.4% 52.4%;    /* #1FBBEC hover on dark */
+    --signal-500: 194.3 100% 45.1%;     /* #00AFE6 ANCHOR primary on dark */
+    --signal-600: 195.3 100% 36.1%;     /* #0089B8 focus ring on light */
+    --signal-700: 198 100% 28%;         /* #00648F ANCHOR primary on light */
+    --signal-800: 198 100% 21.6%;       /* #004D6E primary hover on light */
+    --signal-900: 200 70.6% 13.3%;      /* #0A2A3A selected row on dark */
+    --signal-950: 201.3 68.9% 8.8%;     /* #071B26 */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    /* Radius (A.4): lg 10px cards/dialogs, md 8px controls, sm 6px chips. */
+    --radius: 0.625rem;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    /* Focus (A.5): one ring, 2px Signal, 2px offset in the surface colour. */
+    --focus-ring-width: 2px;
+    --focus-ring-offset: 2px;
 
-    /* Navy blue primary */
-    --primary: 224 71% 33%;
-    --primary-foreground: 210 40% 98%;
+    /* Motion (A.6). Reduced motion is handled globally below. */
+    --ease-tide: cubic-bezier(0.2, 0, 0, 1);
+    --ease-tide-out: cubic-bezier(0.4, 0, 1, 1);
+    --motion-quick: 120ms;
+    --motion-menu: 180ms;
+    --motion-panel: 240ms;
+    --motion-indicator: 320ms;
+    --motion-ping: 2.4s;
 
-    /* Light blue secondary */
-    --secondary: 217 91% 60%;
-    --secondary-foreground: 0 0% 100%;
-
-    --muted: 210 20% 96%;
-    --muted-foreground: 215 16% 47%;
-
-    /* Light blue accent */
-    --accent: 217 91% 60%;
-    --accent-foreground: 0 0% 100%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214 32% 91%;
-    --input: 214 32% 91%;
-    --ring: 224 71% 33%;
-
-    --radius: 0.5rem;
-
-    /* Success color for online status */
-    --success: 142 76% 36%;
-    --success-foreground: 0 0% 100%;
-    --success-muted: 142 76% 94%;
-
-    /* Warning color */
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 0%;
-    --warning-muted: 38 92% 94%;
-
-    /* Info color */
-    --info: 217 91% 60%;
-    --info-foreground: 0 0% 100%;
-    --info-muted: 217 91% 94%;
-
-    /* Emergency/Critical colors */
-    --critical: 0 72% 51%;
-    --critical-foreground: 0 0% 100%;
-    --critical-muted: 0 72% 94%;
-
-    /* Orange accent */
-    --orange: 25 95% 53%;
-    --orange-foreground: 0 0% 100%;
-    --orange-muted: 25 95% 94%;
-
-    /* Purple accent */
-    --purple: 271 91% 65%;
-    --purple-foreground: 0 0% 100%;
-    --purple-muted: 271 91% 94%;
-
-    /* Cyan accent */
-    --cyan: 189 94% 43%;
-    --cyan-foreground: 0 0% 100%;
-    --cyan-muted: 189 94% 94%;
-
-    /* Amber accent */
-    --amber: 38 92% 50%;
-    --amber-foreground: 0 0% 0%;
-    --amber-muted: 38 92% 94%;
-
-    /* Pink accent */
-    --pink: 330 81% 60%;
-    --pink-foreground: 0 0% 100%;
-    --pink-muted: 330 81% 94%;
-
-    /* Indigo accent */
-    --indigo: 239 84% 67%;
-    --indigo-foreground: 0 0% 100%;
-    --indigo-muted: 239 84% 94%;
-
-    /* Teal accent */
-    --teal: 168 76% 42%;
-    --teal-foreground: 0 0% 100%;
-    --teal-muted: 168 76% 94%;
-
-    /* Sidebar */
-    --sidebar-background: 224 71% 33%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 224 71% 40%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 224 71% 45%;
-    --sidebar-ring: 217 91% 60%;
-
-    /* Chart series (categorical, CVD-validated order; 6 = neutral "other") */
-    --chart-1: 217 91% 60%;
-    --chart-2: 38 92% 50%;
-    --chart-3: 168 76% 42%;
-    --chart-4: 271 91% 65%;
-    --chart-5: 142 76% 36%;
-    --chart-6: 215 16% 47%;
-
-    /* Custom gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(224 71% 33%), hsl(217 91% 60%));
-    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(210 20% 98%));
+    /* Density (A.7): `data-density` on <html> (or any container) switches these. */
+    --row-h: 40px;
+    --control-h: 36px;
+    --card-pad: 16px;
+    --cell-py: 10px;
+    --cell-px: 12px;
   }
 
+  /* Dark (default) semantic set. */
+  :root,
   .dark {
-    --background: 222 47% 8%;
-    --foreground: 210 40% 98%;
+    color-scheme: dark;
 
-    --card: 222 47% 11%;
-    --card-foreground: 210 40% 98%;
+    --background: 216 33.3% 5.9%;            /* #0A0E14 abyss-900 */
+    --foreground: 214.3 25.9% 94.7%;         /* #EEF1F5 drift-50 */
+    --card: 218.8 33.3% 10%;                 /* #111722 deep-900 */
+    --card-foreground: 214.3 25.9% 94.7%;    /* #EEF1F5 */
+    --popover: 217.1 31.3% 13.1%;            /* #171F2C deep-800 */
+    --popover-foreground: 214.3 25.9% 94.7%; /* #EEF1F5 */
+    --primary: 194.3 100% 45.1%;             /* #00AFE6 signal-500 */
+    --primary-foreground: 216 33.3% 5.9%;    /* #0A0E14 Abyss text on Signal */
+    --secondary: 216.5 29.1% 15.5%;          /* #1C2533 slate-800 (neutral, was bright blue) */
+    --secondary-foreground: 214.3 25.9% 94.7%;
+    --muted: 220 33.3% 14.1%;                /* #182030 slate-900 */
+    --muted-foreground: 218.6 13.6% 59.6%;   /* #8A94A6 drift-400 */
+    --accent: 216.5 29.9% 15.1%;             /* #1B2432 deep-700 hover surface (was bright blue) */
+    --accent-foreground: 214.3 25.9% 94.7%;
+    --destructive: 355.9 85.8% 66.9%;        /* #F3626C danger-400 */
+    --destructive-foreground: 216 33.3% 5.9%;
+    --border: 216.5 29.1% 15.5%;             /* #1C2533 slate-800, decorative only */
+    --input: 217.5 16.9% 46.3%;              /* #62718A slate-500, >= 3:1 */
+    --ring: 194.3 100% 45.1%;                /* #00AFE6 */
+    --focus: var(--ring);
 
-    --popover: 222 47% 11%;
-    --popover-foreground: 210 40% 98%;
+    /* Status (D-DS2: separate from Signal). `-muted` is the tinted surface. */
+    --success: 152.2 60% 50%;                /* #33CC85 */
+    --success-foreground: 216 33.3% 5.9%;
+    --success-muted: 156.9 44.8% 11.4%;      /* #102A20 */
+    --warning: 38 96.1% 60%;                 /* #FBB337 */
+    --warning-foreground: 216 33.3% 5.9%;
+    --warning-muted: 36.8 50.8% 12%;         /* #2E220F */
+    --info: 216.2 91.6% 72%;                 /* #76AAF9 */
+    --info-foreground: 216 33.3% 5.9%;
+    --info-muted: 217.9 50% 14.9%;           /* #132139 */
+    --critical: 355.9 85.8% 66.9%;           /* #F3626C (same meaning as destructive) */
+    --critical-foreground: 216 33.3% 5.9%;
+    --critical-muted: 354.4 44.4% 14.1%;     /* #341417 */
 
-    --primary: 217 91% 60%;
-    --primary-foreground: 222 47% 11%;
+    /* Decorative families. */
+    --orange: 24.1 94.6% 63.9%;              /* #FA924C */
+    --orange-foreground: 216 33.3% 5.9%;
+    --orange-muted: 21.8 49.3% 13.1%;        /* #321D11 */
+    --purple: 266.4 84.7% 76.9%;             /* #BE92F6 */
+    --purple-foreground: 216 33.3% 5.9%;
+    --purple-muted: 264 36.6% 16.1%;         /* #261A38 */
+    --cyan: 189 81.1% 64.7%;                 /* #5CD8EE */
+    --cyan-foreground: 216 33.3% 5.9%;
+    --cyan-muted: 191.4 60.7% 12%;           /* #0C2A31 */
+    --amber: 44.8 93.1% 60%;                 /* #F8C83A */
+    --amber-foreground: 216 33.3% 5.9%;
+    --amber-muted: 44.5 50.8% 12%;           /* #2E260F */
+    --pink: 330 80.3% 74.1%;                 /* #F288BD */
+    --pink-foreground: 216 33.3% 5.9%;
+    --pink-muted: 327.9 36.8% 14.9%;         /* #341827 */
+    --indigo: 234.2 88% 77.1%;               /* #919BF8 */
+    --indigo-foreground: 216 33.3% 5.9%;
+    --indigo-muted: 234.5 37.9% 17.1%;       /* #1B1E3C */
+    --teal: 167.9 62.4% 50%;                 /* #30CFAF */
+    --teal-foreground: 216 33.3% 5.9%;
+    --teal-muted: 169.3 50% 11%;             /* #0E2A25 */
 
-    --secondary: 224 71% 33%;
-    --secondary-foreground: 210 40% 98%;
+    /* Sidebar: anchored Abyss chrome, identical in both themes (D-DS1). */
+    --sidebar-background: 214.3 36.8% 3.7%;  /* #06090D abyss-950 */
+    --sidebar-foreground: 218.8 16.8% 80.2%; /* #C4CAD5 drift-200 */
+    --sidebar-primary: 194.3 100% 45.1%;     /* #00AFE6 */
+    --sidebar-primary-foreground: 216 33.3% 5.9%;
+    --sidebar-accent: 217.9 32.2% 11.6%;     /* #141B27 deep-850 */
+    --sidebar-accent-foreground: 214.3 25.9% 94.7%;
+    --sidebar-border: 216.7 31% 11.4%;       /* #141B26 */
+    --sidebar-ring: 194.3 100% 45.1%;
 
-    --muted: 217 33% 17%;
-    --muted-foreground: 215 20% 65%;
+    /* Charts: categorical, fixed order, 6 = neutral "Other" (gap/10 A.2). */
+    --chart-1: 188.9 80.1% 39.4%;            /* #149DB5 signal cyan */
+    --chart-2: 24.1 84.9% 46.7%;             /* #DC6312 orange */
+    --chart-3: 264.1 71.8% 66.7%;            /* #9E6DE7 violet */
+    --chart-4: 43.9 90.3% 36.5%;             /* #B18409 mustard */
+    --chart-5: 328.1 67.8% 58.6%;            /* #DD4E9A magenta */
+    --chart-6: 209 11.8% 52%;                /* #768593 neutral */
 
-    --accent: 217 91% 60%;
-    --accent-foreground: 222 47% 11%;
+    /* New semantic tokens. */
+    --overlay: 210 40% 2%;                   /* #030507 dialog / sheet / drawer backdrop */
+    --overlay-opacity: 0.7;                  /* `bg-scrim` = overlay at this alpha */
+    --field: 220 33.3% 14.1%;                /* #182030 slate-900 input / select / textarea fill */
+    --surface-sunken: 217.9 32.2% 11.6%;     /* #141B27 wells, read-only fields */
+    --signal-muted: 200 70.6% 13.3%;         /* #0A2A3A selected row, active segment */
+    --topbar: 216 33.3% 5.9%;                /* #0A0E14, used at 88% + blur */
+    --weekend: 220 33.3% 14.1%;              /* planner weekend columns, used at 50% */
+    --today: 194.3 100% 45.1%;               /* today line and marker */
+    --map-water: 214.3 36.8% 3.7%;           /* Leaflet container while tiles load */
+    /* Map marks (A.11), each >= 3:1 on --map-water (contrast.test.ts). */
+    --map-vessel: 194.3 84.4% 52.4%;         /* #1FBBEC signal-400 vessel marker */
+    --map-marker-ring: 216 33.3% 5.9%;       /* #0A0E14 2px ring round markers */
+    --map-track: 194.3 100% 45.1%;           /* #00AFE6 past track (used at 70%) */
+    --map-route: 218.8 16.8% 80.2%;          /* #C4CAD5 drift-200 planned route, dashed */
+    --map-stale: 218.6 12.3% 55.3%;          /* #7F899B drift-500 last fix > 6 h, hollow */
+    --map-cluster: 217.1 31.3% 13.1%;        /* #171F2C deep-800 cluster disc */
+    --map-cluster-foreground: 194.3 84.4% 52.4%;
+    --scrollbar-thumb: 216.4 26.9% 20.4%;    /* slate-700 */
+    --scrollbar-thumb-hover: 216 24.5% 28%;  /* slate-600 */
 
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
+    /* Gradients: sign-in hero and empty-state art only, never data surfaces. */
+    --gradient-primary: linear-gradient(135deg, hsl(198 100% 28%), hsl(194.3 100% 45.1%));
+    --gradient-card: linear-gradient(180deg, hsl(218.8 33.3% 11%), hsl(218.8 33.3% 9%));
 
-    --border: 217 33% 17%;
-    --input: 217 33% 17%;
-    --ring: 217 91% 60%;
+    /* Elevation (A.4): depth from surface steps, a top highlight and a border. */
+    --shadow-e1: inset 0 1px 0 hsl(0 0% 100% / 0.04), 0 1px 2px hsl(216 60% 2% / 0.5);
+    --shadow-e2: 0 8px 24px hsl(216 60% 2% / 0.6);
+    --shadow-e3: 0 24px 64px hsl(216 60% 2% / 0.7);
+    --shadow-glow-signal: 0 0 0 1px hsl(var(--primary) / 0.5), 0 0 16px hsl(var(--primary) / 0.25);
+  }
 
-    --sidebar-background: 222 47% 8%;
-    --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 222 47% 11%;
-    --sidebar-accent: 217 33% 17%;
-    --sidebar-accent-foreground: 210 40% 98%;
-    --sidebar-border: 217 33% 17%;
-    --sidebar-ring: 217 91% 60%;
+  /* Daylight (optional light theme). */
+  .light {
+    color-scheme: light;
 
-    /* Chart series: deeper steps of the same hues for the dark surface */
-    --chart-1: 217 91% 60%;
-    --chart-2: 32 95% 44%;
-    --chart-3: 168 77% 35%;
-    --chart-4: 271 91% 65%;
-    --chart-5: 142 76% 36%;
-    --chart-6: 215 20% 65%;
+    --background: 216 33.3% 97.1%;           /* #F5F7FA */
+    --foreground: 216 34.9% 8.4%;            /* #0E141D */
+    --card: 0 0% 100%;
+    --card-foreground: 216 34.9% 8.4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 216 34.9% 8.4%;
+    --primary: 198 100% 28%;                 /* #00648F signal-700, white text passes */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 213.3 23.1% 92.4%;          /* #E7EBF0 */
+    --secondary-foreground: 215.5 39.3% 11%;
+    --muted: 214.3 25.9% 94.7%;              /* #EEF1F5 */
+    --muted-foreground: 216.4 15.4% 35.7%;   /* #4D5869 */
+    --accent: 208 42.9% 93.1%;               /* #E6EEF5 hover surface */
+    --accent-foreground: 216 34.9% 8.4%;
+    --destructive: 355.9 72.3% 43.9%;        /* #C11F2A */
+    --destructive-foreground: 0 0% 100%;
+    --border: 214.3 20.6% 86.7%;             /* #D6DCE4 */
+    --input: 216 12.7% 53.7%;                /* #7A8698, >= 3:1 */
+    --ring: 195.3 100% 36.1%;                /* #0089B8 signal-600 */
+    --focus: var(--ring);
+
+    --success: 151.6 71.4% 26.1%;            /* #137245 */
+    --success-foreground: 0 0% 100%;
+    --success-muted: 150 44.4% 92.9%;
+    --warning: 30 92.4% 31%;                 /* #984F06 */
+    --warning-foreground: 0 0% 100%;
+    --warning-muted: 40.5 90.2% 92%;
+    --info: 217 75.7% 42%;                   /* #1A58BC */
+    --info-foreground: 0 0% 100%;
+    --info-muted: 215.5 84.6% 94.9%;
+    --critical: 355.9 72.3% 43.9%;           /* #C11F2A */
+    --critical-foreground: 0 0% 100%;
+    --critical-muted: 356.3 80% 96.1%;
+
+    --orange: 22.1 89.7% 38%;                /* #B84A0A */
+    --orange-foreground: 0 0% 100%;
+    --orange-muted: 24 90.9% 95.7%;
+    --purple: 266 60% 46.1%;                 /* #6C2FBC */
+    --purple-foreground: 0 0% 100%;
+    --purple-muted: 265.7 70% 96.1%;
+    --cyan: 190.2 89.9% 27.1%;               /* #076E83 */
+    --cyan-foreground: 0 0% 100%;
+    --cyan-muted: 189.6 71.4% 93.1%;
+    --amber: 37.9 92.2% 30%;                 /* #935F06 */
+    --amber-foreground: 0 0% 100%;
+    --amber-muted: 45.7 91.3% 91%;
+    --pink: 330 65.4% 42%;                   /* #B1256B */
+    --pink-foreground: 0 0% 100%;
+    --pink-muted: 328 71.4% 95.9%;
+    --indigo: 235.7 55.3% 50%;               /* #3943C6 */
+    --indigo-foreground: 0 0% 100%;
+    --indigo-muted: 236.3 80% 96.1%;
+    --teal: 170.2 80.3% 23.9%;               /* #0C6E5E */
+    --teal-foreground: 0 0% 100%;
+    --teal-muted: 167 56.1% 92%;
+
+    /* The sidebar stays Abyss in Daylight (anchored chrome). */
+    --sidebar-background: 214.3 36.8% 3.7%;
+    --sidebar-foreground: 218.8 16.8% 80.2%;
+    --sidebar-primary: 194.3 100% 45.1%;
+    --sidebar-primary-foreground: 216 33.3% 5.9%;
+    --sidebar-accent: 217.9 32.2% 11.6%;
+    --sidebar-accent-foreground: 214.3 25.9% 94.7%;
+    --sidebar-border: 216.7 31% 11.4%;
+    --sidebar-ring: 194.3 100% 45.1%;
+
+    --chart-1: 189 80.2% 37.6%;              /* #1396AD */
+    --chart-2: 24.1 85.1% 44.7%;             /* #D35F11 */
+    --chart-3: 263.7 72.1% 64.9%;            /* #9865E6 */
+    --chart-4: 43.9 89.9% 34.9%;             /* #A97E09 */
+    --chart-5: 328.1 68.1% 55.7%;            /* #DB4193 */
+    --chart-6: 211.3 9.8% 53.9%;             /* #7E8995 */
+
+    --overlay: 216 34.9% 8.4%;
+    --overlay-opacity: 0.4;
+    --field: 0 0% 100%;                      /* white fields on the Daylight page */
+    --surface-sunken: 214.3 30.4% 95.5%;
+    --signal-muted: 197.5 75% 93.7%;         /* #E3F4FB */
+    --topbar: 0 0% 100%;
+    --weekend: 214.3 25.9% 94.7%;
+    --today: 198 100% 28%;
+    --map-water: 210 30% 92%;
+    --map-vessel: 198 100% 28%;              /* #00648F signal-700 */
+    --map-marker-ring: 0 0% 100%;            /* white halo on light tiles */
+    --map-track: 198 100% 28%;
+    --map-route: 219.3 11.6% 48.8%;          /* #6E788B drift-600 */
+    --map-stale: 216.4 15.4% 35.7%;          /* #4D5869 */
+    --map-cluster: 0 0% 100%;
+    --map-cluster-foreground: 198 100% 28%;
+    --scrollbar-thumb: 218.2 14.3% 69.8%;    /* drift-300 */
+    --scrollbar-thumb-hover: 218.6 12.3% 55.3%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(198 100% 21.6%), hsl(195.3 100% 36.1%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(216 33.3% 98%));
+
+    --shadow-e1: 0 1px 2px hsl(215 30% 20% / 0.06), 0 1px 3px hsl(215 30% 20% / 0.08);
+    --shadow-e2: 0 4px 12px hsl(215 30% 20% / 0.1), 0 2px 4px hsl(215 30% 20% / 0.06);
+    --shadow-e3: 0 16px 48px hsl(215 30% 20% / 0.16), 0 4px 12px hsl(215 30% 20% / 0.08);
+    --shadow-glow-signal: 0 0 0 1px hsl(var(--primary) / 0.45);
+  }
+
+  /* Density (A.7). Default (desktop) is the :root set above. */
+  [data-density="comfortable"] {
+    --row-h: 44px;
+    --control-h: 44px;
+    --card-pad: 20px;
+    --cell-py: 12px;
+  }
+
+  [data-density="compact"] {
+    --row-h: 32px;
+    --control-h: 32px;
+    --card-pad: 12px;
+    --cell-py: 6px;
+  }
+
+  /* 44px touch targets even in compact density (WCAG 2.5.8). */
+  @media (pointer: coarse) {
+    [data-density="compact"] {
+      --control-h: 44px;
+    }
   }
 }
 
@@ -169,9 +327,106 @@
     @apply border-border;
   }
 
+  html {
+    background-color: hsl(var(--background));
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: theme("fontFamily.sans");
+  }
+
+  /* Tabular figures by default wherever numbers are compared (A.3). */
+  table {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Baseline focus ring for interactive elements that set none of their own.
+     Components with their own `focus-visible:` styles override this. */
+  :where(a[href], button, [role="button"], input, select, textarea, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: var(--focus-ring-width) solid hsl(var(--focus));
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  ::selection {
+    background-color: hsl(var(--primary) / 0.3);
+  }
+}
+
+/* Type scale (A.3). Named `type-*` rather than `text-*` because tailwind-merge
+   would classify an unknown `text-display` as a colour and drop it when it
+   meets `text-foreground` inside cn(). Utilities still override these. */
+@layer components {
+  .type-display-lg {
+    font-family: theme("fontFamily.display");
+    font-size: 1.75rem;
+    line-height: 2rem;
+    font-weight: 600;
+  }
+
+  .type-display {
+    font-family: theme("fontFamily.display");
+    font-size: 1.375rem;
+    line-height: 1.75rem;
+    font-weight: 600;
+  }
+
+  .type-title {
+    font-size: 1.0625rem;
+    line-height: 1.5rem;
+    font-weight: 600;
+  }
+
+  .type-subtitle {
+    font-size: 0.9375rem;
+    line-height: 1.375rem;
+    font-weight: 600;
+  }
+
+  .type-body {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+    font-weight: 400;
+  }
+
+  .type-body-sm {
+    font-size: 0.8125rem;
+    line-height: 1.125rem;
+    font-weight: 400;
+  }
+
+  .type-caption {
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 500;
+  }
+
+  .type-eyebrow {
+    font-family: theme("fontFamily.display");
+    font-size: 0.6875rem;
+    line-height: 0.875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  /* KPI numerals use Inter 600 with tabular figures (Barlow's subset is not
+     relied on for tnum). */
+  .type-kpi {
+    font-family: theme("fontFamily.sans");
+    font-size: 2rem;
+    line-height: 2.25rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  .type-mono {
+    font-family: theme("fontFamily.mono");
+    font-size: 0.78125rem;
+    line-height: 1.125rem;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums slashed-zero;
   }
 }
 
@@ -190,38 +445,51 @@
     -webkit-text-fill-color: transparent;
     background-clip: text;
   }
+
+  /* The one focus standard (A.5): keyboard focus only, never removed. */
+  .focus-ring:focus-visible {
+    outline: var(--focus-ring-width) solid hsl(var(--focus));
+    outline-offset: var(--focus-ring-offset);
+  }
+
+  /* Inset variant for matrix cells and edge-to-edge rows. */
+  .focus-ring-inset:focus-visible {
+    outline: var(--focus-ring-width) solid hsl(var(--focus));
+    outline-offset: calc(var(--focus-ring-width) * -1);
+  }
 }
 
 /* Balanced desktop density: retain comfortable mobile touch targets while
-   fitting more operational data into each authenticated workspace. */
+   fitting more operational data into each authenticated workspace. Switched
+   off when the user picks the comfortable density. */
 @media (min-width: 768px) {
-  .storm-compact .space-y-8 > :not([hidden]) ~ :not([hidden]) {
+  :root:not([data-density="comfortable"]) .storm-compact .space-y-8 > :not([hidden]) ~ :not([hidden]) {
     margin-top: 1.25rem;
   }
 
-  .storm-compact .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+  :root:not([data-density="comfortable"]) .storm-compact .space-y-6 > :not([hidden]) ~ :not([hidden]) {
     margin-top: 1rem;
   }
 
-  .storm-compact .space-y-5 > :not([hidden]) ~ :not([hidden]),
-  .storm-compact .space-y-4 > :not([hidden]) ~ :not([hidden]) {
+  :root:not([data-density="comfortable"]) .storm-compact .space-y-5 > :not([hidden]) ~ :not([hidden]),
+  :root:not([data-density="comfortable"]) .storm-compact .space-y-4 > :not([hidden]) ~ :not([hidden]) {
     margin-top: 0.75rem;
   }
 
-  .storm-compact .gap-8 { gap: 1.25rem; }
-  .storm-compact .gap-6 { gap: 1rem; }
-  .storm-compact .gap-5,
-  .storm-compact .gap-4 { gap: 0.75rem; }
+  :root:not([data-density="comfortable"]) .storm-compact .gap-8 { gap: 1.25rem; }
+  :root:not([data-density="comfortable"]) .storm-compact .gap-6 { gap: 1rem; }
+  :root:not([data-density="comfortable"]) .storm-compact .gap-5,
+  :root:not([data-density="comfortable"]) .storm-compact .gap-4 { gap: 0.75rem; }
 
-  .storm-compact .py-8 { padding-top: 1.25rem; padding-bottom: 1.25rem; }
-  .storm-compact .p-8 { padding: 1.25rem; }
-  .storm-compact .p-6 { padding: 1rem; }
-  .storm-compact .px-6 { padding-left: 1rem; padding-right: 1rem; }
-  .storm-compact .py-6 { padding-top: 1rem; padding-bottom: 1rem; }
-  .storm-compact .mb-8 { margin-bottom: 1.25rem; }
-  .storm-compact .mb-6 { margin-bottom: 1rem; }
-  .storm-compact .mt-8 { margin-top: 1.25rem; }
-  .storm-compact .mt-6 { margin-top: 1rem; }
+  :root:not([data-density="comfortable"]) .storm-compact .py-8 { padding-top: 1.25rem; padding-bottom: 1.25rem; }
+  :root:not([data-density="comfortable"]) .storm-compact .p-8 { padding: 1.25rem; }
+  :root:not([data-density="comfortable"]) .storm-compact .p-6 { padding: 1rem; }
+  :root:not([data-density="comfortable"]) .storm-compact .px-6 { padding-left: 1rem; padding-right: 1rem; }
+  :root:not([data-density="comfortable"]) .storm-compact .py-6 { padding-top: 1rem; padding-bottom: 1rem; }
+  :root:not([data-density="comfortable"]) .storm-compact .mb-8 { margin-bottom: 1.25rem; }
+  :root:not([data-density="comfortable"]) .storm-compact .mb-6 { margin-bottom: 1rem; }
+  :root:not([data-density="comfortable"]) .storm-compact .mt-8 { margin-top: 1.25rem; }
+  :root:not([data-density="comfortable"]) .storm-compact .mt-6 { margin-top: 1rem; }
 }
 
 /* Custom scrollbar */
@@ -231,31 +499,519 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(var(--muted));
-  border-radius: 4px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--muted-foreground) / 0.3);
+  background: hsl(var(--scrollbar-thumb));
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--muted-foreground) / 0.5);
+  background: hsl(var(--scrollbar-thumb-hover));
 }
 
-/* Leaflet overrides */
-.vessel-marker, .port-marker {
-  background: transparent !important;
-  border: none !important;
+/*
+ * Maps (gap/10 DS17, §A.11). Surfaces, popups, controls and marks come from
+ * tokens, so a map follows the theme without re-rendering. The shared helper
+ * src/shared/components/data/mapTheme.ts picks the basemap per theme (CARTO
+ * dark_all / light_all) and builds markers, tracks and popups with the
+ * classes below. leaflet.css loads later from the map chunks, hence the
+ * !important on the rules it would otherwise override. SVG marks are styled
+ * by class because CSS beats Leaflet's colour attributes and var() is not
+ * valid inside an SVG presentation attribute.
+ */
+.leaflet-container {
+  background-color: hsl(var(--map-water)) !important;
+  font-family: inherit !important;
+  /* Leaflet's panes and controls use z-index 400–1000; keep them inside the
+     map so they never draw over dialogs, sheets and menus (z-50). */
+  isolation: isolate;
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: hsl(var(--popover)) !important;
+  color: hsl(var(--popover-foreground)) !important;
+  box-shadow: var(--shadow-e2) !important;
 }
 
 .leaflet-popup-content-wrapper {
-  border-radius: 8px !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius) !important;
 }
 
 .leaflet-popup-content {
   margin: 10px 14px !important;
   font-family: inherit !important;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
 }
+
+.leaflet-container a.leaflet-popup-close-button {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: hsl(var(--foreground)) !important;
+}
+
+.leaflet-bar a,
+.leaflet-bar a:hover {
+  background-color: hsl(var(--popover)) !important;
+  color: hsl(var(--popover-foreground)) !important;
+  border-bottom-color: hsl(var(--border)) !important;
+}
+
+.leaflet-bar a:hover {
+  background-color: hsl(var(--accent)) !important;
+}
+
+.leaflet-bar {
+  border: 1px solid hsl(var(--border)) !important;
+  box-shadow: var(--shadow-e1) !important;
+}
+
+.leaflet-tooltip {
+  background: hsl(var(--popover)) !important;
+  color: hsl(var(--popover-foreground)) !important;
+  border: 1px solid hsl(var(--border)) !important;
+  box-shadow: var(--shadow-e2) !important;
+  font-family: inherit;
+}
+
+.leaflet-tooltip-top::before {
+  border-top-color: hsl(var(--border)) !important;
+}
+
+.leaflet-control-attribution {
+  background: hsl(var(--background) / 0.7) !important;
+  color: hsl(var(--muted-foreground)) !important;
+  font-size: 11px;
+}
+
+.leaflet-control-attribution a {
+  color: hsl(var(--primary)) !important;
+}
+
+/* Popup content (mapTheme `popupHtml`). */
+.storm-map-popup__title {
+  margin: 0 0 2px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: hsl(var(--popover-foreground));
+}
+
+.storm-map-popup__meta {
+  margin: 0;
+  font-size: 0.75rem;
+  color: hsl(var(--muted-foreground));
+}
+
+.storm-map-popup__chip {
+  display: inline-block;
+  margin: 6px 0 2px;
+  padding: 1px 8px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 9999px;
+  background: hsl(var(--muted));
+  color: hsl(var(--muted-foreground));
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.storm-map-popup__grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 10px;
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.storm-map-popup__grid dt {
+  color: hsl(var(--muted-foreground));
+}
+
+.storm-map-popup__grid dd {
+  margin: 0;
+}
+
+.storm-map-popup__body {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+}
+
+.storm-map-popup__list {
+  max-height: 120px;
+  margin: 8px 0 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  font-size: 0.6875rem;
+}
+
+.storm-map-popup__list li {
+  padding: 2px 0;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.storm-map-popup__footer {
+  margin: 6px 0 0;
+  font-family: theme("fontFamily.mono");
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums slashed-zero;
+  color: hsl(var(--muted-foreground));
+}
+
+/* Markers (mapTheme icons). The div icon itself carries no box. */
+.storm-map-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.storm-map-vessel {
+  position: relative;
+  display: block;
+  color: hsl(var(--map-vessel));
+}
+
+.storm-map-vessel svg,
+.storm-map-port svg,
+.storm-map-glyph svg {
+  display: block;
+  overflow: visible;
+}
+
+.storm-map-vessel .storm-map-ring,
+.storm-map-port .storm-map-ring,
+.storm-map-glyph .storm-map-ring {
+  stroke: hsl(var(--map-marker-ring));
+}
+
+.storm-map-vessel--stale {
+  color: hsl(var(--map-stale));
+}
+
+.storm-map-vessel--selected svg {
+  filter: drop-shadow(0 0 3px hsl(var(--primary))) drop-shadow(0 0 8px hsl(var(--primary) / 0.5));
+}
+
+.storm-map-alert {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  box-shadow: 0 0 0 2px hsl(var(--map-marker-ring));
+}
+
+.storm-map-alert--danger {
+  background: hsl(var(--critical));
+}
+
+.storm-map-alert--warn {
+  background: hsl(var(--warning));
+}
+
+.storm-map-port--major {
+  color: hsl(var(--chart-2));
+}
+
+.storm-map-port--marina {
+  color: hsl(var(--chart-3));
+}
+
+.storm-map-port--shipyard {
+  color: hsl(var(--chart-4));
+}
+
+.storm-map-glyph {
+  display: inline-block;
+  color: hsl(var(--map-vessel));
+}
+
+.storm-map-label {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 9999px;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  box-shadow: var(--shadow-e1);
+}
+
+.storm-map-waypoint {
+  display: flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid hsl(var(--map-marker-ring));
+  border-radius: 9999px;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  box-shadow: var(--shadow-e2);
+  cursor: grab;
+}
+
+.storm-map-cluster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid hsl(var(--border));
+  border-radius: 9999px;
+  background: hsl(var(--map-cluster));
+  color: hsl(var(--map-cluster-foreground));
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Lines and circles (mapTheme path styles). */
+path.storm-map-track {
+  stroke: hsl(var(--map-track));
+}
+
+path.storm-map-route {
+  stroke: hsl(var(--map-route));
+}
+
+path.storm-map-heat--high {
+  stroke: hsl(var(--success));
+  fill: hsl(var(--success));
+}
+
+path.storm-map-heat--medium {
+  stroke: hsl(var(--warning));
+  fill: hsl(var(--warning));
+}
+
+path.storm-map-heat--low {
+  stroke: hsl(var(--info));
+  fill: hsl(var(--info));
+}
+
+/* Print and PDF stay light (gap/10 DS23): paper never gets the dark set. */
+@media print {
+  :root,
+  .dark,
+  .light {
+    color-scheme: light;
+
+    --background: 0 0% 100%;
+    --foreground: 216 34.9% 8.4%;
+    --card: 0 0% 100%;
+    --card-foreground: 216 34.9% 8.4%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 216 34.9% 8.4%;
+    --primary: 198 100% 28%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 213.3 23.1% 92.4%;
+    --secondary-foreground: 215.5 39.3% 11%;
+    --muted: 214.3 25.9% 94.7%;
+    --muted-foreground: 216.4 15.4% 35.7%;
+    --accent: 208 42.9% 93.1%;
+    --accent-foreground: 216 34.9% 8.4%;
+    --destructive: 355.9 72.3% 43.9%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214.3 20.6% 86.7%;
+    --input: 216 12.7% 53.7%;
+    --field: 0 0% 100%;
+    --success: 151.6 71.4% 26.1%;
+    --success-muted: 150 44.4% 92.9%;
+    --warning: 30 92.4% 31%;
+    --warning-muted: 40.5 90.2% 92%;
+    --info: 217 75.7% 42%;
+    --info-muted: 215.5 84.6% 94.9%;
+    --critical: 355.9 72.3% 43.9%;
+    --critical-muted: 356.3 80% 96.1%;
+    --shadow-e1: none;
+    --shadow-e2: none;
+    --shadow-e3: none;
+    --shadow-glow-signal: none;
+  }
+}
+
+/* Reduced motion (A.6): transitions and animations collapse to <= 1ms and
+   loops stop (spinners and skeleton shimmer become static). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * ---------------------------------------------------------------------------
+ * TEMPORARY legacy dark compatibility layer (gap/10 §C.1, §C.3).
+ *
+ * Remaps the most common hard-coded light palette classes in legacy module
+ * code onto Abyss tokens while `.dark` is active, so those pages look
+ * intentional before the colour codemod (BUILD-PLAN S7/H1) rewrites them.
+ * Each rule has the specificity of the class it replaces and sits after the
+ * utilities, so explicit `dark:`/`hover:`/state variants still win. Wrap a
+ * subtree in `.light` to opt out. The last two rules apply in BOTH themes:
+ * `text-/border-secondary|accent` meant "brand blue" before Abyss and are
+ * neutral surfaces now, so they map to primary until the call sites move to
+ * `text-primary`. Generated by
+ * scripts/design/legacy-dark-compat.mjs (`--write` to regenerate, `--check`
+ * in tests). DELETE this block when the palette ratchet (A10) reaches zero
+ * for the remapped classes. Never add new code that relies on it.
+ * ---------------------------------------------------------------------------
+ */
+/* @legacy-dark-compat:start (generated by scripts/design/legacy-dark-compat.mjs; do not edit by hand) */
+/* White cards and panels → card surface (replaced elements keep real white) */
+:where(.dark) :is(.bg-white):where(:not(img, canvas, svg, video, picture, iframe)) { background-color: hsl(var(--card)); }
+:where(.dark) :is(.bg-white\/50) { background-color: hsl(var(--card) / 0.5); }
+:where(.dark) :is(.bg-white\/60) { background-color: hsl(var(--card) / 0.6); }
+:where(.dark) :is(.bg-white\/70) { background-color: hsl(var(--card) / 0.7); }
+:where(.dark) :is(.bg-white\/80) { background-color: hsl(var(--card) / 0.8); }
+:where(.dark) :is(.bg-white\/90) { background-color: hsl(var(--card) / 0.9); }
+:where(.dark) :is(.bg-white\/95) { background-color: hsl(var(--card) / 0.95); }
+/* Light grey wells → muted */
+:where(.dark) :is(.bg-gray-50, .bg-gray-100, .bg-slate-50, .bg-slate-100, .bg-zinc-50, .bg-zinc-100, .bg-neutral-50, .bg-neutral-100, .bg-stone-50, .bg-stone-100) { background-color: hsl(var(--muted)); }
+/* Mid grey fills → secondary */
+:where(.dark) :is(.bg-gray-200, .bg-slate-200, .bg-zinc-200, .bg-neutral-200, .bg-stone-200) { background-color: hsl(var(--secondary)); }
+/* Grey hovers → accent (hover surface) */
+:where(.dark) :is(.hover\:bg-white:hover, .hover\:bg-gray-50:hover, .hover\:bg-gray-100:hover, .hover\:bg-gray-200:hover, .hover\:bg-slate-50:hover, .hover\:bg-slate-100:hover, .hover\:bg-slate-200:hover, .hover\:bg-zinc-50:hover, .hover\:bg-zinc-100:hover, .hover\:bg-zinc-200:hover, .hover\:bg-neutral-50:hover, .hover\:bg-neutral-100:hover, .hover\:bg-neutral-200:hover, .hover\:bg-stone-50:hover, .hover\:bg-stone-100:hover, .hover\:bg-stone-200:hover) { background-color: hsl(var(--accent)); }
+/* Dark ink → foreground */
+:where(.dark) :is(.text-black, .text-gray-800, .text-gray-900, .text-gray-950, .text-slate-800, .text-slate-900, .text-slate-950, .text-zinc-800, .text-zinc-900, .text-zinc-950, .text-neutral-800, .text-neutral-900, .text-neutral-950, .text-stone-800, .text-stone-900, .text-stone-950) { color: hsl(var(--foreground)); }
+/* Grey secondary text → muted-foreground */
+:where(.dark) :is(.text-gray-400, .text-gray-500, .text-gray-600, .text-gray-700, .text-slate-400, .text-slate-500, .text-slate-600, .text-slate-700, .text-zinc-400, .text-zinc-500, .text-zinc-600, .text-zinc-700, .text-neutral-400, .text-neutral-500, .text-neutral-600, .text-neutral-700, .text-stone-400, .text-stone-500, .text-stone-600, .text-stone-700) { color: hsl(var(--muted-foreground)); }
+/* Grey hover text → foreground */
+:where(.dark) :is(.hover\:text-gray-600:hover, .hover\:text-gray-700:hover, .hover\:text-gray-800:hover, .hover\:text-gray-900:hover, .hover\:text-slate-600:hover, .hover\:text-slate-700:hover, .hover\:text-slate-800:hover, .hover\:text-slate-900:hover, .hover\:text-zinc-600:hover, .hover\:text-zinc-700:hover, .hover\:text-zinc-800:hover, .hover\:text-zinc-900:hover, .hover\:text-neutral-600:hover, .hover\:text-neutral-700:hover, .hover\:text-neutral-800:hover, .hover\:text-neutral-900:hover, .hover\:text-stone-600:hover, .hover\:text-stone-700:hover, .hover\:text-stone-800:hover, .hover\:text-stone-900:hover) { color: hsl(var(--foreground)); }
+/* Light borders → border */
+:where(.dark) :is(.border-gray-100, .border-gray-200, .border-gray-300, .border-slate-100, .border-slate-200, .border-slate-300, .border-zinc-100, .border-zinc-200, .border-zinc-300, .border-neutral-100, .border-neutral-200, .border-neutral-300, .border-stone-100, .border-stone-200, .border-stone-300, .border-black\/5, .border-black\/10, .border-black\/15, .border-black\/20) { border-color: hsl(var(--border)); }
+/* Light dividers → border */
+:where(.dark) :is(.divide-gray-100 > :not([hidden]) ~ :not([hidden]), .divide-gray-200 > :not([hidden]) ~ :not([hidden]), .divide-gray-300 > :not([hidden]) ~ :not([hidden]), .divide-slate-100 > :not([hidden]) ~ :not([hidden]), .divide-slate-200 > :not([hidden]) ~ :not([hidden]), .divide-slate-300 > :not([hidden]) ~ :not([hidden]), .divide-zinc-100 > :not([hidden]) ~ :not([hidden]), .divide-zinc-200 > :not([hidden]) ~ :not([hidden]), .divide-zinc-300 > :not([hidden]) ~ :not([hidden]), .divide-neutral-100 > :not([hidden]) ~ :not([hidden]), .divide-neutral-200 > :not([hidden]) ~ :not([hidden]), .divide-neutral-300 > :not([hidden]) ~ :not([hidden]), .divide-stone-100 > :not([hidden]) ~ :not([hidden]), .divide-stone-200 > :not([hidden]) ~ :not([hidden]), .divide-stone-300 > :not([hidden]) ~ :not([hidden]), .divide-black\/5 > :not([hidden]) ~ :not([hidden]), .divide-black\/10 > :not([hidden]) ~ :not([hidden])) { border-color: hsl(var(--border)); }
+/* Solid black outlines → input-strength border */
+:where(.dark) :is(.border-black) { border-color: hsl(var(--input)); }
+/* red → critical */
+:where(.dark) :is(.bg-red-50, .bg-red-100, .bg-red-200) { background-color: hsl(var(--critical-muted)); }
+:where(.dark) :is(.hover\:bg-red-50:hover, .hover\:bg-red-100:hover, .hover\:bg-red-200:hover) { background-color: hsl(var(--critical-muted)); }
+:where(.dark) :is(.text-red-600, .text-red-700, .text-red-800, .text-red-900, .text-red-950) { color: hsl(var(--critical)); }
+:where(.dark) :is(.hover\:text-red-600:hover, .hover\:text-red-700:hover, .hover\:text-red-800:hover, .hover\:text-red-900:hover) { color: hsl(var(--critical)); }
+:where(.dark) :is(.border-red-100, .border-red-200, .border-red-300) { border-color: hsl(var(--critical) / 0.35); }
+/* rose → critical */
+:where(.dark) :is(.bg-rose-50, .bg-rose-100, .bg-rose-200) { background-color: hsl(var(--critical-muted)); }
+:where(.dark) :is(.hover\:bg-rose-50:hover, .hover\:bg-rose-100:hover, .hover\:bg-rose-200:hover) { background-color: hsl(var(--critical-muted)); }
+:where(.dark) :is(.text-rose-600, .text-rose-700, .text-rose-800, .text-rose-900, .text-rose-950) { color: hsl(var(--critical)); }
+:where(.dark) :is(.hover\:text-rose-600:hover, .hover\:text-rose-700:hover, .hover\:text-rose-800:hover, .hover\:text-rose-900:hover) { color: hsl(var(--critical)); }
+:where(.dark) :is(.border-rose-100, .border-rose-200, .border-rose-300) { border-color: hsl(var(--critical) / 0.35); }
+/* orange → orange */
+:where(.dark) :is(.bg-orange-50, .bg-orange-100, .bg-orange-200) { background-color: hsl(var(--orange-muted)); }
+:where(.dark) :is(.hover\:bg-orange-50:hover, .hover\:bg-orange-100:hover, .hover\:bg-orange-200:hover) { background-color: hsl(var(--orange-muted)); }
+:where(.dark) :is(.text-orange-600, .text-orange-700, .text-orange-800, .text-orange-900, .text-orange-950) { color: hsl(var(--orange)); }
+:where(.dark) :is(.hover\:text-orange-600:hover, .hover\:text-orange-700:hover, .hover\:text-orange-800:hover, .hover\:text-orange-900:hover) { color: hsl(var(--orange)); }
+:where(.dark) :is(.border-orange-100, .border-orange-200, .border-orange-300) { border-color: hsl(var(--orange) / 0.35); }
+/* amber → amber */
+:where(.dark) :is(.bg-amber-50, .bg-amber-100, .bg-amber-200) { background-color: hsl(var(--amber-muted)); }
+:where(.dark) :is(.hover\:bg-amber-50:hover, .hover\:bg-amber-100:hover, .hover\:bg-amber-200:hover) { background-color: hsl(var(--amber-muted)); }
+:where(.dark) :is(.text-amber-600, .text-amber-700, .text-amber-800, .text-amber-900, .text-amber-950) { color: hsl(var(--amber)); }
+:where(.dark) :is(.hover\:text-amber-600:hover, .hover\:text-amber-700:hover, .hover\:text-amber-800:hover, .hover\:text-amber-900:hover) { color: hsl(var(--amber)); }
+:where(.dark) :is(.border-amber-100, .border-amber-200, .border-amber-300) { border-color: hsl(var(--amber) / 0.35); }
+/* yellow → warning */
+:where(.dark) :is(.bg-yellow-50, .bg-yellow-100, .bg-yellow-200) { background-color: hsl(var(--warning-muted)); }
+:where(.dark) :is(.hover\:bg-yellow-50:hover, .hover\:bg-yellow-100:hover, .hover\:bg-yellow-200:hover) { background-color: hsl(var(--warning-muted)); }
+:where(.dark) :is(.text-yellow-600, .text-yellow-700, .text-yellow-800, .text-yellow-900, .text-yellow-950) { color: hsl(var(--warning)); }
+:where(.dark) :is(.hover\:text-yellow-600:hover, .hover\:text-yellow-700:hover, .hover\:text-yellow-800:hover, .hover\:text-yellow-900:hover) { color: hsl(var(--warning)); }
+:where(.dark) :is(.border-yellow-100, .border-yellow-200, .border-yellow-300) { border-color: hsl(var(--warning) / 0.35); }
+/* lime → success */
+:where(.dark) :is(.bg-lime-50, .bg-lime-100, .bg-lime-200) { background-color: hsl(var(--success-muted)); }
+:where(.dark) :is(.hover\:bg-lime-50:hover, .hover\:bg-lime-100:hover, .hover\:bg-lime-200:hover) { background-color: hsl(var(--success-muted)); }
+:where(.dark) :is(.text-lime-600, .text-lime-700, .text-lime-800, .text-lime-900, .text-lime-950) { color: hsl(var(--success)); }
+:where(.dark) :is(.hover\:text-lime-600:hover, .hover\:text-lime-700:hover, .hover\:text-lime-800:hover, .hover\:text-lime-900:hover) { color: hsl(var(--success)); }
+:where(.dark) :is(.border-lime-100, .border-lime-200, .border-lime-300) { border-color: hsl(var(--success) / 0.35); }
+/* green → success */
+:where(.dark) :is(.bg-green-50, .bg-green-100, .bg-green-200) { background-color: hsl(var(--success-muted)); }
+:where(.dark) :is(.hover\:bg-green-50:hover, .hover\:bg-green-100:hover, .hover\:bg-green-200:hover) { background-color: hsl(var(--success-muted)); }
+:where(.dark) :is(.text-green-600, .text-green-700, .text-green-800, .text-green-900, .text-green-950) { color: hsl(var(--success)); }
+:where(.dark) :is(.hover\:text-green-600:hover, .hover\:text-green-700:hover, .hover\:text-green-800:hover, .hover\:text-green-900:hover) { color: hsl(var(--success)); }
+:where(.dark) :is(.border-green-100, .border-green-200, .border-green-300) { border-color: hsl(var(--success) / 0.35); }
+/* emerald → success */
+:where(.dark) :is(.bg-emerald-50, .bg-emerald-100, .bg-emerald-200) { background-color: hsl(var(--success-muted)); }
+:where(.dark) :is(.hover\:bg-emerald-50:hover, .hover\:bg-emerald-100:hover, .hover\:bg-emerald-200:hover) { background-color: hsl(var(--success-muted)); }
+:where(.dark) :is(.text-emerald-600, .text-emerald-700, .text-emerald-800, .text-emerald-900, .text-emerald-950) { color: hsl(var(--success)); }
+:where(.dark) :is(.hover\:text-emerald-600:hover, .hover\:text-emerald-700:hover, .hover\:text-emerald-800:hover, .hover\:text-emerald-900:hover) { color: hsl(var(--success)); }
+:where(.dark) :is(.border-emerald-100, .border-emerald-200, .border-emerald-300) { border-color: hsl(var(--success) / 0.35); }
+/* teal → teal */
+:where(.dark) :is(.bg-teal-50, .bg-teal-100, .bg-teal-200) { background-color: hsl(var(--teal-muted)); }
+:where(.dark) :is(.hover\:bg-teal-50:hover, .hover\:bg-teal-100:hover, .hover\:bg-teal-200:hover) { background-color: hsl(var(--teal-muted)); }
+:where(.dark) :is(.text-teal-600, .text-teal-700, .text-teal-800, .text-teal-900, .text-teal-950) { color: hsl(var(--teal)); }
+:where(.dark) :is(.hover\:text-teal-600:hover, .hover\:text-teal-700:hover, .hover\:text-teal-800:hover, .hover\:text-teal-900:hover) { color: hsl(var(--teal)); }
+:where(.dark) :is(.border-teal-100, .border-teal-200, .border-teal-300) { border-color: hsl(var(--teal) / 0.35); }
+/* cyan → cyan */
+:where(.dark) :is(.bg-cyan-50, .bg-cyan-100, .bg-cyan-200) { background-color: hsl(var(--cyan-muted)); }
+:where(.dark) :is(.hover\:bg-cyan-50:hover, .hover\:bg-cyan-100:hover, .hover\:bg-cyan-200:hover) { background-color: hsl(var(--cyan-muted)); }
+:where(.dark) :is(.text-cyan-600, .text-cyan-700, .text-cyan-800, .text-cyan-900, .text-cyan-950) { color: hsl(var(--cyan)); }
+:where(.dark) :is(.hover\:text-cyan-600:hover, .hover\:text-cyan-700:hover, .hover\:text-cyan-800:hover, .hover\:text-cyan-900:hover) { color: hsl(var(--cyan)); }
+:where(.dark) :is(.border-cyan-100, .border-cyan-200, .border-cyan-300) { border-color: hsl(var(--cyan) / 0.35); }
+/* sky → info */
+:where(.dark) :is(.bg-sky-50, .bg-sky-100, .bg-sky-200) { background-color: hsl(var(--info-muted)); }
+:where(.dark) :is(.hover\:bg-sky-50:hover, .hover\:bg-sky-100:hover, .hover\:bg-sky-200:hover) { background-color: hsl(var(--info-muted)); }
+:where(.dark) :is(.text-sky-600, .text-sky-700, .text-sky-800, .text-sky-900, .text-sky-950) { color: hsl(var(--info)); }
+:where(.dark) :is(.hover\:text-sky-600:hover, .hover\:text-sky-700:hover, .hover\:text-sky-800:hover, .hover\:text-sky-900:hover) { color: hsl(var(--info)); }
+:where(.dark) :is(.border-sky-100, .border-sky-200, .border-sky-300) { border-color: hsl(var(--info) / 0.35); }
+/* blue → info */
+:where(.dark) :is(.bg-blue-50, .bg-blue-100, .bg-blue-200) { background-color: hsl(var(--info-muted)); }
+:where(.dark) :is(.hover\:bg-blue-50:hover, .hover\:bg-blue-100:hover, .hover\:bg-blue-200:hover) { background-color: hsl(var(--info-muted)); }
+:where(.dark) :is(.text-blue-600, .text-blue-700, .text-blue-800, .text-blue-900, .text-blue-950) { color: hsl(var(--info)); }
+:where(.dark) :is(.hover\:text-blue-600:hover, .hover\:text-blue-700:hover, .hover\:text-blue-800:hover, .hover\:text-blue-900:hover) { color: hsl(var(--info)); }
+:where(.dark) :is(.border-blue-100, .border-blue-200, .border-blue-300) { border-color: hsl(var(--info) / 0.35); }
+/* indigo → indigo */
+:where(.dark) :is(.bg-indigo-50, .bg-indigo-100, .bg-indigo-200) { background-color: hsl(var(--indigo-muted)); }
+:where(.dark) :is(.hover\:bg-indigo-50:hover, .hover\:bg-indigo-100:hover, .hover\:bg-indigo-200:hover) { background-color: hsl(var(--indigo-muted)); }
+:where(.dark) :is(.text-indigo-500, .text-indigo-600, .text-indigo-700, .text-indigo-800, .text-indigo-900, .text-indigo-950) { color: hsl(var(--indigo)); }
+:where(.dark) :is(.hover\:text-indigo-600:hover, .hover\:text-indigo-700:hover, .hover\:text-indigo-800:hover, .hover\:text-indigo-900:hover) { color: hsl(var(--indigo)); }
+:where(.dark) :is(.border-indigo-100, .border-indigo-200, .border-indigo-300) { border-color: hsl(var(--indigo) / 0.35); }
+/* violet → purple */
+:where(.dark) :is(.bg-violet-50, .bg-violet-100, .bg-violet-200) { background-color: hsl(var(--purple-muted)); }
+:where(.dark) :is(.hover\:bg-violet-50:hover, .hover\:bg-violet-100:hover, .hover\:bg-violet-200:hover) { background-color: hsl(var(--purple-muted)); }
+:where(.dark) :is(.text-violet-500, .text-violet-600, .text-violet-700, .text-violet-800, .text-violet-900, .text-violet-950) { color: hsl(var(--purple)); }
+:where(.dark) :is(.hover\:text-violet-600:hover, .hover\:text-violet-700:hover, .hover\:text-violet-800:hover, .hover\:text-violet-900:hover) { color: hsl(var(--purple)); }
+:where(.dark) :is(.border-violet-100, .border-violet-200, .border-violet-300) { border-color: hsl(var(--purple) / 0.35); }
+/* purple → purple */
+:where(.dark) :is(.bg-purple-50, .bg-purple-100, .bg-purple-200) { background-color: hsl(var(--purple-muted)); }
+:where(.dark) :is(.hover\:bg-purple-50:hover, .hover\:bg-purple-100:hover, .hover\:bg-purple-200:hover) { background-color: hsl(var(--purple-muted)); }
+:where(.dark) :is(.text-purple-600, .text-purple-700, .text-purple-800, .text-purple-900, .text-purple-950) { color: hsl(var(--purple)); }
+:where(.dark) :is(.hover\:text-purple-600:hover, .hover\:text-purple-700:hover, .hover\:text-purple-800:hover, .hover\:text-purple-900:hover) { color: hsl(var(--purple)); }
+:where(.dark) :is(.border-purple-100, .border-purple-200, .border-purple-300) { border-color: hsl(var(--purple) / 0.35); }
+/* fuchsia → pink */
+:where(.dark) :is(.bg-fuchsia-50, .bg-fuchsia-100, .bg-fuchsia-200) { background-color: hsl(var(--pink-muted)); }
+:where(.dark) :is(.hover\:bg-fuchsia-50:hover, .hover\:bg-fuchsia-100:hover, .hover\:bg-fuchsia-200:hover) { background-color: hsl(var(--pink-muted)); }
+:where(.dark) :is(.text-fuchsia-600, .text-fuchsia-700, .text-fuchsia-800, .text-fuchsia-900, .text-fuchsia-950) { color: hsl(var(--pink)); }
+:where(.dark) :is(.hover\:text-fuchsia-600:hover, .hover\:text-fuchsia-700:hover, .hover\:text-fuchsia-800:hover, .hover\:text-fuchsia-900:hover) { color: hsl(var(--pink)); }
+:where(.dark) :is(.border-fuchsia-100, .border-fuchsia-200, .border-fuchsia-300) { border-color: hsl(var(--pink) / 0.35); }
+/* pink → pink */
+:where(.dark) :is(.bg-pink-50, .bg-pink-100, .bg-pink-200) { background-color: hsl(var(--pink-muted)); }
+:where(.dark) :is(.hover\:bg-pink-50:hover, .hover\:bg-pink-100:hover, .hover\:bg-pink-200:hover) { background-color: hsl(var(--pink-muted)); }
+:where(.dark) :is(.text-pink-600, .text-pink-700, .text-pink-800, .text-pink-900, .text-pink-950) { color: hsl(var(--pink)); }
+:where(.dark) :is(.hover\:text-pink-600:hover, .hover\:text-pink-700:hover, .hover\:text-pink-800:hover, .hover\:text-pink-900:hover) { color: hsl(var(--pink)); }
+:where(.dark) :is(.border-pink-100, .border-pink-200, .border-pink-300) { border-color: hsl(var(--pink) / 0.35); }
+/* White text on token fills → the fill's foreground */
+:where(.dark) :is(.bg-primary.text-white) { color: hsl(var(--primary-foreground)); }
+:where(.dark) :is(.bg-destructive.text-white) { color: hsl(var(--destructive-foreground)); }
+:where(.dark) :is(.bg-success.text-white) { color: hsl(var(--success-foreground)); }
+:where(.dark) :is(.bg-warning.text-white) { color: hsl(var(--warning-foreground)); }
+:where(.dark) :is(.bg-info.text-white) { color: hsl(var(--info-foreground)); }
+:where(.dark) :is(.bg-critical.text-white) { color: hsl(var(--critical-foreground)); }
+:where(.dark) :is(.bg-orange.text-white) { color: hsl(var(--orange-foreground)); }
+:where(.dark) :is(.bg-purple.text-white) { color: hsl(var(--purple-foreground)); }
+:where(.dark) :is(.bg-cyan.text-white) { color: hsl(var(--cyan-foreground)); }
+:where(.dark) :is(.bg-amber.text-white) { color: hsl(var(--amber-foreground)); }
+:where(.dark) :is(.bg-pink.text-white) { color: hsl(var(--pink-foreground)); }
+:where(.dark) :is(.bg-indigo.text-white) { color: hsl(var(--indigo-foreground)); }
+:where(.dark) :is(.bg-teal.text-white) { color: hsl(var(--teal-foreground)); }
+/* @legacy-dark-compat:end */

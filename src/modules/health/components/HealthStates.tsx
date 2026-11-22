@@ -4,31 +4,25 @@ import { Link } from 'react-router-dom';
 import { Lock, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { EmptyState, PageError, PageLoading } from '@/shared/components/states';
+
+/*
+ * Loading, error and empty bodies are the shared page states
+ * (src/shared/components/states, BUILD-PLAN A7). These wrappers keep the
+ * Health names and props so existing pages need no change.
+ */
 
 /** Standard loading body for a health page. */
 export const HealthLoading: React.FC<{ rows?: number }> = ({ rows = 3 }) => (
-  <div className="space-y-4">
-    <Skeleton className="h-24 w-full" />
-    {Array.from({ length: rows }).map((_, i) => (
-      <Skeleton key={i} className="h-16 w-full" />
-    ))}
-  </div>
+  <PageLoading variant="list" rows={rows} label="Loading health records" />
 );
 
-/** Standard error body. */
+/** Standard error body. A missing table reads as "Not available yet" (DECISIONS D-01). */
 export const HealthError: React.FC<{ title?: string; error: unknown }> = ({
   title = 'Could not load this page',
   error,
-}) => (
-  <Alert variant="destructive">
-    <AlertTitle>{title}</AlertTitle>
-    <AlertDescription>
-      {error instanceof Error ? error.message : 'Unknown error'}
-    </AlertDescription>
-  </Alert>
-);
+}) => <PageError variant="inline" title={title} error={error} />;
 
 interface EmptyStateProps {
   icon: LucideIcon;
@@ -40,25 +34,22 @@ interface EmptyStateProps {
 
 /** Standard empty body: says what is missing and offers the way to fix it. */
 export const HealthEmpty: React.FC<EmptyStateProps> = ({
-  icon: Icon,
+  icon,
   title,
   description,
   action,
   className,
 }) => (
-  <div
-    className={cn(
-      'flex flex-col items-center justify-center rounded-lg border border-dashed p-10 text-center',
-      className,
-    )}
-  >
-    <Icon className="mb-3 h-10 w-10 text-muted-foreground/40" />
-    <p className="text-base font-medium text-foreground">{title}</p>
-    {description && (
-      <p className="mt-1 max-w-md text-sm text-muted-foreground">{description}</p>
-    )}
-    {action && <div className="mt-4">{action}</div>}
-  </div>
+  <EmptyState
+    kind="first-use"
+    icon={icon}
+    title={title}
+    body={description ?? null}
+    action={action}
+    headingLevel={3}
+    bordered
+    className={className}
+  />
 );
 
 /**

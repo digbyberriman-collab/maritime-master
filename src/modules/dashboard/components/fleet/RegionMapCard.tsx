@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css';
 import { Button } from '@/components/ui/button';
 import { ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { labelMarkerIcon, useBasemap } from '@/shared/components/data/mapTheme';
 import { FleetRegion, vesselCoord } from './regionUtils';
 
 interface RegionMapCardProps {
@@ -25,10 +26,6 @@ const RegionMapCard: React.FC<RegionMapCardProps> = ({ region, vessels }) => {
       scrollWheelZoom: false,
       attributionControl: false,
     });
-    L.tileLayer(
-      'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-      { maxZoom: 18, subdomains: 'abcd' }
-    ).addTo(map);
     mapRef.current = map;
     return () => {
       map.remove();
@@ -36,19 +33,16 @@ const RegionMapCard: React.FC<RegionMapCardProps> = ({ region, vessels }) => {
     };
   }, [region]);
 
+  // Basemap follows the theme; the map is rebuilt per region.
+  useBasemap(mapRef, region, { attribution: false });
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     const layer = L.layerGroup().addTo(map);
     vessels.forEach((v) => {
       const [lat, lng] = vesselCoord(v.id, region);
-      L.marker([lat, lng], {
-        icon: L.divIcon({
-          className: '',
-          html: `<div style="background:hsl(var(--primary));color:hsl(var(--primary-foreground));font-size:10px;font-weight:600;padding:2px 6px;border-radius:9999px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.2)">${v.name}</div>`,
-          iconAnchor: [20, 10],
-        }),
-      }).addTo(layer);
+      L.marker([lat, lng], { icon: labelMarkerIcon(v.name), interactive: false, keyboard: false }).addTo(layer);
     });
     return () => {
       layer.remove();
@@ -67,7 +61,7 @@ const RegionMapCard: React.FC<RegionMapCardProps> = ({ region, vessels }) => {
         </span>
       </div>
       <div className="relative">
-        <div ref={containerRef} className="h-64 w-full bg-muted" />
+        <div ref={containerRef} className="h-64 w-full bg-map-water" />
         <Button
           size="sm"
           variant="secondary"

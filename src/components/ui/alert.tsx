@@ -8,8 +8,13 @@ const alertVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-background text-foreground",
-        destructive: "border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive",
+        default: "bg-card text-card-foreground",
+        // Tones from the status tokens: tinted surface, text and icon in the tone
+        // (AA on the tint in both themes).
+        destructive: "border-critical/40 bg-critical-muted text-critical [&>svg]:text-critical",
+        warning: "border-warning/40 bg-warning-muted text-warning [&>svg]:text-warning",
+        success: "border-success/40 bg-success-muted text-success [&>svg]:text-success",
+        info: "border-info/40 bg-info-muted text-info [&>svg]:text-info",
       },
     },
     defaultVariants: {

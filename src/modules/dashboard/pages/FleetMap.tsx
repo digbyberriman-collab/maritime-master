@@ -22,6 +22,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import {
+  MAP_OVERLAYS,
+  POPUP_OPTIONS,
+  PORT_SWATCH_CLASS,
+  VESSEL_STATE_LABEL,
+  popupHtml,
+  portMarkerIcon,
+  useBasemap,
+  useTileOverlay,
+  vesselGlyphSvg,
+  vesselMarkerIcon,
+  type VesselNavState,
+} from '@/shared/components/data/mapTheme';
 
 interface MapVessel {
   id: string;
@@ -72,38 +85,20 @@ const MAJOR_PORTS: Port[] = [
   { name: 'Sydney', country: 'Australia', lat: -33.8568, lng: 151.2153, type: 'major', description: 'Superyacht berths at Rozelle Bay and Double Bay' },
 ];
 
-// Create vessel icon as a Leaflet divIcon
-const createVesselIcon = (heading: number, status: string) => {
-  const color = status === 'UNDER_WAY' ? '#22c55e' : status === 'MOORED' ? '#3b82f6' : '#f59e0b';
-  const svg = `<svg width="32" height="32" viewBox="0 0 32 32" style="transform:rotate(${heading}deg)">
-    <path d="M16 2 L24 28 L16 24 L8 28 Z" fill="${color}" stroke="white" stroke-width="1.5"/>
-    <rect x="13" y="12" width="6" height="8" fill="white" opacity="0.7" rx="1"/>
-    <circle cx="16" cy="6" r="2" fill="white"/>
-  </svg>`;
-  return L.divIcon({
-    html: svg,
-    className: 'vessel-marker',
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-    popupAnchor: [0, -16],
-  });
+// Map status → marker shape (mapTheme, gap/10 §A.11): heading arrow under way,
+// circle moored, ringed circle at anchor. Colour comes from the theme tokens.
+const NAV_STATE: Record<MapVessel['status'], VesselNavState> = {
+  UNDER_WAY: 'under_way',
+  MOORED: 'moored',
+  AT_ANCHOR: 'at_anchor',
 };
 
-// Create port icon
-const createPortIcon = (type: string) => {
-  const colors: Record<string, string> = { major: '#3b82f6', marina: '#8b5cf6', shipyard: '#f59e0b' };
-  const color = colors[type] || '#3b82f6';
-  const svg = `<svg width="16" height="16" viewBox="0 0 16 16">
-    <circle cx="8" cy="8" r="6" fill="${color}" stroke="white" stroke-width="2" opacity="0.9"/>
-  </svg>`;
-  return L.divIcon({
-    html: svg,
-    className: 'port-marker',
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
-    popupAnchor: [0, -8],
-  });
-};
+const VESSEL_LEGEND: VesselNavState[] = ['under_way', 'moored', 'at_anchor'];
+const PORT_LEGEND: Array<{ kind: Port['type']; label: string }> = [
+  { kind: 'major', label: 'Commercial Port' },
+  { kind: 'marina', label: 'Marina' },
+  { kind: 'shipyard', label: 'Shipyard' },
+];
 
 // Generate a pseudo-random but stable position from vessel id
 const hashToCoord = (id: string, range: number, offset: number): number => {
@@ -137,13 +132,15 @@ const FleetMap: React.FC = () => {
     vessels: true,
     tracks: false,
     weather: false,
-    ports: true
+    ports: true,
+    seamarks: false,
   });
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const vesselMarkersRef = useRef<L.LayerGroup>(L.layerGroup());
   const portMarkersRef = useRef<L.LayerGroup>(L.layerGroup());
+  const vesselMarkerByIdRef = useRef(new Map<string, { marker: L.Marker; vessel: MapVessel }>());
 
   // Fetch real vessels from database
   const { data: dbVessels = [], refetch } = useQuery({
@@ -183,9 +180,10 @@ const FleetMap: React.FC = () => {
     });
   }, [dbVessels]);
 
-  const displayVessels = vesselFilter 
-    ? mapVessels.filter(v => v.id === vesselFilter)
-    : mapVessels;
+  const displayVessels = useMemo(
+    () => (vesselFilter ? mapVessels.filter(v => v.id === vesselFilter) : mapVessels),
+    [mapVessels, vesselFilter],
+  );
 
   // Initialize Leaflet map
   useEffect(() => {
@@ -198,10 +196,6 @@ const FleetMap: React.FC = () => {
       scrollWheelZoom: true,
     });
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://carto.com/">CARTO</a>',
-    }).addTo(map);
-
     vesselMarkersRef.current.addTo(map);
     portMarkersRef.current.addTo(map);
 
@@ -213,35 +207,58 @@ const FleetMap: React.FC = () => {
     };
   }, []);
 
+  // Basemap follows the theme (Abyss / Daylight); seamarks are an optional overlay.
+  useBasemap(mapRef, true);
+  useTileOverlay(mapRef, true, MAP_OVERLAYS.seamarks, layers.seamarks);
+
+  const selectedVesselId = selectedVessel?.id;
+  const selectedVesselIdRef = useRef<string | undefined>(undefined);
+  selectedVesselIdRef.current = selectedVesselId;
+
   // Update vessel markers
   useEffect(() => {
     const group = vesselMarkersRef.current;
+    const byId = vesselMarkerByIdRef.current;
     group.clearLayers();
+    byId.clear();
 
     if (!layers.vessels) return;
 
     displayVessels.forEach((vessel) => {
+      const state = NAV_STATE[vessel.status];
       const marker = L.marker([vessel.lat, vessel.lng], {
-        icon: createVesselIcon(vessel.heading, vessel.status),
+        icon: vesselMarkerIcon({ heading: vessel.heading, state, selected: vessel.id === selectedVesselIdRef.current }),
+        title: vessel.name,
       });
 
-      marker.bindPopup(`
-        <div style="min-width:200px">
-          <p style="font-weight:600;font-size:14px;margin:0 0 4px">${vessel.name}</p>
-          <p style="font-size:12px;color:#888;margin:0 0 8px">MMSI: ${vessel.mmsi}</p>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:12px">
-            <span>Status: ${vessel.status.replace('_', ' ')}</span>
-            <span>SOG: ${vessel.sog} kts</span>
-            <span>COG: ${vessel.cog}°</span>
-            <span>HDG: ${vessel.heading}°</span>
-          </div>
-        </div>
-      `);
+      marker.bindPopup(
+        popupHtml({
+          title: vessel.name,
+          subtitle: `MMSI: ${vessel.mmsi}`,
+          rows: [
+            ['Status', VESSEL_STATE_LABEL[state]],
+            ['SOG', `${vessel.sog} kts`],
+            ['COG', `${vessel.cog}°`],
+            ['HDG', `${vessel.heading}°`],
+          ],
+        }),
+        POPUP_OPTIONS,
+      );
 
       marker.on('click', () => setSelectedVessel(vessel));
       group.addLayer(marker);
+      byId.set(vessel.id, { marker, vessel });
     });
   }, [displayVessels, layers.vessels]);
+
+  // Selected vessel glows (A.11). Swap icons in place so an open popup stays open.
+  useEffect(() => {
+    vesselMarkerByIdRef.current.forEach(({ marker, vessel }, id) => {
+      marker.setIcon(
+        vesselMarkerIcon({ heading: vessel.heading, state: NAV_STATE[vessel.status], selected: id === selectedVesselId }),
+      );
+    });
+  }, [selectedVesselId]);
 
   // Update port markers
   useEffect(() => {
@@ -252,20 +269,20 @@ const FleetMap: React.FC = () => {
 
     MAJOR_PORTS.forEach((port) => {
       const marker = L.marker([port.lat, port.lng], {
-        icon: createPortIcon(port.type),
+        icon: portMarkerIcon(port.type),
+        title: port.name,
       });
 
-      marker.bindPopup(`
-        <div style="min-width:220px">
-          <p style="font-weight:600;font-size:14px;margin:0 0 4px">${port.name}</p>
-          <p style="font-size:12px;color:#888;margin:0">${port.country}</p>
-          <span style="display:inline-block;font-size:10px;font-weight:500;padding:2px 6px;border-radius:4px;background:#f1f5f9;margin:4px 0">
-            ${getPortTypeLabel(port.type)}
-          </span>
-          <p style="font-size:12px;margin:8px 0 4px">${port.description}</p>
-          <p style="font-size:10px;color:#888;margin:0">${port.lat.toFixed(4)}°N, ${port.lng.toFixed(4)}°E</p>
-        </div>
-      `);
+      marker.bindPopup(
+        popupHtml({
+          title: port.name,
+          subtitle: port.country,
+          chip: getPortTypeLabel(port.type),
+          body: port.description,
+          footer: `${port.lat.toFixed(4)}°N, ${port.lng.toFixed(4)}°E`,
+        }),
+        POPUP_OPTIONS,
+      );
 
       group.addLayer(marker);
     });
@@ -344,8 +361,7 @@ const FleetMap: React.FC = () => {
             >
               <div
                 ref={mapContainerRef}
-                className="h-full w-full z-0"
-                style={{ background: '#0c1929' }}
+                className="h-full w-full z-0 bg-map-water"
               />
 
               {/* Map Controls Overlay */}
@@ -471,31 +487,24 @@ const FleetMap: React.FC = () => {
               <div className="absolute bottom-4 left-4 bg-background/95 rounded-lg shadow-lg p-3 border z-[1000]">
                 <p className="text-sm font-medium mb-2">Legend</p>
                 <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#22c55e' }} />
-                    Under Way
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#3b82f6' }} />
-                    Moored
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#f59e0b' }} />
-                    At Anchor
-                  </div>
+                  {VESSEL_LEGEND.map((state) => (
+                    <div key={state} className="flex items-center gap-2 text-xs">
+                      {/* Static, trusted SVG from mapTheme: the same glyph as the marker. */}
+                      <span
+                        aria-hidden="true"
+                        className="storm-map-glyph h-4 w-4 [&_svg]:h-4 [&_svg]:w-4"
+                        dangerouslySetInnerHTML={{ __html: vesselGlyphSvg(state, { heading: 45 }) }}
+                      />
+                      {VESSEL_STATE_LABEL[state]}
+                    </div>
+                  ))}
                   <div className="border-t my-1" />
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#3b82f6', opacity: 0.9 }} />
-                    Commercial Port
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#8b5cf6', opacity: 0.9 }} />
-                    Marina
-                  </div>
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: '#f59e0b', opacity: 0.9 }} />
-                    Shipyard
-                  </div>
+                  {PORT_LEGEND.map(({ kind, label }) => (
+                    <div key={kind} className="flex items-center gap-2 text-xs">
+                      <span aria-hidden="true" className={`h-2.5 w-2.5 rotate-45 rounded-[2px] ${PORT_SWATCH_CLASS[kind]}`} />
+                      {label}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

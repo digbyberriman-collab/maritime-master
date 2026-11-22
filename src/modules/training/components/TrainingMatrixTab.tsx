@@ -1,23 +1,57 @@
 import React, { useState, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Checkbox } from '@/components/ui/checkbox';
+import { TONE_SURFACE, type Tone } from '@/components/ui/tones';
+import { cn } from '@/lib/utils';
 import { useTraining } from '@/modules/training/hooks/useTraining';
 import { useCrew } from '@/modules/crew/hooks/useCrew';
 import { useVessels } from '@/modules/vessels/hooks/useVessels';
-import { getTrainingStatusColor, daysUntilExpiry } from '@/modules/training/constants';
+import { MatrixGrid, type MatrixColumn, type ChipFilter } from '@/shared/components/data';
+import { PageLoading } from '@/shared/components/states';
+import { humanizeStatus, statusMeta } from '@/shared/components/status';
 import { format } from 'date-fns';
-import { Grid3X3, Check, X, AlertTriangle, Download } from 'lucide-react';
+import { Grid3X3, Check, X, AlertTriangle, Download, type LucideIcon } from 'lucide-react';
+
+type CellRecord = { status: string; expiry: string | null };
+
+/** How a matrix cell reads: tone from the training status registry, an icon so it never relies on colour. */
+const CELL_LOOK: Record<string, { icon: LucideIcon; tone: Tone }> = {
+  Valid: { icon: Check, tone: statusMeta('training', 'Valid').tone },
+  Expiring_Soon: { icon: AlertTriangle, tone: statusMeta('training', 'Expiring_Soon').tone },
+  Expired: { icon: X, tone: statusMeta('training', 'Expired').tone },
+};
+const MISSING_LOOK = { icon: X, tone: 'neutral' as Tone };
+
+function StatusDot({ status }: { status: string | null }) {
+  const look = (status && CELL_LOOK[status]) || MISSING_LOOK;
+  const Icon = look.icon;
+  return (
+    <span
+      aria-hidden="true"
+      className={cn('flex h-6 w-6 items-center justify-center rounded-full border', TONE_SURFACE[look.tone])}
+    >
+      <Icon className="h-4 w-4" />
+    </span>
+  );
+}
+
+const cellText = (record: CellRecord | null) =>
+  record ? statusMeta('training', record.status).label : 'Missing or not required';
+
+const LEGEND: Array<{ status: string | null; label: string }> = [
+  { status: 'Valid', label: 'Valid' },
+  { status: 'Expiring_Soon', label: 'Expiring Soon (<90 days)' },
+  { status: 'Expired', label: 'Expired' },
+  { status: null, label: 'Missing/Not Required' },
+];
 
 const TrainingMatrixTab: React.FC = () => {
-  const { trainingRecords, courses, trainingMatrix, saveTrainingMatrix, isLoading } = useTraining();
+  const { trainingRecords, courses, isLoading } = useTraining();
   const { crew } = useCrew();
   const { vessels } = useVessels();
   const [selectedVessel, setSelectedVessel] = useState<string>('all');
-  const [editMode, setEditMode] = useState(false);
 
   // Get unique crew with their training records
   const crewWithTraining = useMemo(() => {
@@ -26,8 +60,8 @@ const TrainingMatrixTab: React.FC = () => {
 
     return filtered.map(member => {
       const memberRecords = trainingRecords.filter(r => r.user_id === member.user_id);
-      const recordsByCourse: Record<string, { status: string; expiry: string | null }> = {};
-      
+      const recordsByCourse: Record<string, CellRecord> = {};
+
       memberRecords.forEach(record => {
         if (record.course) {
           recordsByCourse[record.course.id] = {
@@ -42,12 +76,61 @@ const TrainingMatrixTab: React.FC = () => {
         trainingRecords: recordsByCourse,
       };
     });
-  }, [crew, trainingRecords, selectedVessel]);
+  }, [crew, trainingRecords]);
 
-  // Get mandatory courses
+  type MatrixRow = (typeof crewWithTraining)[number];
+
+  // Mandatory courses, grouped by category so each group sits under one header.
   const mandatoryCourses = useMemo(() => {
-    return courses.filter(c => c.is_mandatory);
+    const mandatory = courses.filter(c => c.is_mandatory);
+    const order = Array.from(new Set(mandatory.map(c => c.course_category)));
+    return mandatory
+      .map((course, index) => ({ course, index }))
+      .sort((a, b) => order.indexOf(a.course.course_category) - order.indexOf(b.course.course_category) || a.index - b.index)
+      .map(({ course }) => course);
   }, [courses]);
+
+  const columns = useMemo<MatrixColumn[]>(
+    () =>
+      mandatoryCourses.map(course => ({
+        id: course.id,
+        label: course.course_code,
+        sublabel: course.course_name,
+        title: `${course.course_code} · ${course.course_name}`,
+        group: course.course_category || undefined,
+        width: 100,
+      })),
+    [mandatoryCourses],
+  );
+
+  const groups = useMemo(
+    () =>
+      Array.from(new Set(mandatoryCourses.map(c => c.course_category).filter(Boolean))).map(category => ({
+        id: category,
+        label: humanizeStatus(category),
+      })),
+    [mandatoryCourses],
+  );
+
+  const filters = useMemo<ChipFilter<MatrixRow>[]>(
+    () => [
+      {
+        id: 'gaps',
+        label: 'Missing or expired',
+        predicate: member =>
+          mandatoryCourses.some(course => {
+            const record = member.trainingRecords[course.id];
+            return !record || record.status === 'Expired';
+          }),
+      },
+      {
+        id: 'expiring',
+        label: 'Expiring soon',
+        predicate: member => mandatoryCourses.some(course => member.trainingRecords[course.id]?.status === 'Expiring_Soon'),
+      },
+    ],
+    [mandatoryCourses],
+  );
 
   // Calculate compliance summary
   const complianceSummary = useMemo(() => {
@@ -109,12 +192,19 @@ const TrainingMatrixTab: React.FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
+    return <PageLoading variant="tiles" rows={5} label="Loading training matrix" />;
   }
+
+  const summaryTiles: Array<{ label: string; value: React.ReactNode; className?: string }> = [
+    {
+      label: 'Overall Compliance',
+      value: `${complianceSummary.total > 0 ? Math.round((complianceSummary.valid / complianceSummary.total) * 100) : 0}%`,
+    },
+    { label: 'Valid', value: complianceSummary.valid, className: 'text-success' },
+    { label: 'Expiring Soon', value: complianceSummary.expiring, className: 'text-warning' },
+    { label: 'Expired', value: complianceSummary.expired, className: 'text-critical' },
+    { label: 'Missing', value: complianceSummary.missing, className: 'text-muted-foreground' },
+  ];
 
   return (
     <div className="space-y-6">
@@ -145,164 +235,55 @@ const TrainingMatrixTab: React.FC = () => {
 
       {/* Compliance Summary */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="pt-4 text-center">
-            <p className="text-2xl font-bold">
-              {complianceSummary.total > 0 
-                ? Math.round((complianceSummary.valid / complianceSummary.total) * 100) 
-                : 0}%
-            </p>
-            <p className="text-sm text-muted-foreground">Overall Compliance</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 text-center">
-            <p className="text-2xl font-bold text-green-600">{complianceSummary.valid}</p>
-            <p className="text-sm text-muted-foreground">Valid</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 text-center">
-            <p className="text-2xl font-bold text-yellow-600">{complianceSummary.expiring}</p>
-            <p className="text-sm text-muted-foreground">Expiring Soon</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 text-center">
-            <p className="text-2xl font-bold text-red-600">{complianceSummary.expired}</p>
-            <p className="text-sm text-muted-foreground">Expired</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 text-center">
-            <p className="text-2xl font-bold text-gray-600">{complianceSummary.missing}</p>
-            <p className="text-sm text-muted-foreground">Missing</p>
-          </CardContent>
-        </Card>
+        {summaryTiles.map(tile => (
+          <Card key={tile.label}>
+            <CardContent className="pt-4 text-center">
+              <p className={cn('text-2xl font-bold tabular-nums', tile.className)}>{tile.value}</p>
+              <p className="text-sm text-muted-foreground">{tile.label}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {/* Matrix Table */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="sticky left-0 bg-background z-10 min-w-[200px]">Crew Member</TableHead>
-                  <TableHead className="min-w-[100px]">Rank</TableHead>
-                  {mandatoryCourses.map(course => (
-                    <TableHead key={course.id} className="text-center min-w-[100px]">
-                      <div className="flex flex-col items-center">
-                        <span className="text-xs font-medium">{course.course_code}</span>
-                        <span className="text-xs text-muted-foreground truncate max-w-[80px]">
-                          {course.course_name}
-                        </span>
-                      </div>
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {crewWithTraining.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={mandatoryCourses.length + 2} className="text-center py-8">
-                      <Grid3X3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">No crew members found</p>
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  crewWithTraining.map(member => (
-                    <TableRow key={member.user_id}>
-                      <TableCell className="sticky left-0 bg-background font-medium">
-                        {member.first_name} {member.last_name}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{member.rank || 'Crew'}</Badge>
-                      </TableCell>
-                      {mandatoryCourses.map(course => {
-                        const record = member.trainingRecords[course.id];
-                        
-                        if (!record) {
-                          return (
-                            <TableCell key={course.id} className="text-center">
-                              <div className="flex justify-center">
-                                <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
-                                  <X className="h-4 w-4 text-gray-500" />
-                                </div>
-                              </div>
-                            </TableCell>
-                          );
-                        }
-
-                        const days = record.expiry ? daysUntilExpiry(new Date(record.expiry)) : null;
-                        
-                        return (
-                          <TableCell key={course.id} className="text-center">
-                            <div className="flex flex-col items-center gap-1">
-                              {record.status === 'Valid' && (
-                                <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
-                                  <Check className="h-4 w-4 text-green-600" />
-                                </div>
-                              )}
-                              {record.status === 'Expiring_Soon' && (
-                                <div className="w-6 h-6 rounded-full bg-yellow-100 flex items-center justify-center">
-                                  <AlertTriangle className="h-4 w-4 text-yellow-600" />
-                                </div>
-                              )}
-                              {record.status === 'Expired' && (
-                                <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center">
-                                  <X className="h-4 w-4 text-red-600" />
-                                </div>
-                              )}
-                              {record.expiry && (
-                                <span className="text-xs text-muted-foreground">
-                                  {format(new Date(record.expiry), 'MMM yy')}
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                        );
-                      })}
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+      {/* Matrix */}
+      <MatrixGrid<MatrixRow, CellRecord | null>
+        label="Training matrix"
+        noun={{ one: 'crew member', other: 'crew members' }}
+        rows={crewWithTraining}
+        getRowId={member => member.id}
+        rowLabel={member => `${member.first_name} ${member.last_name}`}
+        rowHeader="Crew Member"
+        rowColumns={[
+          {
+            id: 'rank',
+            header: 'Rank',
+            value: member => member.rank || 'Crew',
+            cell: member => <Badge variant="outline">{member.rank || 'Crew'}</Badge>,
+            minWidth: 100,
+          },
+        ]}
+        columns={columns}
+        groups={groups}
+        getValue={(member, column) => member.trainingRecords[column.id] ?? null}
+        renderCell={({ value, label }) => (
+          <div className="flex flex-col items-center gap-1" title={`${label}: ${cellText(value)}`}>
+            <StatusDot status={value?.status ?? null} />
+            <span className="sr-only">{cellText(value)}</span>
+            {value?.expiry ? (
+              <span className="text-xs text-muted-foreground tabular-nums">{format(new Date(value.expiry), 'MMM yy')}</span>
+            ) : null}
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Legend */}
-      <Card>
-        <CardContent className="pt-4">
-          <div className="flex flex-wrap gap-6">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
-                <Check className="h-4 w-4 text-green-600" />
-              </div>
-              <span className="text-sm">Valid</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-yellow-100 flex items-center justify-center">
-                <AlertTriangle className="h-4 w-4 text-yellow-600" />
-              </div>
-              <span className="text-sm">Expiring Soon (&lt;90 days)</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center">
-                <X className="h-4 w-4 text-red-600" />
-              </div>
-              <span className="text-sm">Expired</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
-                <X className="h-4 w-4 text-gray-500" />
-              </div>
-              <span className="text-sm">Missing/Not Required</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        )}
+        filters={filters}
+        searchPlaceholder="Search crew or rank"
+        empty={{ title: 'No crew members found', icon: Grid3X3 }}
+        legend={LEGEND.map(item => (
+          <span key={item.label} className="flex items-center gap-2">
+            <StatusDot status={item.status} />
+            <span className="text-sm text-foreground">{item.label}</span>
+          </span>
+        ))}
+      />
     </div>
   );
 };

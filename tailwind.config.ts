@@ -1,6 +1,20 @@
 import type { Config } from "tailwindcss";
 import tailwindcssAnimate from "tailwindcss-animate";
 
+/**
+ * Abyss design system (gap/10 §A; anchors in DECISIONS §1). Token values live
+ * in src/index.css. Semantic colours (`background`, `primary`, `success`, …)
+ * switch with the theme; the raw scales below (`abyss`, `deep`, `slate-ui`,
+ * `drift`, `signal`) do not and are for design-system components only.
+ *
+ * The type scale is exposed as `type-*` component classes in index.css, not
+ * as `fontSize` keys: tailwind-merge would read `text-display` as a colour.
+ */
+const scale = (family: string, steps: readonly (string | number)[]) =>
+  Object.fromEntries(steps.map((step) => [String(step), `hsl(var(--${family}-${step}) / <alpha-value>)`]));
+
+const FONT_FALLBACK = ["system-ui", "-apple-system", '"Segoe UI"', "Roboto", "sans-serif"];
+
 export default {
   darkMode: ["class"],
   content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
@@ -121,6 +135,47 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        // New semantic tokens (theme-aware).
+        overlay: "hsl(var(--overlay))",
+        // Dialog / sheet / drawer backdrop: overlay at the theme's opacity (70% dark, 40% Daylight).
+        scrim: "hsl(var(--overlay) / var(--overlay-opacity))",
+        // Input, select and textarea fill (Slate-900 on dark, white on Daylight).
+        field: "hsl(var(--field))",
+        topbar: "hsl(var(--topbar))",
+        surface: {
+          sunken: "hsl(var(--surface-sunken))",
+        },
+        focus: "hsl(var(--focus))",
+        weekend: "hsl(var(--weekend))",
+        today: "hsl(var(--today))",
+        "map-water": "hsl(var(--map-water))",
+        // Map marks (A.11), for legends that mirror the markers.
+        map: {
+          vessel: "hsl(var(--map-vessel))",
+          ring: "hsl(var(--map-marker-ring))",
+          track: "hsl(var(--map-track))",
+          route: "hsl(var(--map-route))",
+          stale: "hsl(var(--map-stale))",
+        },
+        // Raw Abyss scales (theme-independent).
+        abyss: { DEFAULT: "hsl(var(--abyss-900) / <alpha-value>)", ...scale("abyss", [950, 900, 800]) },
+        deep: { DEFAULT: "hsl(var(--deep-900) / <alpha-value>)", ...scale("deep", [900, 850, 800, 700]) },
+        "slate-ui": {
+          DEFAULT: "hsl(var(--slate-800) / <alpha-value>)",
+          ...scale("slate", [900, 800, 700, 600, 500, 400]),
+        },
+        drift: { DEFAULT: "hsl(var(--drift-400) / <alpha-value>)", ...scale("drift", [600, 500, 400, 300, 200, 100, 50]) },
+        signal: {
+          DEFAULT: "hsl(var(--signal-500) / <alpha-value>)",
+          ...scale("signal", [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950]),
+          // Theme-aware selected-row / active-segment fill.
+          muted: "hsl(var(--signal-muted))",
+        },
+      },
+      fontFamily: {
+        sans: ["Inter", ...FONT_FALLBACK],
+        display: ['"Barlow Semi Condensed"', "Inter", ...FONT_FALLBACK],
+        mono: ['"JetBrains Mono"', "ui-monospace", "SFMono-Regular", "Menlo", "Consolas", "monospace"],
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -148,6 +203,11 @@ export default {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.7" },
         },
+        // Live AIS position only (A.6 motion-ping).
+        "ais-ping": {
+          "0%": { transform: "scale(1)", opacity: "0.6" },
+          "80%, 100%": { transform: "scale(2.4)", opacity: "0" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -155,11 +215,39 @@ export default {
         "fade-in": "fade-in 0.3s ease-out",
         "slide-in-left": "slide-in-left 0.3s ease-out",
         "pulse-soft": "pulse-soft 2s ease-in-out infinite",
+        "ais-ping": "ais-ping var(--motion-ping) cubic-bezier(0, 0, 0.2, 1) infinite",
+      },
+      transitionDuration: {
+        quick: "var(--motion-quick)",
+        menu: "var(--motion-menu)",
+        panel: "var(--motion-panel)",
+        indicator: "var(--motion-indicator)",
+      },
+      transitionTimingFunction: {
+        tide: "var(--ease-tide)",
+        "tide-out": "var(--ease-tide-out)",
       },
       boxShadow: {
-        "card": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
-        "card-hover": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
-        "navbar": "0 1px 3px 0 rgb(0 0 0 / 0.05)",
+        // Tailwind's own scale sits on the elevation tokens too, so legacy
+        // `shadow-sm/md/lg` look right on Abyss and the primitives can keep
+        // names tailwind-merge understands (a consumer's `shadow-none` or
+        // `shadow-md` still replaces the primitive's default):
+        // sm/DEFAULT = e1 (cards), md/lg = e2 (menus, popovers), xl/2xl = e3 (dialogs, sheets).
+        sm: "var(--shadow-e1)",
+        DEFAULT: "var(--shadow-e1)",
+        md: "var(--shadow-e2)",
+        lg: "var(--shadow-e2)",
+        xl: "var(--shadow-e3)",
+        "2xl": "var(--shadow-e3)",
+        // Elevation (A.4): e1 cards/tiles, e2 menus/popovers, e3 dialogs/sheets.
+        e1: "var(--shadow-e1)",
+        e2: "var(--shadow-e2)",
+        e3: "var(--shadow-e3)",
+        "glow-signal": "var(--shadow-glow-signal)",
+        // Legacy names, now on the elevation tokens.
+        card: "var(--shadow-e1)",
+        "card-hover": "var(--shadow-e2)",
+        navbar: "var(--shadow-e1)",
       },
     },
   },

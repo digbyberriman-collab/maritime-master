@@ -1,7 +1,9 @@
 import React, { createContext, useContext, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useTheme } from 'next-themes';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
+import { hasStoredThemeChoice } from '@/components/ui/theme-config';
 
 interface BrandingContextType {
   clientDisplayName: string | null;
@@ -23,8 +25,41 @@ const BrandingContext = createContext<BrandingContextType>({
 
 export const useBrandingContext = () => useContext(BrandingContext);
 
+/**
+ * Sign-in on a new device (gap/10 W1): when this browser has never stored a
+ * theme, adopt the one saved on the user's profile. Only an explicit `dark` or
+ * `light` is adopted: rows written before Abyss carry `system` merely because
+ * it was the old form's default, and D-DS1 makes dark the default. Once a
+ * choice is stored locally, the device's own choice wins and no query runs.
+ */
+function useProfileThemeOnNewDevice(userId: string | undefined) {
+  const { setTheme } = useTheme();
+  const isNewDevice = !hasStoredThemeChoice();
+  const { data: profileTheme } = useQuery({
+    queryKey: ['user-preferences', 'theme', userId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('user_preferences')
+        .select('theme')
+        .eq('user_id', userId as string)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.theme ?? null;
+    },
+    enabled: !!userId && isNewDevice,
+    staleTime: Infinity,
+  });
+
+  useEffect(() => {
+    if ((profileTheme === 'dark' || profileTheme === 'light') && !hasStoredThemeChoice()) {
+      setTheme(profileTheme);
+    }
+  }, [profileTheme, setTheme]);
+}
+
 export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
+  useProfileThemeOnNewDevice(user?.id);
 
   const { data, isLoading } = useQuery({
     queryKey: ['company-branding', profile?.company_id],

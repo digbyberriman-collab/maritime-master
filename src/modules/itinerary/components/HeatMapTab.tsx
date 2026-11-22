@@ -3,6 +3,16 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useTripSuggestions, type BrowseFilters } from '@/modules/itinerary/hooks/useTripSuggestions';
 import AIRoutePlanner from './AIRoutePlanner';
+import {
+  HEAT_SWATCH_CLASS,
+  POPUP_OPTIONS,
+  ROUTE_STYLE,
+  heatCircleStyle,
+  popupHtml,
+  useBasemap,
+  waypointIcon,
+  type HeatLevel,
+} from '@/shared/components/data/mapTheme';
 
 const DEFAULT_FILTERS: BrowseFilters = {
   search: '',
@@ -117,9 +127,6 @@ const HeatMapTab: React.FC = () => {
 
     if (!mapRef.current) {
       mapRef.current = L.map(containerRef.current).setView([20, 0], 2);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      }).addTo(mapRef.current);
     }
 
     const map = mapRef.current;
@@ -137,38 +144,27 @@ const HeatMapTab: React.FC = () => {
       // Scale dot size based on suggestion count — more suggestions = larger dot
       const radius = Math.min(6 + count * 3, 30);
       const opacity = Math.min(0.5 + count * 0.05, 0.9);
-      const color = avgEnthusiasm >= 4 ? '#22c55e' : avgEnthusiasm >= 3 ? '#f59e0b' : '#3b82f6';
+      const level: HeatLevel = avgEnthusiasm >= 4 ? 'high' : avgEnthusiasm >= 3 ? 'medium' : 'low';
 
-      const marker = L.circleMarker([cluster.lat, cluster.lng], {
-        radius,
-        fillColor: color,
-        fillOpacity: opacity,
-        color,
-        weight: count >= 3 ? 3 : 2,
-        opacity: 0.9,
-      }).addTo(map);
+      const marker = L.circleMarker(
+        [cluster.lat, cluster.lng],
+        heatCircleStyle(level, { radius, fillOpacity: opacity, weight: count >= 3 ? 3 : 2, opacity: 0.9 }),
+      ).addTo(map);
 
-      const popupContent = `
-        <div style="min-width:200px">
-          <strong>${cluster.name}</strong>${cluster.country ? ` — ${cluster.country}` : ''}
-          <div style="font-size:12px;color:#666;margin-top:4px">
-            ${count} suggestion${count !== 1 ? 's' : ''} · 
-            👍 ${totalVotes} · 
-            ⭐ ${avgEnthusiasm.toFixed(1)}
-          </div>
-          <div style="margin-top:8px;max-height:120px;overflow-y:auto;font-size:11px">
-            ${cluster.suggestions.map(s => 
-              `<div style="margin-bottom:4px;padding:2px 0;border-bottom:1px solid #eee">${s.description.slice(0, 60)}...</div>`
-            ).join('')}
-          </div>
-        </div>
-      `;
+      const popupContent = popupHtml({
+        title: `${cluster.name}${cluster.country ? ` — ${cluster.country}` : ''}`,
+        subtitle: `${count} suggestion${count !== 1 ? 's' : ''} · 👍 ${totalVotes} · ⭐ ${avgEnthusiasm.toFixed(1)}`,
+        items: cluster.suggestions.map(s => `${s.description.slice(0, 60)}...`),
+      });
 
-      marker.bindPopup(popupContent);
+      marker.bindPopup(popupContent, POPUP_OPTIONS);
     });
 
     return () => {};
   }, [clusters, isLoading]);
+
+  // Basemap follows the theme; the map is created once the suggestions load.
+  useBasemap(mapRef, !isLoading);
 
   // Map click handler toggle
   useEffect(() => {
@@ -206,20 +202,7 @@ const HeatMapTab: React.FC = () => {
 
     // Add numbered draggable markers
     selectedDestinations.forEach((d, i) => {
-      const icon = L.divIcon({
-        className: 'ai-route-marker',
-        html: `<div style="
-          width:24px;height:24px;border-radius:50%;
-          background:hsl(var(--primary));color:hsl(var(--primary-foreground));
-          display:flex;align-items:center;justify-content:center;
-          font-size:11px;font-weight:700;
-          border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);
-          cursor:grab;
-        ">${i + 1}</div>`,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-      });
-      const marker = L.marker([d.lat, d.lng], { icon, draggable: true }).addTo(map);
+      const marker = L.marker([d.lat, d.lng], { icon: waypointIcon(i + 1), draggable: true }).addTo(map);
       marker.bindTooltip(`${d.name}, ${d.country}`, { direction: 'top', offset: [0, -14] });
 
       marker.on('dragend', async () => {
@@ -240,12 +223,7 @@ const HeatMapTab: React.FC = () => {
     // Draw connecting line
     if (selectedDestinations.length > 1) {
       const latlngs = selectedDestinations.map(d => [d.lat, d.lng] as [number, number]);
-      routeLineRef.current = L.polyline(latlngs, {
-        color: 'hsl(var(--primary))',
-        weight: 2,
-        dashArray: '6 4',
-        opacity: 0.6,
-      }).addTo(map);
+      routeLineRef.current = L.polyline(latlngs, ROUTE_STYLE).addTo(map);
     }
   }, [selectedDestinations, reverseGeocode]);
 
@@ -291,15 +269,15 @@ const HeatMapTab: React.FC = () => {
         </p>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: '#22c55e' }} />
+            <span className={`w-3 h-3 rounded-full inline-block ${HEAT_SWATCH_CLASS.high}`} />
             High enthusiasm
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: '#f59e0b' }} />
+            <span className={`w-3 h-3 rounded-full inline-block ${HEAT_SWATCH_CLASS.medium}`} />
             Medium
           </span>
           <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full inline-block" style={{ backgroundColor: '#3b82f6' }} />
+            <span className={`w-3 h-3 rounded-full inline-block ${HEAT_SWATCH_CLASS.low}`} />
             Low
           </span>
         </div>
@@ -308,7 +286,7 @@ const HeatMapTab: React.FC = () => {
       <div className="flex gap-3" style={{ height: '550px' }}>
         {/* Map */}
         <div className="flex-1 border rounded-lg overflow-hidden relative">
-          <div ref={containerRef} style={{ height: '100%', width: '100%' }} />
+          <div ref={containerRef} className="bg-map-water" style={{ height: '100%', width: '100%' }} />
           {/* Picking mode indicator */}
           <div className="absolute top-3 left-14 z-[1000] bg-card/90 backdrop-blur border border-border rounded-md px-3 py-1.5 text-xs font-medium text-foreground shadow-sm">
             Click map to add destinations
