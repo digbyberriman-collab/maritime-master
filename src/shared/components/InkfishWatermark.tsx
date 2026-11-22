@@ -19,11 +19,12 @@
  */
 import React, { useState } from 'react';
 
-export const InkfishWatermark: React.FC = () => {
+export const InkfishWatermark = React.forwardRef<HTMLDivElement>((_props, ref) => {
   const [imageError, setImageError] = useState(false);
 
   return (
     <div
+      ref={ref}
       data-watermark="inkfish"
       className="fixed inset-0 z-[1] flex items-center justify-center pointer-events-none select-none"
       style={{ pointerEvents: 'none' }}
@@ -34,7 +35,7 @@ export const InkfishWatermark: React.FC = () => {
           <img
             src="/assets/inkfish-logo.png"
             alt=""
-            fetchPriority="high"
+            {...{ fetchpriority: 'high' }}
             className="w-full h-full object-contain opacity-[0.04] grayscale"
             onError={() => setImageError(true)}
             draggable={false}
@@ -47,6 +48,8 @@ export const InkfishWatermark: React.FC = () => {
       </div>
     </div>
   );
-};
+});
+
+InkfishWatermark.displayName = 'InkfishWatermark';
 
 export default InkfishWatermark;
