@@ -59,7 +59,7 @@ import {
   MenubarSubTrigger,
   MenubarTrigger,
 } from '@/components/ui/menubar';
-import { Command, CommandItem, CommandList } from '@/components/ui/command';
+import { Command, CommandDialog, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Badge, badgeVariants } from '@/components/ui/badge';
 import { Alert } from '@/components/ui/alert';
@@ -167,6 +167,56 @@ describe('overlays: scrim token + e3 surface', () => {
     expect(overlayOf()).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Delete' }).className).toContain('text-primary-foreground');
     expect(screen.getByRole('button', { name: 'Keep' }).className).toContain('border-input');
+  });
+
+  it('command dialog: named, e3 on the scrim, panel props pass through, close button optional', () => {
+    const { unmount } = render(
+      <CommandDialog open>
+        <CommandInput placeholder="Search" />
+        <CommandList>
+          <CommandGroup heading="Pages">
+            <CommandItem>Certificates</CommandItem>
+          </CommandGroup>
+        </CommandList>
+      </CommandDialog>,
+    );
+    // A default accessible name, never an unnamed dialog.
+    const fallback = screen.getByRole('dialog', { name: 'Command menu' });
+    expect(fallback.className).toContain('bg-popover');
+    expect(fallback.className).toContain('shadow-xl');
+    expect(fallback.className).not.toMatch(RAW_PALETTE);
+    expect(overlayOf()).not.toBeNull();
+    expect(within(fallback).getByRole('button', { name: 'Close' }).className).toContain('[@media(pointer:coarse)]:h-11');
+    unmount();
+
+    render(
+      <CommandDialog
+        open
+        title="Search STORM"
+        description="Pages, vessels and actions"
+        showCloseButton={false}
+        contentProps={{ 'data-testid': 'command-palette', className: 'sm:max-w-[36rem]' }}
+        commandProps={{ label: 'Search STORM' }}
+      >
+        <CommandInput placeholder="Search" trailing={<kbd>Esc</kbd>} wrapperClassName="h-14" />
+        <CommandList>
+          <CommandGroup heading="Pages">
+            <CommandItem>Certificates</CommandItem>
+          </CommandGroup>
+        </CommandList>
+      </CommandDialog>,
+    );
+    const dialog = screen.getByRole('dialog', { name: 'Search STORM' });
+    expect(dialog).toHaveAccessibleDescription('Pages, vessels and actions');
+    expect(dialog).toHaveAttribute('data-testid', 'command-palette');
+    expect(dialog.className).toContain('sm:max-w-[36rem]');
+    expect(within(dialog).queryByRole('button', { name: 'Close' })).toBeNull();
+    expect(within(dialog).getByRole('combobox', { name: 'Search STORM' })).toBeInTheDocument();
+    expect(within(dialog).getByText('Esc').closest('[cmdk-input-wrapper]')?.className).toContain('h-14');
+    // Group headings on the eyebrow ramp (D-20); 44px options on touch (D-35).
+    const group = dialog.querySelector('[cmdk-group]') as HTMLElement;
+    expect(group.className).toContain('[&_[cmdk-group-heading]]:type-eyebrow');
+    expect(within(dialog).getByRole('option', { name: 'Certificates' }).className).toContain('[@media(pointer:coarse)]:min-h-11');
   });
 
   it('drawer source uses the scrim and e3', () => {

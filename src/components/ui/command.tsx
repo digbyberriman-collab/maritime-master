@@ -1,10 +1,11 @@
 import * as React from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { type DialogProps } from "@radix-ui/react-dialog";
 import { Command as CommandPrimitive } from "cmdk";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogDescription, DialogOverlay, DialogPortal, DialogTitle } from "@/components/ui/dialog";
 
 const Command = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive>,
@@ -21,36 +22,108 @@ const Command = React.forwardRef<
 ));
 Command.displayName = CommandPrimitive.displayName;
 
-type CommandDialogProps = DialogProps;
+type CommandDialogContentProps = Omit<React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>, "children"> & {
+  /** `data-testid` and other data attributes pass straight to the panel. */
+  [dataAttribute: `data-${string}`]: string | undefined;
+};
 
-const CommandDialog = ({ children, ...props }: CommandDialogProps) => {
+interface CommandDialogProps extends DialogProps {
+  /**
+   * The dialog's accessible name, rendered as a visually hidden
+   * `DialogTitle` (every dialog needs one, WCAG 4.1.2).
+   */
+  title?: string;
+  /** A visually hidden `DialogDescription`; omitted when not given. */
+  description?: string;
+  /** Props for the dialog panel: `data-testid`, `className`, `onCloseAutoFocus`, … */
+  contentProps?: CommandDialogContentProps;
+  /** Props for the inner `Command`: `label`, `filter`, `loop`, `vimBindings`, … */
+  commandProps?: Omit<React.ComponentPropsWithoutRef<typeof CommandPrimitive>, "children">;
+  /**
+   * The corner close button. On by default; a caller that renders its own
+   * close control (the command palette's input row) turns it off.
+   */
+  showCloseButton?: boolean;
+}
+
+/*
+ * A command menu in a modal dialog (e3 surface on the scrim). Anchored near
+ * the top rather than centred, so the list grows downwards without the input
+ * jumping; below 640px it is a full-width sheet from the top edge, which
+ * leaves room for the on-screen keyboard.
+ */
+const CommandDialog = ({
+  children,
+  title = "Command menu",
+  description,
+  contentProps,
+  commandProps,
+  showCloseButton = true,
+  ...props
+}: CommandDialogProps) => {
+  const { className: contentClassName, ...panelProps } = contentProps ?? {};
+  const { className: commandClassName, ...innerProps } = commandProps ?? {};
   return (
     <Dialog {...props}>
-      <DialogContent className="overflow-hidden p-0 shadow-xl">
-        <Command className="[&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground [&_[cmdk-group]:not([hidden])_~[cmdk-group]]:pt-0 [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-5 [&_[cmdk-input-wrapper]_svg]:w-5 [&_[cmdk-input]]:h-12 [&_[cmdk-item]]:px-2 [&_[cmdk-item]]:py-3 [&_[cmdk-item]_svg]:h-5 [&_[cmdk-item]_svg]:w-5">
-          {children}
-        </Command>
-      </DialogContent>
+      <DialogPortal>
+        <DialogOverlay />
+        <DialogPrimitive.Content
+          {...(description ? {} : { "aria-describedby": undefined })}
+          {...panelProps}
+          className={cn(
+            "fixed inset-x-0 top-0 z-50 flex max-h-dvh flex-col overflow-hidden border border-t-0 border-border bg-popover text-popover-foreground shadow-xl outline-none",
+            "rounded-b-lg pt-[env(safe-area-inset-top)]",
+            "sm:top-[12dvh] sm:mx-auto sm:max-h-[76dvh] sm:w-[calc(100vw-2rem)] sm:max-w-[40rem] sm:rounded-lg sm:border-t sm:pt-0",
+            "duration-menu ease-tide data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 motion-reduce:animate-none",
+            contentClassName,
+          )}
+        >
+          <DialogTitle className="sr-only">{title}</DialogTitle>
+          {description ? <DialogDescription className="sr-only">{description}</DialogDescription> : null}
+          <Command
+            {...innerProps}
+            className={cn(
+              "min-h-0 flex-1 rounded-none bg-transparent [&_[cmdk-group]]:px-2 [&_[cmdk-input-wrapper]_svg]:h-[18px] [&_[cmdk-input-wrapper]_svg]:w-[18px] [&_[cmdk-input]]:h-12",
+              commandClassName,
+            )}
+          >
+            {children}
+          </Command>
+          {showCloseButton ? (
+            <DialogPrimitive.Close className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-sm text-muted-foreground ring-offset-popover transition-colors duration-quick ease-tide hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11">
+              <X className="h-4 w-4" aria-hidden="true" />
+              <span className="sr-only">Close</span>
+            </DialogPrimitive.Close>
+          ) : null}
+        </DialogPrimitive.Content>
+      </DialogPortal>
     </Dialog>
   );
 };
 
-const CommandInput = React.forwardRef<
-  React.ElementRef<typeof CommandPrimitive.Input>,
-  React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
->(({ className, ...props }, ref) => (
-  <div className="flex items-center border-b px-3" cmdk-input-wrapper="">
-    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-    <CommandPrimitive.Input
-      ref={ref}
-      className={cn(
-        "flex h-11 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
-        className,
-      )}
-      {...props}
-    />
-  </div>
-));
+type CommandInputProps = React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input> & {
+  /** Classes for the row around the input (border, padding, height). */
+  wrapperClassName?: string;
+  /** Rendered after the input inside the row (a close control, a shortcut hint). */
+  trailing?: React.ReactNode;
+};
+
+const CommandInput = React.forwardRef<React.ElementRef<typeof CommandPrimitive.Input>, CommandInputProps>(
+  ({ className, wrapperClassName, trailing, ...props }, ref) => (
+    <div className={cn("flex items-center gap-2 border-b border-border px-3", wrapperClassName)} cmdk-input-wrapper="">
+      <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      <CommandPrimitive.Input
+        ref={ref}
+        className={cn(
+          "flex h-11 w-full min-w-0 rounded-md bg-transparent py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+          className,
+        )}
+        {...props}
+      />
+      {trailing}
+    </div>
+  ),
+);
 
 CommandInput.displayName = CommandPrimitive.Input.displayName;
 
@@ -60,7 +133,7 @@ const CommandList = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <CommandPrimitive.List
     ref={ref}
-    className={cn("max-h-[300px] overflow-y-auto overflow-x-hidden", className)}
+    className={cn("max-h-[300px] overflow-y-auto overflow-x-hidden overscroll-contain", className)}
     {...props}
   />
 ));
@@ -70,10 +143,17 @@ CommandList.displayName = CommandPrimitive.List.displayName;
 const CommandEmpty = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Empty>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Empty>
->((props, ref) => <CommandPrimitive.Empty ref={ref} className="py-6 text-center text-sm" {...props} />);
+>(({ className, ...props }, ref) => (
+  <CommandPrimitive.Empty
+    ref={ref}
+    className={cn("type-body py-6 text-center text-muted-foreground", className)}
+    {...props}
+  />
+));
 
 CommandEmpty.displayName = CommandPrimitive.Empty.displayName;
 
+/* Group headings use the eyebrow ramp (D-20), like the sidebar's section headings. */
 const CommandGroup = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Group>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Group>
@@ -81,7 +161,7 @@ const CommandGroup = React.forwardRef<
   <CommandPrimitive.Group
     ref={ref}
     className={cn(
-      "overflow-hidden p-1 text-foreground [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground",
+      "overflow-hidden p-1 text-foreground [&_[cmdk-group-heading]]:type-eyebrow [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pb-1.5 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:text-muted-foreground",
       className,
     )}
     {...props}
@@ -99,8 +179,9 @@ const CommandSeparator = React.forwardRef<
 CommandSeparator.displayName = CommandPrimitive.Separator.displayName;
 
 /*
- * Selected option (gap/10 A.5, WCAG 1.4.11): a signal-muted fill plus a 2px
- * primary bar on the leading edge; the bar (>= 3:1 on the popover) is the cue.
+ * Selected option (gap/10 A.5, WCAG 1.4.11, D-34): a signal-muted fill plus a
+ * 2px primary bar on the leading edge; the bar (>= 3:1 on the popover) is the
+ * cue. 44px rows on coarse pointers (D-35).
  */
 const CommandItem = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Item>,
@@ -109,7 +190,7 @@ const CommandItem = React.forwardRef<
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-[disabled=true]:pointer-events-none data-[selected=true]:bg-signal-muted data-[selected=true]:text-foreground data-[selected=true]:shadow-[inset_2px_0_0_hsl(var(--primary))] data-[disabled=true]:opacity-50",
+      "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-[disabled=true]:pointer-events-none data-[selected=true]:bg-signal-muted data-[selected=true]:text-foreground data-[selected=true]:shadow-[inset_2px_0_0_hsl(var(--primary))] data-[disabled=true]:opacity-50 [@media(pointer:coarse)]:min-h-11",
       className,
     )}
     {...props}
