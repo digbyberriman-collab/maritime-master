@@ -1,0 +1,47 @@
+[
+  {
+    "id": "e1000000-0000-4000-8000-000000000001",
+    "category_name": "Propulsion",
+    "color": "primary",
+    "icon": "Cog",
+    "display_order": 1,
+    "parent_category_id": null,
+    "created_at": "$ts:-500d"
+  },
+  {
+    "id": "e1000000-0000-4000-8000-000000000002",
+    "category_name": "Electrical",
+    "color": "primary",
+    "icon": "Zap",
+    "display_order": 2,
+    "parent_category_id": null,
+    "created_at": "$ts:-500d"
+  },
+  {
+    "id": "e1000000-0000-4000-8000-000000000003",
+    "category_name": "Safety Equipment",
+    "color": "primary",
+    "icon": "LifeBuoy",
+    "display_order": 3,
+    "parent_category_id": null,
+    "created_at": "$ts:-500d"
+  },
+  {
+    "id": "e1000000-0000-4000-8000-000000000004",
+    "category_name": "Navigation",
+    "color": "primary",
+    "icon": "Compass",
+    "display_order": 4,
+    "parent_category_id": null,
+    "created_at": "$ts:-500d"
+  },
+  {
+    "id": "e1000000-0000-4000-8000-000000000005",
+    "category_name": "Hotel Systems",
+    "color": "primary",
+    "icon": "Home",
+    "display_order": 5,
+    "parent_category_id": null,
+    "created_at": "$ts:-500d"
+  }
+]

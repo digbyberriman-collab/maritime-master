@@ -1,0 +1,23 @@
+[
+  {
+    "id": "c0000000-0000-4000-8000-000000000001",
+    "name": "Demo Fleet Management",
+    "client_display_name": "Demo Fleet",
+    "client_logo_url": null,
+    "brand_color": null,
+    "company_type": "management",
+    "address": "Harbour Office, Quay 1",
+    "email": "operations@demo-fleet.example",
+    "phone": null,
+    "imo_company_number": "5912345",
+    "dpa_name": "Designated Person Ashore (on duty)",
+    "dpa_email": "dpa@demo-fleet.example",
+    "dpa_phone_24_7": null,
+    "crewing_manager_name": "Crewing desk",
+    "crewing_manager_phone": null,
+    "technical_manager_name": "Technical desk",
+    "technical_manager_phone": null,
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-10d"
+  }
+]

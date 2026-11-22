@@ -1,0 +1,542 @@
+[
+  {
+    "id": "92000000-0000-4000-8000-000000000001",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "dashboard",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000002",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "fleet",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000003",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "vessels",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000004",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "crew",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000005",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "crew_roster",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000006",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "ism",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000007",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "incidents",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000008",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "drills",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000009",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "audits",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000010",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "forms",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000011",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "certificates",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000012",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "vessel_certificates",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000013",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "documents",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000014",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "maintenance",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000015",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "alerts",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000016",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "training",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000017",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "reports",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000018",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "insurance",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000019",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "settings",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000020",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "hr",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000021",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "payroll",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000022",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "finance",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000023",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "medical",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000024",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "wellness",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000025",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "legal",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000026",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "logbooks",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000027",
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "module_key": "itinerary",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000101",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "dashboard",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000102",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "fleet",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000103",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "vessels",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000104",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "crew",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000105",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "crew_roster",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000106",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "ism",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000107",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "incidents",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000108",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "drills",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000109",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "audits",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000110",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "forms",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000111",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "certificates",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000112",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "vessel_certificates",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000113",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "documents",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000114",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "maintenance",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000115",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "alerts",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000116",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "training",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000117",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "reports",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000118",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "insurance",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000119",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "settings",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000120",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "hr",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000121",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "payroll",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000122",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "finance",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000123",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "medical",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000124",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "wellness",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000125",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "legal",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000126",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "logbooks",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  },
+  {
+    "id": "92000000-0000-4000-8000-000000000127",
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "module_key": "itinerary",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "created_at": "$ts:-900d",
+    "updated_at": "$ts:-900d"
+  }
+]

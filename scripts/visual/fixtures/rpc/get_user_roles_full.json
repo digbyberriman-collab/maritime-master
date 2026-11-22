@@ -1,0 +1,20 @@
+[
+  {
+    "role_id": "90000000-0000-4000-8000-000000000001",
+    "role_name": "superadmin",
+    "role_display_name": "Superadmin",
+    "vessel_id": null,
+    "vessel_name": null,
+    "department": null,
+    "is_fleet_wide": true
+  },
+  {
+    "role_id": "90000000-0000-4000-8000-000000000002",
+    "role_name": "dpa",
+    "role_display_name": "DPA",
+    "vessel_id": null,
+    "vessel_name": null,
+    "department": null,
+    "is_fleet_wide": true
+  }
+]

@@ -1,0 +1,32 @@
+[
+  {
+    "id": "93000000-0000-4000-8000-000000000001",
+    "user_id": "a0000000-0000-4000-8000-000000000001",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "role": "superadmin",
+    "vessel_id": null,
+    "department": null,
+    "is_active": true,
+    "granted_at": "$ts:-600d",
+    "granted_by": null,
+    "expires_at": null,
+    "metadata": null,
+    "created_at": "$ts:-600d",
+    "updated_at": "$ts:-600d"
+  },
+  {
+    "id": "93000000-0000-4000-8000-000000000002",
+    "user_id": "a0000000-0000-4000-8000-000000000001",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "role": "dpa",
+    "vessel_id": null,
+    "department": null,
+    "is_active": true,
+    "granted_at": "$ts:-600d",
+    "granted_by": null,
+    "expires_at": null,
+    "metadata": null,
+    "created_at": "$ts:-600d",
+    "updated_at": "$ts:-600d"
+  }
+]

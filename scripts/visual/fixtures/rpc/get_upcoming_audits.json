@@ -1,0 +1,24 @@
+[
+  {
+    "id": "b1000000-0000-4000-8000-000000000001",
+    "audit_type": "Internal",
+    "audit_number": "AUD-XIP-{year}-004",
+    "audit_scope": "ISM internal audit",
+    "scheduled_date": "$date:+35",
+    "days_until_due": 35,
+    "vessel_id": "e0000000-0000-4000-8000-000000000005",
+    "vessel_name": "XIPHIAS",
+    "status": "Scheduled"
+  },
+  {
+    "id": "b1000000-0000-4000-8000-000000000002",
+    "audit_type": "External",
+    "audit_number": "AUD-DRA-{year}-002",
+    "audit_scope": "Flag state inspection",
+    "scheduled_date": "$date:+64",
+    "days_until_due": 64,
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "vessel_name": "DRAAK",
+    "status": "Scheduled"
+  }
+]

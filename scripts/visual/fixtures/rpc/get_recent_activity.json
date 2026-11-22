@@ -1,0 +1,50 @@
+[
+  {
+    "id": "b2000000-0000-4000-8000-000000000001",
+    "activity_type": "incident",
+    "title": "Near miss reported",
+    "description": "Mooring line parted while tendering alongside",
+    "module": "incidents",
+    "record_id": null,
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "vessel_name": "DRAAK",
+    "performed_by_name": "Demo Master",
+    "created_at": "$ts:-3d"
+  },
+  {
+    "id": "b2000000-0000-4000-8000-000000000002",
+    "activity_type": "certificate",
+    "title": "Certificate renewed",
+    "description": "Fire detection loop test certificate uploaded",
+    "module": "certificates",
+    "record_id": null,
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "vessel_name": "DRAAK",
+    "performed_by_name": "Demo Chief Engineer",
+    "created_at": "$ts:-9d"
+  },
+  {
+    "id": "b2000000-0000-4000-8000-000000000003",
+    "activity_type": "maintenance",
+    "title": "Defect raised",
+    "description": "Emergency generator fails to start on auto",
+    "module": "maintenance",
+    "record_id": null,
+    "vessel_id": "e0000000-0000-4000-8000-000000000003",
+    "vessel_name": "LEVIATHAN",
+    "performed_by_name": "Demo Chief Engineer",
+    "created_at": "$ts:-3d"
+  },
+  {
+    "id": "b2000000-0000-4000-8000-000000000004",
+    "activity_type": "crew",
+    "title": "Crew joined",
+    "description": "Second Stew joined XIPHIAS",
+    "module": "crew",
+    "record_id": null,
+    "vessel_id": "e0000000-0000-4000-8000-000000000005",
+    "vessel_name": "XIPHIAS",
+    "performed_by_name": "Demo Fleet Manager",
+    "created_at": "$ts:-6d"
+  }
+]

@@ -1,0 +1,68 @@
+[
+  {
+    "id": "c1000000-0000-4000-8000-000000000001",
+    "certificate_type": "Statutory",
+    "certificate_name": "Safety Management Certificate",
+    "expiry_date": "$date:+6",
+    "days_until_expiry": 6,
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "vessel_name": "DRAAK",
+    "is_crew_cert": false,
+    "crew_member_name": null
+  },
+  {
+    "id": "c1000000-0000-4000-8000-000000000002",
+    "certificate_type": "Statutory",
+    "certificate_name": "Safety Radio Certificate",
+    "expiry_date": "$date:+18",
+    "days_until_expiry": 18,
+    "vessel_id": "e0000000-0000-4000-8000-000000000005",
+    "vessel_name": "XIPHIAS",
+    "is_crew_cert": false,
+    "crew_member_name": null
+  },
+  {
+    "id": "c1000000-0000-4000-8000-000000000003",
+    "certificate_type": "Statutory",
+    "certificate_name": "International Load Line Certificate",
+    "expiry_date": "$date:+27",
+    "days_until_expiry": 27,
+    "vessel_id": "e0000000-0000-4000-8000-000000000002",
+    "vessel_name": "GAME CHANGER",
+    "is_crew_cert": false,
+    "crew_member_name": null
+  },
+  {
+    "id": "c1000000-0000-4000-8000-000000000004",
+    "certificate_type": "Medical",
+    "certificate_name": "ENG1 Medical Fitness",
+    "expiry_date": "$date:+12",
+    "days_until_expiry": 12,
+    "vessel_id": "e0000000-0000-4000-8000-000000000007",
+    "vessel_name": "HYDRA",
+    "is_crew_cert": true,
+    "crew_member_name": "Demo Second Engineer"
+  },
+  {
+    "id": "c1000000-0000-4000-8000-000000000005",
+    "certificate_type": "COC",
+    "certificate_name": "Chief Mate (Yachts < 3000 GT)",
+    "expiry_date": "$date:+22",
+    "days_until_expiry": 22,
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "vessel_name": "DRAAK",
+    "is_crew_cert": true,
+    "crew_member_name": "Demo Chief Officer"
+  },
+  {
+    "id": "c1000000-0000-4000-8000-000000000006",
+    "certificate_type": "Statutory",
+    "certificate_name": "Maritime Labour Certificate",
+    "expiry_date": "$date:+75",
+    "days_until_expiry": 75,
+    "vessel_id": "e0000000-0000-4000-8000-000000000004",
+    "vessel_name": "ROCINANTE",
+    "is_crew_cert": false,
+    "crew_member_name": null
+  }
+]

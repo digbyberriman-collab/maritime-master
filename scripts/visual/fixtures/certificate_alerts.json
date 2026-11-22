@@ -1,0 +1,67 @@
+[
+  {
+    "id": "c2000000-0000-4000-8000-000000000001",
+    "certificate_id": "c1000000-0000-4000-8000-000000000001",
+    "alert_type": "30_days",
+    "alert_date": "$date:-1",
+    "sent_at": "$ts:-1d",
+    "sent_to": [
+      "a0000000-0000-4000-8000-000000000001"
+    ],
+    "acknowledged_at": null,
+    "acknowledged_by": null,
+    "created_at": "$ts:-1d"
+  },
+  {
+    "id": "c2000000-0000-4000-8000-000000000002",
+    "certificate_id": "c1000000-0000-4000-8000-000000000004",
+    "alert_type": "30_days",
+    "alert_date": "$date:-1",
+    "sent_at": "$ts:-1d",
+    "sent_to": [
+      "a0000000-0000-4000-8000-000000000001"
+    ],
+    "acknowledged_at": null,
+    "acknowledged_by": null,
+    "created_at": "$ts:-1d"
+  },
+  {
+    "id": "c2000000-0000-4000-8000-000000000003",
+    "certificate_id": "c1000000-0000-4000-8000-000000000005",
+    "alert_type": "expired",
+    "alert_date": "$date:-1",
+    "sent_at": "$ts:-1d",
+    "sent_to": [
+      "a0000000-0000-4000-8000-000000000001"
+    ],
+    "acknowledged_at": null,
+    "acknowledged_by": null,
+    "created_at": "$ts:-1d"
+  },
+  {
+    "id": "c2000000-0000-4000-8000-000000000004",
+    "certificate_id": "c1000000-0000-4000-8000-000000000007",
+    "alert_type": "30_days",
+    "alert_date": "$date:-1",
+    "sent_at": "$ts:-1d",
+    "sent_to": [
+      "a0000000-0000-4000-8000-000000000001"
+    ],
+    "acknowledged_at": null,
+    "acknowledged_by": null,
+    "created_at": "$ts:-1d"
+  },
+  {
+    "id": "c2000000-0000-4000-8000-000000000005",
+    "certificate_id": "c1000000-0000-4000-8000-000000000008",
+    "alert_type": "30_days",
+    "alert_date": "$date:-1",
+    "sent_at": "$ts:-1d",
+    "sent_to": [
+      "a0000000-0000-4000-8000-000000000001"
+    ],
+    "acknowledged_at": null,
+    "acknowledged_by": null,
+    "created_at": "$ts:-1d"
+  }
+]

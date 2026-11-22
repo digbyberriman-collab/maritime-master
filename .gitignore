@@ -36,3 +36,4 @@ dist-ssr
 *.sqlite3
 inkfish-private/
 __pycache__/
+.visual/

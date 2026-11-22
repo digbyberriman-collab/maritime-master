@@ -1,0 +1,42 @@
+[
+  {
+    "id": "f1000000-0000-4000-8000-000000000001",
+    "name": "Manuals",
+    "icon": "BookOpen",
+    "color": "primary",
+    "display_order": 1,
+    "created_at": "$ts:-500d"
+  },
+  {
+    "id": "f1000000-0000-4000-8000-000000000002",
+    "name": "Procedures",
+    "icon": "ListChecks",
+    "color": "primary",
+    "display_order": 2,
+    "created_at": "$ts:-500d"
+  },
+  {
+    "id": "f1000000-0000-4000-8000-000000000003",
+    "name": "Policies",
+    "icon": "Shield",
+    "color": "primary",
+    "display_order": 3,
+    "created_at": "$ts:-500d"
+  },
+  {
+    "id": "f1000000-0000-4000-8000-000000000004",
+    "name": "ISM / SMS",
+    "icon": "FileText",
+    "color": "primary",
+    "display_order": 4,
+    "created_at": "$ts:-500d"
+  },
+  {
+    "id": "f1000000-0000-4000-8000-000000000005",
+    "name": "Drawings",
+    "icon": "Ruler",
+    "color": "primary",
+    "display_order": 5,
+    "created_at": "$ts:-500d"
+  }
+]

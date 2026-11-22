@@ -1,0 +1,191 @@
+[
+  {
+    "module_key": "dashboard",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "fleet",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "vessels",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "crew",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "crew_roster",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "ism",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "incidents",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "drills",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "audits",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "forms",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "certificates",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "vessel_certificates",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "documents",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "maintenance",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "alerts",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "training",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "reports",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "insurance",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "settings",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "hr",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "payroll",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "finance",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "medical",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "wellness",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "legal",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "logbooks",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  },
+  {
+    "module_key": "itinerary",
+    "permission": "admin",
+    "scope": "fleet",
+    "restrictions": {},
+    "source": "role"
+  }
+]

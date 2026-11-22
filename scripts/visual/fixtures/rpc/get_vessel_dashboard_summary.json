@@ -1,0 +1,24 @@
+[
+  {
+    "vessel_id": null,
+    "vessel_name": "All vessels",
+    "imo_number": null,
+    "flag_state": null,
+    "classification_society": null,
+    "open_alerts_count": 7,
+    "red_alerts_count": 2,
+    "crew_onboard_count": 12,
+    "current_captain": null,
+    "certs_expiring_90d": 6,
+    "crew_certs_expiring_90d": 4,
+    "overdue_drills_count": 1,
+    "training_gaps_count": 2,
+    "overdue_maintenance_count": 1,
+    "critical_defects_count": 1,
+    "audits_due_90d": 2,
+    "open_ncs_count": 3,
+    "open_capas_count": 3,
+    "pending_signatures_count": 4,
+    "data_refreshed_at": "$now"
+  }
+]

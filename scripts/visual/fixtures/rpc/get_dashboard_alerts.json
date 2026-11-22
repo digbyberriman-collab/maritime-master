@@ -1,0 +1,57 @@
+[
+  {
+    "id": "a1000000-0000-4000-8000-000000000001",
+    "title": "Safety Management Certificate expires in 6 days",
+    "severity": "red",
+    "source_module": "certificates",
+    "due_at": "$ts:6d",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "vessel_name": "DRAAK",
+    "created_at": "$ts:-2d",
+    "is_overdue": false
+  },
+  {
+    "id": "a1000000-0000-4000-8000-000000000002",
+    "title": "Emergency generator out of service",
+    "severity": "red",
+    "source_module": "maintenance",
+    "due_at": "$ts:-1d",
+    "vessel_id": "e0000000-0000-4000-8000-000000000003",
+    "vessel_name": "LEVIATHAN",
+    "created_at": "$ts:-3d",
+    "is_overdue": true
+  },
+  {
+    "id": "a1000000-0000-4000-8000-000000000003",
+    "title": "Abandon-ship drill overdue",
+    "severity": "orange",
+    "source_module": "drills",
+    "due_at": "$ts:-4d",
+    "vessel_id": "e0000000-0000-4000-8000-000000000002",
+    "vessel_name": "GAME CHANGER",
+    "created_at": "$ts:-4d",
+    "is_overdue": true
+  },
+  {
+    "id": "a1000000-0000-4000-8000-000000000004",
+    "title": "Second Engineer medical fitness expiring",
+    "severity": "orange",
+    "source_module": "crew",
+    "due_at": "$ts:12d",
+    "vessel_id": "e0000000-0000-4000-8000-000000000007",
+    "vessel_name": "HYDRA",
+    "created_at": "$ts:-5d",
+    "is_overdue": false
+  },
+  {
+    "id": "a1000000-0000-4000-8000-000000000005",
+    "title": "Liferaft annual service due",
+    "severity": "yellow",
+    "source_module": "maintenance",
+    "due_at": "$ts:21d",
+    "vessel_id": "e0000000-0000-4000-8000-000000000004",
+    "vessel_name": "ROCINANTE",
+    "created_at": "$ts:-6d",
+    "is_overdue": false
+  }
+]
