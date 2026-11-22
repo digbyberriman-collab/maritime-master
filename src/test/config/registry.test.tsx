@@ -190,7 +190,9 @@ describe('nav invariants', () => {
 
   it('the slots match the shell: one vessel slot per tab, one tree per workspace module', () => {
     expect(VESSEL_SLOTS.map((s) => s.slice('vessel.'.length))).toEqual(VESSEL_MODULES.map((m) => m.id));
-    expect(NAVIGATION_ITEMS.slice(2).map((m) => m.id)).toEqual(WORKSPACE_TREES.map((w) => w.id));
+    // Fleet, Vessel, the workspace trees, then the personal tree (spec §8).
+    expect(NAVIGATION_ITEMS.slice(2, -1).map((m) => m.id)).toEqual(WORKSPACE_TREES.map((w) => w.id));
+    expect(NAVIGATION_ITEMS[NAVIGATION_ITEMS.length - 1]?.id).toBe('personal');
     expect(new Set(NAV_SLOTS).size).toBe(NAV_SLOTS.length);
   });
 });

@@ -46,6 +46,13 @@ export interface NavChild {
    * while access is loading and for an unknown key).
    */
   capability?: string;
+  /**
+   * Add-on entitlement key (gap/03 add-ons, DECISIONS G4). A node whose
+   * entitlement the vessel lacks stays visible with a lock and opens the
+   * add-on explanation, never the page (nav visibility rule, step 6). With no
+   * entitlement source yet (Phase 1), every such node is locked.
+   */
+  entitlement?: string;
   /** Key into the sidebar badge registry (count of items waiting). */
   badgeKey?: string;
   /**
@@ -111,6 +118,10 @@ export interface VesselModule {
   moduleSetting?: string;
   /** `planned` keeps the whole tab hidden unless "Show roadmap" (G1, G5, D-06). */
   status: NavStatus;
+  /** PMS capability key the tab needs (fails closed: hidden while loading and for an unknown key). */
+  capability?: string;
+  /** Add-on entitlement key: without it the tab shows a lock and explains the add-on (G4). */
+  entitlement?: string;
   /** Badge registry key shown on the tab. */
   badgeKey?: string;
 }

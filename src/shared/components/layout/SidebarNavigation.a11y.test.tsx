@@ -1,8 +1,11 @@
+import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import SidebarNavigation from '@/shared/components/layout/SidebarNavigation';
 import { NavAccessContext, type NavAccess } from '@/app/nav/navAccess';
+import { useFilteredModuleTree } from '@/app/nav/useFilteredTree';
+import { NAVIGATION_ITEMS } from '@/config/sitemap';
 
 const mocks = vi.hoisted(() => ({
   order: { map: {} },
@@ -42,11 +45,18 @@ const OPEN_ACCESS: NavAccess = { ready: true, legacyRole: 'dpa', rbacRoles: [], 
 
 const LocationProbe = () => <output aria-label="Current route">{useLocation().pathname}{useLocation().search}</output>;
 
+/** The static vessel tree (tabs as groups), as a legacy page shows it. */
+const VesselTree: React.FC<{ collapsed: boolean; onExpand: () => void }> = ({ collapsed, onExpand }) => {
+  const vessel = NAVIGATION_ITEMS.find((m) => m.id === 'vessel') ?? null;
+  const nodes = useFilteredModuleTree(vessel);
+  return <SidebarNavigation nodes={nodes} heading={vessel} rootPath={vessel?.path} collapsed={collapsed} onExpand={onExpand} />;
+};
+
 function renderSidebar(path = '/v/dra/logbooks/review?module=vessel', collapsed = false, onExpand = vi.fn()) {
   return render(
     <NavAccessContext.Provider value={OPEN_ACCESS}>
       <MemoryRouter initialEntries={[path]}>
-        <SidebarNavigation moduleId="vessel" collapsed={collapsed} onExpand={onExpand} />
+        <VesselTree collapsed={collapsed} onExpand={onExpand} />
         <LocationProbe />
       </MemoryRouter>
     </NavAccessContext.Provider>,
@@ -68,7 +78,7 @@ describe('SidebarNavigation accessibility regressions', () => {
   it('identifies one active page and announces it through a polite atomic live region', async () => {
     renderSidebar();
     const navigation = screen.getByRole('navigation', { name: 'Vessel folders' });
-    const current = within(navigation).getAllByRole('button').filter((button) => button.getAttribute('aria-current') === 'page');
+    const current = within(navigation).getAllByRole('link').filter((link) => link.getAttribute('aria-current') === 'page');
 
     expect(current).toHaveLength(1);
     expect(current[0]).toHaveAccessibleName(/Review & Sign-off, current page/i);
@@ -115,15 +125,16 @@ describe('SidebarNavigation accessibility regressions', () => {
     expect(onExpand).toHaveBeenCalledOnce();
   });
 
-  it('navigates a focused leaf control and keeps its accessible name', async () => {
+  it('navigates a focused leaf link and keeps its accessible name', async () => {
     renderSidebar('/v/dra/logbooks/review?module=vessel');
     const crew = screen.getByRole('button', { name: /Crew section, collapsed/i });
     activateWithKeyboard(crew);
-    const crewList = await screen.findByRole('button', { name: 'Crew List' });
+    const crewList = await screen.findByRole('link', { name: 'Crew List' });
 
     expect(crewList.className).toContain('focus-visible:ring-2');
     activateWithKeyboard(crewList);
     expect(crewList).toHaveFocus();
-    await waitFor(() => expect(screen.getByLabelText('Current route')).toHaveTextContent('/crew/list?module=vessel'));
+    // A link into the vessel scope never carries a workspace's ?module= (deferred item 2).
+    await waitFor(() => expect(screen.getByLabelText('Current route')).toHaveTextContent(/^\/v\/:vesselCode\/crew\/list$/));
   });
 });

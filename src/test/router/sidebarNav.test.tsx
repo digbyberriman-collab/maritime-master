@@ -1,17 +1,26 @@
 /**
- * The sidebar over the real nav tree (BUILD-PLAN B3, B7; D-06; gap/10 IA6,
- * IA7, IA10): planned leaves are hidden by default, shown with a "Planned"
- * chip when an owner or admin turns on "Show roadmap", and never shown to
- * anyone else. The Fleet tree renders its section headings; fleet and vessel
- * nodes need reach to that scope. Vessel URLs light up their leaf.
+ * The sidebar over the real nav tree (BUILD-PLAN B3, B7, S3; D-06; gap/10
+ * IA6, IA7, IA10): planned leaves are hidden by default, shown with a
+ * "Planned" chip when an owner or admin turns on "Show roadmap", and never
+ * shown to anyone else. The Fleet tree renders its section headings; fleet
+ * and vessel nodes need reach to that scope. Vessel URLs light up their leaf.
+ *
+ * The trees are filtered the way the shell filters them
+ * (`useFilteredModuleTree`) and drawn by SidebarNavigation, whose leaves are
+ * links. `vessel` here is the static vessel tree a legacy page still shows
+ * (tabs as groups on the `/v/:vesselCode` pattern); the vessel scope's own
+ * per-tab sidebar is covered by src/test/shell/sidebarScopes.test.tsx.
  */
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import SidebarNavigation from '@/shared/components/layout/SidebarNavigation';
+import SidebarFooter from '@/shared/components/layout/SidebarFooter';
 import { NavAccessContext, type NavAccess } from '@/app/nav/navAccess';
 import { SHOW_ROADMAP_KEY } from '@/app/nav/roadmap';
+import { useFilteredModuleTree } from '@/app/nav/useFilteredTree';
+import { NAVIGATION_ITEMS } from '@/config/sitemap';
 
 const mocks = vi.hoisted(() => ({
   order: { map: {} },
@@ -41,10 +50,18 @@ const admin: NavAccess = { ready: true, legacyRole: 'dpa', rbacRoles: ['dpa'], c
 const crew: NavAccess = { ready: true, legacyRole: 'crew', rbacRoles: ['crew'], can: () => false, fleetReach: false, vesselReach: true };
 const fleetAdmin: NavAccess = { ...admin, can: () => true };
 
+const TreeSidebar: React.FC<{ moduleId: string }> = ({ moduleId }) => {
+  const module = NAVIGATION_ITEMS.find((m) => m.id === moduleId) ?? null;
+  const nodes = useFilteredModuleTree(module);
+  return <SidebarNavigation nodes={nodes} heading={module} rootPath={module?.path} moduleParam={moduleId} />;
+};
+
 function renderSidebar(path: string, access?: NavAccess, moduleId = 'vessel') {
   const tree = (
     <MemoryRouter initialEntries={[path]}>
-      <SidebarNavigation moduleId={moduleId} />
+      <TreeSidebar moduleId={moduleId} />
+      {/* The Show roadmap switch lives in the sidebar footer (D-29). */}
+      <SidebarFooter collapsed={false} />
     </MemoryRouter>
   );
   return render(access ? <NavAccessContext.Provider value={access}>{tree}</NavAccessContext.Provider> : tree);
@@ -65,9 +82,9 @@ describe('planned leaves in the sidebar', () => {
   it('are hidden by default, while live leaves show', () => {
     renderSidebar(DRILLS, admin);
     const nav = screen.getByRole('navigation', { name: 'Vessel folders' });
-    expect(within(nav).getByRole('button', { name: /^Drills, current page/ })).toBeInTheDocument();
-    expect(within(nav).queryByRole('button', { name: /^Summary/ })).toBeNull();
-    expect(within(nav).queryByRole('button', { name: /Muster List/ })).toBeNull();
+    expect(within(nav).getByRole('link', { name: /^Drills, current page/ })).toBeInTheDocument();
+    expect(within(nav).queryByRole('link', { name: /^Summary/ })).toBeNull();
+    expect(within(nav).queryByRole('link', { name: /Muster List/ })).toBeNull();
   });
 
   it('hide a group whose leaves are all planned, and the planned Finance and Departments tabs (G1, G5)', () => {
@@ -78,22 +95,22 @@ describe('planned leaves in the sidebar', () => {
     // planned module still hides them.
     expect(within(nav).queryByRole('button', { name: /^Finance section/ })).toBeNull();
     expect(within(nav).queryByRole('button', { name: /^Departments section/ })).toBeNull();
-    expect(within(nav).queryByRole('button', { name: /^Reports/ })).toBeNull();
-    expect(within(nav).getByRole('button', { name: /^Home/ })).toBeInTheDocument();
-    expect(within(nav).getByRole('button', { name: /^Calendar/ })).toBeInTheDocument();
+    expect(within(nav).queryByRole('link', { name: /^Reports/ })).toBeNull();
+    expect(within(nav).getByRole('link', { name: /^Home/ })).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: /^Calendar/ })).toBeInTheDocument();
   });
 
   it('show with a Planned chip when an admin turns on Show roadmap', () => {
     renderSidebar(DRILLS, admin);
-    const toggle = screen.getByRole('button', { name: /Show roadmap/ });
-    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    const toggle = screen.getByRole('switch', { name: /Show roadmap/ });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
     act(() => {
       fireEvent.click(toggle);
     });
     expect(localStorage.getItem(SHOW_ROADMAP_KEY)).toBe('true');
-    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(toggle).toHaveAttribute('aria-checked', 'true');
     const nav = screen.getByRole('navigation', { name: 'Vessel folders' });
-    expect(within(nav).getByRole('button', { name: 'Summary, planned' })).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: 'Summary, planned' })).toBeInTheDocument();
     expect(within(nav).getAllByText('Planned').length).toBeGreaterThan(0);
     expect(within(nav).getByRole('button', { name: /^Finance section/ })).toBeInTheDocument();
     expect(within(nav).getByRole('button', { name: /^Charter section/ })).toBeInTheDocument();
@@ -103,18 +120,18 @@ describe('planned leaves in the sidebar', () => {
     localStorage.setItem(SHOW_ROADMAP_KEY, 'true');
     renderSidebar(DRILLS, crew);
     const nav = screen.getByRole('navigation', { name: 'Vessel folders' });
-    expect(within(nav).getByRole('button', { name: /^Drills, current page/ })).toBeInTheDocument();
-    expect(within(nav).queryByRole('button', { name: /^Summary/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Show roadmap/ })).toBeNull();
+    expect(within(nav).getByRole('link', { name: /^Drills, current page/ })).toBeInTheDocument();
+    expect(within(nav).queryByRole('link', { name: /^Summary/ })).toBeNull();
+    expect(screen.queryByRole('switch', { name: /Show roadmap/ })).toBeNull();
   });
 
   it('stay hidden without access information (fail closed)', () => {
     localStorage.setItem(SHOW_ROADMAP_KEY, 'true');
     renderSidebar(DRILLS);
-    expect(screen.queryByRole('button', { name: /^Summary/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Show roadmap/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /^Summary/ })).toBeNull();
+    expect(screen.queryByRole('switch', { name: /Show roadmap/ })).toBeNull();
     // No vessel reach is known yet, so no vessel page is offered at all.
-    expect(screen.queryByRole('button', { name: /^Drills/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /^Drills/ })).toBeNull();
   });
 });
 
@@ -124,30 +141,30 @@ describe('vessel URLs', () => {
   it('light up their leaf for any vessel code', () => {
     renderSidebar('/v/dra/logbooks/review?module=vessel', admin);
     const nav = screen.getByRole('navigation', { name: 'Vessel folders' });
-    expect(within(nav).getByRole('button', { name: /Review & Sign-off, current page/ })).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: /Review & Sign-off, current page/ })).toBeInTheDocument();
   });
 
   it('light up the leaf a detail page sits under', () => {
     renderSidebar('/v/hyd/crew/planner/manning?module=vessel', admin);
     const nav = screen.getByRole('navigation', { name: 'Vessel folders' });
-    expect(within(nav).getByRole('button', { name: /^Planner, current page/ })).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: /^Planner, current page/ })).toBeInTheDocument();
   });
 
   it('light up Home on the vessel home only, not on every page under it', () => {
     const { unmount } = renderSidebar('/v/dra?module=vessel', admin);
-    expect(screen.getByRole('button', { name: /^Home, current page/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Home, current page/ })).toBeInTheDocument();
     unmount();
     // A planned page (its own leaf hidden) inside a hidden module: nothing is current.
     renderSidebar('/v/dra/departments/bridge/handover-notes?module=vessel', admin);
     const nav = screen.getByRole('navigation', { name: 'Vessel folders' });
-    expect(within(nav).getByRole('button', { name: /^Home$/ })).toBeInTheDocument();
-    expect(within(nav).queryAllByRole('button').filter((b) => b.getAttribute('aria-current') === 'page')).toEqual([]);
+    expect(within(nav).getByRole('link', { name: /^Home$/ })).toBeInTheDocument();
+    expect(within(nav).queryAllByRole('link').filter((b) => b.getAttribute('aria-current') === 'page')).toEqual([]);
   });
 
   it('are hidden from someone with no vessel to open', () => {
     renderSidebar(DRILLS, { ...admin, vesselReach: false });
     const nav = screen.getByRole('navigation', { name: 'Vessel folders' });
-    const offered = within(nav).queryAllByRole('button').filter((b) => !/Show roadmap/.test(b.textContent ?? ''));
+    const offered = [...within(nav).queryAllByRole('link'), ...within(nav).queryAllByRole('button')];
     expect(offered).toEqual([]);
   });
 });
@@ -163,34 +180,34 @@ describe('the Fleet tree', () => {
       'Overview', 'Compliance', 'People', 'Workspaces', 'Administration', 'Configuration',
     ]);
     const compliance = within(nav).getByRole('group', { name: 'Compliance' });
-    expect(within(compliance).getByRole('button', { name: /^Documents, current page/ })).toBeInTheDocument();
+    expect(within(compliance).getByRole('link', { name: /^Documents, current page/ })).toBeInTheDocument();
   });
 
   it('shows only built pages by default', () => {
     renderSidebar('/fleet/dashboard?module=fleet', fleetAdmin, 'fleet');
     const nav = screen.getByRole('navigation', { name: 'Fleet folders' });
     for (const label of ['Dashboard', 'Tracker', 'Reports', 'Calendar', 'Planner', 'Documents', 'Training', 'Users & Access', 'Notifications', 'Vessels']) {
-      expect(within(nav).getByRole('button', { name: new RegExp(`^${label.replace(/[&]/g, '\\&')}`) }), label).toBeInTheDocument();
+      expect(within(nav).getByRole('link', { name: new RegExp(`^${label.replace(/[&]/g, '\\&')}`) }), label).toBeInTheDocument();
     }
     for (const label of ['Safety queue', 'Forms & Checklists', 'Visits', 'Support', 'Vessel Settings', 'Add-ons', 'Feedback']) {
-      expect(within(nav).queryByRole('button', { name: new RegExp(`^${label}`) }), label).toBeNull();
+      expect(within(nav).queryByRole('link', { name: new RegExp(`^${label}`) }), label).toBeNull();
     }
   });
 
   it('hides fleet pages from someone without fleet reach, but keeps the workspaces', () => {
     renderSidebar('/hris?module=fleet', { ...fleetAdmin, fleetReach: false }, 'fleet');
     const nav = screen.getByRole('navigation', { name: 'Fleet folders' });
-    expect(within(nav).queryByRole('button', { name: /^Dashboard/ })).toBeNull();
+    expect(within(nav).queryByRole('link', { name: /^Dashboard/ })).toBeNull();
     expect(within(nav).queryByRole('group', { name: 'Overview' })).toBeNull();
     const workspaces = within(nav).getByRole('group', { name: 'Workspaces' });
-    expect(within(workspaces).getByRole('button', { name: /^HRIS/ })).toBeInTheDocument();
+    expect(within(workspaces).getByRole('link', { name: /^HRIS/ })).toBeInTheDocument();
   });
 
   it('gates the administration leaves on their capability (fail closed)', () => {
     renderSidebar('/fleet/dashboard?module=fleet', admin, 'fleet');
     const nav = screen.getByRole('navigation', { name: 'Fleet folders' });
-    expect(within(nav).getByRole('button', { name: /^Dashboard/ })).toBeInTheDocument();
-    expect(within(nav).queryByRole('button', { name: /^Users & Access/ })).toBeNull();
+    expect(within(nav).getByRole('link', { name: /^Dashboard/ })).toBeInTheDocument();
+    expect(within(nav).queryByRole('link', { name: /^Users & Access/ })).toBeNull();
     expect(within(nav).queryByRole('group', { name: 'Administration' })).toBeNull();
   });
 });
@@ -203,7 +220,7 @@ describe('badges', () => {
     const nav = screen.getByRole('navigation', { name: 'Vessel folders' });
     // Communications (unread messages) is planned, so the Vessel group carries its badge.
     expect(within(nav).getByRole('button', { name: /^Vessel section.*4 unread messages/ })).toBeInTheDocument();
-    expect(within(nav).getByRole('button', { name: 'Open 4 unread messages' })).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: 'Open 4 unread messages' })).toBeInTheDocument();
   });
 
   it('skips a section heading, which shows no badge, for the nearest group', () => {
@@ -212,7 +229,7 @@ describe('badges', () => {
     const nav = screen.getByRole('navigation', { name: 'Vessel folders' });
     openGroup(/^Vessel section/);
     expect(within(nav).getByText('Vessel Record').tagName).toBe('P');
-    expect(within(nav).getAllByRole('button', { name: 'Open 4 unread messages' })).toHaveLength(1);
+    expect(within(nav).getAllByRole('link', { name: 'Open 4 unread messages' })).toHaveLength(1);
   });
 
   it('shows on the leaf itself when the leaf is visible', () => {
@@ -220,6 +237,6 @@ describe('badges', () => {
     renderSidebar(DRILLS, admin);
     openGroup(/^Vessel section/);
     const nav = screen.getByRole('navigation', { name: 'Vessel folders' });
-    expect(within(nav).getByRole('button', { name: /Communications, planned, 4 unread messages/ })).toBeInTheDocument();
+    expect(within(nav).getByRole('link', { name: /Communications, planned, 4 unread messages/ })).toBeInTheDocument();
   });
 });

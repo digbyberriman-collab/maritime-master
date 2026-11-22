@@ -18,6 +18,9 @@ const mocks = vi.hoisted(() => ({
     user: { id: 'u1' } as { id: string } | null,
     profile: { id: 'p1', role: 'crew', company_id: 'c1', user_id: 'u1' } as { id: string; role: string; company_id: string; user_id: string } | null,
     loading: false,
+    // Read by the nav filter (the vessel nav runs in the scope since S4).
+    practitionerDisciplines: [] as string[],
+    practitionerDisciplinesLoaded: true,
   },
   perm: {
     isInitialized: true,
@@ -28,12 +31,23 @@ const mocks = vi.hoisted(() => ({
     userRoles: [] as { role_name: string }[],
     setCurrentVessel: vi.fn(),
     hasPermission: () => true,
+    // Read by the shell's nav filter and RBAC Retry notice.
+    permissions: [] as unknown[],
+    error: null as string | null,
+    loadPermissions: async () => undefined,
   },
-  sidebarMounts: 0,
+  // Mounts of the shell (its footer renders once per shell, on every page).
+  shellMounts: 0,
   vesselCtx: null as React.Context<unknown> | null,
 }));
 
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
+// The vessel's module settings: the table is not live (D-01), so every module is on.
+vi.mock('@/modules/vessels/hooks/useVesselModuleSettings', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/modules/vessels/hooks/useVesselModuleSettings')>();
+  const { TABLE_MISSING_STATE } = await import('@/modules/vessels/lib/moduleSettings');
+  return { ...actual, useVesselModuleSettings: () => ({ state: TABLE_MISSING_STATE, fetching: false, retry: () => undefined }) };
+});
 vi.mock('@/modules/auth/contexts/AuthContext', () => ({ useAuth: () => mocks.auth }));
 vi.mock('@/modules/auth/store/permissionsStore', () => ({
   usePermissionsStore: (selector: (s: object) => unknown) => selector(mocks.perm),
@@ -50,22 +64,30 @@ vi.mock('@/shared/contexts/BrandingContext', () => ({
 vi.mock('@/modules/dashboard/contexts/DashboardFilterContext', () => ({
   DashboardFilterProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
-vi.mock('@/shared/components/layout/InkfishFooter', () => ({ default: () => null }));
+vi.mock('@/shared/components/layout/InkfishFooter', async () => {
+  const react = await import('react');
+  return {
+    default: () => {
+      react.useEffect(() => {
+        mocks.shellMounts += 1;
+      }, []);
+      return null;
+    },
+  };
+});
 vi.mock('@/shared/components/InkfishWatermark', () => ({ default: () => null }));
-vi.mock('@/shared/components/layout/FloatingQuickActions', () => ({ default: () => null }));
-vi.mock('@/shared/components/layout/SidebarAccountMenu', () => ({ default: () => null }));
-vi.mock('@/shared/components/layout/NotificationBell', () => ({ default: () => null }));
+// The top bar and its dialogs are covered by src/test/shell; here only the frame matters.
+vi.mock('@/shared/components/layout/topbar/TopBar', () => ({ default: () => null }));
+vi.mock('@/shared/components/layout/ModuleTabBar', () => ({ default: () => null }));
+vi.mock('@/shared/components/layout/topbar/KeyboardShortcutsDialog', () => ({ default: () => null }));
+vi.mock('@/shared/components/layout/topbar/ShellShortcuts', () => ({ default: () => null }));
 vi.mock('@/shared/components/layout/PageLocationHeader', () => ({ default: () => null }));
-vi.mock('@/shared/components/layout/ModuleTopNav', () => ({ default: () => null }));
 vi.mock('@/modules/feedback/components/FeedbackPanel', () => ({ default: () => null }));
 vi.mock('@/modules/feedback/components/FeedbackResolvedToast', () => ({ default: () => null }));
 vi.mock('@/shared/components/layout/SidebarNavigation', async () => {
   const react = await import('react');
   return {
     default: () => {
-      react.useEffect(() => {
-        mocks.sidebarMounts += 1;
-      }, []);
       return react.createElement('nav', { 'aria-label': 'Test sidebar' });
     },
   };
@@ -78,7 +100,6 @@ import {
   LegacyRoute,
   PersonalScope,
   ScopeNotFound,
-  ScopeShell,
   VesselScopeRoute,
   WorkspaceScope,
   useScopedPath,
@@ -234,15 +255,17 @@ function renderApp(url: string, vessels: Omit<FakeVesselProps, 'children'>) {
             <Route index element={<h1>Vessel home</h1>} />
             <Route path="a" element={<PageA />} />
             <Route path="b" element={<PageB />} />
-            <Route path="wide" element={<WidePage />} />
+            {/* Under a module with a sidebar (Crew), so there is a sidebar to keep off-canvas. */}
+            <Route path="crew/wide" element={<WidePage />} />
             <Route path="crew/list" element={<h1>Scoped crew list</h1>} />
             <Route path="*" element={<ScopeNotFound />} />
           </Route>
-          <Route path="/me" element={<PersonalScope />}>
-            <Route index element={<h1>My profile</h1>} />
-            <Route element={<ScopeShell />}>
+          <Route element={<PersonalScope />}>
+            <Route path="/me">
+              <Route index element={<h1>My profile</h1>} />
               <Route path="hours-of-rest" element={<h1>My hours of rest</h1>} />
             </Route>
+            <Route path="/inbox" element={<h1>Inbox</h1>} />
           </Route>
           <Route element={<WorkspaceScope workspace="hris" />}>
             <Route path="/hris/one" element={<HrisOne />} />
@@ -260,11 +283,12 @@ function renderApp(url: string, vessels: Omit<FakeVesselProps, 'children'>) {
 }
 
 const location = () => screen.getByLabelText('location').textContent;
-const shells = () => document.querySelectorAll('aside[aria-label="Main navigation"]').length;
+// One shell root per shell; a page may have no sidebar (vessel home, pages outside a module, S3).
+const shells = () => document.querySelectorAll('[data-shell-scope]').length;
 
 beforeEach(() => {
   localStorage.clear();
-  mocks.sidebarMounts = 0;
+  mocks.shellMounts = 0;
   mocks.auth.user = { id: 'u1' };
   mocks.auth.profile = { id: 'p1', role: 'crew', company_id: 'c1', user_id: 'u1' };
   mocks.auth.loading = false;
@@ -337,8 +361,8 @@ describe('VesselScopeRoute', () => {
   it('does not remount the shell when moving between two pages of the scope', async () => {
     renderApp('/v/dra/a', { reachable: [DRAAK], selected: DRAAK.id });
     await screen.findByRole('heading', { name: 'Page A' });
-    const aside = document.querySelector('aside[aria-label="Main navigation"]');
-    expect(mocks.sidebarMounts).toBe(1);
+    const aside = document.querySelector('[data-shell-scope]');
+    expect(mocks.shellMounts).toBe(1);
 
     act(() => {
       fireEvent.click(screen.getByRole('link', { name: 'to B' }));
@@ -349,9 +373,9 @@ describe('VesselScopeRoute', () => {
     });
     expect(await screen.findByRole('heading', { name: 'Page A' })).toBeInTheDocument();
 
-    expect(mocks.sidebarMounts).toBe(1);
+    expect(mocks.shellMounts).toBe(1);
     expect(shells()).toBe(1);
-    expect(document.querySelector('aside[aria-label="Main navigation"]')).toBe(aside);
+    expect(document.querySelector('[data-shell-scope]')).toBe(aside);
   });
 
   it('moves to the same page on another vessel when the selection changes (IA23)', async () => {
@@ -362,7 +386,7 @@ describe('VesselScopeRoute', () => {
     });
     await waitFor(() => expect(location()).toBe('/v/hyd/a?tab=x'));
     expect(await screen.findByText('Vessel in scope: HYDRA')).toBeInTheDocument();
-    expect(mocks.sidebarMounts).toBe(1);
+    expect(mocks.shellMounts).toBe(1);
   });
 
   it('goes to the fleet dashboard when a fleet user picks All vessels', async () => {
@@ -386,10 +410,31 @@ describe('VesselScopeRoute', () => {
   });
 
   it('passes a nested page\'s collapseSidebar up to the one shell', async () => {
-    renderApp('/v/dra/wide', { reachable: [DRAAK], selected: DRAAK.id });
-    await screen.findByRole('heading', { name: 'Wide page' });
-    const aside = document.querySelector('aside[aria-label="Main navigation"]') as HTMLElement;
-    expect(aside.className).not.toContain('lg:static');
+    // A desktop window: without the wide request the static column would show.
+    const realMatchMedia = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: /min-width:\s*(768|1024)px/.test(query),
+      media: query,
+      onchange: null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+    })) as typeof window.matchMedia;
+    try {
+      const normal = renderApp('/v/dra/crew/list', { reachable: [DRAAK], selected: DRAAK.id });
+      await screen.findByRole('heading', { name: 'Scoped crew list' });
+      await waitFor(() => expect(document.querySelector('aside[aria-label="Main navigation"]')).not.toBeNull());
+      normal.unmount();
+      renderApp('/v/dra/crew/wide', { reachable: [DRAAK], selected: DRAAK.id });
+      await screen.findByRole('heading', { name: 'Wide page' });
+      // Wide mode: no static column; the sidebar is the drawer behind the menu button.
+      await waitFor(() => expect(document.querySelector('aside[aria-label="Main navigation"]')).toBeNull());
+      expect(shells()).toBe(1);
+    } finally {
+      window.matchMedia = realMatchMedia;
+    }
   });
 
   it('clears the vessel from the permission store on leaving the scope', async () => {
@@ -532,25 +577,29 @@ describe('FleetScope', () => {
 });
 
 describe('PersonalScope and WorkspaceScope', () => {
-  it('/me renders its page without a shell; its shell routes get one', () => {
-    const { unmount } = renderApp('/me', { reachable: [] });
-    expect(screen.getByRole('heading', { name: 'My profile' })).toBeInTheDocument();
-    expect(shells()).toBe(0);
-    unmount();
-    renderApp('/me/hours-of-rest', { reachable: [] });
-    expect(screen.getByRole('heading', { name: 'My hours of rest' })).toBeInTheDocument();
-    expect(shells()).toBe(1);
+  it('renders every /me page and the inbox inside one personal shell', () => {
+    for (const [url, heading] of [
+      ['/me', 'My profile'],
+      ['/me/hours-of-rest', 'My hours of rest'],
+      ['/inbox', 'Inbox'],
+    ] as const) {
+      const { unmount } = renderApp(url, { reachable: [] });
+      expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
+      expect(shells()).toBe(1);
+      expect(document.querySelector('[data-shell-scope]')).toHaveAttribute('data-shell-scope', 'personal');
+      unmount();
+    }
   });
 
   it('a workspace keeps one shell across its pages', async () => {
     renderApp('/hris/one', { reachable: [DRAAK], selected: DRAAK.id });
     await screen.findByRole('heading', { name: 'HRIS one' });
-    expect(mocks.sidebarMounts).toBe(1);
+    expect(mocks.shellMounts).toBe(1);
     act(() => {
       fireEvent.click(screen.getByRole('link', { name: 'to HRIS two' }));
     });
     expect(await screen.findByRole('heading', { name: 'HRIS two' })).toBeInTheDocument();
-    expect(mocks.sidebarMounts).toBe(1);
+    expect(mocks.shellMounts).toBe(1);
     expect(shells()).toBe(1);
   });
 });

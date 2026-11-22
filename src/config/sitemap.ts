@@ -53,7 +53,7 @@ import {
   Camera, ScrollText, Truck, ClipboardCheck,
   FileBarChart, ShieldAlert, UserCheck, Puzzle, KeyRound, HelpCircle,
   ShieldCheck, Settings2, Plug, Library, Boxes, Route, Navigation, Radar,
-  FolderOpen, Gauge, Eye,
+  FolderOpen, Gauge, Eye, UserCircle,
 } from 'lucide-react';
 import type { NavItem, NavChild, VesselModule, VesselModuleNav } from './navigation-types';
 import { G, L, LIVE, S, mergeSlot, resolveNavStatus, withScope, type SlotEntry } from './navBuilders';
@@ -61,6 +61,7 @@ import { WORKSPACE_TREES, vesselSlot, type NavSlotId } from './navSlots';
 import { MODULE_REGISTRY } from '@/app/registry/modules';
 import { HRIS_PATHS } from '@/modules/hris/paths';
 import { VESSEL_SCOPE_PATTERN, vesselPath } from '@/modules/vessels/lib/vesselCode';
+import { PERSONAL_BASE, buildPersonalNav } from './personalNav';
 
 export { S } from './navBuilders';
 
@@ -264,8 +265,10 @@ const vTechnical: NavChild[] = [
   L('Rounds', 'technical', { icon: Route, moduleSetting: 'technical.rounds' }),
   L('Forms & Checklists', 'technical', { slug: 'forms', icon: CheckSquare }),
   L('Documents & Plans', 'technical', { slug: 'documents', icon: FolderOpen }),
-  // Add-on (G4); gated on its entitlement once add-ons exist (gap/03).
-  L('Deck Plans', 'technical', { icon: Layers, moduleSetting: 'technical.deck_plans' }),
+  // Add-on (G4): locked without the `deck_plans` entitlement. There is no
+  // entitlement source yet (gap/03), so it is locked for everyone; it is also
+  // planned, so nobody sees the lock unless Show roadmap is on.
+  L('Deck Plans', 'technical', { icon: Layers, moduleSetting: 'technical.deck_plans', entitlement: 'deck_plans' }),
   L('Viewers', 'technical', { icon: Eye }),
   L('Settings', 'technical', { icon: Settings }),
 ];
@@ -564,6 +567,13 @@ export const NAVIGATION_ITEMS: NavItem[] = [
     children: vesselPatternModules.map(vesselModuleNode),
   },
   ...workspaceItems,
+  {
+    // The personal area (spec §8). Unfiltered here, for titles and
+    // breadcrumbs; the sidebar draws `buildPersonalNav` with the user's
+    // settings gate (src/app/nav/usePersonalNav.ts).
+    id: 'personal', label: 'My account', icon: UserCircle, path: PERSONAL_BASE, permissions: ['all'], scope: 'personal',
+    children: buildPersonalNav(() => true),
+  },
 ];
 
 // ─── Placeholder and redirect routes ─────────────────────────────────────
@@ -693,6 +703,26 @@ export const VESSEL_PLACEHOLDER_LEAVES: SitemapLeaf[] = (() => {
     if (!isPlannedLeaf(leaf) || seen.has(leaf.path)) continue;
     seen.add(leaf.path);
     out.push({ path: leaf.path, label: leaf.label });
+  }
+  return out;
+})();
+
+/**
+ * Planned personal leaves (`signature`, `documents`, `leave`, the company
+ * settings placeholders), as paths relative to `/me`. The router mounts a
+ * Coming Soon page for each inside the personal scope, so a bookmark
+ * resolves while the sidebar hides the leaf (D-06).
+ */
+export const PERSONAL_PLACEHOLDER_LEAVES: SitemapLeaf[] = (() => {
+  const out: SitemapLeaf[] = [];
+  const seen = new Set<string>();
+  const personal = NAVIGATION_ITEMS.find((m) => m.id === 'personal');
+  for (const leaf of navLeaves(personal?.children ?? [])) {
+    if (!isPlannedLeaf(leaf) || leaf.crossLink || !leaf.path.startsWith(`${PERSONAL_BASE}/`)) continue;
+    const rel = leaf.path.slice(PERSONAL_BASE.length + 1);
+    if (seen.has(rel)) continue;
+    seen.add(rel);
+    out.push({ path: rel, label: leaf.label });
   }
   return out;
 })();

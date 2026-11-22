@@ -3,7 +3,7 @@
  *
  *   /fleet/*            FleetScope        login + fleet reach
  *   /v/:vesselCode/*    VesselScopeRoute  login + reach to that vessel
- *   /me/*               PersonalScope     login
+ *   /me/*, /inbox        PersonalScope     login
  *   /hris, /health, …   WorkspaceScope    login (pages keep their module gates)
  *
  * Each renders the shell (DashboardLayout) once around an <Outlet/>. Pages
@@ -28,6 +28,10 @@ import {
   switchVesselInPath,
   vesselPath,
 } from '@/modules/vessels/lib/vesselCode';
+import { ModuleOff, PageError } from '@/shared/components/states';
+import { useVesselNav, type VesselNavModel } from '@/app/nav/useVesselNav';
+import { moduleSettingLabel, vesselRouteDecision } from '@/app/nav/vesselRouteGate';
+import { useVesselSettingsAccess, vesselSettingsHref } from '@/app/nav/vesselSettingsLink';
 import { RouteErrorBoundary, RouteSuspense } from './RouteBoundary';
 import { ScopeContext, useScope, type ScopeValue } from './scopeContext';
 import { useScopeAccess } from './useScopeAccess';
@@ -118,6 +122,44 @@ export const FleetScope: React.FC = () => (
 
 // ─── Vessel ───────────────────────────────────────────────────────────────
 
+/**
+ * Pages of a module switched off for this vessel do not open (BUILD-PLAN S4;
+ * gap/10 W4; spec §5.5): ModuleOff inside the shell, for everyone, admins
+ * included (the cog and this state's button lead to Vessel Settings). Paths
+ * no setting governs (the vessel home, Calendar) never wait for the settings.
+ */
+const VesselRouteGate: React.FC<{ nav: VesselNavModel; rest: string; vesselName: string; code: string }> = ({
+  nav,
+  rest,
+  vesselName,
+  code,
+}) => {
+  const canEnable = useVesselSettingsAccess();
+  const decision = vesselRouteDecision(rest, nav.resolver);
+  if (decision === 'ok') return <ScopeOutlet />;
+  if (decision === 'loading') return <ScopeLoading label={`Opening ${vesselName}…`} />;
+  if (decision === 'error') {
+    return (
+      <PageError
+        title="This vessel's modules could not load"
+        error={nav.errorMessage ?? undefined}
+        onRetry={nav.retry}
+        headingLevel={1}
+        treatMissingAsOff={false}
+      />
+    );
+  }
+  return (
+    <ModuleOff
+      moduleName={moduleSettingLabel(decision.off, nav.resolver.labelFor)}
+      vesselName={vesselName}
+      canEnable={canEnable}
+      settingsHref={vesselSettingsHref(code)}
+      headingLevel={1}
+    />
+  );
+};
+
 const VesselScopeBody: React.FC = () => {
   const { vesselCode: rawCode = '' } = useParams<{ vesselCode: string }>();
   // `/v/:vesselCode/…` taken literally: a link from the static nav tree
@@ -201,6 +243,10 @@ const VesselScopeBody: React.FC = () => {
     [vessel, code],
   );
 
+  // The vessel's module settings, for the route gate (the shell reads the same cache).
+  const navTarget = useMemo(() => (vessel ? { id: vessel.id, code, name: vessel.name } : null), [vessel, code]);
+  const nav = useVesselNav(navTarget);
+
   let body: React.ReactNode;
   if (!access.ready) {
     body = <ScopeLoading />;
@@ -229,7 +275,9 @@ const VesselScopeBody: React.FC = () => {
     // runs its queries against the previous vessel.
     body = <ScopeLoading label={`Opening ${vessel.name}…`} />;
   } else {
-    body = <ScopeOutlet />;
+    body = (
+      <VesselRouteGate nav={nav} rest={parseVesselPath(location.pathname)?.rest ?? ''} vesselName={vessel.name} code={code} />
+    );
   }
 
   return (
@@ -258,14 +306,16 @@ export const VesselScopeRoute: React.FC = () => (
 // ─── Personal and workspaces ──────────────────────────────────────────────
 
 /**
- * `/me/*`: the user's own area. No shell of its own: `/me` itself (profile
- * and settings) brings its own chrome, and child routes that want the shell
- * sit under a `ScopeShell` route.
+ * `/me/*` and `/inbox`: the user's own area (spec §8). The shell (scope
+ * `personal`, with the personal sidebar) is rendered once around every child
+ * route, so moving between the profile, the settings sections, hours of
+ * rest, training and the inbox never remounts it. Each section has its own
+ * URL (`/me/security`); the old `?tab=` form redirects (personalRoutes.tsx).
  */
 export const PersonalScope: React.FC = () => (
   <ProtectedRoute>
     <ScopeContext.Provider value={PERSONAL_SCOPE}>
-      <Outlet />
+      <ScopeShell />
     </ScopeContext.Provider>
   </ProtectedRoute>
 );

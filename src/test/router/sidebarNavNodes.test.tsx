@@ -1,7 +1,9 @@
 /**
- * Sidebar node kinds and gates over a small fixed tree (BUILD-PLAN B3;
+ * Sidebar node kinds and gates over a small fixed tree (BUILD-PLAN B3, S3;
  * gap/10 IA6; gap/00 C2): section headings, beta chips, capability gating and
- * the fail-closed RBAC fix.
+ * the fail-closed RBAC fix. The tree is filtered the way the shell filters
+ * it (`useFilteredModuleTree`: `useNavNodeFilter().decide` + `filterNavTree`)
+ * and drawn by SidebarNavigation; leaves are links.
  */
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,6 +11,8 @@ import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import SidebarNavigation from '@/shared/components/layout/SidebarNavigation';
 import { NavAccessContext, type NavAccess } from '@/app/nav/navAccess';
+import { useFilteredModuleTree } from '@/app/nav/useFilteredTree';
+import { NAVIGATION_ITEMS } from '@/config/navigation';
 
 const mocks = vi.hoisted(() => ({
   order: { map: {} },
@@ -79,11 +83,17 @@ vi.mock('@/shared/hooks/useSidebarBadgeCounts', () => ({ useSidebarBadgeCounts: 
 
 const access = (can: (key: string) => boolean): NavAccess => ({ ready: true, legacyRole: 'crew', rbacRoles: [], can, fleetReach: true, vesselReach: true });
 
+const FleetSidebar: React.FC<{ collapsed: boolean }> = ({ collapsed }) => {
+  const fleet = NAVIGATION_ITEMS.find((m) => m.id === 'fleet') ?? null;
+  const nodes = useFilteredModuleTree(fleet);
+  return <SidebarNavigation nodes={nodes} heading={fleet} rootPath={fleet?.path} collapsed={collapsed} />;
+};
+
 function renderSidebar(navAccess: NavAccess, { collapsed = false } = {}) {
   return render(
     <NavAccessContext.Provider value={navAccess}>
       <MemoryRouter initialEntries={['/fleet/dashboard']}>
-        <SidebarNavigation moduleId="fleet" collapsed={collapsed} />
+        <FleetSidebar collapsed={collapsed} />
       </MemoryRouter>
     </NavAccessContext.Provider>,
   );
@@ -99,7 +109,7 @@ describe('section headings', () => {
     renderSidebar(access(() => true));
     const nav = screen.getByRole('navigation', { name: 'Fleet folders' });
     const overview = within(nav).getByRole('group', { name: 'Overview' });
-    expect(within(overview).getByRole('button', { name: /^Dashboard/ })).toBeInTheDocument();
+    expect(within(overview).getByRole('link', { name: /^Dashboard/ })).toBeInTheDocument();
     expect(within(nav).getByText('Overview').tagName).toBe('P');
     expect(within(nav).queryByRole('button', { name: /Overview/ })).toBeNull();
   });
@@ -112,7 +122,7 @@ describe('section headings', () => {
   it('become separators when the panel collapses to icons, with their leaves still listed', () => {
     renderSidebar(access(() => true), { collapsed: true });
     expect(screen.getByRole('separator', { name: 'Overview' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^Dashboard/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Dashboard/ })).toBeInTheDocument();
   });
 });
 
@@ -124,30 +134,30 @@ describe('node gates', () => {
 
   it('shows a beta leaf with a Beta chip and its badge', () => {
     renderSidebar(access(() => true));
-    expect(screen.getByRole('button', { name: 'Safety queue, beta, 2 pending compliance items' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Safety queue, beta, 2 pending compliance items' })).toBeInTheDocument();
     expect(screen.getByText('Beta')).toBeInTheDocument();
   });
 
   it('shows a capability-gated leaf only to holders of the capability', () => {
     const { unmount } = renderSidebar(access((key) => key === 'fleet.administration.users_access.view'));
-    expect(screen.getByRole('button', { name: /^Users & Access/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Users & Access/ })).toBeInTheDocument();
     unmount();
     renderSidebar(access(() => false));
-    expect(screen.queryByRole('button', { name: /^Users & Access/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /^Users & Access/ })).toBeNull();
   });
 
   it('applies the RBAC moduleKey gate', () => {
     renderSidebar(access(() => true));
-    expect(screen.getByRole('button', { name: /^Vessels/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Fleet Groups/ })).toBeNull();
+    expect(screen.getByRole('link', { name: /^Vessels/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Fleet Groups/ })).toBeNull();
   });
 
   it('fails closed while RBAC is not initialised', () => {
     mocks.permissions.isInitialized = false;
     renderSidebar(access(() => true));
-    expect(screen.queryByRole('button', { name: /^Vessels/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: /^Fleet Groups/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /^Vessels/ })).toBeNull();
+    expect(screen.queryByRole('link', { name: /^Fleet Groups/ })).toBeNull();
     // Leaves with no moduleKey are unaffected.
-    expect(screen.getByRole('button', { name: /^Dashboard/ })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /^Dashboard/ })).toBeInTheDocument();
   });
 });

@@ -30,7 +30,7 @@ export const slug = (s: string): string =>
 /** Gating and registry fields any node may carry. */
 export type GateOpts = Pick<
   NavChild,
-  'moduleKey' | 'minPermission' | 'crossLink' | 'selfServe' | 'capability' | 'badgeKey' | 'moduleSetting' | 'scope'
+  'moduleKey' | 'minPermission' | 'crossLink' | 'selfServe' | 'capability' | 'entitlement' | 'badgeKey' | 'moduleSetting' | 'scope'
 >;
 
 const gateFields = (opts: GateOpts): Partial<NavChild> => ({
@@ -39,6 +39,7 @@ const gateFields = (opts: GateOpts): Partial<NavChild> => ({
   ...(opts.crossLink ? { crossLink: true } : {}),
   ...(opts.selfServe ? { selfServe: true } : {}),
   ...(opts.capability ? { capability: opts.capability } : {}),
+  ...(opts.entitlement ? { entitlement: opts.entitlement } : {}),
   ...(opts.badgeKey ? { badgeKey: opts.badgeKey } : {}),
   ...(opts.moduleSetting ? { moduleSetting: opts.moduleSetting } : {}),
   ...(opts.scope ? { scope: opts.scope } : {}),

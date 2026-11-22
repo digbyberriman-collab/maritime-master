@@ -267,8 +267,12 @@ describe('Vessel modules (gap/10 "Vessel view")', () => {
 });
 
 describe("today's shell (NAVIGATION_ITEMS)", () => {
-  it('keeps the six top modules the rail shows', () => {
-    expect(NAVIGATION_ITEMS.map((m) => m.id)).toEqual(['fleet', 'vessel', 'shoreside', 'health', 'yard', 'hris']);
+  it('keeps the six top modules, then the personal tree (titles and breadcrumbs for /me, spec §8)', () => {
+    expect(NAVIGATION_ITEMS.map((m) => m.id)).toEqual(['fleet', 'vessel', 'shoreside', 'health', 'yard', 'hris', 'personal']);
+    const personal = module('personal');
+    expect(personal.path).toBe('/me');
+    expect(personal.scope).toBe('personal');
+    expect(navLeaves(personal.children ?? []).every((l) => l.scope === 'personal')).toBe(true);
   });
 
   it('feeds the Vessel module from the vessel tree, on the /v/:vesselCode pattern', () => {

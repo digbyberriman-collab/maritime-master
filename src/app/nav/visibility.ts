@@ -1,21 +1,29 @@
 /**
- * The nav visibility rule (gap/10 "Nav visibility rule").
+ * The nav visibility rule (gap/10 "Nav visibility rule", W3, W4; spec §4.1).
+ * One function for every surface: sidebar, vessel tab row, Apps menu,
+ * command palette, route gate, vessel switch.
  *
- * A node renders only when:
- * 1. its status is `live` or `beta`, or it is `planned` and the viewer may
- *    and does show the roadmap;
- * 2. the viewer can open its scope: fleet reach for a `fleet` node, at least
- *    one reachable vessel for a `vessel` node. Personal and workspace nodes
- *    pass here; workspaces keep their own module gates. The scope routes
- *    check the same thing again when the page opens;
- * 3. (per-vessel module settings arrive with S4 / `vessel_module_settings`);
- * 4. it carries no `capability`, or the viewer holds it. That check fails
- *    closed: hidden while access is loading and for an unknown key.
+ * In this order:
+ * 1. **status**: `planned` is hidden unless the viewer may and does show the
+ *    roadmap (D-06, D-29); `beta`, `live` or none go on.
+ * 2. **scope guard**: a `fleet` node needs fleet reach, a `vessel` node at
+ *    least one reachable vessel (D-26). Workspace and personal nodes pass;
+ *    their module gates follow.
+ * 3. **vessel module setting**: with a vessel's settings (`isModuleOn`), a
+ *    node whose `moduleSetting` is off is hidden (C13, G3).
+ * 4. **capability**: a node with a `capability` the viewer does not hold is
+ *    hidden. Fails closed: hidden while access loads and for an unknown key.
+ * 5. (legacy `moduleKey` gates: in `useNavNodeFilter`, after this function.)
+ * 6. **entitlement**: an add-on node whose entitlement the vessel lacks is
+ *    `locked`: visible with a lock, opening the add-on explanation, never
+ *    the page (G4). No entitlement source (`isEntitled` absent) = locked.
  *
- * The legacy `moduleKey` gates stay in SidebarNavigation and run after this.
- * A group or section with no visible children is hidden by the caller.
+ * Empty groups and sections (7) and label overrides (8) are applied by
+ * `filterNavTree` / `applyLabelOverrides` in ./navTree.ts.
  */
 import type { NavChild } from '@/config/navigation-types';
+
+export type NavNodeDecision = 'hidden' | 'visible' | 'locked';
 
 export interface NavVisibilityContext {
   /** "Show roadmap" is on and the viewer is an owner or admin. */
@@ -26,17 +34,27 @@ export interface NavVisibilityContext {
   fleetReach: boolean;
   /** The viewer can reach at least one vessel; false while loading. */
   vesselReach: boolean;
+  /** The vessel's module settings; present only for a vessel's own tree. */
+  isModuleOn?: (moduleSetting: string) => boolean;
+  /** Add-on entitlements of the vessel or account; absent = none (fail closed). */
+  isEntitled?: (entitlement: string) => boolean;
 }
 
-export function isNavNodeVisible(
-  item: Pick<NavChild, 'status' | 'capability' | 'scope'>,
-  ctx: NavVisibilityContext,
-): boolean {
-  if (item.status === 'planned' && !ctx.showPlanned) return false;
-  if (item.scope === 'fleet' && !ctx.fleetReach) return false;
-  if (item.scope === 'vessel' && !ctx.vesselReach) return false;
-  if (item.capability && !ctx.can(item.capability)) return false;
-  return true;
+export type NavGateFields = Pick<NavChild, 'status' | 'scope' | 'moduleSetting' | 'capability' | 'entitlement'>;
+
+export function navNodeDecision(item: NavGateFields, ctx: NavVisibilityContext): NavNodeDecision {
+  if (item.status === 'planned' && !ctx.showPlanned) return 'hidden';
+  if (item.scope === 'fleet' && !ctx.fleetReach) return 'hidden';
+  if (item.scope === 'vessel' && !ctx.vesselReach) return 'hidden';
+  if (item.moduleSetting && ctx.isModuleOn && !ctx.isModuleOn(item.moduleSetting)) return 'hidden';
+  if (item.capability && !ctx.can(item.capability)) return 'hidden';
+  if (item.entitlement && !(ctx.isEntitled?.(item.entitlement) ?? false)) return 'locked';
+  return 'visible';
+}
+
+/** The node renders (visible or locked). Kept for callers that only need yes or no. */
+export function isNavNodeVisible(item: NavGateFields, ctx: NavVisibilityContext): boolean {
+  return navNodeDecision(item, ctx) !== 'hidden';
 }
 
 /** Leaf/group/section, with the defaults `kind` documents. */

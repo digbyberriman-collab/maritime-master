@@ -23,6 +23,9 @@ const mocks = vi.hoisted(() => ({
     profile: { id: 'p1', role: 'master', company_id: 'c1', user_id: 'u1', first_name: 'Me', last_name: 'Master' },
     loading: false,
     userRole: 'master',
+    // Read by the nav filter (the vessel nav runs in the scope since S4).
+    practitionerDisciplines: [] as string[],
+    practitionerDisciplinesLoaded: true,
   },
   perm: {
     isInitialized: true,
@@ -33,8 +36,13 @@ const mocks = vi.hoisted(() => ({
     userRoles: [] as { role_name: string }[],
     setCurrentVessel: () => undefined,
     hasPermission: () => true,
+    // Read by the shell's nav filter and RBAC Retry notice.
+    permissions: [] as unknown[],
+    error: null as string | null,
+    loadPermissions: async () => undefined,
   },
-  sidebarMounts: 0,
+  // Mounts of the shell (its footer renders once per shell, on every page).
+  shellMounts: 0,
   vesselCtx: null as React.Context<unknown> | null,
 }));
 
@@ -71,6 +79,12 @@ vi.mock('@/integrations/supabase/client', () => {
   };
   return { supabase: { from } };
 });
+// The vessel's module settings: the table is not live (D-01), so every module is on.
+vi.mock('@/modules/vessels/hooks/useVesselModuleSettings', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/modules/vessels/hooks/useVesselModuleSettings')>();
+  const { TABLE_MISSING_STATE } = await import('@/modules/vessels/lib/moduleSettings');
+  return { ...actual, useVesselModuleSettings: () => ({ state: TABLE_MISSING_STATE, fetching: false, retry: () => undefined }) };
+});
 vi.mock('@/modules/auth/contexts/AuthContext', () => ({ useAuth: () => mocks.auth }));
 vi.mock('@/modules/auth/store/permissionsStore', () => ({
   usePermissionsStore: (selector: (s: object) => unknown) => selector(mocks.perm),
@@ -89,22 +103,30 @@ vi.mock('@/shared/contexts/BrandingContext', () => ({
 vi.mock('@/modules/dashboard/contexts/DashboardFilterContext', () => ({
   DashboardFilterProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
-vi.mock('@/shared/components/layout/InkfishFooter', () => ({ default: () => null }));
+vi.mock('@/shared/components/layout/InkfishFooter', async () => {
+  const react = await import('react');
+  return {
+    default: () => {
+      react.useEffect(() => {
+        mocks.shellMounts += 1;
+      }, []);
+      return null;
+    },
+  };
+});
 vi.mock('@/shared/components/InkfishWatermark', () => ({ default: () => null }));
-vi.mock('@/shared/components/layout/FloatingQuickActions', () => ({ default: () => null }));
-vi.mock('@/shared/components/layout/SidebarAccountMenu', () => ({ default: () => null }));
-vi.mock('@/shared/components/layout/NotificationBell', () => ({ default: () => null }));
+// The top bar and its dialogs are covered by src/test/shell; here only the frame matters.
+vi.mock('@/shared/components/layout/topbar/TopBar', () => ({ default: () => null }));
+vi.mock('@/shared/components/layout/ModuleTabBar', () => ({ default: () => null }));
+vi.mock('@/shared/components/layout/topbar/KeyboardShortcutsDialog', () => ({ default: () => null }));
+vi.mock('@/shared/components/layout/topbar/ShellShortcuts', () => ({ default: () => null }));
 vi.mock('@/shared/components/layout/PageLocationHeader', () => ({ default: () => null }));
-vi.mock('@/shared/components/layout/ModuleTopNav', () => ({ default: () => null }));
 vi.mock('@/modules/feedback/components/FeedbackPanel', () => ({ default: () => null }));
 vi.mock('@/modules/feedback/components/FeedbackResolvedToast', () => ({ default: () => null }));
 vi.mock('@/shared/components/layout/SidebarNavigation', async () => {
   const react = await import('react');
   return {
     default: () => {
-      react.useEffect(() => {
-        mocks.sidebarMounts += 1;
-      }, []);
       return react.createElement('nav', { 'aria-label': 'Test sidebar' });
     },
   };
@@ -268,11 +290,12 @@ function renderApp(url: string) {
 }
 
 const location = () => screen.getByLabelText('location').textContent;
-const shells = () => document.querySelectorAll('aside[aria-label="Main navigation"]').length;
+// One shell root per shell; a page may have no sidebar (vessel home, pages outside a module, S3).
+const shells = () => document.querySelectorAll('[data-shell-scope]').length;
 
 beforeEach(() => {
   mocks.perm.userRoles = [];
-  mocks.sidebarMounts = 0;
+  mocks.shellMounts = 0;
   visited.length = 0;
   sessionStorage.clear();
   localStorage.clear();
@@ -285,21 +308,21 @@ describe('the Logbooks tab inside the vessel scope', () => {
     expect((await screen.findAllByRole('button', { name: /^Book / })).length).toBeGreaterThan(1);
     // Never through the legacy /vessel/logbooks URL, which leaves the scope.
     expect(visited.filter((u) => u.startsWith('/vessel/'))).toEqual([]);
-    expect(mocks.sidebarMounts).toBe(1);
+    expect(mocks.shellMounts).toBe(1);
     expect(shells()).toBe(1);
   });
 
   it('switches book in the scope with the one shell', async () => {
     renderApp('/v/dra/logbooks/official-log');
     const books = await screen.findAllByRole('button', { name: /^Book / });
-    const aside = document.querySelector('aside[aria-label="Main navigation"]');
+    const aside = document.querySelector('[data-shell-scope]');
     act(() => {
       fireEvent.click(books[1]);
     });
     await waitFor(() => expect(location()).toMatch(/^\/v\/dra\/logbooks\/(?!official-log)[a-z0-9-]+$/));
     expect(visited.filter((u) => u.startsWith('/vessel/'))).toEqual([]);
-    expect(mocks.sidebarMounts).toBe(1);
-    expect(document.querySelector('aside[aria-label="Main navigation"]')).toBe(aside);
+    expect(mocks.shellMounts).toBe(1);
+    expect(document.querySelector('[data-shell-scope]')).toBe(aside);
   });
 });
 
@@ -313,7 +336,7 @@ describe('the Hours of Rest crew switch inside the vessel scope', () => {
     });
     await waitFor(() => expect(location()).toBe('/v/dra/crew/people/other/hours-of-rest?year=2026&month=11'));
     expect(visited.filter((u) => u.startsWith('/crew/'))).toEqual([]);
-    expect(mocks.sidebarMounts).toBe(1);
+    expect(mocks.shellMounts).toBe(1);
     expect(shells()).toBe(1);
   });
 
@@ -357,7 +380,7 @@ describe('the Hours of Rest toolbar and links', () => {
     });
     await waitFor(() => expect(location()).toBe('/v/dra/crew/hours-of-rest'));
     expect(visited.filter((u) => u.startsWith('/crew/'))).toEqual([]);
-    expect(mocks.sidebarMounts).toBe(1);
+    expect(mocks.shellMounts).toBe(1);
   });
 
   it("the board links one's own hours and each crew member's month in the scope", async () => {
@@ -369,7 +392,7 @@ describe('the Hours of Rest toolbar and links', () => {
       fireEvent.click(row);
     });
     await waitFor(() => expect(location()).toBe('/v/dra/crew/people/other/hours-of-rest?year=2026&month=11'));
-    expect(mocks.sidebarMounts).toBe(1);
+    expect(mocks.shellMounts).toBe(1);
   });
 });
 
@@ -377,15 +400,15 @@ describe('a planned workspace leaf', () => {
   it('opens from a workspace page inside the same scope, with the one shell', async () => {
     renderApp('/yard/refit/overview/dashboard');
     expect(await screen.findByRole('heading', { name: 'Refit dashboard' })).toBeInTheDocument();
-    const aside = document.querySelector('aside[aria-label="Main navigation"]');
-    expect(mocks.sidebarMounts).toBe(1);
+    const aside = document.querySelector('[data-shell-scope]');
+    expect(mocks.shellMounts).toBe(1);
     act(() => {
       fireEvent.click(screen.getByRole('link', { name: 'Refit periods' }));
     });
     expect(await screen.findByRole('heading', { name: 'Refit Periods' })).toBeInTheDocument();
     expect(location()).toBe('/yard/refit/projects/refit-periods?module=yard');
-    expect(mocks.sidebarMounts).toBe(1);
+    expect(mocks.shellMounts).toBe(1);
     expect(shells()).toBe(1);
-    expect(document.querySelector('aside[aria-label="Main navigation"]')).toBe(aside);
+    expect(document.querySelector('[data-shell-scope]')).toBe(aside);
   });
 });

@@ -131,6 +131,12 @@ vi.mock('@/integrations/supabase/client', () => {
     },
   };
 });
+// The vessel's module settings: the table is not live (D-01), so every module is on.
+vi.mock('@/modules/vessels/hooks/useVesselModuleSettings', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/modules/vessels/hooks/useVesselModuleSettings')>();
+  const { TABLE_MISSING_STATE } = await import('@/modules/vessels/lib/moduleSettings');
+  return { ...actual, useVesselModuleSettings: () => ({ state: TABLE_MISSING_STATE, fetching: false, retry: () => undefined }) };
+});
 vi.mock('@/shared/components/layout/DashboardLayout', () => ({
   default: ({ children }: { children: React.ReactNode }) => <div data-testid="shell">{children}</div>,
 }));
