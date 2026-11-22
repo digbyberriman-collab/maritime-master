@@ -9,17 +9,32 @@ import { Link } from 'react-router-dom';
 import { Loader2, SearchX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AccessDenied, EmptyState, PageLoading, VesselArchived } from '@/shared/components/states';
+import RbacRetryNotice from '@/shared/components/layout/topbar/RbacRetryNotice';
 
-/** Placeholder inside the shell while a scope works out what to show. */
+/**
+ * Placeholder inside the shell while a scope works out what to show. It
+ * carries the route-loading marker (`data-route-loading`, `aria-busy`) so the
+ * shell's heading check waits for the page instead of titling the wait.
+ */
 export const ScopeLoading: React.FC<{ label?: string }> = ({ label = 'Loading…' }) => (
-  <PageLoading variant="detail" label={label} />
+  <div data-route-loading="" aria-busy="true">
+    <PageLoading variant="detail" label={label} />
+  </div>
 );
 
-/** Full-page spinner, for routes that decide before any shell renders (as ProtectedRoute does). */
+/**
+ * Full-page spinner, for routes that decide before any shell renders (`/`,
+ * legacy redirects, as ProtectedRoute does). With no shell around it, it
+ * shows the RBAC Retry notice itself, so a failed first role load never
+ * leaves a bare spinner (D-56).
+ */
 export const FullPageLoading: React.FC = () => (
-  <div role="status" aria-live="polite" className="flex min-h-screen items-center justify-center bg-background">
-    <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
-    <span className="sr-only">Loading…</span>
+  <div data-route-loading="" aria-busy="true" className="flex min-h-dvh flex-col bg-background">
+    <RbacRetryNotice />
+    <div role="status" aria-live="polite" className="flex flex-1 items-center justify-center">
+      <Loader2 className="h-8 w-8 text-primary motion-safe:animate-spin" aria-hidden="true" />
+      <span className="sr-only">Loading…</span>
+    </div>
   </div>
 );
 
@@ -55,7 +70,7 @@ export const ScopeAccessDenied: React.FC<{ title?: string; detail?: string; home
 
 /** The vessel has been sold or archived; its records are kept but its pages are closed. */
 export const VesselArchivedState: React.FC<{ name: string; homePath: string }> = ({ name, homePath }) => (
-  <VesselArchived vesselName={name} action={homeLink(homePath)} />
+  <VesselArchived vesselName={name} action={homeLink(homePath)} headingLevel={1} />
 );
 
 /**

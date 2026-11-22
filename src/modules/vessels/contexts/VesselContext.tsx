@@ -18,6 +18,8 @@ export interface Vessel {
   created_at?: string | null;
   /** `vessels.code`, once the column is live (DECISIONS D-03); absent before. */
   code?: string | null;
+  /** `vessels.fleet_group_id` (live column); the vessel switcher groups by it. */
+  fleet_group_id?: string | null;
 }
 
 /** A vessel of the company as the code derivation needs it (sold ones included). */

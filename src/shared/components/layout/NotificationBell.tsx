@@ -1,11 +1,21 @@
-import React, { useState, useEffect, useMemo } from 'react';
+/**
+ * The notification bell in the top bar (gap/10 top bar element 8, IA15; spec
+ * §2.1): the latest 20 alerts in reach and "Open inbox". The badge counts open
+ * alerts and takes the critical tone when any open alert is RED (critical =
+ * destructive, D-57), else Signal; only the critical badge pulses, and not
+ * under reduced motion. While the list loads or after an error the panel says
+ * so; it never reads a failed load as "no alerts".
+ *
+ * The open state is the shell's (`ShellActions.openNotifications` opens it
+ * from the command palette); outside a shell it keeps its own.
+ */
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Popover,
   PopoverContent,
@@ -21,13 +31,18 @@ import {
   CheckCircle,
   Ship,
   Globe,
-  ExternalLink,
+  Inbox,
   Check,
+  Loader2,
+  RotateCw,
 } from 'lucide-react';
 import { formatDistanceToNow, isBefore, addDays, parseISO } from 'date-fns';
 import type { AlertSeverity, AlertStatus } from '@/modules/alerts/constants';
 import { cn } from '@/lib/utils';
 import { ALERT_SEVERITY_TONE } from '@/modules/notifications/lib/alertSeverityTone';
+import { SHELL_TEST_IDS } from '@/app/shell/testIds';
+import { useShellSurface } from '@/app/shell/shellUi';
+import { topBarIconButton } from '@/shared/components/layout/topbar/styles';
 
 interface AlertItem {
   id: string;
@@ -47,6 +62,8 @@ interface AlertItem {
 
 const HELPER_STORAGE_KEY = 'storm_alert_helper_shown';
 const MAX_DROPDOWN_ALERTS = 20;
+/** The personal inbox (all notifications for the signed-in user). */
+const INBOX_PATH = '/inbox';
 const REFRESH_INTERVAL_MS = 30000; // 30 seconds
 
 const getSeverityConfig = (severity: AlertSeverity) => {
@@ -125,31 +142,48 @@ const getDeepLink = (alert: AlertItem): string => {
   return '/notifications/center';
 };
 
-const NotificationBell: React.FC = () => {
+export interface NotificationBellProps {
+  /** Controlled open state; defaults to the shell's. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  className?: string;
+}
+
+const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange, className }) => {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { selectedVesselId, isAllVessels } = useVessel();
-  const [isOpen, setIsOpen] = useState(false);
+  const [shellOpen, setShellOpen] = useShellSurface('notifications');
+  const isOpen = open ?? shellOpen;
+  const setIsOpen = useCallback((next: boolean) => (onOpenChange ?? setShellOpen)(next), [onOpenChange, setShellOpen]);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [criticalUnread, setCriticalUnread] = useState(false);
   const [showHelper, setShowHelper] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   // Check if helper has been shown before
   useEffect(() => {
-    const hasSeenHelper = localStorage.getItem(HELPER_STORAGE_KEY);
-    if (!hasSeenHelper) {
-      setShowHelper(true);
+    try {
+      if (!window.localStorage.getItem(HELPER_STORAGE_KEY)) setShowHelper(true);
+    } catch {
+      /* storage unavailable: no first-run hint */
     }
   }, []);
 
   const dismissHelper = () => {
-    localStorage.setItem(HELPER_STORAGE_KEY, 'true');
+    try {
+      window.localStorage.setItem(HELPER_STORAGE_KEY, 'true');
+    } catch {
+      /* storage unavailable: the hint comes back next time */
+    }
     setShowHelper(false);
   };
 
-  const loadAlerts = async () => {
-    if (!profile?.company_id) return;
+  const companyId = profile?.company_id ?? null;
+  const loadAlerts = useCallback(async () => {
+    if (!companyId) return;
 
     try {
       let query = supabase
@@ -169,7 +203,7 @@ const NotificationBell: React.FC = () => {
           source_module,
           vessel:vessels(name)
         `)
-        .eq('company_id', profile.company_id)
+        .eq('company_id', companyId)
         .in('status', ['OPEN', 'ACKNOWLEDGED', 'SNOOZED', 'ESCALATED'])
         .order('severity_color', { ascending: true }) // RED first
         .order('due_at', { ascending: true, nullsFirst: false })
@@ -184,17 +218,20 @@ const NotificationBell: React.FC = () => {
       const { data, error } = await query;
       if (error) throw error;
 
-      setAlerts((data as AlertItem[]) || []);
-      
-      // Calculate unread (OPEN) count
-      const openCount = (data || []).filter(a => a.status === 'OPEN').length;
-      setUnreadCount(openCount);
+      const rows = (data as AlertItem[]) || [];
+      setAlerts(rows);
+      // Unread = OPEN. Critical tone when any unread alert is RED.
+      const open = rows.filter((a) => a.status === 'OPEN');
+      setUnreadCount(open.length);
+      setCriticalUnread(open.some((a) => a.severity_color === 'RED'));
+      setLoadFailed(false);
     } catch (error) {
       console.error('Failed to load alerts:', error);
+      setLoadFailed(true);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [companyId, isAllVessels, selectedVesselId]);
 
   // Initial load and polling
   useEffect(() => {
@@ -223,7 +260,7 @@ const NotificationBell: React.FC = () => {
       clearInterval(interval);
       subscription.unsubscribe();
     };
-  }, [profile?.company_id, selectedVesselId, isAllVessels]);
+  }, [loadAlerts]);
 
   // Categorize alerts
   const categorizedAlerts = useMemo(() => {
@@ -306,9 +343,14 @@ const NotificationBell: React.FC = () => {
     return (
       <div
         key={alert.id}
+        role="link"
+        tabIndex={0}
         onClick={() => handleAlertClick(alert)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && event.target === event.currentTarget) handleAlertClick(alert);
+        }}
         className={cn(
-          'flex items-start gap-3 p-3 cursor-pointer transition-colors border-l-4',
+          'flex items-start gap-3 p-3 cursor-pointer transition-colors border-l-4 border-b border-b-border last:border-b-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
           config.borderClass,
           'hover:bg-muted/50'
         )}
@@ -342,8 +384,9 @@ const NotificationBell: React.FC = () => {
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7"
+              className="h-7 w-7 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11"
               onClick={(e) => handleAcknowledge(e, alert.id)}
+              aria-label={`Acknowledge ${alert.title}`}
               title="Acknowledge"
             >
               <Check className="w-4 h-4" />
@@ -375,7 +418,8 @@ const NotificationBell: React.FC = () => {
             {alertsList.length}
           </Badge>
         </div>
-        <div className="divide-y divide-border">
+        {/* Row separators set only the bottom edge, so each row keeps its severity bar on the left. */}
+        <div>
           {alertsList.map(renderAlertRow)}
         </div>
       </div>
@@ -385,40 +429,50 @@ const NotificationBell: React.FC = () => {
   const totalAlerts = alerts.length;
   const hasAlerts = totalAlerts > 0;
 
+  const badgeLabel = unreadCount > 99 ? '99+' : String(unreadCount);
+
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon"
-          // The bell sits on the sidebar, which stays Abyss in both themes (D-DS1).
-          className="relative min-h-11 min-w-11 text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-sidebar-ring focus-visible:ring-offset-sidebar"
+        <button
+          type="button"
+          data-testid={SHELL_TEST_IDS.notificationsTrigger}
+          className={cn(topBarIconButton, 'relative', className)}
           aria-label={
             unreadCount > 0
-              ? `Open notifications, ${unreadCount} unread`
-              : 'Open notifications'
+              ? `Notifications, ${unreadCount} unread${criticalUnread ? ', including critical' : ''}`
+              : 'Notifications'
           }
         >
-          <Bell className="w-5 h-5" />
+          <Bell strokeWidth={1.75} aria-hidden="true" />
           {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground animate-pulse">
-              {unreadCount > 99 ? '99+' : unreadCount}
+            <span
+              aria-hidden="true"
+              data-tone={criticalUnread ? 'critical' : 'primary'}
+              className={cn(
+                'absolute right-0.5 top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none ring-2 ring-background',
+                criticalUnread ? 'bg-critical text-critical-foreground motion-safe:animate-pulse' : 'bg-primary text-primary-foreground',
+              )}
+            >
+              {badgeLabel}
             </span>
           )}
-        </Button>
+        </button>
       </PopoverTrigger>
-      <PopoverContent 
-        align="end" 
-        className="w-96 p-0 bg-popover"
+      <PopoverContent
+        align="end"
+        className="w-[min(24rem,calc(100vw-2rem))] p-0 bg-popover"
         sideOffset={8}
+        data-testid={SHELL_TEST_IDS.notificationsPanel}
+        aria-label="Notifications"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex items-center gap-2">
-            <Bell className="w-4 h-4 text-primary" />
-            <span className="font-semibold text-foreground">Alerts</span>
+            <Bell className="w-4 h-4 text-primary" strokeWidth={1.75} aria-hidden="true" />
+            <span className="type-subtitle text-foreground">Alerts</span>
           </div>
-          {totalAlerts > 0 && (
+          {!isLoading && !loadFailed && totalAlerts > 0 && (
             <Badge variant="outline" className="text-xs">
               {unreadCount} open
             </Badge>
@@ -427,8 +481,8 @@ const NotificationBell: React.FC = () => {
 
         {/* Helper text for first-time users */}
         {showHelper && hasAlerts && (
-          <div className="px-4 py-2 bg-primary/5 border-b border-border flex items-start gap-2">
-            <Info className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+          <div className="px-4 py-2 bg-muted border-b border-border flex items-start gap-2">
+            <Info className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" aria-hidden="true" />
             <div className="flex-1">
               <p className="text-xs text-muted-foreground">
                 Quick view: urgent and overdue items. Click an alert to jump directly to the record.
@@ -446,23 +500,39 @@ const NotificationBell: React.FC = () => {
         )}
 
         {/* Alert sections */}
-        {hasAlerts ? (
-          <ScrollArea className="max-h-[400px]">
+        {isLoading && !hasAlerts ? (
+          <div role="status" className="flex items-center justify-center gap-2 p-8 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
+            Loading alerts…
+          </div>
+        ) : loadFailed && !hasAlerts ? (
+          <div role="alert" className="p-6 text-center">
+            <p className="text-sm font-medium text-foreground">Alerts could not load</p>
+            <p className="text-xs text-muted-foreground mt-1">Check your connection and try again.</p>
+            <Button variant="outline" size="sm" className="mt-3 gap-1.5" onClick={() => void loadAlerts()}>
+              <RotateCw className="h-4 w-4" aria-hidden="true" />
+              Try again
+            </Button>
+          </div>
+        ) : hasAlerts ? (
+          // A plain scroller: the ScrollArea viewport lays rows out at their
+          // natural width, so long titles would not truncate.
+          <div className="max-h-[min(400px,60dvh)] overflow-y-auto overflow-x-hidden overscroll-contain">
             <div className="divide-y divide-border">
               {renderSection('Urgent', categorizedAlerts.urgent, 'urgent')}
               {renderSection('Overdue', categorizedAlerts.overdue, 'overdue')}
               {renderSection('Upcoming', categorizedAlerts.upcoming, 'upcoming')}
               {renderSection('Info', categorizedAlerts.info, 'info')}
             </div>
-          </ScrollArea>
+          </div>
         ) : (
           <div className="p-8 text-center">
             <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
-              <Bell className="w-6 h-6 text-muted-foreground" />
+              <Bell className="w-6 h-6 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />
             </div>
             <p className="text-sm font-medium text-foreground">No open alerts</p>
             <p className="text-xs text-muted-foreground mt-1">
-              All systems operating normally
+              New alerts for your vessels appear here.
             </p>
           </div>
         )}
@@ -472,14 +542,14 @@ const NotificationBell: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            className="w-full justify-center"
+            className="w-full justify-center [@media(pointer:coarse)]:h-11"
             onClick={() => {
               setIsOpen(false);
-              navigate('/notifications/center');
+              navigate(INBOX_PATH);
             }}
           >
-            <ExternalLink className="w-4 h-4 mr-2" />
-            Open Notification Center
+            <Inbox className="w-4 h-4 mr-2" strokeWidth={1.75} aria-hidden="true" />
+            Open inbox
           </Button>
         </div>
       </PopoverContent>

@@ -10,8 +10,9 @@
  *
  * A nested layout can still ask the outer shell for one thing its props used
  * to control: `collapseSidebar` (the logbook workspace's wide mode).
+ * DashboardLayout reads it with `useContext(ShellContext)`.
  */
-import { createContext, useContext } from 'react';
+import { createContext } from 'react';
 
 export interface ShellContextValue {
   /** Ask the shell to keep its sidebar off-canvas. Returns the release function. */
@@ -19,8 +20,3 @@ export interface ShellContextValue {
 }
 
 export const ShellContext = createContext<ShellContextValue | null>(null);
-
-/** The enclosing shell, or null when this subtree has none yet. */
-export function useShell(): ShellContextValue | null {
-  return useContext(ShellContext);
-}

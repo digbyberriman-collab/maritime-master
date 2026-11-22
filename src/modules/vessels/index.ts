@@ -11,7 +11,6 @@ export { useVesselFilter } from './hooks/useVesselFilter';
 // Components
 export { default as VesselFormModal } from './components/VesselFormModal';
 export { default as DeleteVesselDialog } from './components/DeleteVesselDialog';
-export { default as VesselSelector } from './components/VesselSelector';
 export { default as VesselContextBanner } from './components/VesselContextBanner';
 
 // Pages
