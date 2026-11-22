@@ -10,11 +10,13 @@ import { useLogbookActor } from '../hooks/useLogbookActor';
 import { useLogbookSamples } from '../hooks/useLogbookSamples';
 import { isFresh } from '../lib/registryRules';
 import { stamp } from '../lib/format';
+import { useLogbookPath } from '../lib/useLogbookPath';
 
 /** Simulated AMCS / NMEA sources. Captured samples become evidence attached to draft lines. */
 const LogbookConnections: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const bookPath = useLogbookPath();
   const actor = useLogbookActor();
   const { samples, simulateSample, pasteRmc, refetch } = useLogbookSamples(actor.vesselId, actor.companyId);
   const [sentence, setSentence] = React.useState('');
@@ -29,7 +31,7 @@ const LogbookConnections: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-5 p-1">
-        <Button asChild variant="ghost" size="sm" className="-ml-2"><Link to="/vessel/logbooks"><ArrowLeft className="mr-1 h-4 w-4" /> Back to logbooks</Link></Button>
+        <Button asChild variant="ghost" size="sm" className="-ml-2"><Link to={bookPath('')}><ArrowLeft className="mr-1 h-4 w-4" /> Back to logbooks</Link></Button>
         <div className="flex items-center gap-3">
           <Plug className="h-7 w-7 text-primary" />
           <div>
@@ -57,7 +59,7 @@ const LogbookConnections: React.FC = () => {
                   <Button type="button" size="sm" disabled={!canCapture || simulateSample.isPending} onClick={() => run(() => simulateSample.mutateAsync(type), 'Sample captured')}>
                     <RefreshCw className="mr-1 h-4 w-4" /> Capture simulated sample
                   </Button>
-                  <Button type="button" size="sm" variant="outline" disabled={!sample || !fresh} onClick={() => navigate(`/vessel/logbooks/${slug}?sample=${sample!.id}`)}>Use in draft</Button>
+                  <Button type="button" size="sm" variant="outline" disabled={!sample || !fresh} onClick={() => navigate(bookPath(slug, `?sample=${sample!.id}`))}>Use in draft</Button>
                 </div>
               </section>
             );

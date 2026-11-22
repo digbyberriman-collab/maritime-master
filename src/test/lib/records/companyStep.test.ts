@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ACTION_FROM,
+  CLOSED_AS,
   ENVELOPE_ACTIONS,
   availableActions,
+  closeAsOptions,
   transitionEnvelope,
   vesselCanClose,
   type ClosedBy,
@@ -9,7 +12,7 @@ import {
   type EnvelopeState,
   type TransitionInput,
 } from '@/lib/records/companyStep';
-import { ENVELOPE_STATUSES, type EnvelopeStatus, type Party } from '@/lib/records/types';
+import { ENVELOPE_STATUSES, type DeleteRule, type EnvelopeStatus, type Party } from '@/lib/records/types';
 
 type KindConfig = Omit<EnvelopeState, 'status'> & { closer: ClosedBy };
 
@@ -76,6 +79,7 @@ describe('exhaustive transition matrix per company step', () => {
         'info_requested --vessel_sign(vessel)--> awaiting_company_close',
         'awaiting_company_close --acknowledge(company)--> closed',
         'submitted --return_to_vessel(company)--> info_requested',
+        'acknowledged --return_to_vessel(company)--> info_requested',
         'awaiting_company_close --return_to_vessel(company)--> info_requested',
         'closed --remove_company_signature(company)--> awaiting_company_close',
       ].sort(),
@@ -92,6 +96,7 @@ describe('exhaustive transition matrix per company step', () => {
         'awaiting_company_close --acknowledge(company)--> awaiting_company_close',
         'awaiting_company_close --sign_off(company)--> closed',
         'submitted --return_to_vessel(company)--> info_requested',
+        'acknowledged --return_to_vessel(company)--> info_requested',
         'awaiting_company_close --return_to_vessel(company)--> info_requested',
         'closed --reopen(company)--> in_review',
         'closed --remove_company_signature(company)--> awaiting_company_close',
@@ -109,6 +114,7 @@ describe('exhaustive transition matrix per company step', () => {
         'awaiting_company_close --acknowledge(company)--> awaiting_company_close',
         'awaiting_company_close --decide(company)--> closed',
         'submitted --return_to_vessel(company)--> info_requested',
+        'acknowledged --return_to_vessel(company)--> info_requested',
         'awaiting_company_close --return_to_vessel(company)--> info_requested',
         'closed --reopen(company)--> in_review',
         'closed --remove_company_signature(company)--> awaiting_company_close',
@@ -116,7 +122,8 @@ describe('exhaustive transition matrix per company step', () => {
     );
   });
 
-  it('report-first kinds: submit, acknowledge, close as, reopen to acknowledged', () => {
+  it('report-first kinds: submit, acknowledge, close after review, reopen to acknowledged', () => {
+    // HAPPY closes "after review", which needs the vessel final review: only from awaiting_company_close.
     expect(okTransitions(KINDS.report_first)).toEqual(
       [
         'open --submit(vessel)--> submitted',
@@ -127,27 +134,23 @@ describe('exhaustive transition matrix per company step', () => {
         'submitted --acknowledge(company)--> acknowledged',
         'awaiting_company_close --acknowledge(company)--> awaiting_company_close',
         'awaiting_company_close --sign_off(company)--> closed',
-        'submitted --close_as(company)--> closed',
-        'acknowledged --close_as(company)--> closed',
         'awaiting_company_close --close_as(company)--> closed',
         'submitted --return_to_vessel(company)--> info_requested',
+        'acknowledged --return_to_vessel(company)--> info_requested',
         'awaiting_company_close --return_to_vessel(company)--> info_requested',
         'closed --reopen(company)--> acknowledged',
       ].sort(),
     );
   });
 
-  it('void: from every live status, by either party, with a reason', () => {
-    for (const kind of Object.values(KINDS)) {
-      for (const status of ENVELOPE_STATUSES) {
-        for (const actor of ['vessel', 'company'] as Party[]) {
-          const r = transitionEnvelope(stateFor(kind, status), { action: 'void', actor, reason: 'Raised on the wrong vessel' });
-          if (status === 'void') expect(r).toMatchObject({ ok: false, error: { code: 'voided' } });
-          else expect(r).toMatchObject({ ok: true, value: { status: 'void', notification: 'record_voided', effects: ['snapshot'] } });
-        }
-      }
+  it('report-first kinds: raised in error and duplicate close from submitted, acknowledged or awaiting the company', () => {
+    for (const closedAs of ['raised_in_error', 'duplicate'] as const) {
+      const from = ENVELOPE_STATUSES.filter(
+        (status) =>
+          transitionEnvelope(stateFor(KINDS.report_first, status), { action: 'close_as', actor: 'company', ...HAPPY, closedAs, duplicateOf: 'INC-DRA-2026-008' }).ok,
+      );
+      expect(from).toEqual(['submitted', 'acknowledged', 'awaiting_company_close']);
     }
-    expect(transitionEnvelope(stateFor(KINDS.none, 'open'), { action: 'void', actor: 'vessel' })).toMatchObject({ ok: false, error: { code: 'reason_required' } });
   });
 
   it('nothing happens to a voided record', () => {
@@ -157,6 +160,59 @@ describe('exhaustive transition matrix per company step', () => {
         expect(r).toMatchObject({ ok: false, error: { code: 'voided' } });
       }
     }
+  });
+});
+
+describe("void follows the kind's delete rule (gap/08 §F; D-32)", () => {
+  const LIVE = ENVELOPE_STATUSES.filter((s) => s !== 'void');
+  const RULES: Array<[DeleteRule | undefined, Record<Party, 'ok' | 'wrong_party' | 'not_for_kind'>]> = [
+    [undefined, { vessel: 'ok', company: 'ok' }], // absent = draft_only
+    ['draft_only', { vessel: 'ok', company: 'ok' }],
+    ['until_signed', { vessel: 'ok', company: 'ok' }],
+    ['never_after_submit', { vessel: 'wrong_party', company: 'ok' }],
+    ['free', { vessel: 'not_for_kind', company: 'not_for_kind' }],
+    ['cascade_parent', { vessel: 'not_for_kind', company: 'not_for_kind' }],
+  ];
+
+  it.each(RULES)('deleteRule %s', (deleteRule, expected) => {
+    for (const kind of Object.values(KINDS)) {
+      for (const actor of ['vessel', 'company'] as Party[]) {
+        for (const status of LIVE) {
+          const r = transitionEnvelope(stateFor(kind, status, { deleteRule }), { action: 'void', actor, reason: 'Raised on the wrong vessel' });
+          if (expected[actor] === 'ok') {
+            expect(r).toMatchObject({ ok: true, value: { status: 'void', notification: 'record_voided', effects: ['snapshot'] } });
+          } else {
+            expect(r).toMatchObject({ ok: false, error: { code: expected[actor] } });
+          }
+        }
+        expect(transitionEnvelope(stateFor(kind, 'void', { deleteRule }), { action: 'void', actor, reason: 'r' })).toMatchObject({ ok: false, error: { code: 'voided' } });
+      }
+    }
+  });
+
+  it('a void needs a reason', () => {
+    expect(transitionEnvelope(stateFor(KINDS.none, 'open'), { action: 'void', actor: 'vessel' })).toMatchObject({ ok: false, error: { code: 'reason_required' } });
+    const incident = stateFor(KINDS.report_first, 'submitted', { deleteRule: 'never_after_submit' });
+    expect(transitionEnvelope(incident, { action: 'void', actor: 'company', reason: '  ' })).toMatchObject({ ok: false, error: { code: 'reason_required' } });
+  });
+
+  it('the company voids a submitted or closed incident with a reason; the vessel cannot', () => {
+    for (const status of ['submitted', 'acknowledged', 'closed'] as EnvelopeStatus[]) {
+      const incident = stateFor(KINDS.report_first, status, { deleteRule: 'never_after_submit' });
+      expect(transitionEnvelope(incident, { action: 'void', actor: 'vessel', reason: 'oops' })).toMatchObject({
+        ok: false,
+        error: { code: 'wrong_party', message: 'Only the company can void this record.' },
+      });
+      expect(transitionEnvelope(incident, { action: 'void', actor: 'company', reason: 'Raised on the wrong vessel' })).toMatchObject({ ok: true, value: { status: 'void' } });
+    }
+  });
+
+  it('availableActions reflects the rule', () => {
+    const incident = stateFor(KINDS.report_first, 'submitted', { deleteRule: 'never_after_submit' });
+    expect(availableActions(incident, 'vessel')).not.toContain('void');
+    expect(availableActions(incident, 'vessel')).toEqual([]);
+    expect(availableActions(incident, 'company')).toContain('void');
+    expect(availableActions(stateFor(KINDS.none, 'open', { deleteRule: 'free' }), 'vessel')).toEqual(['vessel_sign']);
   });
 });
 
@@ -224,7 +280,8 @@ describe('guards', () => {
     ['sign_off', 'awaiting_company_close', { action: 'sign_off', actor: 'company' }],
     ['decision', 'awaiting_company_close', { action: 'decide', actor: 'company', decision: 'approved' }],
     ['decision', 'awaiting_company_close', { action: 'decide', actor: 'company', decision: 'approved_with_conditions', conditions: 'Hot work only by day' }],
-    ['report_first', 'acknowledged', { action: 'close_as', actor: 'company', closedAs: 'after_review' }],
+    ['report_first', 'awaiting_company_close', { action: 'close_as', actor: 'company', closedAs: 'after_review' }],
+    ['report_first', 'acknowledged', { action: 'close_as', actor: 'company', closedAs: 'raised_in_error' }],
   ];
 
   it.each(closeActions)('%s: closing from %s is blocked by open requests', (kind, status, input) => {
@@ -281,6 +338,46 @@ describe('guards', () => {
     expect(transitionEnvelope(s, { action: 'close_as', actor: 'company', closedAs: 'duplicate' })).toMatchObject({ ok: false, error: { code: 'duplicate_required' } });
     expect(transitionEnvelope(s, { action: 'close_as', actor: 'company', closedAs: 'duplicate', duplicateOf: 'INC-DRA-2026-008' })).toMatchObject({ ok: true, value: { status: 'closed', closedBy: 'company_close_as' } });
     expect(transitionEnvelope(s, { action: 'close_as', actor: 'company', closedAs: 'raised_in_error' }).ok).toBe(true);
+  });
+
+  it.each<EnvelopeStatus>(['submitted', 'acknowledged'])('close as after review is refused from %s (vessel final review not signed)', (status) => {
+    const r = transitionEnvelope(stateFor(KINDS.report_first, status), { action: 'close_as', actor: 'company', closedAs: 'after_review' });
+    expect(r).toMatchObject({ ok: false, error: { code: 'invalid_transition', message: 'Closed after review needs the vessel final review signed first.' } });
+  });
+
+  it('closeAsOptions: after review only once the vessel final review is signed', () => {
+    const options = (status: EnvelopeStatus) => closeAsOptions(stateFor(KINDS.report_first, status));
+    expect(options('submitted')).toEqual(['raised_in_error', 'duplicate']);
+    expect(options('acknowledged')).toEqual(['raised_in_error', 'duplicate']);
+    expect(options('awaiting_company_close')).toEqual([...CLOSED_AS]);
+    for (const status of ['open', 'in_review', 'info_requested', 'closed', 'void'] as EnvelopeStatus[]) expect(options(status)).toEqual([]);
+    for (const kind of [KINDS.none, KINDS.acknowledge, KINDS.sign_off, KINDS.decision]) {
+      for (const status of ENVELOPE_STATUSES) expect(closeAsOptions(stateFor(kind, status))).toEqual([]);
+    }
+  });
+
+  it('return to vessel: from submitted, acknowledged and awaiting the company (D-30)', () => {
+    expect([...ACTION_FROM.return_to_vessel].sort()).toEqual(['acknowledged', 'awaiting_company_close', 'submitted']);
+    for (const kind of [KINDS.acknowledge, KINDS.sign_off, KINDS.decision, KINDS.report_first]) {
+      for (const status of ENVELOPE_STATUSES) {
+        const r = transitionEnvelope(stateFor(kind, status, { companyAcknowledged: status === 'acknowledged' }), {
+          action: 'return_to_vessel',
+          actor: 'company',
+          reason: 'Photos missing',
+        });
+        if (['submitted', 'acknowledged', 'awaiting_company_close'].includes(status)) {
+          expect(r).toMatchObject({ ok: true, value: { status: 'info_requested', notification: 'record_returned' } });
+        } else {
+          expect(r).toMatchObject({ ok: false });
+        }
+      }
+    }
+    expect(transitionEnvelope(stateFor(KINDS.none, 'submitted'), { action: 'return_to_vessel', actor: 'company', reason: 'r' })).toMatchObject({ ok: false, error: { code: 'not_for_kind' } });
+  });
+
+  it('a returned record comes back to the company through the vessel signatures (D-30)', () => {
+    const r = transitionEnvelope(stateFor(KINDS.report_first, 'info_requested', { companyAcknowledged: true }), { action: 'vessel_sign', actor: 'vessel', allVesselSlotsSigned: true });
+    expect(r).toMatchObject({ ok: true, value: { status: 'awaiting_company_close', companyAcknowledged: true } });
   });
 
   it('kind checks', () => {
@@ -349,5 +446,12 @@ describe('availableActions (action bar)', () => {
 
   it('thread and signature guards do not hide an action', () => {
     expect(availableActions(stateFor(KINDS.sign_off, 'awaiting_company_close', { companyAcknowledged: true }), 'company')).toEqual(['sign_off', 'return_to_vessel', 'void']);
+  });
+
+  it('close as stays on the bar in submitted and acknowledged (raised in error / duplicate)', () => {
+    expect(availableActions(stateFor(KINDS.report_first, 'submitted'), 'company')).toEqual(['acknowledge', 'close_as', 'return_to_vessel', 'void']);
+    expect(availableActions(stateFor(KINDS.report_first, 'acknowledged', { companyAcknowledged: true }), 'company')).toEqual(['close_as', 'return_to_vessel', 'void']);
+    expect(availableActions(stateFor(KINDS.report_first, 'awaiting_company_close'), 'company')).toEqual(['acknowledge', 'sign_off', 'close_as', 'return_to_vessel', 'void']);
+    expect(availableActions(stateFor(KINDS.report_first, 'submitted'), 'vessel')).not.toContain('close_as');
   });
 });

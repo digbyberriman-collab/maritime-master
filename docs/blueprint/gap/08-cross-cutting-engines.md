@@ -386,8 +386,8 @@ any ──new review cycle / revert to draft / Return to vessel──▶ superse
 | Acknowledge | submitted, awaiting_company_close | company actor | — | `company_ack_by/at`; header line; status `acknowledged` for report-first kinds |
 | Decide | awaiting_company_close (RA-style) | company actor | choice ∈ {approved, approved_with_conditions, not_approved}; conditions text when "with conditions"; reason when "not approved"; optional comment | approved / with conditions → `closed` (label per kind, e.g. "Completed"); not approved → `info_requested` |
 | Sign off & close | awaiting_company_close | company actor | optional comment; open requests = 0 | `closed`; company signature row; snapshot |
-| Close as | submitted, acknowledged, awaiting_company_close (incident) | company actor | closed_as ∈ {after_review, raised_in_error, duplicate}; duplicate → link required; root cause (locked after save) | `closed` |
-| Return to vessel | awaiting_company_close, submitted | company actor | reason | `info_requested`; vessel signatures of the cycle superseded; whose move vessel |
+| Close as | submitted, acknowledged, awaiting_company_close (incident); `after_review` only from awaiting_company_close, because it needs the vessel final review (DECISIONS D-30) | company actor | closed_as ∈ {after_review, raised_in_error, duplicate}; duplicate → link required; root cause (locked after save) | `closed` |
+| Return to vessel | submitted, acknowledged, awaiting_company_close (DECISIONS D-30) | company actor | reason | `info_requested`; vessel signatures of the cycle superseded; whose move vessel; the vessel re-signs to reach `awaiting_company_close` again |
 | Reopen | closed | company actor | reason | new cycle; `acknowledged` (incident) or `in_review` (others) |
 | Remove company signature | closed (by sign-off or decision) | company actor | reason | `awaiting_company_close` |
 
@@ -424,6 +424,7 @@ Registry `delete_rule` per kind:
 | `free` (custom calendar events, saved views, personal drafts) | always (creator or R&W) | — |
 | `cascade_parent` (voyage reports) | per `draft_only`; deleting the last report deletes the voyage | — |
 
+- Who may void, per rule (DECISIONS D-32): `draft_only` / `until_signed` either side (role limits come from capabilities); `never_after_submit` the company only, in every status; `free` / `cascade_parent` never (deleted instead). SQL `void_record()` applies the same matrix as the TS engine (`transitionEnvelope`).
 - Legal hold (person or record) blocks delete, void and purge.
 - Voided records: hidden from registers and counts by default ("Show voided" filter), still in reports flagged "voided", still exportable for audits, still in subject exports.
 - This is deliberately **stricter than the reference**, which lets users permanently delete signed and company-approved risk assessments, closed permits, closed corrective actions and closed HESS minutes (§8.10). ISM record-keeping and PSC inspection need those records to survive.

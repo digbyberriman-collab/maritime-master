@@ -83,10 +83,10 @@ export function ConsistencyCheck() {
     overallTone === "ok"
       ? "bg-success/10 text-success border-success/30"
       : overallTone === "danger"
-        ? "bg-danger/10 text-danger border-danger/30"
+        ? "bg-destructive/10 text-destructive border-destructive/30"
         : overallTone === "warn"
           ? "bg-warning/10 text-warning border-warning/30"
-          : "bg-secondary text-ink border-black/10";
+          : "bg-secondary text-foreground border-black/10";
 
   return (
     <section className="bg-white border border-black/10 rounded-sm p-5 mb-8">
@@ -99,7 +99,7 @@ export function ConsistencyCheck() {
             {activeVessel ? (
               <>
                 {" "}
-                <span className="font-medium text-ink">
+                <span className="font-medium text-foreground">
                   {activeVessel.name}
                   {activeVessel.hull_number ? ` — ${activeVessel.hull_number}` : ""}
                 </span>
@@ -113,7 +113,7 @@ export function ConsistencyCheck() {
         <button
           onClick={run}
           disabled={running || vesselLoading || !activeVesselId}
-          className="text-xs uppercase tracking-wider px-3 py-2 bg-navy text-white rounded-sm hover:opacity-90 disabled:opacity-50"
+          className="text-xs uppercase tracking-wider px-3 py-2 bg-primary text-primary-foreground rounded-sm hover:bg-primary/90 disabled:opacity-50"
         >
           {running ? "Checking…" : "Run check"}
         </button>
@@ -158,11 +158,11 @@ export function ConsistencyCheck() {
             <tbody className="divide-y divide-black/5">
               {results.map((r) => {
                 const status: { label: string; cls: string } = r.error
-                  ? { label: "Error", cls: "bg-danger/10 text-danger" }
+                  ? { label: "Error", cls: "bg-destructive/10 text-destructive" }
                   : r.orphans > 0
                     ? {
                         label: `${r.orphans} orphan${r.orphans === 1 ? "" : "s"}`,
-                        cls: "bg-danger/10 text-danger",
+                        cls: "bg-destructive/10 text-destructive",
                       }
                     : r.otherVessels > 0
                       ? { label: "Mixed vessels", cls: "bg-warning/10 text-warning" }
@@ -175,7 +175,7 @@ export function ConsistencyCheck() {
                     <td className="py-2.5">
                       <div className="font-medium">{r.label}</div>
                       <div className="font-mono text-[10px] text-muted-foreground">{r.table}</div>
-                      {r.error && <div className="text-[11px] text-danger mt-1">{r.error}</div>}
+                      {r.error && <div className="text-[11px] text-destructive mt-1">{r.error}</div>}
                     </td>
                     <td className="py-2.5 text-right tabular-nums">{r.total}</td>
                     <td className="py-2.5 text-right tabular-nums font-medium">{r.linked}</td>
@@ -185,7 +185,7 @@ export function ConsistencyCheck() {
                       {r.otherVessels}
                     </td>
                     <td
-                      className={`py-2.5 text-right tabular-nums ${r.orphans > 0 ? "text-danger font-medium" : "text-muted-foreground"}`}
+                      className={`py-2.5 text-right tabular-nums ${r.orphans > 0 ? "text-destructive font-medium" : "text-muted-foreground"}`}
                     >
                       {r.orphans}
                     </td>
@@ -206,7 +206,7 @@ export function ConsistencyCheck() {
 
       {results && totalIssues > 0 && (
         <div className="mt-4 text-xs text-muted-foreground space-y-1">
-          <div className="font-medium text-ink">Suggested fixes</div>
+          <div className="font-medium text-foreground">Suggested fixes</div>
           <ul className="list-disc pl-5 space-y-1">
             {results.some((r) => r.orphans > 0) && (
               <li>

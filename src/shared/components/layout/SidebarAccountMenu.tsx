@@ -4,7 +4,6 @@ import { ChevronUp, LogOut, MessageSquareWarning, Palette, Settings, Ship, User 
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import { useDashboardFilter } from '@/modules/dashboard/contexts/DashboardFilterContext';
-import { useBrandingContext } from '@/shared/contexts/BrandingContext';
 import { canManageBranding } from '@/shared/hooks/useBranding';
 import { useFeedbackStore } from '@/modules/feedback/store/feedbackStore';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -40,7 +39,6 @@ const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate, col
   const { profile, signOut } = useAuth();
   const { vessels, loading, selectedVessel, setSelectedVesselById } = useVessel();
   const { selectedVesselIds, setSelectedVesselIds } = useDashboardFilter();
-  const { brandColor } = useBrandingContext();
   const { setPanelOpen } = useFeedbackStore();
   const navigate = useNavigate();
 
@@ -89,7 +87,7 @@ const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate, col
               title={`${profile?.first_name ?? ''} ${profile?.last_name ?? ''}`}
             >
               <Avatar className="h-9 w-9 shrink-0">
-                <AvatarFallback className="text-sm text-primary-foreground" style={{ backgroundColor: brandColor }}>
+                <AvatarFallback className="bg-sidebar-accent text-sm font-medium text-sidebar-accent-foreground">
                   {initials}
                 </AvatarFallback>
               </Avatar>
@@ -101,7 +99,7 @@ const SidebarAccountMenu: React.FC<SidebarAccountMenuProps> = ({ onNavigate, col
              className="min-h-11 w-full justify-start gap-3 px-2 py-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
            >
             <Avatar className="h-9 w-9 shrink-0">
-              <AvatarFallback className="text-sm text-primary-foreground" style={{ backgroundColor: brandColor }}>
+              <AvatarFallback className="bg-sidebar-accent text-sm font-medium text-sidebar-accent-foreground">
                 {initials}
               </AvatarFallback>
             </Avatar>

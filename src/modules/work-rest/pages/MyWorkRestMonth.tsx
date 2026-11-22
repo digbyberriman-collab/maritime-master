@@ -6,6 +6,7 @@ import {
   Download,
   FileText,
   Loader2,
+  MoreHorizontal,
   Save,
   Users,
 } from 'lucide-react';
@@ -14,6 +15,12 @@ import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Select,
   SelectContent,
@@ -25,6 +32,8 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useScopedPath, useVesselScope } from '@/app/router/scopes';
+import { useScopeAccess } from '@/app/router/useScopeAccess';
 
 import { useMonthlyWorkRest } from '../hooks/useMonthlyWorkRest';
 import { CompliancePanel } from '../components/CompliancePanel';
@@ -69,10 +78,21 @@ const sb = supabase as any;
  */
 const MyWorkRestMonth: React.FC = () => {
   const { user, profile, userRole } = useAuth();
-  const { selectedVessel } = useVessel();
+  const { selectedVessel, isAllVessels } = useVessel();
   const { toast } = useToast();
   const navigate = useNavigate();
   const params = useParams<{ crewId?: string }>();
+  const inVesselScope = useVesselScope() !== null;
+  const scoped = useScopedPath();
+  const { fleetReach } = useScopeAccess();
+
+  // Links to the vessel's HoR pages (gap/00 B4). Inside the vessel scope
+  // they stay in it, so the shell is not remounted. Elsewhere (/me) they
+  // go where the legacy redirect would send the user anyway, the selected
+  // or first vessel, without the hop; with no vessel to scope to (none at
+  // all, or a fleet user in All vessels mode) the legacy page opens in place.
+  const vesselLink = (rel: string, legacyPath: string) =>
+    inVesselScope || (!isAllVessels && scoped() !== '/') ? scoped(rel) : legacyPath;
   const [searchParams, setSearchParams] = useSearchParams();
 
   const targetCrewId = params.crewId || user?.id || '';
@@ -171,11 +191,13 @@ const MyWorkRestMonth: React.FC = () => {
     params.set('year', String(yearParam));
     params.set('month', String(monthParam));
     if (newCrewId === user?.id) {
-      navigate(`/crew/work-rest?${params.toString()}`);
+      // One's own hours live in the personal area (R8).
+      navigate(`/me/hours-of-rest?${params.toString()}`);
     } else {
-      navigate(`/crew/work-rest/${newCrewId}?${params.toString()}`);
+      navigate(`${vesselLink(`crew/people/${newCrewId}/hours-of-rest`, `/crew/work-rest/${newCrewId}`)}?${params.toString()}`);
     }
   };
+  const openOverview = () => navigate(vesselLink('crew/hours-of-rest', '/crew/work-rest/overview'));
 
   const wr = useMonthlyWorkRest({
     crewId: targetCrewId,
@@ -292,10 +314,12 @@ const MyWorkRestMonth: React.FC = () => {
               )}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          {/* Below md: the crew picker on its own line, then the month and
+              Save; the exports and the overview move into "More". */}
+          <div className="flex flex-wrap items-center gap-2">
             {canSelectOtherCrew && crewList.length > 0 && (
               <Select value={targetCrewId} onValueChange={handleCrewChange}>
-                <SelectTrigger className="h-9 w-[220px]">
+                <SelectTrigger className="h-9 w-full md:w-[220px]" aria-label="Crew member">
                   <SelectValue placeholder="Select crew member" />
                 </SelectTrigger>
                 <SelectContent className="max-h-80">
@@ -309,13 +333,13 @@ const MyWorkRestMonth: React.FC = () => {
                 </SelectContent>
               </Select>
             )}
-            <Button variant="outline" size="sm" onClick={handlePrev}>
+            <Button variant="outline" size="sm" onClick={handlePrev} aria-label="Previous month">
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <span className="font-medium min-w-[10ch] text-center">
               {format(new Date(yearParam, monthParam - 1, 1), 'MMM yyyy')}
             </span>
-            <Button variant="outline" size="sm" onClick={handleNext}>
+            <Button variant="outline" size="sm" onClick={handleNext} aria-label="Next month">
               <ChevronRight className="h-4 w-4" />
             </Button>
             <Button
@@ -330,19 +354,41 @@ const MyWorkRestMonth: React.FC = () => {
               )}
               Save
             </Button>
-            <Button variant="outline" size="sm" onClick={exportPDF}>
-              <FileText className="h-4 w-4 mr-1" /> PDF
-            </Button>
-            <Button variant="outline" size="sm" onClick={exportCSV}>
-              <Download className="h-4 w-4 mr-1" /> CSV
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('/crew/work-rest/overview')}
-            >
-              <Users className="h-4 w-4 mr-1" /> Fleet Overview
-            </Button>
+            <div className="hidden md:flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={exportPDF}>
+                <FileText className="h-4 w-4 mr-1" /> PDF
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportCSV}>
+                <Download className="h-4 w-4 mr-1" /> CSV
+              </Button>
+              {fleetReach && (
+                <Button variant="outline" size="sm" onClick={openOverview}>
+                  <Users className="h-4 w-4 mr-1" /> Fleet Overview
+                </Button>
+              )}
+            </div>
+            <div className="md:hidden">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <MoreHorizontal className="h-4 w-4 mr-1" /> More
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={exportPDF}>
+                    <FileText className="h-4 w-4 mr-2" /> PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={exportCSV}>
+                    <Download className="h-4 w-4 mr-2" /> CSV
+                  </DropdownMenuItem>
+                  {fleetReach && (
+                    <DropdownMenuItem onSelect={openOverview}>
+                      <Users className="h-4 w-4 mr-2" /> Fleet Overview
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
 

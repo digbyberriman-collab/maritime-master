@@ -267,7 +267,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
   const statusChip = (child: NavChild) => {
     if (child.status === 'planned') {
       return (
-        <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-sidebar-foreground/50 ring-1 ring-inset ring-sidebar-border">
+        <span className="shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-wide text-sidebar-muted-foreground ring-1 ring-inset ring-sidebar-border">
           Planned
         </span>
       );
@@ -301,7 +301,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
         <div key={child.id} role="group" aria-labelledby={headingId} className="space-y-1 pt-3 first:pt-0">
           <p
             id={headingId}
-            className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/50"
+            className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-sidebar-muted-foreground"
           >
             {child.label}
           </p>
@@ -521,7 +521,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({ moduleId, onNavig
             className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-xs font-medium text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
           >
             <span>Show roadmap</span>
-            <span aria-hidden="true" className={cn('font-semibold uppercase tracking-wide', showRoadmapStored ? 'text-sidebar-primary' : 'text-sidebar-foreground/50')}>
+            <span aria-hidden="true" className={cn('font-semibold uppercase tracking-wide', showRoadmapStored ? 'text-sidebar-primary' : 'text-sidebar-muted-foreground')}>
               {showRoadmapStored ? 'On' : 'Off'}
             </span>
           </button>

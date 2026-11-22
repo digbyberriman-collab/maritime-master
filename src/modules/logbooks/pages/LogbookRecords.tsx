@@ -16,12 +16,14 @@ import { CATALOG_TOTALS, LOGBOOK_BOOKS, getBookByDbType } from '../lib/catalog';
 import { templateRevision } from '../lib/templates';
 import type { EntryView } from '../lib/types';
 import { stamp } from '../lib/format';
+import { useLogbookPath } from '../lib/useLogbookPath';
 
 const STATUS_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = { draft: 'secondary', signed: 'default', verified: 'default', submitted: 'outline', amended: 'outline' };
 
 /** All records with search and filters, the audit trail, and the JSON audit export. */
 const LogbookRecords: React.FC = () => {
   const actor = useLogbookActor();
+  const bookPath = useLogbookPath();
   const { selectedVessel } = useVessel();
   const vesselId = actor.vesselId;
   const logbooks = useQuery({ queryKey: ['logbooks', vesselId], enabled: !!vesselId, queryFn: () => fetchLogbooks(vesselId!) });
@@ -80,7 +82,7 @@ const LogbookRecords: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-5 p-1">
-        <Button asChild variant="ghost" size="sm" className="-ml-2"><Link to="/vessel/logbooks"><ArrowLeft className="mr-1 h-4 w-4" /> Back to logbooks</Link></Button>
+        <Button asChild variant="ghost" size="sm" className="-ml-2"><Link to={bookPath('')}><ArrowLeft className="mr-1 h-4 w-4" /> Back to logbooks</Link></Button>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <FileText className="h-7 w-7 text-primary" />
@@ -124,7 +126,7 @@ const LogbookRecords: React.FC = () => {
                           <TableCell>{e.recorded_by_name ?? '—'}</TableCell>
                           <TableCell className="text-xs">{e.signatures.filter((s) => s.kind !== 'acknowledge').map((s) => `${s.kind}: ${s.kind === 'attested' ? s.witness_name : s.actor_name}`).join(', ') || 'Unsigned'}</TableCell>
                           <TableCell><Badge variant={STATUS_VARIANT[e.status] ?? 'secondary'}>{e.superseded_by_id ? 'superseded' : e.status}</Badge></TableCell>
-                          <TableCell className="text-right">{book && <Button asChild size="sm" variant="ghost"><Link to={`/vessel/logbooks/${book.slug}?entry=${e.id}`}>Open</Link></Button>}</TableCell>
+                          <TableCell className="text-right">{book && <Button asChild size="sm" variant="ghost"><Link to={bookPath(book.slug, `?entry=${e.id}`)}>Open</Link></Button>}</TableCell>
                         </TableRow>
                       );
                     })}

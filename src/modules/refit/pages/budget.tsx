@@ -95,7 +95,7 @@ export default function BudgetPage() {
               {can(roles, "invoice.manage") && (
                 <Link
                   to="/yard/refit/invoices"
-                  className="px-3 py-2 bg-navy text-white rounded-sm text-sm hover:opacity-90"
+                  className="px-3 py-2 bg-primary text-primary-foreground rounded-sm text-sm hover:bg-primary/90"
                 >
                   Invoices
                 </Link>
@@ -139,7 +139,7 @@ export default function BudgetPage() {
           <Section
             title="Recent Purchase Orders"
             action={
-              <Link to="/yard/refit/purchase-orders" className="text-[11px] text-ocean">
+              <Link to="/yard/refit/purchase-orders" className="text-[11px] text-primary">
                 View all →
               </Link>
             }
@@ -181,7 +181,7 @@ export default function BudgetPage() {
           <Section
             title="Recent Invoices"
             action={
-              <Link to="/yard/refit/invoices" className="text-[11px] text-ocean">
+              <Link to="/yard/refit/invoices" className="text-[11px] text-primary">
                 View all →
               </Link>
             }

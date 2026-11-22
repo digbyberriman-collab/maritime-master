@@ -10,15 +10,17 @@ import { LazyLoader } from '@/shared/components/common/LazyLoader';
 /**
  * Per-route error boundary. It resets when the pathname changes, without
  * remounting the page, so moving between `/x/1` and `/x/2` keeps page state
- * but always clears a previous render error.
+ * but always clears a previous render error. `onReset` runs on each reset
+ * (Try again or a path change), before the children render again.
  */
-export const RouteErrorBoundary: React.FC<{ label?: string; children: React.ReactNode }> = ({
-  label,
-  children,
-}) => {
+export const RouteErrorBoundary: React.FC<{
+  label?: string;
+  onReset?: () => void;
+  children: React.ReactNode;
+}> = ({ label, onReset, children }) => {
   const { pathname } = useLocation();
   return (
-    <ErrorBoundary label={label} resetKey={pathname}>
+    <ErrorBoundary label={label} resetKey={pathname} onReset={onReset}>
       {children}
     </ErrorBoundary>
   );

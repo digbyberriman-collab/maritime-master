@@ -63,7 +63,7 @@ export default function NotificationsPage() {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 text-xs rounded-sm border ${filter === f ? "bg-navy text-white border-navy" : "bg-white border-black/10 hover:bg-secondary"}`}
+              className={`px-3 py-1.5 text-xs rounded-sm border ${filter === f ? "bg-primary text-primary-foreground border-primary" : "bg-white border-black/10 hover:bg-secondary"}`}
             >
               {f}
             </button>
@@ -86,16 +86,16 @@ export default function NotificationsPage() {
             items.map((n) => (
               <div
                 key={n.id}
-                className={`px-4 py-3 border-b border-black/5 ${n.read ? "bg-card" : "bg-paper"}`}
+                className={`px-4 py-3 border-b border-black/5 ${n.read ? "bg-card" : "bg-primary/5"}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-[10px] uppercase tracking-wider text-ocean font-medium">
+                      <span className="text-[10px] uppercase tracking-wider text-primary font-medium">
                         {n.notification_type}
                       </span>
                       {n.priority && <PriorityBadge value={n.priority} />}
-                      {!n.read && <span className="size-1.5 rounded-full bg-ocean" />}
+                      {!n.read && <span className="size-1.5 rounded-full bg-primary" />}
                     </div>
                     <div className="text-sm font-medium">{n.title}</div>
                     {n.body && <div className="text-xs text-muted-foreground mt-1">{n.body}</div>}
@@ -107,7 +107,7 @@ export default function NotificationsPage() {
                     {!n.read && (
                       <button
                         onClick={() => markRead(n.id)}
-                        className="text-[11px] text-ocean hover:underline"
+                        className="text-[11px] text-primary hover:underline"
                       >
                         Mark read
                       </button>

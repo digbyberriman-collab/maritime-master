@@ -1,25 +1,37 @@
-// Fleet Map - Interactive vessel tracking with Leaflet
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+// Fleet tracker: each vessel's last reported AIS fix on a Leaflet map.
+// Positions come only from ais_snapshots (useLatestVesselPositions); a vessel
+// that has not reported one is listed as "No position yet", never placed.
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatDistanceToNow } from 'date-fns';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  Ship, 
+import {
+  Ship,
   Maximize2,
   Minimize2,
   RefreshCw,
   Layers,
   X,
-  Anchor,
-  Navigation
+  Navigation,
+  MapPinOff,
 } from 'lucide-react';
 import { useVesselFilter } from '@/modules/vessels/hooks/useVesselFilter';
+import { useVessel } from '@/modules/vessels/contexts/VesselContext';
+import { vesselPath } from '@/modules/vessels/lib/vesselCode';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
+import { EmptyState, PageError } from '@/shared/components/states';
+import {
+  STALE_FIX_MS,
+  navStateFromAis,
+  useLatestVesselPositions,
+  type VesselPosition,
+} from '@/modules/dashboard/hooks/useLatestVesselPositions';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import {
@@ -36,19 +48,14 @@ import {
   type VesselNavState,
 } from '@/shared/components/data/mapTheme';
 
-interface MapVessel {
+interface FleetVessel {
   id: string;
   name: string;
-  mmsi: string;
-  lat: number;
-  lng: number;
-  sog: number;
-  cog: number;
-  heading: number;
-  status: 'UNDER_WAY' | 'MOORED' | 'AT_ANCHOR';
-  lastUpdate: string;
-  crewOnboard: number;
-  captain: string;
+  mmsi: string | null;
+  /** The last reported fix, or null when the vessel has not reported one. */
+  position: VesselPosition | null;
+  /** From the fix's AIS nav status; null when unknown. */
+  navState: VesselNavState | null;
 }
 
 interface Port {
@@ -85,30 +92,12 @@ const MAJOR_PORTS: Port[] = [
   { name: 'Sydney', country: 'Australia', lat: -33.8568, lng: 151.2153, type: 'major', description: 'Superyacht berths at Rozelle Bay and Double Bay' },
 ];
 
-// Map status → marker shape (mapTheme, gap/10 §A.11): heading arrow under way,
-// circle moored, ringed circle at anchor. Colour comes from the theme tokens.
-const NAV_STATE: Record<MapVessel['status'], VesselNavState> = {
-  UNDER_WAY: 'under_way',
-  MOORED: 'moored',
-  AT_ANCHOR: 'at_anchor',
-};
-
 const VESSEL_LEGEND: VesselNavState[] = ['under_way', 'moored', 'at_anchor'];
 const PORT_LEGEND: Array<{ kind: Port['type']; label: string }> = [
   { kind: 'major', label: 'Commercial Port' },
   { kind: 'marina', label: 'Marina' },
   { kind: 'shipyard', label: 'Shipyard' },
 ];
-
-// Generate a pseudo-random but stable position from vessel id
-const hashToCoord = (id: string, range: number, offset: number): number => {
-  let hash = 0;
-  for (let i = 0; i < id.length; i++) {
-    hash = ((hash << 5) - hash) + id.charCodeAt(i);
-    hash |= 0;
-  }
-  return offset + (Math.abs(hash) % (range * 100)) / 100;
-};
 
 const getPortTypeLabel = (type: string) => {
   switch (type) {
@@ -119,19 +108,52 @@ const getPortTypeLabel = (type: string) => {
   }
 };
 
+/** `43.7384°N, 7.4246°E`; southern and western values get S and W. */
+const formatLatLng = (lat: number, lng: number): string =>
+  `${Math.abs(lat).toFixed(4)}°${lat < 0 ? 'S' : 'N'}, ${Math.abs(lng).toFixed(4)}°${lng < 0 ? 'W' : 'E'}`;
+
+const statusLabel = (state: VesselNavState | null) => (state ? VESSEL_STATE_LABEL[state] : 'Status unknown');
+
+const statusBadgeVariant = (state: VesselNavState | null) => {
+  switch (state) {
+    case 'under_way': return 'default';
+    case 'at_anchor': return 'outline';
+    default: return 'secondary';
+  }
+};
+
+const fixAge = (position: VesselPosition) => formatDistanceToNow(new Date(position.timestampUtc));
+const updatedLabel = (position: VesselPosition) => `Updated ${fixAge(position)} ago`;
+const isStale = (position: VesselPosition) => Date.now() - Date.parse(position.timestampUtc) > STALE_FIX_MS;
+const reading = (value: number | null, unit: string) => (value === null ? '—' : `${Math.round(value * 10) / 10}${unit}`);
+
+/**
+ * Marker for a fix: the nav-state shape, hollow when the fix is over 6 h old
+ * or the status is unknown (gap/10 §A.11), so an unknown status never reads
+ * as a confident one.
+ */
+const markerIconFor = (vessel: FleetVessel & { position: VesselPosition }, selected: boolean) =>
+  vesselMarkerIcon({
+    heading: vessel.position.heading ?? vessel.position.cog,
+    state: vessel.navState ?? 'moored',
+    stale: vessel.navState === null || isStale(vessel.position),
+    selected,
+  });
+
+const hasPosition = (vessel: FleetVessel): vessel is FleetVessel & { position: VesselPosition } => vessel.position !== null;
+
 const FleetMap: React.FC = () => {
   const navigate = useNavigate();
   const { vesselFilter } = useVesselFilter();
+  const { getVesselCodeById } = useVessel();
   const { profile } = useAuth();
   const companyId = profile?.company_id;
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showLayers, setShowLayers] = useState(false);
-  const [selectedVessel, setSelectedVessel] = useState<MapVessel | null>(null);
+  const [selectedVesselId, setSelectedVesselId] = useState<string | null>(null);
   const [layers, setLayers] = useState({
     vessels: true,
-    tracks: false,
-    weather: false,
     ports: true,
     seamarks: false,
   });
@@ -140,10 +162,9 @@ const FleetMap: React.FC = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const vesselMarkersRef = useRef<L.LayerGroup>(L.layerGroup());
   const portMarkersRef = useRef<L.LayerGroup>(L.layerGroup());
-  const vesselMarkerByIdRef = useRef(new Map<string, { marker: L.Marker; vessel: MapVessel }>());
+  const vesselMarkerByIdRef = useRef(new Map<string, { marker: L.Marker; vessel: FleetVessel & { position: VesselPosition } }>());
 
-  // Fetch real vessels from database
-  const { data: dbVessels = [], refetch } = useQuery({
+  const vesselsQuery = useQuery({
     queryKey: ['vessels', companyId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -157,33 +178,35 @@ const FleetMap: React.FC = () => {
     },
     enabled: !!companyId,
   });
+  const dbVessels = useMemo(() => vesselsQuery.data ?? [], [vesselsQuery.data]);
+  const vesselIds = useMemo(() => dbVessels.map((v) => v.id), [dbVessels]);
+  const positionsQuery = useLatestVesselPositions(vesselIds);
+  const positions = positionsQuery.data;
 
-  // Map DB vessels to map vessels with placeholder positions
-  const mapVessels: MapVessel[] = useMemo(() => {
-    return dbVessels.map((v) => {
-      const statuses: MapVessel['status'][] = ['UNDER_WAY', 'MOORED', 'AT_ANCHOR'];
-      const statusIndex = Math.abs(v.id.charCodeAt(0)) % 3;
-      return {
-        id: v.id,
-        name: v.name,
-        mmsi: v.mmsi || 'N/A',
-        lat: hashToCoord(v.id, 20, 30),
-        lng: hashToCoord(v.id + 'lng', 40, -10),
-        sog: Math.round(hashToCoord(v.id + 'sog', 15, 0) * 10) / 10,
-        cog: Math.round(hashToCoord(v.id + 'cog', 360, 0)),
-        heading: Math.round(hashToCoord(v.id + 'hdg', 360, 0)),
-        status: statuses[statusIndex],
-        lastUpdate: new Date().toISOString(),
-        crewOnboard: Math.round(hashToCoord(v.id + 'crew', 20, 5)),
-        captain: '—',
-      };
-    });
-  }, [dbVessels]);
+  const fleet: FleetVessel[] = useMemo(
+    () =>
+      dbVessels.map((v) => {
+        const position = positions?.get(v.id) ?? null;
+        return {
+          id: v.id,
+          name: v.name,
+          mmsi: v.mmsi ?? null,
+          position,
+          navState: position ? navStateFromAis(position.navStatus) : null,
+        };
+      }),
+    [dbVessels, positions],
+  );
 
   const displayVessels = useMemo(
-    () => (vesselFilter ? mapVessels.filter(v => v.id === vesselFilter) : mapVessels),
-    [mapVessels, vesselFilter],
+    () => (vesselFilter ? fleet.filter((v) => v.id === vesselFilter) : fleet),
+    [fleet, vesselFilter],
   );
+  const positioned = useMemo(() => displayVessels.filter(hasPosition), [displayVessels]);
+  const selectedVessel = displayVessels.find((v) => v.id === selectedVesselId) ?? null;
+  const selectedCode = selectedVessel ? getVesselCodeById(selectedVessel.id) : null;
+  const loadError = vesselsQuery.error ?? positionsQuery.error;
+  const positionsSettled = !vesselsQuery.isLoading && !positionsQuery.isLoading;
 
   // Initialize Leaflet map
   useEffect(() => {
@@ -211,11 +234,10 @@ const FleetMap: React.FC = () => {
   useBasemap(mapRef, true);
   useTileOverlay(mapRef, true, MAP_OVERLAYS.seamarks, layers.seamarks);
 
-  const selectedVesselId = selectedVessel?.id;
-  const selectedVesselIdRef = useRef<string | undefined>(undefined);
+  const selectedVesselIdRef = useRef<string | null>(null);
   selectedVesselIdRef.current = selectedVesselId;
 
-  // Update vessel markers
+  // Vessel markers: only vessels with a reported fix.
   useEffect(() => {
     const group = vesselMarkersRef.current;
     const byId = vesselMarkerByIdRef.current;
@@ -224,39 +246,38 @@ const FleetMap: React.FC = () => {
 
     if (!layers.vessels) return;
 
-    displayVessels.forEach((vessel) => {
-      const state = NAV_STATE[vessel.status];
-      const marker = L.marker([vessel.lat, vessel.lng], {
-        icon: vesselMarkerIcon({ heading: vessel.heading, state, selected: vessel.id === selectedVesselIdRef.current }),
+    positioned.forEach((vessel) => {
+      const { position } = vessel;
+      const marker = L.marker([position.latitude, position.longitude], {
+        icon: markerIconFor(vessel, vessel.id === selectedVesselIdRef.current),
         title: vessel.name,
       });
 
       marker.bindPopup(
         popupHtml({
           title: vessel.name,
-          subtitle: `MMSI: ${vessel.mmsi}`,
+          subtitle: vessel.mmsi ? `MMSI: ${vessel.mmsi}` : 'MMSI not recorded',
           rows: [
-            ['Status', VESSEL_STATE_LABEL[state]],
-            ['SOG', `${vessel.sog} kts`],
-            ['COG', `${vessel.cog}°`],
-            ['HDG', `${vessel.heading}°`],
+            ['Status', statusLabel(vessel.navState)],
+            ['SOG', reading(position.sog, ' kts')],
+            ['COG', reading(position.cog, '°')],
+            ['HDG', reading(position.heading, '°')],
           ],
+          footer: `${formatLatLng(position.latitude, position.longitude)} · ${updatedLabel(position)}`,
         }),
         POPUP_OPTIONS,
       );
 
-      marker.on('click', () => setSelectedVessel(vessel));
+      marker.on('click', () => setSelectedVesselId(vessel.id));
       group.addLayer(marker);
       byId.set(vessel.id, { marker, vessel });
     });
-  }, [displayVessels, layers.vessels]);
+  }, [positioned, layers.vessels]);
 
   // Selected vessel glows (A.11). Swap icons in place so an open popup stays open.
   useEffect(() => {
     vesselMarkerByIdRef.current.forEach(({ marker, vessel }, id) => {
-      marker.setIcon(
-        vesselMarkerIcon({ heading: vessel.heading, state: NAV_STATE[vessel.status], selected: id === selectedVesselId }),
-      );
+      marker.setIcon(markerIconFor(vessel, id === selectedVesselId));
     });
   }, [selectedVesselId]);
 
@@ -279,7 +300,7 @@ const FleetMap: React.FC = () => {
           subtitle: port.country,
           chip: getPortTypeLabel(port.type),
           body: port.description,
-          footer: `${port.lat.toFixed(4)}°N, ${port.lng.toFixed(4)}°E`,
+          footer: formatLatLng(port.lat, port.lng),
         }),
         POPUP_OPTIONS,
       );
@@ -288,16 +309,19 @@ const FleetMap: React.FC = () => {
     });
   }, [layers.ports]);
 
-  // Fly to selected vessel
+  // Fly to the selected vessel's last fix, when it has one.
+  const selectedFix = selectedVessel?.position ?? null;
+  const flyLat = selectedFix?.latitude;
+  const flyLng = selectedFix?.longitude;
   useEffect(() => {
-    if (selectedVessel && mapRef.current) {
-      mapRef.current.flyTo([selectedVessel.lat, selectedVessel.lng], 8, { duration: 1 });
+    if (flyLat !== undefined && flyLng !== undefined && mapRef.current) {
+      mapRef.current.flyTo([flyLat, flyLng], 8, { duration: 1 });
     }
-  }, [selectedVessel]);
+  }, [selectedVesselId, flyLat, flyLng]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await refetch();
+    await Promise.all([vesselsQuery.refetch(), positionsQuery.refetch()]);
     setIsRefreshing(false);
   };
 
@@ -326,14 +350,13 @@ const FleetMap: React.FC = () => {
     }, 300);
   }, [isFullscreen]);
 
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status) {
-      case 'UNDER_WAY': return 'default';
-      case 'MOORED': return 'secondary';
-      case 'AT_ANCHOR': return 'outline';
-      default: return 'secondary';
-    }
-  };
+  const noFixes = positionsSettled && !loadError && displayVessels.length > 0 && positioned.length === 0;
+  // Without a fix, say why: still loading, the read failed, or none reported.
+  const noFixLabel = !positionsSettled
+    ? 'Loading position…'
+    : positionsQuery.error
+      ? 'Position could not load'
+      : 'No position yet';
 
   return (
     <DashboardLayout>
@@ -342,7 +365,7 @@ const FleetMap: React.FC = () => {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Fleet Map</h1>
-            <p className="text-muted-foreground">Real-time vessel tracking and AIS data</p>
+            <p className="text-muted-foreground">Last reported AIS positions</p>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
@@ -351,6 +374,15 @@ const FleetMap: React.FC = () => {
             </Button>
           </div>
         </div>
+
+        {loadError ? (
+          <PageError
+            error={loadError}
+            title="Vessel positions could not load"
+            onRetry={handleRefresh}
+            variant="inline"
+          />
+        ) : null}
 
         {/* Map Container */}
         <Card className="shadow-card overflow-hidden">
@@ -364,6 +396,20 @@ const FleetMap: React.FC = () => {
                 className="h-full w-full z-0 bg-map-water"
               />
 
+              {noFixes && (
+                <div className="pointer-events-none absolute inset-x-0 top-16 z-[1000] flex justify-center px-4">
+                  <div className="pointer-events-auto max-w-sm rounded-lg border bg-background/95 shadow-lg">
+                    <EmptyState
+                      compact
+                      icon={MapPinOff}
+                      headingLevel={2}
+                      title="No positions reported yet"
+                      body="Vessels appear on the map once their AIS feed reports a position."
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* Map Controls Overlay */}
               <div className="absolute top-4 right-4 flex flex-col gap-2 z-[1000]">
                 <Button 
@@ -372,6 +418,7 @@ const FleetMap: React.FC = () => {
                   onClick={handleRefresh}
                   disabled={isRefreshing}
                   className="bg-background shadow-md"
+                  aria-label="Refresh positions"
                 >
                   <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                 </Button>
@@ -382,6 +429,8 @@ const FleetMap: React.FC = () => {
                     size="icon"
                     onClick={() => setShowLayers(!showLayers)}
                     className="bg-background shadow-md"
+                    aria-label="Map layers"
+                    aria-expanded={showLayers}
                   >
                     <Layers className="w-4 h-4" />
                   </Button>
@@ -407,6 +456,7 @@ const FleetMap: React.FC = () => {
                   size="icon"
                   onClick={toggleFullscreen}
                   className="bg-background shadow-md"
+                  aria-label={isFullscreen ? 'Exit full screen' : 'Full screen'}
                 >
                   {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                 </Button>
@@ -414,7 +464,10 @@ const FleetMap: React.FC = () => {
 
               {/* Selected Vessel Detail Panel */}
               {selectedVessel && (
-                <div className="absolute top-4 left-4 w-80 bg-background rounded-lg shadow-lg border z-[1000]">
+                <div
+                  className="absolute top-4 left-4 w-80 bg-background rounded-lg shadow-lg border z-[1000]"
+                  data-testid="fleet-vessel-panel"
+                >
                   <div className="p-4 border-b">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -425,60 +478,60 @@ const FleetMap: React.FC = () => {
                         variant="ghost"
                         size="icon"
                         className="h-6 w-6"
-                        onClick={() => setSelectedVessel(null)}
+                        onClick={() => setSelectedVesselId(null)}
+                        aria-label="Close vessel details"
                       >
                         <X className="w-4 h-4" />
                       </Button>
                     </div>
-                    <p className="text-sm text-muted-foreground mt-1">MMSI: {selectedVessel.mmsi}</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {selectedVessel.mmsi ? `MMSI: ${selectedVessel.mmsi}` : 'MMSI not recorded'}
+                    </p>
                   </div>
 
                   <div className="p-4 space-y-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-xs text-muted-foreground">Status</p>
-                        <Badge variant={getStatusBadgeVariant(selectedVessel.status)} className="mt-1">
-                          {selectedVessel.status.replace('_', ' ')}
-                        </Badge>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Speed</p>
-                        <p className="text-sm font-medium">{selectedVessel.sog} kts</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Course</p>
-                        <p className="text-sm font-medium">{selectedVessel.cog}°</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Heading</p>
-                        <p className="text-sm font-medium">{selectedVessel.heading}°</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Crew Onboard</p>
-                        <p className="text-sm font-medium">{selectedVessel.crewOnboard}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground">Captain</p>
-                        <p className="text-sm font-medium">{selectedVessel.captain}</p>
-                      </div>
-                    </div>
+                    {selectedVessel.position ? (
+                      <>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Status</p>
+                            <Badge variant={statusBadgeVariant(selectedVessel.navState)} className="mt-1">
+                              {statusLabel(selectedVessel.navState)}
+                            </Badge>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Speed</p>
+                            <p className="text-sm font-medium">{reading(selectedVessel.position.sog, ' kts')}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Course</p>
+                            <p className="text-sm font-medium">{reading(selectedVessel.position.cog, '°')}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Heading</p>
+                            <p className="text-sm font-medium">{reading(selectedVessel.position.heading, '°')}</p>
+                          </div>
+                        </div>
 
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Navigation className="w-3 h-3" />
-                      {selectedVessel.lat.toFixed(4)}°N, {selectedVessel.lng.toFixed(4)}°E
-                    </div>
+                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Navigation className="w-3 h-3" />
+                          {formatLatLng(selectedVessel.position.latitude, selectedVessel.position.longitude)}
+                        </div>
 
-                    <p className="text-xs text-muted-foreground">
-                      Last update: {new Date(selectedVessel.lastUpdate).toLocaleString()}
-                    </p>
+                        <p className="text-xs text-muted-foreground">
+                          {updatedLabel(selectedVessel.position)}
+                          {isStale(selectedVessel.position) ? ' · old fix' : ''}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">{noFixLabel}</p>
+                    )}
 
-                    <Button 
-                      className="w-full" 
-                      size="sm"
-                      onClick={() => navigate(`/vessels/dashboard?vessel=${selectedVessel.id}`)}
-                    >
-                      View Vessel Dashboard
-                    </Button>
+                    {selectedCode ? (
+                      <Button className="w-full" size="sm" onClick={() => navigate(vesselPath(selectedCode))}>
+                        View Vessel Dashboard
+                      </Button>
+                    ) : null}
                   </div>
                 </div>
               )}
@@ -498,6 +551,14 @@ const FleetMap: React.FC = () => {
                       {VESSEL_STATE_LABEL[state]}
                     </div>
                   ))}
+                  <div className="flex items-center gap-2 text-xs">
+                    <span
+                      aria-hidden="true"
+                      className="storm-map-glyph h-4 w-4 [&_svg]:h-4 [&_svg]:w-4"
+                      dangerouslySetInnerHTML={{ __html: vesselGlyphSvg('moored', { stale: true }) }}
+                    />
+                    Fix over 6 h old or status unknown
+                  </div>
                   <div className="border-t my-1" />
                   {PORT_LEGEND.map(({ kind, label }) => (
                     <div key={kind} className="flex items-center gap-2 text-xs">
@@ -512,12 +573,16 @@ const FleetMap: React.FC = () => {
         </Card>
 
         {/* Fleet Overview Grid */}
+        {positionsSettled && !loadError && displayVessels.length === 0 ? (
+          <EmptyState title="No vessels yet" body="Vessels added to the fleet are listed here with their last reported position." />
+        ) : null}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {displayVessels.map((vessel) => (
-            <Card 
-              key={vessel.id} 
+            <Card
+              key={vessel.id}
               className="shadow-card hover:shadow-card-hover transition-all cursor-pointer"
-              onClick={() => setSelectedVessel(vessel)}
+              onClick={() => setSelectedVesselId(vessel.id)}
+              data-testid={`fleet-vessel-${vessel.id}`}
             >
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-3">
@@ -525,24 +590,28 @@ const FleetMap: React.FC = () => {
                     <Ship className="w-5 h-5 text-primary" />
                     <h3 className="font-medium">{vessel.name}</h3>
                   </div>
-                  <Badge variant={getStatusBadgeVariant(vessel.status)}>
-                    {vessel.status.replace('_', ' ')}
-                  </Badge>
+                  {vessel.position ? (
+                    <Badge variant={statusBadgeVariant(vessel.navState)}>{statusLabel(vessel.navState)}</Badge>
+                  ) : null}
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Speed:</span> {vessel.sog} kts
+                {vessel.position ? (
+                  <div className="space-y-2 text-sm">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-muted-foreground">Speed:</span> {reading(vessel.position.sog, ' kts')}
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Heading:</span> {reading(vessel.position.heading, '°')}
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {updatedLabel(vessel.position)}
+                      {isStale(vessel.position) ? ' · old fix' : ''}
+                    </p>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">Heading:</span> {vessel.heading}°
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Crew:</span> {vessel.crewOnboard}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Captain:</span> {vessel.captain}
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">{noFixLabel}</p>
+                )}
               </CardContent>
             </Card>
           ))}

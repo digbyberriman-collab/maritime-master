@@ -128,6 +128,8 @@ export default {
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
+          // Section headings and chips (Drift-500): 4.5:1 on the sidebar and its hover surface.
+          "muted-foreground": "hsl(var(--sidebar-muted-foreground))",
           primary: "hsl(var(--sidebar-primary))",
           "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
           accent: "hsl(var(--sidebar-accent))",

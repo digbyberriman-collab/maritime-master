@@ -27,6 +27,7 @@ vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 import { Route, createRoutesFromChildren, matchRoutes } from 'react-router-dom';
 import { MODULE_REGISTRY } from '@/app/registry/modules';
 import { buildRegistry, fullRoutePath } from '@/app/registry/registry';
+import { createRecordKindRegistry, recordKinds, type RecordKindDefinition } from '@/lib/records/registry';
 import { isRedirectDef, type ModuleManifest, type RouteDef } from '@/app/registry/types';
 import { scopeRouteElements, workspaceRouteElements } from '@/app/router/manifestRoutes';
 import ModuleRoute from '@/shared/components/ModuleRoute';
@@ -343,5 +344,49 @@ describe('registry mechanism (fixtures)', () => {
     // manifests claiming one path, the first in id order keeps it.
     expect(registry.routes.filter((r) => r.moduleId === 'mismatch').map((r) => r.fullPath)).toEqual(['/fleet/safety']);
     expect(registry.routes.filter((r) => r.moduleId === 'safety-fixture')).toHaveLength(3);
+  });
+
+  it('validates manifest record kinds: bad and duplicate reference prefixes are problems, not throws', () => {
+    const kind = (key: string, refPrefix: string): RecordKindDefinition => ({
+      key,
+      moduleKey: 'safety',
+      label: key,
+      refPrefix,
+      scope: 'vessel',
+      enveloped: true,
+      companyStep: 'sign_off',
+      editAfterSign: 'allow_with_flag',
+      deleteRule: 'draft_only',
+      slotTemplate: [],
+    });
+    // Record-kind keys are snake_case "<module>.<kind>", so the fixture module is "safety".
+    const safety = fixture({
+      id: 'safety',
+      routes: [],
+      nav: [],
+      recordKinds: [
+        kind('safety.corrective_action', 'CA'),
+        kind('safety.near_miss', 'CA'),
+        kind('safety.bad_prefix', 'ca'),
+        { ...kind('safety.bogus_step', 'BOG'), companyStep: 'bogus' as never },
+      ],
+    });
+    const kinds = createRecordKindRegistry();
+    let registry: ReturnType<typeof buildRegistry> | undefined;
+    expect(() => (registry = buildRegistry([safety], { recordKindRegistry: kinds }))).not.toThrow();
+    const text = registry?.problems.join('\n') ?? '';
+    expect(text).toContain('safety: Reference prefix "CA" is already used by "safety.corrective_action"');
+    expect(text).toContain('safety: Record kind "safety.bad_prefix": refPrefix must be 1–8 upper-case letters or digits');
+    expect(text).toContain('safety: Record kind "safety.bogus_step": unknown companyStep "bogus"');
+    // Only the sound kind registers, in the manifest registry and the record-kind registry alike.
+    expect(registry?.recordKinds.map((k) => k.key)).toEqual(['safety.corrective_action']);
+    expect(kinds.list().map((k) => k.key)).toEqual(['safety.corrective_action']);
+    expect(kinds.byRefPrefix('CA')?.key).toBe('safety.corrective_action');
+  });
+
+  it('builds a fresh record-kind registry when none is injected (pure)', () => {
+    const safety = fixture({ id: 'safety', routes: [], nav: [], recordKinds: [] });
+    expect(buildRegistry([safety]).problems).toEqual([]);
+    expect(recordKinds.list().map((k) => k.key)).toEqual(MODULE_REGISTRY.recordKinds.map((k) => k.key));
   });
 });

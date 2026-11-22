@@ -123,7 +123,7 @@ export default function ChangeOrdersPage() {
                   onClick={() => setCreateOpen(true)}
                   aria-label="New change order"
                   title="New change order"
-                  className="inline-flex items-center justify-center h-9 w-9 rounded-sm bg-navy text-white hover:opacity-90 transition"
+                  className="inline-flex items-center justify-center h-9 w-9 rounded-sm bg-primary text-primary-foreground hover:bg-primary/90 transition"
                 >
                   <Plus size={18} />
                 </button>
@@ -215,7 +215,7 @@ export default function ChangeOrdersPage() {
               <button
                 key={co.id}
                 onClick={() => setOpenId(co.id)}
-                className="block w-full text-left cursor-pointer hover:bg-paper transition border-b border-black/5"
+                className="block w-full text-left cursor-pointer hover:bg-muted/50 transition border-b border-black/5"
               >
                 <div
                   className="px-4 py-3 grid items-center"
@@ -542,7 +542,7 @@ function CreateChangeOrderDrawer({
           <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-2 flex items-center gap-1.5">
             <Paperclip size={12} /> Supporting attachments
           </div>
-          <label className="inline-flex items-center gap-2 px-3 py-2 text-xs rounded-sm border border-black/10 bg-paper hover:bg-secondary cursor-pointer">
+          <label className="inline-flex items-center gap-2 px-3 py-2 text-xs rounded-sm border border-black/10 bg-card hover:bg-secondary cursor-pointer">
             <Paperclip size={14} />
             <span>Attach files (PDF, drawings, quotes)</span>
             <input
@@ -1042,7 +1042,7 @@ function SignedFileLink({ path, label }: { path: string; label: string }) {
       href={url}
       target="_blank"
       rel="noreferrer"
-      className="underline underline-offset-2 hover:text-navy truncate"
+      className="underline underline-offset-2 hover:text-primary truncate"
     >
       {label}
     </a>

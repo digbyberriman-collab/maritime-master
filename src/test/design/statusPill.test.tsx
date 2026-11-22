@@ -135,6 +135,26 @@ describe('WhoseMoveChip', () => {
     expect(waitingDays('garbage')).toBeNull();
     expect([0, 1, 12].map(formatWaiting)).toEqual(['today', '1 day', '12 days']);
   });
+
+  it('counts local calendar days for a timestamptz `since` (any time zone)', () => {
+    const localDay = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86_400_000;
+    const cases: Array<[string, Date]> = [
+      ['2026-03-15T22:30:00+00:00', new Date('2026-03-15T23:00:00Z')],
+      ['2026-03-16T02:00:00+00:00', new Date('2026-03-16T16:00:00Z')],
+      ['2026-03-15T11:00:00Z', new Date('2026-03-15T11:30:00Z')],
+      ['2026-11-10T08:00:00+00:00', new Date('2026-11-22T08:00:00Z')],
+    ];
+    for (const [since, now] of cases) {
+      const expected = Math.max(0, localDay(now) - localDay(new Date(since)));
+      expect(waitingDays(since, now)).toBe(expected);
+    }
+  });
+
+  it('a move 30 minutes ago is "today" and one before local midnight is "1 day"', () => {
+    const now = new Date(2026, 2, 15, 12, 0);
+    expect(waitingDays(new Date(2026, 2, 15, 11, 30).toISOString(), now)).toBe(0);
+    expect(waitingDays(new Date(2026, 2, 14, 23, 30).toISOString(), new Date(2026, 2, 15, 0, 30))).toBe(1);
+  });
 });
 
 describe('ExpiryPill', () => {
@@ -159,11 +179,45 @@ describe('ExpiryPill', () => {
     expect(pill('Due ≤ window')).toHaveAttribute('data-bucket', 'expiring');
   });
 
-  it('a server bucket wins; the date still gives the days', () => {
+  it('a server bucket wins; a local day count that contradicts it is dropped', () => {
     render(<ExpiryPill bucket="expired" expiresOn="2026-11-30" today={today} />);
     const el = pill('Expired');
     expect(el).toHaveAttribute('data-tone', 'danger');
-    expect(el).toHaveTextContent('in 8d');
+    expect(el).toHaveTextContent(/^Expired$/);
+    expect(el).not.toHaveTextContent('in 8d');
+  });
+
+  it('a server bucket keeps the local days when they agree', () => {
+    render(<ExpiryPill bucket="expiring_soon" expiresOn="2026-11-30" today={today} />);
+    expect(pill('≤ 30 d')).toHaveTextContent('in 8d');
+  });
+
+  it('server days win over the local count', () => {
+    render(<ExpiryPill bucket="expired" daysRemaining={-1} expiresOn="2026-11-30" today={today} />);
+    expect(pill('Expired')).toHaveTextContent('1d overdue');
+  });
+
+  it('server days without a server bucket give the bucket too', () => {
+    render(<ExpiryPill daysRemaining={-1} expiresOn="2026-11-30" today={today} />);
+    const el = pill('Expired');
+    expect(el).toHaveAttribute('data-bucket', 'expired');
+    expect(el).toHaveTextContent('1d overdue');
+  });
+
+  it('a server "Valid" still shows the date when the local bucket differs', () => {
+    render(<ExpiryPill bucket="valid" expiresOn="2027-01-31" today={today} />);
+    expect(pill('Valid')).toHaveTextContent('to 31 Jan 2027');
+  });
+
+  it('server bucket and local day never contradict near midnight (any time zone)', () => {
+    // Server (UTC) says "≤ 30 d" on the expiry day; a browser east of UTC is already a day later.
+    const soon = resolveExpiry({ bucket: 'expiring_soon', expiresOn: '2026-03-15', today: new Date('2026-03-15T19:00:00Z') });
+    expect(soon.bucket).toBe('expiring_soon');
+    expect(['today', null]).toContain(expiryDetail(soon));
+    // Server says "Expired" the day after; a browser west of UTC is still on the expiry day.
+    const gone = resolveExpiry({ bucket: 'expired', expiresOn: '2026-03-15', today: new Date('2026-03-16T01:00:00Z') });
+    expect(gone.bucket).toBe('expired');
+    expect(['1d overdue', null]).toContain(expiryDetail(gone));
   });
 
   it('bucket only, and detail off', () => {

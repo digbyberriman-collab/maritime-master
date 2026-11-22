@@ -73,4 +73,53 @@ describe('ErrorBoundary', () => {
     );
     expect(screen.getByText('recovered content')).toBeInTheDocument();
   });
+
+  it('calls onReset when Try again clears an error, before the children render again', () => {
+    const order: string[] = [];
+    const onReset = vi.fn(() => order.push('reset'));
+    const Child = ({ explode }: { explode: boolean }) => {
+      if (explode) throw new Error('kaboom');
+      order.push('render');
+      return <div>recovered content</div>;
+    };
+    const { rerender } = render(
+      <ErrorBoundary onReset={onReset}>
+        <Child explode />
+      </ErrorBoundary>,
+    );
+    expect(onReset).not.toHaveBeenCalled();
+    rerender(
+      <ErrorBoundary onReset={onReset}>
+        <Child explode={false} />
+      </ErrorBoundary>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    expect(onReset).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(['reset', 'render']);
+    expect(screen.getByText('recovered content')).toBeInTheDocument();
+  });
+
+  it('calls onReset when the reset key changes after an error, and not without one', () => {
+    const onReset = vi.fn();
+    const { rerender } = render(
+      <ErrorBoundary resetKey="/crew" onReset={onReset}>
+        <Boom explode />
+      </ErrorBoundary>,
+    );
+    rerender(
+      <ErrorBoundary resetKey="/documents" onReset={onReset}>
+        <Boom explode={false} />
+      </ErrorBoundary>,
+    );
+    expect(onReset).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('recovered content')).toBeInTheDocument();
+
+    // Healthy subtree: a path change is not a reset.
+    rerender(
+      <ErrorBoundary resetKey="/vessels" onReset={onReset}>
+        <Boom explode={false} />
+      </ErrorBoundary>,
+    );
+    expect(onReset).toHaveBeenCalledTimes(1);
+  });
 });

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Check, Download, X } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -16,6 +17,7 @@ import type { LegalSubmissionRow, ReviewSubmissionArgs } from '@/modules/legal/h
 import { emptySchema, parseFormSchema, type FormData } from '@/modules/legal/lib/forms';
 import { exportSubmissionPdf } from '@/modules/legal/lib/pdf';
 import { submissionReference } from '@/modules/legal/lib/forms';
+import { errorMessage } from '@/modules/legal/lib/storage';
 
 interface SubmissionReviewSheetProps {
   submission: LegalSubmissionRow | null;
@@ -40,7 +42,7 @@ export const SubmissionReviewSheet: React.FC<SubmissionReviewSheetProps> = ({ su
 
   const download = () => {
     if (!submission) return;
-    exportSubmissionPdf({
+    void exportSubmissionPdf({
       templateName,
       versionNumber: version.data?.version_number ?? 0,
       schema,
@@ -54,7 +56,7 @@ export const SubmissionReviewSheet: React.FC<SubmissionReviewSheetProps> = ({ su
       reviewNotes: submission.review_notes,
       reference: submissionReference(submission.id),
       branding: { clientDisplayName, clientLogoUrl },
-    });
+    }).catch((error: unknown) => toast.error('Could not create the PDF', { description: errorMessage(error) }));
   };
 
   return (

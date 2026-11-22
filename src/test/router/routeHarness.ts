@@ -1,6 +1,7 @@
 /**
  * The real route tree, as React Router builds it from <AppRoutes/>, plus a
- * resolver that follows <Navigate> redirects. Nothing is rendered and no page
+ * resolver that follows <Navigate> redirects (and <KeepSearchNavigate>, the
+ * same redirect keeping the query and hash). Nothing is rendered and no page
  * chunk is loaded.
  *
  * Test files that import this must mock the Supabase client first:
@@ -10,6 +11,7 @@ import React from 'react';
 import { Navigate, Routes, createRoutesFromChildren, matchRoutes, resolvePath, type RouteObject } from 'react-router-dom';
 import { AppRoutes } from '@/routes';
 import { LegacyRoute, ScopeNotFound } from '@/app/router/scopes';
+import KeepSearchNavigate from '@/app/router/KeepSearchNavigate';
 
 type WithChildren = React.ReactElement<{ children?: React.ReactNode }>;
 
@@ -57,6 +59,10 @@ function joinPattern(base: string, path: string | undefined): string {
   return `${base.replace(/\/$/, '')}/${path}`;
 }
 
+/** A redirect element: <Navigate>, or <KeepSearchNavigate>, which is one that keeps the query and hash. */
+export const isRedirectElement = (el: React.ReactElement | null | undefined): el is React.ReactElement<{ to: string }> =>
+  !!el && (el.type === Navigate || el.type === KeepSearchNavigate);
+
 export interface Resolved {
   /** The matched route's full pattern (parents joined). '*' for the catch-all. */
   pattern: string;
@@ -84,7 +90,7 @@ export function resolveUrl(routes: RouteObject[], url: string): Resolved {
     if (route?.path === '*' && (matches?.length ?? 0) === 1) {
       return { pattern: '*', path: '*', element, hops, url: current };
     }
-    if (element && element.type === Navigate) {
+    if (isRedirectElement(element)) {
       hops.push(current);
       const to = String((element.props as { to: string }).to);
       current = resolvePath(to, last?.pathname ?? '/').pathname;
@@ -193,7 +199,7 @@ export function describeElement(node: React.ReactNode): string {
   if (Array.isArray(node)) return node.map(describeElement).join(' + ');
   if (!React.isValidElement(node)) return JSON.stringify(node);
   const props = node.props as Record<string, unknown> & { children?: React.ReactNode };
-  if (node.type === Navigate) return `redirect(${String(props.to)})`;
+  if (node.type === Navigate || node.type === KeepSearchNavigate) return `redirect(${String(props.to)})`;
   if (node.type === LegacyRoute) return `legacy(${String(props.from)}) > ${describeElement(props.children)}`;
   if (isLazyPage(node)) {
     const meta = ((node.type as { meta?: LazyMeta }).meta ?? {}) as LazyMeta;

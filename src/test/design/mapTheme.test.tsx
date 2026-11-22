@@ -5,7 +5,7 @@
  * popups and no hard-coded colours in the map code.
  */
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { act, render } from '@testing-library/react';
+import { act, cleanup, render } from '@testing-library/react';
 import * as React from 'react';
 import L from 'leaflet';
 import { readRepoFile } from './cssTokens';
@@ -49,6 +49,10 @@ beforeAll(() => {
 });
 
 afterEach(() => {
+  // Unmount first: useMapTheme observes <html>, so resetting its classes while
+  // a tree is still mounted would set state outside act(). RTL's own cleanup
+  // runs later and is a no-op by then.
+  cleanup();
   document.documentElement.classList.remove('light', 'dark');
   themeMock.resolvedTheme = undefined;
 });

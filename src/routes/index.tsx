@@ -3,10 +3,10 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from '@/shared/components/ProtectedRoute';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { PlaceholderPage } from '@/shared/components/common/PlaceholderPage';
-import { PLACEHOLDER_LEAVES, SECTION_REDIRECTS } from '@/config/sitemap';
-import PlaceholderWrapper from '@/app/router/PlaceholderWrapper';
+import { SECTION_REDIRECTS } from '@/config/sitemap';
 import { fleetNavRoutes, retiredNavRoutes, vesselNavRoutes } from '@/app/router/navRoutes';
 import ModuleRoute from '@/shared/components/ModuleRoute';
+import KeepSearchNavigate from '@/app/router/KeepSearchNavigate';
 import { lazyPage, type LazyPageOptions, type PageLoader } from '@/app/router/lazyPage';
 import {
   FleetScope,
@@ -19,8 +19,10 @@ import {
 } from '@/app/router/scopes';
 import NavAccessProvider from '@/app/nav/NavAccessProvider';
 import {
+  TOP_LEVEL_PLACEHOLDER_LEAVES,
   fleetManifestRoutes,
   personalManifestRoutes,
+  placeholderElement,
   vesselManifestRoutes,
   workspaceManifestRoutes,
 } from '@/app/router/manifestRoutes';
@@ -145,6 +147,7 @@ const Drawings = protectedPage(() => import('@/modules/documents/pages/Drawings'
 const IncidentAnalytics = protectedPage(() => import('@/modules/incidents/pages/IncidentAnalytics'));
 const CAPATracker = protectedPage(() => import('@/modules/incidents/pages/CAPATracker'));
 const DrillAnalytics = protectedPage(() => import('@/modules/drills/pages/DrillAnalytics'));
+const FleetReportsIndex = protectedPage(() => import('@/modules/dashboard/pages/FleetReportsIndex'));
 const CertificateAlerts = protectedPage(() => import('@/modules/certificates/pages/CertificateAlerts'));
 
 // Settings and admin pages
@@ -452,20 +455,21 @@ export const AppRoutes: React.FC = () => {
 
       {/* Fleet view: oversight across every vessel the user can reach. */}
       <Route path="/fleet" element={<FleetScope />}>
-        <Route index element={<Navigate to="/fleet/dashboard" replace />} />
+        <Route index element={<KeepSearchNavigate to="/fleet/dashboard" />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="tracker" element={<FleetMap />} />
         <Route path="calendar" element={<FleetTimelinePage />} />
         <Route path="planner" element={<RotationPlannerPage />} />
         <Route path="documents" element={<Documents />} />
         <Route path="training" element={<CrewTraining />} />
-        <Route path="reports" element={<Navigate to="/fleet/reports/incident-analytics" replace />} />
+        {/* The reports overview (gap/02): links every fleet report, risk overview included. */}
+        <Route path="reports" element={<FleetReportsIndex />} />
         <Route path="reports/incident-analytics" element={<IncidentAnalytics />} />
         <Route path="reports/capa-tracker" element={<CAPATracker />} />
         <Route path="reports/drill-analytics" element={<DrillAnalytics />} />
         <Route path="reports/risk-overview" element={<ERMPage />} />
-        <Route path="admin" element={<Navigate to="/fleet/admin/users/crew" replace />} />
-        <Route path="admin/users" element={<Navigate to="/fleet/admin/users/crew" replace />} />
+        <Route path="admin" element={<KeepSearchNavigate to="/fleet/admin/users/crew" />} />
+        <Route path="admin/users" element={<KeepSearchNavigate to="/fleet/admin/users/crew" />} />
         <Route path="admin/users/crew" element={<UsersAccessListPage />} />
         <Route path="admin/users/people/:userId" element={<UsersAccessDetailPage />} />
         <Route path="admin/users/sets" element={<RolesPermissionsPage />} />
@@ -483,11 +487,11 @@ export const AppRoutes: React.FC = () => {
         <Route index element={<VesselDashboard />} />
         <Route path="crew/list" element={<CrewList />} />
         <Route path="crew/roster" element={<CrewRoster />} />
-        <Route path="crew/compliance" element={<Navigate to="status" replace />} />
+        <Route path="crew/compliance" element={<KeepSearchNavigate to="status" />} />
         <Route path="crew/compliance/status" element={<CrewDocuments />} />
         <Route path="crew/hours-of-rest" element={<WorkRestOverview />} />
         <Route path="crew/people/:crewId/hours-of-rest" element={<CrewWorkRestMonth />} />
-        <Route path="crew/planner" element={<Navigate to="timeline" replace />} />
+        <Route path="crew/planner" element={<KeepSearchNavigate to="timeline" />} />
         <Route path="crew/planner/timeline" element={<RotationPlannerPage />} />
         <Route path="crew/planner/manning" element={<LeavePlannerPage />} />
         <Route path="crew/planner/requests" element={<LeaveRequestsPage />} />
@@ -523,7 +527,9 @@ export const AppRoutes: React.FC = () => {
         <Route index element={<Settings />} />
         <Route element={<ScopeShell />}>
           <Route path="hours-of-rest" element={<MyWorkRestMonth />} />
-          <Route path="training" element={<MyDevelopment />} />
+          {/* Absolute, as the HRIS Training & Development leaf links it, so
+              the route-literal checks (src/test/hris/wiring.test.ts) find it. */}
+          <Route path="/me/training" element={<MyDevelopment />} />
           <Route path="notifications" element={<NotificationsPage />} />
           {/* Personal routes registered by module manifests (B8). */}
           {personalManifestRoutes}
@@ -545,29 +551,18 @@ export const AppRoutes: React.FC = () => {
       {/* Sitemap-driven placeholders: every planned Shoreside/Health/Yard/HRIS
           leaf (no real page yet) renders a Coming Soon screen, so bookmarks
           resolve while the sidebar hides the leaf (D-06). Live leaves never
-          get one. Fleet and vessel placeholders sit inside their scopes. */}
-      {PLACEHOLDER_LEAVES.map((leaf) => (
-        <Route
-          key={leaf.path}
-          path={leaf.path}
-          element={
-            leaf.path.startsWith('/hris/') ? (
-              <ModuleRoute moduleId="hris">
-                <PlaceholderWrapper title={leaf.label} />
-              </ModuleRoute>
-            ) : (
-              <ProtectedRoute>
-                <PlaceholderWrapper title={leaf.label} />
-              </ProtectedRoute>
-            )
-          }
-        />
+          get one. Fleet and vessel placeholders sit inside their scopes, and
+          a workspace's inside its WorkspaceScope (manifestRoutes.tsx); only
+          those of a workspace with no scope route (Shoreside) are here. */}
+      {TOP_LEVEL_PLACEHOLDER_LEAVES.map((leaf) => (
+        <Route key={leaf.path} path={leaf.path} element={placeholderElement(leaf, false)} />
       ))}
 
       {/* Section and group paths (e.g. /hris, /hris/compensation) redirect to
-          their first leaf so bookmarks don't bounce to the dashboard. */}
+          their first leaf so bookmarks don't bounce to the dashboard. The
+          query and hash are kept; the target's own ?module= wins. */}
       {SECTION_REDIRECTS.map((redirect) => (
-        <Route key={redirect.from} path={redirect.from} element={<Navigate to={redirect.to} replace />} />
+        <Route key={redirect.from} path={redirect.from} element={<KeepSearchNavigate to={redirect.to} />} />
       ))}
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

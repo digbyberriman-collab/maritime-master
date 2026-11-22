@@ -178,8 +178,27 @@ describe('bridges to the engines', () => {
       closedBy: null,
       companyAcknowledged: false,
       version: 3,
+      deleteRule: 'draft_only',
     });
     expect(transitionEnvelope(state, { action: 'sign_off', actor: 'company', expectedVersion: 3 })).toMatchObject({ ok: true, value: { status: 'closed' } });
     expect(transitionEnvelope(state, { action: 'sign_off', actor: 'vessel' })).toMatchObject({ ok: false });
+  });
+
+  it('the envelope state carries the delete rule, so void follows the kind (D-32)', () => {
+    const reg = createRecordKindRegistry();
+    const incident = reg.register({
+      ...CORRECTIVE_ACTION,
+      key: 'safety.incident',
+      label: 'Incident',
+      refPrefix: 'INC',
+      routePattern: '/v/:vesselCode/safety/incidents/:id',
+      reportFirst: true,
+      allowCloseAs: true,
+      deleteRule: 'never_after_submit',
+    });
+    const submitted = envelopeStateForKind(incident, { status: 'submitted' });
+    expect(submitted.deleteRule).toBe('never_after_submit');
+    expect(transitionEnvelope(submitted, { action: 'void', actor: 'vessel', reason: 'oops' })).toMatchObject({ ok: false, error: { code: 'wrong_party' } });
+    expect(transitionEnvelope(submitted, { action: 'void', actor: 'company', reason: 'Raised on the wrong vessel' })).toMatchObject({ ok: true, value: { status: 'void' } });
   });
 });

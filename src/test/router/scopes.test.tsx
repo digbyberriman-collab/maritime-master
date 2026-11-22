@@ -83,6 +83,9 @@ import {
   useVesselScope,
 } from '@/app/router/scopes';
 import { PROFILE_GRACE_MS } from '@/app/router/useScopeAccess';
+import { useVesselFilter } from '@/modules/vessels/hooks/useVesselFilter';
+import { parseVesselPath } from '@/modules/vessels/lib/vesselCode';
+import { toNavPathname } from '@/app/router/legacyResolve';
 
 // ─── Fake VesselContext ───────────────────────────────────────────────────
 
@@ -148,6 +151,8 @@ const FakeVesselProvider: React.FC<FakeVesselProps> = ({ reachable, selected = n
     vesselCodes: codes,
     getVesselCodeById: (id: string | null | undefined) => (id ? codes.get(id) ?? null : null),
     findVesselByCode: (code: string | null | undefined) => resolveVesselByCode(code, reachable, COMPANY),
+    // The lists are the signed-in user's own (see VesselContext).
+    loadedForUserId: mocks.auth.user?.id ?? null,
   };
   const Ctx = mocks.vesselCtx;
   if (!Ctx) throw new Error('VesselContext mock not loaded');
@@ -170,6 +175,7 @@ const PageA: React.FC = () => {
       <h1>Page A</h1>
       <p>Vessel in scope: {scope?.vessel.name ?? 'none'}</p>
       <Link to={scoped('b')}>to B</Link>
+      <Link to="/fleet/dashboard">to the Fleet dashboard</Link>
       <button type="button" onClick={() => pickVessel(HYDRA.id)}>Pick HYDRA</button>
       <button type="button" onClick={() => pickVessel(null)}>Pick all vessels</button>
     </DashboardLayout>
@@ -198,6 +204,20 @@ const WidePage: React.FC = () => (
   </DashboardLayout>
 );
 
+/** A legacy fleet page: reads the global selection, as FleetMap and the roster do. */
+const FleetPage: React.FC<{ title: string }> = ({ title }) => {
+  const { isAllVessels, vesselFilter } = useVesselFilter();
+  return (
+    <>
+      <h1>{title}</h1>
+      <output aria-label="fleet selection">{`isAll=${isAllVessels} filter=${vesselFilter ?? 'none'}`}</output>
+      <Link to="/v/dra/a">to DRAAK page A</Link>
+      <Link to="/fleet/documents">to Fleet documents</Link>
+      <button type="button" onClick={() => pickVessel(HYDRA.id)}>Pick HYDRA in the fleet view</button>
+    </>
+  );
+};
+
 function renderApp(url: string, vessels: Omit<FakeVesselProps, 'children'>) {
   return render(
     <FakeVesselProvider {...vessels}>
@@ -205,8 +225,8 @@ function renderApp(url: string, vessels: Omit<FakeVesselProps, 'children'>) {
         <Routes>
           <Route path="/" element={<HomeRedirect />} />
           <Route path="/fleet" element={<FleetScope />}>
-            <Route path="dashboard" element={<h1>Fleet dashboard</h1>} />
-            <Route path="documents" element={<h1>Fleet documents</h1>} />
+            <Route path="dashboard" element={<FleetPage title="Fleet dashboard" />} />
+            <Route path="documents" element={<FleetPage title="Fleet documents" />} />
           </Route>
           <Route path="/v/:vesselCode" element={<VesselScopeRoute />}>
             <Route index element={<h1>Vessel home</h1>} />
@@ -261,6 +281,28 @@ describe('VesselScopeRoute', () => {
     expect(screen.getByText('ZZZ')).toBeInTheDocument();
     expect(shells()).toBe(1);
     expect(screen.queryByRole('heading', { name: 'Page A' })).toBeNull();
+  });
+
+  it('renders a 404 inside the shell for a malformed percent-escape in the code', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      renderApp('/v/%zz/a', { reachable: [DRAAK], selected: DRAAK.id });
+      expect(screen.getByRole('heading', { name: 'Vessel not found' })).toBeInTheDocument();
+      expect(shells()).toBe(1);
+      expect(screen.queryByRole('heading', { name: 'Something went wrong' })).toBeNull();
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('parses a malformed vessel URL without throwing', () => {
+    expect(() => parseVesselPath('/v/%')).not.toThrow();
+    expect(parseVesselPath('/v/%')).toEqual({ code: '%', rest: '' });
+    expect(parseVesselPath('/v/%zz/crew')).toEqual({ code: '%ZZ', rest: 'crew' });
+    expect(() => toNavPathname('/v/%E0%A4%A/crew/list')).not.toThrow();
+    expect(toNavPathname('/v/%E0%A4%A/crew/list')).toBe('/v/:vesselCode/crew/list');
+    // A well-formed escape is still decoded.
+    expect(parseVesselPath('/v/dr%41/a')?.code).toBe('DRA');
   });
 
   it('renders AccessDenied for a vessel of the company outside the user\'s reach', () => {
@@ -421,6 +463,52 @@ describe('FleetScope', () => {
     expect(screen.getByRole('heading', { name: 'Fleet documents' })).toBeInTheDocument();
   });
 
+  it('goes back to All vessels on entering the Fleet view after a vessel visit', async () => {
+    renderApp('/fleet/dashboard', { reachable: [DRAAK, HYDRA], allVessels: true, canAccessAllVessels: true });
+    const selection = () => screen.getByLabelText('fleet selection').textContent;
+    expect(selection()).toBe('isAll=true filter=none');
+
+    act(() => {
+      fireEvent.click(screen.getByRole('link', { name: 'to DRAAK page A' }));
+    });
+    expect(await screen.findByText('Vessel in scope: M/Y DRAAK')).toBeInTheDocument();
+
+    act(() => {
+      fireEvent.click(screen.getByRole('link', { name: 'to the Fleet dashboard' }));
+    });
+    expect(await screen.findByRole('heading', { name: 'Fleet dashboard' })).toBeInTheDocument();
+    await waitFor(() => expect(selection()).toBe('isAll=true filter=none'));
+    // The vessel scope is gone, so its All-vessels redirect does not fire.
+    expect(location()).toBe('/fleet/dashboard');
+
+    // Opening a vessel again still takes the user to that vessel.
+    act(() => {
+      fireEvent.click(screen.getByRole('link', { name: 'to DRAAK page A' }));
+    });
+    expect(await screen.findByText('Vessel in scope: M/Y DRAAK')).toBeInTheDocument();
+    expect(location()).toBe('/v/dra/a');
+  });
+
+  it('keeps a single vessel picked while in the Fleet view, across fleet pages', async () => {
+    renderApp('/fleet/dashboard', { reachable: [DRAAK, HYDRA], allVessels: true, canAccessAllVessels: true });
+    const selection = () => screen.getByLabelText('fleet selection').textContent;
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Pick HYDRA in the fleet view' }));
+    });
+    await waitFor(() => expect(selection()).toBe('isAll=false filter=v-hydra'));
+    act(() => {
+      fireEvent.click(screen.getByRole('link', { name: 'to Fleet documents' }));
+    });
+    expect(await screen.findByRole('heading', { name: 'Fleet documents' })).toBeInTheDocument();
+    expect(selection()).toBe('isAll=false filter=v-hydra');
+  });
+
+  it('leaves the selection alone for a fleet user who cannot enter All vessels mode', async () => {
+    mocks.perm.userRoles = [{ role_name: 'fleet_master' }];
+    renderApp('/fleet/dashboard', { reachable: [DRAAK], selected: DRAAK.id });
+    expect(screen.getByLabelText('fleet selection').textContent).toBe('isAll=false filter=v-draak');
+  });
+
   it('fails closed while RBAC is still loading', () => {
     mocks.perm.isInitialized = false;
     mocks.perm.userRoles = [{ role_name: 'superadmin' }];
@@ -492,9 +580,21 @@ describe('landing after sign-in', () => {
 
 describe('LegacyRoute', () => {
   it('redirects an old vessel URL into the vessel scope, keeping the query', async () => {
-    renderApp('/crew/list?module=vessel', { reachable: [DRAAK], selected: DRAAK.id });
-    await waitFor(() => expect(location()).toBe('/v/dra/crew/list?module=vessel'));
+    renderApp('/crew/list?tab=x', { reachable: [DRAAK], selected: DRAAK.id });
+    await waitFor(() => expect(location()).toBe('/v/dra/crew/list?tab=x'));
     expect(await screen.findByRole('heading', { name: 'Scoped crew list' })).toBeInTheDocument();
+  });
+
+  it("does not carry a workspace's ?module= into a scope, which picks its sidebar from the path", async () => {
+    renderApp('/crew/list?module=hris&tab=x', { reachable: [DRAAK], selected: DRAAK.id });
+    await waitFor(() => expect(location()).toBe('/v/dra/crew/list?tab=x'));
+    expect(await screen.findByRole('heading', { name: 'Scoped crew list' })).toBeInTheDocument();
+  });
+
+  it('keeps ?module= on an old page that renders in place', () => {
+    renderApp('/crew/list?module=hris', { reachable: [DRAAK], allVessels: true, canAccessAllVessels: true });
+    expect(screen.getByRole('heading', { name: 'Legacy crew list' })).toBeInTheDocument();
+    expect(location()).toBe('/crew/list?module=hris');
   });
 
   it('keeps the old page for a fleet user looking at All vessels', () => {

@@ -1753,7 +1753,7 @@
       "moduleKey": null,
       "minPermission": null,
       "selfServe": false,
-      "crossLink": false
+      "crossLink": true
     },
     {
       "kind": "leaf",
@@ -1764,7 +1764,7 @@
       "moduleKey": null,
       "minPermission": null,
       "selfServe": false,
-      "crossLink": false
+      "crossLink": true
     },
     {
       "kind": "leaf",
@@ -1786,18 +1786,18 @@
       "moduleKey": null,
       "minPermission": null,
       "selfServe": false,
-      "crossLink": false
+      "crossLink": true
     },
     {
       "kind": "leaf",
       "id": "hris-training-and-development",
       "label": "Training & Development",
-      "path": "/development",
+      "path": "/me/training",
       "status": "live",
       "moduleKey": null,
       "minPermission": null,
       "selfServe": false,
-      "crossLink": false
+      "crossLink": true
     },
     {
       "kind": "leaf",

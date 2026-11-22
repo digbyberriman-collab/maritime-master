@@ -51,6 +51,13 @@ function pairsFor(): Pair[] {
   add('destructive', 'card', TEXT);
   add('destructive', 'background', TEXT);
 
+  // Highlighted menu / select / command option (A5): the signal-muted fill is
+  // too close to the popover to be the cue on its own, so the 2px primary bar
+  // carries it (a 3:1 graphic against the popover around it, WCAG 1.4.11).
+  // Item text, destructive items included, stays readable on the fill.
+  add('primary', 'popover', UI);
+  add('destructive', 'signal-muted', TEXT);
+
   // Status and decorative families: label on solid fill, text on surfaces, text on own tint.
   for (const s of STATUS_FAMILIES) {
     add(`${s}-foreground`, s, TEXT);
@@ -63,6 +70,9 @@ function pairsFor(): Pair[] {
   // Sidebar (anchored Abyss chrome in both themes).
   add('sidebar-foreground', 'sidebar-background', TEXT);
   add('sidebar-foreground', 'sidebar-accent', TEXT);
+  // Section headings, "Planned" chips and the roadmap "Off" label (Drift-500).
+  add('sidebar-muted-foreground', 'sidebar-background', TEXT);
+  add('sidebar-muted-foreground', 'sidebar-accent', TEXT);
   add('sidebar-accent-foreground', 'sidebar-accent', TEXT);
   add('sidebar-primary', 'sidebar-background', TEXT);
   add('sidebar-primary-foreground', 'sidebar-primary', TEXT);
@@ -96,9 +106,16 @@ function pairsFor(): Pair[] {
 const ratio = (t: ThemeTokens, theme: Record<string, string>, fg: string, bg: string) =>
   contrast(tokenRgb(t, theme, fg), tokenRgb(t, theme, bg));
 
+/**
+ * Print as the browser resolves it: <html> carries `.dark` by default, so a
+ * token the print block leaves out keeps its Abyss value on paper.
+ */
+const printTheme = { ...tokens.dark, ...tokens.print };
+
 describe.each([
   ['Abyss (dark, default)', tokens.dark],
   ['Daylight (light)', tokens.light],
+  ['Print (from the default dark page)', printTheme],
 ])('%s token pairs meet WCAG AA', (_name, theme) => {
   it.each(pairsFor().map((p) => [`${p.fg} on ${p.bg}`, p] as const))('%s', (_label, p) => {
     const r = ratio(tokens, theme, p.fg, p.bg);
@@ -154,7 +171,29 @@ describe('raw text steps', () => {
 });
 
 describe('print stays light', () => {
-  const printTheme = { ...tokens.light, ...tokens.print };
+  /** The only print values that differ from Daylight: white paper, no elevation. */
+  const PRINT_ONLY = ['--background', '--shadow-e1', '--shadow-e2', '--shadow-e3', '--shadow-glow-signal'];
+
+  it('declares every token Daylight declares, so nothing prints with its Abyss value', () => {
+    const missing = Object.keys(tokens.light).filter((key) => !(key in tokens.print));
+    expect(missing).toEqual([]);
+  });
+
+  it('uses the Daylight value for every token except white paper and no elevation', () => {
+    const drift = Object.keys(tokens.light)
+      .filter((key) => !PRINT_ONLY.includes(key) && tokens.print[key] !== tokens.light[key])
+      .map((key) => `${key}: print "${tokens.print[key]}" vs Daylight "${tokens.light[key]}"`);
+    expect(drift).toEqual([]);
+    expect(tokens.print['--background']).toBe('0 0% 100%');
+    for (const key of PRINT_ONLY.slice(1)) expect(tokens.print[key], key).toBe('none');
+  });
+
+  it('resolves no token to its Abyss value unless Daylight shares it (the sidebar)', () => {
+    const leaks = Object.keys(tokens.dark)
+      .filter((key) => key.startsWith('--') && tokens.dark[key] !== tokens.light[key])
+      .filter((key) => printTheme[key] === tokens.dark[key]);
+    expect(leaks).toEqual([]);
+  });
 
   it('prints dark ink on white paper', () => {
     expect(tokenRgb(tokens, printTheme, 'background')).toEqual([255, 255, 255]);

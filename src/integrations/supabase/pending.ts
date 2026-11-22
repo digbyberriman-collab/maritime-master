@@ -21,8 +21,10 @@
  *
  * Pending tables are not live (D-01): code built on them must treat a
  * "relation does not exist" error as "module not set up yet" and render an
- * empty or ModuleOff state, never a crash and never mock rows
- * (`isMissingRelation` below).
+ * empty or ModuleOff state, never a crash and never mock rows. Use
+ * `isMissingRelation` (re-exported below from `./missingRelation`, the one
+ * classifier; `notify`'s `isMissingRelationError` and `PageError` use the
+ * same function).
  *
  * Measured on 22 Nov 2026 (tsconfig.app.json settings, the real `types.ts`):
  * a probe making 11 calls through `pendingClient` with Refit's 31 pending
@@ -35,6 +37,7 @@
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 import { supabase } from './client';
+import { isMissingRelation as classifyMissingRelation } from './missingRelation';
 
 /** One pending table, in the generated types' shape. */
 export interface PendingTableShape {
@@ -107,12 +110,10 @@ export const pendingClient = <T extends PendingTables, V extends PendingViews = 
   supabase as unknown as SupabaseClient<WithPending<T, V, F>>;
 
 /**
- * True when a query failed because the table or view is not in the
- * database yet (Postgres 42P01, or PostgREST's PGRST205 schema-cache miss).
- * Pages map this to their "not set up" state (D-01).
+ * True when a query failed because a table, view, column or RPC is not in
+ * the database yet. Pages map this to their "not set up" state (D-01). A
+ * thin alias of the one classifier in `./missingRelation`.
  */
 export function isMissingRelation(error: Pick<PostgrestError, 'code' | 'message'> | null | undefined): boolean {
-  if (!error) return false;
-  if (error.code === '42P01' || error.code === 'PGRST205') return true;
-  return /relation .* does not exist|could not find the table/i.test(error.message ?? '');
+  return classifyMissingRelation(error);
 }

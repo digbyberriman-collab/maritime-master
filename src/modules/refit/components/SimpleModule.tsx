@@ -161,7 +161,7 @@ function SimpleModuleInner<T extends { id: string }>({
             filtered.map((row) => (
               <div
                 key={row.id}
-                className="border-b border-black/5 hover:bg-paper px-4 py-3 grid items-center"
+                className="border-b border-black/5 hover:bg-muted/50 px-4 py-3 grid items-center"
                 style={{ gridTemplateColumns: gridTemplate }}
               >
                 {config.columns.map((c) => (

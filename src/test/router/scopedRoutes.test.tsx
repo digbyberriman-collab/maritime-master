@@ -23,6 +23,7 @@ const FLEET_PAGES = [
   '/fleet/planner',
   '/fleet/documents',
   '/fleet/training',
+  '/fleet/reports',
   '/fleet/reports/incident-analytics',
   '/fleet/reports/capa-tracker',
   '/fleet/reports/drill-analytics',
@@ -112,7 +113,9 @@ describe('scoped route trees', () => {
   it('/fleet and /fleet/admin land on a page', () => {
     expect(resolveUrl(routes, '/fleet').url).toBe('/fleet/dashboard');
     expect(resolveUrl(routes, '/fleet/admin').url).toBe('/fleet/admin/users/crew');
-    expect(resolveUrl(routes, '/fleet/reports').url).toBe('/fleet/reports/incident-analytics');
+    // The reports overview is a page of its own (gap/02), linking every report.
+    expect(resolveUrl(routes, '/fleet/reports').url).toBe('/fleet/reports');
+    expect(isLazyPage(resolveUrl(routes, '/fleet/reports').element)).toBe(true);
   });
 
   it('/, /index and /dashboard go through the landing redirect', () => {

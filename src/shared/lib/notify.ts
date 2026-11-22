@@ -14,8 +14,13 @@
  * still logged in development.
  *
  * No fake success: only call `success` after the work has actually finished.
+ *
+ * "Not live yet" (a table, column or RPC missing from the schema, D-01) is
+ * decided by the one classifier in `@/integrations/supabase/missingRelation`,
+ * the same one pages use through `isMissingRelation`.
  */
 import { toast } from 'sonner';
+import { isMissingRelation } from '@/integrations/supabase/missingRelation';
 
 // ─── Error normalisation ──────────────────────────────────────────────────
 
@@ -60,20 +65,26 @@ const CODE_MESSAGES: Readonly<Record<string, { kind: ErrorKind; message: string 
   '22001': { kind: 'validation', message: 'One of the values is too long.' },
   '22007': { kind: 'validation', message: 'One of the dates is not valid.' },
   '22008': { kind: 'validation', message: 'One of the dates is out of range.' },
+  '22003': { kind: 'validation', message: 'One of the numbers is too large.' },
   '40001': { kind: 'conflict', message: 'Someone else changed this at the same time. Reload and try again.' },
   '40P01': { kind: 'conflict', message: 'Someone else changed this at the same time. Reload and try again.' },
+  // lock_timeout: another transaction holds the row.
+  '55P03': { kind: 'conflict', message: 'Someone else is working on this record. Try again in a moment.' },
   '57014': { kind: 'server', message: 'That took too long. Try again, or narrow the filters.' },
-  // Table, column or function not in the live schema yet (DECISIONS D-01).
-  '42P01': { kind: 'missing_feature', message: "This feature isn't switched on for your account yet." },
-  '42703': { kind: 'missing_feature', message: "This feature isn't switched on for your account yet." },
-  '42883': { kind: 'missing_feature', message: "This feature isn't switched on for your account yet." },
-  PGRST200: { kind: 'missing_feature', message: "This feature isn't switched on for your account yet." },
-  PGRST202: { kind: 'missing_feature', message: "This feature isn't switched on for your account yet." },
-  PGRST204: { kind: 'missing_feature', message: "This feature isn't switched on for your account yet." },
-  PGRST205: { kind: 'missing_feature', message: "This feature isn't switched on for your account yet." },
+  // idle_in_transaction_session_timeout.
+  '25P03': { kind: 'server', message: 'That took too long. Try again.' },
   // RAISE EXCEPTION in an RPC guard: the server wrote the sentence; show it.
   P0001: { kind: 'validation', message: null },
 };
+
+/*
+ * Table, column or function not in the live schema yet (DECISIONS D-01):
+ * the codes live in `MISSING_RELATION_CODES`. PGRST200 (an embed whose
+ * relationship PostgREST cannot find) counts: an embedded pending table is
+ * the D-01 case. A typo in an embed reads the same way; the code stays on
+ * the normalised error (and in PageError's reference) for diagnosis.
+ */
+const MISSING_FEATURE_MESSAGE = "This feature isn't switched on for your account yet.";
 
 const NETWORK_MESSAGE = "Can't reach the server. Check the connection and try again.";
 
@@ -92,8 +103,19 @@ interface ErrorLike {
 const asText = (value: unknown): string | undefined =>
   typeof value === 'string' && value.trim() ? value.trim() : undefined;
 
+/**
+ * Transport failures only. A bare "timeout" is not one: server timeouts
+ * arrive with a code (57014, 55P03, 25P03) and a lock timeout is not a
+ * connection problem.
+ */
 function isNetworkMessage(message: string): boolean {
-  return /failed to fetch|networkerror|network request failed|load failed|fetch failed|err_internet_disconnected|timeout/i.test(message);
+  return /failed to fetch|networkerror|network request failed|load failed|fetch failed|err_internet_disconnected/i.test(message);
+}
+
+/** A client-side request timeout (`AbortSignal.timeout`, fetch with a timeout signal). */
+function isTransportTimeout(name: string | undefined, message: string | undefined): boolean {
+  if (name === 'TimeoutError') return true;
+  return name === 'AbortError' && /timed? ?out|timeout/i.test(message ?? '');
 }
 
 /**
@@ -104,7 +126,11 @@ export function normaliseError(error: unknown, fallback: string = DEFAULT_FALLBA
   if (error === null || error === undefined) return { message: fallback, kind: 'unknown' };
   if (typeof error === 'string') {
     const text = error.trim();
-    return text ? { message: text, kind: isNetworkMessage(text) ? 'network' : 'unknown' } : { message: fallback, kind: 'unknown' };
+    if (!text) return { message: fallback, kind: 'unknown' };
+    // Kind and message agree: a network kind always carries the network sentence.
+    if (isNetworkMessage(text)) return { message: NETWORK_MESSAGE, kind: 'network', details: text };
+    if (isMissingRelation(text)) return { message: MISSING_FEATURE_MESSAGE, kind: 'missing_feature', details: text };
+    return { message: text, kind: 'unknown' };
   }
   if (typeof error !== 'object') return { message: fallback, kind: 'unknown' };
 
@@ -114,12 +140,16 @@ export function normaliseError(error: unknown, fallback: string = DEFAULT_FALLBA
   const name = asText(e.name);
   const technical = [message, asText(e.details), asText(e.hint)].filter(Boolean).join(' — ') || undefined;
 
+  if (isMissingRelation(error)) {
+    return { message: MISSING_FEATURE_MESSAGE, kind: 'missing_feature', code, details: technical };
+  }
+
   if (code && CODE_MESSAGES[code]) {
     const mapped = CODE_MESSAGES[code];
     return { message: mapped.message ?? message ?? fallback, kind: mapped.kind, code, details: technical };
   }
 
-  if (message && isNetworkMessage(message)) {
+  if ((message && isNetworkMessage(message)) || isTransportTimeout(name, message)) {
     return { message: NETWORK_MESSAGE, kind: 'network', code, details: technical };
   }
 
@@ -168,11 +198,10 @@ export function errorMessage(error: unknown, fallback?: string): string {
 /**
  * True when the error means a table, view, column or RPC is not in the live
  * schema yet. Pages use it to render `ModuleOff` / `PageEmpty` instead of an
- * error (DECISIONS D-01: never crash, never mock data).
+ * error (DECISIONS D-01: never crash, never mock data). The same function as
+ * `isMissingRelation` (`@/integrations/supabase/missingRelation`).
  */
-export function isMissingRelationError(error: unknown): boolean {
-  return normaliseError(error).kind === 'missing_feature';
-}
+export const isMissingRelationError: (error: unknown) => boolean = isMissingRelation;
 
 // ─── Toasts ───────────────────────────────────────────────────────────────
 

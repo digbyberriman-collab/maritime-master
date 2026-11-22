@@ -11,19 +11,35 @@
  * active.
  *
  * Scoping rules (kept deliberately narrow):
- *  - Every rule is `:where(.dark) :is(<classes>)`, so its specificity equals
+ *  - Every rule is `:where(.dark) :is(<classes>)…`, so its specificity equals
  *    the plain utility it replaces (0,1,0). It is emitted after Tailwind's
- *    utilities, so it beats the bare class but loses to every state or variant
- *    class (`hover:`, `data-[state=…]:`, and the existing `dark:` variants,
- *    which therefore keep their author-chosen dark styling).
+ *    plain utilities, so it beats the bare class. Tailwind appends variant
+ *    rules (`hover:`, `md:`, `data-[state=…]:`, `dark:`) at the very end of
+ *    the stylesheet (index.css has no `@tailwind variants`), and those carry
+ *    more specificity anyway, so author variants keep their styling.
+ *  - Hover remaps target `hover:<class>` and so must outrank the plain
+ *    `.hover\:<class>:hover` utility (0,2,0), which is emitted after this
+ *    block. They repeat the class (`.hover\:bg-red-100.hover\:bg-red-100:hover`,
+ *    0,3,0): that beats the plain hover utility and ties with an author
+ *    `dark:hover:` variant (`.dark\:hover\:x:hover:is(.dark *)`, 0,3,0),
+ *    which comes later and so still wins. Do NOT move `@tailwind variants`
+ *    above the block: the (0,1,0) remaps would then override responsive
+ *    variants such as `md:bg-white`. The neutral hover groups
+ *    (`hover:bg-white|gray-*`, `hover:text-gray-*` …) are not emitted: no
+ *    source uses them and the palette ratchet keeps new ones out.
+ *  - Screen only: the block is wrapped in `@media screen`, so print and PDF
+ *    get the print token set (index.css) and the classes as authored.
  *  - Only light-theme shades are touched: tints (50–200) for backgrounds and
  *    borders, and dark text shades (600–950, plus any lighter shade that fails
  *    4.5:1 on the Deep card anchor). Vivid fills (`bg-green-500`), translucent
  *    tints (`bg-green-500/10`), `text-white` and `bg-black/…` are left alone.
  *  - `bg-white` on replaced elements (img, canvas, svg, video, picture,
  *    iframe) is NOT remapped: QR codes and drawing surfaces need real white.
- *  - A subtree can opt out with the `light` class (it also switches tokens to
- *    Daylight, so `bg-card` there is white again).
+ *  - A subtree opts out with the `light` class: every rule excludes
+ *    `.light, .light *` in a zero-specificity `:where(:not(…))` (the same
+ *    list that keeps replaced elements out), so the subtree keeps its
+ *    authored classes (paper previews keep white paper and black rules), and
+ *    `.light` also switches the tokens there to Daylight.
  *  - One small exception: token fills paired with `text-white` get their
  *    Abyss `-foreground` (dark only). `text-/border-secondary|accent` (the
  *    tokens that changed meaning from "brand blue" to "neutral surface") are
@@ -97,6 +113,10 @@ export const TOKEN_FILLS = ['primary', 'destructive', 'success', 'warning', 'inf
 /** Tokens whose meaning changed from "brand blue" to "neutral surface". */
 export const REPURPOSED_TOKENS = ['secondary', 'accent'];
 const REPLACED_ELEMENTS = 'img, canvas, svg, video, picture, iframe';
+/** Excluded by every rule (`:where(:not(…))`): a `.light` subtree is left exactly as authored. */
+export const LIGHT_SUBTREE = '.light, .light *';
+/** The at-rule the whole block is wrapped in (screen only; print stays as authored). */
+export const BLOCK_MEDIA = '@media screen';
 
 const lin = (c) => {
   const v = c / 255;
@@ -116,7 +136,16 @@ export const contrastRatio = (a, b) => {
 /** Escape a Tailwind class name for use in a CSS selector. */
 export const escapeClass = (cls) => cls.replace(/([:/.[\]%])/g, '\\$1');
 const sel = (cls) => `.${escapeClass(cls)}`;
-const hoverSel = (cls) => `.${escapeClass(`hover:${cls}`)}:hover`;
+/**
+ * `hover:<cls>` remap selector. The class is repeated so the rule is (0,3,0):
+ * it must beat the plain `.hover\:<cls>:hover` utility (0,2,0) that Tailwind
+ * emits after this block, and still tie with (and so lose by order to) an
+ * author `dark:hover:` variant.
+ */
+export const hoverSel = (cls) => {
+  const c = `.${escapeClass(`hover:${cls}`)}`;
+  return `${c}${c}:hover`;
+};
 
 /** Text shades of a hue that the layer remaps: 600+ always, lighter ones only if they fail AA on Deep. */
 export const remappedTextShades = (hue) =>
@@ -145,11 +174,8 @@ export function buildLegacyDarkCompatRules() {
     'background-color: hsl(var(--muted));',
   );
   add('Mid grey fills → secondary', NEUTRALS.map((n) => sel(`bg-${n}-200`)), 'background-color: hsl(var(--secondary));');
-  add(
-    'Grey hovers → accent (hover surface)',
-    [hoverSel('bg-white'), ...NEUTRALS.flatMap((n) => [50, 100, 200].map((s) => hoverSel(`bg-${n}-${s}`)))],
-    'background-color: hsl(var(--accent));',
-  );
+  // No neutral hover remaps (`hover:bg-white`, `hover:bg-gray-*` …): no
+  // source uses them, and the palette ratchet keeps new raw colour out.
 
   // Neutral text.
   add(
@@ -162,11 +188,7 @@ export function buildLegacyDarkCompatRules() {
     NEUTRALS.flatMap((n) => [400, 500, 600, 700].map((s) => sel(`text-${n}-${s}`))),
     'color: hsl(var(--muted-foreground));',
   );
-  add(
-    'Grey hover text → foreground',
-    NEUTRALS.flatMap((n) => [600, 700, 800, 900].map((s) => hoverSel(`text-${n}-${s}`))),
-    'color: hsl(var(--foreground));',
-  );
+  // No neutral hover-text remaps (`hover:text-gray-*` …): unused in source.
 
   // Neutral borders and dividers.
   add(
@@ -221,18 +243,20 @@ export function buildLegacyDarkCompatRules() {
 }
 
 const scopeSelectors = ({ selectors, declaration, scope }) => {
-  const notReplaced = `:where(:not(${REPLACED_ELEMENTS}))`;
   const isBgWhite = selectors.length === 1 && selectors[0] === sel('bg-white');
+  // One zero-specificity exclusion list per rule: the `.light` subtree, and
+  // for `bg-white` the replaced elements too.
+  const excluded = isBgWhite ? `${REPLACED_ELEMENTS}, ${LIGHT_SUBTREE}` : LIGHT_SUBTREE;
   const prefix = scope === 'all' ? '' : ':where(.dark) ';
-  return `${prefix}:is(${selectors.join(', ')})${isBgWhite ? notReplaced : ''} { ${declaration} }`;
+  return `${prefix}:is(${selectors.join(', ')}):where(:not(${excluded})) { ${declaration} }`;
 };
 
 /** The full CSS block, markers included, exactly as it appears in src/index.css. */
 export function buildLegacyDarkCompatCss() {
   const body = buildLegacyDarkCompatRules()
-    .map((r) => `${r.comment ? `/* ${r.comment} */\n` : ''}${scopeSelectors(r)}`)
+    .map((r) => `${r.comment ? `  /* ${r.comment} */\n` : ''}  ${scopeSelectors(r)}`)
     .join('\n');
-  return `${BLOCK_START}\n${body}\n${BLOCK_END}`;
+  return `${BLOCK_START}\n${BLOCK_MEDIA} {\n${body}\n}\n${BLOCK_END}`;
 }
 
 /** Extract the current block (markers included) from a CSS source, or null. */

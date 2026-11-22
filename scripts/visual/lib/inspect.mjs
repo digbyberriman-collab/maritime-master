@@ -23,6 +23,16 @@ export function inspectPage() {
   const titleMatch = /([A-Z][\w &/-]{0,60} could not be displayed|Something went wrong)/.exec(bodyText);
   const accessDeniedMatch = /(Restricted area|HR access required|Finance access required|Clinical access required|Wellness access required)/.exec(bodyText);
   const h1 = document.querySelector('h1');
+  // A skeleton or loading region still announced as busy (PageLoading,
+  // DataTable, KpiTile and MatrixGrid set aria-busy while they load).
+  const busy = !!document.querySelector('main [aria-busy="true"], #root [role="status"][aria-busy="true"]');
+  // Sideways scroll: how far the main pane and the page scroll horizontally.
+  const main = document.querySelector('main');
+  const doc = document.documentElement;
+  const overflowX = {
+    main: main ? main.scrollWidth - main.clientWidth : 0,
+    document: doc ? doc.scrollWidth - doc.clientWidth : 0,
+  };
   return {
     title: document.title,
     h1: h1 ? squash(h1.textContent).slice(0, 120) : null,
@@ -37,8 +47,30 @@ export function inspectPage() {
     accessDenied: accessDeniedMatch ? accessDeniedMatch[1] : null,
     recoveryPanel: bodyText.includes("We couldn't finish loading STORM"),
     loadingOnly: rootText.length < 40 && (/Loading/i.test(rootText) || !!(root && root.querySelector('.animate-spin'))),
+    busy,
+    overflowX,
     signInForm: !!document.querySelector('input[type="password"]'),
   };
+}
+
+/** Viewports narrower than this are phone layouts, where sideways scroll is a defect. */
+export const PHONE_MAX_WIDTH = 768;
+/** More mock requests than this in one capture means a refetch loop, not a busy page. */
+export const RUNAWAY_REQUESTS = 500;
+
+/** Capture notes that mean a wait gave up: the screenshot may show an unfinished page. */
+const WAIT_FAILURE_NOTES = [/^network did not go idle$/, /^a spinner was still showing$/, /^a skeleton was still showing$/, /^waitFor .* not found$/, /^screenshot failed/];
+
+/**
+ * Warnings for what capture() noticed outside the page: waits that timed out
+ * and runaway request volume.
+ * @param {{ notes?: string[], mockRequests?: number }} c
+ * @returns {string[]}
+ */
+export function captureWarnings({ notes = [], mockRequests = 0 } = {}) {
+  const warnings = notes.filter((n) => WAIT_FAILURE_NOTES.some((re) => re.test(n)));
+  if (mockRequests > RUNAWAY_REQUESTS) warnings.push(`runaway fetching: ${mockRequests} mock requests`);
+  return warnings;
 }
 
 const normalisePath = (p) => (p.length > 1 ? p.replace(/\/+$/, '') : p);
@@ -46,7 +78,8 @@ const normalisePath = (p) => (p.length > 1 ? p.replace(/\/+$/, '') : p);
 /**
  * Grade one capture.
  * @param {{ requestedPath: string, finalUrl: string | null, expectAuth: boolean, expectRedirect?: string | boolean,
- *           inspection: ReturnType<typeof inspectPage> | null, consoleErrors: string[], pageErrors: string[], navigationError: string | null }} c
+ *           inspection: ReturnType<typeof inspectPage> | null, consoleErrors: string[], pageErrors: string[], navigationError: string | null,
+ *           viewportWidth?: number }} c
  * @returns {{ status: 'ok' | 'warn' | 'fail', problems: string[], warnings: string[] }}
  */
 export function classify(c) {
@@ -61,7 +94,13 @@ export function classify(c) {
     if (i.recoveryPanel) problems.push('stale-chunk recovery panel');
     if (i.textLength === 0 && i.visibleMedia === 0) problems.push('blank page');
     if (!i.errorBoundary && i.somethingWentWrong) warnings.push("'Something went wrong' text on page");
-    if (i.loadingOnly) warnings.push('still loading');
+    // A skeleton inside the shell has plenty of text around it, so busy wins over length.
+    if (i.busy) warnings.push('still loading (skeleton)');
+    else if (i.loadingOnly) warnings.push('still loading');
+    if (typeof c.viewportWidth === 'number' && c.viewportWidth < PHONE_MAX_WIDTH && i.overflowX) {
+      const worst = Math.max(i.overflowX.main ?? 0, i.overflowX.document ?? 0);
+      if (worst > 1) warnings.push(`horizontal overflow: ${worst}px at ${c.viewportWidth}px wide`);
+    }
     if (i.accessDenied) warnings.push(`access denied: ${i.accessDenied}`);
   } else if (!c.navigationError) {
     problems.push('page could not be inspected');

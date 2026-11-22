@@ -8,6 +8,7 @@ import { AuthProvider } from "@/modules/auth/contexts/AuthContext";
 import { BrandingProvider } from "@/shared/contexts/BrandingContext";
 import { VesselProvider } from "@/modules/vessels/contexts/VesselContext";
 import ErrorBoundary from "@/shared/components/ErrorBoundary";
+import QueryCacheReset from "@/app/QueryCacheReset";
 import AppRoutes from "@/routes";
 
 // Defaults, because none were set: queries refetched on every mount and focus
@@ -41,6 +42,8 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
+            {/* One user's cached query results are never shown to the next. */}
+            <QueryCacheReset />
             <BrandingProvider>
               <VesselProvider>
                 <ErrorBoundary>

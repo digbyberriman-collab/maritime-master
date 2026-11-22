@@ -11,6 +11,7 @@ import {
   XCircle,
   FileText,
   FileSpreadsheet,
+  UserRound,
 } from 'lucide-react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
@@ -24,6 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
+import { useScopedPath, useVesselScope } from '@/app/router/scopes';
 import { listVesselMonthMatrix, type VesselMonthCrewRow } from '../services/workRestService';
 import { cn } from '@/lib/utils';
 
@@ -33,6 +35,12 @@ const DEPT_ORDER = ['DECK', 'BRIDGE', 'ENGINEERING', 'INTERIOR', 'OTHER'];
 const WorkRestOverview: React.FC = () => {
   const { selectedVessel } = useVessel();
   const [searchParams, setSearchParams] = useSearchParams();
+  const inVesselScope = useVesselScope() !== null;
+  const scoped = useScopedPath();
+  // A crew member's month, in this vessel's scope (gap/00 B4). The legacy
+  // path is only for the old page rendering outside the scope.
+  const crewMonthPath = (crewId: string) =>
+    inVesselScope ? scoped(`crew/people/${crewId}/hours-of-rest`) : `/crew/work-rest/${crewId}`;
 
   const today = new Date();
   const year = Number(searchParams.get('year')) || today.getFullYear();
@@ -102,7 +110,13 @@ const WorkRestOverview: React.FC = () => {
               {selectedVessel?.name ?? 'No vessel selected'} — Monthly compliance report
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* The signed-in crew member's own monthly entry (R8). */}
+            <Button asChild variant="outline" size="sm">
+              <Link to="/me/hours-of-rest">
+                <UserRound className="h-4 w-4 mr-1.5" /> My hours
+              </Link>
+            </Button>
             <Button variant="outline" size="sm">
               <FileText className="h-4 w-4 mr-1.5" /> Summary PDF
             </Button>
@@ -197,7 +211,7 @@ const WorkRestOverview: React.FC = () => {
                       {deptRows.map((r) => (
                         <tr key={r.crew_id} className="border-b hover:bg-muted/30 transition-colors">
                           <td className="px-3 py-2 sticky left-0 bg-card z-10">
-                            <Link to={`/crew/work-rest/${r.crew_id}?year=${year}&month=${month}`} className="block">
+                            <Link to={`${crewMonthPath(r.crew_id)}?year=${year}&month=${month}`} className="block">
                               <div className="font-medium text-foreground hover:text-primary">{r.crew_name}</div>
                               <div className="text-[10px] text-muted-foreground">{r.rank}</div>
                             </Link>

@@ -5,7 +5,7 @@
  * popups and a legend built from tokens.
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
@@ -21,6 +21,11 @@ const fixtures = vi.hoisted(() => ({
     { id: 'v-1', name: 'Draak <b>', mmsi: '244000001', status: 'Active' },
     { id: 'v-2', name: 'Hydra', mmsi: null, status: 'Active' },
   ],
+  // Last AIS fix per vessel (useLatestVesselPositions reads ais_snapshots).
+  fixes: {
+    'v-1': { vessel_id: 'v-1', latitude: 43.7, longitude: 7.42, sog: 0, cog: null, heading: null, nav_status: '5', timestamp_utc: new Date().toISOString() },
+    'v-2': { vessel_id: 'v-2', latitude: 39.5, longitude: 2.65, sog: 11.2, cog: 80, heading: 82, nav_status: '0', timestamp_utc: new Date().toISOString() },
+  } as Record<string, unknown>,
   suggestions: [
     {
       id: 's1',
@@ -34,14 +39,31 @@ const fixtures = vi.hoisted(() => ({
 
 vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: 'dark' }) }));
 vi.mock('@/integrations/supabase/client', () => {
-  const chain = {
-    select: () => chain,
-    eq: () => chain,
-    neq: () => chain,
+  const vessels = {
+    select: () => vessels,
+    eq: () => vessels,
+    neq: () => vessels,
     order: () => Promise.resolve({ data: fixtures.vessels, error: null }),
   };
-  return { supabase: { from: () => chain } };
+  const ais = () => {
+    let vesselId = '';
+    const chain = {
+      select: () => chain,
+      eq: (_col: string, value: string) => {
+        vesselId = value;
+        return chain;
+      },
+      not: () => chain,
+      order: () => chain,
+      limit: () => Promise.resolve({ data: fixtures.fixes[vesselId] ? [fixtures.fixes[vesselId]] : [], error: null }),
+    };
+    return chain;
+  };
+  return { supabase: { from: (table: string) => (table === 'ais_snapshots' ? ais() : vessels) } };
 });
+vi.mock('@/modules/vessels/contexts/VesselContext', () => ({
+  useVessel: () => ({ getVesselCodeById: (id: string | null | undefined) => (id === 'v-1' ? 'DRA' : null) }),
+}));
 vi.mock('@/modules/auth/contexts/AuthContext', () => ({ useAuth: () => ({ profile: { company_id: 'co-1' } }) }));
 vi.mock('@/modules/vessels/hooks/useVesselFilter', () => ({ useVesselFilter: () => ({ vesselFilter: null }) }));
 vi.mock('@/shared/components/layout/DashboardLayout', () => ({
@@ -89,9 +111,11 @@ describe('Fleet Map', () => {
     await waitFor(() => expect(container.querySelectorAll('.storm-map-vessel')).toHaveLength(2));
     expect(container.querySelectorAll('.storm-map-port').length).toBeGreaterThan(10);
     expect(container.querySelector('.vessel-marker, .port-marker, .leaflet-div-icon')).toBeNull();
-    expect(screen.getByText('Under way')).toBeInTheDocument();
-    expect(screen.getByText('At anchor')).toBeInTheDocument();
-    expect(container.querySelectorAll('.storm-map-glyph svg')).toHaveLength(3);
+    const legend = within(screen.getByText('Legend').parentElement as HTMLElement);
+    expect(legend.getByText('Under way')).toBeInTheDocument();
+    expect(legend.getByText('At anchor')).toBeInTheDocument();
+    // Three nav states plus the hollow "old fix or unknown status" glyph.
+    expect(container.querySelectorAll('.storm-map-glyph svg')).toHaveLength(4);
     expect(screen.getByText('Marina').firstElementChild).toHaveClass('bg-chart-3');
   });
 

@@ -3,7 +3,7 @@
  * user_preferences.theme; a new device adopts the profile theme (A2; W1).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { ThemeProvider } from '@/components/ui/theme-provider';
@@ -17,6 +17,7 @@ const state = vi.hoisted(() => ({
   upserts: [] as Record<string, unknown>[],
   selects: [] as string[],
   toast: vi.fn(),
+  notifyError: vi.fn(),
 }));
 
 vi.mock('@/integrations/supabase/client', () => {
@@ -49,6 +50,11 @@ vi.mock('@/modules/auth/contexts/AuthContext', () => ({
 }));
 
 vi.mock('@/shared/hooks/use-toast', () => ({ useToast: () => ({ toast: state.toast }) }));
+// D-05: new code reports through notify. Spy on notify.error, keep the rest real.
+vi.mock('@/shared/lib/notify', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/shared/lib/notify')>();
+  return { ...actual, notify: { ...actual.notify, error: state.notifyError } };
+});
 
 import AppearanceSection from '@/modules/settings/components/sections/AppearanceSection';
 import { BrandingProvider } from '@/shared/contexts/BrandingContext';
@@ -73,6 +79,7 @@ beforeEach(() => {
   state.upserts = [];
   state.selects = [];
   state.toast.mockReset();
+  state.notifyError.mockReset();
 });
 
 describe('AppearanceSection', () => {
@@ -89,19 +96,22 @@ describe('AppearanceSection', () => {
     expect(state.upserts[0]).toMatchObject({ user_id: 'user-1', theme: 'light' });
     expect(screen.getByRole('radio', { name: /Daylight/ })).toHaveAttribute('aria-checked', 'true');
     expect(state.toast).not.toHaveBeenCalled();
+    expect(state.notifyError).not.toHaveBeenCalled();
   });
 
-  it('reports, rather than hides, a failed profile save', async () => {
+  it('reports, rather than hides, a failed profile save, through notify', async () => {
     state.upsertError = { message: 'offline' };
-    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
     wrap(<AppearanceSection />);
     fireEvent.click(await screen.findByRole('radio', { name: /System/ }));
-    await waitFor(() => expect(state.toast).toHaveBeenCalledTimes(1));
-    expect(state.toast.mock.calls[0][0]).toMatchObject({ variant: 'destructive', title: 'Theme applied on this device only' });
+    await waitFor(() => expect(state.notifyError).toHaveBeenCalledTimes(1));
+    expect(state.notifyError).toHaveBeenCalledWith(state.upsertError, {
+      title: 'Theme applied on this device only',
+      fallback: 'It could not be saved to your profile. Try again later.',
+    });
+    // Not the legacy shadcn toast.
+    expect(state.toast).not.toHaveBeenCalled();
     // The theme still applied locally.
     expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('system');
-    expect(logged).toHaveBeenCalled();
-    logged.mockRestore();
   });
 
   it('saves the active theme with the other preferences', async () => {
@@ -110,6 +120,46 @@ describe('AppearanceSection', () => {
     fireEvent.click(await screen.findByRole('button', { name: /Save Preferences/ }));
     await waitFor(() => expect(state.upserts).toHaveLength(1));
     expect(state.upserts[0]).toMatchObject({ user_id: 'user-1', theme: 'light', dashboard_widgets: ['alerts'] });
+  });
+
+  it('arrow keys move the theme selection, with one tab stop in the group', async () => {
+    wrap(<AppearanceSection />);
+    const groupEl = await screen.findByRole('radiogroup', { name: 'Theme' });
+    const group = within(groupEl);
+    // One tab stop: the group is the entry point, no option is tabbable on its own.
+    expect(groupEl).toHaveAttribute('tabindex', '0');
+    expect(group.getAllByRole('radio').map((r) => r.getAttribute('tabindex'))).toEqual(['-1', '-1', '-1']);
+
+    // Tabbing in lands on the checked option, which becomes the only tabbable one.
+    act(() => groupEl.focus());
+    const abyss = group.getByRole('radio', { name: /Abyss/ });
+    expect(abyss).toHaveFocus();
+    expect(group.getAllByRole('radio').map((r) => r.getAttribute('tabindex'))).toEqual(['0', '-1', '-1']);
+
+    fireEvent.keyDown(abyss, { key: 'ArrowRight' });
+    await waitFor(() => expect(group.getByRole('radio', { name: /Daylight/ })).toHaveAttribute('aria-checked', 'true'));
+    expect(group.getByRole('radio', { name: /Daylight/ })).toHaveFocus();
+    expect(root().classList.contains('light')).toBe(true);
+    await waitFor(() => expect(state.upserts).toHaveLength(1));
+    expect(state.upserts[0]).toMatchObject({ theme: 'light' });
+    expect(group.getAllByRole('radio').map((r) => r.getAttribute('tabindex'))).toEqual(['-1', '0', '-1']);
+  });
+
+  it('arrow keys move the density selection, with one tab stop in the group', async () => {
+    localStorage.setItem(DENSITY_STORAGE_KEY, 'default');
+    wrap(<AppearanceSection />);
+    const groupEl = await screen.findByRole('radiogroup', { name: 'Density' });
+    const group = within(groupEl);
+    const current = group.getByRole('radio', { name: /Default/ });
+    expect(current).toHaveAttribute('aria-checked', 'true');
+    act(() => groupEl.focus());
+    expect(current).toHaveFocus();
+    expect(group.getAllByRole('radio').filter((r) => r.getAttribute('tabindex') === '0')).toEqual([current]);
+
+    fireEvent.keyDown(current, { key: 'ArrowDown' });
+    await waitFor(() => expect(group.getByRole('radio', { name: /Compact/ })).toHaveAttribute('aria-checked', 'true'));
+    expect(root().getAttribute('data-density')).toBe('compact');
+    expect(localStorage.getItem(DENSITY_STORAGE_KEY)).toBe('compact');
   });
 
   it('switches density on <html> and stores it on this device', async () => {

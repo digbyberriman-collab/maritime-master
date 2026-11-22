@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 import { resolveToken, resolveTokens, loadFixtures } from '../lib/fixtures.mjs';
 import { parseArgs, normaliseRoutes, selectRoutes, slugFor, viewportFor } from '../lib/options.mjs';
-import { classify, isReactDevWarning, formatConsoleArgs, isHarnessNoise } from '../lib/inspect.mjs';
+import { classify, captureWarnings, isReactDevWarning, formatConsoleArgs, isHarnessNoise, RUNAWAY_REQUESTS } from '../lib/inspect.mjs';
 import { storageKeyFor, fakeJwt, createMockState, handleSupabaseRequest } from '../lib/supabase-mock.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -132,7 +132,7 @@ test('viewports use device heights for the standard widths', () => {
 const page = (overrides = {}) => ({
   title: 'STORM', h1: 'Fleet Dashboard', themeClass: 'dark', textLength: 900, textSample: '', rootChildren: 3,
   visibleMedia: 2, errorBoundary: false, errorBoundaryTitle: null, somethingWentWrong: false, accessDenied: null,
-  recoveryPanel: false, loadingOnly: false, signInForm: false, ...overrides,
+  recoveryPanel: false, loadingOnly: false, busy: false, overflowX: { main: 0, document: 0 }, signInForm: false, ...overrides,
 });
 const base = { requestedPath: '/dashboard', finalUrl: 'http://x/dashboard', expectAuth: true, consoleErrors: [], pageErrors: [], navigationError: null };
 
@@ -153,6 +153,54 @@ test('classify: ok, warn and fail', () => {
   assert.equal(classify({ ...base, requestedPath: '/hris', finalUrl: 'http://x/hr?module=hris', expectRedirect: true, inspection: page() }).status, 'ok');
   assert.equal(classify({ ...base, inspection: page({ accessDenied: 'Restricted area' }) }).status, 'warn');
   assert.equal(classify({ ...base, inspection: null, navigationError: 'Timeout' }).status, 'fail');
+});
+
+test('classify: a skeleton still busy is a warning whatever the text length', () => {
+  const busy = classify({ ...base, inspection: page({ busy: true, textLength: 2000 }) });
+  assert.equal(busy.status, 'warn');
+  assert.deepEqual(busy.warnings, ['still loading (skeleton)']);
+  // The short spinner-only screen keeps its own wording.
+  assert.deepEqual(classify({ ...base, inspection: page({ loadingOnly: true }) }).warnings, ['still loading']);
+});
+
+test('classify: sideways scroll warns at phone width only', () => {
+  const wide = page({ overflowX: { main: 510, document: 0 } });
+  const phone = classify({ ...base, inspection: wide, viewportWidth: 390 });
+  assert.equal(phone.status, 'warn');
+  assert.match(phone.warnings.join(), /horizontal overflow: 510px at 390px wide/);
+  assert.equal(classify({ ...base, inspection: page({ overflowX: { main: 0, document: 24 } }), viewportWidth: 390 }).status, 'warn');
+  // Desktop, sub-pixel rounding, or no width given: no warning.
+  assert.equal(classify({ ...base, inspection: wide, viewportWidth: 1440 }).status, 'ok');
+  assert.equal(classify({ ...base, inspection: page({ overflowX: { main: 1, document: 1 } }), viewportWidth: 390 }).status, 'ok');
+  assert.equal(classify({ ...base, inspection: wide }).status, 'ok');
+});
+
+test('captureWarnings: waits that gave up and runaway fetching are warnings, not notes', () => {
+  assert.deepEqual(
+    captureWarnings({
+      notes: [
+        'network did not go idle',
+        'a spinner was still showing',
+        'a skeleton was still showing',
+        'waitFor "[data-testid=grid]" not found',
+        'screenshot failed: Timeout 30000ms exceeded',
+      ],
+    }),
+    [
+      'network did not go idle',
+      'a spinner was still showing',
+      'a skeleton was still showing',
+      'waitFor "[data-testid=grid]" not found',
+      'screenshot failed: Timeout 30000ms exceeded',
+    ],
+  );
+  assert.deepEqual(captureWarnings({ notes: [], mockRequests: 60 }), []);
+  assert.deepEqual(captureWarnings({ mockRequests: RUNAWAY_REQUESTS }), []);
+  assert.deepEqual(captureWarnings({ notes: ['network did not go idle'], mockRequests: 10469 }), [
+    'network did not go idle',
+    'runaway fetching: 10469 mock requests',
+  ]);
+  assert.deepEqual(captureWarnings(), []);
 });
 
 test('console helpers: React warnings, formatting and harness noise', () => {

@@ -14,8 +14,16 @@
  * certificates 90). This function mirrors SQL `expiry_bucket()` (gap/02 X2
  * owns it); both must give the same answer for the same inputs.
  *
- * An item is valid through its expiry date: on that day it is
- * `expiring_soon` with 0 days left, and `expired` from the next day.
+ * An item is valid through its expiry date (DECISIONS D-31): on that day it
+ * is `expiring_soon` with 0 days left, and `expired` from the next day. The
+ * boundary table in `src/test/lib/records/expiry.test.ts` is the shared
+ * TS/SQL fixture (EXP1).
+ *
+ * A null or blank date is `no_expiry` (D-31; gap/06 certificates rely on it).
+ * Callers whose items always expire (crew documents, passports) pass
+ * `noExpiry` from the "No expiry" tick and treat a missing date without the
+ * tick as missing data: pass `undefined` to `<ExpiryPill>` ("Expiry unknown")
+ * or flag it upstream, never `null`.
  */
 import { daysBetween, toCalendarDate, type DateInput } from './dates';
 
@@ -82,14 +90,24 @@ export function expiryStatus(input: ExpiryInput): ExpiryStatus {
     return { bucket: 'no_expiry', daysRemaining: null, label: EXPIRY_BUCKET_LABELS.no_expiry, windowDays };
   }
   const daysRemaining = daysBetween(toCalendarDate(input.today), toCalendarDate(input.expiresOn as DateInput));
-  // A window shorter than 30 days shrinks the soon tier: nothing is flagged before its window opens.
-  const soon = Math.min(EXPIRING_SOON_DAYS, windowDays);
-  let bucket: ExpiryBucket;
-  if (daysRemaining < 0) bucket = 'expired';
-  else if (daysRemaining <= soon) bucket = 'expiring_soon';
-  else if (daysRemaining <= windowDays) bucket = 'expiring';
-  else bucket = 'valid';
+  const bucket = expiryBucketForDays(daysRemaining, windowDays);
   return { bucket, daysRemaining, label: EXPIRY_BUCKET_LABELS[bucket], windowDays };
+}
+
+/**
+ * The bucket for a number of days left (negative once expired) and a window.
+ * `expiryStatus` uses it after counting the days; callers that already have
+ * the server's day count use it directly so bucket and days agree.
+ */
+export function expiryBucketForDays(daysRemaining: number, windowDays?: number | null): ExpiryBucket {
+  if (!Number.isInteger(daysRemaining)) throw new RangeError(`daysRemaining must be a whole number, got ${daysRemaining}`);
+  const window = normaliseWindow(windowDays);
+  // A window shorter than 30 days shrinks the soon tier: nothing is flagged before its window opens.
+  const soon = Math.min(EXPIRING_SOON_DAYS, window);
+  if (daysRemaining < 0) return 'expired';
+  if (daysRemaining <= soon) return 'expiring_soon';
+  if (daysRemaining <= window) return 'expiring';
+  return 'valid';
 }
 
 /** The bucket for one item. */

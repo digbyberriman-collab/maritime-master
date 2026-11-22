@@ -324,11 +324,13 @@ States (computed in view `crew_document_status`, never stored):
 |---|---|
 | Not uploaded | Record exists (metadata) but no file |
 | Valid | Expiry is null with "No expiry" ticked, or expiry > today + warn window |
-| Expiring | today < expiry ≤ today + warn window (per type: passports 270 d, others 90 d by default, from `expiry_window_rules`); the 30-day sub-bucket is shown in red-amber |
-| Expired | expiry ≤ today |
+| Expiring | today ≤ expiry ≤ today + warn window (per type: passports 270 d, others 90 d by default, from `expiry_window_rules`); the 30-day sub-bucket is shown in red-amber, and the expiry day itself is in it with 0 days left (DECISIONS D-31) |
+| Expired | expiry < today: a document is valid through its expiry date (DECISIONS D-31) |
 | Endorsement due / overdue | Types with an endorsement interval (e.g. flag endorsements, some CoCs): due when inside the window before `endorsement_due_date`; overdue after |
 | Alerts off | Muted by an authorised user; still shows its real state in a tooltip and in audits, but raises no alert and is excluded from KPI counts |
 | Missing | Computed per requirement, not per document: required for the role and no satisfying valid document |
+
+**Missing expiry date** (DECISIONS D-31): the shared expiry engine reads a null expiry as "no expiry". Crew-document and passport callers therefore pass `noExpiry` from the "No expiry" tick, and treat a date that is missing without the tick as missing data: `<ExpiryPill>` gets `undefined` ("Expiry unknown") and the document is flagged as incomplete upstream, never shown as Valid.
 
 Transitions: renew (upload a new version: old version kept, state recomputed) → Valid; delete (only the uploader within 24 h, or anyone with crew document edit; soft delete, kept in versions); mute / unmute (reason required).
 

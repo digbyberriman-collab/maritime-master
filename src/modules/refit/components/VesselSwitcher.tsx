@@ -36,14 +36,14 @@ export function VesselSwitcher({ compact = false }: { compact?: boolean }) {
       : "—";
     return (
       <div className={wrapperCls}>
-        <div className="block text-[10px] tracking-[0.2em] uppercase text-ocean/70 mb-1.5">
+        <div className="block text-[10px] tracking-[0.2em] uppercase text-sidebar-foreground/70 mb-1.5">
           Active Vessel
         </div>
         <button
           type="button"
           onClick={() => setDenied((d) => !d)}
           aria-expanded={denied}
-          className="w-full text-left bg-white/5 border border-white/10 text-white text-xs rounded-sm px-2 py-1.5 flex items-center justify-between gap-2 hover:bg-white/10 focus-visible:outline-none focus:ring-2 focus:ring-ocean"
+          className="w-full text-left bg-white/5 border border-white/10 text-white text-xs rounded-sm px-2 py-1.5 flex items-center justify-between gap-2 hover:bg-white/10 focus-visible:outline-none focus:ring-2 focus:ring-sidebar-ring"
           title="Switching vessels is restricted"
         >
           <span className="truncate">{label}</span>
@@ -81,7 +81,7 @@ export function VesselSwitcher({ compact = false }: { compact?: boolean }) {
     <div className={wrapperCls}>
       <label
         htmlFor="vessel-switcher"
-        className="block text-[10px] tracking-[0.2em] uppercase text-ocean/70 mb-1.5"
+        className="block text-[10px] tracking-[0.2em] uppercase text-sidebar-foreground/70 mb-1.5"
       >
         Active Vessel
       </label>
@@ -89,11 +89,11 @@ export function VesselSwitcher({ compact = false }: { compact?: boolean }) {
         id="vessel-switcher"
         value={activeVesselId ?? ""}
         onChange={(e) => setActiveVesselId(e.target.value)}
-        className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs rounded-sm px-2 py-1.5 focus-visible:outline-none focus:ring-2 focus:ring-ocean"
+        className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white text-xs rounded-sm px-2 py-1.5 focus-visible:outline-none focus:ring-2 focus:ring-sidebar-ring"
         aria-label="Switch active vessel"
       >
         {vessels.map((v) => (
-          <option key={v.id} value={v.id} className="bg-navy text-white">
+          <option key={v.id} value={v.id} className="bg-sidebar text-sidebar-foreground">
             {v.name}
             {v.hull_number ? ` — ${v.hull_number}` : ""}
           </option>
@@ -121,7 +121,7 @@ export function ActiveVesselBar() {
         <div className="text-[10px] tracking-[0.2em] uppercase text-muted-foreground">
           Active Vessel
         </div>
-        <div className="text-sm font-semibold text-ink truncate">
+        <div className="text-sm font-semibold text-foreground truncate">
           {loading
             ? "Loading…"
             : activeVessel
@@ -142,7 +142,7 @@ export function ActiveVesselBar() {
           value={activeVesselId ?? ""}
           onChange={(e) => setActiveVesselId(e.target.value)}
           disabled={loading || vessels.length === 0}
-          className="bg-white border border-black/15 text-ink text-sm rounded-sm px-3 py-2 min-w-[200px] focus-visible:outline-none focus:ring-2 focus:ring-navy disabled:opacity-50"
+          className="bg-white border border-black/15 text-foreground text-sm rounded-sm px-3 py-2 min-w-[200px] focus-visible:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
           aria-label="Switch active vessel"
         >
           {vessels.length === 0 && <option value="">No vessels available</option>}

@@ -174,8 +174,8 @@ function ReauthModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-paper border border-black/10 rounded-sm shadow-xl w-full max-w-sm p-6">
-        <div className="text-xs tracking-[0.25em] uppercase text-ocean font-semibold mb-2">
+      <div className="bg-card border border-black/10 rounded-sm shadow-xl w-full max-w-sm p-6">
+        <div className="text-xs tracking-[0.25em] uppercase text-primary font-semibold mb-2">
           OCEANCOS // RE-AUTH
         </div>
         <h2 className="text-lg font-semibold mb-1">Continue your session</h2>
@@ -207,20 +207,20 @@ function ReauthModal({
             />
           </div>
           {err && (
-            <div className="text-xs text-danger bg-danger/10 px-3 py-2 rounded-sm">{err}</div>
+            <div className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-sm">{err}</div>
           )}
           <div className="flex items-center gap-2 pt-1">
             <button
               type="submit"
               disabled={busy}
-              className="flex-1 bg-navy text-white py-2 rounded-sm text-sm font-medium hover:opacity-90 disabled:opacity-50"
+              className="flex-1 bg-primary text-primary-foreground py-2 rounded-sm text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
             >
               {busy ? "Signing in…" : "Continue"}
             </button>
             <button
               type="button"
               onClick={onCancel}
-              className="px-3 py-2 text-xs text-muted-foreground hover:text-ink"
+              className="px-3 py-2 text-xs text-muted-foreground hover:text-foreground"
             >
               Sign out
             </button>

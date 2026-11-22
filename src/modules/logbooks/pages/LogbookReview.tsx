@@ -12,10 +12,13 @@ import { getBookByDbType, type LogbookBook } from '../lib/catalog';
 import { canAcknowledge, canAttestWitness, canCountersign, missingSigners } from '../lib/formRules';
 import type { EntryView } from '../lib/types';
 import { stamp } from '../lib/format';
+import { useLogbookPath } from '../lib/useLogbookPath';
 
 interface Item { entry: EntryView; book: LogbookBook | undefined; note: string; }
 
-const Queue: React.FC<{ title: string; description: string; items: Item[] }> = ({ title, description, items }) => (
+const Queue: React.FC<{ title: string; description: string; items: Item[] }> = ({ title, description, items }) => {
+  const bookPath = useLogbookPath();
+  return (
   <section className="rounded-lg border border-border bg-card">
     <header className="flex items-center justify-between border-b border-border px-4 py-3">
       <div><h2 className="font-semibold">{title}</h2><p className="text-xs text-muted-foreground">{description}</p></div>
@@ -31,17 +34,19 @@ const Queue: React.FC<{ title: string; description: string; items: Item[] }> = (
               <span className="font-medium">{book?.title ?? 'Logbook'}</span> · {entry.schema_snapshot?.title ?? entry.section_id ?? 'record'} · line {entry.line_number ?? '—'}
               <span className="block text-xs text-muted-foreground">{stamp(entry.entry_at)} · {entry.recorded_by_name ?? '—'} · {note}</span>
             </div>
-            {book && <Button asChild size="sm" variant="outline"><Link to={`/vessel/logbooks/${book.slug}?entry=${entry.id}`}>Open line</Link></Button>}
+            {book && <Button asChild size="sm" variant="outline"><Link to={bookPath(book.slug, `?entry=${entry.id}`)}>Open line</Link></Button>}
           </li>
         ))}
       </ul>
     )}
   </section>
-);
+  );
+};
 
 /** Review & sign-off queues for the signed-in crew member, resolved from the same signature policies as the sheet. */
 const LogbookReview: React.FC = () => {
   const actor = useLogbookActor();
+  const bookPath = useLogbookPath();
   const logbooks = useQuery({ queryKey: ['logbooks', actor.vesselId], enabled: !!actor.vesselId, queryFn: () => fetchLogbooks(actor.vesselId!) });
   const entries = useQuery({ queryKey: ['logbook-vessel-entries', actor.vesselId], enabled: !!actor.vesselId, queryFn: () => fetchVesselEntries(actor.vesselId!) });
 
@@ -62,7 +67,7 @@ const LogbookReview: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-5 p-1">
-        <Button asChild variant="ghost" size="sm" className="-ml-2"><Link to="/vessel/logbooks"><ArrowLeft className="mr-1 h-4 w-4" /> Back to logbooks</Link></Button>
+        <Button asChild variant="ghost" size="sm" className="-ml-2"><Link to={bookPath('')}><ArrowLeft className="mr-1 h-4 w-4" /> Back to logbooks</Link></Button>
         <div className="flex items-center gap-3">
           <ClipboardCheck className="h-7 w-7 text-primary" />
           <div>

@@ -249,6 +249,122 @@ describe('lazyPage', () => {
     expect(loader).toHaveBeenCalledTimes(2);
   });
 
+  it('Try again after a failed chunk fetches it again and renders the page', async () => {
+    const loader = vi
+      .fn<() => Promise<PageModule<object>>>()
+      .mockRejectedValueOnce(new Error('Failed to fetch dynamically imported module'))
+      .mockResolvedValue({ default: () => <p>page ok</p> });
+    const Page = lazyPage(loader, { label: 'Crew' });
+    render(<MemoryRouter><Page /></MemoryRouter>);
+    await flush();
+    expect(screen.getByText('Crew could not be displayed')).toBeInTheDocument();
+    expect(loader).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    await flush();
+    expect(screen.getByText('page ok')).toBeInTheDocument();
+    expect(screen.queryByText('Crew could not be displayed')).toBeNull();
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it('navigating away and back after a failed chunk fetches it again', async () => {
+    const loader = vi
+      .fn<() => Promise<PageModule<object>>>()
+      .mockRejectedValueOnce(new Error('Failed to fetch dynamically imported module'))
+      .mockResolvedValue({ default: () => <p>page ok</p> });
+    const Page = lazyPage(loader, { label: 'Crew' });
+    render(
+      <MemoryRouter initialEntries={['/a']}>
+        <NavButton to="/a" />
+        <NavButton to="/b" />
+        <Routes>
+          <Route path="/a" element={<Page />} />
+          <Route path="/b" element={<p>other</p>} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await flush();
+    expect(screen.getByText('Crew could not be displayed')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('go /b'));
+    await flush();
+    fireEvent.click(screen.getByText('go /a'));
+    await flush();
+    expect(screen.getByText('page ok')).toBeInTheDocument();
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it('a path change within the same page retries a failed chunk', async () => {
+    const loader = vi
+      .fn<() => Promise<PageModule<object>>>()
+      .mockRejectedValueOnce(new Error('Failed to fetch dynamically imported module'))
+      .mockResolvedValue({ default: () => <p>item page</p> });
+    const Page = lazyPage(loader, { label: 'Item' });
+    render(
+      <MemoryRouter initialEntries={['/items/1']}>
+        <NavButton to="/items/2" />
+        <Routes>
+          <Route path="/items/:id" element={<Page />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await flush();
+    expect(screen.getByText('Item could not be displayed')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('go /items/2'));
+    await flush();
+    expect(screen.getByText('item page')).toBeInTheDocument();
+    expect(loader).toHaveBeenCalledTimes(2);
+  });
+
+  it('an import that resolves to no module (Vite after a prevented preloadError) shows the boundary, then recovers', async () => {
+    // Vite's preload helper: baseModule().catch(handlePreloadError). When the
+    // vite:preloadError event is prevented, the import resolves to undefined.
+    let available = false;
+    const loader = vi.fn(() =>
+      available
+        ? Promise.resolve({ default: () => <p>chunk back</p> })
+        : (Promise.reject(new Error('Failed to fetch dynamically imported module')).catch(
+            () => undefined,
+          ) as unknown as Promise<PageModule<object>>),
+    );
+    const Page = lazyPage(loader, { label: 'Crew' });
+    render(<MemoryRouter><Page /></MemoryRouter>);
+    await flush();
+    expect(screen.getByText('Crew could not be displayed')).toBeInTheDocument();
+    expect(screen.getByText('Page chunk failed to load')).toBeInTheDocument();
+    // The failed import was forgotten, so preload() tries again too.
+    await expect(Page.preload()).rejects.toThrow('Page chunk failed to load');
+
+    available = true;
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    await flush();
+    expect(screen.getByText('chunk back')).toBeInTheDocument();
+    expect(loader).toHaveBeenCalledTimes(3);
+  });
+
+  it('Try again after a render error in a loaded page re-renders it without a new chunk fetch', async () => {
+    const lazySpy = vi.spyOn(React, 'lazy');
+    let fail = true;
+    const Flaky: React.FC = () => {
+      if (fail) throw new Error('render failed');
+      return <p>rendered</p>;
+    };
+    const loader = ready(Flaky);
+    const Page = lazyPage(loader);
+    render(<MemoryRouter><Page /></MemoryRouter>);
+    await flush();
+    expect(screen.getByText('render failed')).toBeInTheDocument();
+
+    fail = false;
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    await flush();
+    expect(screen.getByText('rendered')).toBeInTheDocument();
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(lazySpy).toHaveBeenCalledTimes(1);
+    lazySpy.mockRestore();
+  });
+
   it('names the component for React devtools', () => {
     expect(lazyPage(ready(() => null), { label: 'Crew list' }).displayName).toBe('LazyPage(Crew list)');
     expect(lazyPage(ready(() => null)).displayName).toBe('LazyPage');

@@ -98,6 +98,10 @@ const CommandSeparator = React.forwardRef<
 ));
 CommandSeparator.displayName = CommandPrimitive.Separator.displayName;
 
+/*
+ * Selected option (gap/10 A.5, WCAG 1.4.11): a signal-muted fill plus a 2px
+ * primary bar on the leading edge; the bar (>= 3:1 on the popover) is the cue.
+ */
 const CommandItem = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive.Item>
@@ -105,7 +109,7 @@ const CommandItem = React.forwardRef<
   <CommandPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-[disabled=true]:pointer-events-none data-[selected='true']:bg-accent data-[selected=true]:text-accent-foreground data-[disabled=true]:opacity-50",
+      "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-[disabled=true]:pointer-events-none data-[selected=true]:bg-signal-muted data-[selected=true]:text-foreground data-[selected=true]:shadow-[inset_2px_0_0_hsl(var(--primary))] data-[disabled=true]:opacity-50",
       className,
     )}
     {...props}

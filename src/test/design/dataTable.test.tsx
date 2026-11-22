@@ -7,6 +7,7 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { DataTable, type DataTableColumn } from '@/shared/components/data';
+import { loadTokens } from './cssTokens';
 
 beforeAll(() => {
   if (typeof globalThis.ResizeObserver === 'undefined') {
@@ -251,6 +252,59 @@ describe('selection and rows', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Draak' }));
     expect(onAction).toHaveBeenCalledWith('v1');
     expect(onRowClick).toHaveBeenCalledTimes(2);
+  });
+
+  it('hooks every row for the cell-drawn focus ring and selected bar (sticky cells cannot cover them)', () => {
+    renderTable({ selectable: true, rowLabel: (v) => v.name, onRowClick: () => undefined });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Hydra' }));
+    for (const row of bodyRows()) {
+      expect(row).toHaveClass('dt-row');
+      expect(row).toHaveAttribute('tabindex', '0');
+      // The row outline paints under positioned cells, so it is not the ring.
+      expect(row.className).not.toContain('focus-ring-inset');
+      // `.dt-row > td` is what index.css targets: every cell is a direct td.
+      expect(Array.from(row.children).every((cell) => cell.tagName === 'TD')).toBe(true);
+    }
+    const selected = bodyRows().find((row) => row.getAttribute('data-row-id') === 'v2')!;
+    expect(selected).toHaveAttribute('data-state', 'selected');
+    const [selectionCell, stickyCell] = Array.from(selected.children) as HTMLElement[];
+    for (const cell of [selectionCell, stickyCell]) {
+      expect(cell.className).toMatch(/\bsticky\b/);
+      expect(cell.matches('.dt-row > td')).toBe(true);
+      // No shadow utility of its own that would replace the composed cues.
+      expect(cell.className).not.toMatch(/(?:^|\s)shadow-/);
+    }
+    expect(selectionCell.matches('.dt-row > td:first-child')).toBe(true);
+    expect(selectionCell.matches('.dt-row[data-state="selected"] > td:first-child')).toBe(true);
+    const lastCell = selected.lastElementChild as HTMLElement;
+    expect(lastCell.matches('.dt-row > td:last-child')).toBe(true);
+  });
+
+  it('keeps the selected bar on rows that are not clickable', () => {
+    renderTable({ selectable: true, rowLabel: (v) => v.name });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Draak' }));
+    const row = bodyRows().find((r) => r.getAttribute('data-row-id') === 'v1')!;
+    expect(row).toHaveClass('dt-row');
+    expect(row).not.toHaveAttribute('tabindex');
+    expect((row.firstElementChild as HTMLElement).matches('.dt-row[data-state="selected"] > td:first-child')).toBe(true);
+  });
+
+  it('index.css draws the ring and the bar on the cells as stacked inset shadows', () => {
+    const { rules } = loadTokens();
+    const decls = (selector: string) => {
+      const rule = rules.find((r) => r.selector === selector);
+      expect(rule, selector).toBeDefined();
+      return rule!.decls;
+    };
+    expect(decls('.dt-row > td')['box-shadow']).toBe('var(--dt-ring-y), var(--dt-ring-start), var(--dt-ring-end), var(--dt-selected)');
+    const ringY = decls('.dt-row:focus-visible > td')['--dt-ring-y'];
+    expect(ringY).toContain('inset 0 var(--focus-ring-width) 0 0 hsl(var(--focus))');
+    expect(ringY).toContain('inset 0 calc(var(--focus-ring-width) * -1) 0 0 hsl(var(--focus))');
+    expect(decls('.dt-row:focus-visible > td:first-child')['--dt-ring-start']).toBe('inset var(--focus-ring-width) 0 0 0 hsl(var(--focus))');
+    expect(decls('.dt-row:focus-visible > td:last-child')['--dt-ring-end']).toBe('inset calc(var(--focus-ring-width) * -1) 0 0 0 hsl(var(--focus))');
+    expect(decls('.dt-row[data-state="selected"] > td:first-child')['--dt-selected']).toBe('inset 2px 0 0 0 hsl(var(--primary))');
+    // Forced-colours fallback: a transparent outline the system paints when shadows are dropped.
+    expect(decls('.dt-row:focus-visible').outline).toBe('var(--focus-ring-width) solid transparent');
   });
 
   it('reveals row actions on hover and focus, and always on touch', () => {

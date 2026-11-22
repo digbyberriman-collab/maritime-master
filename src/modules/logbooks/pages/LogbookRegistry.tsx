@@ -18,6 +18,7 @@ import { fieldProblems } from '../lib/formRules';
 import { lineFields } from '../lib/lineLayouts';
 import type { FlagProfileId } from '../lib/types';
 import { stamp } from '../lib/format';
+import { useLogbookPath } from '../lib/useLogbookPath';
 
 const bookReferenceFields = (bookId: string): TemplateField[] =>
   (getBook(bookId)?.coverFields ?? []).filter((f) => registryBookKeys.includes(f.key)).map((f) => ({ ...f, required: false }));
@@ -25,6 +26,7 @@ const bookReferenceFields = (bookId: string): TemplateField[] =>
 /** Saved vessel registry: separate CISR / MCA revisions, shared vessel details and book-specific references. */
 const LogbookRegistry: React.FC = () => {
   const { toast } = useToast();
+  const bookPath = useLogbookPath();
   const { selectedVessel } = useVessel();
   const actor = useLogbookActor();
   const registry = useLogbookRegistry(actor.vesselId);
@@ -95,7 +97,7 @@ const LogbookRegistry: React.FC = () => {
       <div className="space-y-5 p-1">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <Button asChild variant="ghost" size="sm"><Link to="/vessel/logbooks"><ArrowLeft className="mr-1 h-4 w-4" /> Back to logbooks</Link></Button>
+            <Button asChild variant="ghost" size="sm"><Link to={bookPath('')}><ArrowLeft className="mr-1 h-4 w-4" /> Back to logbooks</Link></Button>
           </div>
           <label className="flex items-center gap-2 text-sm">
             Registration profile

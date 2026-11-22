@@ -25,6 +25,7 @@ import {
   navLeaves,
 } from '@/config/sitemap';
 import { RETIRED_NAV_REDIRECTS } from '@/app/router/retiredNavPaths';
+import { WorkspaceScope } from '@/app/router/scopes';
 import { vesselPatternPath } from '@/modules/vessels/lib/vesselCode';
 import {
   appRouteObjects,
@@ -96,8 +97,29 @@ describe('nav leaf status', () => {
   it('placeholders are generated for planned leaves only', () => {
     const plannedPaths = new Set(planned.map((l) => l.path));
     expect(PLACEHOLDER_LEAVES.filter((p) => !plannedPaths.has(p.path)).map((p) => p.path)).toEqual([]);
-    const placeholderRoutes = routes.filter((r) => isPlaceholderElement(r.element as React.ReactElement));
-    expect(placeholderRoutes).toHaveLength(PLACEHOLDER_LEAVES.length);
+    const workspacePlaceholders = flatRoutes(routes)
+      .filter((f) => isPlaceholderElement(f.route.element as React.ReactElement))
+      .map((f) => f.pattern)
+      .filter((p) => !p.startsWith('/fleet/') && !p.startsWith('/v/:vesselCode'))
+      .sort();
+    expect(workspacePlaceholders).toEqual(PLACEHOLDER_LEAVES.map((p) => p.path).sort());
+  });
+
+  it("workspace placeholders sit inside their workspace's scope, so the shell is not remounted", () => {
+    const inScope = new Map<string, string>();
+    for (const r of routes) {
+      const el = r.element as React.ReactElement<{ workspace?: string }> | undefined;
+      if (el?.type !== WorkspaceScope) continue;
+      for (const child of r.children ?? []) {
+        if (isPlaceholderElement(child.element as React.ReactElement)) inScope.set(child.path ?? '', el.props.workspace ?? '');
+      }
+    }
+    const topLevel = routes.filter((r) => isPlaceholderElement(r.element as React.ReactElement)).map((r) => r.path);
+    // Yard's planned Refit project leaves live in the Yard scope; Shoreside has no scope route yet.
+    expect(inScope.get('/yard/refit/projects/refit-periods')).toBe('yard');
+    expect(topLevel).toContain('/shoreside');
+    expect(topLevel.every((p) => (p ?? '').startsWith('/shoreside'))).toBe(true);
+    expect(inScope.size + topLevel.length).toBe(PLACEHOLDER_LEAVES.length);
   });
 
   it('fleet and vessel placeholders sit inside their scope routes, one per planned leaf', () => {
@@ -138,7 +160,7 @@ describe('retired Coming Soon URLs (B7)', () => {
 
   it('lead to the replacement in the new tree', () => {
     expect(resolveUrl(routes, '/fleet/fleet-scheduler').url).toBe('/fleet/planner');
-    expect(resolveUrl(routes, '/fleet/fleet-reports').url).toBe('/fleet/reports/incident-analytics');
+    expect(resolveUrl(routes, '/fleet/fleet-reports').url).toBe('/fleet/reports');
     expect(resolveUrl(routes, '/vessel/safety/sms-summary').url).toBe('/v/:vesselCode/safety/drills');
     expect(resolveUrl(routes, '/vessel/accounting/expenses').url).toBe('/v/:vesselCode/finance');
     expect(resolveUrl(routes, '/vessel/charter/checklists').url).toBe('/v/:vesselCode/charter/checklists');

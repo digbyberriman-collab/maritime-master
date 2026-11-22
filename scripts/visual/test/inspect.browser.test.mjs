@@ -86,3 +86,35 @@ test('the stale-chunk recovery panel is a failure', async (t) => {
   assert.equal(i.recoveryPanel, true);
   assert.equal(grade(i).status, 'fail');
 });
+
+async function inspectAt(width, body) {
+  const page = await browser.newPage({ viewport: { width, height: 844 } });
+  await page.setContent(`<!doctype html><html class="dark"><head><title>STORM</title></head><body style="margin:0">${body}</body></html>`);
+  const result = await page.evaluate(inspectPage);
+  await page.close();
+  return { result, width };
+}
+
+const gradeAt = ({ result, width }) =>
+  classify({ requestedPath: '/x', finalUrl: 'http://h/x', expectAuth: true, inspection: result, consoleErrors: [], pageErrors: [], navigationError: null, viewportWidth: width });
+
+test('a skeleton inside the shell is still loading, however much shell text surrounds it', async (t) => {
+  if (skipReason) return t.skip(skipReason);
+  const shell = '<nav>' + 'Fleet Crew Safety Documents Maintenance Reports Settings '.repeat(4) + '</nav>';
+  const { result } = await inspectAt(1440, `<div id="root">${shell}<main><h1>Crew list</h1><div role="status" aria-busy="true"><div style="height:16px"></div></div></main></div>`);
+  assert.equal(result.busy, true);
+  assert.ok(result.textLength > 40);
+  assert.equal(result.loadingOnly, false);
+  assert.deepEqual(gradeAt({ result, width: 1440 }).warnings, ['still loading (skeleton)']);
+});
+
+test('a main pane that scrolls sideways at 390 is flagged, and not at 1440', async (t) => {
+  if (skipReason) return t.skip(skipReason);
+  const body = '<div id="root"><main style="overflow-x:auto;width:100%"><h1>Documents</h1><div style="width:900px;height:20px">wide table</div></main></div>';
+  const phone = await inspectAt(390, body);
+  assert.ok(phone.result.overflowX.main > 1, `main overflow ${phone.result.overflowX.main}`);
+  assert.match(gradeAt(phone).warnings.join(), /horizontal overflow/);
+  const desktop = await inspectAt(1440, body);
+  assert.equal(desktop.result.overflowX.main, 0);
+  assert.equal(gradeAt(desktop).status, 'ok');
+});

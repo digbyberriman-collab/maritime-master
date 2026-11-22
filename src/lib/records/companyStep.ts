@@ -4,14 +4,21 @@
  *
  *   open ──first vessel signature──▶ in_review ──last vessel slot──▶ awaiting_company_close
  *     │                                                                   ├─ company: Sign off & close ─▶ closed
+ *     │                                                                   ├─ company: Close as (any option) ─▶ closed
  *     │                                                                   ├─ company: Return to vessel (reason) ─▶ info_requested
  *     │                                                                   └─ company: Not approved (reason) ─▶ info_requested
  *     ├─ report-first kinds: Submit ─▶ submitted ─Acknowledge─▶ acknowledged
+ *     │     submitted | acknowledged ── company: Close as raised in error / duplicate ─▶ closed
+ *     │     submitted | acknowledged ── company: Return to vessel (reason) ─▶ info_requested   (D-30)
  *     ├─ company_step = none: last vessel slot ─▶ closed
- *     └─ Void (reason) ─▶ void
- *   info_requested ──vessel edits, re-signs──▶ awaiting_company_close
+ *     └─ Void (reason; who may void depends on the kind's delete rule, D-32) ─▶ void
+ *   info_requested ──vessel edits, re-signs──▶ awaiting_company_close   (D-30: not "the previous state")
  *   closed ──Reopen (company, reason)──▶ acknowledged (report-first) | in_review
  *   closed ──Remove company signature (company, reason)──▶ awaiting_company_close
+ *
+ * "Close as after review" needs the vessel final review signed first, so it
+ * is only possible from awaiting_company_close (gap/05 W1); `closeAsOptions`
+ * says which options a status allows.
  *
  * Company step per kind (`none` / `acknowledge` / `sign_off`):
  * - `none`: the last vessel slot closes the record.
@@ -24,8 +31,14 @@
  * close; no stale required signatures to submit or close; not voided; the
  * expected version matches. Pure: `record_transition()` / `company_action()`
  * are the authority.
+ *
+ * The signature sheet's `vesselLocked` (no removing vessel signatures)
+ * follows from this envelope: set it when `companyAcknowledged` is true and
+ * the status is `awaiting_company_close` or `closed`. Not for report-first
+ * kinds in `acknowledged`: their final-review vessel slots are signed after
+ * the acknowledgement. Every action with the `new_cycle` effect clears it.
  */
-import type { CompanyStep, EnvelopeStatus, Party } from './types';
+import type { CompanyStep, DeleteRule, EnvelopeStatus, Party } from './types';
 import { fail, ok, type EngineResult } from './types';
 
 export const ENVELOPE_ACTIONS = [
@@ -43,7 +56,8 @@ export const ENVELOPE_ACTIONS = [
 export type EnvelopeAction = (typeof ENVELOPE_ACTIONS)[number];
 
 export type CompanyDecision = 'approved' | 'approved_with_conditions' | 'not_approved';
-export type ClosedAs = 'after_review' | 'raised_in_error' | 'duplicate';
+export const CLOSED_AS = ['after_review', 'raised_in_error', 'duplicate'] as const;
+export type ClosedAs = (typeof CLOSED_AS)[number];
 export type ClosedBy = 'vessel' | 'company_acknowledge' | 'company_sign_off' | 'company_decision' | 'company_close_as';
 
 /** Side effects the server performs in the same transaction. */
@@ -78,6 +92,11 @@ export interface EnvelopeState {
   closedBy?: ClosedBy | null;
   companyAcknowledged?: boolean;
   version?: number;
+  /**
+   * The kind's delete rule (gap/08 §F; DECISIONS D-32), which decides who may
+   * void. Absent means `draft_only`.
+   */
+  deleteRule?: DeleteRule;
 }
 
 export interface TransitionInput {
@@ -142,7 +161,8 @@ export const ACTION_FROM: Readonly<Record<EnvelopeAction, readonly EnvelopeStatu
   decide: ['awaiting_company_close'],
   sign_off: ['awaiting_company_close'],
   close_as: ['submitted', 'acknowledged', 'awaiting_company_close'],
-  return_to_vessel: ['submitted', 'awaiting_company_close'],
+  // D-30: the union of gap/05 W1 and gap/08 §C.
+  return_to_vessel: ['submitted', 'acknowledged', 'awaiting_company_close'],
   reopen: ['closed'],
   remove_company_signature: ['closed'],
   void: ['open', 'in_review', 'submitted', 'acknowledged', 'awaiting_company_close', 'info_requested', 'closed'],
@@ -248,6 +268,9 @@ export function transitionEnvelope(state: EnvelopeState, input: TransitionInput)
     case 'close_as': {
       if (!state.allowCloseAs) return fail('not_for_kind', 'This kind of record cannot be closed that way.');
       if (!input.closedAs) return fail('closed_as_required', 'Choose how the record is closed.');
+      if (input.closedAs === 'after_review' && state.status !== 'awaiting_company_close') {
+        return fail('invalid_transition', 'Closed after review needs the vessel final review signed first.');
+      }
       if (input.closedAs === 'duplicate' && blank(input.duplicateOf)) return fail('duplicate_required', 'Link the record this one duplicates.');
       if (openRequestsBlock) return fail('open_requests', requestsMessage());
       if (input.staleRequiredSignatures) return fail('stale_signatures', staleMessage);
@@ -275,6 +298,11 @@ export function transitionEnvelope(state: EnvelopeState, input: TransitionInput)
     }
 
     case 'void': {
+      // D-32: the kind's delete rule decides who may void. Role limits (owner,
+      // admins, the Master) belong to the capability layer, not this engine.
+      const rule = state.deleteRule ?? 'draft_only';
+      if (rule === 'free' || rule === 'cascade_parent') return fail('not_for_kind', 'This kind of record is deleted, not voided.');
+      if (rule === 'never_after_submit' && actor !== 'company') return fail('wrong_party', 'Only the company can void this record.');
       if (blank(input.reason)) return fail('reason_required', 'Say why the record is being voided.');
       return outcome('void', ['snapshot'], 'record_voided', { closedBy: state.closedBy ?? null });
     }
@@ -288,18 +316,34 @@ export function transitionEnvelope(state: EnvelopeState, input: TransitionInput)
  */
 export function availableActions(state: EnvelopeState, actor: Party): EnvelopeAction[] {
   return ENVELOPE_ACTIONS.filter((action) => {
-    const result = transitionEnvelope(state, {
-      action,
-      actor,
-      reason: 'x',
-      decision: 'approved',
-      closedAs: 'after_review',
-      allVesselSlotsSigned: true,
-    });
-    if (result.ok) return true;
-    // Guards that depend on the thread or the signatures are not "unavailable".
-    return result.error.code === 'open_requests' || result.error.code === 'stale_signatures';
+    if (action === 'close_as') return actor === 'company' && closeAsOptions(state).length > 0;
+    return probe(state, { action, actor });
   });
+}
+
+/**
+ * The "Close as" options the company may pick from `state`, in display
+ * order (empty when the kind has no close-as or the status allows none).
+ * "After review" appears only once the vessel final review is signed
+ * (awaiting_company_close); "raised in error" and "duplicate" also close
+ * straight from submitted or acknowledged (gap/05 W1).
+ */
+export function closeAsOptions(state: EnvelopeState): ClosedAs[] {
+  return CLOSED_AS.filter((closedAs) => probe(state, { action: 'close_as', actor: 'company', closedAs }));
+}
+
+/** Would the action pass, ignoring free-text inputs and the thread / signature guards? */
+function probe(state: EnvelopeState, input: Pick<TransitionInput, 'action' | 'actor' | 'closedAs'>): boolean {
+  const result = transitionEnvelope(state, {
+    reason: 'x',
+    decision: 'approved',
+    duplicateOf: 'x',
+    allVesselSlotsSigned: true,
+    ...input,
+  });
+  if (result.ok) return true;
+  // Guards that depend on the thread or the signatures are not "unavailable".
+  return result.error.code === 'open_requests' || result.error.code === 'stale_signatures';
 }
 
 /** True when a vessel-side action could ever close a record of this company step (false for sign_off). */

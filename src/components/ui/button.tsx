@@ -9,6 +9,9 @@ import { cn } from "@/lib/utils";
  * `-foreground` token, which is Abyss ink on dark (white on Signal is 2.5:1)
  * and white on Daylight. Variant names are unchanged; `signal` adds the
  * Signal glow for the one primary call to action on a page.
+ * The default and icon sizes take their height from the density token
+ * `--control-h` (gap/10 A.7: 44 comfortable / 36 default / 32 compact, and
+ * 44 on touch even in compact); sm and lg stay fixed secondary sizes.
  */
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors duration-quick ease-tide focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
@@ -24,10 +27,10 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-10 px-4 py-2 md:h-9 md:py-1.5",
+        default: "h-[var(--control-h)] px-4 py-1.5",
         sm: "h-9 rounded-md px-3 md:h-8",
         lg: "h-11 rounded-md px-8",
-        icon: "h-10 w-10",
+        icon: "h-[var(--control-h)] w-[var(--control-h)]",
       },
     },
     defaultVariants: {

@@ -6,8 +6,10 @@
  *   voyages          VSL-YYYYMMDD-NNN     DRA-20261103-037
  *
  * TYPE is the record kind's prefix (registry `refPrefix`), VSL the vessel
- * code (C20: three letters, stored upper case), NNN the counter, zero-padded
- * to three digits and allowed to grow past 999.
+ * code (D-25, amending C20: a letter then two letters or digits, stored
+ * upper case, e.g. `DRA` or `DR1`), NNN the counter, zero-padded to three
+ * digits and allowed to grow past 999. Every code `getVesselCode()` can
+ * return must format and parse here.
  *
  * Numbers are never computed in the browser: the counter comes from
  * `next_reference_value()` through SQL `format_reference()`. This module
@@ -18,13 +20,17 @@ import { toCalendarDate, type DateInput } from './dates';
 
 /** Record-kind prefixes: an upper-case letter, then up to seven letters or digits. */
 export const REFERENCE_TYPE_PATTERN = /^[A-Z][A-Z0-9]{0,7}$/;
-/** Vessel codes (C20). */
-export const VESSEL_CODE_PATTERN = /^[A-Z]{3}$/;
+/**
+ * Vessel codes (D-25, amending C20): a letter followed by two letters or
+ * digits. Must agree with `storedVesselCode()` in
+ * `src/modules/vessels/lib/vesselCode.ts` (a test pins the agreement).
+ */
+export const VESSEL_CODE_PATTERN = /^[A-Z][A-Z0-9]{2}$/;
 
 export interface RecordReferenceInput {
   /** Record-kind prefix, e.g. `PTW`. Upper-cased. */
   type: string;
-  /** Three-letter vessel code; omit (or null) for fleet-level records. Upper-cased. */
+  /** Vessel code (D-25); omit (or null) for fleet-level records. Upper-cased. */
   vesselCode?: string | null;
   /** The record's numbering date; only the year is used. */
   date: DateInput;
@@ -51,7 +57,7 @@ function checkSeq(seq: number): string {
 
 function checkVesselCode(code: string): string {
   const upper = String(code).trim().toUpperCase();
-  if (!VESSEL_CODE_PATTERN.test(upper)) throw new RangeError(`Vessel code must be three letters, got "${code}"`);
+  if (!VESSEL_CODE_PATTERN.test(upper)) throw new RangeError(`Vessel code must be a letter followed by two letters or digits, got "${code}"`);
   return upper;
 }
 
@@ -83,9 +89,13 @@ export function formatReference(input: RecordReferenceInput | VoyageReferenceInp
   return hasVessel ? `${type}-${checkVesselCode(record.vesselCode as string)}-${year}-${seq}` : `${type}-${year}-${seq}`;
 }
 
-const VESSEL_RECORD = /^([A-Z][A-Z0-9]{0,7})-([A-Z]{3})-(\d{4})-(\d{3,})$/;
+const VESSEL_RECORD = /^([A-Z][A-Z0-9]{0,7})-([A-Z][A-Z0-9]{2})-(\d{4})-(\d{3,})$/;
 const FLEET_RECORD = /^([A-Z][A-Z0-9]{0,7})-(\d{4})-(\d{3,})$/;
-const VOYAGE = /^([A-Z]{3})-(\d{4})(\d{2})(\d{2})-(\d{3,})$/;
+/*
+ * Tried first. A fleet record never matches it: FLEET_RECORD's middle
+ * segment is a 4-digit year, VOYAGE's an 8-digit date.
+ */
+const VOYAGE = /^([A-Z][A-Z0-9]{2})-(\d{4})(\d{2})(\d{2})-(\d{3,})$/;
 
 /**
  * Parse a reference typed by a person or printed on a PDF. Case and

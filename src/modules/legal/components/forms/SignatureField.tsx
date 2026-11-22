@@ -5,6 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { SignatureValue } from '@/modules/legal/lib/forms';
+import { recolourSignatureInk } from '@/modules/legal/lib/signatureInk';
 
 interface SignatureFieldProps {
   id: string;
@@ -35,11 +36,25 @@ export const SignatureField: React.FC<SignatureFieldProps> = ({ id, value, onCha
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    if (value?.image) {
-      const img = new Image();
-      img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      img.src = value.image;
-    }
+    const stored = value?.image;
+    if (!stored) return;
+    let cancelled = false;
+    // Show any stored signature in the pad's own ink, so one captured in the
+    // old near-white dark-theme ink still reads on the paper pad. Display
+    // only: the stored image is not rewritten.
+    recolourSignatureInk(stored, getComputedStyle(canvas).color)
+      .catch(() => stored)
+      .then((src) => {
+        if (cancelled) return;
+        const img = new Image();
+        img.onload = () => {
+          if (!cancelled) ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        };
+        img.src = src;
+      });
+    return () => {
+      cancelled = true;
+    };
     // Only redraw when the stored image changes (e.g. loading a submission).
   }, [value?.image]);
 
@@ -107,18 +122,23 @@ export const SignatureField: React.FC<SignatureFieldProps> = ({ id, value, onCha
             </Button>
           )}
         </div>
-        <canvas
-          ref={canvasRef}
-          width={600}
-          height={180}
-          className="h-32 w-full touch-none rounded-md border border-dashed border-border bg-card text-foreground"
-          onPointerDown={start}
-          onPointerMove={move}
-          onPointerUp={end}
-          onPointerLeave={end}
-          aria-label="Signature pad"
-          role="img"
-        />
+        {/* A Daylight paper surface in every theme (gap/10 DS23), as the ISM
+            pad: the ink is the canvas's computed text colour, so it is dark
+            and the stored PNG reads on PDFs, print and either theme. */}
+        <div className="light rounded-md border border-dashed border-border bg-card">
+          <canvas
+            ref={canvasRef}
+            width={600}
+            height={180}
+            className="h-32 w-full touch-none rounded-md bg-card text-foreground"
+            onPointerDown={start}
+            onPointerMove={move}
+            onPointerUp={end}
+            onPointerLeave={end}
+            aria-label="Signature pad"
+            role="img"
+          />
+        </div>
       </div>
       {current.signedAt && <p className="text-xs text-muted-foreground">Signed {new Date(current.signedAt).toLocaleString()}</p>}
     </div>

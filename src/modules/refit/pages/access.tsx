@@ -311,7 +311,7 @@ export default function AccessPage() {
 
   if (loading || !user) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-paper text-sm text-muted-foreground">
+      <div className="min-h-dvh flex items-center justify-center bg-background text-sm text-muted-foreground">
         Loading access profile…
       </div>
     );
@@ -353,7 +353,7 @@ export default function AccessPage() {
                 <div className="font-mono text-xs text-muted-foreground mt-1">{role}</div>
               </>
             ) : (
-              <div className="text-sm text-danger">
+              <div className="text-sm text-destructive">
                 No role assigned — contact your project manager.
               </div>
             )}
@@ -406,7 +406,7 @@ export default function AccessPage() {
                   return (
                     <tr
                       key={spec.key}
-                      className={`border-t border-black/5 ${mismatch ? "bg-danger/5" : ""}`}
+                      className={`border-t border-black/5 ${mismatch ? "bg-destructive/5" : ""}`}
                     >
                       <td className="px-5 py-3">
                         <div className="font-medium">{spec.label}</div>
@@ -423,7 +423,7 @@ export default function AccessPage() {
                       <td className="px-5 py-3">
                         <ProbePill probe={probe} />
                         {mismatch && (
-                          <div className="text-[11px] text-danger mt-1">
+                          <div className="text-[11px] text-destructive mt-1">
                             ⚠ Does not match expected policy
                           </div>
                         )}
@@ -433,7 +433,7 @@ export default function AccessPage() {
                           <a
                             href={firstAccessibleRoute(spec, role)}
                             title={`Open ${spec.label} — first accessible screen for ${role ? ROLE_LABEL[role] : "your role"}`}
-                            className="text-xs text-ocean hover:underline"
+                            className="text-xs text-primary hover:underline"
                           >
                             Open →
                           </a>
@@ -616,7 +616,7 @@ function TroubleshootingPanel({
     <section className="bg-white border border-black/10 rounded-sm overflow-hidden mt-8">
       <div
         className={`px-5 py-3 border-b border-black/10 flex items-center justify-between ${
-          tone === "danger" ? "bg-danger/5" : tone === "warn" ? "bg-amber-50" : "bg-emerald-50"
+          tone === "danger" ? "bg-destructive/5" : tone === "warn" ? "bg-amber-50" : "bg-emerald-50"
         }`}
       >
         <div>
@@ -629,7 +629,7 @@ function TroubleshootingPanel({
         <span
           className={`text-[11px] uppercase tracking-wider px-2 py-0.5 rounded-sm border ${
             tone === "danger"
-              ? "bg-danger/10 text-danger border-danger/30"
+              ? "bg-destructive/10 text-destructive border-destructive/30"
               : tone === "warn"
                 ? "bg-amber-100 text-amber-800 border-amber-300"
                 : "bg-emerald-100 text-emerald-800 border-emerald-300"
@@ -747,7 +747,7 @@ function Stat({
 }) {
   const toneCls =
     tone === "danger"
-      ? "text-danger"
+      ? "text-destructive"
       : tone === "ok"
         ? "text-emerald-700"
         : "text-muted-foreground";
@@ -795,10 +795,10 @@ function ProbePill({ probe }: { probe: ProbeResult }) {
   }
   return (
     <span
-      className="inline-flex items-center gap-1.5 text-xs text-danger"
+      className="inline-flex items-center gap-1.5 text-xs text-destructive"
       title={probe.errorMessage}
     >
-      <span className="size-1.5 rounded-full bg-danger" />
+      <span className="size-1.5 rounded-full bg-destructive" />
       Error {probe.errorCode ?? ""}
     </span>
   );

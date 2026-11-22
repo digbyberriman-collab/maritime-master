@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { toast } from "sonner";
 import DashboardLayout from "@/shared/components/layout/DashboardLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,7 +37,8 @@ const IncidentAnalytics: React.FC = () => {
   const [datePreset, setDatePreset] = useState<DateRangePreset>("last30");
   const [selectedVessel, setSelectedVessel] = useState<string>("all");
   const { vessels } = useVessels();
-  const dateRange = getDateRangeFromPreset(datePreset);
+  // Memoised: a new Date per render would change the query keys and refetch forever.
+  const dateRange = useMemo(() => getDateRangeFromPreset(datePreset), [datePreset]);
   
   const { data: analytics, isLoading } = useIncidentAnalytics(
     dateRange,

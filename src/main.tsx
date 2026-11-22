@@ -1,4 +1,4 @@
-import { createRoot } from "react-dom/client";
+import { createRoot, type Root } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
@@ -8,23 +8,53 @@ import "./index.css";
 // frame can't fetch assets at all) an unguarded reload loop leaves the user
 // staring at a permanently blank white screen. Cap the automatic retries and
 // show a visible recovery panel instead.
+//
+// The guard stores {count, at}: how many automatic reloads ran back to back,
+// and when the last one started. It is not cleared when the app mounts — a
+// route chunk fails after boot, so clearing at boot reset the count on every
+// reload and the cap never tripped. Instead a reload more than
+// RELOAD_WINDOW_MS after the previous one starts a new count.
 const RELOAD_KEY = "storm.preloadReloads";
 const MAX_RELOADS = 2;
+const RELOAD_WINDOW_MS = 60_000;
 
-const readCount = (): number => {
+interface ReloadRecord {
+  count: number;
+  at: number;
+}
+
+const readRecord = (): ReloadRecord => {
   try {
-    return Number(sessionStorage.getItem(RELOAD_KEY) ?? "0") || 0;
+    const raw = sessionStorage.getItem(RELOAD_KEY);
+    const parsed: unknown = raw ? JSON.parse(raw) : null;
+    if (parsed && typeof parsed === "object") {
+      const { count, at } = parsed as Partial<ReloadRecord>;
+      if (typeof count === "number" && typeof at === "number") return { count, at };
+    }
   } catch {
-    return 0;
+    /* unreadable: treat as no earlier reloads */
   }
+  return { count: 0, at: 0 };
 };
 
+let reactRoot: Root | null = null;
+// One recovery decision per page load: a failed import can raise several of
+// the events below, and each must not count as another reload.
+let recovering = false;
+
 const showRecoveryPanel = () => {
-  const root = document.getElementById("root");
-  if (!root) return;
+  const el = document.getElementById("root");
+  if (!el) return;
+  // Stop React before replacing its DOM, rather than writing under a live root.
+  try {
+    reactRoot?.unmount();
+  } catch {
+    /* already unmounted */
+  }
+  reactRoot = null;
   // Styled by the .storm-boot classes in index.html's head <style>, so the
   // panel follows the theme without the app's CSS.
-  root.innerHTML = `
+  el.innerHTML = `
     <div class="storm-boot">
       <div style="max-width:24rem">
         <div class="storm-boot-mark">STORM</div>
@@ -43,15 +73,22 @@ const showRecoveryPanel = () => {
 };
 
 const recoverFromStaleChunk = () => {
-  const count = readCount();
+  if (recovering) return;
+  recovering = true;
+  const now = Date.now();
+  const last = readRecord();
+  const count = now - last.at > RELOAD_WINDOW_MS ? 0 : last.count;
+  // Deferred so React is never unmounted from inside one of its own renders.
   if (count >= MAX_RELOADS) {
-    showRecoveryPanel();
+    setTimeout(showRecoveryPanel, 0);
     return;
   }
   try {
-    sessionStorage.setItem(RELOAD_KEY, String(count + 1));
+    sessionStorage.setItem(RELOAD_KEY, JSON.stringify({ count: count + 1, at: now }));
   } catch {
-    /* ignore */
+    // Without storage the guard cannot count, so never reload automatically.
+    setTimeout(showRecoveryPanel, 0);
+    return;
   }
   window.location.reload();
 };
@@ -76,11 +113,5 @@ window.addEventListener("unhandledrejection", (e) => {
 const rootEl = document.getElementById("root")!;
 // Clear the static first-paint placeholder from index.html.
 rootEl.innerHTML = "";
-createRoot(rootEl).render(<App />);
-
-// The app mounted, so any earlier recovery attempts succeeded.
-try {
-  sessionStorage.removeItem(RELOAD_KEY);
-} catch {
-  /* ignore */
-}
+reactRoot = createRoot(rootEl);
+reactRoot.render(<App />);

@@ -241,11 +241,24 @@ export function vesselPath(code: string, rel = ''): string {
   return `${base}/${tail}`;
 }
 
+/**
+ * A URL segment, decoded; a malformed escape (`%zz`, a cut-off `%E0%A4%A`)
+ * comes back as written, as React Router's own path decoding does, so a
+ * garbage URL is an unknown vessel rather than a crash during render.
+ */
+function safeDecode(segment: string): string {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
 /** `/v/dra/crew/list?x=1` → `{ code: 'DRA', rest: 'crew/list' }`; null outside the vessel scope. */
 export function parseVesselPath(pathname: string): { code: string; rest: string } | null {
   const match = /^\/v\/([^/?#]+)(?:\/([^?#]*))?/.exec(pathname);
   if (!match) return null;
-  return { code: normaliseVesselCode(decodeURIComponent(match[1])), rest: (match[2] ?? '').replace(/\/+$/, '') };
+  return { code: normaliseVesselCode(safeDecode(match[1])), rest: (match[2] ?? '').replace(/\/+$/, '') };
 }
 
 /**

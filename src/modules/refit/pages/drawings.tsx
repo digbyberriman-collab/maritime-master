@@ -105,7 +105,7 @@ export default function DrawingsPage() {
               <button
                 key={d.id}
                 onClick={() => setOpenId(d.id)}
-                className="w-full text-left hover:bg-paper border-b border-black/5"
+                className="w-full text-left hover:bg-muted/50 border-b border-black/5"
               >
                 <div
                   className="px-4 py-3 grid items-center"

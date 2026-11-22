@@ -238,5 +238,6 @@ export function envelopeStateForKind(
     closedBy: record.closedBy ?? null,
     companyAcknowledged: record.companyAcknowledged ?? false,
     version: record.version,
+    deleteRule: kind.deleteRule,
   };
 }

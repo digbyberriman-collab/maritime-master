@@ -35,10 +35,19 @@ describe('sitemap invariants', () => {
 
   it('HRIS owns its real pages so reloads land in HRIS', () => {
     expect(resolveModuleForPath('/hr')?.id).toBe('hris');
-    expect(resolveModuleForPath('/crew/leave')?.id).toBe('hris');
-    expect(resolveModuleForPath('/crew/leave/requests')?.id).toBe('hris');
-    expect(resolveModuleForPath('/development/my')?.id).toBe('hris');
+    expect(resolveModuleForPath('/crew/leave/calculator')?.id).toBe('hris');
     expect(resolveModuleForPath('/hris/compensation/payroll')?.id).toBe('hris');
+  });
+
+  it("HRIS's planner and training leaves are cross-links, so they claim no page", () => {
+    // Leave Planner, Leave Requests and Rotation Planner open the vessel (or
+    // Fleet) planner through their old URLs' redirects, and Training &
+    // Development the personal training page (gap/04 implementation notes,
+    // R8). Those scopes pick their sidebar from the path.
+    expect(resolveModuleForPath('/crew/leave')).toBeNull();
+    expect(resolveModuleForPath('/crew/leave/requests')).toBeNull();
+    expect(resolveModuleForPath('/crew/rotation-planner')).toBeNull();
+    expect(resolveModuleForPath('/development/my')).toBeNull();
   });
 
   it('every HRIS record leaf is gated on the hr module', () => {

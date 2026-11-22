@@ -9,6 +9,13 @@ interface Props {
   label?: string;
   /** Changing any value resets the boundary — pass the route path to clear on navigation. */
   resetKey?: string;
+  /**
+   * Called when a caught error is cleared (Try again, or a resetKey change),
+   * just before the children render again. lazyPage uses it to swap in a fresh
+   * React.lazy after a chunk failed to load, since React.lazy caches the
+   * rejection and would rethrow it forever.
+   */
+  onReset?: () => void;
 }
 
 interface State {
@@ -38,11 +45,14 @@ class ErrorBoundary extends React.Component<Props, State> {
 
   componentDidUpdate(prev: Props) {
     if (this.state.error && prev.resetKey !== this.props.resetKey) {
-      this.setState({ error: null });
+      this.reset();
     }
   }
 
-  private reset = () => this.setState({ error: null });
+  private reset = () => {
+    this.props.onReset?.();
+    this.setState({ error: null });
+  };
 
   render() {
     const { error } = this.state;

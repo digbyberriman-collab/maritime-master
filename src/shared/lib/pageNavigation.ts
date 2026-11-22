@@ -44,10 +44,62 @@ const DETAIL_LABELS: Record<string, string> = {
   visitor: 'Visitor & Guest Log',
 };
 
+/**
+ * Pages the nav tree does not name a leaf for, by route pattern (the
+ * pathname as the shell passes it: vessel URLs already on the
+ * `/v/:vesselCode` pattern). `label` replaces the last crumb and is the page
+ * title; `parent` is a crumb inserted before it. Without these the last
+ * crumb would be the URL segment (`Crew`, `Sets`, `Capa Tracker`).
+ */
+interface ScopedTitle {
+  label: string;
+  parent?: PageCrumb;
+}
+
+const SCOPED_TITLES: ReadonlyArray<readonly [pattern: string, title: ScopedTitle]> = [
+  // Fleet › Administration › Users & Access tabs (gap/03).
+  ['/fleet/admin/users/crew', { label: 'Vessel Crew' }],
+  ['/fleet/admin/users/sets', { label: 'Access Sets' }],
+  // Fleet › Reports (gap/02).
+  ['/fleet/reports', { label: 'Fleet Reports' }],
+  ['/fleet/reports/capa-tracker', { label: 'CAPA Tracker' }],
+  // Vessel › Crew (gap/04): one crew member's month, under Hours of Rest.
+  [
+    '/v/:vesselCode/crew/people/:crewId/hours-of-rest',
+    { label: 'Crew member hours', parent: { label: 'Hours of Rest', path: '/v/:vesselCode/crew/hours-of-rest' } },
+  ],
+  // Crew Compliance and Planner tabs (gap/04 /crew/compliance/:tab, /crew/planner/:tab).
+  ['/v/:vesselCode/crew/compliance/status', { label: 'Compliance Status' }],
+  ['/v/:vesselCode/crew/compliance/configuration', { label: 'Compliance Configuration' }],
+  ['/v/:vesselCode/crew/planner/timeline', { label: 'Rotation Timeline' }],
+  ['/v/:vesselCode/crew/planner/manning', { label: 'Manning' }],
+  ['/v/:vesselCode/crew/planner/requests', { label: 'Leave Requests' }],
+  ['/v/:vesselCode/crew/planner/configuration', { label: 'Planner Configuration' }],
+];
+
+/** Segment-wise match; a `:param` segment of the pattern takes any one segment. */
+function matchesPattern(pattern: string, pathname: string): boolean {
+  const want = pattern.split('/');
+  const got = pathname.replace(/\/+$/, '').split('/');
+  return want.length === got.length && want.every((segment, i) => segment === got[i] || (segment.startsWith(':') && got[i] !== ''));
+}
+
+const scopedTitleFor = (pathname: string): ScopedTitle | null =>
+  SCOPED_TITLES.find(([pattern]) => matchesPattern(pattern, pathname))?.[1] ?? null;
+
 const pathnameOf = (path: string): string => path.split('?')[0] || '/';
 
+/** Decoded, or as written when the escape is malformed (never throws during render). */
+function safeDecode(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
 function titleCase(value: string): string {
-  return decodeURIComponent(value)
+  return safeDecode(value)
     .replace(/[-_]+/g, ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
@@ -76,20 +128,25 @@ function findBestMatch(pathname: string, search: string, activeModuleId?: string
     ? NAVIGATION_ITEMS.filter((item) => item.id === activeModuleId)
     : NAVIGATION_ITEMS;
 
-  const visit = (node: NavigationNode, ancestors: NavigationNode[], depth: number) => {
+  // A node on its module's own root (the vessel Home leaf and the Vessel
+  // module at /v/:vesselCode, Fleet's section headings at /fleet) sits above
+  // every page of the module, so it only matches exactly, as in the sidebar
+  // (SidebarNavigation activeLeafPath). Otherwise a page with no leaf of its
+  // own lands under Home.
+  const visit = (node: NavigationNode, ancestors: NavigationNode[], depth: number, moduleRoot: string) => {
     const nodePath = pathnameOf(node.path);
     const exact = pathname === nodePath;
-    const descendant = nodePath !== '/' && pathname.startsWith(`${nodePath}/`);
+    const descendant = nodePath !== '/' && nodePath !== moduleRoot && pathname.startsWith(`${nodePath}/`);
     if (exact || descendant) {
       const queryBonus = exact && routeQueryMatches(node.path, search) ? 500 : 0;
       const leafBonus = node.children?.length ? 0 : 100;
       const score = (exact ? 10_000 : 1_000) + nodePath.length + depth * 10 + queryBonus + leafBonus;
       if (!best || score > best.score) best = { node, trail: [...ancestors, node], score };
     }
-    node.children?.forEach((child) => visit(child, [...ancestors, node], depth + 1));
+    node.children?.forEach((child) => visit(child, [...ancestors, node], depth + 1, moduleRoot));
   };
 
-  modules.forEach((module) => visit(module, [], 0));
+  modules.forEach((module) => visit(module, [], 0, pathnameOf(module.path)));
   return best;
 }
 
@@ -125,6 +182,12 @@ export function resolvePageNavigation(
     if (detail) {
       crumbs[crumbs.length - 1] = { label: match.node.label, path: match.node.path };
       crumbs.push(detail);
+    }
+    const scoped = scopedTitleFor(pathname);
+    if (scoped) {
+      const last = crumbs.length - 1;
+      crumbs[last] = { label: scoped.label };
+      if (scoped.parent && crumbs[last - 1]?.label !== scoped.parent.label) crumbs.splice(last, 0, scoped.parent);
     }
     const title = crumbs[crumbs.length - 1]?.label ?? match.node.label;
     return { crumbs, title };

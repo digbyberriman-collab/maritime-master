@@ -6,9 +6,11 @@
  * `yyyy-MM-dd` string. Never build it with `toISOString().slice(0, 10)`: that
  * is the UTC date, which is the wrong day for anyone east of UTC after
  * midnight local time or west of UTC in the evening (the Health `fixes.test`
- * bug class). These helpers read and build the local calendar day.
+ * bug class). These helpers read and build the local calendar day, on top of
+ * the one date-only primitive in `@/lib/records/dates`.
  */
 import { z } from 'zod';
+import { isCalendarDate, toCalendarDate } from '@/lib/records/dates';
 
 // ─── Blank → null ─────────────────────────────────────────────────────────
 
@@ -39,29 +41,15 @@ export function blankFieldsToNull<T extends Record<string, unknown>>(values: T):
 
 // ─── Date-only (local) ────────────────────────────────────────────────────
 
-const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/;
-
-const pad = (n: number, width = 2) => String(n).padStart(width, '0');
-
-/** True for a real calendar date written `yyyy-MM-dd` (rejects 2026-02-30). */
-export function isDateOnly(value: unknown): value is string {
-  if (typeof value !== 'string') return false;
-  const m = DATE_ONLY.exec(value);
-  if (!m) return false;
-  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-  if (mo < 1 || mo > 12 || d < 1) return false;
-  // Day 0 of the next month is the last day of this one; UTC avoids DST.
-  const lastDay = new Date(Date.UTC(y, mo, 0)).getUTCDate();
-  return d <= lastDay;
-}
+/** True for a real calendar date written `yyyy-MM-dd` (rejects 2026-02-30). Alias of `isCalendarDate`. */
+export const isDateOnly: (value: unknown) => value is string = isCalendarDate;
 
 /**
  * The LOCAL calendar day of `date` as `yyyy-MM-dd`, or null for null,
- * undefined or an invalid date.
+ * undefined or an invalid date (`toCalendarDate` without the throw).
  */
 export function toDateOnly(date: Date | null | undefined): string | null {
-  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
-  return `${pad(date.getFullYear(), 4)}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return date instanceof Date && !Number.isNaN(date.getTime()) ? toCalendarDate(date) : null;
 }
 
 /**
@@ -72,7 +60,7 @@ export function toDateOnly(date: Date | null | undefined): string | null {
 export function fromDateOnly(value: string | null | undefined): Date | null {
   if (typeof value !== 'string') return null;
   const datePart = value.trim().slice(0, 10);
-  if (!isDateOnly(datePart)) return null;
+  if (!isCalendarDate(datePart)) return null;
   const [y, m, d] = datePart.split('-').map(Number);
   const date = new Date(y, m - 1, d);
   // Years 0–99 would be mapped to 1900–1999 by the constructor.
@@ -133,6 +121,8 @@ export function optionalDateOnly() {
 }
 
 const toNumberInput = (v: unknown): unknown => {
+  // React Hook Form's `valueAsNumber` gives NaN for an empty input: that is blank.
+  if (typeof v === 'number' && Number.isNaN(v)) return undefined;
   if (typeof v === 'string') {
     const t = v.trim();
     if (t === '') return undefined;
@@ -142,24 +132,43 @@ const toNumberInput = (v: unknown): unknown => {
   return v === null ? undefined : v;
 };
 
-/** Required whole number ≥ 1. Accepts numbers or numeric strings from inputs. */
-export function positiveInt(message: string = REQUIRED) {
+/** The largest value of a Postgres `integer` (int4) column: the default ceiling. */
+export const INT4_MAX = 2147483647;
+
+/** The ceiling actually applied: a whole number ≥ 1 the browser still holds exactly. */
+const ceiling = (max: number) => Math.min(Math.max(1, Math.floor(max)), Number.MAX_SAFE_INTEGER);
+
+/**
+ * Required whole number from 1 to `max` (default `INT4_MAX`; raise it for a
+ * bigint column, up to `Number.MAX_SAFE_INTEGER`). Accepts numbers or numeric
+ * strings from inputs; a digit string too long to hold exactly fails the
+ * ceiling. Blank (including NaN from `valueAsNumber`) reports `message`.
+ */
+export function positiveInt(message: string = REQUIRED, max: number = INT4_MAX) {
+  const top = ceiling(max);
   return z.preprocess(
     toNumberInput,
     z
       .number({ required_error: message, invalid_type_error: 'Enter a whole number' })
       .int('Enter a whole number')
-      .positive('Must be 1 or more'),
+      .positive('Must be 1 or more')
+      .max(top, `Must be ${top} or less`),
   );
 }
 
-/** Optional whole number ≥ 1: blank → null. */
-export function optionalPositiveInt() {
+/** Optional whole number from 1 to `max` (default `INT4_MAX`): blank or NaN → null. */
+export function optionalPositiveInt(max: number = INT4_MAX) {
+  const top = ceiling(max);
   return z.preprocess(
     (v) => {
       const n = toNumberInput(v);
       return n === undefined ? null : n;
     },
-    z.number({ invalid_type_error: 'Enter a whole number' }).int('Enter a whole number').positive('Must be 1 or more').nullable(),
+    z
+      .number({ invalid_type_error: 'Enter a whole number' })
+      .int('Enter a whole number')
+      .positive('Must be 1 or more')
+      .max(top, `Must be ${top} or less`)
+      .nullable(),
   );
 }

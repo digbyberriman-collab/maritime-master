@@ -33,7 +33,12 @@ describe('normaliseError: Supabase / PostgREST', () => {
     ['23514', 'validation', "One of the values isn't allowed here."],
     ['22P02', 'validation', 'One of the values has the wrong format.'],
     ['40001', 'conflict', 'Someone else changed this at the same time. Reload and try again.'],
+    ['55P03', 'conflict', 'Someone else is working on this record. Try again in a moment.'],
+    ['57014', 'server', 'That took too long. Try again, or narrow the filters.'],
+    ['25P03', 'server', 'That took too long. Try again.'],
+    ['22003', 'validation', 'One of the numbers is too large.'],
     ['42P01', 'missing_feature', "This feature isn't switched on for your account yet."],
+    ['PGRST200', 'missing_feature', "This feature isn't switched on for your account yet."],
     ['PGRST205', 'missing_feature', "This feature isn't switched on for your account yet."],
     ['PGRST202', 'missing_feature', "This feature isn't switched on for your account yet."],
     ['PGRST301', 'auth', 'Your session has expired. Sign in again to continue.'],
@@ -63,6 +68,28 @@ describe('normaliseError: Supabase / PostgREST', () => {
   it('unknown codes fall back to the message', () => {
     expect(normaliseError(pg('XX999', 'Odd failure'))).toMatchObject({ kind: 'unknown', message: 'Odd failure', code: 'XX999' });
   });
+
+  it('server timeouts are classified by their code, never as a network problem', () => {
+    expect(normaliseError(pg('55P03', 'canceling statement due to lock timeout'))).toMatchObject({
+      kind: 'conflict',
+      code: '55P03',
+      message: 'Someone else is working on this record. Try again in a moment.',
+    });
+    expect(normaliseError(pg('57014', 'canceling statement due to statement timeout'))).toMatchObject({ kind: 'server', code: '57014' });
+    expect(normaliseError(pg('25P03', 'terminating connection due to idle-in-transaction timeout'))).toMatchObject({ kind: 'server', code: '25P03' });
+  });
+
+  it('an uncoded "timeout" message is not a network failure', () => {
+    const n = normaliseError({ message: 'Lock acquisition timeout on record' });
+    expect(n.kind).not.toBe('network');
+    expect(n).toMatchObject({ kind: 'unknown', message: 'Lock acquisition timeout on record' });
+  });
+
+  it('PGRST200 (embed of a table not live yet) keeps its code for diagnosis', () => {
+    const n = normaliseError(pg('PGRST200', "Could not find a relationship between 'crew' and 'vessel' in the schema cache"));
+    expect(n).toMatchObject({ kind: 'missing_feature', code: 'PGRST200' });
+    expect(n.details).toContain("between 'crew' and 'vessel'");
+  });
 });
 
 describe('normaliseError: other sources', () => {
@@ -70,6 +97,20 @@ describe('normaliseError: other sources', () => {
     for (const msg of ['Failed to fetch', 'NetworkError when attempting to fetch resource.', 'Load failed', 'TypeError: fetch failed']) {
       expect(normaliseError(new TypeError(msg))).toMatchObject({ kind: 'network', message: "Can't reach the server. Check the connection and try again." });
     }
+  });
+
+  it('a network string gets the network sentence, so kind and message agree', () => {
+    expect(normaliseError('Failed to fetch')).toMatchObject({ kind: 'network', message: "Can't reach the server. Check the connection and try again.", details: 'Failed to fetch' });
+    expect(normaliseError(new TypeError('Failed to fetch')).message).toBe(normaliseError('Failed to fetch').message);
+  });
+
+  it('a client-side request timeout reads as a connection problem', () => {
+    const timeout = Object.assign(new Error('signal timed out'), { name: 'TimeoutError' });
+    const aborted = Object.assign(new Error('The operation timed out.'), { name: 'AbortError' });
+    const cancelled = Object.assign(new Error('The user aborted a request.'), { name: 'AbortError' });
+    expect(normaliseError(timeout).kind).toBe('network');
+    expect(normaliseError(aborted).kind).toBe('network');
+    expect(normaliseError(cancelled).kind).toBe('unknown');
   });
 
   it('edge function errors', () => {
@@ -105,10 +146,11 @@ describe('normaliseError: other sources', () => {
     expect(normaliseError('   ', 'Fallback').message).toBe('Fallback');
   });
 
-  it('errorMessage and isMissingRelationError', () => {
+  it('errorMessage and isMissingRelationError (alias; the full table is in missingRelation.test.ts)', () => {
     expect(errorMessage(pg('23505'))).toBe('That already exists. Check for a duplicate and try again.');
     expect(isMissingRelationError(pg('42P01'))).toBe(true);
     expect(isMissingRelationError(pg('PGRST205'))).toBe(true);
+    expect(isMissingRelationError({ code: '', message: 'relation "rf_x" does not exist' })).toBe(true);
     expect(isMissingRelationError(pg('42501'))).toBe(false);
     expect(isMissingRelationError(null)).toBe(false);
   });

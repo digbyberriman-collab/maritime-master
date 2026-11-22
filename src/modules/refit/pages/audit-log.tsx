@@ -95,8 +95,8 @@ export default function AuditLogPage() {
     const tone = action.startsWith("vessel.renamed")
       ? "bg-warning/10 text-warning"
       : action.startsWith("vessel.")
-        ? "bg-ocean/10 text-ocean"
-        : "bg-secondary text-ink";
+        ? "bg-primary/10 text-primary"
+        : "bg-secondary text-foreground";
     return (
       <span
         className={`inline-block px-2 py-0.5 rounded-sm text-[11px] font-mono tracking-tight ${tone}`}
@@ -125,7 +125,7 @@ export default function AuditLogPage() {
             <span className="text-muted-foreground">{it.field}:</span>{" "}
             <span className="line-through text-muted-foreground">{it.old ?? "∅"}</span>{" "}
             <span aria-hidden>→</span>{" "}
-            <span className="font-medium text-ink">{it.next ?? "∅"}</span>
+            <span className="font-medium text-foreground">{it.next ?? "∅"}</span>
           </div>
         ))}
       </div>
@@ -142,13 +142,13 @@ export default function AuditLogPage() {
             <div className="inline-flex border border-black/10 rounded-sm overflow-hidden text-xs">
               <button
                 onClick={() => setFilter("vessel")}
-                className={`px-3 py-1.5 ${filter === "vessel" ? "bg-navy text-white" : "bg-white hover:bg-secondary"}`}
+                className={`px-3 py-1.5 ${filter === "vessel" ? "bg-primary text-primary-foreground" : "bg-white hover:bg-secondary"}`}
               >
                 Vessel changes
               </button>
               <button
                 onClick={() => setFilter("all")}
-                className={`px-3 py-1.5 border-l border-black/10 ${filter === "all" ? "bg-navy text-white" : "bg-white hover:bg-secondary"}`}
+                className={`px-3 py-1.5 border-l border-black/10 ${filter === "all" ? "bg-primary text-primary-foreground" : "bg-white hover:bg-secondary"}`}
               >
                 All entries
               </button>
@@ -186,7 +186,7 @@ export default function AuditLogPage() {
                   )}
                   {error && !loading && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-danger">
+                      <td colSpan={5} className="px-4 py-8 text-center text-destructive">
                         {error}
                       </td>
                     </tr>

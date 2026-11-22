@@ -26,7 +26,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { loadFixtures } from './lib/fixtures.mjs';
 import { createMockState, installSupabaseMock, FAKE_PUBLISHABLE_KEY } from './lib/supabase-mock.mjs';
-import { inspectPage, classify, isHarnessNoise, isReactDevWarning, formatConsoleArgs } from './lib/inspect.mjs';
+import { inspectPage, classify, captureWarnings, isHarnessNoise, isReactDevWarning, formatConsoleArgs } from './lib/inspect.mjs';
 import { parseArgs, normaliseRoutes, selectRoutes, viewportFor, HELP } from './lib/options.mjs';
 import { loadPlaywright } from './lib/playwright.mjs';
 
@@ -231,6 +231,10 @@ async function capture(browser, job, ctx) {
     await page
       .waitForFunction(() => document.querySelectorAll('.animate-spin').length === 0, null, { timeout: 8_000 })
       .catch(() => notes.push('a spinner was still showing'));
+    // Skeletons announce themselves with aria-busy; wait for them the same way.
+    await page
+      .waitForFunction(() => !document.querySelector('#root [aria-busy="true"]'), null, { timeout: 8_000 })
+      .catch(() => notes.push('a skeleton was still showing'));
     await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => {});
     await page.evaluate(() => document.fonts?.ready).catch(() => {});
     await page.waitForTimeout(options.settle);
@@ -267,7 +271,10 @@ async function capture(browser, job, ctx) {
     consoleErrors,
     pageErrors,
     navigationError,
+    viewportWidth: viewport.width,
   });
+  // Waits that gave up and runaway request volume would otherwise pass as ok.
+  grade.warnings.push(...captureWarnings({ notes, mockRequests: state.log.length }));
   if (inspection && !inspection.themeClass.split(/\s+/).includes(theme)) grade.warnings.push(`theme class is "${inspection.themeClass}"`);
   if (state.log.length === 0 && route.auth !== false) {
     grade.warnings.push(`no request reached the mock at ${options.supabaseUrl}: is the server running with VITE_SUPABASE_URL=${options.supabaseUrl}?`);

@@ -100,12 +100,16 @@ const EntryDetail: React.FC<{ entry: EntryView }> = ({ entry }) => (
   </article>
 );
 
-/** Printable book: cover, section index, sealed pages, record details and blank ruled sections. */
+/**
+ * Printable book: cover, section index, sealed pages, record details and blank ruled sections.
+ * The root is `.light` paper (gap/10 DS23): Daylight tokens, and the legacy dark
+ * compat layer leaves the subtree alone, so the preview is white with black rules.
+ */
 const PrintBook: React.FC<Props> = ({ book, volume, entries, pages, onExit }) => {
   const sections = volume.template.sections;
   const forPage = (p: PageRow) => p.entry_ids.map((id) => entries.find((e) => e.id === id)).filter((e): e is EntryView => Boolean(e));
   return (
-    <div id="logbook-print" className="fixed inset-0 z-50 overflow-auto bg-white p-6 text-black print:static print:p-0">
+    <div id="logbook-print" className="light fixed inset-0 z-50 overflow-auto bg-white p-6 text-black print:static print:p-0">
       <style>{`@media print { body * { visibility: hidden; } #logbook-print, #logbook-print * { visibility: visible; } #logbook-print { position: absolute; inset: 0; } .print-controls { display: none; } }`}</style>
       <div className="print-controls mb-4 flex gap-2">
         <Button type="button" onClick={() => window.print()}><Printer className="mr-1 h-4 w-4" /> Print / save PDF</Button>

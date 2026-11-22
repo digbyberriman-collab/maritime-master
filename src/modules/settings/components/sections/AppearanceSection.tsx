@@ -7,9 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import * as RadioGroupPrimitive from '@radix-ui/react-radio-group';
 import { useToast } from '@/shared/hooks/use-toast';
+import { notify } from '@/shared/lib/notify';
 import { cn } from '@/lib/utils';
-import { DEFAULT_THEME, isThemePreference, type Density, type ThemePreference } from '@/components/ui/theme-config';
+import { DEFAULT_THEME, isDensity, isThemePreference, type Density, type ThemePreference } from '@/components/ui/theme-config';
 import { useDensity } from '@/components/ui/use-density';
 import SettingsCard from '../common/SettingsCard';
 
@@ -115,11 +117,9 @@ const AppearanceSection: React.FC = () => {
       .from('user_preferences')
       .upsert({ user_id: user.id, theme: next, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
     if (error) {
-      console.error('Error saving theme preference:', error);
-      toast({
+      notify.error(error, {
         title: 'Theme applied on this device only',
-        description: 'It could not be saved to your profile. Try again later.',
-        variant: 'destructive',
+        fallback: 'It could not be saved to your profile. Try again later.',
       });
     }
   };
@@ -214,43 +214,49 @@ const AppearanceSection: React.FC = () => {
         title="Theme"
         description="Applies straight away and is saved to your profile"
       >
-        <div role="radiogroup" aria-label="Theme" className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Radix radio group: one tab stop, arrow keys move the selection (WAI-ARIA radio pattern). */}
+        <RadioGroupPrimitive.Root
+          value={theme}
+          onValueChange={(value) => {
+            if (isThemePreference(value)) void chooseTheme(value);
+          }}
+          aria-label="Theme"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+        >
           {themes.map((t) => {
             const Icon = t.icon;
             const isSelected = theme === t.id;
 
             return (
-              <button
-                key={t.id}
-                type="button"
-                role="radio"
-                aria-checked={isSelected}
-                onClick={() => void chooseTheme(t.id)}
-                className={cn(
-                  'relative flex flex-col items-center gap-3 p-4 rounded-lg border-2 transition-colors duration-quick ease-tide focus-ring',
-                  'hover:border-primary/50',
-                  isSelected ? 'border-primary bg-signal-muted' : 'border-border'
-                )}
-              >
-                {isSelected && (
-                  <div className="absolute top-2 right-2">
-                    <Check className="h-4 w-4 text-primary" />
+              <RadioGroupPrimitive.Item key={t.id} value={t.id} asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    'relative flex flex-col items-center gap-3 p-4 rounded-lg border-2 transition-colors duration-quick ease-tide focus-ring',
+                    'hover:border-primary/50',
+                    isSelected ? 'border-primary bg-signal-muted' : 'border-border'
+                  )}
+                >
+                  {isSelected && (
+                    <div className="absolute top-2 right-2">
+                      <Check className="h-4 w-4 text-primary" />
+                    </div>
+                  )}
+                  <div className={cn(
+                    'p-3 rounded-full',
+                    isSelected ? 'bg-primary/10' : 'bg-muted'
+                  )}>
+                    <Icon className={cn('h-6 w-6', isSelected ? 'text-primary' : 'text-muted-foreground')} />
                   </div>
-                )}
-                <div className={cn(
-                  'p-3 rounded-full',
-                  isSelected ? 'bg-primary/10' : 'bg-muted'
-                )}>
-                  <Icon className={cn('h-6 w-6', isSelected ? 'text-primary' : 'text-muted-foreground')} />
-                </div>
-                <div className="text-center">
-                  <p className="font-medium">{t.label}</p>
-                  <p className="text-xs text-muted-foreground">{t.description}</p>
-                </div>
-              </button>
+                  <div className="text-center">
+                    <p className="font-medium">{t.label}</p>
+                    <p className="text-xs text-muted-foreground">{t.description}</p>
+                  </div>
+                </button>
+              </RadioGroupPrimitive.Item>
             );
           })}
-        </div>
+        </RadioGroupPrimitive.Root>
       </SettingsCard>
 
       {/* Density */}
@@ -258,34 +264,39 @@ const AppearanceSection: React.FC = () => {
         title="Density"
         description="Row and control sizes. Saved on this device."
       >
-        <div role="radiogroup" aria-label="Density" className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <RadioGroupPrimitive.Root
+          value={density}
+          onValueChange={(value) => {
+            if (isDensity(value)) setDensity(value);
+          }}
+          aria-label="Density"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-4"
+        >
           {densities.map((d) => {
             const Icon = d.icon;
             const isSelected = density === d.id;
 
             return (
-              <button
-                key={d.id}
-                type="button"
-                role="radio"
-                aria-checked={isSelected}
-                onClick={() => setDensity(d.id)}
-                className={cn(
-                  'relative flex items-center gap-3 p-4 rounded-lg border-2 text-left transition-colors duration-quick ease-tide focus-ring',
-                  'hover:border-primary/50',
-                  isSelected ? 'border-primary bg-signal-muted' : 'border-border'
-                )}
-              >
-                <Icon className={cn('h-5 w-5 shrink-0', isSelected ? 'text-primary' : 'text-muted-foreground')} />
-                <div className="min-w-0">
-                  <p className="font-medium">{d.label}</p>
-                  <p className="text-xs text-muted-foreground">{d.description}</p>
-                </div>
-                {isSelected && <Check className="ml-auto h-4 w-4 shrink-0 text-primary" />}
-              </button>
+              <RadioGroupPrimitive.Item key={d.id} value={d.id} asChild>
+                <button
+                  type="button"
+                  className={cn(
+                    'relative flex items-center gap-3 p-4 rounded-lg border-2 text-left transition-colors duration-quick ease-tide focus-ring',
+                    'hover:border-primary/50',
+                    isSelected ? 'border-primary bg-signal-muted' : 'border-border'
+                  )}
+                >
+                  <Icon className={cn('h-5 w-5 shrink-0', isSelected ? 'text-primary' : 'text-muted-foreground')} />
+                  <div className="min-w-0">
+                    <p className="font-medium">{d.label}</p>
+                    <p className="text-xs text-muted-foreground">{d.description}</p>
+                  </div>
+                  {isSelected && <Check className="ml-auto h-4 w-4 shrink-0 text-primary" />}
+                </button>
+              </RadioGroupPrimitive.Item>
             );
           })}
-        </div>
+        </RadioGroupPrimitive.Root>
       </SettingsCard>
 
       {/* Layout Options */}

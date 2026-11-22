@@ -8,10 +8,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { APPROVAL_ROUTES, CATALOG_TOTALS, LOGBOOK_BOOKS, getBook, referenceFor } from '../lib/catalog';
 import { profiles, templateRevision } from '../lib/templates';
+import { useLogbookPath } from '../lib/useLogbookPath';
 
 /** CISR / MCA comparison, source coverage and the sourced approval register. */
 const LogbookAssurance: React.FC = () => {
   const [params, setParams] = useSearchParams();
+  const bookPath = useLogbookPath();
   const book = getBook(params.get('book')) ?? LOGBOOK_BOOKS[0];
   const tab = params.get('tab') ?? 'comparison';
   const setBook = (id: string) => { params.set('book', id); setParams(params, { replace: true }); };
@@ -20,7 +22,7 @@ const LogbookAssurance: React.FC = () => {
   return (
     <DashboardLayout>
       <div className="space-y-5 p-1">
-        <Button asChild variant="ghost" size="sm" className="-ml-2"><Link to={`/vessel/logbooks/${book.slug}`}><ArrowLeft className="mr-1 h-4 w-4" /> Back to {book.title}</Link></Button>
+        <Button asChild variant="ghost" size="sm" className="-ml-2"><Link to={bookPath(book.slug)}><ArrowLeft className="mr-1 h-4 w-4" /> Back to {book.title}</Link></Button>
         <div className="flex items-center gap-3">
           <ShieldAlert className="h-7 w-7 text-primary" />
           <div>
@@ -73,7 +75,7 @@ const LogbookAssurance: React.FC = () => {
                 <TableBody>
                   {LOGBOOK_BOOKS.map((b) => (
                     <TableRow key={b.id}>
-                      <TableCell><Link to={`/vessel/logbooks/${b.slug}`} className="font-medium text-primary hover:underline">{b.title}</Link><span className="block text-xs text-muted-foreground">{b.code} · {b.statutory ? 'Statutory' : 'Operational'}</span></TableCell>
+                      <TableCell><Link to={bookPath(b.slug)} className="font-medium text-primary hover:underline">{b.title}</Link><span className="block text-xs text-muted-foreground">{b.code} · {b.statutory ? 'Statutory' : 'Operational'}</span></TableCell>
                       <TableCell><strong>{b.basis}</strong><span className="block text-xs text-muted-foreground">{referenceFor(b).note}</span></TableCell>
                       <TableCell>{b.sections.length}</TableCell>
                       <TableCell className="text-xs">{b.roles.join(', ')} · master</TableCell>

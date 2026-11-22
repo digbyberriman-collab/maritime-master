@@ -21,6 +21,17 @@ import {
 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Link } from "react-router-dom";
+import type { Tables } from "@/integrations/supabase/types";
+
+// Row types from the generated schema. The module's client is still untyped
+// (src/modules/new-build/lib/supabase.ts), so the queries below declare them.
+type Material = Tables<"nb_materials">;
+type MaterialStatusChange = Tables<"nb_material_status_history">;
+type MaterialUsage = Tables<"nb_material_usages">;
+type SupplierOption = Pick<Tables<"nb_suppliers">, "id" | "name" | "company">;
+type InteriorArea = Tables<"nb_areas">;
+
+const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 // --- constants ---
 const MATERIAL_CATEGORIES = [
@@ -151,7 +162,7 @@ export default function InteriorMaterials() {
   const projectId = currentProject?.id;
 
   // queries
-  const { data: interiorAreas = [] } = useQuery({
+  const { data: interiorAreas = [] } = useQuery<InteriorArea[]>({
     queryKey: ["interior-areas", projectId],
     queryFn: async () => {
       if (!projectId) return [];
@@ -162,7 +173,7 @@ export default function InteriorMaterials() {
     enabled: !!projectId,
   });
 
-  const { data: suppliers = [] } = useQuery({
+  const { data: suppliers = [] } = useQuery<SupplierOption[]>({
     queryKey: ["suppliers", projectId],
     queryFn: async () => {
       const { data, error } = await supabase.from("nb_suppliers").select("id,name,company").eq("project_id", projectId!);
@@ -172,7 +183,7 @@ export default function InteriorMaterials() {
     enabled: !!projectId,
   });
 
-  const { data: materials = [] } = useQuery({
+  const { data: materials = [] } = useQuery<Material[]>({
     queryKey: ["materials", projectId],
     queryFn: async () => {
       const { data, error } = await supabase.from("nb_materials").select("*").eq("project_id", projectId!).order("name");
@@ -182,7 +193,7 @@ export default function InteriorMaterials() {
     enabled: !!projectId,
   });
 
-  const { data: usages = [] } = useQuery({
+  const { data: usages = [] } = useQuery<MaterialUsage[]>({
     queryKey: ["material-usages", projectId],
     queryFn: async () => {
       const { data, error } = await supabase.from("nb_material_usages").select("*");
@@ -192,10 +203,10 @@ export default function InteriorMaterials() {
     enabled: !!projectId,
   });
 
-  const { data: statusHistory = [] } = useQuery({
+  const { data: statusHistory = [] } = useQuery<MaterialStatusChange[]>({
     queryKey: ["material-status-history", projectId],
     queryFn: async () => {
-      const materialIds = (materials as any[]).map((m) => m.id);
+      const materialIds = materials.map((m) => m.id);
       if (materialIds.length === 0) return [];
       const { data, error } = await supabase
         .from("nb_material_status_history")
@@ -209,15 +220,15 @@ export default function InteriorMaterials() {
   });
 
   const lastStatusChange = useMemo(() => {
-    const map = new Map<string, any>();
-    for (const h of statusHistory as any[]) {
+    const map = new Map<string, MaterialStatusChange>();
+    for (const h of statusHistory) {
       if (!map.has(h.material_id)) map.set(h.material_id, h);
     }
     return map;
   }, [statusHistory]);
 
   const historyForMaterial = (id: string) =>
-    (statusHistory as any[]).filter((h) => h.material_id === id);
+    statusHistory.filter((h) => h.material_id === id);
 
   // mutations
   const [materialDialog, setMaterialDialog] = useState(false);
@@ -364,8 +375,8 @@ export default function InteriorMaterials() {
 
   // Build parent→children map
   const childrenMap = useMemo(() => {
-    const map = new Map<string, any[]>();
-    for (const m of materials as any[]) {
+    const map = new Map<string, Material[]>();
+    for (const m of materials) {
       if (m.parent_material_id) {
         if (!map.has(m.parent_material_id)) map.set(m.parent_material_id, []);
         map.get(m.parent_material_id)!.push(m);
@@ -374,7 +385,7 @@ export default function InteriorMaterials() {
     return map;
   }, [materials]);
 
-  const passesFilters = (m: any) => {
+  const passesFilters = (m: Material) => {
     if (statusFilter !== "all") {
       const ms = m.selection_status || "Pending";
       if (statusFilter === "Pending") { if (!isPendingStatus(ms)) return false; }
@@ -394,7 +405,7 @@ export default function InteriorMaterials() {
 
   // Filtered top-level materials (no parent, or parent doesn't exist in this project)
   const filteredMaterials = useMemo(() => {
-    const allMats = materials as any[];
+    const allMats = materials;
     const matIds = new Set(allMats.map((m) => m.id));
 
     const statusRank = (s?: string | null) => {
@@ -435,20 +446,20 @@ export default function InteriorMaterials() {
 
   // Parent materials (those that have children) — for the "Parent Material" picker
   const parentCandidates = useMemo(() => {
-    return (materials as any[]).filter((m) => !m.parent_material_id);
+    return materials.filter((m) => !m.parent_material_id);
   }, [materials]);
 
-  const allCategories = useMemo(() => Array.from(new Set((materials as any[]).map((m) => m.category).filter(Boolean))).sort(), [materials]);
-  const allProposers = useMemo(() => Array.from(new Set((materials as any[]).map((m) => m.proposed_by).filter(Boolean))).sort(), [materials]);
-  const compareMaterials = useMemo(() => (materials as any[]).filter((m) => selectedForCompare.includes(m.id)), [materials, selectedForCompare]);
-  const detailMaterial = useMemo(() => (materials as any[]).find((m) => m.id === detailMaterialId) || null, [materials, detailMaterialId]);
+  const allCategories = useMemo(() => Array.from(new Set(materials.map((m) => m.category).filter(Boolean))).sort(), [materials]);
+  const allProposers = useMemo(() => Array.from(new Set(materials.map((m) => m.proposed_by).filter(Boolean))).sort(), [materials]);
+  const compareMaterials = useMemo(() => materials.filter((m) => selectedForCompare.includes(m.id)), [materials, selectedForCompare]);
+  const detailMaterial = useMemo(() => materials.find((m) => m.id === detailMaterialId) || null, [materials, detailMaterialId]);
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     let withSwatch = 0;
     let withoutSwatch = 0;
     let totalPending = 0;
-    for (const m of materials as any[]) {
+    for (const m of materials) {
       const s = m.selection_status || "Pending";
       counts[s] = (counts[s] || 0) + 1;
       if (isPendingStatus(s)) totalPending++;
@@ -475,7 +486,7 @@ export default function InteriorMaterials() {
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });
 
-  const openEditMaterial = (m: any) => {
+  const openEditMaterial = (m: Material) => {
     setEditingMaterialId(m.id);
     setMaterialForm({
       name: m.name, category: m.category || "", brand: m.brand || "", colour: m.colour || "",
@@ -504,8 +515,8 @@ export default function InteriorMaterials() {
       if (error) throw error;
       setMaterialForm((f) => ({ ...f, swatch_storage_path: path }));
       toast({ title: "Swatch uploaded" });
-    } catch (e: any) {
-      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+    } catch (e: unknown) {
+      toast({ title: "Upload failed", description: errorText(e), variant: "destructive" });
     } finally {
       setSwatchUploading(false);
     }
@@ -534,8 +545,8 @@ export default function InteriorMaterials() {
       }
       setMaterialForm((f) => ({ ...f, photos: [...(f.photos || []), ...uploaded] }));
       toast({ title: `${uploaded.length} photo${uploaded.length !== 1 ? "s" : ""} added` });
-    } catch (e: any) {
-      toast({ title: "Upload failed", description: e.message, variant: "destructive" });
+    } catch (e: unknown) {
+      toast({ title: "Upload failed", description: errorText(e), variant: "destructive" });
     } finally {
       setSwatchUploading(false);
     }
@@ -611,9 +622,9 @@ export default function InteriorMaterials() {
   });
 
   const areaName = (id?: string | null) => interiorAreas.find((a) => a.id === id)?.name || "—";
-  const supplierLabel = (m: any) => {
+  const supplierLabel = (m: Material) => {
     if (m.supplier_id) {
-      const s = suppliers.find((s: any) => s.id === m.supplier_id);
+      const s = suppliers.find((s) => s.id === m.supplier_id);
       return s ? `${s.name}${s.company ? ` (${s.company})` : ""}` : m.supplier_name;
     }
     return m.supplier_name || null;
@@ -622,7 +633,7 @@ export default function InteriorMaterials() {
   if (!projectId) return <p className="text-muted-foreground">Select a project.</p>;
 
   // --- GRID CARD (reusable) ---
-  const renderGridCard = (m: any, isChild = false) => {
+  const renderGridCard = (m: Material, isChild = false) => {
     const isChecked = selectedForCompare.includes(m.id);
     const url = swatchUrl(m.swatch_storage_path);
     return (
@@ -673,8 +684,8 @@ export default function InteriorMaterials() {
   };
 
   // --- LIST CARD (reusable) ---
-  const renderListCard = (m: any, isChild = false) => {
-    const matUsages = usages.filter((u: any) => u.material_id === m.id);
+  const renderListCard = (m: Material, isChild = false) => {
+    const matUsages = usages.filter((u) => u.material_id === m.id);
     const isChecked = selectedForCompare.includes(m.id);
     const label = supplierLabel(m);
     return (
@@ -800,7 +811,7 @@ export default function InteriorMaterials() {
                         <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">—</SelectItem>
-                          {suppliers.filter((s: any) => s.id).map((s: any) => (
+                          {suppliers.filter((s) => s.id).map((s) => (
                             <SelectItem key={s.id} value={s.id}>{s.name}{s.company ? ` (${s.company})` : ""}</SelectItem>
                           ))}
                         </SelectContent>
@@ -1049,7 +1060,7 @@ export default function InteriorMaterials() {
             /* ─── GRID VIEW (mood-board with folders) ─── */
             <div className="space-y-4">
               {/* Folder materials */}
-              {filteredMaterials.filter((m: any) => (getFilteredChildren(m.id)).length > 0).map((m: any) => {
+              {filteredMaterials.filter((m: Material) => (getFilteredChildren(m.id)).length > 0).map((m: Material) => {
                 const children = getFilteredChildren(m.id);
                 const isExpanded = expandedFolders.has(m.id);
                 return (
@@ -1089,7 +1100,7 @@ export default function InteriorMaterials() {
                     {isExpanded && (
                       <div className="px-4 pb-4 pt-1">
                         <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                          {children.map((child: any) => renderGridCard(child, true))}
+                          {children.map((child: Material) => renderGridCard(child, true))}
                         </div>
                       </div>
                     )}
@@ -1098,11 +1109,11 @@ export default function InteriorMaterials() {
               })}
               {/* Standalone (non-folder) materials in a single grid */}
               {(() => {
-                const standalones = filteredMaterials.filter((m: any) => (getFilteredChildren(m.id)).length === 0);
+                const standalones = filteredMaterials.filter((m: Material) => (getFilteredChildren(m.id)).length === 0);
                 if (standalones.length === 0) return null;
                 return (
                   <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                    {standalones.map((m: any) => renderGridCard(m))}
+                    {standalones.map((m: Material) => renderGridCard(m))}
                   </div>
                 );
               })()}
@@ -1111,7 +1122,7 @@ export default function InteriorMaterials() {
             /* ─── LIST VIEW (compact with folders) ─── */
             <div className="space-y-3">
               {/* Folder materials */}
-              {filteredMaterials.filter((m: any) => (getFilteredChildren(m.id)).length > 0).map((m: any) => {
+              {filteredMaterials.filter((m: Material) => (getFilteredChildren(m.id)).length > 0).map((m: Material) => {
                 const children = getFilteredChildren(m.id);
                 const isExpanded = expandedFolders.has(m.id);
                 return (
@@ -1151,7 +1162,7 @@ export default function InteriorMaterials() {
                     {isExpanded && (
                       <div className="px-4 pb-4 pt-1">
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                          {children.map((child: any) => renderListCard(child, true))}
+                          {children.map((child: Material) => renderListCard(child, true))}
                         </div>
                       </div>
                     )}
@@ -1160,7 +1171,7 @@ export default function InteriorMaterials() {
               })}
               {/* Standalone materials */}
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {filteredMaterials.filter((m: any) => (getFilteredChildren(m.id)).length === 0).map((m: any) => renderListCard(m))}
+                {filteredMaterials.filter((m: Material) => (getFilteredChildren(m.id)).length === 0).map((m: Material) => renderListCard(m))}
               </div>
             </div>
           )}
@@ -1194,10 +1205,10 @@ export default function InteriorMaterials() {
               {detailMaterial && (() => {
                 const m = detailMaterial;
                 const url = swatchUrl(m.swatch_storage_path);
-                const matUsages = usages.filter((u: any) => u.material_id === m.id);
+                const matUsages = usages.filter((u) => u.material_id === m.id);
                 const label = supplierLabel(m);
                 const children = childrenMap.get(m.id) || [];
-                const parentMat = m.parent_material_id ? (materials as any[]).find((p) => p.id === m.parent_material_id) : null;
+                const parentMat = m.parent_material_id ? materials.find((p) => p.id === m.parent_material_id) : null;
                 return (
                   <>
                     <SheetHeader>
@@ -1283,7 +1294,7 @@ export default function InteriorMaterials() {
                       <div className="mt-3">
                         <Label className="text-xs text-muted-foreground">Status History</Label>
                         <div className="mt-1 max-h-40 overflow-y-auto space-y-1">
-                          {historyForMaterial(m.id).map((h: any) => (
+                          {historyForMaterial(m.id).map((h) => (
                             <div key={h.id} className="flex items-center gap-2 text-[11px] py-1 border-b border-muted last:border-0">
                               <span className="text-muted-foreground shrink-0">
                                 {new Date(h.changed_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
@@ -1367,7 +1378,7 @@ export default function InteriorMaterials() {
                           </div>
                         </div>
                         <div className="space-y-1.5">
-                          {children.map((child: any) => (
+                          {children.map((child: Material) => (
                             <div
                               key={child.id}
                               className="w-full flex items-center gap-2.5 p-2 rounded-md border hover:bg-muted/50 transition-colors group"
@@ -1433,7 +1444,7 @@ export default function InteriorMaterials() {
                       <p className="text-xs text-muted-foreground">No locations recorded.</p>
                     ) : (
                       <ul className="space-y-1.5 text-sm">
-                        {matUsages.map((u: any) => (
+                        {matUsages.map((u) => (
                           <li key={u.id} className="flex items-start justify-between gap-2 group">
                             <span>
                               <span className="font-medium">{areaName(u.area_id)}</span>
@@ -1504,7 +1515,7 @@ export default function InteriorMaterials() {
               <p className="text-xs text-muted-foreground">
                 Pick a material to move under{" "}
                 <span className="font-medium text-foreground">
-                  {(materials as any[]).find((m) => m.id === assignChildDialogParentId)?.name || "this folder"}
+                  {materials.find((m) => m.id === assignChildDialogParentId)?.name || "this folder"}
                 </span>.
               </p>
               <Input
@@ -1518,8 +1529,8 @@ export default function InteriorMaterials() {
                   const parentId = assignChildDialogParentId;
                   if (!parentId) return null;
                   const parentChildren = childrenMap.get(parentId) || [];
-                  const childIds = new Set(parentChildren.map((c: any) => c.id));
-                  const candidates = (materials as any[]).filter((m) => {
+                  const childIds = new Set(parentChildren.map((c: Material) => c.id));
+                  const candidates = materials.filter((m) => {
                     if (m.id === parentId) return false;
                     if (childIds.has(m.id)) return false;
                     // Don't allow assigning a material that itself has children (would create nesting >1 deep)
@@ -1533,7 +1544,7 @@ export default function InteriorMaterials() {
                   if (candidates.length === 0) {
                     return <p className="text-sm text-muted-foreground py-4 text-center">No matching materials found.</p>;
                   }
-                  return candidates.map((m: any) => (
+                  return candidates.map((m: Material) => (
                     <button
                       key={m.id}
                       type="button"
@@ -1550,7 +1561,7 @@ export default function InteriorMaterials() {
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{m.name}</p>
                         <p className="text-[10px] text-muted-foreground truncate">
-                          {[m.category, m.brand, m.parent_material_id ? `Under: ${(materials as any[]).find((p) => p.id === m.parent_material_id)?.name || "another"}` : null].filter(Boolean).join(" · ")}
+                          {[m.category, m.brand, m.parent_material_id ? `Under: ${materials.find((p) => p.id === m.parent_material_id)?.name || "another"}` : null].filter(Boolean).join(" · ")}
                         </p>
                       </div>
                       <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${statusDot(m.selection_status)}`} />
@@ -1578,7 +1589,7 @@ export default function InteriorMaterials() {
                     <thead>
                       <tr className="border-b">
                         <th className="text-left p-2 sticky left-0 bg-background z-10 min-w-[160px]">Property</th>
-                        {compareMaterials.map((m: any) => (
+                        {compareMaterials.map((m: Material) => (
                           <th key={m.id} className="text-left p-2 min-w-[220px] align-top">
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
@@ -1593,7 +1604,7 @@ export default function InteriorMaterials() {
                       </tr>
                       <tr className="border-b bg-muted/40">
                         <th className="text-left p-2 sticky left-0 bg-muted/40 z-10 font-normal text-xs text-muted-foreground">Status</th>
-                        {compareMaterials.map((m: any) => (
+                        {compareMaterials.map((m: Material) => (
                           <th key={m.id} className="p-2 font-normal">
                             <Select value={m.selection_status || "Pending"} onValueChange={(v) => updateMaterialStatus.mutate({ id: m.id, status: v })}>
                               <SelectTrigger className={`h-8 text-xs ${statusTone(m.selection_status)}`}><SelectValue /></SelectTrigger>
@@ -1612,12 +1623,12 @@ export default function InteriorMaterials() {
                     </thead>
                     <tbody>
                       {COMPARE_PROPERTIES.map((p) => {
-                        const anyValue = compareMaterials.some((m: any) => m[p.key]);
+                        const anyValue = compareMaterials.some((m: Material) => m[p.key]);
                         if (!anyValue) return null;
                         return (
                           <tr key={p.key} className="border-b align-top">
                             <td className="p-2 font-medium text-xs text-muted-foreground sticky left-0 bg-background z-10">{p.label}</td>
-                            {compareMaterials.map((m: any) => (
+                            {compareMaterials.map((m: Material) => (
                               <td key={m.id} className="p-2 text-xs whitespace-pre-wrap">{m[p.key] || <span className="text-muted-foreground">—</span>}</td>
                             ))}
                           </tr>

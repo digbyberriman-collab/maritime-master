@@ -8,9 +8,15 @@
  * whole app down at load): each problem is recorded in `problems`, the
  * offending entry is skipped, and src/test/config/registry.test.tsx fails
  * while any problem is left.
+ *
+ * Record kinds are validated by registering them into a record-kind
+ * registry built here (gap/08 REG1; DECISIONS G7): an invalid definition or
+ * a reference prefix used twice becomes a problem. `./modules.ts` then seeds
+ * the app-wide `recordKinds` registry from the kinds that passed.
  */
 import { matchPath } from 'react-router-dom';
 import { isNavSlot, type NavSlotId } from '@/config/navSlots';
+import { RecordKindError, createRecordKindRegistry, type RecordKindRegistry } from '@/lib/records/registry';
 import {
   isRedirectDef,
   type AlertRoute,
@@ -109,12 +115,24 @@ function checkRoute(def: RouteDef, manifest: ModuleManifest): string[] {
   return out;
 }
 
+export interface BuildRegistryOptions {
+  /**
+   * The record-kind registry manifest kinds are validated into. Default: a
+   * fresh one per build, so the builder stays pure.
+   */
+  recordKindRegistry?: RecordKindRegistry;
+}
+
 /**
  * Collect manifests into one registry. Accepts the glob result
  * (`{ '<path>/module.ts': manifest }`) or a plain list (tests).
  */
-export function buildRegistry(source: Record<string, ModuleManifest> | readonly ModuleManifest[]): ModuleRegistry {
+export function buildRegistry(
+  source: Record<string, ModuleManifest> | readonly ModuleManifest[],
+  options: BuildRegistryOptions = {},
+): ModuleRegistry {
   const problems: string[] = [];
+  const kindRegistry = options.recordKindRegistry ?? createRecordKindRegistry();
   const entries: [string | null, ModuleManifest][] = Array.isArray(source)
     ? (source as readonly ModuleManifest[]).map((m) => [null, m])
     : Object.entries(source as Record<string, ModuleManifest>).map(([key, m]) => [moduleFolder(key), m]);
@@ -192,12 +210,25 @@ export function buildRegistry(source: Record<string, ModuleManifest> | readonly 
     }
     for (const kind of manifest.recordKinds ?? []) {
       const owner = kindKeys.get(kind.key);
-      if (owner) problems.push(`${manifest.id}: record kind ${kind.key} is already registered by ${owner}`);
-      else if (kind.moduleKey !== manifest.id) problems.push(`${manifest.id}: record kind ${kind.key} belongs to ${kind.moduleKey}`);
-      else {
-        kindKeys.set(kind.key, manifest.id);
-        recordKinds.push({ ...kind, moduleId: manifest.id });
+      if (owner) {
+        problems.push(`${manifest.id}: record kind ${kind.key} is already registered by ${owner}`);
+        continue;
       }
+      if (kind.moduleKey !== manifest.id) {
+        problems.push(`${manifest.id}: record kind ${kind.key} belongs to ${kind.moduleKey}`);
+        continue;
+      }
+      try {
+        kindRegistry.register(kind);
+      } catch (e) {
+        if (e instanceof RecordKindError) {
+          problems.push(`${manifest.id}: ${e.message}`);
+          continue;
+        }
+        throw e;
+      }
+      kindKeys.set(kind.key, manifest.id);
+      recordKinds.push({ ...kind, moduleId: manifest.id });
     }
   }
 

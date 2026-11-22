@@ -80,7 +80,7 @@ Each capture gets a status:
 | Status | When |
 |---|---|
 | `fail` | The ErrorBoundary rendered ("This part of the page failed to render"), the page was blank, the stale-chunk recovery panel showed, an uncaught page error fired, navigation failed, or a signed-in route ended on `/auth` |
-| `warn` | Console errors, "Something went wrong" text outside the boundary, an AccessDenied card, a spinner that never cleared, or an unexpected redirect |
+| `warn` | Console errors, "Something went wrong" text outside the boundary, an AccessDenied card, a spinner or skeleton (`aria-busy`) that never cleared, a wait that gave up (network never idle, `waitFor` selector not found, screenshot failed), more than 500 mock requests in one capture ("runaway fetching"), horizontal overflow of `main` or the page at a width under 768 px, or an unexpected redirect |
 | `ok` | None of the above |
 
 React development warnings (`Warning: …`) are listed separately under `reactWarnings` and do not change the status. The exception is "Maximum update depth exceeded", which counts as a console error.
@@ -205,6 +205,14 @@ Use `--external live` on a machine with direct internet access to load everythin
 ```bash
 node --test scripts/visual/test/*.test.mjs
 ```
+
+CI (`.github/workflows/ci.yml`, job `check`, step "Visual harness unit tests") runs the two suites that need no browser:
+
+```bash
+node --test scripts/visual/test/harness.test.mjs scripts/visual/test/postgrest.test.mjs
+```
+
+The browser suite, `inspect.browser.test.mjs`, needs Playwright and a browser, so it runs by hand only.
 
 The tests cover:
 

@@ -56,13 +56,20 @@ const hrisTree: NavChild[] = [
     L('Candidates', hrisRecruit, hrView),
     L('Onboarding', hrisRecruit, hrView),
   ], { icon: Search, slug: 'recruitment', ...hrView }),
+  // The planner pages moved into the vessel scope (and the Fleet planner for
+  // fleet users); these leaves are explicit exits from the workspace
+  // (gap/04 implementation notes: the HRIS Leave & Rotation leaves link into
+  // the vessel planner). They keep their old URLs, which redirect for users
+  // with a vessel and still open the page in place for those without, and
+  // keep the workspace scope so nobody loses the leaf (D-27).
   G('Leave & Rotation', HR, [
-    L('Leave Planner', hrisLeave, { existing: '/crew/leave', icon: CalendarDays }),
-    L('Leave Requests', hrisLeave, { existing: '/crew/leave/requests', icon: ClipboardList }),
+    L('Leave Planner', hrisLeave, { existing: '/crew/leave', icon: CalendarDays, crossLink: true }),
+    L('Leave Requests', hrisLeave, { existing: '/crew/leave/requests', icon: ClipboardList, crossLink: true }),
     L('Leave Calculator', hrisLeave, { existing: '/crew/leave/calculator', icon: Clock }),
-    L('Rotation Planner', hrisLeave, { existing: '/crew/rotation-planner', icon: Network }),
+    L('Rotation Planner', hrisLeave, { existing: '/crew/rotation-planner', icon: Network, crossLink: true }),
   ], { icon: CalendarDays, slug: 'leave-and-rotation' }),
-  L('Training & Development', HR, { existing: '/development', icon: GraduationCap }),
+  // One's own training record is in the personal area (R8).
+  L('Training & Development', HR, { existing: '/me/training', icon: GraduationCap, crossLink: true, scope: 'personal' }),
   L('Compliance & Right to Work', HR, { icon: Shield, ...hrView }),
   L('Reporting & Analytics', HR, { icon: ClipboardList, ...hrView }),
 ];

@@ -12,10 +12,22 @@
  *   signed ──covered content changes──▶ signed + stale   (derived from digests)
  *   signed + stale ──Re-sign (same signer)──▶ signed     (old row superseded)
  *   signed ──remove (latest in cycle only; reason once submitted)──▶ open
- *            (every later slot returns to waiting)
+ *            (when the slot is required, every later slot returns to waiting)
  *   any ──new cycle (review / revert to draft / return to vessel)──▶ superseded
  *
  * Nothing here reads the clock: every action takes its `at` timestamp.
+ *
+ * Signature ids are the client's idempotency key (gap/08: retries must be
+ * idempotent): signing again with the id of the live row on the same slot is
+ * a no-op, and an id already used for any other row is refused.
+ *
+ * Once the company has acknowledged a cycle, vessel signatures cannot be
+ * removed until the company returns the record (gap/05 "Signature slots";
+ * SIG10). The caller sets `sheet.vesselLocked` from the envelope:
+ * `companyAcknowledged` and status `awaiting_company_close` or `closed`. Do
+ * not set it for report-first kinds in `acknowledged`: their final-review
+ * vessel slots are signed after the acknowledgement. Return to vessel,
+ * Reopen and Initiate review start a new cycle, which clears the lock.
  */
 import { fail, ok, type EngineResult, type Party } from './types';
 
@@ -45,6 +57,8 @@ export interface SlotDefinition {
   allowVisitor?: boolean;
   /** May be signed on the office holder's behalf (e.g. voyage reports, Master slots). */
   allowOnBehalf?: boolean;
+  /** An on-behalf signature must give a reason (e.g. passage plans: "Master or on-behalf with reason"). */
+  onBehalfReasonRequired?: boolean;
   /** Separation of duties: the signer may not also have signed these slots; `'creator'` = the record's creator. */
   distinctFrom?: readonly string[];
 }
@@ -63,6 +77,8 @@ export interface SlotSignature {
   witnessProfileId: string | null;
   /** Office signed for when `method = on_behalf`. */
   onBehalfOfOffice: string | null;
+  /** On-behalf only: why the office holder did not sign (present on on-behalf rows). */
+  onBehalfReason?: string | null;
   /** Digest of the covered content at signing time (computed in SQL). */
   recordDigest: string;
   signedAt: string;
@@ -90,6 +106,12 @@ export interface SignatureSheet {
   creatorProfileId?: string | null;
   /** Once submitted, removing a signature needs a reason. */
   submitted?: boolean;
+  /**
+   * The company has acknowledged the signatures of this cycle: vessel slots
+   * cannot be removed until the company returns the record. Set by the
+   * caller from the envelope (see the header); `startNextCycle` clears it.
+   */
+  vesselLocked?: boolean;
 }
 
 /** The person acting in the UI. Eligibility is resolved by the caller (server: `slot_eligible`). */
@@ -100,6 +122,13 @@ export interface SignatureActor {
   isEligible: (slot: SlotDefinition, profileId: string) => boolean;
   /** Write access on the record. Required (true) to witness a signature or sign on behalf; absent = no. */
   canWrite?: boolean;
+  /**
+   * May `profileId` sign `slot` on the office holder's behalf (the module's
+   * sign capability plus the rank tier the kind requires; server mirror:
+   * `has_capability(<module>.sign)` and the tier check)? Absent = no: write
+   * access alone never fills someone else's slot.
+   */
+  canSignOnBehalf?: (slot: SlotDefinition, profileId: string) => boolean;
   /** Master of this vessel: may remove vessel-slot signatures. */
   isMaster?: boolean;
   /** Owner / admin with reach: may remove company-slot signatures. */
@@ -128,6 +157,7 @@ export type SignatureErrorCode =
   | 'not_stale'
   | 'different_signer'
   | 'needs_ceremony'
+  | 'company_acknowledged'
   | 'invalid_input';
 
 export type SignatureResult = EngineResult<SignatureSheet, SignatureErrorCode>;
@@ -279,6 +309,8 @@ export interface SignInput {
   signer?: { profileId: string | null; name: string; kind?: SignerKind };
   /** On-behalf only: the office signed for (defaults to the slot's office). */
   onBehalfOfOffice?: string | null;
+  /** On-behalf only: why the office holder is not signing (required where the slot says so). */
+  reason?: string | null;
 }
 
 function signerFor(input: SignInput, actor: SignatureActor): { profileId: string | null; name: string; kind: SignerKind } {
@@ -328,6 +360,12 @@ export function signBlocker(sheet: SignatureSheet, input: SignInput, actor: Sign
     case 'on_behalf':
       if (!slot.allowOnBehalf) return { code: 'method_not_allowed', message: `The ${slot.label} slot can't be signed on someone's behalf.` };
       if (!actor.canWrite) return { code: 'no_write_access', message: 'You need write access to this record to sign on behalf.' };
+      if (!actor.canSignOnBehalf?.(slot, actor.profileId)) {
+        return { code: 'not_eligible', message: "You can't sign on the " + slot.label + "'s behalf on this record." };
+      }
+      if (slot.onBehalfReasonRequired && !input.reason?.trim()) {
+        return { code: 'reason_required', message: `Say why you are signing on the ${slot.label}'s behalf.` };
+      }
       break;
     default:
       return { code: 'invalid_input', message: 'Unknown signing method.' };
@@ -362,8 +400,25 @@ const withPassCleared = (passes: Readonly<Record<string, PassRequest>>, keys: re
   return next;
 };
 
-/** Sign a slot. */
+const isLive = (sheet: SignatureSheet, sig: SlotSignature) => sig.cycle === sheet.cycle && !sig.removedAt && !sig.supersededAt;
+
+/**
+ * Idempotency on the client-generated id: `'replay'` when `id` is the live row
+ * on `slotKey` (the earlier attempt went through), `'conflict'` when any other
+ * row already has it, null when it is new.
+ */
+function idReuse(sheet: SignatureSheet, id: string, slotKey: string): 'replay' | 'conflict' | null {
+  const existing = sheet.signatures.find((s) => s.id === id);
+  if (!existing) return null;
+  return existing.slotKey === slotKey && isLive(sheet, existing) ? 'replay' : 'conflict';
+}
+const ID_CONFLICT = 'That signature id is already used on this record.';
+
+/** Sign a slot. Re-sending the same id for the same slot is a no-op. */
 export function signSlot(sheet: SignatureSheet, input: SignInput, actor: SignatureActor): SignatureResult {
+  const reuse = idReuse(sheet, input.id, input.slotKey);
+  if (reuse === 'replay') return ok(sheet);
+  if (reuse === 'conflict') return fail('invalid_input', ID_CONFLICT);
   const blocker = signBlocker(sheet, input, actor);
   if (blocker) return fail(blocker.code, blocker.message);
   const slot = getSlot(sheet, input.slotKey) as SlotDefinition;
@@ -378,6 +433,7 @@ export function signSlot(sheet: SignatureSheet, input: SignInput, actor: Signatu
     method: input.method,
     witnessProfileId: input.method === 'witnessed' ? actor.profileId : null,
     onBehalfOfOffice: input.method === 'on_behalf' ? input.onBehalfOfOffice ?? slot.officeKey ?? slot.label : null,
+    ...(input.method === 'on_behalf' ? { onBehalfReason: input.reason?.trim() || null } : {}),
     recordDigest: input.recordDigest,
     signedAt: input.at,
     removedAt: null,
@@ -422,6 +478,12 @@ export function removeBlocker(
   if (actor.impersonating) return { code: 'impersonating', message: 'Signatures cannot be removed while acting as another user.' };
   const sig = activeSignature(sheet, slot.key);
   if (!sig) return { code: 'not_signed', message: `The ${slot.label} slot is not signed.` };
+  if (sheet.vesselLocked && slot.party === 'vessel') {
+    return {
+      code: 'company_acknowledged',
+      message: 'The company has acknowledged this record. Ask the company to return it to the vessel before removing a vessel signature.',
+    };
+  }
 
   const laterSigned = activeSignatures(sheet).some((s) => (getSlot(sheet, s.slotKey)?.order ?? 0) > slot.order);
   if (laterSigned) return { code: 'not_latest', message: 'Signatures are removed in reverse order. Remove the later signatures first.' };
@@ -434,7 +496,11 @@ export function removeBlocker(
   return null;
 }
 
-/** Remove the latest signature (reverse order only). Later slots return to waiting. */
+/**
+ * Remove the latest signature (reverse order only). When the slot is
+ * required, later slots return to waiting and lose their pass requests; an
+ * optional slot's removal leaves later slots (and their passes) as they were.
+ */
 export function removeSignature(
   sheet: SignatureSheet,
   input: { slotKey: string; reason?: string | null; at: string },
@@ -444,11 +510,14 @@ export function removeSignature(
   if (blocker) return fail(blocker.code, blocker.message);
   const slot = getSlot(sheet, input.slotKey) as SlotDefinition;
   const sig = activeSignature(sheet, slot.key) as SlotSignature;
+  // By identity, not id: exactly this row changes.
   const signatures = sheet.signatures.map((s) =>
-    s.id === sig.id ? { ...s, removedAt: input.at, removedBy: actor.profileId, removalReason: input.reason?.trim() || null } : s,
+    s === sig ? { ...s, removedAt: input.at, removedBy: actor.profileId, removalReason: input.reason?.trim() || null } : s,
   );
-  const laterKeys = sheet.slots.filter((s) => s.order > slot.order).map((s) => s.key);
-  return ok({ ...sheet, signatures, passes: withPassCleared(sheet.passes, laterKeys) });
+  const next: SignatureSheet = { ...sheet, signatures };
+  // slotState checks "waiting" before it looks at passes, so the old passes on `next` do no harm here.
+  const nowWaiting = sheet.slots.filter((s) => s.order > slot.order && slotState(next, s.key) === 'waiting').map((s) => s.key);
+  return ok({ ...next, passes: withPassCleared(sheet.passes, nowWaiting) });
 }
 
 /**
@@ -461,6 +530,9 @@ export function reSignSlot(
   input: { slotKey: string; id: string; recordDigest: string; at: string },
   actor: SignatureActor,
 ): SignatureResult {
+  const reuse = idReuse(sheet, input.id, input.slotKey);
+  if (reuse === 'replay') return ok(sheet);
+  if (reuse === 'conflict') return fail('invalid_input', ID_CONFLICT);
   const slot = getSlot(sheet, input.slotKey);
   if (!slot) return fail('unknown_slot', 'That signature slot does not exist on this record.');
   if (actor.impersonating) return fail('impersonating', 'Signatures cannot be made while acting as another user.');
@@ -471,8 +543,13 @@ export function reSignSlot(
   if (sig.method === 'verified' && sig.signerProfileId !== actor.profileId) return fail('different_signer', 'Only the person who signed can re-sign.');
   if (sig.method === 'on_behalf' && sig.signerProfileId !== actor.profileId) return fail('different_signer', 'Only the person who signed can re-sign.');
   if (sig.method === 'verified' && !actor.isEligible(slot, actor.profileId)) return fail('not_eligible', `You can no longer sign as ${slot.label} on this record.`);
+  if (sig.method === 'on_behalf') {
+    if (!actor.canWrite) return fail('no_write_access', 'You need write access to this record to sign on behalf.');
+    if (!actor.canSignOnBehalf?.(slot, actor.profileId)) return fail('not_eligible', `You can no longer sign on the ${slot.label}'s behalf on this record.`);
+  }
 
-  const superseded = sheet.signatures.map((s) => (s.id === sig.id ? { ...s, supersededAt: input.at } : s));
+  // By identity, not id: exactly this row is superseded.
+  const superseded = sheet.signatures.map((s) => (s === sig ? { ...s, supersededAt: input.at } : s));
   const fresh: SlotSignature = { ...sig, id: input.id, recordDigest: input.recordDigest, signedAt: input.at, supersededAt: null };
   return ok({ ...sheet, signatures: [...superseded, fresh] });
 }
@@ -490,6 +567,7 @@ export function startNextCycle(sheet: SignatureSheet, at: string): SignatureShee
       s.cycle === sheet.cycle && !s.removedAt && !s.supersededAt ? { ...s, supersededAt: at } : s,
     ),
     passes: {},
+    vesselLocked: false,
   };
 }
 
@@ -518,7 +596,8 @@ export function slotActions(sheet: SignatureSheet, slotKey: string, actor: Signa
   const signable = state === 'open' || state === 'requested';
   const signAsMe = signable && canSign(sheet, probe('verified'), actor);
   const someoneElse = signable && !actor.impersonating && allowsWitnessed(slot) && Boolean(actor.canWrite);
-  const signOnBehalf = signable && canSign(sheet, probe('on_behalf'), actor);
+  // The office holder signs as themselves, never on their own behalf.
+  const signOnBehalf = signable && !signAsMe && canSign(sheet, { ...probe('on_behalf'), reason: 'probe' }, actor);
   const passTo = state === 'open' && !actor.impersonating;
   return {
     signAsMe,

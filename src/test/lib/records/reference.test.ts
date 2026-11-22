@@ -7,7 +7,9 @@ import {
   normaliseReference,
   parseReference,
   referenceCounterScope,
+  VESSEL_CODE_PATTERN,
 } from '@/lib/records/reference';
+import { assignVesselCodes, storedVesselCode } from '@/modules/vessels/lib/vesselCode';
 
 describe('formatReference (C21)', () => {
   it('vessel records: TYPE-VSL-YYYY-NNN', () => {
@@ -37,7 +39,8 @@ describe('formatReference (C21)', () => {
   it.each([
     [{ type: 'PTW', vesselCode: 'DR', date: '2026-01-01', seq: 1 }, 'two-letter vessel code'],
     [{ type: 'PTW', vesselCode: 'DRAK', date: '2026-01-01', seq: 1 }, 'four-letter vessel code'],
-    [{ type: 'PTW', vesselCode: 'D1A', date: '2026-01-01', seq: 1 }, 'digit in vessel code'],
+    [{ type: 'PTW', vesselCode: '1RA', date: '2026-01-01', seq: 1 }, 'vessel code starting with a digit'],
+    [{ type: 'PTW', vesselCode: 'D-A', date: '2026-01-01', seq: 1 }, 'dash in vessel code'],
     [{ type: '', date: '2026-01-01', seq: 1 }, 'empty type'],
     [{ type: '1PT', date: '2026-01-01', seq: 1 }, 'type starting with a digit'],
     [{ type: 'P-T', date: '2026-01-01', seq: 1 }, 'type with a dash'],
@@ -87,6 +90,67 @@ describe('parseReference', () => {
       expect(normaliseReference(ref.toLowerCase())).toBe(ref);
     }
     expect(normaliseReference('nonsense')).toBeNull();
+  });
+});
+
+describe('vessel codes with digits (D-25)', () => {
+  it.each(['DRA', 'DR1', 'D1A', 'DR', 'DRAK', '1RA', 'D-A', 'dr1', ' DR1 '])(
+    'VESSEL_CODE_PATTERN agrees with storedVesselCode for %j',
+    (code) => {
+      const upper = code.trim().toUpperCase();
+      expect(VESSEL_CODE_PATTERN.test(upper)).toBe(storedVesselCode({ code }) === upper);
+    },
+  );
+
+  it.each(['DR1', 'D1A'])('%s formats, parses and normalises as a record and a voyage', (code) => {
+    const record = formatReference({ type: 'PTW', vesselCode: code.toLowerCase(), date: '2026-03-14', seq: 61 });
+    expect(record).toBe(`PTW-${code}-2026-061`);
+    expect(parseReference(record)).toEqual({ kind: 'record', type: 'PTW', vesselCode: code, year: 2026, seq: 61 });
+    expect(isReference(record)).toBe(true);
+    expect(normaliseReference(record.toLowerCase())).toBe(record);
+
+    const voyage = formatReference({ kind: 'voyage', vesselCode: code, date: '2026-11-03', seq: 37 });
+    expect(voyage).toBe(`${code}-20261103-037`);
+    expect(parseReference(voyage)).toEqual({ kind: 'voyage', vesselCode: code, date: '2026-11-03', seq: 37 });
+    expect(isReference(voyage)).toBe(true);
+    expect(normaliseReference(` ${voyage.toLowerCase()} `)).toBe(voyage);
+  });
+
+  it.each(['PTW-DR-2026-001', 'PTW-DRAK-2026-001', 'PTW-1RA-2026-001', '1RA-20261103-001', 'DR-20261103-001'])(
+    'still rejects %j',
+    (text) => {
+      expect(parseReference(text)).toBeNull();
+    },
+  );
+
+  it('a fleet record is not read as a voyage or a vessel record', () => {
+    expect(parseReference('AUD-2026-004')).toEqual({ kind: 'record', type: 'AUD', vesselCode: null, year: 2026, seq: 4 });
+    expect(parseReference('A12-2026-004')).toEqual({ kind: 'record', type: 'A12', vesselCode: null, year: 2026, seq: 4 });
+  });
+
+  it.each([
+    [['M/Y DRAAK', 'M/Y DRAAKE', 'S/Y DRAKAR']],
+    [['AAA', 'AAAA']],
+    [['HYDRA', 'HYDRAX', 'HYDRO']],
+  ])('every code assignVesselCodes gives the fleet %j round-trips', (names) => {
+    const fleet = names.map((name, i) => ({ id: `v${i}`, name, created_at: `202${i}-01-01T00:00:00Z` }));
+    const codes = [...assignVesselCodes(fleet).values()];
+    expect(codes).toHaveLength(names.length);
+    expect(codes.some((c) => /\d/.test(c))).toBe(true);
+    for (const code of codes) {
+      expect(VESSEL_CODE_PATTERN.test(code)).toBe(true);
+      const record = formatReference({ type: 'PTW', vesselCode: code, date: '2026-01-01', seq: 7 });
+      expect(parseReference(record)).toMatchObject({ kind: 'record', vesselCode: code });
+      expect(normaliseReference(record.toLowerCase())).toBe(record);
+      const voyage = formatVoyageReference({ vesselCode: code, date: '2026-01-01', seq: 7 });
+      expect(parseReference(voyage)).toMatchObject({ kind: 'voyage', vesselCode: code });
+      expect(normaliseReference(voyage.toLowerCase())).toBe(voyage);
+    }
+  });
+
+  it('sorts a digit code as a parseable reference', () => {
+    const refs = ['PTW-DR1-2026-002', 'garbage', 'PTW-DRK-2026-001', 'PTW-DRA-2026-003'];
+    expect([...refs].sort(compareReferences)).toEqual(['PTW-DR1-2026-002', 'PTW-DRA-2026-003', 'PTW-DRK-2026-001', 'garbage']);
   });
 });
 

@@ -10,6 +10,10 @@ const Tabs = TabsPrimitive.Root;
  * indicator under the active trigger (with the Signal glow on dark). The
  * indicator grows in with the `indicator` motion token and is static under
  * reduced motion. Vertical lists put the indicator on the left edge.
+ * A horizontal list never widens the page (390 px phones): it is capped at its
+ * container and scrolls sideways inside itself, scrollbar hidden. The hairline
+ * is an inset shadow rather than a border so the indicator sits inside the
+ * clipped box and causes no vertical scroll.
  * Consumers can still restyle with className (e.g. `grid w-full grid-cols-4`).
  */
 const TabsList = React.forwardRef<
@@ -19,7 +23,7 @@ const TabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex h-10 items-center justify-start gap-1 border-b border-border text-muted-foreground data-[orientation=vertical]:h-auto data-[orientation=vertical]:flex-col data-[orientation=vertical]:items-stretch data-[orientation=vertical]:border-b-0 data-[orientation=vertical]:border-l md:h-9",
+      "inline-flex h-10 max-w-full items-center justify-start gap-1 overflow-x-auto overflow-y-hidden overscroll-x-contain border-border text-muted-foreground shadow-[inset_0_-1px_0_0_hsl(var(--border))] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:h-9 data-[orientation=vertical]:h-auto data-[orientation=vertical]:max-w-none data-[orientation=vertical]:flex-col data-[orientation=vertical]:items-stretch data-[orientation=vertical]:overflow-visible data-[orientation=vertical]:border-l data-[orientation=vertical]:shadow-none",
       className,
     )}
     {...props}
@@ -35,9 +39,9 @@ const TabsTrigger = React.forwardRef<
     ref={ref}
     className={cn(
       // Trigger
-      "relative inline-flex h-full items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-colors duration-quick ease-tide hover:text-foreground data-[state=active]:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 md:py-1",
-      // Signal indicator (horizontal: bottom edge over the list hairline)
-      "after:pointer-events-none after:absolute after:inset-x-2 after:-bottom-px after:h-0.5 after:origin-center after:scale-x-0 after:rounded-full after:bg-primary after:transition-transform after:duration-indicator after:ease-tide data-[state=active]:after:scale-x-100 data-[state=active]:after:shadow-glow-signal",
+      "relative inline-flex h-full shrink-0 items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-colors duration-quick ease-tide hover:text-foreground data-[state=active]:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 md:py-1",
+      // Signal indicator (horizontal: bottom edge, over the list hairline)
+      "after:pointer-events-none after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:origin-center after:scale-x-0 after:rounded-full after:bg-primary after:transition-transform after:duration-indicator after:ease-tide data-[state=active]:after:scale-x-100 data-[state=active]:after:shadow-glow-signal",
       // Vertical: left edge
       "data-[orientation=vertical]:justify-start data-[orientation=vertical]:after:inset-x-auto data-[orientation=vertical]:after:inset-y-1 data-[orientation=vertical]:after:-left-px data-[orientation=vertical]:after:bottom-auto data-[orientation=vertical]:after:h-auto data-[orientation=vertical]:after:w-0.5 data-[orientation=vertical]:after:scale-x-100 data-[orientation=vertical]:after:scale-y-0 data-[orientation=vertical]:data-[state=active]:after:scale-y-100",
       className,

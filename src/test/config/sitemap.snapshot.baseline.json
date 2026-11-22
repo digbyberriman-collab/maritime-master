@@ -405,11 +405,11 @@
     "    CircleDot {\"id\":\"hris-recruitment-candidates\",\"kind\":\"leaf\",\"label\":\"Candidates\",\"moduleKey\":\"hr\",\"path\":\"/hris/recruitment/candidates\",\"scope\":\"workspace\",\"status\":\"live\"}",
     "    CircleDot {\"id\":\"hris-recruitment-onboarding\",\"kind\":\"leaf\",\"label\":\"Onboarding\",\"moduleKey\":\"hr\",\"path\":\"/hris/recruitment/onboarding\",\"scope\":\"workspace\",\"status\":\"live\"}",
     "  CalendarDays {\"id\":\"hris-leave-and-rotation\",\"kind\":\"group\",\"label\":\"Leave & Rotation\",\"path\":\"/hris/leave-and-rotation\",\"scope\":\"workspace\"}",
-    "    CalendarDays {\"id\":\"hris-leave-and-rotation-leave-planner\",\"kind\":\"leaf\",\"label\":\"Leave Planner\",\"path\":\"/crew/leave\",\"scope\":\"workspace\",\"status\":\"live\"}",
-    "    ClipboardList {\"id\":\"hris-leave-and-rotation-leave-requests\",\"kind\":\"leaf\",\"label\":\"Leave Requests\",\"path\":\"/crew/leave/requests\",\"scope\":\"workspace\",\"status\":\"live\"}",
+    "    CalendarDays {\"crossLink\":true,\"id\":\"hris-leave-and-rotation-leave-planner\",\"kind\":\"leaf\",\"label\":\"Leave Planner\",\"path\":\"/crew/leave\",\"scope\":\"workspace\",\"status\":\"live\"}",
+    "    ClipboardList {\"crossLink\":true,\"id\":\"hris-leave-and-rotation-leave-requests\",\"kind\":\"leaf\",\"label\":\"Leave Requests\",\"path\":\"/crew/leave/requests\",\"scope\":\"workspace\",\"status\":\"live\"}",
     "    Clock {\"id\":\"hris-leave-and-rotation-leave-calculator\",\"kind\":\"leaf\",\"label\":\"Leave Calculator\",\"path\":\"/crew/leave/calculator\",\"scope\":\"workspace\",\"status\":\"live\"}",
-    "    Network {\"id\":\"hris-leave-and-rotation-rotation-planner\",\"kind\":\"leaf\",\"label\":\"Rotation Planner\",\"path\":\"/crew/rotation-planner\",\"scope\":\"workspace\",\"status\":\"live\"}",
-    "  GraduationCap {\"id\":\"hris-training-and-development\",\"kind\":\"leaf\",\"label\":\"Training & Development\",\"path\":\"/development\",\"scope\":\"workspace\",\"status\":\"live\"}",
+    "    Network {\"crossLink\":true,\"id\":\"hris-leave-and-rotation-rotation-planner\",\"kind\":\"leaf\",\"label\":\"Rotation Planner\",\"path\":\"/crew/rotation-planner\",\"scope\":\"workspace\",\"status\":\"live\"}",
+    "  GraduationCap {\"crossLink\":true,\"id\":\"hris-training-and-development\",\"kind\":\"leaf\",\"label\":\"Training & Development\",\"path\":\"/me/training\",\"scope\":\"personal\",\"status\":\"live\"}",
     "  Shield {\"id\":\"hris-compliance-and-right-to-work\",\"kind\":\"leaf\",\"label\":\"Compliance & Right to Work\",\"moduleKey\":\"hr\",\"path\":\"/hris/compliance-and-right-to-work\",\"scope\":\"workspace\",\"status\":\"live\"}",
     "  ClipboardList {\"id\":\"hris-reporting-and-analytics\",\"kind\":\"leaf\",\"label\":\"Reporting & Analytics\",\"moduleKey\":\"hr\",\"path\":\"/hris/reporting-and-analytics\",\"scope\":\"workspace\",\"status\":\"live\"}"
   ],
@@ -1021,6 +1021,6 @@
     "/hris/compensation -> /hris/compensation/salaries-and-compensation?module=hris",
     "/hris/performance -> /hris/performance/annual-evaluations?module=hris",
     "/hris/recruitment -> /hris/recruitment/vacancies?module=hris",
-    "/hris/leave-and-rotation -> /crew/leave?module=hris"
+    "/hris/leave-and-rotation -> /crew/leave/calculator?module=hris"
   ]
 }

@@ -355,7 +355,7 @@ Status: **complete** / **partial** / **placeholder** / **missing** as defined in
 | `info_requested` | Further information required | vessel | Company returned it to the vessel with a reason. |
 | `awaiting_company_close` | Awaiting company sign-off | company | Vessel has completed and signed; only the company can close. |
 | `closed` | Closed | — | Final. Read-only except company "Reopen" (where the kind allows) and new links. |
-| `void` | Voided | — | Replaces delete after submission: reason required, company actor only, record kept. |
+| `void` | Voided | — | Replaces delete after submission: reason required, company actor only, record kept (per kind delete rule, DECISIONS D-32). |
 
 Not every kind uses every state (see each workflow). The transition table and its guards live in one SQL function (`safety_record_transition(record_id, action, payload)`), in the style of `form_submissions_before_write()`: identity, company, vessel, status, timestamps and actor are set by the server; the client only names the action.
 
@@ -403,18 +403,19 @@ open ──Submit initial report (checklist clear)──▶ submitted ──Ackn
   ▼                                                │ "duplicate" (company)               ▼
  (gone)                                            └────────────────▶ closed ◀── Close (company) ── awaiting_company_close
                                                                        │ Reopen (company, reason) ─▶ acknowledged
-                              acknowledged / awaiting_company_close ── Return to vessel (reason) ─▶ info_requested ── vessel resubmits ─▶ previous state
+              submitted / acknowledged / awaiting_company_close ── Return to vessel (reason) ─▶ info_requested ── vessel re-signs ─▶ awaiting_company_close   (DECISIONS D-30)
 ```
 
 - **Create**: anyone with `vessel.safety.incidents.create` (crew can report; T-287 observations are the lighter path). Safety Officer defaults to the designated holder.
 - **Submit initial report** requires: classification, at least one effect, at least one contributing factor, date, time, UTC offset, position, narrative; if any involved person is marked injured, an outcome for that person. The submit panel lists what is missing. Submitting freezes the initial-details section (snapshot 1); later facts go into the update thread, the repeaters and the final review (T-69: "add updates, don't overwrite"). Posts "Initial incident report submitted to the company" in the thread. Notifies company safety recipients immediately.
 - **Acknowledge**: company actor; stamps "Acknowledged by the company — name, time".
 - **Vessel final review** (section unlocks after acknowledgement): immediate cause, root / underlying causes, contributing factors confirmed, corrective and preventive actions (each a linked CA or "no action, because…"), lessons learned, reviewed by the vessel safety committee (yes / no + HESS link), "all evidence attached" confirmation. Then slots SO / HoD → Master. Master's signature moves it to `awaiting_company_close`.
-- **Close** (company actor): root cause confirmed (saved against the closer's name, then locked), close-as ∈ {closed after review, raised in error — no incident, duplicate of `<reference>` (link required)}. Blocked while a status request is open. "Raised in error" and "duplicate" may close straight from `submitted` without vessel signatures. Closing writes snapshot n ("closed review version").
+- **Close** (company actor): root cause confirmed (saved against the closer's name, then locked), close-as ∈ {closed after review, raised in error — no incident, duplicate of `<reference>` (link required)}. Blocked while a status request is open. "Closed after review" needs the vessel final review signed, so it is offered only from `awaiting_company_close`; "Raised in error" and "duplicate" may close straight from `submitted` or `acknowledged` without vessel signatures (DECISIONS D-30). Closing writes snapshot n ("closed review version").
+- **Return to vessel** (company actor, reason): from `submitted`, `acknowledged` or `awaiting_company_close`; the cycle's vessel signatures are superseded and the record comes back through the vessel signature chain to `awaiting_company_close`, not to the previous state (DECISIONS D-30).
 - **Reopen** (company actor, reason): back to `acknowledged`; vessel final-review signatures are invalidated (new signing cycle); a new closed version is produced on the next close.
 - **Linked CAs**: closing with open linked CAs is allowed but shows a warning list (open question Q1).
 - **Reporting & notifications block**: shows the vessel flag's reporting profile (SET4): which categories this incident may fall under (derived from classification, effects and injuries), deadlines counted from the incident time, recipients. The company records each notification made (recipient, method, sent at, by, reference, response, attachments). STORM never sends to an authority by itself; it can prepare a draft (T-69).
-- **Delete**: only while `open`, by the creator or a safety editor. After submission: no delete; company can `void` with a reason (kept, hidden from KPIs).
+- **Delete**: only while `open`, by the creator or a safety editor. After submission: no delete; company can `void` with a reason (kept, hidden from KPIs); the vessel never voids an incident (`delete_rule = never_after_submit`, DECISIONS D-32).
 - **Notifications**: submitted → company safety recipients (immediately); acknowledged / returned / closed / reopened → vessel safety subscribers (immediately); thread entries (batched 15 min); follow-up due (daily); flag-reporting deadline approaching (1 h and 24 h before, company).
 
 ### W2. Corrective action (§6.5)

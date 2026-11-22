@@ -90,7 +90,7 @@ export default function LoginDiagnosticsPage() {
             title="Login Diagnostics"
             subtitle="Restricted area — Owner or Shore Management role required."
           />
-          <div className="border border-danger/30 bg-danger/5 text-danger text-sm rounded-sm p-4 max-w-xl">
+          <div className="border border-destructive/30 bg-destructive/5 text-destructive text-sm rounded-sm p-4 max-w-xl">
             Your role ({role ?? "none"}) does not have permission to view authentication failure
             diagnostics. This protects user privacy: only administrators can see why other users
             fail to sign in.
@@ -109,7 +109,7 @@ export default function LoginDiagnosticsPage() {
         />
 
         {error && (
-          <div className="text-xs text-danger bg-danger/10 px-3 py-2 rounded-sm mb-4">{error}</div>
+          <div className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-sm mb-4">{error}</div>
         )}
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -117,7 +117,7 @@ export default function LoginDiagnosticsPage() {
             <button
               key={code}
               onClick={() => setFilter(code)}
-              className={`text-left border rounded-sm p-3 transition ${filter === code ? "border-navy bg-navy/5" : "border-black/10 hover:border-black/30"}`}
+              className={`text-left border rounded-sm p-3 transition ${filter === code ? "border-primary bg-primary/5" : "border-black/10 hover:border-black/30"}`}
             >
               <div className="text-2xl font-semibold tabular-nums">{n}</div>
               <div className="text-xs text-muted-foreground mt-0.5 font-mono">{code}</div>
@@ -125,7 +125,7 @@ export default function LoginDiagnosticsPage() {
           ))}
           <button
             onClick={() => setFilter("all")}
-            className={`text-left border rounded-sm p-3 transition ${filter === "all" ? "border-navy bg-navy/5" : "border-black/10 hover:border-black/30"}`}
+            className={`text-left border rounded-sm p-3 transition ${filter === "all" ? "border-primary bg-primary/5" : "border-black/10 hover:border-black/30"}`}
           >
             <div className="text-2xl font-semibold tabular-nums">{rows?.length ?? 0}</div>
             <div className="text-xs text-muted-foreground mt-0.5 font-mono">all events</div>

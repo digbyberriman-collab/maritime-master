@@ -172,7 +172,7 @@ export default function SessionDiagnosticsPage() {
                 onClick={async () => {
                   await supabase.auth.refreshSession();
                 }}
-                className="inline-flex items-center gap-2 rounded-sm bg-navy px-4 py-2 text-xs font-medium text-white hover:opacity-90 transition"
+                className="inline-flex items-center gap-2 rounded-sm bg-primary px-4 py-2 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <polyline points="23 4 23 10 17 10" />
@@ -183,7 +183,7 @@ export default function SessionDiagnosticsPage() {
               </button>
               <button
                 onClick={() => supabase.auth.signOut()}
-                className="inline-flex items-center gap-2 rounded-sm border border-danger/30 text-danger px-4 py-2 text-xs font-medium hover:bg-danger/5 transition"
+                className="inline-flex items-center gap-2 rounded-sm border border-destructive/30 text-destructive px-4 py-2 text-xs font-medium hover:bg-destructive/5 transition"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -224,7 +224,7 @@ function DiagnosticRow({
   return (
     <div>
       <div className="text-[10px] tracking-[0.15em] uppercase text-muted-foreground mb-0.5">{label}</div>
-      <div className={`flex items-center gap-2 font-medium text-ink ${mono ? "font-mono text-xs" : ""} ${highlight ? "text-navy" : ""}`}>
+      <div className={`flex items-center gap-2 font-medium ${highlight ? "text-primary" : "text-foreground"} ${mono ? "font-mono text-xs" : ""}`}>
         {statusDot && <span className={`inline-block size-2 rounded-full ${statusDot}`} />}
         <span className="break-all">{value}</span>
         {highlightNote && <span className="text-[10px] text-muted-foreground font-normal">{highlightNote}</span>}

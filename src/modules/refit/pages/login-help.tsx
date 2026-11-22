@@ -76,12 +76,12 @@ function LoginHelpPage() {
   };
 
   return (
-    <div className="min-h-dvh bg-paper">
+    <div className="min-h-dvh bg-background">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10">
         <div className="mb-8">
           <Link
             to="/auth"
-            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-ink transition"
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M15 18l-6-6 6-6" />
@@ -96,7 +96,7 @@ function LoginHelpPage() {
 
         {/* Shared password */}
         <section className="border border-black/10 rounded-sm overflow-hidden mb-8">
-          <div className="bg-navy text-white px-4 py-3 flex items-center justify-between">
+          <div className="bg-sidebar text-sidebar-foreground px-4 py-3 flex items-center justify-between">
             <span className="text-xs uppercase tracking-wider font-medium">Shared Password</span>
             <button
               onClick={() => copy(PASSWORD, "password")}
@@ -106,7 +106,7 @@ function LoginHelpPage() {
             </button>
           </div>
           <div className="p-4 bg-white">
-            <code className="font-mono text-sm text-ink">{PASSWORD}</code>
+            <code className="font-mono text-sm text-foreground">{PASSWORD}</code>
             <p className="text-xs text-muted-foreground mt-2">
               All test accounts below use this single password. Click any email to copy it, or use the
               account buttons on the sign-in page to auto-fill.
@@ -148,11 +148,11 @@ function LoginHelpPage() {
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div>
                         <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Email</div>
-                        <code className="font-mono text-xs text-ink">{a.email}</code>
+                        <code className="font-mono text-xs text-foreground">{a.email}</code>
                       </div>
                       <div>
                         <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Role code</div>
-                        <code className="font-mono text-xs text-ink">{a.role}</code>
+                        <code className="font-mono text-xs text-foreground">{a.role}</code>
                       </div>
                     </div>
 
@@ -162,7 +162,7 @@ function LoginHelpPage() {
                         {view.pages.map((p) => (
                           <span
                             key={p}
-                            className="text-[10px] px-1.5 py-0.5 bg-secondary rounded-sm text-ink"
+                            className="text-[10px] px-1.5 py-0.5 bg-secondary rounded-sm text-foreground"
                           >
                             {p}
                           </span>
@@ -171,7 +171,7 @@ function LoginHelpPage() {
                       <ul className="space-y-1">
                         {view.notes.map((n, i) => (
                           <li key={i} className="text-xs text-muted-foreground flex items-start gap-1.5">
-                            <span className="mt-1 size-1 rounded-full bg-ocean shrink-0" />
+                            <span className="mt-1 size-1 rounded-full bg-primary shrink-0" />
                             {n}
                           </li>
                         ))}
@@ -211,30 +211,30 @@ function LoginHelpPage() {
           </div>
           <div className="p-4 space-y-3 text-sm">
             <div className="flex items-start gap-2">
-              <span className="mt-0.5 size-1.5 rounded-full bg-ocean shrink-0" />
+              <span className="mt-0.5 size-1.5 rounded-full bg-primary shrink-0" />
               <span>
                 On the sign-in page, click any test account button to auto-fill the email and password.
               </span>
             </div>
             <div className="flex items-start gap-2">
-              <span className="mt-0.5 size-1.5 rounded-full bg-ocean shrink-0" />
+              <span className="mt-0.5 size-1.5 rounded-full bg-primary shrink-0" />
               <span>
                 If an account does not exist yet, signing in will auto-provision it with the correct role
                 and vessel assignment.
               </span>
             </div>
             <div className="flex items-start gap-2">
-              <span className="mt-0.5 size-1.5 rounded-full bg-ocean shrink-0" />
+              <span className="mt-0.5 size-1.5 rounded-full bg-primary shrink-0" />
               <span>
                 Use the <strong>Verify account</strong> button on the sign-in page to check credentials
                 without actually logging in.
               </span>
             </div>
             <div className="flex items-start gap-2">
-              <span className="mt-0.5 size-1.5 rounded-full bg-ocean shrink-0" />
+              <span className="mt-0.5 size-1.5 rounded-full bg-primary shrink-0" />
               <span>
                 If you get stuck on <em>"Verifying session…"</em>, open{" "}
-                <Link to="/yard/refit/session-diagnostics" className="underline text-navy">
+                <Link to="/yard/refit/session-diagnostics" className="underline text-primary">
                   Session Diagnostics
                 </Link>{" "}
                 to troubleshoot.

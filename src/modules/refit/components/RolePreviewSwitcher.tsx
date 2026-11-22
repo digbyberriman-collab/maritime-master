@@ -23,13 +23,13 @@ export function RolePreviewSwitcher() {
 
   return (
     <div className="px-3 py-2 rounded-sm bg-white/5 border border-white/10">
-      <label className="block text-[10px] tracking-[0.2em] uppercase text-ocean/70 mb-1.5">
+      <label className="block text-[10px] tracking-[0.2em] uppercase text-sidebar-foreground/70 mb-1.5">
         Preview as role
       </label>
       <select
         value={current}
         onChange={(e) => setPreviewRole((e.target.value || null) as AppRole | null)}
-        className="w-full bg-navy text-white text-xs px-2 py-1.5 border border-white/15 rounded-sm focus-visible:outline-none focus:ring-2 focus:ring-ocean"
+        className="w-full bg-sidebar text-sidebar-foreground text-xs px-2 py-1.5 border border-white/15 rounded-sm focus-visible:outline-none focus:ring-2 focus:ring-sidebar-ring"
       >
         <option value="">Use my real role ({realRole ? ROLE_LABEL[realRole] : "—"})</option>
         {PREVIEW_OPTIONS.map((r) => (
@@ -41,7 +41,7 @@ export function RolePreviewSwitcher() {
       {previewRole && (
         <button
           onClick={() => setPreviewRole(null)}
-          className="mt-1.5 text-[10px] text-ocean hover:text-white underline-offset-2 hover:underline"
+          className="mt-1.5 text-[10px] text-sidebar-primary hover:text-sidebar-foreground underline-offset-2 hover:underline"
         >
           Exit preview
         </button>

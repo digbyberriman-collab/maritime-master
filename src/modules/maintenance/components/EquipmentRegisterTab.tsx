@@ -132,14 +132,16 @@ const EquipmentRegisterTab: React.FC<EquipmentRegisterTabProps> = ({ onAddEquipm
   };
 
   return (
-    <div className="flex gap-4">
+    // Stacked below md; side by side from md, where the register's table
+    // scrolls inside its card (min-w-0) instead of widening the page.
+    <div className="flex flex-col md:flex-row gap-4">
       {/* Category Sidebar */}
-      <Card className="w-64 shrink-0">
+      <Card className="w-full md:w-64 md:shrink-0">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm font-medium">Categories</CardTitle>
         </CardHeader>
         <CardContent className="p-2">
-          <ScrollArea className="h-[500px]">
+          <ScrollArea className="h-48 md:h-[500px]">
             <div
               className={`flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-muted transition-colors ${
                 !selectedCategory ? 'bg-primary/10 text-primary' : ''
@@ -156,7 +158,7 @@ const EquipmentRegisterTab: React.FC<EquipmentRegisterTabProps> = ({ onAddEquipm
       </Card>
 
       {/* Equipment List */}
-      <Card className="flex-1">
+      <Card className="flex-1 min-w-0">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Equipment Register</CardTitle>

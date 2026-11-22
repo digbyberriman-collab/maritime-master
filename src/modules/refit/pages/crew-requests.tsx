@@ -104,7 +104,7 @@ export default function CrewRequestsPage() {
                 onClick={() => setCreateOpen(true)}
                 aria-label="New crew request"
                 title="New crew request"
-                className="inline-flex items-center justify-center h-9 w-9 rounded-sm bg-navy text-white hover:opacity-90 transition"
+                className="inline-flex items-center justify-center h-9 w-9 rounded-sm bg-primary text-primary-foreground hover:bg-primary/90 transition"
               >
                 <Plus size={18} />
               </button>
@@ -117,7 +117,7 @@ export default function CrewRequestsPage() {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 text-xs rounded-sm border ${filter === f ? "bg-navy text-white border-navy" : "bg-white border-black/10 hover:bg-secondary"}`}
+              className={`px-3 py-1.5 text-xs rounded-sm border ${filter === f ? "bg-primary text-primary-foreground border-primary" : "bg-white border-black/10 hover:bg-secondary"}`}
             >
               {f === "open" ? "Open" : f === "mine" ? "Mine" : "All"}
             </button>
@@ -162,7 +162,7 @@ export default function CrewRequestsPage() {
               <button
                 key={r.id}
                 onClick={() => setOpenId(r.id)}
-                className="w-full text-left hover:bg-paper border-b border-black/5"
+                className="w-full text-left hover:bg-muted/50 border-b border-black/5"
               >
                 <div
                   className="px-4 py-3 grid items-center"
@@ -567,7 +567,7 @@ function CrewRequestDetailDrawer({
                     key={s}
                     onClick={() => transition(s)}
                     disabled={busy || r.status === s}
-                    className={`px-2.5 py-1.5 text-xs rounded-sm border ${r.status === s ? "bg-navy text-white border-navy" : "bg-white border-black/10 hover:bg-secondary"}`}
+                    className={`px-2.5 py-1.5 text-xs rounded-sm border ${r.status === s ? "bg-primary text-primary-foreground border-primary" : "bg-white border-black/10 hover:bg-secondary"}`}
                   >
                     {s.replace(/_/g, " ")}
                   </button>

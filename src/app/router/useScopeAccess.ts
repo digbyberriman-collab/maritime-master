@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
-import { useVessel } from '@/modules/vessels/contexts/VesselContext';
+import { useVessel, type Vessel } from '@/modules/vessels/contexts/VesselContext';
 import { findVesselBySlug } from '@/modules/vessels/lib/vesselSlug';
 import { hasFleetReach, landingPath } from './reach';
 import type { LegacyRedirectContext } from './legacyResolve';
@@ -33,10 +33,16 @@ export interface ScopeAccess {
  */
 export const PROFILE_GRACE_MS = 5000;
 
+// Never mutated; shared so the legacy lookups keep a stable identity.
+const NO_VESSELS: Vessel[] = [];
+
 export function useScopeAccess(): ScopeAccess {
   const { user, profile, loading: authLoading } = useAuth();
   const vessel = useVessel();
   const rbacInitialized = usePermissionsStore((s) => s.isInitialized);
+  // A load in flight may be replacing the previous user's roles (an account
+  // switch keeps `isInitialized` set), so it counts as not loaded yet.
+  const rbacLoading = usePermissionsStore((s) => s.isLoading);
   const hasFleetWideRole = usePermissionsStore((s) => s.hasFleetAccess);
   const userRoles = usePermissionsStore((s) => s.userRoles);
 
@@ -53,15 +59,23 @@ export function useScopeAccess(): ScopeAccess {
     const timer = window.setTimeout(() => setProfileGaveUp(true), PROFILE_GRACE_MS);
     return () => window.clearTimeout(timer);
   }, [waitingForProfile]);
-  const vesselsReady = profile ? !vessel.loading : profileGaveUp;
-  const readyNow = !authLoading && !!user && vesselsReady && rbacInitialized;
+  const userId = user?.id ?? null;
+  // The vessel lists count only once they are this user's: VesselContext
+  // tags them with the user they were loaded for, and the profile can still
+  // be the previous user's for a moment after an account switch (D-25).
+  // A signed-in user whose profile cannot be read has no vessels at all
+  // (fail closed), whatever VesselContext still holds.
+  const vesselsReady = profile ? !vessel.loading && vessel.loadedForUserId === userId : profileGaveUp;
+  const readyNow = !authLoading && !!user && vesselsReady && rbacInitialized && !rbacLoading;
 
   // Once ready, stay ready: a background refresh (refreshVessels, a
   // permissions reload) must not unmount the page the user is working in.
-  const readyOnce = useRef(false);
-  if (readyNow) readyOnce.current = true;
-  if (!user) readyOnce.current = false;
-  const ready = readyNow || readyOnce.current;
+  // The latch belongs to one user: signing out, or switching straight to
+  // another account (another tab, no signed-out moment), resets it.
+  const latchedFor = useRef<string | null>(null);
+  if (latchedFor.current !== userId) latchedFor.current = null;
+  if (readyNow && userId) latchedFor.current = userId;
+  const ready = readyNow || (userId !== null && latchedFor.current === userId);
 
   const fleetReach = hasFleetReach({
     canAccessAllVessels: vessel.canAccessAllVessels,
@@ -69,11 +83,15 @@ export function useScopeAccess(): ScopeAccess {
     rbacRoles: (userRoles ?? []).map((r) => r.role_name),
   });
 
-  const selectedCode = vessel.getVesselCodeById(vessel.selectedVesselId);
-  const firstCode = vessel.vessels.length ? vessel.getVesselCodeById(vessel.vessels[0].id) : null;
+  // No readable profile: no vessels, whatever the lists hold.
+  const vessels = profile ? vessel.vessels : NO_VESSELS;
+  const selectedVesselId = profile ? vessel.selectedVesselId : null;
+  const isAllVessels = profile ? vessel.isAllVessels : false;
+  const { getVesselCodeById } = vessel;
+  const selectedCode = getVesselCodeById(selectedVesselId);
+  const firstCode = vessels.length ? getVesselCodeById(vessels[0].id) : null;
   const lastVesselCode = selectedCode ?? firstCode;
 
-  const { vessels, getVesselCodeById, isAllVessels } = vessel;
   const legacy = useMemo<LegacyRedirectContext>(
     () => ({
       fleetReach,

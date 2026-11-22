@@ -240,12 +240,55 @@ describe('someone else signing (witnessed)', () => {
 });
 
 describe('signed on behalf', () => {
+  const OFFICER = actor('p-chief-officer', { canSignOnBehalf: () => true });
+
   it('only where the slot allows it; the office is recorded', () => {
     let s = must(sign(fresh(), 'hod', HOD));
-    const officer = actor('p-chief-officer');
-    s = must(sign(s, 'master', officer, { method: 'on_behalf' }));
-    expect(activeSignature(s, 'master')).toMatchObject({ method: 'on_behalf', signerProfileId: 'p-chief-officer', onBehalfOfOffice: 'master' });
-    expect(code(sign(fresh(), 'hod', officer, { method: 'on_behalf' }))).toBe('method_not_allowed');
+    s = must(sign(s, 'master', OFFICER, { method: 'on_behalf' }));
+    expect(activeSignature(s, 'master')).toMatchObject({ method: 'on_behalf', signerProfileId: 'p-chief-officer', onBehalfOfOffice: 'master', onBehalfReason: null });
+    expect(code(sign(fresh(), 'hod', OFFICER, { method: 'on_behalf' }))).toBe('method_not_allowed');
+  });
+
+  it('write access alone is not enough: the caller must allow on-behalf signing for this person', () => {
+    const s = must(sign(fresh(), 'hod', HOD));
+    const writer = actor('p-deckhand'); // canWrite, not eligible, no canSignOnBehalf
+    const r = sign(s, 'master', writer, { method: 'on_behalf' });
+    expect(r).toMatchObject({ ok: false, error: { code: 'not_eligible', message: "You can't sign on the Master's behalf on this record." } });
+    expect(code(sign(s, 'master', actor('p-deckhand', { canSignOnBehalf: () => false }), { method: 'on_behalf' }))).toBe('not_eligible');
+    expect(slotActions(s, 'master', writer).signOnBehalf).toBe(false);
+  });
+
+  it('the predicate gets the slot and the signer', () => {
+    const seen: Array<[string, string]> = [];
+    const s = must(sign(fresh(), 'hod', HOD));
+    must(sign(s, 'master', actor('p-co', { canSignOnBehalf: (slot, id) => (seen.push([slot.key, id]), true) }), { method: 'on_behalf' }));
+    expect(seen).toContainEqual(['master', 'p-co']);
+  });
+
+  it('re-signing an on-behalf signature re-checks write access and on-behalf eligibility', () => {
+    let s = must(sign(fresh(), 'hod', HOD));
+    s = must(sign(s, 'master', OFFICER, { method: 'on_behalf', recordDigest: 'd1' }));
+    const resign = (who: SignatureActor) => reSignSlot(s, { slotKey: 'master', id: `re-${++n}`, recordDigest: 'd2', at: 't2' }, who);
+    expect(code(resign(OFFICER))).toBe('ok');
+    expect(code(resign(actor('p-chief-officer')))).toBe('not_eligible');
+    expect(code(resign(actor('p-chief-officer', { canSignOnBehalf: () => true, canWrite: false })))).toBe('no_write_access');
+  });
+
+  it('the office holder is offered "Sign as me", not "Sign on behalf"', () => {
+    const s = must(sign(fresh(), 'hod', HOD));
+    const master = actor('p-master', { isMaster: true, canSignOnBehalf: () => true });
+    expect(slotActions(s, 'master', master)).toMatchObject({ signAsMe: true, signOnBehalf: false });
+    expect(slotActions(s, 'master', OFFICER)).toMatchObject({ signAsMe: false, signOnBehalf: true });
+  });
+
+  it('a slot may require a reason for on-behalf signing; it is stored on the row', () => {
+    const slots: SlotDefinition[] = [{ key: 'master', label: 'Master', order: 1, party: 'vessel', officeKey: 'master', allowOnBehalf: true, onBehalfReasonRequired: true }];
+    const s = createSignatureSheet(slots);
+    expect(code(sign(s, 'master', OFFICER, { method: 'on_behalf' }))).toBe('reason_required');
+    expect(code(sign(s, 'master', OFFICER, { method: 'on_behalf', reason: '  ' }))).toBe('reason_required');
+    const signed = must(sign(s, 'master', OFFICER, { method: 'on_behalf', reason: ' Master ashore for the port state visit ' }));
+    expect(activeSignature(signed, 'master')?.onBehalfReason).toBe('Master ashore for the port state visit');
+    expect(slotActions(s, 'master', OFFICER).signOnBehalf).toBe(true);
   });
 
   it('needs write access (absent counts as none)', () => {
@@ -331,6 +374,23 @@ describe('remove signature: reverse order only', () => {
     expect(CA_SLOTS.map((slot) => slotState(s, slot.key))).toEqual(['signed', 'open', 'waiting']);
   });
 
+  it('removing an optional earlier slot keeps the later slot open and its pass requested', () => {
+    const slots: SlotDefinition[] = [
+      { key: 'a', label: 'A', order: 1, party: 'vessel' },
+      { key: 'o', label: 'Observer', order: 2, party: 'vessel', required: false },
+      { key: 'c', label: 'C', order: 3, party: 'vessel' },
+    ];
+    const anyone = actor('p-any', { isEligible: () => true });
+    let s = must(sign(createSignatureSheet(slots), 'a', anyone));
+    s = must(passSlotTo(s, { slotKey: 'c', toProfileId: 'p3', at: 't2' }, anyone));
+    expect(slotState(s, 'c')).toBe('requested');
+    s = must(sign(s, 'o', anyone));
+    s = must(removeSignature(s, { slotKey: 'o', at: 't3' }, anyone));
+    expect(slotState(s, 'o')).toBe('open');
+    expect(slotState(s, 'c')).toBe('requested');
+    expect(s.passes.c).toEqual({ profileId: 'p3', at: 't2' });
+  });
+
   it('removal returns later slots to waiting and clears their pass requests', () => {
     let s = must(sign(fresh(), 'hod', HOD));
     s = must(passSlotTo(s, { slotKey: 'master', toProfileId: 'p-master', at: 't' }, HOD));
@@ -371,6 +431,29 @@ describe('remove signature: reverse order only', () => {
     expect(code(removeSignature(fresh(), { slotKey: 'hod', at: 't' }, HOD))).toBe('not_signed');
     const s = must(sign(fresh(), 'hod', HOD));
     expect(code(removeSignature(s, { slotKey: 'hod', at: 't' }, actor('p-hod', { impersonating: true })))).toBe('impersonating');
+  });
+
+  it('after company acknowledgement, vessel signatures are locked until the record is returned', () => {
+    let s = must(sign(fresh(), 'hod', HOD));
+    s = must(sign(s, 'master', MASTER));
+    s = { ...s, submitted: true, vesselLocked: true };
+    const master = removeSignature(s, { slotKey: 'master', at: 't', reason: 'changed my mind' }, MASTER);
+    expect(master).toMatchObject({
+      ok: false,
+      error: { code: 'company_acknowledged', message: 'The company has acknowledged this record. Ask the company to return it to the vessel before removing a vessel signature.' },
+    });
+    expect(code(removeSignature(s, { slotKey: 'master', at: 't', reason: 'r' }, actor('p-master')))).toBe('company_acknowledged');
+    expect(slotActions(s, 'master', MASTER).remove).toBe(false);
+
+    // The company's own slot stays removable by the company.
+    const withCompany = must(sign(s, 'company', SHORE));
+    expect(code(removeSignature(withCompany, { slotKey: 'company', at: 't', reason: 'Signed too early' }, SHORE))).toBe('ok');
+
+    // Return to vessel / reopen / review starts a new cycle, which clears the lock.
+    let next = startNextCycle(s, 't-return');
+    expect(next.vesselLocked).toBe(false);
+    next = must(sign(next, 'hod', HOD));
+    expect(code(removeSignature(next, { slotKey: 'hod', at: 't', reason: 'r' }, HOD))).toBe('ok');
   });
 
   it('the slot can be signed again after removal (new row)', () => {
@@ -427,6 +510,52 @@ describe('stale signatures', () => {
   });
 });
 
+describe('signature ids are idempotency keys', () => {
+  const twoSlots: SlotDefinition[] = [
+    { key: 'a', label: 'A', order: 1, party: 'vessel' },
+    { key: 'b', label: 'B', order: 2, party: 'vessel' },
+  ];
+  const anyone = actor('p-any', { isEligible: () => true, isMaster: true });
+  const input = (slotKey: string, id: string, recordDigest = 'd1'): SignInput => ({ slotKey, id, method: 'verified', recordDigest, at: 't' });
+
+  it('replaying a signature (same id, same slot) is a no-op', () => {
+    const s = must(signSlot(createSignatureSheet(twoSlots), input('a', 'same'), anyone));
+    const again = signSlot(s, input('a', 'same'), anyone);
+    expect(again).toMatchObject({ ok: true });
+    expect(again.value).toBe(s);
+    expect(s.signatures).toHaveLength(1);
+  });
+
+  it('an id used on another slot (or on a removed row) is refused', () => {
+    let s = must(signSlot(createSignatureSheet(twoSlots), input('a', 'same'), anyone));
+    expect(signSlot(s, input('b', 'same'), anyone)).toMatchObject({ ok: false, error: { code: 'invalid_input', message: 'That signature id is already used on this record.' } });
+    s = must(removeSignature(s, { slotKey: 'a', at: 't2' }, anyone));
+    expect(code(signSlot(s, input('a', 'same'), anyone))).toBe('invalid_input');
+  });
+
+  it('removal and re-sign change exactly one row, even if ids collide in stored data', () => {
+    const base = must(signSlot(must(signSlot(createSignatureSheet(twoSlots), input('a', 'a1'), anyone)), input('b', 'b1'), anyone));
+    // Legacy data with a duplicated id: only the row on the slot acted on may change.
+    const dup: SignatureSheet = { ...base, signatures: base.signatures.map((r) => ({ ...r, id: 'dup' })) };
+    const removed = must(removeSignature(dup, { slotKey: 'b', at: 't2' }, anyone));
+    expect(activeSignature(removed, 'a')).toBeDefined();
+    expect(activeSignature(removed, 'b')).toBeUndefined();
+    expect(removed.signatures.filter((r) => r.removedAt)).toHaveLength(1);
+
+    const resigned = must(reSignSlot(dup, { slotKey: 'b', id: 'b2', recordDigest: 'd2', at: 't3' }, anyone));
+    expect(activeSignature(resigned, 'a')).toMatchObject({ id: 'dup', supersededAt: null });
+    expect(activeSignature(resigned, 'b')).toMatchObject({ id: 'b2', recordDigest: 'd2' });
+    expect(resigned.signatures.filter((r) => r.supersededAt)).toHaveLength(1);
+  });
+
+  it('re-sign: replaying the same id is a no-op; reusing another row\'s id is refused', () => {
+    const s = must(signSlot(createSignatureSheet(twoSlots), input('a', 'a1'), anyone));
+    const resigned = must(reSignSlot(s, { slotKey: 'a', id: 'a2', recordDigest: 'd2', at: 't2' }, anyone));
+    expect(reSignSlot(resigned, { slotKey: 'a', id: 'a2', recordDigest: 'd2', at: 't2' }, anyone).value).toBe(resigned);
+    expect(code(reSignSlot(resigned, { slotKey: 'a', id: 'a1', recordDigest: 'd3', at: 't3' }, anyone))).toBe('invalid_input');
+  });
+});
+
 describe('cycles', () => {
   it('a new cycle supersedes live signatures and reopens the template', () => {
     let s = must(sign(fresh(), 'hod', HOD));
@@ -476,8 +605,9 @@ describe('slot actions (what the slot shows)', () => {
     const r = must(passSlotTo(fresh(), { slotKey: 'hod', toProfileId: 'p-hod2', at: 't' }, CREW));
     expect(slotActions(r, 'hod', CREW)).toMatchObject({ cancelPass: true, passTo: false });
     const s = must(sign(fresh(), 'hod', HOD));
-    expect(slotActions(s, 'master', actor('p-officer')).signOnBehalf).toBe(true);
-    expect(slotActions(fresh(), 'hod', actor('p-officer')).signOnBehalf).toBe(false);
+    expect(slotActions(s, 'master', actor('p-officer', { canSignOnBehalf: () => true })).signOnBehalf).toBe(true);
+    expect(slotActions(s, 'master', actor('p-officer')).signOnBehalf).toBe(false);
+    expect(slotActions(fresh(), 'hod', actor('p-officer', { canSignOnBehalf: () => true })).signOnBehalf).toBe(false);
   });
 
   it('impersonation hides every control', () => {

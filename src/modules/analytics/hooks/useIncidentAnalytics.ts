@@ -43,12 +43,21 @@ export interface IncidentAnalytics {
   rootCauses: { cause: string; count: number }[];
 }
 
+/**
+ * Query-key part for a date range. Keys are day strings, not Date objects: a
+ * caller that builds a fresh range on every render (new Date() with new
+ * milliseconds) would otherwise change the key each render and refetch forever.
+ */
+export function dateRangeKey(dateRange: DateRange): [string, string] {
+  return [format(dateRange.start, "yyyy-MM-dd"), format(dateRange.end, "yyyy-MM-dd")];
+}
+
 export function useIncidentAnalytics(
   dateRange: DateRange,
   vesselId?: string
 ) {
   return useQuery({
-    queryKey: ["incident-analytics", dateRange.start, dateRange.end, vesselId],
+    queryKey: ["incident-analytics", ...dateRangeKey(dateRange), vesselId ?? "all"],
     queryFn: async (): Promise<IncidentAnalytics> => {
       // Get current period incidents
       let query = supabase
@@ -284,7 +293,7 @@ export interface VesselComparison {
 
 export function useVesselComparison(dateRange: DateRange) {
   return useQuery({
-    queryKey: ["vessel-comparison", dateRange.start, dateRange.end],
+    queryKey: ["vessel-comparison", ...dateRangeKey(dateRange)],
     queryFn: async (): Promise<VesselComparison[]> => {
       const { data: incidents, error } = await supabase
         .from("incidents")

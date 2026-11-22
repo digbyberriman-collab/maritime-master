@@ -10,6 +10,7 @@ const SelectGroup = SelectPrimitive.Group;
 
 const SelectValue = SelectPrimitive.Value;
 
+/** Height follows the density token `--control-h` (gap/10 A.7), like Button and Input. */
 const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
@@ -17,7 +18,7 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-10 w-full items-center justify-between rounded-md border border-input bg-field px-3 py-2 text-sm text-foreground ring-offset-background transition-colors duration-quick ease-tide placeholder:text-muted-foreground data-[placeholder]:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:h-9 md:py-1.5 [&>span]:line-clamp-1",
+      "flex h-[var(--control-h)] w-full items-center justify-between rounded-md border border-input bg-field px-3 py-1.5 text-sm text-foreground ring-offset-background transition-colors duration-quick ease-tide placeholder:text-muted-foreground data-[placeholder]:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1",
       className,
     )}
     {...props}
@@ -98,6 +99,13 @@ const SelectLabel = React.forwardRef<
 ));
 SelectLabel.displayName = SelectPrimitive.Label.displayName;
 
+/*
+ * Highlighted option (gap/10 A.5, WCAG 1.4.11): a signal-muted fill plus a 2px
+ * primary bar on the leading edge. The fill alone is ~1.1:1 against the
+ * popover; the bar (>= 3:1, contrast.test.ts) is the cue. Radix sets
+ * `data-highlighted` for keyboard and pointer alike. Text uses `focus:` so a
+ * consumer's `focus:text-destructive` still replaces it in cn().
+ */
 const SelectItem = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Item>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>
@@ -105,7 +113,7 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus:bg-accent focus:text-accent-foreground",
+      "relative flex w-full cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus:text-foreground data-[highlighted]:bg-signal-muted data-[highlighted]:shadow-[inset_2px_0_0_hsl(var(--primary))]",
       className,
     )}
     {...props}

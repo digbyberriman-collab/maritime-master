@@ -35,6 +35,7 @@ import { useLogbookRegistry } from '../hooks/useLogbookRegistry';
 import { useLogbookSamples } from '../hooks/useLogbookSamples';
 import { useLogbookPreferences } from '../hooks/useLogbookPreferences';
 import { useWorkingCopies, type LineBuffer } from '../hooks/useWorkingCopies';
+import { useLogbookPath } from '../lib/useLogbookPath';
 
 interface OpenBookState { bookId?: string; profile?: FlagProfileId; volumeId?: string; sectionId?: string; }
 const OPEN_KEY = 'logbooks:open-book';
@@ -60,6 +61,7 @@ const LogbookWorkspace: React.FC = () => {
   const { logbookSlug } = useParams<{ logbookSlug: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const bookPath = useLogbookPath();
   const { toast } = useToast();
   const { selectedVessel, vessels, setSelectedVesselById, loading: vesselsLoading } = useVessel();
   const actor = useLogbookActor();
@@ -90,8 +92,9 @@ const LogbookWorkspace: React.FC = () => {
   const copies = useWorkingCopies(actor.userId, (message) => toast({ title: message, variant: 'destructive' }));
 
   React.useEffect(() => {
-    if (!logbookSlug) navigate(`/vessel/logbooks/${book.slug}`, { replace: true });
-  }, [logbookSlug, book.slug, navigate]);
+    // The logbooks index opens a book; the query (e.g. ?module=) is kept.
+    if (!logbookSlug) navigate(bookPath(book.slug, location.search), { replace: true });
+  }, [logbookSlug, book.slug, navigate, bookPath, location.search]);
 
   React.useEffect(() => { const t = setInterval(() => setTick((n) => n + 1), 5000); return () => clearInterval(t); }, []);
 
@@ -166,7 +169,7 @@ const LogbookWorkspace: React.FC = () => {
   const selectBook = (next: LogbookBook) => {
     if (next.id === book.id) return;
     setVolumeId(null); setSectionId(''); setPageView('all'); setProposal(null); setHighlighted(null);
-    navigate(`/vessel/logbooks/${next.slug}`);
+    navigate(bookPath(next.slug));
   };
   const selectSection = (id: string) => { setSectionId(id); setPageView('all'); setProposal(null); };
   const selectProfile = (p: FlagProfileId) => { setProfile(p); setVolumeId(null); setSectionId(''); setPageView('all'); setProposal(null); };

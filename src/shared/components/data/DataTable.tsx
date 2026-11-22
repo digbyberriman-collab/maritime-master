@@ -394,9 +394,11 @@ export function DataTable<T>({
                   : undefined
               }
               className={cn(
-                'group/row h-[var(--row-h)] transition-colors duration-quick',
+                // `dt-row` (index.css) draws the focus ring and the selected
+                // bar on the cells, where sticky cells cannot cover them.
+                'dt-row group/row h-[var(--row-h)] transition-colors duration-quick',
                 isSelected ? 'bg-signal-muted' : 'hover:bg-accent',
-                onRowClick && 'focus-ring-inset cursor-pointer',
+                onRowClick && 'cursor-pointer',
                 rowClassName?.(row),
               )}
             >
@@ -404,9 +406,7 @@ export function DataTable<T>({
                 <td
                   className={cn(
                     'sticky left-0 z-[1] w-10 border-b border-border px-3 align-middle',
-                    isSelected
-                      ? 'bg-signal-muted shadow-[inset_2px_0_0_0_hsl(var(--primary))]'
-                      : 'bg-card group-hover/row:bg-accent',
+                    isSelected ? 'bg-signal-muted' : 'bg-card group-hover/row:bg-accent',
                   )}
                 >
                   <Checkbox
@@ -416,7 +416,7 @@ export function DataTable<T>({
                   />
                 </td>
               ) : null}
-              {columns.map((column, c) => {
+              {columns.map((column) => {
                 const content = column.cell ? column.cell(row, index) : defaultCell(column, row);
                 const reason = typeof column.emptyReason === 'function' ? column.emptyReason(row) : column.emptyReason;
                 const align = alignOf(column);
@@ -431,7 +431,6 @@ export function DataTable<T>({
                       column.kind === 'reference' && 'type-mono whitespace-nowrap',
                       column.kind === 'date' && 'whitespace-nowrap tabular-nums',
                       column.sticky && cn('sticky z-[1]', stickyOffset, isSelected ? 'bg-signal-muted' : 'bg-card group-hover/row:bg-accent'),
-                      !selectable && c === 0 && isSelected && 'shadow-[inset_2px_0_0_0_hsl(var(--primary))]',
                       column.className,
                     )}
                   >

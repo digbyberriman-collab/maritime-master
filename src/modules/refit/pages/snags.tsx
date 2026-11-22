@@ -7,7 +7,7 @@ import { AppShell, PageHeader } from "@/modules/refit/components/AppShell";
 import { RequireAuth } from "@/modules/refit/components/RequireAuth";
 
 const SEV: Record<string, string> = {
-  critical: "bg-danger/10 text-danger",
+  critical: "bg-destructive/10 text-destructive",
   major: "bg-warning/10 text-warning",
   minor: "bg-success/10 text-success",
 };
@@ -52,7 +52,7 @@ export default function SnagsPage() {
           title="Snags & Warranty"
           subtitle={`${rows.length} active snags on Y709`}
           action={
-            <button className="px-3 py-2 bg-navy text-white rounded-sm text-sm">
+            <button className="px-3 py-2 bg-primary text-primary-foreground rounded-sm text-sm hover:bg-primary/90">
               + Raise snag
             </button>
           }

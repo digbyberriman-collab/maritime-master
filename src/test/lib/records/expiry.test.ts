@@ -5,6 +5,7 @@ import {
   EXPIRY_BUCKETS,
   countBuckets,
   expiryBucket,
+  expiryBucketForDays,
   expiryStatus,
   needsAttention,
   resolveExpiryWindow,
@@ -19,11 +20,63 @@ const plusDays = (n: number) => {
   return d.toISOString().slice(0, 10); // UTC date math on a UTC-constructed date: safe here
 };
 
+/**
+ * EXP1 shared fixture (gap/08 EXP1; DECISIONS C5, D-31): SQL `expiry_bucket()`
+ * must give the same bucket and days for every row, so the pgTAP test for it
+ * copies this table verbatim. An item is valid through its expiry date: the
+ * expiry day is `expiring_soon` with 0 days, the day after is `expired`.
+ */
+const EXPIRY_BUCKET_FIXTURE: ReadonlyArray<{
+  case: string;
+  expiresOn: string;
+  windowDays: number;
+  today: string;
+  bucket: ExpiryBucket;
+  days: number;
+}> = [
+  { case: 'a year overdue', expiresOn: '2025-11-22', windowDays: 90, today: TODAY, bucket: 'expired', days: -365 },
+  { case: 'the day after the expiry date', expiresOn: '2026-11-21', windowDays: 90, today: TODAY, bucket: 'expired', days: -1 },
+  { case: 'the expiry date itself', expiresOn: '2026-11-22', windowDays: 90, today: TODAY, bucket: 'expiring_soon', days: 0 },
+  { case: 'the day before the expiry date', expiresOn: '2026-11-23', windowDays: 90, today: TODAY, bucket: 'expiring_soon', days: 1 },
+  { case: 'last day of the 30-day tier', expiresOn: '2026-12-22', windowDays: 90, today: TODAY, bucket: 'expiring_soon', days: 30 },
+  { case: 'first day past the 30-day tier', expiresOn: '2026-12-23', windowDays: 90, today: TODAY, bucket: 'expiring', days: 31 },
+  { case: 'last day of the window', expiresOn: '2027-02-20', windowDays: 90, today: TODAY, bucket: 'expiring', days: 90 },
+  { case: 'first day past the window', expiresOn: '2027-02-21', windowDays: 90, today: TODAY, bucket: 'valid', days: 91 },
+  { case: 'passport, last day of 270', expiresOn: '2027-08-19', windowDays: 270, today: TODAY, bucket: 'expiring', days: 270 },
+  { case: 'passport, past 270', expiresOn: '2027-08-20', windowDays: 270, today: TODAY, bucket: 'valid', days: 271 },
+  { case: '14-day window, last day', expiresOn: '2026-12-06', windowDays: 14, today: TODAY, bucket: 'expiring_soon', days: 14 },
+  { case: '14-day window, past it', expiresOn: '2026-12-07', windowDays: 14, today: TODAY, bucket: 'valid', days: 15 },
+  { case: 'zero window, expiry date', expiresOn: '2026-11-22', windowDays: 0, today: TODAY, bucket: 'expiring_soon', days: 0 },
+  { case: 'zero window, the day after', expiresOn: '2026-11-21', windowDays: 0, today: TODAY, bucket: 'expired', days: -1 },
+];
+
+describe('EXP1 shared TS/SQL expiry_bucket() fixture', () => {
+  it.each(EXPIRY_BUCKET_FIXTURE)('$case → $bucket ($days d)', ({ expiresOn, windowDays, today, bucket, days }) => {
+    expect(expiryStatus({ expiresOn, windowDays, today })).toMatchObject({ bucket, daysRemaining: days, windowDays });
+    expect(expiryBucketForDays(days, windowDays)).toBe(bucket);
+  });
+
+  it('null expiry is no_expiry (engine contract; callers decide what a missing date means)', () => {
+    expect(expiryStatus({ expiresOn: null, windowDays: 90, today: TODAY })).toMatchObject({ bucket: 'no_expiry', daysRemaining: null });
+  });
+});
+
+describe('expiryBucketForDays', () => {
+  it('rejects a fractional day count or a bad window', () => {
+    expect(() => expiryBucketForDays(1.5, 90)).toThrow(RangeError);
+    expect(() => expiryBucketForDays(1, -1)).toThrow(RangeError);
+  });
+  it('defaults the window', () => {
+    expect(expiryBucketForDays(90)).toBe('expiring');
+    expect(expiryBucketForDays(91, null)).toBe('valid');
+  });
+});
+
 describe('expiryBucket: boundaries with a 90-day window', () => {
   it.each<[number, ExpiryBucket]>([
     [-365, 'expired'],
-    [-1, 'expired'],
-    [0, 'expiring_soon'], // valid through the expiry date
+    [-1, 'expired'], // the day after the expiry date (D-31)
+    [0, 'expiring_soon'], // the expiry date itself: valid through it (D-31)
     [1, 'expiring_soon'],
     [30, 'expiring_soon'],
     [31, 'expiring'],

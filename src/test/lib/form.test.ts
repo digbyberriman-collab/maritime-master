@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { z } from 'zod';
+import { isCalendarDate, toCalendarDate } from '@/lib/records/dates';
 import {
+  INT4_MAX,
   blankFieldsToNull,
   blankToNull,
   dateOnly,
@@ -230,5 +232,40 @@ describe('zod helpers', () => {
     expect(optionalPositiveInt().parse(undefined)).toBeNull();
     expect(optionalPositiveInt().parse('4')).toBe(4);
     expect(optionalPositiveInt().safeParse('0').success).toBe(false);
+  });
+
+  it('NaN (valueAsNumber on an empty input) is blank', () => {
+    expect(optionalPositiveInt().parse(Number.NaN)).toBeNull();
+    const r = positiveInt('How many people?').safeParse(Number.NaN);
+    expect(r.success ? '' : r.error.issues[0].message).toBe('How many people?');
+  });
+
+  const firstIssue = (r: { success: boolean; error?: { issues: { message: string }[] } }) => (r.success ? 'ok' : r.error?.issues[0].message);
+
+  it('values above the column ceiling are refused (default int4)', () => {
+    expect(INT4_MAX).toBe(2147483647);
+    expect(positiveInt().parse(2147483647)).toBe(2147483647);
+    expect(firstIssue(positiveInt().safeParse(2147483648))).toBe('Must be 2147483647 or less');
+    expect(firstIssue(positiveInt().safeParse(1e21))).toBe('Must be 2147483647 or less');
+    expect(firstIssue(optionalPositiveInt().safeParse('2147483648'))).toBe('Must be 2147483647 or less');
+  });
+
+  it('a digit string too long to hold exactly is refused, even with a raised ceiling', () => {
+    expect(firstIssue(positiveInt().safeParse('99999999999999999999'))).toBe('Must be 2147483647 or less');
+    const big = positiveInt(undefined, Number.MAX_SAFE_INTEGER);
+    expect(big.parse('9007199254740991')).toBe(Number.MAX_SAFE_INTEGER);
+    expect(firstIssue(big.safeParse('9007199254740993'))).toBe(`Must be ${Number.MAX_SAFE_INTEGER} or less`);
+    // A ceiling above the safe range is clamped to it.
+    expect(firstIssue(optionalPositiveInt(1e30).safeParse('99999999999999999999'))).toBe(`Must be ${Number.MAX_SAFE_INTEGER} or less`);
+    expect(optionalPositiveInt(10).safeParse(11).success).toBe(false);
+  });
+});
+
+describe('date-only helpers are the records date primitive', () => {
+  it('isDateOnly is isCalendarDate; toDateOnly is toCalendarDate without the throw', () => {
+    expect(isDateOnly).toBe(isCalendarDate);
+    const d = new Date(2026, 10, 22, 23, 59);
+    expect(toDateOnly(d)).toBe(toCalendarDate(d));
+    expect(toDateOnly(new Date(Number.NaN))).toBeNull();
   });
 });

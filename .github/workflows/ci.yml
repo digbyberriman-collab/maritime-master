@@ -43,6 +43,12 @@ jobs:
       - name: Test
         run: npm test
 
+      # node:test suites for the visual harness: grading, the PostgREST mock and
+      # the D-08 no-personal-data check on the shipped fixtures. The browser
+      # suite (inspect.browser.test.mjs) needs Playwright and stays out.
+      - name: Visual harness unit tests
+        run: node --test scripts/visual/test/harness.test.mjs scripts/visual/test/postgrest.test.mjs
+
       - name: Build
         run: npm run build
         env:

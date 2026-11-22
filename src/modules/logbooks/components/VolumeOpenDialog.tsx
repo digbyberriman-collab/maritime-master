@@ -13,6 +13,7 @@ import { coverFromRegistry } from '../lib/registryRules';
 import { fieldProblems } from '../lib/formRules';
 import { lineFields } from '../lib/lineLayouts';
 import { stamp } from '../lib/format';
+import { useLogbookPath } from '../lib/useLogbookPath';
 
 interface Props {
   open: boolean;
@@ -30,6 +31,7 @@ interface Props {
 
 /** Administrative dialog: open a new volume (or a continuation) with a reviewed cover. */
 const VolumeOpenDialog: React.FC<Props> = ({ open, onOpenChange, book, profile, registry, continuationOf, hasSensor, autoReadings, onAutoReadingsChange, saving, onSubmit }) => {
+  const bookPath = useLogbookPath();
   const [values, setValues] = React.useState<Record<string, string>>({});
   const [autoFill, setAutoFill] = React.useState(false);
   const [autoKeys, setAutoKeys] = React.useState<Record<string, string>>({});
@@ -116,7 +118,7 @@ const VolumeOpenDialog: React.FC<Props> = ({ open, onOpenChange, book, profile, 
                 <p className="text-xs text-muted-foreground">{autoFill ? `${Object.keys(autoKeys).length} empty fields filled. Your existing values are retained.` : 'Enter the cover manually or enable automatic population.'} Opening place and volume reference belong to this book.</p>
               </>
             ) : (
-              <p>No saved registry for this flag. Complete the cover below, or <Link to="/vessel/logbooks/registry" className="text-primary underline">set up reusable vessel details</Link>.</p>
+              <p>No saved registry for this flag. Complete the cover below, or <Link to={bookPath('registry')} className="text-primary underline">set up reusable vessel details</Link>.</p>
             )}
             {hasSensor && (
               <label className="flex items-start gap-2">

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { assignVesselCodes, resolveVesselByCode } from '@/modules/vessels/lib/vesselCode';
@@ -47,6 +47,13 @@ interface VesselContextType {
   getVesselCodeById: (vesselId: string | null | undefined) => string | null;
   /** The reachable vessel with this code (any case), or undefined. */
   findVesselByCode: (code: string | null | undefined) => Vessel | undefined;
+  /**
+   * The user (`profiles.user_id`) whose vessels the lists above hold, or null
+   * before the first load. While it differs from the signed-in profile the
+   * lists are empty and `loading` is true, so nothing (the scope routes, a
+   * vessel picker) ever reads one user's vessels for another (D-25).
+   */
+  loadedForUserId: string | null;
 }
 
 const VesselContext = createContext<VesselContextType | undefined>(undefined);
@@ -64,14 +71,35 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [companyVessels, setCompanyVessels] = useState<CompanyVessel[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAllVessels, setIsAllVessels] = useState(false);
+  // Whose vessels the state above holds. A sign-out or a switch to another
+  // account changes the profile before the next load lands; until then the
+  // previous user's lists must not be served (fail closed, D-04, D-25).
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  // Each load takes a ticket; a load that a newer one (or a user change) has
+  // superseded never writes, so A's slow load cannot land after B's.
+  const loadSeq = useRef(0);
+  const profileUserId = profile?.user_id ?? null;
 
   // Check if user can access all vessels based on their role
   const canAccessAllVessels = ALL_VESSELS_ROLES.includes(profile?.role || '');
 
+  // What is served: nothing while the state still belongs to another user
+  // (or none), derived during render so not even one render hands the
+  // previous user's vessels to the next before the clearing effect runs.
+  const stale = loadedFor !== profileUserId;
+  const servedVessels = useMemo(() => (stale ? [] : vessels), [stale, vessels]);
+  const servedCompany = useMemo(() => (stale ? [] : companyVessels), [stale, companyVessels]);
+  const servedSelection = stale ? null : selectedVessel;
+
   // Load vessels based on user role
   const loadVessels = useCallback(async () => {
+    loadSeq.current += 1;
+    const seq = loadSeq.current;
+    const current = () => seq === loadSeq.current;
+    const owner = profile?.user_id ?? null;
     if (!profile?.company_id) {
       setLoading(false);
+      setLoadedFor(owner);
       return;
     }
 
@@ -92,6 +120,7 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       // DPA/Shore Management see all company vessels
       if (canAccessAllVessels) {
         const { data, error } = await directoryRequest;
+        if (!current()) return;
 
         if (error) throw error;
         const directory: Vessel[] = data || [];
@@ -108,6 +137,7 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             .eq('is_current', true),
           directoryRequest,
         ]);
+        if (!current()) return;
         const { data: assignments, error: assignmentError } = assignmentRes;
 
         if (assignmentError) throw assignmentError;
@@ -124,6 +154,7 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             .in('id', vesselIds)
             .neq('status', 'Sold')
             .order('name');
+          if (!current()) return;
 
           if (error) throw error;
           vesselsData = data || [];
@@ -162,11 +193,28 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setIsAllVessels(true);
       }
     } catch (error) {
-      console.error('Error loading vessels:', error);
+      if (current()) console.error('Error loading vessels:', error);
     } finally {
-      setLoading(false);
+      if (current()) {
+        setLoading(false);
+        setLoadedFor(owner);
+      }
     }
   }, [profile?.company_id, profile?.user_id, canAccessAllVessels]);
+
+  // A different user (or none): drop the previous user's vessels and
+  // selection, and supersede any load still running for them. Declared
+  // before the load effect so the new user's load runs after this. Clearing
+  // writes nothing to localStorage (the persist effects only store a
+  // selection that is set).
+  useEffect(() => {
+    loadSeq.current += 1;
+    setVessels([]);
+    setCompanyVessels([]);
+    setSelectedVesselState(null);
+    setIsAllVessels(false);
+    if (!profileUserId) setLoadedFor(null);
+  }, [profileUserId]);
 
   // Load vessels when profile changes
   useEffect(() => {
@@ -203,13 +251,13 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setSelectedVesselState(null);
       }
     } else {
-      const vessel = vessels.find(v => v.id === vesselId);
+      const vessel = servedVessels.find(v => v.id === vesselId);
       if (vessel) {
         setSelectedVesselState(vessel);
         setIsAllVessels(false);
       }
     }
-  }, [vessels, canAccessAllVessels]);
+  }, [servedVessels, canAccessAllVessels]);
 
   const setAllVessels = useCallback(() => {
     if (canAccessAllVessels) {
@@ -225,9 +273,9 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // Codes are derived over the company fleet plus anything reachable that
   // the company list missed (e.g. when it could not be read).
   const codeSource = useMemo<CompanyVessel[]>(() => {
-    const known = new Set(companyVessels.map((v) => v.id));
-    return [...companyVessels, ...vessels.filter((v) => !known.has(v.id))];
-  }, [companyVessels, vessels]);
+    const known = new Set(servedCompany.map((v) => v.id));
+    return [...servedCompany, ...servedVessels.filter((v) => !known.has(v.id))];
+  }, [servedCompany, servedVessels]);
 
   const vesselCodes = useMemo(() => assignVesselCodes(codeSource), [codeSource]);
 
@@ -237,25 +285,26 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   );
 
   const findVesselByCode = useCallback(
-    (code: string | null | undefined) => resolveVesselByCode(code, vessels, codeSource),
-    [vessels, codeSource],
+    (code: string | null | undefined) => resolveVesselByCode(code, servedVessels, codeSource),
+    [servedVessels, codeSource],
   );
 
   const value: VesselContextType = {
-    selectedVessel,
-    selectedVesselId: selectedVessel?.id || null,
-    vessels,
-    isAllVessels,
+    selectedVessel: servedSelection,
+    selectedVesselId: servedSelection?.id || null,
+    vessels: servedVessels,
+    isAllVessels: stale ? false : isAllVessels,
     setSelectedVessel,
     setSelectedVesselById,
     setAllVessels,
-    loading,
+    loading: loading || stale,
     refreshVessels,
     canAccessAllVessels,
     companyVessels: codeSource,
     vesselCodes,
     getVesselCodeById,
     findVesselByCode,
+    loadedForUserId: loadedFor,
   };
 
   return <VesselContext.Provider value={value}>{children}</VesselContext.Provider>;

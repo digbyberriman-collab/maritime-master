@@ -241,7 +241,7 @@ export default function Dashboard() {
               </Link>
               <Link
                 to="/yard/refit/change-orders"
-                className="px-3 py-2 bg-navy text-white rounded-sm text-sm hover:opacity-90"
+                className="px-3 py-2 bg-primary text-primary-foreground rounded-sm text-sm hover:bg-primary/90"
               >
                 Change Orders
               </Link>
@@ -299,7 +299,7 @@ export default function Dashboard() {
           <Section
             title="Next 5 Milestones"
             action={
-              <Link to="/yard/refit/schedule" className="text-[11px] text-ocean">
+              <Link to="/yard/refit/schedule" className="text-[11px] text-primary">
                 View schedule →
               </Link>
             }
@@ -312,7 +312,7 @@ export default function Dashboard() {
                   <div key={m.id} className="flex justify-between items-center py-3">
                     <div className="flex items-center gap-3">
                       <span
-                        className={`size-2 rounded-full ${m.rag === "red" ? "bg-danger" : m.rag === "amber" ? "bg-warning" : "bg-success"}`}
+                        className={`size-2 rounded-full ${m.rag === "red" ? "bg-destructive" : m.rag === "amber" ? "bg-warning" : "bg-success"}`}
                       />
                       <span className="text-sm">{m.name}</span>
                     </div>
@@ -331,7 +331,7 @@ export default function Dashboard() {
           <Section title="Open Snags">
             <div className="space-y-5">
               {[
-                { label: "Critical", count: snags.critical, color: "bg-danger", max: 5 },
+                { label: "Critical", count: snags.critical, color: "bg-destructive", max: 5 },
                 { label: "Major", count: snags.major, color: "bg-warning", max: 10 },
                 { label: "Minor", count: snags.minor, color: "bg-success", max: 20 },
               ].map((row) => (
@@ -340,7 +340,7 @@ export default function Dashboard() {
                     <span>{row.label}</span>
                     <span className="tabular-nums font-medium">{row.count}</span>
                   </div>
-                  <div className="h-1 bg-paper">
+                  <div className="h-1 bg-muted">
                     <div
                       className={`h-1 ${row.color}`}
                       style={{ width: `${Math.min(100, (row.count / row.max) * 100)}%` }}
@@ -354,7 +354,7 @@ export default function Dashboard() {
           <Section
             title="Top Risks"
             action={
-              <Link to="/yard/refit/risks" className="text-[11px] text-ocean">
+              <Link to="/yard/refit/risks" className="text-[11px] text-primary">
                 Risk register →
               </Link>
             }
@@ -368,7 +368,7 @@ export default function Dashboard() {
                     <span className="truncate pr-2">{r.title}</span>
                     <span className="flex items-center gap-2 shrink-0">
                       <span
-                        className={`px-1.5 py-0.5 text-[10px] font-bold rounded-sm ${(r.rating ?? 0) >= 15 ? "bg-danger/10 text-danger" : (r.rating ?? 0) >= 8 ? "bg-warning/10 text-warning" : "bg-slate-100 text-slate-700"}`}
+                        className={`px-1.5 py-0.5 text-[10px] font-bold rounded-sm ${(r.rating ?? 0) >= 15 ? "bg-destructive/10 text-destructive" : (r.rating ?? 0) >= 8 ? "bg-warning/10 text-warning" : "bg-slate-100 text-slate-700"}`}
                       >
                         R{r.rating ?? 0}
                       </span>
@@ -383,7 +383,7 @@ export default function Dashboard() {
           <Section
             title="Change Orders by Status"
             action={
-              <Link to="/yard/refit/change-orders" className="text-[11px] text-ocean">
+              <Link to="/yard/refit/change-orders" className="text-[11px] text-primary">
                 View all →
               </Link>
             }
@@ -411,7 +411,7 @@ export default function Dashboard() {
           <Section
             title="Crew Requests by Status"
             action={
-              <Link to="/yard/refit/crew-requests" className="text-[11px] text-ocean">
+              <Link to="/yard/refit/crew-requests" className="text-[11px] text-primary">
                 View all →
               </Link>
             }
@@ -436,7 +436,7 @@ export default function Dashboard() {
           <Section
             title="Upcoming Logistics"
             action={
-              <Link to="/yard/refit/logistics" className="text-[11px] text-ocean">
+              <Link to="/yard/refit/logistics" className="text-[11px] text-primary">
                 View all →
               </Link>
             }
@@ -448,7 +448,7 @@ export default function Dashboard() {
                 {logistics.map((l) => (
                   <div key={l.id} className="flex justify-between items-center py-2.5 text-sm">
                     <div className="min-w-0 truncate">
-                      <span className="text-[10px] uppercase tracking-wider text-ocean mr-2">
+                      <span className="text-[10px] uppercase tracking-wider text-primary mr-2">
                         {l.kind.replace(/_/g, " ")}
                       </span>
                       <span>{l.title}</span>
@@ -476,7 +476,7 @@ export default function Dashboard() {
                 {activity.map((a) => (
                   <div key={a.id} className="flex justify-between items-center py-2.5 text-sm">
                     <div className="min-w-0 truncate">
-                      <span className="text-[10px] uppercase tracking-wider text-ocean font-medium mr-2">
+                      <span className="text-[10px] uppercase tracking-wider text-primary font-medium mr-2">
                         {a.action}
                       </span>
                       <span>{a.entity_label ?? "—"}</span>

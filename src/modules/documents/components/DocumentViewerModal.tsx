@@ -191,7 +191,7 @@ const DocumentViewerModal: React.FC<DocumentViewerModalProps> = ({
           {/* Right Panel - Tabs */}
           <div className="w-[400px] flex flex-col">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
-              <TabsList className="w-full justify-start rounded-none border-b px-4 pt-2 h-auto bg-transparent">
+              <TabsList className="w-full justify-start rounded-none px-4 pt-2 h-auto bg-transparent">
                 <TabsTrigger value="details">
                   Details
                 </TabsTrigger>

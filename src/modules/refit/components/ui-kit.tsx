@@ -96,7 +96,7 @@ export function ListShell({ children }: { children: ReactNode }) {
 
 export function ListHeader({ children }: { children: ReactNode }) {
   return (
-    <div className="grid bg-paper border-b border-black/5 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+    <div className="grid bg-muted/50 border-b border-black/5 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
       {children}
     </div>
   );
@@ -112,7 +112,7 @@ export function ListRow({
   onClick?: () => void;
 }) {
   const cls =
-    "grid items-center px-4 py-3 border-b border-black/5 hover:bg-paper transition cursor-pointer text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset";
+    "grid items-center px-4 py-3 border-b border-black/5 hover:bg-muted/50 transition cursor-pointer text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset";
   if (to)
     return (
       <Link to={to} className={cls}>
@@ -141,7 +141,7 @@ export function EmptyState({
 }) {
   return (
     <div className="p-10 text-center">
-      <div className="mx-auto mb-3 size-10 rounded-full bg-paper border border-black/5 flex items-center justify-center text-muted-foreground">
+      <div className="mx-auto mb-3 size-10 rounded-full bg-muted border border-black/5 flex items-center justify-center text-muted-foreground">
         ∅
       </div>
       <div className="text-sm font-medium">{title}</div>
@@ -154,13 +154,13 @@ export function EmptyState({
 export function LoadingRow({ cols = 5 }: { cols?: number }) {
   return (
     <div className="px-4 py-3 border-b border-black/5">
-      <div className="animate-pulse h-4 bg-paper rounded-sm" style={{ width: `${cols * 12}%` }} />
+      <div className="animate-pulse h-4 bg-muted rounded-sm" style={{ width: `${cols * 12}%` }} />
     </div>
   );
 }
 
 export function ErrorBlock({ message }: { message: string }) {
-  return <div className="p-4 m-4 text-xs text-danger bg-danger/10 rounded-sm">{message}</div>;
+  return <div className="p-4 m-4 text-xs text-destructive bg-destructive/10 rounded-sm">{message}</div>;
 }
 
 // -------------------- BUTTONS ------------------------------------------
@@ -183,7 +183,7 @@ export function PrimaryBtn({
       type={type ?? "button"}
       onClick={onClick}
       disabled={disabled}
-      className={`px-3 py-2 bg-navy text-white rounded-sm text-sm font-medium hover:opacity-90 disabled:opacity-50 ${className ?? ""}`}
+      className={`px-3 py-2 bg-primary text-primary-foreground rounded-sm text-sm font-medium hover:bg-primary/90 disabled:opacity-50 ${className ?? ""}`}
     >
       {children}
     </button>
@@ -227,7 +227,7 @@ export function DangerBtn({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="px-3 py-2 bg-danger/10 text-danger border border-danger/20 rounded-sm text-sm hover:bg-danger/15 disabled:opacity-50"
+      className="px-3 py-2 bg-destructive/10 text-destructive border border-destructive/20 rounded-sm text-sm hover:bg-destructive/15 disabled:opacity-50"
     >
       {children}
     </button>
@@ -253,13 +253,13 @@ export function Field({
     <label className="block">
       <span className="block text-xs uppercase tracking-wider text-muted-foreground mb-1">
         {label}
-        {required && <span className="text-danger ml-0.5">*</span>}
+        {required && <span className="text-destructive ml-0.5">*</span>}
       </span>
       {children}
       {hint && !error && (
         <span className="block text-[11px] text-muted-foreground mt-1">{hint}</span>
       )}
-      {error && <span className="block text-[11px] text-danger mt-1">{error}</span>}
+      {error && <span className="block text-[11px] text-destructive mt-1">{error}</span>}
     </label>
   );
 }
@@ -289,13 +289,13 @@ export function Drawer({
     <div className="fixed inset-0 z-50 flex">
       <button aria-label="Close" onClick={onClose} className="flex-1 bg-black/40" />
       <div
-        className={`bg-paper border-l border-black/10 shadow-xl flex flex-col w-full ${wide ? "max-w-3xl" : "max-w-md"}`}
+        className={`bg-card border-l border-black/10 shadow-xl flex flex-col w-full ${wide ? "max-w-3xl" : "max-w-md"}`}
       >
         <div className="flex items-center justify-between px-5 h-12 border-b border-black/10">
-          <div className="text-xs uppercase tracking-[0.25em] text-ocean font-semibold truncate">
+          <div className="text-xs uppercase tracking-[0.25em] text-primary font-semibold truncate">
             {title}
           </div>
-          <button onClick={onClose} className="text-muted-foreground hover:text-ink text-xs">
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xs">
             Close
           </button>
         </div>
@@ -335,7 +335,7 @@ export function StatCard({
   sub?: string;
 }) {
   const ring =
-    tone === "bad" ? "ring-1 ring-danger/30" : tone === "warn" ? "ring-1 ring-warning/30" : "";
+    tone === "bad" ? "ring-1 ring-destructive/30" : tone === "warn" ? "ring-1 ring-warning/30" : "";
   return (
     <div className={`p-5 bg-card border border-black/5 rounded-sm shadow-sm ${ring}`}>
       <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wider">{label}</div>
@@ -357,7 +357,7 @@ export function Section({
   return (
     <section className="p-6 bg-card border border-black/5 rounded-sm shadow-sm">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-deep">{title}</h2>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-foreground">{title}</h2>
         {action}
       </div>
       {children}

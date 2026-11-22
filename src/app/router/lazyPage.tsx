@@ -8,7 +8,10 @@
  * different Suspense fallbacks. `lazyPage` fixes both:
  *
  * - `React.lazy` runs once, when `lazyPage()` is called. Call it at module
- *   scope, never inside a render or a route element.
+ *   scope, never inside a render or a route element. The one exception is
+ *   recovery: React.lazy caches a rejected import, so after a chunk fails to
+ *   load, the next Try again, path change or fresh mount gets a new
+ *   React.lazy that fetches the chunk again.
  * - Every page gets the same `LazyLoader` fallback.
  * - Every page gets its own `ErrorBoundary`, reset by the URL path, so a
  *   broken page clears itself when the user navigates away.
@@ -87,34 +90,69 @@ export function lazyPage<P extends object>(
   options: LazyPageOptions = {},
 ): LazyPageComponent<P> {
   // One import promise shared by preload() and React.lazy. A failed import is
-  // forgotten so a later preload can try again.
+  // forgotten so a later preload or retry can try again. A result that is not
+  // a module counts as a failure too: when main.tsx prevents Vite's
+  // vite:preloadError, the import resolves to undefined instead of rejecting.
   let pending: Promise<PageModule<P>> | null = null;
   const load = (): Promise<PageModule<P>> => {
     if (!pending) {
-      pending = loader().catch((error: unknown) => {
-        pending = null;
-        throw error;
-      });
+      pending = loader()
+        .then((m) => {
+          if (!m || typeof m !== 'object' || !('default' in m)) throw new Error('Page chunk failed to load');
+          return m;
+        })
+        .catch((error: unknown) => {
+          pending = null;
+          throw error;
+        });
     }
     return pending;
   };
 
-  const Lazy = React.lazy(load) as unknown as React.ComponentType<P>;
+  // The React.lazy in use, and whether its import failed. Normal renders all
+  // share one; a failed one is replaced only when a page recovers (below).
+  interface LazyEntry {
+    Lazy: React.ComponentType<P>;
+    failed: boolean;
+  }
+  const makeEntry = (): LazyEntry => {
+    const entry: LazyEntry = { Lazy: () => null, failed: false };
+    entry.Lazy = React.lazy(() =>
+      load().catch((error: unknown) => {
+        entry.failed = true;
+        throw error;
+      }),
+    ) as unknown as React.ComponentType<P>;
+    return entry;
+  };
+  let current = makeEntry();
+  /** The lazy component to render: a fresh one if the current one failed to load. */
+  const acquire = (): React.ComponentType<P> => {
+    if (current.failed) current = makeEntry();
+    return current.Lazy;
+  };
+
   const { guard, layout, label } = options;
 
-  const Page: React.FC<P> = (props) => (
-    <>
-      {wrapWith(
-        guard,
-        wrapWith(
-          layout,
-          <RouteErrorBoundary label={label}>
-            <RouteSuspense>{React.createElement(Lazy, props)}</RouteSuspense>
-          </RouteErrorBoundary>,
-        ),
-      )}
-    </>
-  );
+  const Page: React.FC<P> = (props) => {
+    // Read once per mount, so remounting after a failed load retries it.
+    const [Lazy, setLazy] = React.useState(() => acquire());
+    // The boundary was reset (Try again, or the path changed): retry a failed load.
+    const retry = React.useCallback(() => setLazy(() => acquire()), []);
+    return (
+      <>
+        {wrapWith(
+          guard,
+          wrapWith(
+            layout,
+            <RouteErrorBoundary label={label} onReset={retry}>
+              <RouteSuspense>{React.createElement(Lazy, props)}</RouteSuspense>
+            </RouteErrorBoundary>,
+          ),
+        )}
+      </>
+    );
+  };
   Page.displayName = label ? `LazyPage(${label})` : 'LazyPage';
 
   return Object.assign(Page, { preload: load, meta: Object.freeze({ loader, guard, layout, label }) });

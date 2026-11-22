@@ -25,7 +25,9 @@ export type { Fixtures };
  *     return { useAuth: () => s.authState.value, AuthProvider: ({ children }: any) => children };
  *   });
  *   vi.mock('@/modules/vessels/contexts/VesselContext', () => ({
- *     useVessel: () => ({ vessels: [], selectedVessel: null, selectedVesselId: null }),
+ *     // loadedForUserId: whose lists these are; the scope routes only count
+ *     // them as loaded for that signed-in user (useScopeAccess).
+ *     useVessel: () => ({ vessels: [], selectedVessel: null, selectedVesselId: null, loadedForUserId: MEDIC_USER.id }),
  *     VesselProvider: ({ children }: any) => children,
  *   }));
  */

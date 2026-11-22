@@ -16,6 +16,13 @@ const ContextMenuSub = ContextMenuPrimitive.Sub;
 
 const ContextMenuRadioGroup = ContextMenuPrimitive.RadioGroup;
 
+/*
+ * Highlighted option (gap/10 A.5, WCAG 1.4.11): a signal-muted fill plus a 2px
+ * primary bar on the leading edge. The fill alone is ~1.1:1 against the
+ * popover; the bar (>= 3:1, contrast.test.ts) is the cue. Radix sets
+ * `data-highlighted` for keyboard and pointer alike. Text uses `focus:` so a
+ * consumer's `focus:text-destructive` still replaces it in cn().
+ */
 const ContextMenuSubTrigger = React.forwardRef<
   React.ElementRef<typeof ContextMenuPrimitive.SubTrigger>,
   React.ComponentPropsWithoutRef<typeof ContextMenuPrimitive.SubTrigger> & {
@@ -25,7 +32,7 @@ const ContextMenuSubTrigger = React.forwardRef<
   <ContextMenuPrimitive.SubTrigger
     ref={ref}
     className={cn(
-      "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-[state=open]:bg-accent data-[state=open]:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
+      "flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none focus:text-foreground data-[highlighted]:bg-signal-muted data-[highlighted]:shadow-[inset_2px_0_0_hsl(var(--primary))] data-[state=open]:bg-accent data-[state=open]:text-accent-foreground data-[state=open]:shadow-[inset_2px_0_0_hsl(var(--primary))]",
       inset && "pl-8",
       className,
     )}
@@ -78,7 +85,7 @@ const ContextMenuItem = React.forwardRef<
   <ContextMenuPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus:bg-accent focus:text-accent-foreground",
+      "relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus:text-foreground data-[highlighted]:bg-signal-muted data-[highlighted]:shadow-[inset_2px_0_0_hsl(var(--primary))]",
       inset && "pl-8",
       className,
     )}
@@ -94,7 +101,7 @@ const ContextMenuCheckboxItem = React.forwardRef<
   <ContextMenuPrimitive.CheckboxItem
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus:bg-accent focus:text-accent-foreground",
+      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus:text-foreground data-[highlighted]:bg-signal-muted data-[highlighted]:shadow-[inset_2px_0_0_hsl(var(--primary))]",
       className,
     )}
     checked={checked}
@@ -117,7 +124,7 @@ const ContextMenuRadioItem = React.forwardRef<
   <ContextMenuPrimitive.RadioItem
     ref={ref}
     className={cn(
-      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus:bg-accent focus:text-accent-foreground",
+      "relative flex cursor-default select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 focus:text-foreground data-[highlighted]:bg-signal-muted data-[highlighted]:shadow-[inset_2px_0_0_hsl(var(--primary))]",
       className,
     )}
     {...props}

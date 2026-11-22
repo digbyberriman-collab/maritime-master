@@ -1,5 +1,5 @@
 import type { ManifestPageLoader, RouteDef } from '@/app/registry/types';
-import { REFIT_PATHS, REFIT_REDIRECTS } from './paths';
+import { REFIT_PATHS, REFIT_REDIRECTS, REFIT_RETIRED_SIDEBAR_REDIRECTS } from './paths';
 
 /**
  * Refit workspace routes, as data (BUILD-PLAN B8). The module manifest
@@ -51,4 +51,6 @@ export const REFIT_ROUTES: readonly RouteDef[] = [
   page(REFIT_PATHS.loginDiagnostics, () => import('./pages/login-diagnostics')),
   // Old or shorthand Refit URLs the ported pages link to (see REFIT_REDIRECTS).
   ...REFIT_REDIRECTS.map(({ from, to }): RouteDef => ({ scope: 'workspace', workspace: 'yard', path: from, redirectTo: to })),
+  // RETIRED for one release (gap/10 W3): the old double-slug sidebar URLs.
+  ...REFIT_RETIRED_SIDEBAR_REDIRECTS.map(({ from, to }): RouteDef => ({ scope: 'workspace', workspace: 'yard', path: from, redirectTo: to })),
 ];

@@ -8,10 +8,10 @@ import { AppShell, PageHeader } from "@/modules/refit/components/AppShell";
 import { RequireAuth } from "@/modules/refit/components/RequireAuth";
 
 const STATUS_TONE: Record<string, string> = {
-  draft: "bg-secondary text-slate-deep",
+  draft: "bg-secondary text-secondary-foreground",
   quoted: "bg-warning/10 text-warning",
-  accepted: "bg-ocean/10 text-ocean",
-  in_progress: "bg-ocean/15 text-ocean",
+  accepted: "bg-primary/10 text-primary",
+  in_progress: "bg-primary/15 text-primary",
   complete: "bg-success/10 text-success",
   closed: "bg-secondary text-muted-foreground",
 };
@@ -59,7 +59,7 @@ export default function WorksPage() {
           title="Works Orders"
           subtitle={`${rows.length} works orders on Y709`}
           action={
-            <button className="px-3 py-2 bg-navy text-white rounded-sm text-sm">
+            <button className="px-3 py-2 bg-primary text-primary-foreground rounded-sm text-sm hover:bg-primary/90">
               + New works order
             </button>
           }

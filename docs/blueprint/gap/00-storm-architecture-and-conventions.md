@@ -130,7 +130,7 @@ src/modules/<module>/
 | Public | `/auth`, `/reset-password`, `/accept-invite/:token` | none | none | anyone | doc 01 |
 | External viewer | `/x/:token/…` | minimal shell | token + authenticator | invited viewer | docs 01, 06 |
 | Personal | `/me/…` | `PersonalScope` | login | every user | doc 01 |
-| Fleet | `/fleet/…` | `FleetScope` → `AppShell scope="fleet"` | login + fleet reach + leaf capability | owner, admins, shore staff with fleet access | docs 01, 02, 03 |
+| Fleet | `/fleet/…` | `FleetScope` → `AppShell scope="fleet"` | login + fleet reach + leaf capability (except the five live `/fleet/admin` pages, which stay login + fleet reach until doc 03 lands: DECISIONS D-33) | owner, admins, shore staff with fleet access | docs 01, 02, 03 |
 | Vessel | `/v/:vesselCode/…` | `VesselScopeRoute` → `AppShell scope="vessel"` | login + vessel reach + module on for vessel + leaf capability | anyone assigned to or with reach over that vessel | docs 01, 04–07 |
 | Workspaces | `/hris/…`, `/health/…`, `/yard/…`, `/shoreside/…`, `/departments/legal/…` | `WorkspaceScope` (existing shells kept: `RefitShell`, `NewBuildShell`, `LegalShell`) | login + module capability | per module | existing modules |
 
@@ -228,7 +228,7 @@ Status here describes the platform capability, not a domain feature. "Blueprint 
 | J2 | Lockfile policy | — | partial | `bun.lock` and `package-lock.json` both present; CI uses `npm ci`; drift broke installs before (HRIS-AUDIT 4.7) | Dependency changes only in platform PRs; update both lockfiles in the same commit, or drop one (Open questions) | P2 | S |
 | J3 | README and contributor guide | — | missing | README is Lovable boilerplate (`REPLACE_WITH_PROJECT_ID`) | Setup, environments, module map, how a migration reaches production, Lovable rules, link to this doc | P1 | S |
 | J4 | Beta flags and per-vessel module toggles | §1.3 | missing | None (T-10 asked for leave screens to be hidden per vessel) | Nav `status: 'beta'` + capability for incremental release; per-vessel module settings owned by doc 03 | P1 | M |
-| J5 | Resilience basics (boundaries, query defaults, stale-chunk recovery) | — | complete | `App.tsx` (boundaries, `staleTime` 30 s, `retry` 1), `main.tsx` (reload loop guard and recovery panel) | Keep; add error reporting (G4) | — | — |
+| J5 | Resilience basics (boundaries, query defaults, stale-chunk recovery) | — | complete (fixed in the Phase 0 audit) | `App.tsx` (boundaries, `staleTime` 30 s, `retry` 1), `main.tsx` (reload loop guard and recovery panel), `src/app/router/lazyPage.tsx`. The Phase 0 audit found the `main.tsx` reload guard was reset at every boot, so its cap never tripped, and that a lazy page never retried a failed chunk. The fix bounds automatic reloads (`MAX_RELOADS` within a time window, then the recovery panel) and lets Try again or a navigation retry the page chunk | Keep; add error reporting (G4) | — | — |
 | **K** | **No fabricated data** | | | | | | |
 | K1 | Mocked pages removed or replaced | — | placeholder | `ism/pages/PermitsToWorkPage.tsx` (`mockPermits`, sidebar-linked), `ObservationsPage.tsx`, `maintenance/pages/CriticalEquipment.tsx`, `documents/pages/{Manuals,Policies,Procedures}.tsx`, `vessels/pages/CompanyDetails.tsx`, `settings/pages/APIIntegrations.tsx`, `drills/components/EquipmentReadinessTab.tsx` | Owning domain stream replaces each with the real page or `status: 'planned'`; test bans `const mock*`/`SAMPLE_*` in `src/modules/*/pages` | P0 | S per page |
 

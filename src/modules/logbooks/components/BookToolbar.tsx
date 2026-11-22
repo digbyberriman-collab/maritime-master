@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { profiles } from '../lib/templates';
 import type { LogbookBook } from '../lib/catalog';
 import type { FlagProfileId, RegistryRow, VolumeRow } from '../lib/types';
+import { useLogbookPath } from '../lib/useLogbookPath';
 
 interface Props {
   book: LogbookBook;
@@ -34,6 +35,7 @@ const BookToolbar: React.FC<Props> = ({
   onOpenVolume, onContinueVolume, onShowCover, onCloseVolume, onPrint,
 }) => {
   const [open, setOpen] = React.useState(false);
+  const bookPath = useLogbookPath();
   const settingsId = React.useId();
   const act = (fn: () => void) => () => { setOpen(false); fn(); };
   return (
@@ -50,7 +52,7 @@ const BookToolbar: React.FC<Props> = ({
             {p.id}<small className="block text-[10px] font-normal">{p.flag}</small>
           </button>
         ))}
-        <Button asChild variant="ghost" size="sm" className="text-xs"><Link to={`/vessel/logbooks/assurance?book=${book.id}`}><Layers className="mr-1 h-3.5 w-3.5" /> Compare formats</Link></Button>
+        <Button asChild variant="ghost" size="sm" className="text-xs"><Link to={bookPath('assurance', `?book=${book.id}`)}><Layers className="mr-1 h-3.5 w-3.5" /> Compare formats</Link></Button>
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <span className="max-w-[16rem] truncate text-sm text-muted-foreground" title={volume?.label ?? ''}>{volume ? volume.label : 'No volume opened'}</span>
@@ -82,7 +84,7 @@ const BookToolbar: React.FC<Props> = ({
             </div>
             <div className="space-y-2 border-t border-border pt-3">
               <p><strong>{registry ? `${profile} registry · revision ${registry.version}` : 'Vessel registry not set up'}</strong></p>
-              <Link to="/vessel/logbooks/registry" className="text-xs text-primary hover:underline">{registry ? 'Edit vessel details' : 'Set up vessel details'} ↗</Link>
+              <Link to={bookPath('registry')} className="text-xs text-primary hover:underline">{registry ? 'Edit vessel details' : 'Set up vessel details'} ↗</Link>
               {book.sensor ? (
                 <label className="flex items-start justify-between gap-2">
                   <span>Prepare an entry from readings on open<small className="block text-xs text-muted-foreground">{readingStatus}</small></span>
@@ -92,7 +94,7 @@ const BookToolbar: React.FC<Props> = ({
                 <p className="text-xs text-muted-foreground">Saved registration details fill the cover of a new volume.</p>
               )}
             </div>
-            <Link to={`/vessel/logbooks/assurance?book=${book.id}&tab=coverage`} className="block text-xs text-primary hover:underline">Sources &amp; format coverage ↗</Link>
+            <Link to={bookPath('assurance', `?book=${book.id}&tab=coverage`)} className="block text-xs text-primary hover:underline">Sources &amp; format coverage ↗</Link>
           </PopoverContent>
         </Popover>
       </div>

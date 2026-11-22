@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Plus, Pencil, Trash2, MapPin, Target, Sofa } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import type { Tables } from "@/integrations/supabase/types";
 
 interface AreaForm {
   name: string;
@@ -95,7 +96,7 @@ export default function Areas() {
     setForm(emptyForm);
   };
 
-  const openEdit = (a: any) => {
+  const openEdit = (a: Tables<"nb_areas">) => {
     setEditingId(a.id);
     setForm({
       name: a.name,

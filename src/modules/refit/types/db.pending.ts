@@ -5,7 +5,10 @@
  * migration block 11). Until it lands and `types.ts` is regenerated, these
  * shapes are the only declaration of the tables, and every call against
  * them can fail with "relation does not exist" on a database that lacks
- * them (`isMissingRelation` in src/integrations/supabase/pending.ts).
+ * them. Classify that with `isMissingRelation` (the one helper, in
+ * src/integrations/supabase/missingRelation.ts; re-exported from
+ * `@/integrations/supabase/pending` and as `isMissingRelationError` from
+ * `@/shared/lib/notify`).
  *
  * The client typed with these is `refitDb` (../lib/db.ts). When the import
  * lands and the types are regenerated, src/test/config/pendingTables.test.ts

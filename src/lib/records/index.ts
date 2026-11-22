@@ -1,11 +1,14 @@
 /**
  * Record engines (gap/08): pure TypeScript, no database access.
  *
- * - `expiry`      window-relative expiry buckets (DECISIONS C5)
+ * - `dates`       calendar days: `toCalendarDate` for date columns,
+ *                 `localCalendarDate` for instants ("days since" ages)
+ * - `expiry`      window-relative expiry buckets (DECISIONS C5, D-31)
  * - `reference`   TYPE-VSL-YYYY-NNN / TYPE-YYYY-NNN / VSL-YYYYMMDD-NNN (C21)
  * - `signatures`  ordered signature slots, sign as / witnessed / on behalf,
  *                 pass to, reverse-order removal, stale detection
  * - `companyStep` envelope transitions with the none / acknowledge / sign_off gate
+ *                 (return and close-as sources D-30, void rules D-32)
  * - `threads`     status-update threads, requests, follow-up dates
  * - `whoseMove`   vessel / company / none
  * - `registry`    record-kind registry (G7)

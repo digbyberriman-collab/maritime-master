@@ -67,16 +67,12 @@ describe('pendingClient', () => {
 });
 
 describe('isMissingRelation (D-01: a pending table may not exist yet)', () => {
-  it('recognises the missing-table errors', () => {
+  // Alias checks only: the full classifier table is src/test/lib/missingRelation.test.ts.
+  it('is the shared classifier', () => {
     expect(isMissingRelation({ code: '42P01', message: 'relation "public.rf_snags" does not exist' })).toBe(true);
-    expect(isMissingRelation({ code: 'PGRST205', message: "Could not find the table 'public.rf_snags' in the schema cache" })).toBe(true);
+    expect(isMissingRelation({ code: 'PGRST202', message: 'Could not find the function public.next_reference in the schema cache' })).toBe(true);
     expect(isMissingRelation({ code: '', message: 'relation "rf_x" does not exist' })).toBe(true);
-  });
-
-  it('does not mistake other failures for a missing table', () => {
-    expect(isMissingRelation(null)).toBe(false);
-    expect(isMissingRelation(undefined)).toBe(false);
     expect(isMissingRelation({ code: '42501', message: 'permission denied for table rf_snags' })).toBe(false);
-    expect(isMissingRelation({ code: 'PGRST116', message: 'JSON object requested, multiple (or no) rows returned' })).toBe(false);
+    expect(isMissingRelation(null)).toBe(false);
   });
 });
