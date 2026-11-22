@@ -1,0 +1,144 @@
+# Completeness critic review of gap docs 00–10
+
+> Doc 99 of the blueprint gap series. It checks the ten domain gap docs and doc 00 against the blueprint (v1.3) heading list and against each other. It covers four things: blueprint coverage, contradictions between docs, personal data and verbatim copying, and a spot-check of STORM status claims against the code. This review does not edit the docs. Each finding names the file and line so the owning doc can be fixed. Line numbers are from the files as they stood on 22 Nov 2026.
+
+---
+
+## 0. Method
+
+- **Coverage.** Every `##`–`####` heading in the blueprint (§1–§10, the exec summary and Appendices A–C) was matched against `§n.n` citations in docs 00–10. This included range citations such as `§3.1–3.6` and plain-number references. Sections with 0–2 hits, and long sections with few hits, were then read in the blueprint and compared with what the docs specify.
+- **Contradictions.** The Data model and Target IA sections of all eleven docs were compared side by side, along with the Implementation notes where docs refer to each other. Every proposed table, view, RPC, route, bucket and column name that two docs define for the same concept was diffed.
+- **Personal data and copying.** Regex scans for emails and phone numbers. Name scans used common given names plus every name token from the ticket export's submitter addresses and greetings (the tokens are not reproduced here). A brand and hostname scan looked for the reference app's name and domain. A 12-word shingle overlap test ran against the blueprint and a 10-word test against the ticket export text. Quoted strings of 30 or more characters were also checked against the blueprint.
+- **Spot-checks.** Seven "complete" claims and five "partial" claims were checked by opening the cited code, migrations and generated types.
+
+---
+
+## 1. Blueprint coverage: sections missing or too thin to implement
+
+Every numbered blueprint section is cited by at least one doc. One exception, §3.37, is cited by none, and its contents are only partly picked up elsewhere. The table lists what an implementer still cannot build from the docs.
+
+| # | Blueprint § | What is missing | Where it is thin today | Recommended owner |
+|---|---|---|---|---|
+| G1 | **§3.37** (other entities, fields not captured): payroll runs, expenses, supplier invoices; candidate forms; vacancy steps 2–3 | No doc cites §3.37. Emergency (doc 05), inventory and PO (doc 06) and damage claims (doc 07) are covered. **Expenses, supplier invoices and payroll runs** have no data model, workflow or page anywhere. Candidate forms and vacancy steps 2–3 are listed in doc 09's known-gap register (L377) as "designed by STORM", but doc 02's recruitment section (W4, Vacancy row L467) designs no steps. | doc 02, doc 09 | New "Finance" section (see G2). Doc 02 adds vacancy steps 2–3 and the candidate form. |
+| G2 | **Finance module and Finance add-on** (§2.3 four finance approval flags, §2.4 Finance and ↳ Payroll levels, §3.23 / §4.15 Finance add-on, §4.1 Finance KPI tile, §4.16 Finance toggle) | Doc 10 L147 puts a vessel **Finance** tab under its own ownership ("Overview · Expenses · Invoices · APA · Budgets & Reporting"). Doc 10 is a design-system doc and has no data model, states or capabilities for it. Doc 02 D8 (L120) wants "real count from invoices", but no invoices table exists in any doc. Doc 03 F6 (L241) defers invoices. Doc 01 F27/F29 model the finance flags and levels with nothing behind them. | docs 01, 02, 03, 10 | Decide build or hide (doc 10 open question 7, doc 01 open question 10). If build, it needs its own gap doc. If hide, record "Finance off" in doc 01's module defaults and drop the D8 tile. |
+| G3 | **§4.16 MLC 2006 and Voice toggles** | Doc 01 L406 lists the `mlc2006` and `voice` module keys, and doc 03 L445 lists the matrix columns. No doc says what switching either one on or off shows, hides or enforces. Doc 10 open question 8 defers Voice. | docs 01, 03 | Doc 01: one line per module key saying what it gates (nav leaf, capability, rule, tile). |
+| G4 | **§4.15 / §3.23 / §7.7 add-on catalogue content** | Doc 03 F1–F3 define the add-on engine but never list the add-ons: Deck Plans, Finance and Recruitment in the blueprint. They also don't say which `module_key`s or capabilities each one gates. Doc 02's Employment › Recruitment pages are never tied to an entitlement. | docs 03, 02 | Doc 03: seed table of add-ons → gated module keys and capabilities. Doc 02: entitlement check on recruitment pages. |
+| G5 | **Vessel tabs with an owner but no spec**: Departments (68 placeholder leaves) and Logbooks (moved) | Doc 10 L146–148 claims "this doc" for the Logbooks, Finance and Departments tabs. Departments has no pages, tables or capabilities defined. Logbooks only has a route move. These are STORM extras, not blueprint items. They are listed here because doc 10 creates nav slots that nothing fills. | doc 10 | Keep them as `status: planned` (hidden) until a domain doc owns them. Doc 10 should say "slot only, no owner". |
+| G6 | **Appendix A** (positions) | Doc 01 L409 says "Seed ≈250 positions (blueprint Appendix A)". Doc 04 C70 (L271) says "our own list derived from industry usage, not a verbatim copy". Neither doc says how the positions map to `department_key`, `rank_tier` and `default_access_set_id`. Without that mapping the crew list sort, presets and notification routing can't be built. | docs 01, 04 | Doc 04 owns the seed: a STORM-authored list plus its mapping columns. Doc 01 points to it. |
+| G7 | **Cross-module record-kind list** (exec summary engines 2–3, §3.10, §8) | Doc 08 REG2 (L136) puts "one row per workflow record of any module" in `record_envelopes`. Domain docs keep their own status columns and transition RPCs instead. Doc 05 has permits, RAs, drills and emergencies. Doc 06 has jobs and POs. Doc 07 has voyages, reports and `voyage_sign_report()`. Doc 04 has HoR months. No doc lists which kinds are enveloped, so signature slots, threads and whose-move can't be wired consistently. | doc 08 | Doc 08: a table of every record kind (key, owning doc, enveloped yes/no, company step, slot template). Domain docs then drop their local transition RPCs or wrap `record_transition`. |
+
+Sections with low citation counts that were read and judged **adequately covered**:
+
+- §3.11–3.14, §3.20, §5.2.15 (doc 05 designs close-as, gas readings and schema-driven permit types).
+- §5.4.5, §5.4.8, §5.4.11 (doc 06 tables, W9 and open question 7).
+- §5.5.2, §5.5.4 (doc 07).
+- §7.9 (a pointer to §8, which doc 08 covers).
+- §7.11 (doc 03 `platform_subprocessors`).
+- §8.3 (doc 08).
+- Appendices B and C (doc 04 C71, `ref_countries` and `ref_languages`).
+- §7.3 / §5.8 (all 18 vessel reports appear as RV3–RV20 in doc 07).
+
+---
+
+## 2. Contradictions between docs
+
+Each item gives the conflicting statements and a recommended resolution. Unless stated otherwise, the recommendation picks the doc that owns the concept in doc 00's ownership table. Any doc that loses should be edited to point at the winner.
+
+### 2.1 Data model
+
+| # | Topic | Conflict | Recommended resolution |
+|---|---|---|---|
+| C1 | **Non-crew person directory** | Doc 02 L465 creates `visitor_people`. Doc 04 L500 and L571 reuse `visitor_people` and keep `hw_people` "for clinical use". Doc 07 L498, L572 and L610 make `hw_people` the "single non-crew person directory" for guests, owners, visitors and contractors. Doc 07 does not account for `hw_people`'s RLS (`20260919100000_health_phase1_foundation.sql` L419–437): select needs `wellness_can_view`, `medical_can_view` or `med_fitness_can_view`, and write needs a wellness or medical edit capability. A guest-list or visitor user without health access would see nothing. | One neutral directory owned by doc 02, e.g. `visitor_people` renamed `external_people` or `persons`, with its own capability-based RLS. Doc 07's `person_identity_documents` holds passport and ID data (T2) instead of passport columns on the person row. `guest_stays` and `vessel_visits` FK to it. `hw_people` gains `external_person_id` for clinical use only. Doc 07 drops the `hw_people` extension. |
+| C2 | **Vessel "counted" / demo / training flags** | Doc 01 L405 defines `is_counted`, `is_demo` and `lifecycle_status`. Doc 02 L436, L533 and L547 define `is_counted_in_fleet`. Doc 09 L425 defines `is_training` and `training_since`, "excluded from KPIs … and counted-vessel rule". That is three overlapping flags for one rule (§7.13). | Doc 01 owns them: `lifecycle_status` plus `is_counted`, plus one purpose enum, `vessel_purpose ∈ {operational, demo, training}`, that replaces both `is_demo` and `is_training`. Docs 02 and 09 reference doc 01. |
+| C3 | **`feature_flags` table, two schemas** | Doc 00 L348 has `feature_flags(company_id, key, enabled, audience)`. Doc 09 L419–420 has `feature_flags(key PK, state)` plus `account_feature_flags(company_id, flag_key, …)`. They are the same table name with incompatible shapes. | Doc 09's shape (platform flag plus per-account opt-in) is the fuller one. Doc 00 should reference it and drop its own row. |
+| C4 | **Client error capture tables** | Doc 00 L347 and L635 have `client_error_events` ("doc 09 SUP7"). Doc 09 L411 and L503 have `client_error_occurrences` plus `client_error_groups`. | Use doc 09's names. Doc 00 should update its row and its G4 reference. |
+| C5 | **Expiry buckets and warning windows** | Doc 08 EXP1 (L316) and doc 10 L527 hard-code `expiring_90` / `expiring_30` tiers. Doc 02 L440 and doc 04 L327 use per-type warning windows from `expiry_window_rules`, with passports at 270 days, so a fixed 90-day bucket mislabels passports. Doc 06 L491 also stores `expiring_windows` on `certificate_types`, a second place to configure certificate windows. Doc 08 says computation is "owned by doc 02 X2" but then defines the bucket names itself. | Doc 02 owns `expiry_bucket()`. Use window-relative buckets `expiring` (inside the type's window) and `expiring_soon` (≤ 30 d), not `_90` / `_30`. Windows live only in `expiry_window_rules`, keyed by item type or `certificate_type_id`; drop `certificate_types.expiring_windows`. Docs 08 and 10 use labels such as "Due ≤ window" and "≤ 30 d". |
+| C6 | **`form_templates.area` means two things** | In doc 02 L452, `area` is the module area (safety, technical, movement, charter, crew, ptw, …). Doc 05 L630 and doc 07 L490 use it the same way. Doc 06 L522 adds `module = 'technical'` plus `area ∈ {forms, checklists, registers}`, a different meaning in the same column. The company-step flag also has three names: `company_signoff` (doc 05 L630), `company_step` (doc 06 L522) and `record_kinds.company_step` (doc 08). | Keep `area` as doc 02's module-area enum. Add `form_kind ∈ {form, checklist, register, passage_plan, …}` for doc 06's meaning. Use doc 08's `company_step` enum (`none` / `acknowledge` / `sign_off`) everywhere and drop `company_signoff`. |
+| C7 | **Attachments: one engine vs per-domain tables** | Doc 08 L545–546 defines `file_objects` plus `record_attachments` and states the domain stores "migrate over time". Several docs still create new parallel tables: doc 05 L617 `safety_record_attachments`, doc 06 L506 `technical_media`, doc 07 L483 `voyage_report_files` and L494 `charter_documents`, and doc 03 L473 `support_request_attachments`. Path conventions also differ: doc 00 H3 uses `<company>/<vessel|fleet>/<module>/<record_id>/…`, doc 08 §I uses `…/<module>/<entity_type>/<entity_id>/…`, and doc 03 uses `company_id/request_id/…`. | New domains use `file_objects` and `record_attachments` from day one, with domain-specific columns (audience, deck pin, kind) on the link row or a thin side table. Doc 08 §I's path is canonical. Per-domain buckets stay. Docs 03, 05, 06 and 07 should be edited. |
+| C8 | **Envelope satellite tables** | Doc 08's reconciliation (L672–678) folds doc 05's `safety_records`, `safety_record_updates` and `safety_record_snapshots` into the generic engine. It does not cover doc 05's `safety_record_events` (L614), `safety_record_links` (L616), `safety_record_attachments` (L617) or `safety_record_notifications` (L618). Doc 06 `job_activity` (L502, "also the job's audit trail") duplicates `record_events` and the thread engine in the same way. | Extend doc 08's reconciliation: `record_events`, `record_attachments` and a generic `record_links` replace the safety versions. `safety_record_notifications` (external authority log) stays as a safety-only table keyed on the envelope. Doc 06 `job_activity` becomes thread entries plus `record_events`. |
+| C9 | **Signature stores** | Doc 08 SIG18 (L160) migrates `work_rest_signatures` into `record_signatures`. Doc 04 L481 says HoR signatures "stay in `work_rest_signatures`". Doc 07 L481, L568 and L580 propose an interim `voyage_report_signatures` table plus `voyage_sign_report()`. That breaks doc 08's "do not create parallel tables" rule. | Voyage reports wait for doc 08's slots (build order: engines before doc 07 reports). HoR follows SIG18 through a compatibility view. Docs 04 and 07 should be edited. |
+| C10 | **Export log** | Doc 07 L522 has `report_exports`. Doc 08 L549 has `export_jobs` plus `export_downloads`. Doc 03 L488 has `gdpr_exports`; doc 08 reconciles that one, but doc 03 itself was not updated. | `export_jobs` (doc 08) only. Doc 07's report exports become `kind = 'csv' | 'xlsx' | 'compliance_pack'` rows. Docs 03 and 07 should be edited. |
+| C11 | **Calendar feed name and columns** | Doc 02 L443 has `fleet_calendar_feed(...)`, which doc 07 L504 reuses. Doc 08 L676 renames it `calendar_feed`. Doc 02 L442 has `calendar_events.timezone`, while doc 08 L551 has `time_zone`. | `calendar_feed()` and `time_zone` (doc 08 wins as the engine owner). Docs 02 and 07 should be edited. |
+| C12 | **Report registry location** | Doc 02 L441 has `src/modules/fleet/reports/registry.ts`. Doc 07 L524 has `src/modules/reports/registry.ts` "shared with doc 02". | One registry, `src/modules/reports/registry.ts`, with a `scope` flag (doc 07). Doc 02 should be edited. |
+| C13 | **Per-vessel module settings vs per-module settings tables** | Doc 01 L406 puts on/off, label and `settings jsonb` in `vessel_module_settings` (keys include `safety_manual`). Doc 04 L477 and doc 07 L486 use that jsonb. Doc 05 L653 creates `vessel_safety_settings` with `smm_visible`, which duplicates `safety_manual`; it also repeats `drill_due_any_time_in_month` (L634 and L653). Doc 06 L528 creates `vessel_technical_settings`. | Rule: enablement, labels and "on from" dates live only in `vessel_module_settings`. Typed configuration lives in `vessel_<module>_settings` tables (doc 05 and doc 06 style), not jsonb. Remove `smm_visible`. Docs 04 and 07 move their jsonb settings to typed tables. |
+| C14 | **Branding columns and storage** | Account: doc 01 L400 uses `display_name`, `logo_url`, `tagline`, but the live columns are `client_display_name`, `client_logo_url` and `brand_color` (types.ts `companies`). Doc 10 L714 adds `client_logo_dark_url` and `footer_tagline`. Doc 08 L548 uses `logo_file_id`. Vessel: doc 07 L515 uses `logo_path`, `icon_path`, `seal_path` plus bucket `vessel-branding`, while doc 08 L547 uses `logo_file_id`, `icon_file_id`, `seal_file_id`. Accepted types also differ: doc 08 allows JPG/PNG/GIF/WebP/HEIC, doc 10 and doc 01 F1 allow JPEG/PNG/WebP/SVG. | Keep the existing `client_*` names. Add `client_logo_dark_file_id` and one `footer_tagline`. Store all logos and seals as `file_objects` FKs (doc 08). One allow-list (doc 08's, plus SVG for tenant logos only). |
+| C15 | **Entitlement helper** | Doc 03 L238, L557 and L585 use `vessel_has_addon(vessel, addon)`. Doc 08 L294 and L480 use `has_vessel_entitlement()` "defined here". | One function, `has_vessel_entitlement(vessel, entitlement_key)`, owned by doc 03 (the add-on owner) and called by doc 01's `has_capability`. |
+| C16 | **Vessel-reach helper** | Doc 00 L186 and later lines have `user_can_reach_vessel(_user, _vessel) → bool`. Doc 01 L428 and L475 (and doc 04) have `user_vessel_reach(user) → setof uuid`. They are two names, and doc 00 says doc 01 owns the model. | Doc 01 defines both: `user_vessel_reach()` (set) and `user_can_reach_vessel()` (boolean wrapper used in RLS). Doc 00 should reference doc 01. |
+| C17 | **External viewer invitations** | Doc 06 L526 gives `technical_viewers` its own `token_hash`, invite and accept columns. Doc 01 L417 and L482 route every invite through `user_invitations` plus `account_memberships(kind = 'external')`. That is two token mechanisms. | Doc 01's invitation and membership flow issues the token. `technical_viewers` keeps only scope (period, costs, end date) and FKs `membership_id`. |
+| C18 | **Medical case store** | Doc 02 L464 points to `med_consultations` (+ SMS-form wrapper). Doc 05 L626 has NEW `medical_cases` on the safety envelope, patient `hw_people.id`. | Doc 05 wins (doc 02 already says "owned by SMS-forms gap doc"). Doc 02's row should be edited. The patient FK follows C1 (crew → `profiles.id` via `hw_people`; others → the external directory). |
+| C19 | **DPA: job role or flag** | Doc 01 F25 (L203) and L403 seed DPA as one of 12 `job_roles`. The doc 01 membership row also has `is_dpa` (L402). Doc 03 L437's job-role list leaves DPA out. | DPA is the `is_dpa` flag only, as doc 03 has it. Seed 11 job roles. |
+| C20 | **Vessel code case** | Doc 00 L336 says "3 lower-case letters". Doc 01 L405 uses `CHECK code ~ '^[A-Z]{3}$'` and lower case in URLs (L62). | Store upper case (doc 01), use lower case in URLs, resolve case-insensitively. Doc 00 should be edited. |
+| C21 | **Reference number format** | There are four patterns for the same kinds. `TYPE-YYYY-NNN`: blueprint §1.6, doc 01 L73, doc 03, doc 08 L119 (`CA-2026-014`), doc 10 L75. `TYPE-VSL-YYYY-NNN`: doc 05 L93 and L173 (`PTW-DRA-2026-061`, `INC-DRA-2026-009`), doc 09. `VSL-TYPE-YYYY-NNN`: doc 00 L341 (`DRA-PTW-2026-061`), doc 07 L80 (`DRA-CH-2026-004`). No vessel part at all: doc 06 (`SRV-YYYY-NNN`). Doc 00 says doc 08 owns the format, while doc 01 owns `format_reference()` and says "each domain wires its own". | Doc 01 owns one canonical pattern, recommended `TYPE-VSL-YYYY-NNN` (vessel-unique without lookup, and it sorts by type). Voyages keep `VSL-YYYYMMDD-NNN` as the only exception. Every doc's examples and doc 10's search examples should be updated. |
+| C22 | **Positions seed** | Doc 01 L409 seeds from blueprint Appendix A. Doc 04 L271 uses a STORM-authored list, "not a verbatim copy". | Doc 04's stance (see G6 and §3). |
+
+### 2.2 Routes and information architecture
+
+| # | Topic | Conflict | Recommended resolution |
+|---|---|---|---|
+| R1 | **Fleet sidebar grouping** | Doc 01 L83–119 groups everything under "Operations", then Workspaces, then Administration. Doc 02 L45–73 uses Overview, Compliance, People, Planning, Administration. Doc 03 L70–101 puts Vessels, Vessel Settings, Fleet Groups and Add-ons under Administration. Doc 10 L90–131 uses OVERVIEW, COMPLIANCE, PEOPLE, WORKSPACES, ADMINISTRATION and a separate **CONFIGURATION** group for Vessels, Vessel Settings, Fleet Groups, Add-ons, Certificate catalogue, Job library and Suppliers. It also adds Planner and Safety queue under OVERVIEW, while doc 05 L113 puts Safety queue under "Operations". | Doc 10 is canonical for nav structure (it owns IA). Docs 01, 02, 03 and 05 keep their route tables and drop their own tree groupings, or mark them "see doc 10". |
+| R2 | **`/fleet/planner` has two owners and two contents** | Doc 04 L117 and L130 say "owned here": the rotation planner with stacked vessel lanes. Doc 07 L128, L147 and L174 say the itinerary/season board moves there and "this doc proposes the move". Doc 10 L97 says "docs 04, 07". Doc 02 L70 still cross-links `/crew/rotation-planner`. | One page with tabs, `/fleet/planner?tab=crew|season`. Doc 04 owns the shell and the crew tab, doc 07 owns the season tab. Doc 02 drops its cross-link. |
+| R3 | **Feedback inbox** | Doc 10 L130 keeps "Feedback inbox `/fleet/admin/feedback`". Doc 03 L150 and doc 09 L119 retire feedback into Support and redirect `/admin/feedback`. Doc 03 redirects to `?source=feedback`, but doc 03's own enum value is `quick`. | Remove the leaf from doc 10. The redirect target is `/fleet/admin/support?source=quick` (tenant) or `/platform/support?source=quick` (staff). |
+| R4 | **Legal workspace route** | Doc 00 L135 keeps `/departments/legal/…`. Doc 10 L50, L111 and L171 propose `/legal/…` (open question 6). `/legal/privacy-policy` and `/legal/terms-of-service` already exist (`src/routes/index.tsx` L185–186) and the footer links to them, so a `/legal` workspace root would collide. | Keep `/departments/legal` (or use `/legal-workspace`). If `/legal` is wanted, first move the policy pages to `/policies/*` with redirects. |
+| R5 | **External viewer routes** | Doc 00 L131 has `/x/:token/…`. Doc 06 L125–127 has `/viewer/accept/:token`, `/viewer/sign-in` and `/viewer/:vesselCode/work-list`. | Doc 06's `/viewer/...` tree (it owns the portal). Doc 00's scope table should be edited. |
+| R6 | **Person and visitor routes** | Doc 02 L65 has `/fleet/visits/people/:personId`. Doc 07 L129 has `/fleet/people?type=guest`. These are two fleet person registers, which follows from C1. | `/fleet/people/:personId` as the single register (tabs: visits, guest stays). Visits and guest lists link into it. |
+| R7 | **Stale vessel routes in doc 02** | Doc 02 L80 and L83 still use legacy `/vessel/:vesselSlug/dashboard` and `/development/crew-training` as vessel counterparts. | Replace them with `/v/:vc` and `/v/:vc/crew/training` (doc 04). |
+| R8 | **Legacy HoR redirect** | Doc 01 L152 redirects `/crew/work-rest` to `/v/<last vessel>/…`. Doc 04 L130 redirects it to `/me/hours-of-rest`. | Doc 04 (module owner). Doc 01's list should say "per module doc". |
+| R9 | **Minor path drift** | Doc 01 L128's examples `/v/dra/certificates/:sectionSlug` and `/technical/jobs/:jobId` differ from doc 06 L82–99 (`/certificates/s/:sectionSlug`, `/c/:certificateId`, `/jobs/:jobRef`). Vessel tab lists differ: doc 01 L126 has no Home or Finance tab, doc 10 L82 has both. Ticket citations are written as `T-n` everywhere except doc 07, which uses `#n`. | Module docs and doc 10 win. Doc 01's examples are illustrative and should say so. Doc 07 should switch to `T-n`. |
+
+---
+
+## 3. Personal data and verbatim copying
+
+**Personal data: none found.**
+
+- No email addresses or phone numbers appear in any of docs 00–10.
+- None of the roughly 30 person-name tokens from the ticket export's submitter addresses and greetings appear in any doc.
+- No common given name appears except in the UI label "Mark Complete" (doc 06 L194, L375).
+- The reference app's product name and hostname do not appear.
+- Vessel names (Draak, Hydra, Dagon) appear 20 times, e.g. doc 00 L57 and doc 01 L62. They are tenant business identifiers, not personal data, and are acceptable in internal specs. Strip them from anything published outside the team.
+
+**Verbatim copying: no long passages.** The longest run shared with the blueprint is 26 words, and every run of 12 or more words is a list of field names or option values, not prose. Quoted strings that match the blueprint are all 11 words or fewer, and all are button or label names. These items should still be reworded, because they would become STORM seed data or UI copy:
+
+| File : line | What | Action |
+|---|---|---|
+| `03-fleet-view-administration.md` : 477 | FAQ category seed list (17-word run identical to the reference, and also present in the ticket export) | Write STORM's own category names |
+| `05-vessel-safety-sms.md` : 111 | Default template-group names and order on the SMS Forms tab (22-word run) | Write STORM's own defaults |
+| `01-foundations-tenancy-roles.md` : 203, `03-fleet-view-administration.md` : 437 | Job-role option list (generic industry titles; low risk) | Keep, but take the order and wording from doc 01's seed, not the reference |
+| `01-foundations-tenancy-roles.md` : 409 | "Seed ≈250 positions (blueprint Appendix A)" | Change to doc 04 C70's "STORM-authored list" (C22) |
+| `01-foundations-tenancy-roles.md` : 221, `03-fleet-view-administration.md` : 34 | The reference's helper sentence about pressing Review & save, quoted | Fine as a citation. Write fresh UI copy for STORM |
+
+---
+
+## 4. STORM status spot-checks
+
+| # | Claim (doc : line) | Status claimed | Code checked | Verdict |
+|---|---|---|---|---|
+| S1 | Footer with **tenant tagline**, Help, Support, Privacy, Terms, copyright (doc 01 : 193 F20; doc 10 : 244 IA18) | complete | `src/shared/components/layout/InkfishFooter.tsx` | **Wrong → partial.** The footer hard-codes the vendor's logo, name and tagline, a vendor support address and a vendor copyright line. Nothing comes from the tenant (`companies` has no tagline column). The links exist. |
+| S2 | Leave allowance: days per year (default 30, 2.50/month) **or ratio**; accrual and balance (doc 04 : 231 C55) | complete | `src/modules/crew/services/leaveCalculator.ts` L20–47, L182–190 | **Wrong → partial.** `DEFAULT_LEAVE_POLICY` is 60 days and 5 days per month, not 30 and 2.5. The `rotation` method falls through to the same code as `monthly`, so there is no on:off ratio. Doc 04's own data model (vessel assignment row) adds `leave_method`, `leave_ratio_on` and `leave_ratio_off` as new columns. |
+| S3 | HoR rule sets (10 h / 24 h, 77 h / 7 d, ≤ 2 periods with one ≥ 6 h, ≤ 14 h gap) **with exceptions** (doc 04 : 217 C46) | complete | `src/modules/work-rest/types/index.ts` L43–50, `lib/complianceEngine.ts` L222–373, `work_rest_rule_sets` (types.ts), `services/workRestService.ts` L530–556 | **Mostly right; overstated.** All five rules are enforced, rule sets are per company and vessel, and there is a DB default with a code fallback. There is no exception model (no columns or logic for STCW-style exceptions). Read it as "complete except exceptions". |
+| S4 | Emergency contacts for the vessel, with history (doc 05 : 318 EMG4) | complete | `src/modules/emergency/store/emergencyContactsStore.ts` (RPCs `get_vessel_emergency_contacts`, `update_emergency_contacts`, `initialize_vessel_emergency_from_defaults`; table `emergency_contacts_history`), `components/EmergencyContactsHistoryDialog.tsx` | **Correct.** |
+| S5 | Resilience basics: boundaries, 30 s `staleTime`, 1 retry, stale-chunk recovery with loop guard (doc 00 : 231 J5) | complete | `src/App.tsx` L19–20, L34–52; `src/main.tsx` L5–16 (`RELOAD_KEY`, `MAX_RELOADS = 2`) | **Correct.** |
+| S6 | Sidebar collapse to icons, Ctrl/Cmd+B, `storm-sidebar-collapsed` (doc 10 : 246 IA20) | complete | `DashboardLayout.tsx` L36, L45, L56 | **Correct.** |
+| S7 | Fleet season planning, AI routes, trip suggestions, heat map (doc 07 : 174 CH16) | complete | `itinerary/pages/FleetPlanningPage.tsx`, `TripSuggestionsPage.tsx`, `components/AIRoutePlanner.tsx` (invokes the existing `ai-route-planner` function), `HeatMapTab.tsx`, `trip_suggestions*` in types.ts | **Correct.** The code exists and is wired; behaviour was not exercised. |
+
+The following partial or missing claims were also checked and are **correct**:
+
+- 42 inline `React.createElement(React.lazy(` calls in `src/routes/index.tsx` (doc 00 headline 1).
+- Duplicate migration version `20260919120000` (doc 00 headline 7).
+- `setCurrentVessel` is never called outside the store and its tests (doc 00 headline 3).
+- Certificates upload to the private `documents` bucket and save `getPublicUrl` (`useCertificates.ts` L384–392; doc 06 headline 3).
+- `user_permission_overrides` has no `company_id` or `vessel_id`, and `permission_audit_log` has a `WITH CHECK (true)` insert policy (`20260129125736_…sql` L698; doc 01 headlines 3 and 7).
+
+**Pattern:** errors run toward over-claiming "complete" where a feature exists in a different shape than the blueprint row describes (S1, S2, S3). Reviewers should treat any "complete" row whose Gap column is not "—" as "partial".
+
+---
+
+## 5. Suggested next edits (in order)
+
+1. **Doc 08:** add the record-kind table (G7) and extend the reconciliation list (C7, C8, C9, C10, C11).
+2. **Doc 01:** take ownership of C2, C16, C17, C20 and C21. Add per-key module-setting effects (G3).
+3. **Docs 02 and 07:** settle the person directory (C1 and R6) and the planner page (R2) together.
+4. **Docs 02, 04 and 08:** align the expiry engine on window-relative buckets (C5).
+5. **Doc 10:** remove the Feedback inbox (R3), mark the Finance and Departments tabs as slots with no owner (G2, G5), and resolve the Legal route collision (R4).
+6. Decide Finance build or hide (G2), and list the add-ons with what each gates (G4).
+7. Downgrade S1 and S2 to partial, and qualify S3.
