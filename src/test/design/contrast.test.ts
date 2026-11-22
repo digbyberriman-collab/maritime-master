@@ -37,9 +37,11 @@ function pairsFor(): Pair[] {
     add('foreground', bg, TEXT);
   }
   add('card-foreground', 'card', TEXT);
+  // Also the Recharts default tooltip (index.css maps it to popover / popover-foreground).
   add('popover-foreground', 'popover', TEXT);
   add('secondary-foreground', 'secondary', TEXT);
   add('accent-foreground', 'accent', TEXT);
+  // Includes Recharts default axis tick text on card and popover (index.css maps #666 to muted-foreground).
   for (const bg of ['background', 'card', 'popover', 'muted', 'accent']) add('muted-foreground', bg, TEXT);
 
   // Primary (fill and link text).

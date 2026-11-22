@@ -316,9 +316,10 @@
     --cell-py: 6px;
   }
 
-  /* 44px touch targets even in compact density (WCAG 2.5.8). */
+  /* 44px touch targets in every density (D-35, gap/10 A.7, WCAG 2.5.8). */
   @media (pointer: coarse) {
-    [data-density="compact"] {
+    :root,
+    [data-density] {
       --control-h: 44px;
     }
   }
@@ -840,6 +841,33 @@ path.storm-map-heat--medium {
 path.storm-map-heat--low {
   stroke: hsl(var(--info));
   fill: hsl(var(--info));
+}
+
+/* Charts (A9, DS18): Recharts library defaults → theme tokens. Scoped to the default values so a module's explicit colours still win. */
+.recharts-cartesian-axis-tick-value[fill="#666"] {
+  fill: hsl(var(--muted-foreground));
+}
+
+.recharts-cartesian-axis-line[stroke="#666"],
+.recharts-cartesian-axis-tick-line[stroke="#666"] {
+  stroke: hsl(var(--border));
+}
+
+.recharts-cartesian-grid line[stroke="#ccc"],
+.recharts-reference-line [stroke="#ccc"] {
+  stroke: hsl(var(--border) / 0.6);
+}
+
+/* Recharts writes the tooltip background and border inline, hence !important. */
+.recharts-default-tooltip {
+  background-color: hsl(var(--popover)) !important;
+  border-color: hsl(var(--border)) !important;
+  color: hsl(var(--popover-foreground));
+  border-radius: var(--radius);
+}
+
+.recharts-default-tooltip .recharts-tooltip-label {
+  color: hsl(var(--popover-foreground));
 }
 
 /*

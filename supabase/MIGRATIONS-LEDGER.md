@@ -118,7 +118,12 @@ Every file dated `20261123000000` or later follows D-12 and gap/00 §3, and `src
 
 - name `<YYYYMMDDHHMMSS>_<module>_<topic>.sql` (lower case, underscores), with a version used by no other file;
 - the hour inside the stream's block: platform `00`–`03`, fleet operations `04`, fleet administration `05`, crew `06`, safety `07`, certificates and technical `08`, voyage, charter, calendar and reports `09`, support `10`, Refit import `11`, fixes and seeds `12`–`13`;
-- idempotent: `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, `DROP POLICY IF EXISTS` for the same name and table before each `CREATE POLICY`, `DROP TRIGGER IF EXISTS` before each `CREATE TRIGGER`, `CREATE OR REPLACE` for functions and views, `ON CONFLICT` (or a `NOT EXISTS` guard) on every `INSERT`, and enum types created inside a guarded `DO` block;
-- `ENABLE ROW LEVEL SECURITY` on every table it creates, and no `USING (true)` / `WITH CHECK (true)` policy for anyone but `service_role`.
+- idempotent: `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`, `CREATE MATERIALIZED VIEW IF NOT EXISTS`, `DROP POLICY IF EXISTS` for the same name and table before each `CREATE POLICY`, `DROP TRIGGER IF EXISTS` before each `CREATE TRIGGER`, `CREATE OR REPLACE` for functions and views, `ON CONFLICT` (or a `NOT EXISTS` guard) on every `INSERT`, and enum types and domains created inside a guarded `DO` block;
+- idempotent `ALTER`s (each action of an `ALTER TABLE` list is checked on its own):
+  - `ADD COLUMN IF NOT EXISTS` (or `ADD IF NOT EXISTS`) for every new column;
+  - `DROP CONSTRAINT IF EXISTS <name>` on the same table before each `ADD CONSTRAINT <name>`, either as an earlier statement or earlier in the same list (`ALTER TABLE t DROP CONSTRAINT IF EXISTS c, ADD CONSTRAINT c UNIQUE (code)`). Postgres has no `ADD CONSTRAINT IF NOT EXISTS`, so every constraint is named: an unnamed `ADD PRIMARY KEY` / `UNIQUE` / `CHECK` / `FOREIGN KEY` / `EXCLUDE` cannot be guarded and fails;
+  - `ALTER TYPE … ADD VALUE IF NOT EXISTS`;
+  - `IF EXISTS` on every `DROP`: `DROP COLUMN IF EXISTS`, `DROP CONSTRAINT IF EXISTS`, and `DROP TABLE` / `VIEW` / `INDEX` / `FUNCTION` / … `IF EXISTS`;
+- `ENABLE ROW LEVEL SECURITY` on every table it creates, and no `USING (true)` / `WITH CHECK (true)` policy for anyone but `service_role`. The rule covers `ALTER POLICY` as well as `CREATE POLICY`, and the policy's role list must be exactly `TO service_role`: `TO service_role, authenticated` fails, and so does a policy with no `TO` list (that means PUBLIC; on `ALTER POLICY` it keeps roles the file does not show). The policy's name does not count, so `"open to service_role" … TO authenticated` fails too.
 
 Add each new file to the ledger table above as `written, not applied`, in the commit that adds it.

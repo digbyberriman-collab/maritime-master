@@ -29,11 +29,9 @@ export const IncidentTrendChart: React.FC<IncidentTrendChartProps> = ({ data }) 
           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
           <XAxis 
             dataKey="month" 
-            className="text-xs fill-muted-foreground"
             tick={{ fontSize: 12 }}
           />
           <YAxis 
-            className="text-xs fill-muted-foreground"
             tick={{ fontSize: 12 }}
           />
           <Tooltip 

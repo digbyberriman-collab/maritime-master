@@ -49,9 +49,12 @@ interface VesselContextType {
   findVesselByCode: (code: string | null | undefined) => Vessel | undefined;
   /**
    * The user (`profiles.user_id`) whose vessels the lists above hold, or null
-   * before the first load. While it differs from the signed-in profile the
-   * lists are empty and `loading` is true, so nothing (the scope routes, a
-   * vessel picker) ever reads one user's vessels for another (D-25).
+   * before the first load. While it differs from the profile, or the profile
+   * is not the signed-in auth user's own, the lists are empty, nothing is
+   * selected and `loading` is true, so nothing (the scope routes, a vessel
+   * picker) ever reads one user's vessels for another (D-25, D-41). A
+   * signed-in user whose profile has not arrived also reads as loading, for
+   * at most PROFILE_WAIT_MS (an unreadable profile then means no vessels).
    */
   loadedForUserId: string | null;
 }
@@ -64,8 +67,15 @@ const STORAGE_KEY_ALL_VESSELS = 'storm_isAllVessels';
 // Roles that can access all vessels and see \"All Vessels\" option
 const ALL_VESSELS_ROLES = ['dpa', 'shore_management'];
 
+/**
+ * How long a signed-in user without a profile reads as loading. The same
+ * grace as PROFILE_GRACE_MS in app/router/useScopeAccess (not imported from
+ * there: that module imports this one).
+ */
+const PROFILE_WAIT_MS = 5000;
+
 export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const [selectedVessel, setSelectedVesselState] = useState<Vessel | null>(null);
   const [vessels, setVessels] = useState<Vessel[]>([]);
   const [companyVessels, setCompanyVessels] = useState<CompanyVessel[]>([]);
@@ -79,17 +89,38 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // superseded never writes, so A's slow load cannot land after B's.
   const loadSeq = useRef(0);
   const profileUserId = profile?.user_id ?? null;
+  const authUserId = user?.id ?? null;
+  // A profile that is not the signed-in user's own: AuthContext swaps the
+  // profile with the session user, so this is a guard, not a normal state.
+  const foreignProfile = profileUserId !== null && profileUserId !== authUserId;
 
   // Check if user can access all vessels based on their role
   const canAccessAllVessels = ALL_VESSELS_ROLES.includes(profile?.role || '');
 
   // What is served: nothing while the state still belongs to another user
-  // (or none), derived during render so not even one render hands the
-  // previous user's vessels to the next before the clearing effect runs.
-  const stale = loadedFor !== profileUserId;
+  // (or none), or the profile is not the signed-in user's, derived during
+  // render so not even one render hands the previous user's vessels to the
+  // next before the clearing effect runs. A missing profile alone is not
+  // stale: the lists are already empty then (see awaitingProfile).
+  const stale = loadedFor !== profileUserId || foreignProfile;
   const servedVessels = useMemo(() => (stale ? [] : vessels), [stale, vessels]);
   const servedCompany = useMemo(() => (stale ? [] : companyVessels), [stale, companyVessels]);
   const servedSelection = stale ? null : selectedVessel;
+
+  // Signed in, profile not here yet (a sign-in, or a switch straight to
+  // another account): nothing has loaded for this user, so report loading,
+  // but only for PROFILE_WAIT_MS, after which the user has no vessels.
+  const awaitingProfile = authUserId !== null && profileUserId === null;
+  const [profileWaitOverFor, setProfileWaitOverFor] = useState<string | null>(null);
+  useEffect(() => {
+    if (!awaitingProfile) {
+      setProfileWaitOverFor(null);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => setProfileWaitOverFor(authUserId), PROFILE_WAIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [awaitingProfile, authUserId]);
+  const waitingForProfile = awaitingProfile && profileWaitOverFor !== authUserId;
 
   // Load vessels based on user role
   const loadVessels = useCallback(async () => {
@@ -297,9 +328,10 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setSelectedVessel,
     setSelectedVesselById,
     setAllVessels,
-    loading: loading || stale,
+    loading: stale || (awaitingProfile ? waitingForProfile : loading),
     refreshVessels,
-    canAccessAllVessels,
+    // Never another user's role (the profile is swapped with the session user).
+    canAccessAllVessels: foreignProfile ? false : canAccessAllVessels,
     companyVessels: codeSource,
     vesselCodes,
     getVesselCodeById,

@@ -7,6 +7,7 @@ import {
   closeAsOptions,
   transitionEnvelope,
   vesselCanClose,
+  vesselSignaturesLocked,
   type ClosedBy,
   type EnvelopeAction,
   type EnvelopeState,
@@ -42,6 +43,17 @@ const stateFor = (kind: KindConfig, status: EnvelopeStatus, extra: Partial<Envel
   const { closer, ...rest } = kind;
   return { ...rest, status, closedBy: status === 'closed' ? closer : null, ...extra };
 };
+
+/** Apply `input` and feed the outcome into the next state (what the server stores). */
+const step = (state: EnvelopeState, input: TransitionInput): EnvelopeState => {
+  const r = transitionEnvelope(state, input);
+  if (!r.ok) throw new Error(`${input.action}: ${r.error.code}`);
+  const { status, closedBy, companyAcknowledged, cycle, acknowledgedCycle, initialReportAcknowledged } = r.value;
+  return { ...state, status, closedBy, companyAcknowledged, cycle, acknowledgedCycle, initialReportAcknowledged };
+};
+const ACK: TransitionInput = { action: 'acknowledge', actor: 'company' };
+const RETURN: TransitionInput = { action: 'return_to_vessel', actor: 'company', reason: 'Photos missing' };
+const RESIGN: TransitionInput = { action: 'vessel_sign', actor: 'vessel', allVesselSlotsSigned: true };
 
 /** Every ok transition except void, as "status --action(actor)--> to". */
 function okTransitions(kind: KindConfig): string[] {
@@ -375,9 +387,85 @@ describe('guards', () => {
     expect(transitionEnvelope(stateFor(KINDS.none, 'submitted'), { action: 'return_to_vessel', actor: 'company', reason: 'r' })).toMatchObject({ ok: false, error: { code: 'not_for_kind' } });
   });
 
-  it('a returned record comes back to the company through the vessel signatures (D-30)', () => {
-    const r = transitionEnvelope(stateFor(KINDS.report_first, 'info_requested', { companyAcknowledged: true }), { action: 'vessel_sign', actor: 'vessel', allVesselSlotsSigned: true });
-    expect(r).toMatchObject({ ok: true, value: { status: 'awaiting_company_close', companyAcknowledged: true } });
+  it.each<[string, EnvelopeState]>([
+    ['report-first (initial report acknowledged)', stateFor(KINDS.report_first, 'submitted')],
+    ['sign_off (acknowledged while awaiting the company)', stateFor(KINDS.sign_off, 'awaiting_company_close')],
+  ])('%s: a returned record comes back to the company through the vessel signatures, unacknowledged (D-30, D-51)', (_, start) => {
+    const acked = step(start, ACK);
+    expect(acked).toMatchObject({ companyAcknowledged: true, cycle: 1 });
+    const returned = step(acked, RETURN);
+    expect(returned).toMatchObject({ status: 'info_requested', companyAcknowledged: false, acknowledgedCycle: null, cycle: 2 });
+    const resigned = step(returned, RESIGN);
+    expect(resigned).toMatchObject({ status: 'awaiting_company_close', companyAcknowledged: false, acknowledgedCycle: null, cycle: 2 });
+    expect(resigned.initialReportAcknowledged).toBe(Boolean(start.reportFirst));
+  });
+
+  it('the company acknowledges a resubmitted cycle; twice in that cycle is refused (D-51)', () => {
+    const resubmitted = step(step(step(stateFor(KINDS.sign_off, 'awaiting_company_close'), ACK), RETURN), RESIGN);
+    expect(transitionEnvelope(resubmitted, ACK)).toMatchObject({
+      ok: true,
+      value: { status: 'awaiting_company_close', companyAcknowledged: true, acknowledgedCycle: 2, cycle: 2, effects: ['company_acknowledgement'] },
+    });
+    expect(transitionEnvelope(step(resubmitted, ACK), ACK)).toMatchObject({ ok: false, error: { code: 'already_acknowledged' } });
+    expect(availableActions(resubmitted, 'company')).toContain('acknowledge');
+  });
+
+  it('reopen resets the acknowledgement and starts the next cycle (D-51)', () => {
+    const closed = step(step(stateFor(KINDS.sign_off, 'awaiting_company_close'), ACK), { action: 'sign_off', actor: 'company' });
+    expect(closed).toMatchObject({ status: 'closed', closedBy: 'company_sign_off', companyAcknowledged: true, acknowledgedCycle: 1, cycle: 1 });
+    const reopened = step(closed, { action: 'reopen', actor: 'company', reason: 'New evidence' });
+    expect(reopened).toMatchObject({ status: 'in_review', closedBy: null, companyAcknowledged: false, acknowledgedCycle: null, cycle: 2 });
+    const resubmitted = step(reopened, RESIGN);
+    expect(transitionEnvelope(resubmitted, ACK)).toMatchObject({ ok: true, value: { acknowledgedCycle: 2, cycle: 2 } });
+  });
+
+  it('report-first reopen keeps the initial-report history but not the acknowledgement', () => {
+    const closed = stateFor(KINDS.report_first, 'closed', { companyAcknowledged: true, acknowledgedCycle: 1, initialReportAcknowledged: true });
+    expect(step(closed, { action: 'reopen', actor: 'company', reason: 'New evidence' })).toMatchObject({
+      status: 'acknowledged',
+      companyAcknowledged: false,
+      acknowledgedCycle: null,
+      initialReportAcknowledged: true,
+      cycle: 2,
+    });
+  });
+
+  it('report-first: the initial-report acknowledgement does not count as acknowledging the final review (D-51)', () => {
+    const submitted = step(stateFor(KINDS.report_first, 'open'), { action: 'submit', actor: 'vessel' });
+    const initial = transitionEnvelope(submitted, ACK);
+    expect(initial).toMatchObject({
+      ok: true,
+      value: { status: 'acknowledged', companyAcknowledged: true, initialReportAcknowledged: true, acknowledgedCycle: null, cycle: 1 },
+    });
+    const finalReview = step(step(submitted, ACK), RESIGN);
+    expect(finalReview).toMatchObject({ status: 'awaiting_company_close', acknowledgedCycle: null });
+    expect(availableActions(finalReview, 'company')).toContain('acknowledge');
+    const acked = transitionEnvelope(finalReview, ACK);
+    expect(acked).toMatchObject({ ok: true, value: { status: 'awaiting_company_close', acknowledgedCycle: 1, initialReportAcknowledged: true } });
+    expect(transitionEnvelope(step(finalReview, ACK), ACK)).toMatchObject({ ok: false, error: { code: 'already_acknowledged' } });
+  });
+
+  it('not approved resets the acknowledgement and starts the next cycle (D-51)', () => {
+    const acked = step(stateFor(KINDS.decision, 'awaiting_company_close', { cycle: 3 }), ACK);
+    expect(acked).toMatchObject({ acknowledgedCycle: 3, cycle: 3 });
+    const notApproved = step(acked, { action: 'decide', actor: 'company', decision: 'not_approved', reason: 'Controls missing for line 4' });
+    expect(notApproved).toMatchObject({ status: 'info_requested', companyAcknowledged: false, acknowledgedCycle: null, cycle: 4 });
+  });
+
+  it('acknowledge kinds: after Remove company signature the company closes again by acknowledging', () => {
+    const closed = step(stateFor(KINDS.acknowledge, 'awaiting_company_close'), ACK);
+    expect(closed).toMatchObject({ status: 'closed', closedBy: 'company_acknowledge', acknowledgedCycle: 1 });
+    const removed = step(closed, { action: 'remove_company_signature', actor: 'company', reason: 'Signed too early' });
+    expect(removed).toMatchObject({ status: 'awaiting_company_close', closedBy: null, acknowledgedCycle: 1, cycle: 1 });
+    expect(transitionEnvelope(removed, ACK)).toMatchObject({ ok: true, value: { status: 'closed', closedBy: 'company_acknowledge' } });
+  });
+
+  it('transitions without a new cycle keep the cycle and the acknowledgement', () => {
+    const s = stateFor(KINDS.sign_off, 'awaiting_company_close', { cycle: 2, companyAcknowledged: true, acknowledgedCycle: 2 });
+    expect(transitionEnvelope(s, { action: 'sign_off', actor: 'company' })).toMatchObject({
+      ok: true,
+      value: { status: 'closed', cycle: 2, acknowledgedCycle: 2, companyAcknowledged: true },
+    });
   });
 
   it('kind checks', () => {
@@ -389,13 +477,16 @@ describe('guards', () => {
     expect(transitionEnvelope(stateFor(KINDS.none, 'closed'), { action: 'remove_company_signature', actor: 'company', reason: 'r' })).toMatchObject({ ok: false, error: { code: 'not_for_kind' } });
   });
 
-  it('acknowledging twice is refused; the flag carries forward', () => {
+  it('acknowledging twice in one cycle is refused; the flag carries forward to the close', () => {
     const first = transitionEnvelope(stateFor(KINDS.sign_off, 'awaiting_company_close'), { action: 'acknowledge', actor: 'company' });
-    expect(first).toMatchObject({ ok: true, value: { companyAcknowledged: true, effects: ['company_acknowledgement'], notification: 'record_acknowledged' } });
-    const again = transitionEnvelope(stateFor(KINDS.sign_off, 'awaiting_company_close', { companyAcknowledged: true }), { action: 'acknowledge', actor: 'company' });
+    expect(first).toMatchObject({
+      ok: true,
+      value: { companyAcknowledged: true, acknowledgedCycle: 1, cycle: 1, effects: ['company_acknowledgement'], notification: 'record_acknowledged' },
+    });
+    const again = transitionEnvelope(stateFor(KINDS.sign_off, 'awaiting_company_close', { companyAcknowledged: true, acknowledgedCycle: 1 }), { action: 'acknowledge', actor: 'company' });
     expect(again).toMatchObject({ ok: false, error: { code: 'already_acknowledged' } });
-    const signOff = transitionEnvelope(stateFor(KINDS.sign_off, 'awaiting_company_close', { companyAcknowledged: true }), { action: 'sign_off', actor: 'company' });
-    expect(signOff).toMatchObject({ ok: true, value: { companyAcknowledged: true, closedBy: 'company_sign_off', effects: ['company_signature', 'snapshot'] } });
+    const signOff = transitionEnvelope(stateFor(KINDS.sign_off, 'awaiting_company_close', { companyAcknowledged: true, acknowledgedCycle: 1 }), { action: 'sign_off', actor: 'company' });
+    expect(signOff).toMatchObject({ ok: true, value: { companyAcknowledged: true, acknowledgedCycle: 1, closedBy: 'company_sign_off', effects: ['company_signature', 'snapshot'] } });
   });
 
   it('optimistic concurrency: a stale expected version is refused before anything else', () => {
@@ -445,7 +536,15 @@ describe('availableActions (action bar)', () => {
   });
 
   it('thread and signature guards do not hide an action', () => {
-    expect(availableActions(stateFor(KINDS.sign_off, 'awaiting_company_close', { companyAcknowledged: true }), 'company')).toEqual(['sign_off', 'return_to_vessel', 'void']);
+    expect(availableActions(stateFor(KINDS.sign_off, 'awaiting_company_close', { companyAcknowledged: true, acknowledgedCycle: 1 }), 'company')).toEqual(['sign_off', 'return_to_vessel', 'void']);
+  });
+
+  it('acknowledge comes back on the bar for a cycle the company has not acknowledged (D-51)', () => {
+    // Acknowledged an earlier cycle only.
+    expect(availableActions(stateFor(KINDS.sign_off, 'awaiting_company_close', { cycle: 2, acknowledgedCycle: 1 }), 'company')).toContain('acknowledge');
+    // Report-first: only the initial report was acknowledged.
+    const finalReview = stateFor(KINDS.report_first, 'awaiting_company_close', { companyAcknowledged: true, initialReportAcknowledged: true });
+    expect(availableActions(finalReview, 'company')).toEqual(['acknowledge', 'sign_off', 'close_as', 'return_to_vessel', 'void']);
   });
 
   it('close as stays on the bar in submitted and acknowledged (raised in error / duplicate)', () => {
@@ -453,5 +552,46 @@ describe('availableActions (action bar)', () => {
     expect(availableActions(stateFor(KINDS.report_first, 'acknowledged', { companyAcknowledged: true }), 'company')).toEqual(['close_as', 'return_to_vessel', 'void']);
     expect(availableActions(stateFor(KINDS.report_first, 'awaiting_company_close'), 'company')).toEqual(['acknowledge', 'sign_off', 'close_as', 'return_to_vessel', 'void']);
     expect(availableActions(stateFor(KINDS.report_first, 'submitted'), 'vessel')).not.toContain('close_as');
+  });
+});
+
+describe('vesselSignaturesLocked (gap/05 "Signature slots"; SIG10; D-51)', () => {
+  const locked = (extra: Partial<EnvelopeState> & Pick<EnvelopeState, 'status'>, sheetCycle = 1) =>
+    vesselSignaturesLocked({ closedBy: null, ...extra }, sheetCycle);
+
+  it('locks the cycle the company acknowledged, while awaiting the company or closed', () => {
+    expect(locked({ status: 'awaiting_company_close', acknowledgedCycle: 1 })).toBe(true);
+    expect(locked({ status: 'awaiting_company_close', cycle: 2, acknowledgedCycle: 2 }, 2)).toBe(true);
+    expect(locked({ status: 'closed', closedBy: 'company_sign_off', acknowledgedCycle: 1 })).toBe(true);
+    expect(locked({ status: 'awaiting_company_close', acknowledgedCycle: null })).toBe(false);
+    expect(locked({ status: 'awaiting_company_close' })).toBe(false);
+  });
+
+  it('an acknowledgement of an earlier cycle does not lock the current one', () => {
+    expect(locked({ status: 'awaiting_company_close', cycle: 2, acknowledgedCycle: 1 }, 2)).toBe(false);
+  });
+
+  it('only the envelope\'s current cycle is ever locked', () => {
+    expect(locked({ status: 'awaiting_company_close', cycle: 2, acknowledgedCycle: 2 }, 1)).toBe(false);
+    expect(locked({ status: 'closed', closedBy: 'company_close_as', cycle: 2 }, 1)).toBe(false);
+  });
+
+  it('a company close locks; a vessel close does not', () => {
+    for (const closedBy of ['company_acknowledge', 'company_sign_off', 'company_decision', 'company_close_as'] as ClosedBy[]) {
+      expect(locked({ status: 'closed', closedBy })).toBe(true);
+    }
+    expect(locked({ status: 'closed', closedBy: 'vessel' })).toBe(false);
+    expect(locked({ status: 'closed', closedBy: null })).toBe(false);
+  });
+
+  it('report-first: the initial-report acknowledgement does not lock the final-review slots', () => {
+    expect(locked({ status: 'acknowledged', acknowledgedCycle: null })).toBe(false);
+    expect(locked({ status: 'awaiting_company_close', acknowledgedCycle: null })).toBe(false);
+  });
+
+  it('other statuses are never locked', () => {
+    for (const status of ['open', 'in_review', 'submitted', 'acknowledged', 'info_requested', 'void'] as EnvelopeStatus[]) {
+      expect(locked({ status, acknowledgedCycle: 1 })).toBe(false);
+    }
   });
 });

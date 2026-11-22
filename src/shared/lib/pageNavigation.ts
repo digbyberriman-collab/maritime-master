@@ -128,15 +128,18 @@ function findBestMatch(pathname: string, search: string, activeModuleId?: string
     ? NAVIGATION_ITEMS.filter((item) => item.id === activeModuleId)
     : NAVIGATION_ITEMS;
 
-  // A node on its module's own root (the vessel Home leaf and the Vessel
-  // module at /v/:vesselCode, Fleet's section headings at /fleet) sits above
-  // every page of the module, so it only matches exactly, as in the sidebar
-  // (SidebarNavigation activeLeafPath). Otherwise a page with no leaf of its
-  // own lands under Home.
+  // The module node itself (Fleet at /fleet, Vessel at /v/:vesselCode) may
+  // still be an ancestor of any page in it: it has children, so it scores
+  // lowest of all descendant matches and only wins when nothing deeper does,
+  // which keeps the scope root crumb on an unmatched in-scope URL (the
+  // in-scope 404). Nodes below it that sit on the root path (the vessel Home
+  // leaf, Fleet's section headings at /fleet) match exactly only, as in the
+  // sidebar (SidebarNavigation activeLeafPath); otherwise a page with no
+  // leaf of its own would land under Home or Overview.
   const visit = (node: NavigationNode, ancestors: NavigationNode[], depth: number, moduleRoot: string) => {
     const nodePath = pathnameOf(node.path);
     const exact = pathname === nodePath;
-    const descendant = nodePath !== '/' && nodePath !== moduleRoot && pathname.startsWith(`${nodePath}/`);
+    const descendant = nodePath !== '/' && (depth === 0 || nodePath !== moduleRoot) && pathname.startsWith(`${nodePath}/`);
     if (exact || descendant) {
       const queryBonus = exact && routeQueryMatches(node.path, search) ? 500 : 0;
       const leafBonus = node.children?.length ? 0 : 100;

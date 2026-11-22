@@ -41,6 +41,22 @@ describe('scoped breadcrumbs', () => {
     expect(nav('/v/dra/nonexistent/thing', 'vessel').crumbs).not.toContain('Home');
   });
 
+  // The in-scope 404 (ScopeNotFound) renders inside the shell: its header
+  // keeps the scope root crumb, with its link back to the scope.
+  it('an unmatched fleet URL keeps the Fleet crumb and its link', () => {
+    expect(nav('/fleet/nonexistent', 'fleet')).toEqual({
+      crumbs: 'Fleet > Nonexistent',
+      title: 'Nonexistent',
+      links: ['/fleet', null],
+    });
+  });
+
+  it('an unmatched vessel URL keeps the Vessel crumb and its link', () => {
+    const page = nav('/v/dra/nonexistent/thing', 'vessel');
+    expect(page).toEqual({ crumbs: 'Vessel > Thing', title: 'Thing', links: ['/v/:vesselCode', null] });
+    expect(nav('/v/dra/x', 'vessel')).toMatchObject({ crumbs: 'Vessel > X', links: ['/v/:vesselCode', null] });
+  });
+
   it('Users & Access tabs have their names', () => {
     expect(nav('/fleet/admin/users/crew')).toMatchObject({
       crumbs: 'Fleet > Administration > Users & Access > Vessel Crew',

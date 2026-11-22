@@ -19,6 +19,13 @@ interface PermissionsState {
   error: string | null;
   hasFleetAccess: boolean;
   primaryRole: Role | null;
+  /**
+   * The user (auth user id) whose roles and permissions the store holds, or
+   * null when it holds nobody's. A switch to another account keeps
+   * `isInitialized` set, so readers that must only ever act on the signed-in
+   * user's own roles compare this with that user's id (D-41).
+   */
+  loadedFor: string | null;
   
   loadPermissions: () => Promise<void>;
   setCurrentVessel: (vesselId: string | null) => void;
@@ -61,6 +68,36 @@ const permissionIncludes = (actual: PermissionLevel, required: PermissionLevel) 
   return required === 'view';
 };
 
+/** Nobody's roles: what a signed-out user, or a failed first load, holds. */
+const NO_ROLES = {
+  permissions: [] as ModulePermission[],
+  userRoles: [] as UserRole[],
+  hasFleetAccess: false,
+  primaryRole: null as Role | null,
+};
+
+/*
+ * One user's roles must never be presented as another's (D-41; fail closed,
+ * D-04). Every load takes a ticket from `loadSeq`; a newer load or reset()
+ * supersedes it, and a superseded load never writes. `resetEpoch` moves only
+ * on reset(), so a call still resolving its user when the store is reset is
+ * dropped outright. `inFlight` is the latest load and the user it is for.
+ */
+let loadSeq = 0;
+let resetEpoch = 0;
+let inFlight: { seq: number; userId: string | null } | null = null;
+
+/** The signed-in user's id as Supabase reports it now; null if none or unreadable. */
+const currentAuthUserId = async (): Promise<string | null> => {
+  try {
+    const { data } = await supabase.auth.getUser();
+    return data?.user?.id ?? null;
+  } catch (error) {
+    console.error('Failed to read the signed-in user:', error);
+    return null;
+  }
+};
+
 export const usePermissionsStore = create<PermissionsState>((set, get) => ({
   permissions: [],
   userRoles: [],
@@ -72,36 +109,57 @@ export const usePermissionsStore = create<PermissionsState>((set, get) => ({
   error: null,
   hasFleetAccess: false,
   primaryRole: null,
+  loadedFor: null,
 
   loadPermissions: async () => {
-    const { isLoading, isInitialized } = get();
-    
-    // Prevent duplicate loads
-    if (isLoading) return;
-    
+    const epoch = resetEpoch;
     set({ isLoading: true, error: null });
-    
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        set({ 
-          permissions: [],
-          userRoles: [],
-          hasFleetAccess: false,
-          primaryRole: null,
-          isLoading: false,
-          isInitialized: true,
-        });
+
+    const userId = await currentAuthUserId();
+    // Reset while the user was being resolved (a sign-out): this call is void.
+    if (epoch !== resetEpoch) return;
+    // Already loading this user's roles: that load answers this call too.
+    if (inFlight && inFlight.userId === userId) return;
+
+    // A load still running for another user is superseded by this one, which
+    // is its re-run for the user signed in now: it can no longer write.
+    loadSeq += 1;
+    const seq = loadSeq;
+    inFlight = { seq, userId };
+    set({ isLoading: true, error: null });
+    const live = () => seq === loadSeq;
+    const settle = () => {
+      if (inFlight?.seq === seq) inFlight = null;
+    };
+
+    // Write the result only while this load is the latest and its user is
+    // still the signed-in one. A user who changed under the load (no reset
+    // in between) gets a fresh load; isLoading stays true until it lands.
+    const commit = async (patch: Partial<PermissionsState>): Promise<void> => {
+      if (!live()) return settle();
+      const stillSignedIn = await currentAuthUserId();
+      if (!live()) return settle();
+      settle();
+      if (stillSignedIn !== userId) {
+        await get().loadPermissions();
         return;
       }
+      set({ ...patch, loadedFor: userId, isLoading: false, isInitialized: true });
+    };
 
+    if (!userId) {
+      await commit({ ...NO_ROLES });
+      return;
+    }
+
+    let result: Partial<PermissionsState>;
+    try {
       // Fetch all data in parallel
       const [modulesRes, rolesRes, userRolesRes, permissionsRes] = await Promise.all([
         supabase.from('modules').select('*').eq('is_active', true).order('sort_order'),
         supabase.from('roles').select('*'),
-        supabase.rpc('get_user_roles_full', { p_user_id: user.id }),
-        supabase.rpc('get_user_rbac_permissions', { p_user_id: user.id }),
+        supabase.rpc('get_user_roles_full', { p_user_id: userId }),
+        supabase.rpc('get_user_rbac_permissions', { p_user_id: userId }),
       ]);
 
       if (modulesRes.error) throw modulesRes.error;
@@ -149,24 +207,23 @@ export const usePermissionsStore = create<PermissionsState>((set, get) => ({
         permissionsByModule.set(permissionRow.module_key, existing);
       });
 
-      set({
+      result = {
         modules,
         roles: (rolesRes.data ?? []) as Role[],
         userRoles,
         permissions: Array.from(permissionsByModule.values()),
         hasFleetAccess,
         primaryRole,
-        isLoading: false,
-        isInitialized: true,
-      });
+      };
     } catch (error) {
-      console.error('Failed to load permissions:', error);
-      set({ 
+      if (live()) console.error('Failed to load permissions:', error);
+      result = {
         error: error instanceof Error ? error.message : 'Failed to load permissions',
-        isLoading: false,
-        isInitialized: true,
-      });
+        // A failed refresh keeps this user's own roles; anyone else's go.
+        ...(get().loadedFor === userId ? {} : NO_ROLES),
+      };
     }
+    await commit(result);
   },
 
   setCurrentVessel: (vesselId) => set({ currentVesselId: vesselId }),
@@ -211,6 +268,10 @@ export const usePermissionsStore = create<PermissionsState>((set, get) => ({
   },
 
   reset: () => {
+    // Any load still in flight is for the previous user: it must not write.
+    loadSeq += 1;
+    resetEpoch += 1;
+    inFlight = null;
     set({
       permissions: [],
       userRoles: [],
@@ -222,6 +283,7 @@ export const usePermissionsStore = create<PermissionsState>((set, get) => ({
       error: null,
       hasFleetAccess: false,
       primaryRole: null,
+      loadedFor: null,
     });
   },
 }));

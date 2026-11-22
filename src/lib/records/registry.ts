@@ -226,7 +226,10 @@ export function signatureSheetForKind(kind: RecordKind, options: { creatorProfil
 /** The envelope-machine state for a record of this kind. */
 export function envelopeStateForKind(
   kind: RecordKind,
-  record: Pick<EnvelopeState, 'status'> & Partial<Pick<EnvelopeState, 'closedBy' | 'companyAcknowledged' | 'version'>>,
+  record: Pick<EnvelopeState, 'status'> &
+    Partial<
+      Pick<EnvelopeState, 'closedBy' | 'companyAcknowledged' | 'cycle' | 'acknowledgedCycle' | 'initialReportAcknowledged' | 'version'>
+    >,
 ): EnvelopeState {
   return {
     status: record.status,
@@ -237,6 +240,9 @@ export function envelopeStateForKind(
     allowCloseAs: kind.allowCloseAs ?? false,
     closedBy: record.closedBy ?? null,
     companyAcknowledged: record.companyAcknowledged ?? false,
+    cycle: record.cycle ?? 1,
+    acknowledgedCycle: record.acknowledgedCycle ?? null,
+    initialReportAcknowledged: record.initialReportAcknowledged ?? false,
     version: record.version,
     deleteRule: kind.deleteRule,
   };

@@ -13,15 +13,27 @@
  * idempotent and safe, because the owner applies it by hand and Lovable may
  * re-run a pasted copy (D-01, D-12):
  * - `CREATE TABLE` / `CREATE INDEX` / `CREATE SEQUENCE` / `CREATE SCHEMA` /
- *   `CREATE EXTENSION` carry `IF NOT EXISTS`;
+ *   `CREATE EXTENSION` / `CREATE MATERIALIZED VIEW` carry `IF NOT EXISTS`;
+ * - `ALTER TABLE` actions (split on top-level commas): every `ADD COLUMN`
+ *   (or bare `ADD <col>`) carries `IF NOT EXISTS`; every
+ *   `ADD CONSTRAINT <name>` follows a `DROP CONSTRAINT IF EXISTS <name>` for
+ *   the same table (an earlier statement or an earlier action in the same
+ *   list; Postgres has no `ADD CONSTRAINT IF NOT EXISTS`); unnamed
+ *   `ADD PRIMARY KEY` / `UNIQUE` / `CHECK` / `FOREIGN KEY` / `EXCLUDE`
+ *   cannot be guarded and fail; `DROP COLUMN` / `DROP CONSTRAINT` carry
+ *   `IF EXISTS`;
+ * - `ALTER TYPE … ADD VALUE` carries `IF NOT EXISTS`, and every top-level
+ *   `DROP <object>` carries `IF EXISTS`;
  * - each `CREATE POLICY` follows a `DROP POLICY IF EXISTS` for the same
  *   policy and table, each `CREATE TRIGGER` a `DROP TRIGGER IF EXISTS`;
- * - functions and views are `CREATE OR REPLACE`; a `CREATE TYPE` sits in a
- *   guarded `DO` block; every `INSERT` has `ON CONFLICT` or a `NOT EXISTS`
- *   guard;
+ * - functions and views are `CREATE OR REPLACE`; a `CREATE TYPE` or
+ *   `CREATE DOMAIN` sits in a guarded `DO` block; every `INSERT` has
+ *   `ON CONFLICT` or a `NOT EXISTS` guard;
  * - every table it creates has `ENABLE ROW LEVEL SECURITY` (a statement, or
- *   a `DO` loop that names the table), and no policy is
- *   `USING (true)` / `WITH CHECK (true)` for anyone but `service_role`;
+ *   a `DO` loop that names the table), and no `CREATE POLICY` or
+ *   `ALTER POLICY` is `USING (true)` / `WITH CHECK (true)` unless its role
+ *   list is exactly `TO service_role` (no `TO` means PUBLIC; on
+ *   `ALTER POLICY` it keeps roles the file cannot see, so both fail);
  * - its name is `<version>_<module>_<topic>.sql` in lower snake case, with the
  *   hour inside a stream block (00–13, gap/00 §3).
  *
@@ -106,7 +118,117 @@ export function topLevelStatements(sql: string, bodies: string[] = []): string[]
 
 const IDENT = String.raw`(?:"[^"]+"|[A-Za-z_][\w$]*)`;
 const QUALIFIED = String.raw`(?:${IDENT}\.)?${IDENT}`;
-const unquote = (name: string) => name.replace(/"/g, '').replace(/^public\./i, '').toLowerCase();
+/** A name as Postgres resolves it: unquoted parts fold to lower case, quoted parts keep theirs; `public.` dropped. */
+const unquote = (name: string) =>
+  (name.match(/"[^"]+"|[^."]+/g) ?? [])
+    .map((part) => (part.startsWith('"') ? part.slice(1, -1) : part.toLowerCase()))
+    .join('.')
+    .replace(/^public\./, '');
+
+/** Skips the quoted string or identifier that opens at `i`; returns the index of its closing quote. */
+function skipQuoted(text: string, i: number): number {
+  const quote = text[i];
+  let j = i + 1;
+  while (j < text.length) {
+    if (text[j] === quote && text[j + 1] === quote) j += 2;
+    else if (text[j] === quote) return j;
+    else j += 1;
+  }
+  return text.length;
+}
+
+/**
+ * A comma-separated list split on its top-level commas only: commas inside
+ * parentheses (`numeric(10,2)`, `CHECK (a IN (1, 2))`) and inside quoted
+ * strings or identifiers stay in their item.
+ */
+export function splitTopLevel(list: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < list.length; i += 1) {
+    const ch = list[i];
+    if (ch === "'" || ch === '"') i = skipQuoted(list, i);
+    else if (ch === '(') depth += 1;
+    else if (ch === ')') depth -= 1;
+    else if (ch === ',' && depth === 0) {
+      parts.push(list.slice(start, i).trim());
+      start = i + 1;
+    }
+  }
+  parts.push(list.slice(start).trim());
+  return parts.filter(Boolean);
+}
+
+/** The text with every '…' string literal emptied (identifiers in "…" are kept). */
+function withoutStringLiterals(text: string): string {
+  let out = '';
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i];
+    if (ch === "'" || ch === '"') {
+      const end = skipQuoted(text, i);
+      out += ch === "'" ? "''" : text.slice(i, end + 1);
+      i = end;
+    } else out += ch;
+  }
+  return out;
+}
+
+const PERMISSIVE = /\b(?:USING|WITH CHECK)\s*\(+\s*true\s*\)+/i;
+
+/**
+ * The roles a policy statement names, from the text after `ON <table>`:
+ * the `TO` list up to `USING` / `WITH CHECK` (or the end), split on commas,
+ * unquoted and lower-cased. `null` when there is no `TO` list.
+ */
+export function policyRoles(afterTable: string): string[] | null {
+  const head = withoutStringLiterals(afterTable).split(/\b(?:USING|WITH CHECK)\b/i)[0];
+  const list = head.match(/\bTO\s+(.+)$/i)?.[1];
+  if (!list) return null;
+  return splitTopLevel(list).map((role) => role.replace(/"/g, '').trim().toLowerCase());
+}
+
+/**
+ * A `USING (true)` / `WITH CHECK (true)` policy (any nesting of parentheses)
+ * is allowed only when its role list is exactly `service_role`. `noRoles`
+ * names who it applies to when there is no `TO` list.
+ */
+function permissivePolicyProblems(policy: string, afterTable: string, noRoles: string): string[] {
+  if (!PERMISSIVE.test(withoutStringLiterals(afterTable))) return [];
+  const roles = policyRoles(afterTable);
+  if (roles?.length === 1 && roles[0] === 'service_role') return [];
+  return [`policy ${policy} is USING (true) / WITH CHECK (true) for ${roles ? roles.join(', ') : noRoles}`];
+}
+
+/** The idempotency problems in one `ALTER TABLE` action list, recording guarded drops as it goes. */
+function alterTableProblems(table: string, actions: string, droppedConstraints: Set<string>, rlsEnabled: Set<string>, short: string): string[] {
+  const problems: string[] = [];
+  for (const action of splitTopLevel(actions)) {
+    let m: RegExpMatchArray | null;
+    if (/^ENABLE ROW LEVEL SECURITY\b/i.test(action)) {
+      rlsEnabled.add(table);
+    } else if ((m = action.match(new RegExp(String.raw`^DROP CONSTRAINT IF EXISTS (${IDENT})`, 'i')))) {
+      droppedConstraints.add(`${unquote(m[1])}@${table}`);
+    } else if ((m = action.match(new RegExp(String.raw`^ADD CONSTRAINT (${IDENT})`, 'i')))) {
+      if (!droppedConstraints.has(`${unquote(m[1])}@${table}`)) {
+        problems.push(`ADD CONSTRAINT ${m[1]} ON ${table} without a DROP CONSTRAINT IF EXISTS before it: ${short}`);
+      }
+    } else if (/^ADD (?:COLUMN )?IF NOT EXISTS /i.test(action)) {
+      // guarded column
+    } else if (/^ADD COLUMN /i.test(action)) {
+      problems.push(`ADD COLUMN without IF NOT EXISTS on ${table}: ${action}`);
+    } else if ((m = action.match(/^ADD (PRIMARY KEY|UNIQUE|CHECK|FOREIGN KEY|EXCLUDE)\b/i))) {
+      problems.push(`unnamed ADD ${m[1].toUpperCase()} on ${table} (name it and DROP CONSTRAINT IF EXISTS first): ${action}`);
+    } else if (/^ADD /i.test(action)) {
+      problems.push(`ADD COLUMN without IF NOT EXISTS on ${table}: ${action}`);
+    } else if (/^DROP /i.test(action) && !/^DROP (?:COLUMN |CONSTRAINT )?IF EXISTS /i.test(action)) {
+      problems.push(`DROP without IF EXISTS on ${table}: ${action}`);
+    }
+  }
+  return problems;
+}
+
+const DROPPABLE = String.raw`(?:TABLE|VIEW|MATERIALIZED VIEW|INDEX(?: CONCURRENTLY)?|SEQUENCE|TYPE|DOMAIN|FUNCTION|PROCEDURE|TRIGGER|POLICY|SCHEMA|EXTENSION)`;
 
 /** Everything that keeps a build-out file from being safe to run twice (or at all). */
 export function idempotencyProblems(sql: string): string[] {
@@ -115,6 +237,7 @@ export function idempotencyProblems(sql: string): string[] {
   const problems: string[] = [];
   const droppedPolicies = new Set<string>();
   const droppedTriggers = new Set<string>();
+  const droppedConstraints = new Set<string>();
   const createdTables: string[] = [];
   const rlsEnabled = new Set<string>();
 
@@ -131,8 +254,24 @@ export function idempotencyProblems(sql: string): string[] {
       droppedTriggers.add(`${unquote(m[1])}@${unquote(m[2])}`);
       continue;
     }
-    if ((m = s.match(new RegExp(String.raw`^ALTER TABLE (?:IF EXISTS )?(?:ONLY )?(${QUALIFIED}) ENABLE ROW LEVEL SECURITY`, 'i')))) {
-      rlsEnabled.add(unquote(m[1]));
+    if ((m = s.match(new RegExp(String.raw`^DROP (${DROPPABLE}) `, 'i')))) {
+      if (!new RegExp(String.raw`^DROP ${DROPPABLE} IF EXISTS `, 'i').test(s)) problems.push(`DROP ${m[1].toUpperCase()} without IF EXISTS: ${short}`);
+      continue;
+    }
+    if ((m = s.match(new RegExp(String.raw`^ALTER TABLE (?:IF EXISTS )?(?:ONLY )?(${QUALIFIED}) (.+)$`, 'i')))) {
+      problems.push(...alterTableProblems(unquote(m[1]), m[2], droppedConstraints, rlsEnabled, short));
+      continue;
+    }
+    if (new RegExp(String.raw`^ALTER TYPE ${QUALIFIED} ADD VALUE `, 'i').test(s)) {
+      if (!new RegExp(String.raw`^ALTER TYPE ${QUALIFIED} ADD VALUE IF NOT EXISTS `, 'i').test(s)) problems.push(`ALTER TYPE … ADD VALUE without IF NOT EXISTS: ${short}`);
+      continue;
+    }
+    if ((m = s.match(new RegExp(String.raw`^ALTER POLICY (${IDENT}) ON (${QUALIFIED})`, 'i')))) {
+      problems.push(...permissivePolicyProblems(`${m[1]} ON ${m[2]}`, s.slice(m[0].length), 'the roles it already has (no TO list)'));
+      continue;
+    }
+    if (/^CREATE MATERIALIZED VIEW /i.test(s)) {
+      if (!/^CREATE MATERIALIZED VIEW IF NOT EXISTS /i.test(s)) problems.push(`CREATE MATERIALIZED VIEW without IF NOT EXISTS: ${short}`);
       continue;
     }
     if (/^CREATE (?:UNLOGGED |TEMP |TEMPORARY )?TABLE /i.test(s)) {
@@ -153,8 +292,7 @@ export function idempotencyProblems(sql: string): string[] {
       if (!droppedPolicies.has(`${unquote(m[1])}@${unquote(m[2])}`)) {
         problems.push(`CREATE POLICY ${m[1]} ON ${m[2]} without a DROP POLICY IF EXISTS before it`);
       }
-      const permissive = /\b(?:USING|WITH CHECK) \(\s*true\s*\)/i.test(s);
-      if (permissive && !/\bTO service_role\b/i.test(s)) problems.push(`policy ${m[1]} ON ${m[2]} is USING (true) / WITH CHECK (true)`);
+      problems.push(...permissivePolicyProblems(`${m[1]} ON ${m[2]}`, s.slice(m[0].length), 'PUBLIC (no TO list)'));
       continue;
     }
     if ((m = s.match(new RegExp(String.raw`^CREATE (?:CONSTRAINT )?TRIGGER (${IDENT}) .*? ON (${QUALIFIED})`, 'i')))) {
@@ -167,8 +305,8 @@ export function idempotencyProblems(sql: string): string[] {
       problems.push(`CREATE without OR REPLACE: ${short}`);
       continue;
     }
-    if (/^CREATE TYPE /i.test(s)) {
-      problems.push(`CREATE TYPE outside a guarded DO block: ${short}`);
+    if ((m = s.match(/^CREATE (TYPE|DOMAIN) /i))) {
+      problems.push(`CREATE ${m[1].toUpperCase()} outside a guarded DO block: ${short}`);
       continue;
     }
     if (/^INSERT INTO /i.test(s) && !/\bON CONFLICT\b/i.test(s) && !/\bNOT EXISTS\b/i.test(s)) {
@@ -346,7 +484,7 @@ CREATE SEQUENCE public.s;
     expect(problems.match(/CREATE INDEX without IF NOT EXISTS/g)).toHaveLength(2);
     expect(problems).toContain('CREATE POLICY "a_select" ON public.a without a DROP POLICY IF EXISTS');
     expect(problems).toContain('CREATE POLICY "a_insert" ON public.a without a DROP POLICY IF EXISTS');
-    expect(problems).toContain('policy "a_insert" ON public.a is USING (true) / WITH CHECK (true)');
+    expect(problems).toContain('policy "a_insert" ON public.a is USING (true) / WITH CHECK (true) for authenticated');
     expect(problems.match(/CREATE without OR REPLACE/g)).toHaveLength(2);
     expect(problems).toContain('CREATE TRIGGER trg_a ON public.a without a DROP TRIGGER IF EXISTS');
     expect(problems).toContain('CREATE TYPE outside a guarded DO block');
@@ -358,6 +496,122 @@ CREATE SEQUENCE public.s;
   it('a DROP POLICY for another table does not count', () => {
     const sql = `DROP POLICY IF EXISTS "p" ON public.b; CREATE POLICY "p" ON public.a FOR SELECT USING (false);`;
     expect(idempotencyProblems(sql)).toEqual(['CREATE POLICY "p" ON public.a without a DROP POLICY IF EXISTS before it']);
+  });
+
+  // The vessel-code migration (P1, D-25) is an ADD COLUMN plus a UNIQUE constraint: these are its safe forms.
+  const guarded: Record<string, string> = {
+    addColumnIfNotExists: `ALTER TABLE public.vessels ADD COLUMN IF NOT EXISTS code text;`,
+    bareAddIfNotExists: `ALTER TABLE public.vessels ADD IF NOT EXISTS code text;`,
+    dropThenAddConstraint: `ALTER TABLE public.vessels DROP CONSTRAINT IF EXISTS vessels_code_key;
+      ALTER TABLE public.vessels ADD CONSTRAINT vessels_code_key UNIQUE (company_id, code);`,
+    dropThenAddInOneList: `ALTER TABLE public.vessels DROP CONSTRAINT IF EXISTS vessels_code_key, ADD CONSTRAINT vessels_code_key UNIQUE (code);`,
+    quotedConstraintName: `ALTER TABLE ONLY public.vessels DROP CONSTRAINT IF EXISTS "Vessels code check", ADD CONSTRAINT "Vessels code check" CHECK (code ~ '^[A-Z][A-Z0-9]{2}$');`,
+    unquotedFoldsToLowerCase: `ALTER TABLE public.vessels DROP CONSTRAINT IF EXISTS Vessels_Code_Key; ALTER TABLE "public"."vessels" ADD CONSTRAINT "vessels_code_key" UNIQUE (code);`,
+    commasInsideParensAndStrings: `ALTER TABLE public.vessels ADD COLUMN IF NOT EXISTS price numeric(10,2),
+      ADD COLUMN IF NOT EXISTS note text DEFAULT 'a, ADD b', DROP CONSTRAINT IF EXISTS c, ADD CONSTRAINT c CHECK (kind IN ('x', 'y'));`,
+    dropsWithIfExists: `ALTER TABLE public.vessels DROP COLUMN IF EXISTS legacy_code, DROP IF EXISTS old_code;
+      DROP TABLE IF EXISTS public.old_vessel_codes; DROP INDEX CONCURRENTLY IF EXISTS idx_old;
+      DROP MATERIALIZED VIEW IF EXISTS public.mv_old; DROP FUNCTION IF EXISTS public.f(uuid);`,
+    alterColumnIsNotAnAdd: `ALTER TABLE public.vessels ALTER COLUMN code SET NOT NULL, ALTER COLUMN code DROP DEFAULT;`,
+    alterTypeAddValueIfNotExists: `ALTER TYPE public.permit_kind ADD VALUE IF NOT EXISTS 'cold_work';`,
+    materializedViewIfNotExists: `CREATE MATERIALIZED VIEW IF NOT EXISTS public.permit_counts AS SELECT company_id, count(*) FROM public.safety_permits GROUP BY company_id;`,
+    domainInGuardedDo: `DO $$ BEGIN CREATE DOMAIN public.vessel_code AS text CHECK (VALUE ~ '^[A-Z][A-Z0-9]{2}$'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    serviceRolePolicy: `DROP POLICY IF EXISTS "svc" ON public.a; CREATE POLICY "svc" ON public.a FOR ALL TO service_role USING (true);`,
+    quotedServiceRolePolicy: `DROP POLICY IF EXISTS "svc" ON public.a; CREATE POLICY "svc" ON public.a AS PERMISSIVE FOR ALL TO "service_role" USING ((true)) WITH CHECK (true);`,
+    alterPolicyToServiceRole: `ALTER POLICY "svc" ON public.a TO service_role USING (true) WITH CHECK (true);`,
+    alterPolicyScoped: `ALTER POLICY "a_select" ON public.a TO authenticated USING (public.user_belongs_to_company(auth.uid(), company_id));`,
+    trueInsideAStringIsNotPermissive: `DROP POLICY IF EXISTS "p" ON public.a; CREATE POLICY "p" ON public.a FOR SELECT TO authenticated USING (note <> 'USING (true)');`,
+  };
+
+  it.each(Object.entries(guarded))('passes the guarded form %s', (_name, sql) => {
+    expect(idempotencyProblems(sql)).toEqual([]);
+  });
+
+  // [sql, the one problem it must raise]
+  const unguarded: Record<string, [string, string]> = {
+    addColumn: [`ALTER TABLE public.vessels ADD COLUMN code text;`, 'ADD COLUMN without IF NOT EXISTS on vessels'],
+    bareAdd: [`ALTER TABLE public.vessels ADD code text;`, 'ADD COLUMN without IF NOT EXISTS on vessels'],
+    addConstraintUnique: [`ALTER TABLE public.vessels ADD CONSTRAINT vessels_code_key UNIQUE (code);`, 'ADD CONSTRAINT vessels_code_key ON vessels without a DROP CONSTRAINT IF EXISTS'],
+    addConstraintCheck: [`ALTER TABLE public.vessels ADD CONSTRAINT vessels_code_check CHECK (length(code) = 3);`, 'ADD CONSTRAINT vessels_code_check ON vessels without a DROP CONSTRAINT IF EXISTS'],
+    dropAfterAdd: [
+      `ALTER TABLE public.vessels ADD CONSTRAINT c UNIQUE (code), DROP CONSTRAINT IF EXISTS c;`,
+      'ADD CONSTRAINT c ON vessels without a DROP CONSTRAINT IF EXISTS',
+    ],
+    dropOnAnotherTable: [
+      `ALTER TABLE public.crew DROP CONSTRAINT IF EXISTS c; ALTER TABLE public.vessels ADD CONSTRAINT c UNIQUE (code);`,
+      'ADD CONSTRAINT c ON vessels without a DROP CONSTRAINT IF EXISTS',
+    ],
+    quotedNameKeepsItsCase: [
+      `ALTER TABLE public.vessels DROP CONSTRAINT IF EXISTS "Vessels_Code_Key"; ALTER TABLE public.vessels ADD CONSTRAINT vessels_code_key UNIQUE (code);`,
+      'ADD CONSTRAINT vessels_code_key ON vessels without a DROP CONSTRAINT IF EXISTS',
+    ],
+    dropAnotherConstraint: [
+      `ALTER TABLE public.vessels DROP CONSTRAINT IF EXISTS c_old, ADD CONSTRAINT c UNIQUE (code);`,
+      'ADD CONSTRAINT c ON vessels without a DROP CONSTRAINT IF EXISTS',
+    ],
+    secondActionInTheList: [
+      `ALTER TABLE public.vessels ADD COLUMN IF NOT EXISTS price numeric(10,2), ADD COLUMN qty int;`,
+      'ADD COLUMN without IF NOT EXISTS on vessels: ADD COLUMN qty int',
+    ],
+    unnamedUnique: [`ALTER TABLE public.vessels ADD UNIQUE (code);`, 'unnamed ADD UNIQUE on vessels'],
+    unnamedPrimaryKey: [`ALTER TABLE public.vessels ADD PRIMARY KEY (id);`, 'unnamed ADD PRIMARY KEY on vessels'],
+    unnamedCheck: [`ALTER TABLE public.vessels ADD CHECK (length(code) = 3);`, 'unnamed ADD CHECK on vessels'],
+    unnamedForeignKey: [`ALTER TABLE public.vessels ADD FOREIGN KEY (company_id) REFERENCES public.companies(id);`, 'unnamed ADD FOREIGN KEY on vessels'],
+    unnamedExclude: [`ALTER TABLE public.vessels ADD EXCLUDE USING gist (period WITH &&);`, 'unnamed ADD EXCLUDE on vessels'],
+    dropColumn: [`ALTER TABLE public.vessels DROP COLUMN legacy_code;`, 'DROP without IF EXISTS on vessels'],
+    dropConstraint: [`ALTER TABLE public.vessels DROP CONSTRAINT vessels_code_key;`, 'DROP without IF EXISTS on vessels'],
+    dropTable: [`DROP TABLE public.old_vessel_codes;`, 'DROP TABLE without IF EXISTS'],
+    dropPolicy: [`DROP POLICY "p" ON public.a;`, 'DROP POLICY without IF EXISTS'],
+    alterTypeAddValue: [`ALTER TYPE public.permit_kind ADD VALUE 'cold_work';`, 'ALTER TYPE … ADD VALUE without IF NOT EXISTS'],
+    materializedView: [`CREATE MATERIALIZED VIEW public.permit_counts AS SELECT 1;`, 'CREATE MATERIALIZED VIEW without IF NOT EXISTS'],
+    domain: [`CREATE DOMAIN public.vessel_code AS text CHECK (length(VALUE) = 3);`, 'CREATE DOMAIN outside a guarded DO block'],
+    policyNamedForServiceRole: [
+      `DROP POLICY IF EXISTS "open to service_role" ON public.a;
+       CREATE POLICY "open to service_role" ON public.a FOR ALL TO authenticated USING (true) WITH CHECK (true);`,
+      'policy "open to service_role" ON public.a is USING (true) / WITH CHECK (true) for authenticated',
+    ],
+    serviceRoleThenAuthenticated: [
+      `DROP POLICY IF EXISTS "x" ON public.a; CREATE POLICY "x" ON public.a FOR ALL TO service_role, authenticated USING (true);`,
+      'policy "x" ON public.a is USING (true) / WITH CHECK (true) for service_role, authenticated',
+    ],
+    authenticatedThenServiceRole: [
+      `DROP POLICY IF EXISTS "x" ON public.a; CREATE POLICY "x" ON public.a FOR ALL TO authenticated, service_role USING (true);`,
+      'policy "x" ON public.a is USING (true) / WITH CHECK (true) for authenticated, service_role',
+    ],
+    doubleParentheses: [
+      `DROP POLICY IF EXISTS "x" ON public.a; CREATE POLICY "x" ON public.a FOR ALL TO authenticated USING ((true));`,
+      'policy "x" ON public.a is USING (true) / WITH CHECK (true) for authenticated',
+    ],
+    noRoleListIsPublic: [
+      `DROP POLICY IF EXISTS "x" ON public.a; CREATE POLICY "x" ON public.a FOR SELECT USING (true);`,
+      'policy "x" ON public.a is USING (true) / WITH CHECK (true) for PUBLIC',
+    ],
+    alterPolicyTrue: [`ALTER POLICY "a_select" ON public.a USING (true);`, 'policy "a_select" ON public.a is USING (true) / WITH CHECK (true) for the roles it already has'],
+    alterPolicyToAuthenticated: [
+      `ALTER POLICY "a_select" ON public.a TO authenticated WITH CHECK ( true );`,
+      'policy "a_select" ON public.a is USING (true) / WITH CHECK (true) for authenticated',
+    ],
+  };
+
+  it.each(Object.entries(unguarded))('fails the unguarded form %s', (_name, [sql, problem]) => {
+    const problems = idempotencyProblems(sql);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain(problem);
+  });
+
+  it('splits an action or role list on top-level commas only', () => {
+    expect(splitTopLevel(`ADD COLUMN IF NOT EXISTS p numeric(10,2), ADD CONSTRAINT c CHECK (a IN ('x, y', 'z')), DROP "a,b"`)).toEqual([
+      'ADD COLUMN IF NOT EXISTS p numeric(10,2)',
+      "ADD CONSTRAINT c CHECK (a IN ('x, y', 'z'))",
+      'DROP "a,b"',
+    ]);
+  });
+
+  it('reads a policy role list after the table, not from its name', () => {
+    expect(policyRoles(' FOR ALL TO service_role USING (true)')).toEqual(['service_role']);
+    expect(policyRoles(' FOR ALL TO "service_role", authenticated WITH CHECK (true)')).toEqual(['service_role', 'authenticated']);
+    expect(policyRoles(' FOR SELECT USING (x = 1)')).toBeNull();
+    expect(policyRoles(` FOR SELECT USING (note = ' TO service_role')`)).toBeNull();
   });
 
   it('checks build-out names and blocks', () => {

@@ -161,7 +161,7 @@ export const RedRoomAlerts: React.FC<RedRoomAlertsProps> = ({
                   alert.status === 'pending' 
                     ? 'border-destructive text-destructive' 
                     : alert.status === 'acknowledged'
-                    ? 'border-warning text-warning-foreground'
+                    ? 'border-warning text-warning'
                     : 'border-primary text-primary'
                 }
               >

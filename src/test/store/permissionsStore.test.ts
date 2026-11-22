@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
+import { supabase } from '@/integrations/supabase/client';
 
 // Mock supabase
 vi.mock('@/integrations/supabase/client', () => ({
@@ -50,6 +51,10 @@ describe('permissionsStore', () => {
 
     it('should have no error', () => {
       expect(usePermissionsStore.getState().error).toBeNull();
+    });
+
+    it("should hold nobody's roles", () => {
+      expect(usePermissionsStore.getState().loadedFor).toBeNull();
     });
   });
 
@@ -222,6 +227,138 @@ describe('permissionsStore', () => {
       expect(state.isInitialized).toBe(false);
       expect(state.hasFleetAccess).toBe(false);
       expect(state.currentVesselId).toBeNull();
+    });
+  });
+
+  // D-41: one user's roles are never presented as another's.
+  describe('loadPermissions across users', () => {
+    type GetUser = typeof supabase.auth.getUser;
+    type Rpc = typeof supabase.rpc;
+    const getUser = vi.mocked(supabase.auth.getUser);
+    const rpc = vi.mocked(supabase.rpc);
+    let signedIn: string | null = 'uA';
+    const holds = new Map<string, Promise<void>>();
+    const rolesOf: Record<string, { role_name: string; is_fleet_wide: boolean }[]> = {
+      uA: [{ role_name: 'dpa', is_fleet_wide: true }],
+      uB: [{ role_name: 'crew', is_fleet_wide: false }],
+    };
+    /** Hold one user's RPCs back until the returned function is called. */
+    const hold = (userId: string) => {
+      let release = () => {};
+      holds.set(userId, new Promise<void>((resolve) => { release = resolve; }));
+      return () => release();
+    };
+    /** Let every pending promise chain run. */
+    const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+    const store = () => usePermissionsStore.getState();
+    const roleNames = () => store().userRoles.map((r) => r.role_name);
+
+    beforeEach(() => {
+      signedIn = 'uA';
+      holds.clear();
+      getUser.mockImplementation((async () => ({ data: { user: signedIn ? { id: signedIn } : null }, error: null })) as unknown as GetUser);
+      rpc.mockImplementation((async (name: string, args: { p_user_id: string }) => {
+        await holds.get(args.p_user_id);
+        return { data: name === 'get_user_roles_full' ? rolesOf[args.p_user_id] ?? [] : [], error: null };
+      }) as unknown as Rpc);
+    });
+
+    afterEach(() => {
+      getUser.mockReset();
+      rpc.mockReset();
+      rpc.mockResolvedValue({ data: [], error: null } as never);
+    });
+
+    it("loads the signed-in user's roles and records whose they are", async () => {
+      await store().loadPermissions();
+      expect(store()).toMatchObject({ loadedFor: 'uA', isInitialized: true, isLoading: false, hasFleetAccess: true });
+      expect(roleNames()).toEqual(['dpa']);
+    });
+
+    it('records nobody when no one is signed in', async () => {
+      signedIn = null;
+      await store().loadPermissions();
+      expect(store()).toMatchObject({ loadedFor: null, isInitialized: true, isLoading: false, hasFleetAccess: false });
+      expect(roleNames()).toEqual([]);
+    });
+
+    it('dedupes a second load for the same user while one is in flight', async () => {
+      const release = hold('uA');
+      const first = store().loadPermissions();
+      await flush();
+      const second = store().loadPermissions();
+      await flush();
+      release();
+      await Promise.all([first, second]);
+      // One load is one pair of RPCs.
+      expect(rpc).toHaveBeenCalledTimes(2);
+      expect(store()).toMatchObject({ loadedFor: 'uA', isLoading: false, isInitialized: true });
+    });
+
+    it("discards a load for A that finishes after a switch to B, and loads B's instead", async () => {
+      const seen: { loadedFor: string | null; roles: string[]; isLoading: boolean }[] = [];
+      const unsubscribe = usePermissionsStore.subscribe((s) => {
+        seen.push({ loadedFor: s.loadedFor, roles: s.userRoles.map((r) => r.role_name), isLoading: s.isLoading });
+      });
+      try {
+        const release = hold('uA');
+        const load = store().loadPermissions();
+        await flush();
+        expect(store().isLoading).toBe(true);
+
+        signedIn = 'uB';
+        release();
+        await load;
+
+        expect(store()).toMatchObject({ loadedFor: 'uB', isInitialized: true, isLoading: false, hasFleetAccess: false });
+        expect(roleNames()).toEqual(['crew']);
+        expect(rpc).toHaveBeenCalledWith('get_user_roles_full', { p_user_id: 'uB' });
+        // A's roles were never written, and the store stayed loading until B's landed.
+        expect(seen.some((s) => s.roles.includes('dpa') || s.loadedFor === 'uA')).toBe(false);
+        expect(seen.filter((s) => !s.isLoading).every((s) => s.loadedFor === 'uB')).toBe(true);
+      } finally {
+        unsubscribe();
+      }
+    });
+
+    it('lets a load for another user supersede the one in flight', async () => {
+      const release = hold('uA');
+      const forA = store().loadPermissions();
+      await flush();
+      signedIn = 'uB';
+      await store().loadPermissions();
+      expect(store()).toMatchObject({ loadedFor: 'uB', isLoading: false });
+
+      release();
+      await forA;
+      expect(store()).toMatchObject({ loadedFor: 'uB', isLoading: false, hasFleetAccess: false });
+      expect(roleNames()).toEqual(['crew']);
+    });
+
+    it('reset() invalidates a load in flight', async () => {
+      const release = hold('uA');
+      const load = store().loadPermissions();
+      await flush();
+      store().reset();
+      release();
+      await load;
+      await flush();
+      expect(store()).toMatchObject({ loadedFor: null, isInitialized: false, isLoading: false, hasFleetAccess: false });
+      expect(roleNames()).toEqual([]);
+    });
+
+    it('reset() while the user is still being resolved drops the call', async () => {
+      let resolveUser: () => void = () => {};
+      getUser.mockImplementationOnce((() => new Promise((resolve) => {
+        resolveUser = () => resolve({ data: { user: { id: 'uA' } }, error: null });
+      })) as unknown as GetUser);
+      const load = store().loadPermissions();
+      store().reset();
+      resolveUser();
+      await load;
+      await flush();
+      expect(store()).toMatchObject({ loadedFor: null, isInitialized: false, isLoading: false });
+      expect(rpc).not.toHaveBeenCalled();
     });
   });
 });

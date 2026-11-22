@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
@@ -142,6 +142,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [practitionerDisciplines, setPractitionerDisciplines] = useState<string[]>([]);
   const [practitionerDisciplinesLoaded, setPractitionerDisciplinesLoaded] = useState(false);
+  // The session user right now, written synchronously on every auth event.
+  // A profile fetch lands only if its user is still the session user, so a
+  // fetch for A (say, started by A's TOKEN_REFRESHED) that resolves after a
+  // switch to B is dropped rather than shown as B's profile (D-41).
+  const sessionUserIdRef = useRef<string | null>(null);
   
   // RBAC store integration
   const {
@@ -325,6 +330,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user, userRole, rbacInitialized, rbacLoading, canView, hasRBACRole, rbacPermissions, rbacUserRoles, practitionerDisciplines, practitionerDisciplinesLoaded]);
 
   useEffect(() => {
+    const loadProfileFor = (userId: string) => {
+      fetchProfile(userId)
+        .then((next) => {
+          if (sessionUserIdRef.current === userId) setProfile(next);
+        })
+        .catch(() => {});
+    };
+
+    // A session for `userId` is now current. Nothing of another user's may
+    // stand for it while its own profile and roles load: their profile goes
+    // in the same render as the new user, and a direct switch from another
+    // account (another tab signing in, no SIGNED_OUT here) drops the roles
+    // and any role load still running for the previous user.
+    const adoptSessionUser = (userId: string) => {
+      const previous = sessionUserIdRef.current;
+      sessionUserIdRef.current = userId;
+      setProfile((prev) => (prev?.user_id === userId ? prev : null));
+      if (previous !== null && previous !== userId) resetPermissions();
+    };
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
@@ -334,12 +359,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Defer profile fetch with setTimeout
         if (session?.user) {
+          const userId = session.user.id;
+          adoptSessionUser(userId);
           setTimeout(() => {
-            fetchProfile(session.user.id).then(setProfile);
+            loadProfileFor(userId);
             // Load RBAC permissions when user logs in
             loadPermissions();
           }, 0);
         } else {
+          sessionUserIdRef.current = null;
           setProfile(null);
           // Reset RBAC permissions when user logs out
           resetPermissions();
@@ -354,8 +382,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          fetchProfile(session.user.id).then(setProfile).catch(() => {});
+          adoptSessionUser(session.user.id);
+          loadProfileFor(session.user.id);
           loadPermissions();
+        } else {
+          sessionUserIdRef.current = null;
         }
       })
       .catch((err) => {
@@ -427,6 +458,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    sessionUserIdRef.current = null;
     setUser(null);
     setSession(null);
     setProfile(null);

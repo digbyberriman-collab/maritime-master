@@ -160,9 +160,19 @@ describe('radius, elevation, focus, motion and density (A4)', () => {
     }
   });
 
-  it('keeps 44 px controls on touch even in compact density', () => {
-    const coarse = declsFor(tokens.rules, '[data-density="compact"]', ['@layer base', '@media (pointer: coarse)']);
+  it('keeps 44 px controls on touch in every density', () => {
+    const COARSE = ['@layer base', '@media (pointer: coarse)'];
+    const coarse = declsFor(tokens.rules, ':root, [data-density]', COARSE);
     expect(coarse['--control-h']).toBe('44px');
+    // Equal specificity (0,1,0), so the coarse rule wins only by coming after every density set.
+    const indexOf = (selector: string, atRules: string[]) =>
+      tokens.rules.findIndex((r) => r.selector === selector && r.atRules.join('|') === atRules.join('|'));
+    const coarseAt = indexOf(':root, [data-density]', COARSE);
+    for (const selector of [':root', '[data-density="comfortable"]', '[data-density="compact"]']) {
+      const at = indexOf(selector, ['@layer base']);
+      expect(at, selector).toBeGreaterThanOrEqual(0);
+      expect(coarseAt, `coarse rule after ${selector}`).toBeGreaterThan(at);
+    }
   });
 
   it('the table primitive reads the density tokens', () => {
@@ -188,6 +198,43 @@ describe('radius, elevation, focus, motion and density (A4)', () => {
     expect(kpi?.decls['font-variant-numeric']).toBe('tabular-nums');
     const table = tokens.rules.find((r) => r.selector === 'table');
     expect(table?.decls['font-variant-numeric']).toBe('tabular-nums');
+  });
+});
+
+describe('chart library defaults (A9, DS18)', () => {
+  // Recharts 2 writes #666 axes / tick text, #ccc grid and reference lines,
+  // and a white tooltip (inline style) whatever the theme.
+  const topLevel = (selector: string) => declsFor(tokens.rules, selector, []);
+
+  it('maps the Recharts defaults to theme tokens', () => {
+    expect(topLevel('.recharts-cartesian-axis-tick-value[fill="#666"]')).toMatchObject({
+      fill: 'hsl(var(--muted-foreground))',
+    });
+    expect(
+      topLevel('.recharts-cartesian-axis-line[stroke="#666"], .recharts-cartesian-axis-tick-line[stroke="#666"]'),
+    ).toMatchObject({ stroke: 'hsl(var(--border))' });
+    expect(topLevel('.recharts-cartesian-grid line[stroke="#ccc"], .recharts-reference-line [stroke="#ccc"]')).toMatchObject({
+      stroke: 'hsl(var(--border) / 0.6)',
+    });
+    // The background and border are inline styles, so only !important beats them.
+    expect(topLevel('.recharts-default-tooltip')).toMatchObject({
+      'background-color': 'hsl(var(--popover)) !important',
+      'border-color': 'hsl(var(--border)) !important',
+      color: 'hsl(var(--popover-foreground))',
+      'border-radius': 'var(--radius)',
+    });
+    expect(topLevel('.recharts-default-tooltip .recharts-tooltip-label')).toMatchObject({
+      color: 'hsl(var(--popover-foreground))',
+    });
+  });
+
+  it('scopes every Recharts fill / stroke override to the library default value', () => {
+    const paints = tokens.rules.filter((r) => r.selector.includes('.recharts-') && ('fill' in r.decls || 'stroke' in r.decls));
+    expect(paints.length).toBe(3);
+    for (const r of paints) {
+      // A module's explicit tick fill or stroke must still win.
+      for (const part of r.selector.split(',')) expect(part.trim(), r.selector).toMatch(/\[(?:fill|stroke)="#[0-9a-f]{3}"\]$/i);
+    }
   });
 });
 

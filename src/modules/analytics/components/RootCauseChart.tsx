@@ -35,13 +35,11 @@ export const RootCauseChart: React.FC<RootCauseChartProps> = ({ data }) => {
           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={true} vertical={false} />
           <XAxis 
             type="number"
-            className="text-xs fill-muted-foreground"
             tick={{ fontSize: 12 }}
           />
           <YAxis 
             type="category" 
             dataKey="cause" 
-            className="text-xs fill-muted-foreground"
             tick={{ fontSize: 11 }}
             width={110}
           />

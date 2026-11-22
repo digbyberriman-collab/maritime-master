@@ -26,13 +26,11 @@ export const LocationChart: React.FC<LocationChartProps> = ({ data }) => {
           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={true} vertical={false} />
           <XAxis 
             type="number" 
-            className="text-xs fill-muted-foreground"
             tick={{ fontSize: 12 }}
           />
           <YAxis 
             type="category" 
             dataKey="location" 
-            className="text-xs fill-muted-foreground"
             tick={{ fontSize: 11 }}
             width={75}
           />

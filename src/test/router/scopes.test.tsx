@@ -22,6 +22,8 @@ const mocks = vi.hoisted(() => ({
   perm: {
     isInitialized: true,
     isLoading: false,
+    // Whose roles these are; the scope routes count them only for that user.
+    loadedFor: 'u1' as string | null,
     hasFleetAccess: false,
     userRoles: [] as { role_name: string }[],
     setCurrentVessel: vi.fn(),
@@ -267,6 +269,7 @@ beforeEach(() => {
   mocks.auth.profile = { id: 'p1', role: 'crew', company_id: 'c1', user_id: 'u1' };
   mocks.auth.loading = false;
   mocks.perm.isInitialized = true;
+  mocks.perm.loadedFor = 'u1';
   mocks.perm.hasFleetAccess = false;
   mocks.perm.userRoles = [];
   mocks.perm.setCurrentVessel.mockClear();
@@ -514,6 +517,16 @@ describe('FleetScope', () => {
     mocks.perm.userRoles = [{ role_name: 'superadmin' }];
     renderApp('/fleet/dashboard', { reachable: [DRAAK], canAccessAllVessels: true });
     expect(screen.queryByRole('heading', { name: 'Fleet dashboard' })).toBeNull();
+    expect(screen.getByText('Loading…')).toBeInTheDocument();
+  });
+
+  it("fails closed while the roles held are another user's (D-41)", () => {
+    // Initialized and not loading, but the roles are the previous account's.
+    mocks.perm.loadedFor = 'someone-else';
+    mocks.perm.userRoles = [{ role_name: 'fleet_master' }];
+    mocks.perm.hasFleetAccess = true;
+    renderApp('/fleet/documents', { reachable: [DRAAK], selected: DRAAK.id });
+    expect(screen.queryByRole('heading', { name: 'Fleet documents' })).toBeNull();
     expect(screen.getByText('Loading…')).toBeInTheDocument();
   });
 });

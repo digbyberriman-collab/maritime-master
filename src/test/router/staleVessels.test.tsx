@@ -1,10 +1,12 @@
 /**
  * A same-tab user switch never resolves the vessel scope on the previous
- * user's vessels (D-25; fail closed, D-04). Real AuthProvider, permissions
- * store, VesselProvider, HomeRedirect and VesselScopeRoute; Supabase is a
- * small fake whose queries can be held back, and DashboardLayout a stub.
+ * user's vessels or roles (D-25, D-41; fail closed, D-04). Real AuthProvider,
+ * permissions store, VesselProvider, HomeRedirect and VesselScopeRoute;
+ * Supabase is a small fake whose queries can be held back, and
+ * DashboardLayout a stub.
  *
- * User A (company cA) has the vessel ALPHA, user B (company cB) BRAVO.
+ * User A (company cA) has the vessel ALPHA, user B (company cB) BRAVO. RBAC
+ * roles are none unless a test gives a user some.
  */
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -21,6 +23,8 @@ const h = vi.hoisted(() => ({
   holds: new Map<string, Promise<void>>(),
   /** user_ids whose profile read fails. */
   profileFails: new Set<string>(),
+  /** user_id → the rows get_user_roles_full returns (none if unset). */
+  roles: new Map<string, Record<string, unknown>[]>(),
   users: {
     a: { id: 'uA', email: 'a@test.invalid' },
     b: { id: 'uB', email: 'b@test.invalid' },
@@ -88,9 +92,13 @@ vi.mock('@/integrations/supabase/client', () => {
   return {
     supabase: {
       from,
-      rpc: () => {
-        const hold = h.holds.get('rpc');
-        const result = () => ({ data: [], error: null });
+      // Held by 'rpc' (every call) or 'rpc:<user id>' (that user's calls).
+      rpc: (name: string, args: { p_user_id: string }) => {
+        const hold = h.holds.get(`rpc:${args.p_user_id}`) ?? h.holds.get('rpc');
+        const result = () => ({
+          data: name === 'get_user_roles_full' ? h.roles.get(args.p_user_id) ?? [] : [],
+          error: null,
+        });
         return hold ? hold.then(result) : Promise.resolve(result());
       },
       auth: {
@@ -172,6 +180,42 @@ const PathSpy: React.FC = () => {
   return null;
 };
 
+/** Everything a reader could see, logged on every render. */
+interface Snapshot {
+  user: string | null;
+  profile: string | null;
+  ready: boolean;
+  fleetReach: boolean;
+  loading: boolean;
+  vessels: string[];
+  selected: string | null;
+  roles: string[];
+  rolesFor: string | null;
+}
+const snapshots: Snapshot[] = [];
+const WindowProbe: React.FC = () => {
+  const scope = useScopeAccess();
+  const v = useVessel();
+  const { user, profile } = useAuth();
+  const roles = usePermissionsStore((s) => s.userRoles);
+  const rolesFor = usePermissionsStore((s) => s.loadedFor);
+  const snap: Snapshot = {
+    user: user?.id ?? null,
+    profile: profile?.user_id ?? null,
+    ready: scope.ready,
+    fleetReach: scope.fleetReach,
+    loading: v.loading,
+    vessels: v.vessels.map((x) => x.name),
+    selected: v.selectedVessel?.name ?? null,
+    roles: (roles ?? []).map((r) => r.role_name),
+    rolesFor,
+  };
+  snapshots.push(snap);
+  return <output aria-label="window">{JSON.stringify(snap)}</output>;
+};
+const seen = (view: ReturnType<typeof render>) =>
+  JSON.parse(view.getByLabelText('window').textContent ?? '{}') as Snapshot;
+
 /** What the hook and the context say, for the hook-level checks. */
 const AccessProbe: React.FC = () => {
   const access = useScopeAccess();
@@ -192,6 +236,7 @@ function renderApp() {
           <Control />
           <PathSpy />
           <AccessProbe />
+          <WindowProbe />
           <Routes>
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/dashboard" element={<HomeRedirect />} />
@@ -253,6 +298,8 @@ afterEach(() => {
   vi.useRealTimers();
   h.holds.clear();
   h.profileFails.clear();
+  h.roles.clear();
+  snapshots.length = 0;
   h.current = null;
   h.listeners = [];
   vesselPageRenders.length = 0;
@@ -277,6 +324,9 @@ describe('the vessel scope across a same-tab user switch', () => {
     await settle(PROFILE_GRACE_MS);
     expect(path).toBe('/me');
     expect(view.getByRole('heading', { name: 'My area' })).toBeInTheDocument();
+    // VesselContext stops reporting loading too: an unreadable profile means
+    // no vessels, not a spinner forever.
+    expect(seen(view)).toMatchObject({ user: 'uB', profile: null, loading: false, vessels: [], selected: null });
 
     await settle(PROFILE_GRACE_MS * 2);
     expect(path).toBe('/me');
@@ -346,7 +396,7 @@ describe('useScopeAccess and VesselContext across a user switch', () => {
     const releaseProfile = hold('profiles:user_id=uB');
     await act(async () => { await control?.signIn(h.users.b); });
     await settle();
-    // The profile is still A's; the scope is not ready on it.
+    // B's profile has not arrived; the scope is not ready.
     expect(access(view)).toMatchObject({ user: 'uB', ready: false });
 
     await releaseProfile();
@@ -373,6 +423,74 @@ describe('useScopeAccess and VesselContext across a user switch', () => {
     await releaseA();
     await settle();
     expect(access(view)).toMatchObject({ user: 'uB', ready: true, last: 'BRA', vessels: ['BRAVO'] });
+  });
+
+  it("a direct A-to-B switch serves none of A's vessels, selection or profile while B's profile loads", async () => {
+    const view = renderApp();
+    await settle();
+    await signInA(view);
+    expect(seen(view)).toMatchObject({ user: 'uA', profile: 'uA', vessels: ['ALPHA'], selected: 'ALPHA', loading: false, ready: true });
+
+    // Another tab signs B in: no SIGNED_OUT here, and B's profile is slow.
+    const releaseProfile = hold('profiles:user_id=uB');
+    snapshots.length = 0;
+    await act(async () => { await control?.signIn(h.users.b); });
+    await settle();
+    expect(seen(view)).toMatchObject({ user: 'uB', profile: null, vessels: [], selected: null, loading: true, ready: false });
+    // Not one render under B's session showed anything of A's.
+    const underB = snapshots.filter((s) => s.user === 'uB');
+    expect(underB.length).toBeGreaterThan(0);
+    for (const s of underB) {
+      expect(s).toMatchObject({ profile: null, vessels: [], selected: null, loading: true, ready: false, fleetReach: false });
+    }
+    expect(rendersFor('uB').some((r) => r.vessel === 'ALPHA')).toBe(false);
+
+    await releaseProfile();
+    await settle();
+    expect(seen(view)).toMatchObject({ user: 'uB', profile: 'uB', vessels: ['BRAVO'], selected: 'BRAVO', loading: false, ready: true });
+    expect(snapshots.some((s) => s.user === 'uB' && (s.vessels.includes('ALPHA') || s.selected === 'ALPHA' || s.profile === 'uA'))).toBe(false);
+  });
+
+  it("A's role load still in flight when B signs in never puts A's roles in front of B", async () => {
+    h.roles.set('uA', [{ role_name: 'dpa', is_fleet_wide: true }]);
+    h.roles.set('uB', [{ role_name: 'crew', is_fleet_wide: false }]);
+    const committed: { loadedFor: string | null; roles: string[]; fleet: boolean }[] = [];
+    const unsubscribe = usePermissionsStore.subscribe((s) => {
+      committed.push({ loadedFor: s.loadedFor, roles: s.userRoles.map((r) => r.role_name), fleet: s.hasFleetAccess });
+    });
+    try {
+      const view = renderApp();
+      await settle();
+
+      // A signs in; A's role queries hang.
+      const releaseRbacA = hold('rpc:uA');
+      await act(async () => { await control?.signIn(h.users.a); });
+      await settle();
+      expect(usePermissionsStore.getState().isLoading).toBe(true);
+      expect(seen(view)).toMatchObject({ user: 'uA', ready: false });
+
+      // B signs in straight over A (another tab), then A's roles come back.
+      await act(async () => { await control?.signIn(h.users.b); });
+      await settle();
+      await releaseRbacA();
+      await settle();
+
+      const expectB = () => {
+        expect(usePermissionsStore.getState()).toMatchObject({ loadedFor: 'uB', hasFleetAccess: false, isLoading: false, isInitialized: true });
+        expect(usePermissionsStore.getState().userRoles.map((r) => r.role_name)).toEqual(['crew']);
+        expect(seen(view)).toMatchObject({ user: 'uB', ready: true, fleetReach: false, roles: ['crew'], rolesFor: 'uB', vessels: ['BRAVO'] });
+        expect(path).toBe('/v/bra');
+      };
+      expectB();
+      await settle(60_000);
+      expectB();
+
+      // A's roles were never written, and never counted while ready.
+      expect(committed.some((c) => c.roles.includes('dpa') || c.fleet || c.loadedFor === 'uA')).toBe(false);
+      expect(snapshots.some((s) => s.ready && (s.roles.includes('dpa') || s.fleetReach || s.rolesFor !== s.user))).toBe(false);
+    } finally {
+      unsubscribe();
+    }
   });
 
   it('serves nothing once the user signs out', async () => {

@@ -27,6 +27,8 @@ const mocks = vi.hoisted(() => ({
   perm: {
     isInitialized: true,
     isLoading: false,
+    // Whose roles these are; the scope routes count them only for that user.
+    loadedFor: 'u1' as string | null,
     hasFleetAccess: false,
     userRoles: [] as { role_name: string }[],
     setCurrentVessel: () => undefined,

@@ -17,7 +17,7 @@ type CenterTab = typeof TABS[number];
 
 const severityStyle = {
   RED: 'border-destructive/40 bg-destructive/10 text-destructive',
-  ORANGE: 'border-warning/40 bg-warning/10 text-warning-foreground',
+  ORANGE: 'border-orange/40 bg-orange/10 text-orange',
   YELLOW: 'border-amber/40 bg-amber/10 text-amber',
   GREEN: 'border-success/40 bg-success/10 text-success',
 } as const;

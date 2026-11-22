@@ -718,10 +718,10 @@ export function ReportIncidentModal({ open, onOpenChange }: ReportIncidentModalP
                 <div className="flex items-start gap-3">
                   <AlertCircle className="h-5 w-5 text-warning mt-0.5" />
                   <div>
-                    <p className="font-medium text-warning-foreground">
+                    <p className="font-medium text-warning">
                       Investigation Required
                     </p>
-                    <p className="text-sm text-warning-foreground/80">
+                    <p className="text-sm text-warning">
                       Based on the severity assessment, this incident will require a
                       formal investigation.
                     </p>
@@ -757,7 +757,7 @@ export function ReportIncidentModal({ open, onOpenChange }: ReportIncidentModalP
 
               {formData.dpa_notified && (
                 <div className="p-4 bg-info-muted border border-info/30 rounded-lg">
-                  <p className="text-sm text-info-foreground">
+                  <p className="text-sm text-info">
                     The DPA will be notified via email once this incident is
                     submitted.
                   </p>

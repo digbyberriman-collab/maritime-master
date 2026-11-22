@@ -40,9 +40,11 @@ export function useScopeAccess(): ScopeAccess {
   const { user, profile, loading: authLoading } = useAuth();
   const vessel = useVessel();
   const rbacInitialized = usePermissionsStore((s) => s.isInitialized);
-  // A load in flight may be replacing the previous user's roles (an account
-  // switch keeps `isInitialized` set), so it counts as not loaded yet.
-  const rbacLoading = usePermissionsStore((s) => s.isLoading);
+  // Whose roles the store holds. An account switch can leave `isInitialized`
+  // set, and a load that is in flight or has just finished may be the
+  // previous user's, so the roles count only once they are this user's own
+  // (D-41; fail closed, D-04). A same-user refresh keeps them counted.
+  const rbacLoadedFor = usePermissionsStore((s) => s.loadedFor);
   const hasFleetWideRole = usePermissionsStore((s) => s.hasFleetAccess);
   const userRoles = usePermissionsStore((s) => s.userRoles);
 
@@ -61,12 +63,12 @@ export function useScopeAccess(): ScopeAccess {
   }, [waitingForProfile]);
   const userId = user?.id ?? null;
   // The vessel lists count only once they are this user's: VesselContext
-  // tags them with the user they were loaded for, and the profile can still
-  // be the previous user's for a moment after an account switch (D-25).
+  // tags them with the user they were loaded for, and serves nothing while
+  // they are another user's (D-25, D-41).
   // A signed-in user whose profile cannot be read has no vessels at all
   // (fail closed), whatever VesselContext still holds.
   const vesselsReady = profile ? !vessel.loading && vessel.loadedForUserId === userId : profileGaveUp;
-  const readyNow = !authLoading && !!user && vesselsReady && rbacInitialized && !rbacLoading;
+  const readyNow = !authLoading && !!user && vesselsReady && rbacInitialized && rbacLoadedFor === userId;
 
   // Once ready, stay ready: a background refresh (refreshVessels, a
   // permissions reload) must not unmount the page the user is working in.
@@ -77,10 +79,12 @@ export function useScopeAccess(): ScopeAccess {
   if (readyNow && userId) latchedFor.current = userId;
   const ready = readyNow || (userId !== null && latchedFor.current === userId);
 
+  // Roles give fleet reach only while they are this user's own.
+  const ownRoles = userId !== null && rbacLoadedFor === userId;
   const fleetReach = hasFleetReach({
     canAccessAllVessels: vessel.canAccessAllVessels,
-    hasFleetWideRole,
-    rbacRoles: (userRoles ?? []).map((r) => r.role_name),
+    hasFleetWideRole: ownRoles && hasFleetWideRole,
+    rbacRoles: ownRoles ? (userRoles ?? []).map((r) => r.role_name) : [],
   });
 
   // No readable profile: no vessels, whatever the lists hold.

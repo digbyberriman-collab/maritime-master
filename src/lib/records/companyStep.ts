@@ -32,11 +32,21 @@
  * expected version matches. Pure: `record_transition()` / `company_action()`
  * are the authority.
  *
- * The signature sheet's `vesselLocked` (no removing vessel signatures)
- * follows from this envelope: set it when `companyAcknowledged` is true and
- * the status is `awaiting_company_close` or `closed`. Not for report-first
- * kinds in `acknowledged`: their final-review vessel slots are signed after
- * the acknowledgement. Every action with the `new_cycle` effect clears it.
+ * The company acknowledgement belongs to a review cycle, not to the record
+ * (gap/05 "Signature slots"; gap/08 SIG10; DECISIONS D-51). `acknowledge`
+ * from `awaiting_company_close` records `acknowledgedCycle = cycle`, and the
+ * `already_acknowledged` guard is per cycle. Every outcome with the
+ * `new_cycle` effect (Return to vessel, Not approved, Reopen) moves to
+ * `cycle + 1` and clears `companyAcknowledged` and `acknowledgedCycle`, so
+ * the company can acknowledge the resubmitted cycle. A report-first kind's
+ * initial-report acknowledgement sets `initialReportAcknowledged` (record
+ * history, kept across cycles) but no `acknowledgedCycle`: the final-review
+ * vessel slots are signed after it, so it does not lock them.
+ *
+ * The signature sheet's `vesselLocked` (no removing vessel signatures) is
+ * `vesselSignaturesLocked(envelope, sheet.cycle)`: the company acknowledged
+ * the sheet's cycle (status `awaiting_company_close` or `closed`), or the
+ * company closed the record.
  */
 import type { CompanyStep, DeleteRule, EnvelopeStatus, Party } from './types';
 import { fail, ok, type EngineResult } from './types';
@@ -90,7 +100,14 @@ export interface EnvelopeState {
   /** The company may "Close as" (after review / raised in error / duplicate), e.g. incidents. */
   allowCloseAs?: boolean;
   closedBy?: ClosedBy | null;
+  /** The company acknowledged in the current cycle (cleared by every `new_cycle` outcome). */
   companyAcknowledged?: boolean;
+  /** The current review cycle, 1 first; mirrors the signature sheet's `cycle`. Absent means 1. */
+  cycle?: number;
+  /** The cycle whose vessel signatures the company acknowledged; null or absent when none. */
+  acknowledgedCycle?: number | null;
+  /** Report-first kinds only: the company acknowledged the initial report (record-level history). */
+  initialReportAcknowledged?: boolean;
   version?: number;
   /**
    * The kind's delete rule (gap/08 §F; DECISIONS D-32), which decides who may
@@ -121,6 +138,11 @@ export interface TransitionOutcome {
   status: EnvelopeStatus;
   closedBy: ClosedBy | null;
   companyAcknowledged: boolean;
+  /** The cycle after the transition: one more when `effects` include `new_cycle`. */
+  cycle: number;
+  /** The cycle the company acknowledged, or null (always null after `new_cycle`). */
+  acknowledgedCycle: number | null;
+  initialReportAcknowledged: boolean;
   effects: TransitionEffect[];
   notification: EnvelopeNotification | null;
 }
@@ -169,6 +191,8 @@ export const ACTION_FROM: Readonly<Record<EnvelopeAction, readonly EnvelopeStatu
 };
 
 const COMPANY_CLOSED: ReadonlySet<ClosedBy> = new Set(['company_acknowledge', 'company_sign_off', 'company_decision']);
+/** Every company close, with or without a company signature (`close_as` has none). */
+const COMPANY_CLOSERS: ReadonlySet<ClosedBy> = new Set([...COMPANY_CLOSED, 'company_close_as']);
 
 const blank = (s: string | null | undefined) => !s || !s.trim();
 
@@ -185,20 +209,29 @@ export function transitionEnvelope(state: EnvelopeState, input: TransitionInput)
     return fail('invalid_transition', `"${action}" is not possible while the record is ${state.status.replace(/_/g, ' ')}.`);
   }
 
-  const acked = Boolean(state.companyAcknowledged);
+  const cycle = state.cycle ?? 1;
+  const ackedCycle = state.acknowledgedCycle ?? null;
+  // A new cycle starts unacknowledged (D-51); the initial-report history is kept.
   const outcome = (
     status: EnvelopeStatus,
     effects: TransitionEffect[],
     notification: EnvelopeNotification | null,
-    extra: Partial<Pick<TransitionOutcome, 'closedBy' | 'companyAcknowledged'>> = {},
-  ): TransitionResult =>
-    ok({
+    extra: Partial<
+      Pick<TransitionOutcome, 'closedBy' | 'companyAcknowledged' | 'cycle' | 'acknowledgedCycle' | 'initialReportAcknowledged'>
+    > = {},
+  ): TransitionResult => {
+    const newCycle = effects.includes('new_cycle');
+    return ok({
       status,
       closedBy: extra.closedBy !== undefined ? extra.closedBy : status === 'closed' ? state.closedBy ?? null : null,
-      companyAcknowledged: extra.companyAcknowledged ?? acked,
+      companyAcknowledged: extra.companyAcknowledged ?? (newCycle ? false : Boolean(state.companyAcknowledged)),
+      cycle: extra.cycle ?? (newCycle ? cycle + 1 : cycle),
+      acknowledgedCycle: extra.acknowledgedCycle !== undefined ? extra.acknowledgedCycle : newCycle ? null : ackedCycle,
+      initialReportAcknowledged: extra.initialReportAcknowledged ?? Boolean(state.initialReportAcknowledged),
       effects,
       notification,
     });
+  };
   const openRequestsBlock = (input.openRequests ?? 0) > 0;
   const requestsMessage = () => {
     const n = input.openRequests ?? 0;
@@ -227,19 +260,29 @@ export function transitionEnvelope(state: EnvelopeState, input: TransitionInput)
       if (state.companyStep === 'none') return fail('not_for_kind', 'This kind of record has no company step.');
       if (state.status === 'submitted') {
         if (!state.reportFirst) return fail('not_for_kind', 'Only report-first records are acknowledged on submission.');
-        return outcome('acknowledged', ['company_acknowledgement'], 'record_acknowledged', { companyAcknowledged: true });
+        // The initial report only: the final-review vessel slots are signed later, so no acknowledgedCycle (D-51).
+        return outcome('acknowledged', ['company_acknowledgement'], 'record_acknowledged', {
+          companyAcknowledged: true,
+          initialReportAcknowledged: true,
+        });
       }
-      // awaiting_company_close
+      // awaiting_company_close: the company acknowledges this cycle's vessel signatures.
       if (state.companyStep === 'acknowledge') {
+        // The acknowledgement is the closing signature, so it is not guarded per cycle: after
+        // Remove company signature the company closes again the same way.
         if (openRequestsBlock) return fail('open_requests', requestsMessage());
         if (input.staleRequiredSignatures) return fail('stale_signatures', staleMessage);
         return outcome('closed', ['company_acknowledgement', 'company_signature', 'snapshot'], 'record_acknowledged', {
           closedBy: 'company_acknowledge',
           companyAcknowledged: true,
+          acknowledgedCycle: cycle,
         });
       }
-      if (acked) return fail('already_acknowledged', 'The company has already acknowledged this record.');
-      return outcome('awaiting_company_close', ['company_acknowledgement'], 'record_acknowledged', { companyAcknowledged: true });
+      if (ackedCycle === cycle) return fail('already_acknowledged', 'The company has already acknowledged this review cycle.');
+      return outcome('awaiting_company_close', ['company_acknowledgement'], 'record_acknowledged', {
+        companyAcknowledged: true,
+        acknowledgedCycle: cycle,
+      });
     }
 
     case 'decide': {
@@ -349,4 +392,25 @@ function probe(state: EnvelopeState, input: Pick<TransitionInput, 'action' | 'ac
 /** True when a vessel-side action could ever close a record of this company step (false for sign_off). */
 export function vesselCanClose(companyStep: CompanyStep): boolean {
   return companyStep === 'none';
+}
+
+/**
+ * Are the vessel signatures of the sheet's cycle locked (no removing them)?
+ * Callers set `sheet.vesselLocked = vesselSignaturesLocked(envelope, sheet.cycle)`
+ * (gap/05 "Signature slots"; gap/08 SIG10; DECISIONS D-51). True only for the
+ * envelope's current cycle, and only when the company acknowledged that cycle
+ * (status `awaiting_company_close` or `closed`) or closed the record. A
+ * report-first initial-report acknowledgement does not lock the final-review
+ * slots. After Return to vessel, Not approved or Reopen the new cycle is
+ * unlocked until the company acknowledges it (or closes the record).
+ */
+export function vesselSignaturesLocked(
+  state: Pick<EnvelopeState, 'status' | 'acknowledgedCycle' | 'closedBy' | 'cycle'>,
+  sheetCycle: number,
+): boolean {
+  if (sheetCycle !== (state.cycle ?? 1)) return false;
+  const acknowledgedThisCycle =
+    state.acknowledgedCycle === sheetCycle && (state.status === 'awaiting_company_close' || state.status === 'closed');
+  const companyClosed = state.status === 'closed' && state.closedBy != null && COMPANY_CLOSERS.has(state.closedBy);
+  return acknowledgedThisCycle || companyClosed;
 }

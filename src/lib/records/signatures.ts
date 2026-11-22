@@ -21,13 +21,18 @@
  * idempotent): signing again with the id of the live row on the same slot is
  * a no-op, and an id already used for any other row is refused.
  *
- * Once the company has acknowledged a cycle, vessel signatures cannot be
- * removed until the company returns the record (gap/05 "Signature slots";
- * SIG10). The caller sets `sheet.vesselLocked` from the envelope:
- * `companyAcknowledged` and status `awaiting_company_close` or `closed`. Do
- * not set it for report-first kinds in `acknowledged`: their final-review
- * vessel slots are signed after the acknowledgement. Return to vessel,
- * Reopen and Initiate review start a new cycle, which clears the lock.
+ * Once the company has acknowledged a cycle (or closed the record), that
+ * cycle's vessel signatures cannot be removed until the company returns the
+ * record (gap/05 "Signature slots"; SIG10; DECISIONS D-51). The lock belongs
+ * to the acknowledged cycle, not to the record. The caller sets
+ * `sheet.vesselLocked = vesselSignaturesLocked(envelope, sheet.cycle)` from
+ * the record envelope (`companyStep.ts`; this module does not import it, so
+ * the engines stay independent). A report-first initial-report
+ * acknowledgement does not lock the final-review vessel slots signed after
+ * it. Return to vessel, Not approved, Reopen and Initiate review start a new
+ * cycle: `startNextCycle` clears the flag here, and the envelope's
+ * `new_cycle` outcomes clear the acknowledgement, so re-deriving the flag
+ * for the new cycle stays false until the company acknowledges that cycle.
  */
 import { fail, ok, type EngineResult, type Party } from './types';
 
@@ -107,9 +112,10 @@ export interface SignatureSheet {
   /** Once submitted, removing a signature needs a reason. */
   submitted?: boolean;
   /**
-   * The company has acknowledged the signatures of this cycle: vessel slots
-   * cannot be removed until the company returns the record. Set by the
-   * caller from the envelope (see the header); `startNextCycle` clears it.
+   * The company has acknowledged this cycle's vessel signatures (or closed
+   * the record): vessel slots cannot be removed until the company returns
+   * it. Set by the caller as `vesselSignaturesLocked(envelope, sheet.cycle)`
+   * (see the header); `startNextCycle` clears it.
    */
   vesselLocked?: boolean;
 }

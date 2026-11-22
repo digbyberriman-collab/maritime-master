@@ -34,11 +34,9 @@ export const CAPAAgingChart: React.FC<CAPAAgingChartProps> = ({ data }) => {
           <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
           <XAxis 
             dataKey="bucket" 
-            className="text-xs fill-muted-foreground"
             tick={{ fontSize: 10 }}
           />
           <YAxis 
-            className="text-xs fill-muted-foreground"
             tick={{ fontSize: 12 }}
           />
           <Tooltip 

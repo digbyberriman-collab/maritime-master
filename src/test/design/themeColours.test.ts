@@ -121,6 +121,35 @@ function candidatesIn(texts: readonly string[]): string[] {
   return [...found];
 }
 
+/**
+ * Status tones whose `-foreground` token means "text on a SOLID `bg-<tone>`
+ * fill" since the A1 remap (Abyss ink on dark, white on Daylight). Text on a
+ * tint (`bg-<tone>/NN`, `bg-<tone>-muted`) or an outline uses `text-<tone>`.
+ */
+const STATUS_TONES = [
+  'success', 'warning', 'info', 'critical', 'destructive', 'orange', 'purple', 'cyan', 'amber', 'pink', 'indigo', 'teal',
+] as const;
+const ON_FILL_TEXT = new RegExp(`^text-(${STATUS_TONES.join('|')})-foreground(?:\\/(?:\\d{1,3}|\\[[^\\]\\s]+\\]))?$`);
+
+/**
+ * `text-<tone>-foreground` utilities (variants stripped, opacity kept) in one
+ * class string that has no solid `bg-<same tone>` beside it. A solid fill may
+ * carry any variant prefix (`group-[.destructive]:hover:bg-critical`) but no
+ * opacity modifier and no `-muted`.
+ */
+function onFillTextWithoutFill(text: string): string[] {
+  const utilities: string[] = [];
+  for (const token of text.split(/\s+/)) {
+    const m = CANDIDATE.exec(token);
+    if (m) utilities.push(m[2]);
+  }
+  const fills = new Set(utilities.filter((u) => u.startsWith('bg-')));
+  return utilities.filter((u) => {
+    const m = ON_FILL_TEXT.exec(u);
+    return m !== null && !fills.has(`bg-${m[1]}`);
+  });
+}
+
 /** Class names in the CSS Tailwind emits for `candidates`, with src/index.css. */
 async function emittedClasses(candidates: readonly string[]): Promise<Set<string>> {
   const css = readFileSync(join(SRC, 'index.css'), 'utf8');
@@ -194,4 +223,44 @@ describe('theme colours', () => {
       'Fixed: delete these from KNOWN_UNDEFINED',
     ).toEqual([]);
   }, 120_000);
+
+  it('flags status -foreground text without its solid fill, and passes solid pairs and variant-prefixed fills', () => {
+    // Positive: on-fill text with no fill at all, or on a tint / outline.
+    expect(onFillTextWithoutFill('font-medium text-warning-foreground')).toEqual(['text-warning-foreground']);
+    expect(onFillTextWithoutFill('border-warning text-warning-foreground')).toEqual(['text-warning-foreground']);
+    // Opacity: an alpha of the text is still on-fill text; an alpha fill is a tint, not a fill.
+    expect(onFillTextWithoutFill('text-sm text-warning-foreground/80')).toEqual(['text-warning-foreground/80']);
+    expect(onFillTextWithoutFill('bg-warning/20 text-warning-foreground')).toEqual(['text-warning-foreground']);
+    // -muted is a tint.
+    expect(onFillTextWithoutFill('p-4 bg-info-muted border border-info/30 text-info-foreground')).toEqual([
+      'text-info-foreground',
+    ]);
+    // The fill must be the same tone.
+    expect(onFillTextWithoutFill('bg-destructive text-critical-foreground')).toEqual(['text-critical-foreground']);
+    expect(onFillTextWithoutFill('hover:text-orange-foreground')).toEqual(['text-orange-foreground']);
+    // Negative: solid pairs, with or without variants, and non-status tokens.
+    expect(onFillTextWithoutFill('bg-warning text-warning-foreground')).toEqual([]);
+    expect(onFillTextWithoutFill('bg-destructive text-destructive-foreground hover:bg-destructive/90')).toEqual([]);
+    expect(
+      onFillTextWithoutFill(
+        'group-[.destructive]:border-muted/40 group-[.destructive]:hover:border-critical/30 group-[.destructive]:hover:bg-critical group-[.destructive]:hover:text-critical-foreground',
+      ),
+    ).toEqual([]);
+    expect(onFillTextWithoutFill('data-[state=on]:!bg-success data-[state=on]:text-success-foreground/90')).toEqual([]);
+    expect(onFillTextWithoutFill('bg-primary text-primary-foreground text-muted-foreground text-warning')).toEqual([]);
+  });
+
+  it('status -foreground text sits on its solid bg-<tone> (A1: text on a tint or outline uses text-<tone>)', () => {
+    const hits: string[] = [];
+    for (const file of walk(SRC)) {
+      const rel = relative(ROOT, file);
+      for (const text of literalTexts(file)) {
+        for (const u of onFillTextWithoutFill(text)) hits.push(`${rel}: ${u} in "${text.replace(/\s+/g, ' ').trim()}"`);
+      }
+    }
+    expect(
+      hits.sort(),
+      'On a tint (bg-<tone>/NN, bg-<tone>-muted) or an outline use text-<tone>; -foreground is for a solid bg-<tone> in the same class string',
+    ).toEqual([]);
+  });
 });

@@ -121,7 +121,7 @@ const ReviewQueue: React.FC = () => {
                         <CardDescription>{review.document_number}</CardDescription>
                       </div>
                     </div>
-                    <Badge variant="secondary" className="bg-warning/20 text-warning-foreground">
+                    <Badge variant="warn">
                       <Clock className="w-3 h-3 mr-1" />
                       Pending Review
                     </Badge>

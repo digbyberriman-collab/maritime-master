@@ -177,6 +177,9 @@ describe('bridges to the engines', () => {
       allowCloseAs: false,
       closedBy: null,
       companyAcknowledged: false,
+      cycle: 1,
+      acknowledgedCycle: null,
+      initialReportAcknowledged: false,
       version: 3,
       deleteRule: 'draft_only',
     });
@@ -200,5 +203,10 @@ describe('bridges to the engines', () => {
     expect(submitted.deleteRule).toBe('never_after_submit');
     expect(transitionEnvelope(submitted, { action: 'void', actor: 'vessel', reason: 'oops' })).toMatchObject({ ok: false, error: { code: 'wrong_party' } });
     expect(transitionEnvelope(submitted, { action: 'void', actor: 'company', reason: 'Raised on the wrong vessel' })).toMatchObject({ ok: true, value: { status: 'void' } });
+
+    // The cycle-scoped acknowledgement passes through (D-51).
+    const finalReview = envelopeStateForKind(incident, { status: 'awaiting_company_close', cycle: 2, acknowledgedCycle: 2, initialReportAcknowledged: true });
+    expect(finalReview).toMatchObject({ cycle: 2, acknowledgedCycle: 2, initialReportAcknowledged: true });
+    expect(transitionEnvelope(finalReview, { action: 'acknowledge', actor: 'company' })).toMatchObject({ ok: false, error: { code: 'already_acknowledged' } });
   });
 });
