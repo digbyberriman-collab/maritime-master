@@ -5,11 +5,6 @@ export { default as SettingsPage } from './pages/Settings';
 export { default as BrandingSettingsPage } from './pages/BrandingSettings';
 export { default as RolesPermissionsPage } from './pages/RolesPermissionsPage';
 
-// Components
-export { default as SettingsHeader } from './components/SettingsHeader';
-export { default as SettingsSidebar } from './components/SettingsSidebar';
-export { default as SettingsMobileNav } from './components/SettingsMobileNav';
-
 // Common components
 export {
   SectionHeader,

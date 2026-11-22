@@ -19,6 +19,7 @@ import { matchRoutes } from 'react-router-dom';
 import {
   FLEET_PLACEHOLDER_LEAVES,
   NAVIGATION_ITEMS,
+  PERSONAL_PLACEHOLDER_LEAVES,
   PLACEHOLDER_LEAVES,
   VESSEL_MODULES,
   VESSEL_PLACEHOLDER_LEAVES,
@@ -100,7 +101,7 @@ describe('nav leaf status', () => {
     const workspacePlaceholders = flatRoutes(routes)
       .filter((f) => isPlaceholderElement(f.route.element as React.ReactElement))
       .map((f) => f.pattern)
-      .filter((p) => !p.startsWith('/fleet/') && !p.startsWith('/v/:vesselCode'))
+      .filter((p) => !p.startsWith('/fleet/') && !p.startsWith('/v/:vesselCode') && !p.startsWith('/me/'))
       .sort();
     expect(workspacePlaceholders).toEqual(PLACEHOLDER_LEAVES.map((p) => p.path).sort());
   });
@@ -122,13 +123,18 @@ describe('nav leaf status', () => {
     expect(inScope.size + topLevel.length).toBe(PLACEHOLDER_LEAVES.length);
   });
 
-  it('fleet and vessel placeholders sit inside their scope routes, one per planned leaf', () => {
+  it('fleet, vessel and personal placeholders sit inside their scope routes, one per planned leaf', () => {
     const nested = flatRoutes(routes).filter((f) => isPlaceholderElement(f.route.element as React.ReactElement));
     const fleet = nested.filter((f) => f.pattern.startsWith('/fleet/')).map((f) => f.pattern).sort();
     const vessel = nested.filter((f) => f.pattern.startsWith('/v/:vesselCode/')).map((f) => f.pattern).sort();
+    const personal = nested.filter((f) => f.pattern.startsWith('/me/')).map((f) => f.pattern).sort();
     expect(fleet).toEqual(FLEET_PLACEHOLDER_LEAVES.map((p) => `/fleet/${p.path}`).sort());
     expect(vessel).toEqual(VESSEL_PLACEHOLDER_LEAVES.map((p) => vesselPatternPath(p.path)).sort());
-    expect(nested).toHaveLength(PLACEHOLDER_LEAVES.length + FLEET_PLACEHOLDER_LEAVES.length + VESSEL_PLACEHOLDER_LEAVES.length);
+    expect(personal).toEqual(PERSONAL_PLACEHOLDER_LEAVES.map((p) => `/me/${p.path}`).sort());
+    expect(personal.length).toBeGreaterThanOrEqual(3);
+    expect(nested).toHaveLength(
+      PLACEHOLDER_LEAVES.length + FLEET_PLACEHOLDER_LEAVES.length + VESSEL_PLACEHOLDER_LEAVES.length + PERSONAL_PLACEHOLDER_LEAVES.length,
+    );
   });
 
   it('every vessel tab opens a page or its placeholder inside the scope, never not-found', () => {

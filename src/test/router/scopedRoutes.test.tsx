@@ -7,9 +7,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 
-import type { RouteObject } from 'react-router-dom';
+import { matchRoutes, type RouteObject } from 'react-router-dom';
 import { FleetScope, HomeRedirect, PersonalScope, VesselScopeRoute, WorkspaceScope } from '@/app/router/scopes';
 import { FLEET_RBAC_ROLES, hasFleetReach, landingPath } from '@/app/router/reach';
+import { PersonalIndexRedirect } from '@/app/router/personalRoutes';
 import { appRouteObjects, flatRoutes, isLazyPage, resolveUrl } from './routeHarness';
 
 const routes = appRouteObjects();
@@ -62,7 +63,22 @@ const VESSEL_PAGES = [
   '/v/dra/logbooks/engine-log',
   '/v/dra/calendar',
 ];
-const PERSONAL_PAGES = ['/me', '/me/hours-of-rest', '/me/training', '/me/notifications'];
+const PERSONAL_PAGES = [
+  '/me/profile',
+  '/me/security',
+  '/me/appearance',
+  '/me/shortcuts',
+  '/me/permissions',
+  '/me/hours-of-rest',
+  '/me/training',
+  '/me/notifications',
+  '/me/notifications/channels',
+  '/inbox',
+];
+
+/** The scope layout elements on the way to a URL (pathless layouts included). */
+const layoutsOf = (url: string) =>
+  (matchRoutes(routes, resolveUrl(routes, url).url) ?? []).map((m) => (m.route.element as React.ReactElement | undefined)?.type);
 
 const layoutOf = (url: string) => {
   const r = resolveUrl(routes, url);
@@ -106,8 +122,17 @@ describe('scoped route trees', () => {
 
   it.each(PERSONAL_PAGES)('%s opens an existing page inside PersonalScope', (url) => {
     const r = resolveUrl(routes, url);
+    expect(r.hops, url).toEqual([]);
     expect(isLazyPage(r.element), r.pattern).toBe(true);
-    expect(layoutOf(url)?.type).toBe(PersonalScope);
+    expect(layoutsOf(url)).toContain(PersonalScope);
+  });
+
+  it('/me and the old settings URLs land on their /me section, inside PersonalScope', () => {
+    // `/me` reads ?tab= / ?section= first (src/test/router/meRoutes.test.tsx renders it).
+    expect(resolveUrl(routes, '/me').element?.type).toBe(PersonalIndexRedirect);
+    expect(layoutsOf('/me')).toContain(PersonalScope);
+    expect(resolveUrl(routes, '/me/no-such-section').url).toBe('/me/profile');
+    expect(resolveUrl(routes, '/settings/whatever/deeper').url).toBe('/me/profile');
   });
 
   it('/fleet and /fleet/admin land on a page', () => {

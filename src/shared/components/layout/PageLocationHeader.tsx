@@ -1,57 +1,179 @@
+/**
+ * The page's location (gap/10 IA17; heading contract, spec §7; deferred
+ * item 4): one breadcrumb row above every page, and the shell's fallback h1
+ * only when the page brings none.
+ *
+ * - The breadcrumb row always renders (`nav aria-label="Breadcrumb"`, caption
+ *   size, the current crumb `aria-current="page"`). Below 640 px a trail of
+ *   four or more crumbs folds its middle into a "…" menu, so the row never
+ *   pushes the page sideways. Crumb links have a 44 px hit area on touch.
+ * - The page owns its h1 (`PageHeader`, or a legacy page's own `<h1>`). The
+ *   shell adds `<h1 data-testid="shell-page-title">` with the nav title only
+ *   once the page has settled with no h1 of its own (usePageHeadingPresence),
+ *   so a page never shows two headings and never flashes a second one.
+ * - `document.title` is "<title> | STORM".
+ * - Vessel scope: crumbs carry the vessel's label overrides (Planner →
+ *   "Leave", through useCurrentPageNavigation), the root crumb is the vessel's
+ *   name, and links open the same vessel (no literal `:vesselCode`).
+ * - A crumb into a scope the user cannot reach (Fleet without fleet reach)
+ *   is plain text, never a link they cannot open (deferred item 1). Section
+ *   headings ("Overview") are labels in the trail, not links.
+ */
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { ChevronRight, MoreHorizontal } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from '@/components/ui/breadcrumb';
-import { resolvePageNavigation } from '@/shared/lib/pageNavigation';
-import { toNavPathname } from '@/app/router/legacyResolve';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { SHELL_TEST_IDS } from '@/app/shell/testIds';
+import { useNavAccess } from '@/app/nav/navAccess';
+import { useScope } from '@/app/router/scopeContext';
+import { VESSEL_SCOPE_PATTERN, vesselPath } from '@/modules/vessels/lib/vesselCode';
+import type { PageCrumb } from '@/shared/lib/pageNavigation';
+import { useCurrentPageNavigation } from './useActiveNavModule';
+import { usePageHeadingPresence } from './usePageHeadingPresence';
 
-interface PageLocationHeaderProps {
-  activeModuleId?: string | null;
+/** A crumb as the row draws it: a link, or plain text. */
+interface ShownCrumb {
+  key: string;
+  label: string;
+  href: string | null;
 }
 
-const PageLocationHeader: React.FC<PageLocationHeaderProps> = ({ activeModuleId }) => {
-  const location = useLocation();
-  const page = React.useMemo(
-    // Vessel URLs (/v/dra/crew/list) resolve as the nav tree's pattern path
-    // (/v/:vesselCode/crew/list), as DashboardLayout and the sidebar do.
-    () => resolvePageNavigation(toNavPathname(location.pathname), location.search, activeModuleId),
-    [activeModuleId, location.pathname, location.search],
-  );
+/** Trails this long fold their middle crumbs into "…" below 640 px. */
+const FOLD_FROM = 4;
+
+const pathnameOf = (path: string): string => path.split(/[?#]/)[0] || '/';
+
+/** Fleet pages (and the legacy "Fleet" crumb, which lands on the fleet dashboard). */
+const isFleetTarget = (path: string): boolean => {
+  const pathname = pathnameOf(path);
+  return pathname === '/fleet' || pathname.startsWith('/fleet/') || pathname === '/dashboard';
+};
+
+/** The nav tree's `/v/:vesselCode/…` pattern, on the vessel in scope. */
+function onVessel(path: string, code: string | null): string | null {
+  if (!path.startsWith(VESSEL_SCOPE_PATTERN)) return path;
+  if (!code) return null;
+  const rest = path.slice(VESSEL_SCOPE_PATTERN.length).replace(/^\//, '');
+  return vesselPath(code, rest);
+}
+
+const crumbText = 'min-w-0 max-w-[14rem] truncate';
+
+const crumbLink = cn(
+  'inline-flex min-w-0 items-center rounded-sm transition-colors duration-quick ease-tide hover:text-foreground',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+  '[@media(pointer:coarse)]:min-h-11',
+);
+
+const Separator: React.FC = () => (
+  <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground/70" strokeWidth={1.75} aria-hidden="true" />
+);
+
+/** Rendered by AppShell as the first child of `<main>`, where it looks for the page's own h1. */
+const PageLocationHeader: React.FC = () => {
+  const rootRef = React.useRef<HTMLDivElement>(null);
+  const page = useCurrentPageNavigation();
+  const scope = useScope();
+  const { fleetReach } = useNavAccess();
+  const { hasPageHeading, settled } = usePageHeadingPresence(rootRef);
+
+  const vesselCode = scope.scope === 'vessel' ? scope.vesselCode ?? null : null;
+  const vesselName = scope.scope === 'vessel' ? scope.vessel?.name ?? null : null;
 
   React.useEffect(() => {
     document.title = `${page.title} | STORM`;
   }, [page.title]);
 
+  const crumbs = React.useMemo<ShownCrumb[]>(
+    () =>
+      page.crumbs.map((crumb: PageCrumb, index) => {
+        const current = index === page.crumbs.length - 1;
+        // The vessel scope's root crumb names the vessel.
+        const label = index === 0 && vesselName && crumb.path === VESSEL_SCOPE_PATTERN ? vesselName : crumb.label;
+        let href: string | null = !current && crumb.path && !crumb.section ? onVessel(crumb.path, vesselCode) : null;
+        if (href && isFleetTarget(href) && !fleetReach) href = null;
+        return { key: `${index}-${crumb.label}`, label, href };
+      }),
+    [page.crumbs, vesselCode, vesselName, fleetReach],
+  );
+
+  const fold = crumbs.length >= FOLD_FROM;
+  const middle = fold ? crumbs.slice(1, -1) : [];
+  const showFallback = settled && !hasPageHeading;
+
   return (
-    <div className="mb-3 border-b border-border pb-2">
-      <Breadcrumb>
-        <BreadcrumbList className="gap-1 text-xs sm:gap-1.5">
-          {page.crumbs.map((crumb, index) => {
-            const current = index === page.crumbs.length - 1;
+    <div ref={rootRef} data-testid={SHELL_TEST_IDS.pageHeader} className={cn('min-w-0', showFallback ? 'mb-3' : 'mb-2')}>
+      <nav aria-label="Breadcrumb" className="min-w-0">
+        <ol className="type-caption flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-muted-foreground">
+          {crumbs.map((crumb, index) => {
+            const current = index === crumbs.length - 1;
+            const hiddenOnNarrow = fold && index > 0 && !current;
             return (
-              <React.Fragment key={`${crumb.label}-${index}`}>
-                {index > 0 && <BreadcrumbSeparator />}
-                <BreadcrumbItem>
-                  {!current && crumb.path ? (
-                    <BreadcrumbLink asChild>
-                      <Link to={crumb.path}>{crumb.label}</Link>
-                    </BreadcrumbLink>
+              <React.Fragment key={crumb.key}>
+                {fold && index === 1 && (
+                  <li className="inline-flex items-center gap-1.5 sm:hidden">
+                    <Separator />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        aria-label="Show the full path"
+                        className={cn(
+                          'inline-flex h-5 w-6 items-center justify-center rounded-sm hover:bg-accent hover:text-foreground',
+                          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                          '[@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11',
+                        )}
+                      >
+                        <MoreHorizontal className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="max-w-[calc(100vw-2rem)]">
+                        {middle.map((hidden) =>
+                          hidden.href ? (
+                            <DropdownMenuItem key={hidden.key} asChild>
+                              <Link to={hidden.href}>{hidden.label}</Link>
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem key={hidden.key} disabled>
+                              {hidden.label}
+                            </DropdownMenuItem>
+                          ),
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </li>
+                )}
+                <li className={cn('min-w-0 items-center gap-1.5', hiddenOnNarrow ? 'hidden sm:inline-flex' : 'inline-flex')}>
+                  {index > 0 && <Separator />}
+                  {current ? (
+                    <span aria-current="page" className={cn(crumbText, 'text-foreground')}>
+                      {crumb.label}
+                    </span>
+                  ) : crumb.href ? (
+                    <Link to={crumb.href} className={crumbLink}>
+                      <span className={crumbText}>{crumb.label}</span>
+                    </Link>
                   ) : (
-                    <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                    <span className={crumbText}>{crumb.label}</span>
                   )}
-                </BreadcrumbItem>
+                </li>
               </React.Fragment>
             );
           })}
-        </BreadcrumbList>
-      </Breadcrumb>
-      <h1 className="mt-0.5 text-xl font-semibold text-foreground sm:text-2xl">{page.title}</h1>
+        </ol>
+      </nav>
+      {showFallback && (
+        <h1
+          data-testid={SHELL_TEST_IDS.fallbackHeading}
+          data-shell-heading=""
+          className="type-display mt-1 min-w-0 break-words text-foreground"
+        >
+          {page.title}
+        </h1>
+      )}
     </div>
   );
 };

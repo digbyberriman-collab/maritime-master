@@ -4,7 +4,9 @@ import ProtectedRoute from '@/shared/components/ProtectedRoute';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { PlaceholderPage } from '@/shared/components/common/PlaceholderPage';
 import { SECTION_REDIRECTS } from '@/config/sitemap';
-import { fleetNavRoutes, retiredNavRoutes, vesselNavRoutes } from '@/app/router/navRoutes';
+import { fleetNavRoutes, personalNavRoutes, retiredNavRoutes, vesselNavRoutes } from '@/app/router/navRoutes';
+import { PersonalIndexRedirect, SettingsSectionRedirect } from '@/app/router/personalRoutes';
+import { INBOX_PATH, PERSONAL_HOME, PERSONAL_SETTINGS_ROUTES } from '@/config/personalNav';
 import ModuleRoute from '@/shared/components/ModuleRoute';
 import KeepSearchNavigate from '@/app/router/KeepSearchNavigate';
 import { lazyPage, type LazyPageOptions, type PageLoader } from '@/app/router/lazyPage';
@@ -14,7 +16,6 @@ import {
   LegacyRoute,
   PersonalScope,
   ScopeNotFound,
-  ScopeShell,
   VesselScopeRoute,
 } from '@/app/router/scopes';
 import NavAccessProvider from '@/app/nav/NavAccessProvider';
@@ -391,7 +392,10 @@ export const AppRoutes: React.FC = () => {
 
       {/* Settings */}
       <Route path="/settings" element={legacy('/settings', <Settings />)} />
-      <Route path="/settings/*" element={<Settings />} />
+      {/* A settings section opens its /me URL; any other /settings/… the profile.
+          The static /settings/… routes below rank first (React Router). */}
+      <Route path="/settings/:section" element={<SettingsSectionRedirect />} />
+      <Route path="/settings/*" element={<KeepSearchNavigate to={PERSONAL_HOME} />} />
       <Route path="/settings/branding" element={<BrandingSettings />} />
       <Route path="/settings/permissions" element={legacy('/settings/permissions', <RolesPermissionsPage />)} />
 
@@ -522,10 +526,15 @@ export const AppRoutes: React.FC = () => {
         <Route path="*" element={<ScopeNotFound />} />
       </Route>
 
-      {/* Personal area. /me (profile and settings) brings its own chrome. */}
-      <Route path="/me" element={<PersonalScope />}>
-        <Route index element={<Settings />} />
-        <Route element={<ScopeShell />}>
+      {/* Personal area (spec §8): one shell (scope personal) around /me/* and
+          /inbox. Every settings section has its own URL; /me and the old
+          ?tab= form redirect (src/app/router/personalRoutes.tsx). */}
+      <Route element={<PersonalScope />}>
+        <Route path="/me">
+          <Route index element={<PersonalIndexRedirect />} />
+          {PERSONAL_SETTINGS_ROUTES.map((route) => (
+            <Route key={route.path} path={route.path} element={<Settings section={route.section} />} />
+          ))}
           <Route path="hours-of-rest" element={<MyWorkRestMonth />} />
           {/* Absolute, as the HRIS Training & Development leaf links it, so
               the route-literal checks (src/test/hris/wiring.test.ts) find it. */}
@@ -533,7 +542,12 @@ export const AppRoutes: React.FC = () => {
           <Route path="notifications" element={<NotificationsPage />} />
           {/* Personal routes registered by module manifests (B8). */}
           {personalManifestRoutes}
+          {/* Planned personal leaves: Coming Soon inside the scope (sitemap, D-06). */}
+          {personalNavRoutes}
+          <Route path="*" element={<KeepSearchNavigate to={PERSONAL_HOME} />} />
         </Route>
+        {/* The inbox the bell opens (gap/10 /inbox); /notifications/center keeps working (D-27). */}
+        <Route path={INBOX_PATH} element={<NotificationCenterPage />} />
       </Route>
 
       {/* Workspaces keep their URLs, guards and module shells (D-09). Their

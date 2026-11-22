@@ -3,6 +3,13 @@ import { NAVIGATION_ITEMS, type NavChild, type NavItem } from '@/config/navigati
 export interface PageCrumb {
   label: string;
   path?: string;
+  /**
+   * The nav node's `vessel_module_settings` key, when it has one: the shell
+   * shows the vessel's label override for it (Planner → "Leave", spec §7).
+   */
+  moduleSetting?: string;
+  /** A section heading ("OVERVIEW"): a label in the trail, not a page to open. */
+  section?: boolean;
 }
 
 export interface PageNavigation {
@@ -179,11 +186,13 @@ export function resolvePageNavigation(
     const crumbs: PageCrumb[] = match.trail.map((item, index) => ({
       label: item.label,
       path: index < match.trail.length - 1 ? item.path : undefined,
+      ...('moduleSetting' in item && item.moduleSetting ? { moduleSetting: item.moduleSetting } : {}),
+      ...('kind' in item && item.kind === 'section' ? { section: true } : {}),
     }));
     const matchedPath = pathnameOf(match.node.path);
     const detail = detailCrumb(pathname, matchedPath, match.node.label);
     if (detail) {
-      crumbs[crumbs.length - 1] = { label: match.node.label, path: match.node.path };
+      crumbs[crumbs.length - 1] = { ...crumbs[crumbs.length - 1], label: match.node.label, path: match.node.path };
       crumbs.push(detail);
     }
     const scoped = scopedTitleFor(pathname);

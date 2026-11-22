@@ -74,3 +74,22 @@ export const canAccessSection = (userRole: string | null, sectionId: string): bo
   if (item.permission) return hasSettingsPermission(userRole, item.permission);
   return false;
 };
+
+/**
+ * Every settings section id. Each is URL-routed under `/me/<id>` (gap/10
+ * "Personal and global", gap/01 "Personal area"; `notifications` lives at
+ * `/me/notifications/channels`, beside the in-app preferences page).
+ */
+export const SETTINGS_SECTION_IDS: readonly string[] = Object.freeze(SETTINGS_NAV_ITEMS.map((item) => item.id));
+
+const SECTION_ID_SET: ReadonlySet<string> = new Set(SETTINGS_SECTION_IDS);
+
+/** True for a known settings section id (`profile`, `security`, `permissions`, …). */
+export const isSettingsSection = (id: string | null | undefined): id is string => !!id && SECTION_ID_SET.has(id);
+
+/** True for a section only some roles may open (`scope: 'admin'`); false for unknown ids. */
+export const isAdminSection = (id: string): boolean => SETTINGS_NAV_ITEMS.find((item) => item.id === id)?.scope === 'admin';
+
+/** The `/me` URL of a settings section (`notifications` → `/me/notifications/channels`). */
+export const settingsSectionPath = (id: string): string =>
+  id === 'notifications' ? '/me/notifications/channels' : `/me/${id}`;
