@@ -71,6 +71,7 @@ export const useVessels = () => {
   const { refreshVessels } = useVessel();
   const queryClient = useQueryClient();
 
+  // This key holds the full '*' row; a narrower select must use its own key under the 'vessels' prefix.
   const vesselsQuery = useQuery({
     queryKey: ['vessels', profile?.company_id],
     queryFn: async () => {

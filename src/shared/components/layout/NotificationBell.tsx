@@ -27,6 +27,7 @@ import {
 import { formatDistanceToNow, isBefore, addDays, parseISO } from 'date-fns';
 import type { AlertSeverity, AlertStatus } from '@/modules/alerts/constants';
 import { cn } from '@/lib/utils';
+import { ALERT_SEVERITY_TONE } from '@/modules/notifications/lib/alertSeverityTone';
 
 interface AlertItem {
   id: string;
@@ -53,33 +54,33 @@ const getSeverityConfig = (severity: AlertSeverity) => {
     case 'RED':
       return {
         icon: AlertCircle,
-        bgClass: 'bg-destructive/10',
-        textClass: 'text-destructive',
-        borderClass: 'border-l-destructive',
+        bgClass: ALERT_SEVERITY_TONE.RED.tint,
+        textClass: ALERT_SEVERITY_TONE.RED.text,
+        borderClass: ALERT_SEVERITY_TONE.RED.borderLeft,
         label: 'Critical',
       };
     case 'ORANGE':
       return {
         icon: AlertTriangle,
-        bgClass: 'bg-warning/10',
-        textClass: 'text-warning',
-        borderClass: 'border-l-warning',
+        bgClass: ALERT_SEVERITY_TONE.ORANGE.tint,
+        textClass: ALERT_SEVERITY_TONE.ORANGE.text,
+        borderClass: ALERT_SEVERITY_TONE.ORANGE.borderLeft,
         label: 'High Priority',
       };
     case 'YELLOW':
       return {
         icon: Clock,
-        bgClass: 'bg-accent/20',
-        textClass: 'text-accent-foreground',
-        borderClass: 'border-l-accent',
+        bgClass: ALERT_SEVERITY_TONE.YELLOW.tint,
+        textClass: ALERT_SEVERITY_TONE.YELLOW.text,
+        borderClass: ALERT_SEVERITY_TONE.YELLOW.borderLeft,
         label: 'Upcoming',
       };
     case 'GREEN':
       return {
         icon: CheckCircle,
-        bgClass: 'bg-success/10',
-        textClass: 'text-success',
-        borderClass: 'border-l-success',
+        bgClass: ALERT_SEVERITY_TONE.GREEN.tint,
+        textClass: ALERT_SEVERITY_TONE.GREEN.text,
+        borderClass: ALERT_SEVERITY_TONE.GREEN.borderLeft,
         label: 'Info',
       };
     default:
@@ -358,10 +359,10 @@ const NotificationBell: React.FC = () => {
     if (alertsList.length === 0) return null;
 
     const colors = {
-      urgent: 'text-destructive',
-      overdue: 'text-warning',
-      upcoming: 'text-accent-foreground',
-      info: 'text-success',
+      urgent: ALERT_SEVERITY_TONE.RED.text,
+      overdue: ALERT_SEVERITY_TONE.ORANGE.text,
+      upcoming: ALERT_SEVERITY_TONE.YELLOW.text,
+      info: ALERT_SEVERITY_TONE.GREEN.text,
     };
 
     return (

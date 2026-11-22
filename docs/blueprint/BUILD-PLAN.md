@@ -136,7 +136,7 @@ Updated by the build loop in the same commit as the work. Newest last.
 ### Phase status
 
 - Phase 0: Lane A `[x]` A1–A10 · Lane B `[x]` B1–B8, B10 · `[~]` B9 · Lane C `[x]` C1, C3 · `[~]` C2
-  - B9 `[~]`: the shim, `refitDb` and the cast ratchet exist, but Refit pages still use the untyped `db` handle (94 casts in 21 allow-listed Refit files since the audit round 2 re-seed, which counts `any`-typed client aliases; 13 files import `db` as a value). `src/test/config/refitDbHandle.test.ts` now pins those importers (shrink only), so "Refit uses the shim" is met when that list is empty.
+  - B9 `[~]`: the shim, `refitDb` and the cast ratchet exist, but Refit pages still use the untyped `db` handle (94 casts in 21 allow-listed Refit files since the audit round 2 re-seed, which counts `any`-typed client aliases; 13 files import `db` as a value). `src/test/config/anyClientHandles.test.ts` pins the importers of every `any`-typed client handle (shrink only): refit's `db` (13 files) and new-build's `supabase` (28 files); a new any-typed handle fails. "Refit uses the shim" is met when refit's list is empty.
   - C2 `[~]`: `notify` and the form helpers exist with tests. "New code uses them" is pending adoption by the first Phase 1/3 form; `notify` is now used by Appearance (theme save error), `form.ts` has no production caller yet.
 - Phase 1: `[ ]` S1–S7
 - Phase 2: `[ ]` P1–P6

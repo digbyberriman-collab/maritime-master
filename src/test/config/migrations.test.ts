@@ -11,24 +11,52 @@
  *
  * Every file from the build-out (version >= 20261123000000) is also
  * idempotent and safe, because the owner applies it by hand and Lovable may
- * re-run a pasted copy (D-01, D-12):
+ * re-run a pasted copy (D-01, D-12). The check is an allow-list: a top-level
+ * statement must match one of the forms below, or it fails as
+ * "unrecognised top-level statement (wrap it in a guarded DO block)". That
+ * catches `ALTER PUBLICATION … ADD / DROP TABLE` (wrap it in a `DO` block
+ * with an `EXCEPTION WHEN duplicate_object` / `undefined_object` guard), a
+ * `CREATE RULE` that is not `OR REPLACE`, `CREATE ROLE` and
+ * `CREATE EVENT TRIGGER`.
  * - `CREATE TABLE` / `CREATE INDEX` / `CREATE SEQUENCE` / `CREATE SCHEMA` /
- *   `CREATE EXTENSION` / `CREATE MATERIALIZED VIEW` carry `IF NOT EXISTS`;
- * - `ALTER TABLE` actions (split on top-level commas): every `ADD COLUMN`
- *   (or bare `ADD <col>`) carries `IF NOT EXISTS`; every
+ *   `CREATE EXTENSION` / `CREATE MATERIALIZED VIEW` (and any other
+ *   `CREATE <kind> IF NOT EXISTS`) carry `IF NOT EXISTS`;
+ * - `ALTER TABLE` actions (split on top-level commas) are an allow-list too:
+ *   every `ADD COLUMN` (or bare `ADD <col>`) carries `IF NOT EXISTS`; every
  *   `ADD CONSTRAINT <name>` follows a `DROP CONSTRAINT IF EXISTS <name>` for
  *   the same table (an earlier statement or an earlier action in the same
  *   list; Postgres has no `ADD CONSTRAINT IF NOT EXISTS`); unnamed
  *   `ADD PRIMARY KEY` / `UNIQUE` / `CHECK` / `FOREIGN KEY` / `EXCLUDE`
  *   cannot be guarded and fail; `DROP COLUMN` / `DROP CONSTRAINT` carry
- *   `IF EXISTS`;
- * - `ALTER TYPE … ADD VALUE` carries `IF NOT EXISTS`, and every top-level
- *   `DROP <object>` carries `IF EXISTS`;
+ *   `IF EXISTS`; otherwise only ENABLE / DISABLE / FORCE / NO FORCE ROW
+ *   LEVEL SECURITY, `ALTER [COLUMN] …` (not `ADD GENERATED`, nor
+ *   `DROP IDENTITY` / `DROP EXPRESSION` without `IF EXISTS`), `SET (…)` /
+ *   `RESET (…)`, `SET LOGGED` / `UNLOGGED` / `TABLESPACE` /
+ *   `WITHOUT CLUSTER`, `OWNER TO`, `REPLICA IDENTITY`, ENABLE / DISABLE
+ *   [REPLICA | ALWAYS] TRIGGER / RULE, `VALIDATE CONSTRAINT` and
+ *   `CLUSTER ON` pass; RENAME, ATTACH / DETACH PARTITION, INHERIT /
+ *   NO INHERIT, SET SCHEMA, OF and the rest fail as unrecognised;
+ * - `ALTER TYPE` allows only `ADD VALUE IF NOT EXISTS`, `OWNER TO` and
+ *   `DROP ATTRIBUTE IF EXISTS` (RENAME VALUE / ATTRIBUTE / TO,
+ *   ADD ATTRIBUTE and SET SCHEMA fail); any other `ALTER … RENAME` or
+ *   `ALTER … SET SCHEMA` (a function, a policy, a view) fails; and every
+ *   top-level `DROP`, of any object kind, carries `IF EXISTS`;
  * - each `CREATE POLICY` follows a `DROP POLICY IF EXISTS` for the same
- *   policy and table, each `CREATE TRIGGER` a `DROP TRIGGER IF EXISTS`;
+ *   policy and table, each `CREATE TRIGGER` a `DROP TRIGGER IF EXISTS` (or
+ *   is `CREATE OR REPLACE TRIGGER`);
  * - functions and views are `CREATE OR REPLACE`; a `CREATE TYPE` or
- *   `CREATE DOMAIN` sits in a guarded `DO` block; every `INSERT` has
- *   `ON CONFLICT` or a `NOT EXISTS` guard;
+ *   `CREATE DOMAIN` sits in a guarded `DO` block; every `INSERT` (and every
+ *   `WITH … INSERT`) has `ON CONFLICT` or a `NOT EXISTS` guard;
+ * - the other safe shapes are `DO`, `CREATE OR REPLACE FUNCTION` /
+ *   `PROCEDURE` / `VIEW` / `TRIGGER` / `RULE`, `GRANT`, `REVOKE`,
+ *   `COMMENT ON`, `ALTER POLICY`, `ALTER FUNCTION` / `PROCEDURE` /
+ *   `ROUTINE` attribute changes (`SET`, `RESET`, `OWNER TO`, `SECURITY …`,
+ *   volatility, …), `ALTER VIEW` / `MATERIALIZED VIEW` / `INDEX` `SET`,
+ *   `RESET`, `OWNER TO` or `ALTER COLUMN`, `ALTER SEQUENCE` `OWNED BY` /
+ *   `RESTART` / `INCREMENT` / bounds / `CACHE`, `ALTER DEFAULT PRIVILEGES`,
+ *   `UPDATE`, `DELETE`, `SELECT`, `WITH`, `REFRESH MATERIALIZED VIEW`,
+ *   `NOTIFY`, `SET`, `RESET`, `BEGIN`, `COMMIT`, `START TRANSACTION` and
+ *   `ANALYZE`;
  * - every table it creates has `ENABLE ROW LEVEL SECURITY` (a statement, or
  *   a `DO` loop that names the table), and no `CREATE POLICY` or
  *   `ALTER POLICY` is `USING (true)` / `WITH CHECK (true)` unless its role
@@ -200,6 +228,28 @@ function permissivePolicyProblems(policy: string, afterTable: string, noRoles: s
   return [`policy ${policy} is USING (true) / WITH CHECK (true) for ${roles ? roles.join(', ') : noRoles}`];
 }
 
+/**
+ * `ALTER TABLE` actions that are safe to run twice as written. The ADD and
+ * DROP forms are checked on their own in `alterTableProblems`; any other
+ * action (RENAME, ATTACH / DETACH PARTITION, INHERIT / NO INHERIT,
+ * SET SCHEMA, OF / NOT OF, …) is unrecognised and fails.
+ */
+const SAFE_TABLE_ACTIONS: readonly RegExp[] = [
+  /^(?:ENABLE|DISABLE|FORCE|NO FORCE) ROW LEVEL SECURITY\b/i,
+  /^ALTER /i, // ALTER [COLUMN] …, ALTER CONSTRAINT …
+  /^(?:SET|RESET) ?\(/i,
+  /^SET (?:LOGGED|UNLOGGED|WITHOUT CLUSTER)$/i,
+  /^SET TABLESPACE /i,
+  /^OWNER TO /i,
+  /^REPLICA IDENTITY /i,
+  /^(?:ENABLE|DISABLE) (?:(?:REPLICA|ALWAYS) )?(?:TRIGGER|RULE)\b/i,
+  /^VALIDATE CONSTRAINT /i,
+  /^CLUSTER ON /i,
+];
+
+/** Column actions that fail on a second run: an identity added twice, or an identity / generation expression dropped without IF EXISTS. */
+const UNSAFE_COLUMN_ACTION = /\b(?:ADD GENERATED\b|DROP (?:IDENTITY|EXPRESSION)\b(?! IF EXISTS\b))/i;
+
 /** The idempotency problems in one `ALTER TABLE` action list, recording guarded drops as it goes. */
 function alterTableProblems(table: string, actions: string, droppedConstraints: Set<string>, rlsEnabled: Set<string>, short: string): string[] {
   const problems: string[] = [];
@@ -221,14 +271,105 @@ function alterTableProblems(table: string, actions: string, droppedConstraints: 
       problems.push(`unnamed ADD ${m[1].toUpperCase()} on ${table} (name it and DROP CONSTRAINT IF EXISTS first): ${action}`);
     } else if (/^ADD /i.test(action)) {
       problems.push(`ADD COLUMN without IF NOT EXISTS on ${table}: ${action}`);
-    } else if (/^DROP /i.test(action) && !/^DROP (?:COLUMN |CONSTRAINT )?IF EXISTS /i.test(action)) {
+    } else if (/^DROP (?:COLUMN |CONSTRAINT )?IF EXISTS /i.test(action)) {
+      // guarded drop
+    } else if (/^DROP /i.test(action)) {
       problems.push(`DROP without IF EXISTS on ${table}: ${action}`);
+    } else if (/^ALTER /i.test(action) && UNSAFE_COLUMN_ACTION.test(withoutStringLiterals(action))) {
+      problems.push(`ALTER COLUMN action that fails on a second run on ${table} (wrap it in a guarded DO block): ${action}`);
+    } else if (!SAFE_TABLE_ACTIONS.some((safe) => safe.test(action))) {
+      problems.push(`unrecognised ALTER TABLE action on ${table}: ${action}`);
     }
   }
   return problems;
 }
 
-const DROPPABLE = String.raw`(?:TABLE|VIEW|MATERIALIZED VIEW|INDEX(?: CONCURRENTLY)?|SEQUENCE|TYPE|DOMAIN|FUNCTION|PROCEDURE|TRIGGER|POLICY|SCHEMA|EXTENSION)`;
+/**
+ * The idempotency problems in one `ALTER TYPE` action list. Only
+ * `ADD VALUE IF NOT EXISTS`, `OWNER TO` and `DROP ATTRIBUTE IF EXISTS` are
+ * safe to run twice; RENAME VALUE / ATTRIBUTE / TO, ADD ATTRIBUTE (which has
+ * no IF NOT EXISTS), ALTER ATTRIBUTE, SET SCHEMA and the rest fail.
+ */
+function alterTypeProblems(type: string, actions: string, short: string): string[] {
+  const problems: string[] = [];
+  for (const action of splitTopLevel(actions)) {
+    if (/^(?:ADD VALUE IF NOT EXISTS|OWNER TO|DROP ATTRIBUTE IF EXISTS) /i.test(action)) continue;
+    if (/^ADD VALUE /i.test(action)) problems.push(`ALTER TYPE … ADD VALUE without IF NOT EXISTS: ${short}`);
+    else if (/^DROP ATTRIBUTE /i.test(action)) problems.push(`DROP ATTRIBUTE without IF EXISTS on ${type}: ${action}`);
+    else problems.push(`unrecognised ALTER TYPE action on ${type} (wrap it in a guarded DO block): ${action}`);
+  }
+  return problems;
+}
+
+/** The object kind a `DROP` names, for its message: multi-word kinds first, else the first word. */
+const DROP_KIND =
+  /^DROP (EVENT TRIGGER|FOREIGN (?:DATA WRAPPER|TABLE)|MATERIALIZED VIEW|TEXT SEARCH (?:CONFIGURATION|DICTIONARY|PARSER|TEMPLATE)|OPERATOR (?:CLASS|FAMILY)|USER MAPPING|ACCESS METHOD|INDEX CONCURRENTLY|[A-Z]+)\b/i;
+/** `DROP <kind of one to three words> IF EXISTS …`: TABLE, EVENT TRIGGER, INDEX CONCURRENTLY, TEXT SEARCH CONFIGURATION, … */
+const DROP_IF_EXISTS = /^DROP (?:[A-Z]+ ){1,3}IF EXISTS /i;
+
+/** `ALTER …` clauses that fail on a second run (the object has its new name or schema by then). */
+const ALTER_RENAME = /\bRENAME (?:TO|COLUMN|CONSTRAINT|VALUE|ATTRIBUTE)\b|\bRENAME (?:""|[A-Za-z_][\w$]*) TO\b/i;
+const ALTER_SET_SCHEMA = /\bSET SCHEMA\b/i;
+
+/** The text with every '…' string and "…" identifier emptied, so keywords inside them do not count. */
+const withoutQuoted = (text: string) => withoutStringLiterals(text).replace(/"(?:[^"]|"")*"/g, '""');
+
+/**
+ * The rest of an `ALTER <object>` statement after the object's name and, for
+ * a routine, its argument list (`f(uuid, numeric(10,2)) SET x` → `SET x`).
+ */
+function afterObjectName(rest: string, withArgs: boolean): string {
+  const name = rest.match(new RegExp(String.raw`^${QUALIFIED}\s*`));
+  if (!name) return '';
+  let i = name[0].length;
+  if (withArgs && rest[i] === '(') {
+    let depth = 0;
+    for (; i < rest.length; i += 1) {
+      const ch = rest[i];
+      if (ch === "'" || ch === '"') i = skipQuoted(rest, i);
+      else if (ch === '(') depth += 1;
+      else if (ch === ')' && (depth -= 1) === 0) {
+        i += 1;
+        break;
+      }
+    }
+  }
+  return rest.slice(i).trim();
+}
+
+const ROUTINE_ACTIONS =
+  /^(?:SET|RESET|OWNER TO|(?:EXTERNAL )?SECURITY (?:DEFINER|INVOKER)|STABLE|IMMUTABLE|VOLATILE|STRICT|CALLED ON NULL INPUT|RETURNS NULL ON NULL INPUT|(?:NOT )?LEAKPROOF|PARALLEL|COST|ROWS)\b/i;
+const RELATION_ACTIONS = /^(?:SET|RESET|OWNER TO|ALTER)\b/i;
+const SEQUENCE_ACTIONS = /^(?:OWNED BY|RESTART|INCREMENT|MINVALUE|MAXVALUE|NO (?:MINVALUE|MAXVALUE|CYCLE)|CACHE|START|CYCLE|OWNER TO)\b/i;
+
+/**
+ * Top-level statement shapes that are safe to run twice as written, checked
+ * after the guarded forms in `idempotencyProblems`. Anything else fails as
+ * unrecognised: wrap it in a guarded `DO` block.
+ */
+const SAFE_STATEMENTS: readonly RegExp[] = [
+  /^DO\b/i,
+  /^CREATE OR REPLACE (?:(?:TEMP|TEMPORARY) )?(?:RECURSIVE )?(?:FUNCTION|PROCEDURE|VIEW|TRIGGER|RULE) /i,
+  /^CREATE (?:[A-Z]+ ){1,3}IF NOT EXISTS /i,
+  /^(?:GRANT|REVOKE) /i,
+  /^COMMENT ON /i,
+  /^ALTER DEFAULT PRIVILEGES /i,
+  /^(?:UPDATE|DELETE|SELECT|WITH)\b/i,
+  /^REFRESH MATERIALIZED VIEW /i,
+  /^(?:NOTIFY|SET|RESET|BEGIN|COMMIT|ANALYZE)\b/i,
+  /^START TRANSACTION\b/i,
+];
+
+/** Is this top-level statement one of the safe shapes (including ALTER FUNCTION / VIEW / INDEX / SEQUENCE attribute changes)? */
+function isSafeStatement(s: string): boolean {
+  let m: RegExpMatchArray | null;
+  if ((m = s.match(/^ALTER (?:FUNCTION|PROCEDURE|ROUTINE) (?:IF EXISTS )?(.+)$/i))) return ROUTINE_ACTIONS.test(afterObjectName(m[1], true));
+  if ((m = s.match(/^ALTER (?:MATERIALIZED VIEW|VIEW|INDEX) (?:IF EXISTS )?(.+)$/i))) return RELATION_ACTIONS.test(afterObjectName(m[1], false));
+  if ((m = s.match(/^ALTER SEQUENCE (?:IF EXISTS )?(.+)$/i))) return SEQUENCE_ACTIONS.test(afterObjectName(m[1], false));
+  return SAFE_STATEMENTS.some((safe) => safe.test(s));
+}
+
+const INSERT_GUARDED = (s: string) => /\bON CONFLICT\b/i.test(s) || /\bNOT EXISTS\b/i.test(s);
 
 /** Everything that keeps a build-out file from being safe to run twice (or at all). */
 export function idempotencyProblems(sql: string): string[] {
@@ -254,16 +395,21 @@ export function idempotencyProblems(sql: string): string[] {
       droppedTriggers.add(`${unquote(m[1])}@${unquote(m[2])}`);
       continue;
     }
-    if ((m = s.match(new RegExp(String.raw`^DROP (${DROPPABLE}) `, 'i')))) {
-      if (!new RegExp(String.raw`^DROP ${DROPPABLE} IF EXISTS `, 'i').test(s)) problems.push(`DROP ${m[1].toUpperCase()} without IF EXISTS: ${short}`);
+    if (/^DROP /i.test(s)) {
+      if (!DROP_IF_EXISTS.test(s)) problems.push(`DROP ${(s.match(DROP_KIND)?.[1] ?? '').toUpperCase()} without IF EXISTS: ${short}`);
       continue;
     }
     if ((m = s.match(new RegExp(String.raw`^ALTER TABLE (?:IF EXISTS )?(?:ONLY )?(${QUALIFIED}) (.+)$`, 'i')))) {
       problems.push(...alterTableProblems(unquote(m[1]), m[2], droppedConstraints, rlsEnabled, short));
       continue;
     }
-    if (new RegExp(String.raw`^ALTER TYPE ${QUALIFIED} ADD VALUE `, 'i').test(s)) {
-      if (!new RegExp(String.raw`^ALTER TYPE ${QUALIFIED} ADD VALUE IF NOT EXISTS `, 'i').test(s)) problems.push(`ALTER TYPE … ADD VALUE without IF NOT EXISTS: ${short}`);
+    if ((m = s.match(new RegExp(String.raw`^ALTER TYPE (${QUALIFIED}) (.+)$`, 'i')))) {
+      problems.push(...alterTypeProblems(unquote(m[1]), m[2], short));
+      continue;
+    }
+    if (/^ALTER /i.test(s) && (ALTER_RENAME.test(withoutQuoted(s)) || ALTER_SET_SCHEMA.test(withoutQuoted(s)))) {
+      const clause = ALTER_RENAME.test(withoutQuoted(s)) ? 'RENAME' : 'SET SCHEMA';
+      problems.push(`ALTER … ${clause} fails on a second run (wrap it in a guarded DO block): ${short}`);
       continue;
     }
     if ((m = s.match(new RegExp(String.raw`^ALTER POLICY (${IDENT}) ON (${QUALIFIED})`, 'i')))) {
@@ -309,9 +455,12 @@ export function idempotencyProblems(sql: string): string[] {
       problems.push(`CREATE ${m[1].toUpperCase()} outside a guarded DO block: ${short}`);
       continue;
     }
-    if (/^INSERT INTO /i.test(s) && !/\bON CONFLICT\b/i.test(s) && !/\bNOT EXISTS\b/i.test(s)) {
-      problems.push(`INSERT without ON CONFLICT or a NOT EXISTS guard: ${short}`);
+    // An INSERT, or a WITH … INSERT, needs ON CONFLICT or a NOT EXISTS guard.
+    if (/^INSERT /i.test(s) || (/^WITH\b/i.test(s) && /\bINSERT INTO\b/i.test(withoutQuoted(s)))) {
+      if (!INSERT_GUARDED(s)) problems.push(`INSERT without ON CONFLICT or a NOT EXISTS guard: ${short}`);
+      continue;
     }
+    if (!isSafeStatement(s)) problems.push(`unrecognised top-level statement (wrap it in a guarded DO block): ${short}`);
   }
 
   // RLS may also be switched on in a DO loop over table names
@@ -521,6 +670,41 @@ CREATE SEQUENCE public.s;
     alterPolicyToServiceRole: `ALTER POLICY "svc" ON public.a TO service_role USING (true) WITH CHECK (true);`,
     alterPolicyScoped: `ALTER POLICY "a_select" ON public.a TO authenticated USING (public.user_belongs_to_company(auth.uid(), company_id));`,
     trueInsideAStringIsNotPermissive: `DROP POLICY IF EXISTS "p" ON public.a; CREATE POLICY "p" ON public.a FOR SELECT TO authenticated USING (note <> 'USING (true)');`,
+    // The known-safe statement shapes (everything else is unrecognised and fails).
+    publicationInGuardedDo: `DO $$ BEGIN ALTER PUBLICATION supabase_realtime ADD TABLE public.x; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`,
+    grantAndRevoke: `GRANT SELECT, INSERT ON public.a TO authenticated; GRANT EXECUTE ON FUNCTION public.f(uuid) TO authenticated; REVOKE ALL ON public.a FROM anon;`,
+    commentOn: `COMMENT ON TABLE public.a IS 'Permits; one per job'; COMMENT ON COLUMN public.a.code IS NULL;`,
+    enableRowLevelSecurity: `ALTER TABLE public.a ENABLE ROW LEVEL SECURITY;`,
+    tableOwnerTo: `ALTER TABLE public.a OWNER TO postgres;`,
+    otherSafeTableActions: `ALTER TABLE public.a FORCE ROW LEVEL SECURITY, NO FORCE ROW LEVEL SECURITY;
+      ALTER TABLE public.a DISABLE ROW LEVEL SECURITY; ALTER TABLE public.a SET (fillfactor = 70), RESET (autovacuum_enabled);
+      ALTER TABLE public.a SET LOGGED; ALTER TABLE public.a SET UNLOGGED; ALTER TABLE public.a SET TABLESPACE pg_default;
+      ALTER TABLE public.a REPLICA IDENTITY FULL; ALTER TABLE public.a ENABLE TRIGGER trg_a, DISABLE TRIGGER ALL;
+      ALTER TABLE public.a ENABLE REPLICA TRIGGER trg_b, ENABLE ALWAYS RULE r, DISABLE RULE r2;
+      ALTER TABLE public.a VALIDATE CONSTRAINT c; ALTER TABLE public.a CLUSTER ON idx_a; ALTER TABLE public.a SET WITHOUT CLUSTER;
+      ALTER TABLE public.a ALTER COLUMN c TYPE text USING c::text, ALTER c SET DEFAULT 'ADD GENERATED', ALTER COLUMN d DROP IDENTITY IF EXISTS;`,
+    alterFunctionSearchPath: `ALTER FUNCTION public.f(uuid) SET search_path = public;`,
+    alterRoutineAttributes: `ALTER FUNCTION public.reset_flags(p_ids uuid[], p_scale numeric(10,2)) SECURITY DEFINER;
+      ALTER PROCEDURE public.p() OWNER TO postgres; ALTER FUNCTION public.g STABLE; ALTER ROUTINE public.h(int) RESET ALL;`,
+    alterViewIndexSequence: `ALTER VIEW public.v SET (security_invoker = true); ALTER MATERIALIZED VIEW public.mv OWNER TO postgres;
+      ALTER INDEX public.idx_a SET TABLESPACE pg_default; ALTER VIEW IF EXISTS public.v ALTER COLUMN c SET DEFAULT 1;
+      ALTER SEQUENCE public.s OWNED BY public.a.id; ALTER SEQUENCE public.s RESTART WITH 1; ALTER SEQUENCE IF EXISTS public.s INCREMENT BY 1 CACHE 1;`,
+    alterTypeOwnerAndGuardedDrop: `ALTER TYPE public.addr OWNER TO postgres; ALTER TYPE public.addr DROP ATTRIBUTE IF EXISTS zip;`,
+    alterDefaultPrivileges: `ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO authenticated;`,
+    createOrReplaceTrigger: `CREATE OR REPLACE TRIGGER trg_a BEFORE UPDATE ON public.a FOR EACH ROW EXECUTE FUNCTION public.f();`,
+    createOrReplaceRuleAndView: `CREATE OR REPLACE RULE r AS ON INSERT TO public.a DO INSTEAD NOTHING; CREATE OR REPLACE RECURSIVE VIEW public.v (n) AS SELECT 1;`,
+    createAnyKindIfNotExists: `CREATE STATISTICS IF NOT EXISTS public.st ON a, b FROM public.t;`,
+    select: `SELECT cron.unschedule('x') WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'x');`,
+    update: `UPDATE public.a SET status = 'open' WHERE status IS NULL;`,
+    deleteAndRefresh: `DELETE FROM public.a WHERE code IS NULL; REFRESH MATERIALIZED VIEW public.mv;`,
+    withInsertOnConflict: `WITH s AS (SELECT 1 AS id) INSERT INTO public.a (id) SELECT id FROM s ON CONFLICT DO NOTHING;`,
+    notify: `NOTIFY pgrst, 'reload schema';`,
+    sessionAndTransaction: `BEGIN; SET LOCAL statement_timeout = 0; RESET statement_timeout; ANALYZE public.a; COMMIT; START TRANSACTION; COMMIT;`,
+    dropEventTriggerIfExists: `DROP EVENT TRIGGER IF EXISTS et;`,
+    dropRuleIfExists: `DROP RULE IF EXISTS r ON public.a;`,
+    dropRoutineIfExists: `DROP ROUTINE IF EXISTS public.f(uuid);`,
+    dropOtherKindsIfExists: `DROP FOREIGN TABLE IF EXISTS public.ft; DROP TEXT SEARCH CONFIGURATION IF EXISTS public.cfg;
+      DROP AGGREGATE IF EXISTS public.agg(int); DROP OPERATOR IF EXISTS public.=== (int, int); DROP CAST IF EXISTS (text AS int);`,
   };
 
   it.each(Object.entries(guarded))('passes the guarded form %s', (_name, sql) => {
@@ -591,6 +775,51 @@ CREATE SEQUENCE public.s;
       `ALTER POLICY "a_select" ON public.a TO authenticated WITH CHECK ( true );`,
       'policy "a_select" ON public.a is USING (true) / WITH CHECK (true) for authenticated',
     ],
+    // Statements no rule recognises fail until they sit in a guarded DO block.
+    publicationAddTable: [
+      `ALTER PUBLICATION supabase_realtime ADD TABLE public.frp_vessel_locations;`,
+      'unrecognised top-level statement (wrap it in a guarded DO block): ALTER PUBLICATION supabase_realtime ADD TABLE',
+    ],
+    publicationDropTable: [`ALTER PUBLICATION supabase_realtime DROP TABLE public.x;`, 'unrecognised top-level statement'],
+    createRule: [`CREATE RULE r AS ON INSERT TO public.a DO INSTEAD NOTHING;`, 'unrecognised top-level statement'],
+    createRole: [`CREATE ROLE reporter;`, 'unrecognised top-level statement'],
+    createEventTrigger: [`CREATE EVENT TRIGGER et ON ddl_command_start EXECUTE FUNCTION public.f();`, 'unrecognised top-level statement'],
+    alterFunctionOtherAction: [`ALTER FUNCTION public.f(uuid) DEPENDS ON EXTENSION pgcrypto;`, 'unrecognised top-level statement'],
+    alterIndexAttachPartition: [`ALTER INDEX public.idx_p ATTACH PARTITION public.idx_p1;`, 'unrecognised top-level statement'],
+    // ALTER TABLE actions outside the safe list.
+    renameColumn: [`ALTER TABLE public.vessels RENAME COLUMN code TO vessel_code;`, 'unrecognised ALTER TABLE action on vessels: RENAME COLUMN code TO vessel_code'],
+    renameTable: [`ALTER TABLE public.vessels RENAME TO ships;`, 'unrecognised ALTER TABLE action on vessels: RENAME TO ships'],
+    renameConstraint: [`ALTER TABLE public.vessels RENAME CONSTRAINT a TO b;`, 'unrecognised ALTER TABLE action on vessels: RENAME CONSTRAINT a TO b'],
+    attachPartition: [`ALTER TABLE public.p ATTACH PARTITION public.p1 FOR VALUES IN (1);`, 'unrecognised ALTER TABLE action on p: ATTACH PARTITION'],
+    detachPartition: [`ALTER TABLE public.p DETACH PARTITION public.p1;`, 'unrecognised ALTER TABLE action on p: DETACH PARTITION'],
+    inherit: [`ALTER TABLE public.p INHERIT public.base;`, 'unrecognised ALTER TABLE action on p: INHERIT'],
+    tableSetSchema: [`ALTER TABLE public.p SET SCHEMA archive;`, 'unrecognised ALTER TABLE action on p: SET SCHEMA'],
+    secondActionUnrecognised: [`ALTER TABLE public.p OWNER TO postgres, NO INHERIT public.base;`, 'unrecognised ALTER TABLE action on p: NO INHERIT'],
+    addIdentity: [`ALTER TABLE public.p ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY;`, 'ALTER COLUMN action that fails on a second run on p'],
+    dropIdentity: [`ALTER TABLE public.p ALTER COLUMN id DROP IDENTITY;`, 'ALTER COLUMN action that fails on a second run on p'],
+    // ALTER TYPE: only ADD VALUE IF NOT EXISTS, OWNER TO and DROP ATTRIBUTE IF EXISTS are safe.
+    alterTypeRenameValue: [`ALTER TYPE public.permit_kind RENAME VALUE 'a' TO 'b';`, "unrecognised ALTER TYPE action on permit_kind (wrap it in a guarded DO block): RENAME VALUE 'a'"],
+    alterTypeRenameAttribute: [`ALTER TYPE public.addr RENAME ATTRIBUTE zip TO postcode;`, 'unrecognised ALTER TYPE action on addr'],
+    alterTypeRenameTo: [`ALTER TYPE public.addr RENAME TO address;`, 'unrecognised ALTER TYPE action on addr'],
+    alterTypeAddAttribute: [`ALTER TYPE public.addr ADD ATTRIBUTE zip text;`, 'unrecognised ALTER TYPE action on addr (wrap it in a guarded DO block): ADD ATTRIBUTE zip text'],
+    alterTypeDropAttribute: [`ALTER TYPE public.addr DROP ATTRIBUTE zip;`, 'DROP ATTRIBUTE without IF EXISTS on addr'],
+    alterTypeSetSchema: [`ALTER TYPE public.addr SET SCHEMA archive;`, 'unrecognised ALTER TYPE action on addr'],
+    // ALTER … RENAME / SET SCHEMA on any other object.
+    alterFunctionRename: [`ALTER FUNCTION public.f(uuid) RENAME TO g;`, 'ALTER … RENAME fails on a second run'],
+    alterPolicyRename: [`ALTER POLICY "p" ON public.a RENAME TO "q";`, 'ALTER … RENAME fails on a second run'],
+    alterViewRenameColumn: [`ALTER VIEW public.v RENAME COLUMN a TO b;`, 'ALTER … RENAME fails on a second run'],
+    alterFunctionSetSchema: [`ALTER FUNCTION public.reset(uuid) SET SCHEMA archive;`, 'ALTER … SET SCHEMA fails on a second run'],
+    // IF EXISTS on a DROP of any object kind.
+    dropRoutine: [`DROP ROUTINE public.f(uuid);`, 'DROP ROUTINE without IF EXISTS'],
+    dropRule: [`DROP RULE r ON public.a;`, 'DROP RULE without IF EXISTS'],
+    dropEventTrigger: [`DROP EVENT TRIGGER et;`, 'DROP EVENT TRIGGER without IF EXISTS'],
+    dropAggregate: [`DROP AGGREGATE public.agg(int);`, 'DROP AGGREGATE without IF EXISTS'],
+    dropOperator: [`DROP OPERATOR public.=== (int, int);`, 'DROP OPERATOR without IF EXISTS'],
+    dropCast: [`DROP CAST (text AS int);`, 'DROP CAST without IF EXISTS'],
+    dropForeignTable: [`DROP FOREIGN TABLE public.ft;`, 'DROP FOREIGN TABLE without IF EXISTS'],
+    dropTrigger: [`DROP TRIGGER trg_a ON public.a;`, 'DROP TRIGGER without IF EXISTS'],
+    dropIndexConcurrently: [`DROP INDEX CONCURRENTLY idx_old;`, 'DROP INDEX CONCURRENTLY without IF EXISTS'],
+    withInsertUnguarded: [`WITH s AS (SELECT 1 AS id) INSERT INTO public.a (id) SELECT id FROM s;`, 'INSERT without ON CONFLICT or a NOT EXISTS guard'],
   };
 
   it.each(Object.entries(unguarded))('fails the unguarded form %s', (_name, [sql, problem]) => {

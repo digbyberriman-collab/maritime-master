@@ -10,20 +10,26 @@
  *    (pendingTables.allowlist.json), at no more than its listed count. A
  *    TypeScript AST walk (`clientCasts`) counts `.from(…)` / `.rpc(…)`
  *    arguments cast `as any` or `as never` (any argument expression;
- *    `as never` is allowed where `pendingClient(` is called), the client
- *    cast `as any` / `as unknown as any` under whatever local name it is
- *    imported, and declarations typed `any` that hold the client
- *    (`const supabase: any = supabaseClient`), once where defined. The list
- *    only shrinks: after removing casts, run
+ *    `as never` is allowed only when the receiver is a pending client: a
+ *    name declared from `pendingClient(…)`, a plain alias of one, or the
+ *    call itself), the client or its `.from` / `.rpc` method cast `as any` /
+ *    `as unknown as any` under whatever local name it is imported
+ *    (`(supabase.from as any)("x")`), and declarations typed `any` that hold
+ *    the client (`const supabase: any = supabaseClient`), once where
+ *    defined. The list only shrinks: after removing casts, run
  *    `UPDATE_PENDING_ALLOWLIST=1 npx vitest run <this file>`, which lowers
  *    counts and drops clean files but never raises a count.
  *
  * Only src/integrations/supabase/pending.ts (where `pendingClient` casts the
  * client once, on purpose), test files (mocks cast the client on purpose)
  * and the generated types.ts are exempt; a file that merely imports from
- * the shim is scanned like any other. Comments are ignored. Refit's
- * `db: any` handle is built from `pendingClient`, not the client import, so
- * refitDbHandle.test.ts pins its importers instead.
+ * the shim is scanned like any other. Comments are ignored. An exported
+ * `any` handle hides its importers' calls from this count (`handle.from('x')`
+ * needs no cast), so anyClientHandles.test.ts pins, shrink only, the
+ * importers of every such handle: new-build's `supabase`
+ * (new-build/lib/supabase.ts, counted here once where it is defined) as well
+ * as refit's `db` (refit/lib/db.ts, built from `pendingClient`, so not
+ * counted here), and fails on a new one.
  */
 import { describe, expect, it } from 'vitest';
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
@@ -147,16 +153,28 @@ function unwrap(expr: ts.Expression): { base: ts.Expression; cast: CastKind } {
  * 1. each `.from(…)` / `.rpc(…)` whose first argument is cast `as any` or
  *    `as never` (through any parentheses or `as unknown as`), whatever the
  *    argument: a literal, a variable, `t.key`. `as never` is the shim's
- *    documented fallback, so it is allowed in a file that calls
- *    `pendingClient(`;
- * 2. each `X as any` / `X as unknown as any` where X is the client: a local
- *    name bound to the value import from @/integrations/supabase/client
- *    (whatever the alias), a plain alias of one, or the name `supabase`;
- * 3. each declaration typed `any` and initialised with the client
- *    (`const supabase: any = supabaseClient`,
+ *    documented fallback, so it is allowed only on a pending client: the
+ *    receiver is a name declared from `pendingClient(…)` (or a plain alias
+ *    of one) or is the `pendingClient(…)` call itself. The typed client in
+ *    the same file is still counted (`supabase.from("x" as never)` next to
+ *    `const c = pendingClient<T>()`);
+ * 2. each `X as any` / `X as unknown as any` / `<any>X` where X is the
+ *    client: a local name bound to the value import from
+ *    @/integrations/supabase/client (whatever the alias), a plain alias of
+ *    one, or the name `supabase`; or where X is the client's `.from` /
+ *    `.rpc` method (`(supabase.from as any)("x")`,
+ *    `(supabase.rpc as unknown as any)("f")`);
+ * 3. each declaration typed `any` and initialised with the client (or its
+ *    method) (`const supabase: any = supabaseClient`,
  *    `export const supabase: any = typedClient`). A handle like that is
  *    counted once, where it is defined: its re-exports and importers are not
- *    counted again.
+ *    counted again (anyClientHandles.test.ts pins those importers).
+ *
+ * Out of reach: a client passed to a helper with an `any` parameter
+ * (`const q = (c: any) => c.from("x"); q(supabase)`). An any-typed
+ * parameter cannot be resolved statically; the cast it hides is the
+ * parameter type, which lint only warns about
+ * (`@typescript-eslint/no-explicit-any`).
  *
  * The AST carries no comments, so a doc example is never a cast.
  */
@@ -164,7 +182,8 @@ export function clientCasts(file: string, text: string): number {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, file.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
   const clientNames = new Set(['supabase']);
   const namespaces = new Set<string>();
-  let buildsPendingClient = false;
+  /** Names declared from a `pendingClient(…)` call, and plain aliases of them: the only receivers allowed `as never`. */
+  const pendingNames = new Set<string>();
 
   for (const node of source.statements) {
     if (!ts.isImportDeclaration(node) || !ts.isStringLiteral(node.moduleSpecifier) || !isClientModule(file, node.moduleSpecifier.text)) continue;
@@ -181,33 +200,69 @@ export function clientCasts(file: string, text: string): number {
     (ts.isIdentifier(e) && clientNames.has(e.text)) ||
     (ts.isPropertyAccessExpression(e) && ts.isIdentifier(e.expression) && namespaces.has(e.expression.text) && e.name.text === 'supabase');
 
-  // Plain aliases (`const db = supabaseClient`) are the client too; `pendingClient(` allows `as never`.
-  const collect = (node: ts.Node): void => {
-    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer && node.type?.kind !== ts.SyntaxKind.AnyKeyword) {
-      const { base, cast } = unwrap(node.initializer);
-      if (cast === null && isClient(base)) clientNames.add(node.name.text);
-    }
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'pendingClient') buildsPendingClient = true;
-    ts.forEachChild(node, collect);
+  const isPendingCall = (e: ts.Expression): boolean => ts.isCallExpression(e) && ts.isIdentifier(e.expression) && e.expression.text === 'pendingClient';
+  /** A pending client, uncast: `pendingClient<…>()` itself or a name bound to it. */
+  const isPending = (e: ts.Expression): boolean => {
+    const { base, cast } = unwrap(e);
+    return cast === null && (isPendingCall(base) || (ts.isIdentifier(base) && pendingNames.has(base.text)));
   };
-  collect(source);
+  /** `X.from` / `X.rpc` (or `X['from']` / `X['rpc']`): its receiver X, else null. */
+  const clientMethod = (e: ts.Expression): { receiver: ts.Expression } | null => {
+    if (ts.isPropertyAccessExpression(e) && /^(?:from|rpc)$/.test(e.name.text)) return { receiver: e.expression };
+    if (ts.isElementAccessExpression(e) && ts.isStringLiteralLike(e.argumentExpression) && /^(?:from|rpc)$/.test(e.argumentExpression.text)) return { receiver: e.expression };
+    return null;
+  };
+  /** The client's `.from` / `.rpc` method itself (cast instead of its argument: `(supabase.from as any)("x")`). */
+  const isClientMethod = (e: ts.Expression): boolean => {
+    const method = clientMethod(e);
+    return !!method && isClient(unwrap(method.receiver).base);
+  };
+
+  // Plain aliases (`const db = supabaseClient`) are the client too. Names
+  // declared from `pendingClient(…)`, and plain aliases of them, are pending
+  // clients. Collected to a fixed point, so declaration order does not matter.
+  const declarations: ts.VariableDeclaration[] = [];
+  const gather = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) declarations.push(node);
+    ts.forEachChild(node, gather);
+  };
+  gather(source);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const d of declarations) {
+      const name = (d.name as ts.Identifier).text;
+      const init = d.initializer as ts.Expression;
+      const { base, cast } = unwrap(init);
+      if (cast !== null || d.type?.kind === ts.SyntaxKind.AnyKeyword) continue;
+      if (!clientNames.has(name) && isClient(base)) {
+        clientNames.add(name);
+        grew = true;
+      }
+      if (!pendingNames.has(name) && !d.type && isPending(init)) {
+        pendingNames.add(name);
+        grew = true;
+      }
+    }
+  }
 
   let count = 0;
   const visit = (node: ts.Node): void => {
-    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression) && /^(?:from|rpc)$/.test(node.expression.name.text)) {
-      const receiver = node.expression.expression;
+    const method = ts.isCallExpression(node) ? clientMethod(node.expression) : null;
+    if (method && ts.isCallExpression(node)) {
+      const { receiver } = method;
       const first = node.arguments[0];
       if (first && !(ts.isIdentifier(receiver) && NOT_A_CLIENT.test(receiver.text))) {
         const { cast } = unwrap(first);
-        if (cast === 'any' || (cast === 'never' && !buildsPendingClient)) count += 1;
+        if (cast === 'any' || (cast === 'never' && !isPending(receiver))) count += 1;
       }
     }
     if ((ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) && node.type.kind === ts.SyntaxKind.AnyKeyword) {
-      if (isClient(unwrap(node.expression).base)) count += 1;
+      const { base } = unwrap(node.expression);
+      if (isClient(base) || isClientMethod(base)) count += 1;
     }
     if ((ts.isVariableDeclaration(node) || ts.isPropertyDeclaration(node) || ts.isParameter(node)) && node.type?.kind === ts.SyntaxKind.AnyKeyword && node.initializer) {
       const { base, cast } = unwrap(node.initializer);
-      if (cast !== 'any' && isClient(base)) count += 1;
+      if (cast !== 'any' && (isClient(base) || isClientMethod(base))) count += 1;
     }
     ts.forEachChild(node, visit);
   };
@@ -335,10 +390,30 @@ describe('client cast ratchet (gap/00 D2)', () => {
     expect(clientCasts(join(SRC, 'modules/x/pages/Page.tsx'), sample)).toBe(1);
   });
 
-  it('allows as never in a file that builds its client with pendingClient, and ignores what is not the client', () => {
+  it.each([
+    ['the from method cast as any', `(supabase.from as any)("x");`, 1],
+    ['the rpc method cast as unknown as any', `(supabase.rpc as unknown as any)("f");`, 1],
+    ['the from method of an imported alias, stored first', `import { supabase as c } from "@/integrations/supabase/client";\nconst f = c.from as any;\nf("x");`, 1],
+    ['the from method by element access', `(supabase["from"] as any)("x"); supabase["rpc"]("f" as any);`, 2],
+    ['as never on a name declared from pendingClient', `const c = pendingClient<T>(); c.from("x" as never);`, 0],
+    ['as never on a plain alias of a pendingClient name, declared before it', `function q() { return d.from("x" as never); }\nconst d = c;\nconst c = pendingClient<T>();`, 0],
+    ['as never on the typed client next to a pendingClient', `const c = pendingClient<T>(); supabase.from("x" as never);`, 1],
+    ['as never on the pendingClient call itself', `pendingClient<T>().from("x" as never);`, 0],
+    ['as never on an any-typed copy of a pendingClient name', `const c = pendingClient<T>(); const d: any = c; d.from("x" as never);`, 1],
+    ['as never on a pendingClient name cast as any', `const c = pendingClient<T>(); (c as any).rpc("f" as never);`, 1],
+  ])('the scanner counts %s', (_name, sample, expected) => {
+    expect(clientCasts(join(SRC, 'modules/x/pages/Page.tsx'), sample)).toBe(expected);
+  });
+
+  it('counts an <any> method assertion in a .ts file', () => {
+    expect(clientCasts(join(SRC, 'modules/x/lib/a.ts'), `(<any>supabase.rpc)("f");`)).toBe(1);
+  });
+
+  it('allows as never on a pendingClient receiver only, and ignores what is not the client', () => {
     const page = join(SRC, 'modules/x/lib/db.ts');
     const withShim = `import { pendingClient } from "@/integrations/supabase/pending";\nexport const refitDb = pendingClient<T>();\nrefitDb.from(name as never).select("*");`;
     expect(clientCasts(page, withShim)).toBe(0);
+    expect(clientCasts(page, `${withShim}\nsupabase.from(name as never).select("*");`)).toBe(1);
     const shimImportOnly = `import { isMissingRelation } from "@/integrations/supabase/pending";\nsupabase.from(name as never).select("*");`;
     expect(clientCasts(page, shimImportOnly)).toBe(1);
     expect(clientCasts(page, `const rows = Array.from(set as any); const x = other as any; const y: any = 3;`)).toBe(0);

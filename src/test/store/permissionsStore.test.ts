@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
+import { AuthRetryableFetchError } from '@supabase/supabase-js';
+import { usePermissionsStore, RBAC_RETRY_DELAYS_MS } from '@/modules/auth/store/permissionsStore';
 import { supabase } from '@/integrations/supabase/client';
 
 // Mock supabase
@@ -7,6 +8,7 @@ vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     auth: {
       getUser: vi.fn(),
+      getSession: vi.fn(),
     },
     from: vi.fn().mockReturnValue({
       select: vi.fn().mockReturnValue({
@@ -233,8 +235,10 @@ describe('permissionsStore', () => {
   // D-41: one user's roles are never presented as another's.
   describe('loadPermissions across users', () => {
     type GetUser = typeof supabase.auth.getUser;
+    type GetSession = typeof supabase.auth.getSession;
     type Rpc = typeof supabase.rpc;
     const getUser = vi.mocked(supabase.auth.getUser);
+    const getSession = vi.mocked(supabase.auth.getSession);
     const rpc = vi.mocked(supabase.rpc);
     let signedIn: string | null = 'uA';
     const holds = new Map<string, Promise<void>>();
@@ -256,7 +260,16 @@ describe('permissionsStore', () => {
     beforeEach(() => {
       signedIn = 'uA';
       holds.clear();
-      getUser.mockImplementation((async () => ({ data: { user: signedIn ? { id: signedIn } : null }, error: null })) as unknown as GetUser);
+      getSession.mockImplementation((async () => ({
+        data: { session: signedIn ? { user: { id: signedIn } } : null },
+        error: null,
+      })) as unknown as GetSession);
+      // The shape getUser() resolves to when /auth/v1/user is unreachable. The
+      // store must not ask it: an outage would pass for a sign-out.
+      getUser.mockImplementation((async () => ({
+        data: { user: null },
+        error: new AuthRetryableFetchError('Failed to fetch', 0),
+      })) as unknown as GetUser);
       rpc.mockImplementation((async (name: string, args: { p_user_id: string }) => {
         await holds.get(args.p_user_id);
         return { data: name === 'get_user_roles_full' ? rolesOf[args.p_user_id] ?? [] : [], error: null };
@@ -264,14 +277,16 @@ describe('permissionsStore', () => {
     });
 
     afterEach(() => {
+      expect(getUser).not.toHaveBeenCalled();
       getUser.mockReset();
+      getSession.mockReset();
       rpc.mockReset();
       rpc.mockResolvedValue({ data: [], error: null } as never);
     });
 
     it("loads the signed-in user's roles and records whose they are", async () => {
       await store().loadPermissions();
-      expect(store()).toMatchObject({ loadedFor: 'uA', isInitialized: true, isLoading: false, hasFleetAccess: true });
+      expect(store()).toMatchObject({ loadedFor: 'uA', isInitialized: true, isLoading: false, hasFleetAccess: true, error: null });
       expect(roleNames()).toEqual(['dpa']);
     });
 
@@ -349,9 +364,9 @@ describe('permissionsStore', () => {
 
     it('reset() while the user is still being resolved drops the call', async () => {
       let resolveUser: () => void = () => {};
-      getUser.mockImplementationOnce((() => new Promise((resolve) => {
-        resolveUser = () => resolve({ data: { user: { id: 'uA' } }, error: null });
-      })) as unknown as GetUser);
+      getSession.mockImplementationOnce((() => new Promise((resolve) => {
+        resolveUser = () => resolve({ data: { session: { user: { id: 'uA' } } }, error: null });
+      })) as unknown as GetSession);
       const load = store().loadPermissions();
       store().reset();
       resolveUser();
@@ -359,6 +374,136 @@ describe('permissionsStore', () => {
       await flush();
       expect(store()).toMatchObject({ loadedFor: null, isInitialized: false, isLoading: false });
       expect(rpc).not.toHaveBeenCalled();
+    });
+
+    // A read that fails is never a sign-out, and never an unbounded wait
+    // (D-04 fail closed; D-54).
+    describe('when a read fails', () => {
+      type RpcResult = { data: unknown; error: { message: string } | null };
+      const failing: RpcResult = { data: null, error: { message: 'Failed to fetch' } };
+      /** Answer the role RPCs with `answer()`, or with u1's roles when it returns null. */
+      const rpcAnswers = (answer: () => RpcResult | null) => {
+        rpc.mockImplementation((async (name: string) =>
+          answer() ?? { data: name === 'get_user_roles_full' ? [{ role_name: 'fleet_master', is_fleet_wide: true }] : [], error: null }
+        ) as unknown as Rpc);
+      };
+      const loads = () => rpc.mock.calls.length / 2;
+
+      beforeEach(() => {
+        vi.useFakeTimers();
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        signedIn = 'u1';
+      });
+
+      afterEach(() => {
+        store().reset();
+        vi.useRealTimers();
+        vi.mocked(console.error).mockRestore();
+      });
+
+      it('reads the identity from the stored session, so a failing getUser() is not a sign-out', async () => {
+        rpcAnswers(() => null);
+        await store().loadPermissions();
+        expect(store()).toMatchObject({ loadedFor: 'u1', isInitialized: true, isLoading: false, error: null });
+        expect(roleNames()).toEqual(['fleet_master']);
+        expect(getSession).toHaveBeenCalled();
+      });
+
+      it('commits no roles for the session user, with an error, when the role queries fail', async () => {
+        rpcAnswers(() => failing);
+        await store().loadPermissions();
+        expect(store()).toMatchObject({ loadedFor: 'u1', isInitialized: true, isLoading: false, hasFleetAccess: false });
+        expect(store().error).toBeTruthy();
+        expect(store().userRoles).toEqual([]);
+      });
+
+      it('retries after the first delay and lands the roles once the queries recover', async () => {
+        let down = true;
+        rpcAnswers(() => (down ? failing : null));
+        await store().loadPermissions();
+        expect(store().error).toBeTruthy();
+
+        down = false;
+        await vi.advanceTimersByTimeAsync(RBAC_RETRY_DELAYS_MS[0]);
+        expect(store()).toMatchObject({ loadedFor: 'u1', isLoading: false, hasFleetAccess: true, error: null });
+        expect(roleNames()).toEqual(['fleet_master']);
+        expect(vi.getTimerCount()).toBe(0);
+      });
+
+      it('gives up after the bounded retries, and a manual load still works and restores the budget', async () => {
+        let down = true;
+        rpcAnswers(() => (down ? failing : null));
+        await store().loadPermissions();
+        const total = RBAC_RETRY_DELAYS_MS.reduce((sum, ms) => sum + ms, 0);
+        await vi.advanceTimersByTimeAsync(total * 10);
+        expect(loads()).toBe(1 + RBAC_RETRY_DELAYS_MS.length);
+        expect(vi.getTimerCount()).toBe(0);
+        expect(store()).toMatchObject({ loadedFor: 'u1', isLoading: false, isInitialized: true });
+        expect(store().error).toBeTruthy();
+
+        // Out of retries: a manual load (a shell Retry button) still runs...
+        down = false;
+        await store().loadPermissions();
+        expect(store()).toMatchObject({ loadedFor: 'u1', hasFleetAccess: true, error: null });
+
+        // ...and its success restores the retry budget.
+        down = true;
+        await store().loadPermissions();
+        const before = loads();
+        await vi.advanceTimersByTimeAsync(total * 10);
+        expect(loads() - before).toBe(RBAC_RETRY_DELAYS_MS.length);
+      });
+
+      it('reset() cancels a pending retry', async () => {
+        rpcAnswers(() => failing);
+        await store().loadPermissions();
+        expect(vi.getTimerCount()).toBe(1);
+        store().reset();
+        rpc.mockClear();
+        await vi.advanceTimersByTimeAsync(RBAC_RETRY_DELAYS_MS[0] * 10);
+        expect(rpc).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+      });
+
+      it("keeps the user's own roles when a refresh cannot read the session, and never commits a sign-out", async () => {
+        rpcAnswers(() => null);
+        await store().loadPermissions();
+        expect(store()).toMatchObject({ loadedFor: 'u1', hasFleetAccess: true });
+
+        const seen: (string | null)[] = [];
+        const unsubscribe = usePermissionsStore.subscribe((s) => { seen.push(s.loadedFor); });
+        try {
+          getSession.mockResolvedValueOnce({
+            data: { session: null },
+            error: new AuthRetryableFetchError('x', 0),
+          } as unknown as Awaited<ReturnType<GetSession>>);
+          rpc.mockClear();
+          await store().loadPermissions();
+
+          expect(store()).toMatchObject({ loadedFor: 'u1', isLoading: false, isInitialized: true, hasFleetAccess: true });
+          expect(store().error).toBeTruthy();
+          expect(roleNames()).toEqual(['fleet_master']);
+          expect(seen).not.toContain(null);
+          // Nothing was loaded for "nobody".
+          expect(rpc).not.toHaveBeenCalled();
+        } finally {
+          unsubscribe();
+        }
+
+        // The retry reads the session again and refreshes the same user.
+        await vi.advanceTimersByTimeAsync(RBAC_RETRY_DELAYS_MS[0]);
+        expect(store()).toMatchObject({ loadedFor: 'u1', hasFleetAccess: true, error: null });
+      });
+
+      it('writes for the user read at the start when only the re-read before the write fails', async () => {
+        rpcAnswers(() => null);
+        getSession
+          .mockResolvedValueOnce({ data: { session: { user: { id: 'u1' } } }, error: null } as unknown as Awaited<ReturnType<GetSession>>)
+          .mockResolvedValueOnce({ data: { session: null }, error: new AuthRetryableFetchError('x', 0) } as unknown as Awaited<ReturnType<GetSession>>);
+        await store().loadPermissions();
+        expect(store()).toMatchObject({ loadedFor: 'u1', isLoading: false, hasFleetAccess: true, error: null });
+        expect(loads()).toBe(1);
+      });
     });
   });
 });

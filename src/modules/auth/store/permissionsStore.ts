@@ -16,6 +16,13 @@ interface PermissionsState {
   currentVesselId: string | null;
   isLoading: boolean;
   isInitialized: boolean;
+  /**
+   * Set when the last load failed: the signed-in session could not be read,
+   * or the role queries failed. The store retries twice with backoff
+   * (RBAC_RETRY_DELAYS_MS), then waits for the next auth event or a manual
+   * `loadPermissions()`, which a future shell Retry button can call. Null
+   * once a load succeeds.
+   */
   error: string | null;
   hasFleetAccess: boolean;
   primaryRole: Role | null;
@@ -87,14 +94,54 @@ let loadSeq = 0;
 let resetEpoch = 0;
 let inFlight: { seq: number; userId: string | null } | null = null;
 
-/** The signed-in user's id as Supabase reports it now; null if none or unreadable. */
-const currentAuthUserId = async (): Promise<string | null> => {
+/*
+ * A failed load is retried on its own, a bounded number of times, so a
+ * transient outage does not leave the user on no roles (fail closed) until
+ * the next auth event. Each failed write spends one delay; a successful
+ * write restores the budget, and reset() cancels a pending retry.
+ */
+export const RBAC_RETRY_DELAYS_MS = [1000, 4000] as const;
+let retryAttempts = 0;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+const clearRetry = () => {
+  if (retryTimer !== null) {
+    clearTimeout(retryTimer);
+    retryTimer = null;
+  }
+};
+
+/** After a load writes: a failure schedules the next retry while the budget lasts. */
+const afterWrite = (error: string | null, retry: () => Promise<void>) => {
+  clearRetry();
+  if (!error) {
+    retryAttempts = 0;
+    return;
+  }
+  if (retryAttempts < RBAC_RETRY_DELAYS_MS.length) {
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      void retry();
+    }, RBAC_RETRY_DELAYS_MS[retryAttempts++]);
+  }
+};
+
+/**
+ * Who is signed in, from the locally stored session that AuthContext also
+ * acts on. It still catches an account switched in another tab (the stored
+ * session is shared), and RLS enforces identity on the server whatever the
+ * client believes. getSession only touches the network to refresh an expired
+ * token; a failure there (an error result, or a throw) means the identity is
+ * unreadable (`failed`), never that nobody is signed in.
+ */
+const readSessionUserId = async (): Promise<{ id: string | null; failed: boolean }> => {
   try {
-    const { data } = await supabase.auth.getUser();
-    return data?.user?.id ?? null;
+    const { data, error } = await supabase.auth.getSession();
+    if (error) return { id: null, failed: true };
+    return { id: data.session?.user.id ?? null, failed: false };
   } catch (error) {
-    console.error('Failed to read the signed-in user:', error);
-    return null;
+    console.error('Failed to read the signed-in session:', error);
+    return { id: null, failed: true };
   }
 };
 
@@ -115,9 +162,22 @@ export const usePermissionsStore = create<PermissionsState>((set, get) => ({
     const epoch = resetEpoch;
     set({ isLoading: true, error: null });
 
-    const userId = await currentAuthUserId();
+    const identity = await readSessionUserId();
     // Reset while the user was being resolved (a sign-out): this call is void.
     if (epoch !== resetEpoch) return;
+    if (identity.failed) {
+      // The load in flight answers this call; its own re-read decides whose
+      // roles it may write.
+      if (inFlight) return;
+      // Unreadable is not signed out: commit no sign-out. Whatever the store
+      // holds stays, and it counts only while `loadedFor` is the user
+      // AuthContext has signed in, so this stays fail closed (D-04, D-41).
+      const error = 'Could not read the signed-in session';
+      set({ isLoading: false, isInitialized: true, error });
+      afterWrite(error, () => get().loadPermissions());
+      return;
+    }
+    const userId = identity.id;
     // Already loading this user's roles: that load answers this call too.
     if (inFlight && inFlight.userId === userId) return;
 
@@ -135,16 +195,20 @@ export const usePermissionsStore = create<PermissionsState>((set, get) => ({
     // Write the result only while this load is the latest and its user is
     // still the signed-in one. A user who changed under the load (no reset
     // in between) gets a fresh load; isLoading stays true until it lands.
+    // An unreadable re-read proves no change: the result is written for
+    // `userId`, which this load read successfully at its start.
     const commit = async (patch: Partial<PermissionsState>): Promise<void> => {
       if (!live()) return settle();
-      const stillSignedIn = await currentAuthUserId();
+      const stillSignedIn = await readSessionUserId();
       if (!live()) return settle();
       settle();
-      if (stillSignedIn !== userId) {
+      if (!stillSignedIn.failed && stillSignedIn.id !== userId) {
         await get().loadPermissions();
         return;
       }
-      set({ ...patch, loadedFor: userId, isLoading: false, isInitialized: true });
+      const error = patch.error ?? null;
+      set({ ...patch, error, loadedFor: userId, isLoading: false, isInitialized: true });
+      afterWrite(error, () => get().loadPermissions());
     };
 
     if (!userId) {
@@ -268,10 +332,13 @@ export const usePermissionsStore = create<PermissionsState>((set, get) => ({
   },
 
   reset: () => {
-    // Any load still in flight is for the previous user: it must not write.
+    // Any load still in flight is for the previous user: it must not write,
+    // and no retry may run for them.
     loadSeq += 1;
     resetEpoch += 1;
     inFlight = null;
+    clearRetry();
+    retryAttempts = 0;
     set({
       permissions: [],
       userRoles: [],

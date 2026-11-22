@@ -11,16 +11,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { useNotificationCenter, type NotificationAlert, type OverdueOperationalTask } from '@/modules/notifications/hooks/useNotificationCenter';
 import { getAlertDestination, getTaskDestination } from '@/modules/notifications/lib/notificationLinks';
+import { ALERT_SEVERITY_TONE } from '@/modules/notifications/lib/alertSeverityTone';
 
 const TABS = ['compliance', 'messages', 'tasks'] as const;
 type CenterTab = typeof TABS[number];
-
-const severityStyle = {
-  RED: 'border-destructive/40 bg-destructive/10 text-destructive',
-  ORANGE: 'border-orange/40 bg-orange/10 text-orange',
-  YELLOW: 'border-amber/40 bg-amber/10 text-amber',
-  GREEN: 'border-success/40 bg-success/10 text-success',
-} as const;
 
 const formatDueDate = (value: string | null) => value ? format(parseISO(value), 'd MMM yyyy') : null;
 
@@ -58,7 +52,7 @@ function AlertRow({ alert }: { alert: NotificationAlert }) {
       className="group flex min-h-24 items-start gap-3 p-4 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       aria-label={`Open ${alert.title}`}
     >
-      <span className={cn('mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border', severityStyle[alert.severity_color])}>
+      <span className={cn('mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md border', ALERT_SEVERITY_TONE[alert.severity_color].badge)}>
         <AlertTriangle className="h-4 w-4" aria-hidden="true" />
       </span>
       <span className="min-w-0 flex-1">

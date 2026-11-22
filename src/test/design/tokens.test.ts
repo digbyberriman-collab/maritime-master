@@ -203,19 +203,21 @@ describe('radius, elevation, focus, motion and density (A4)', () => {
 
 describe('chart library defaults (A9, DS18)', () => {
   // Recharts 2 writes #666 axes / tick text, #ccc grid and reference lines,
-  // and a white tooltip (inline style) whatever the theme.
+  // and a white tooltip (inline style) whatever the theme. Each tooltip item
+  // also gets an inline `color: entry.color || '#000'`: #000 for a Pie sector
+  // (1.27:1 on the Abyss popover) and the series hue otherwise.
   const topLevel = (selector: string) => declsFor(tokens.rules, selector, []);
 
   it('maps the Recharts defaults to theme tokens', () => {
-    expect(topLevel('.recharts-cartesian-axis-tick-value[fill="#666"]')).toMatchObject({
+    expect(topLevel(':where(.recharts-cartesian-axis-tick-value[fill="#666"])')).toMatchObject({
       fill: 'hsl(var(--muted-foreground))',
     });
     expect(
-      topLevel('.recharts-cartesian-axis-line[stroke="#666"], .recharts-cartesian-axis-tick-line[stroke="#666"]'),
+      topLevel(':where(.recharts-cartesian-axis-line[stroke="#666"]), :where(.recharts-cartesian-axis-tick-line[stroke="#666"])'),
     ).toMatchObject({ stroke: 'hsl(var(--border))' });
-    expect(topLevel('.recharts-cartesian-grid line[stroke="#ccc"], .recharts-reference-line [stroke="#ccc"]')).toMatchObject({
-      stroke: 'hsl(var(--border) / 0.6)',
-    });
+    expect(
+      topLevel(':where(.recharts-cartesian-grid line[stroke="#ccc"]), :where(.recharts-reference-line [stroke="#ccc"])'),
+    ).toMatchObject({ stroke: 'hsl(var(--border) / 0.6)' });
     // The background and border are inline styles, so only !important beats them.
     expect(topLevel('.recharts-default-tooltip')).toMatchObject({
       'background-color': 'hsl(var(--popover)) !important',
@@ -226,14 +228,22 @@ describe('chart library defaults (A9, DS18)', () => {
     expect(topLevel('.recharts-default-tooltip .recharts-tooltip-label')).toMatchObject({
       color: 'hsl(var(--popover-foreground))',
     });
+    // The item colour is inline too (#000 for Pie sectors), so it needs !important.
+    expect(topLevel('.recharts-default-tooltip .recharts-tooltip-item')).toMatchObject({
+      color: 'hsl(var(--popover-foreground)) !important',
+    });
   });
 
-  it('scopes every Recharts fill / stroke override to the library default value', () => {
+  it('scopes every Recharts fill / stroke override to the library default value, at zero specificity', () => {
     const paints = tokens.rules.filter((r) => r.selector.includes('.recharts-') && ('fill' in r.decls || 'stroke' in r.decls));
     expect(paints.length).toBe(3);
     for (const r of paints) {
-      // A module's explicit tick fill or stroke must still win.
-      for (const part of r.selector.split(',')) expect(part.trim(), r.selector).toMatch(/\[(?:fill|stroke)="#[0-9a-f]{3}"\]$/i);
+      // A module's explicit tick fill or stroke, attribute or class
+      // (`className="stroke-muted"`, 0,1,0), must still win: each part matches
+      // only the default value and sits in :where() (0,0,0).
+      for (const part of r.selector.split(',')) {
+        expect(part.trim(), r.selector).toMatch(/^:where\(.*\[(?:fill|stroke)="#[0-9a-f]{3}"\]\)$/i);
+      }
     }
   });
 });

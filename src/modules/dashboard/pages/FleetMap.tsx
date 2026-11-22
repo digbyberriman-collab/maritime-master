@@ -165,7 +165,7 @@ const FleetMap: React.FC = () => {
   const vesselMarkerByIdRef = useRef(new Map<string, { marker: L.Marker; vessel: FleetVessel & { position: VesselPosition } }>());
 
   const vesselsQuery = useQuery({
-    queryKey: ['vessels', companyId],
+    queryKey: ['vessels', companyId, 'tracker'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('vessels')

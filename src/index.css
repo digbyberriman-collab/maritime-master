@@ -843,18 +843,24 @@ path.storm-map-heat--low {
   fill: hsl(var(--info));
 }
 
-/* Charts (A9, DS18): Recharts library defaults → theme tokens. Scoped to the default values so a module's explicit colours still win. */
-.recharts-cartesian-axis-tick-value[fill="#666"] {
+/*
+ * Charts (A9, DS18): Recharts library defaults → theme tokens. The paint rules
+ * match only the library default values and have zero specificity via
+ * :where(), so a module's explicit attribute or class colour (e.g.
+ * `className="stroke-muted"`) wins. A CSS rule of any specificity still beats
+ * the SVG presentation attribute (`stroke="#ccc"`), so the defaults apply.
+ */
+:where(.recharts-cartesian-axis-tick-value[fill="#666"]) {
   fill: hsl(var(--muted-foreground));
 }
 
-.recharts-cartesian-axis-line[stroke="#666"],
-.recharts-cartesian-axis-tick-line[stroke="#666"] {
+:where(.recharts-cartesian-axis-line[stroke="#666"]),
+:where(.recharts-cartesian-axis-tick-line[stroke="#666"]) {
   stroke: hsl(var(--border));
 }
 
-.recharts-cartesian-grid line[stroke="#ccc"],
-.recharts-reference-line [stroke="#ccc"] {
+:where(.recharts-cartesian-grid line[stroke="#ccc"]),
+:where(.recharts-reference-line [stroke="#ccc"]) {
   stroke: hsl(var(--border) / 0.6);
 }
 
@@ -868,6 +874,16 @@ path.storm-map-heat--low {
 
 .recharts-default-tooltip .recharts-tooltip-label {
   color: hsl(var(--popover-foreground));
+}
+
+/*
+ * Recharts writes the item colour inline (`#000` for Pie sectors, the series
+ * hue otherwise), hence !important. Default tooltips drop the series hue; a
+ * module that wants hues or swatches passes a custom `content` such as
+ * ChartTooltipContent in components/ui/chart.tsx.
+ */
+.recharts-default-tooltip .recharts-tooltip-item {
+  color: hsl(var(--popover-foreground)) !important;
 }
 
 /*

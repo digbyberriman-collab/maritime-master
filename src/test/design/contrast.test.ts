@@ -37,7 +37,7 @@ function pairsFor(): Pair[] {
     add('foreground', bg, TEXT);
   }
   add('card-foreground', 'card', TEXT);
-  // Also the Recharts default tooltip (index.css maps it to popover / popover-foreground).
+  // Also the Recharts default tooltip: index.css maps its background to popover and its label and item text to popover-foreground.
   add('popover-foreground', 'popover', TEXT);
   add('secondary-foreground', 'secondary', TEXT);
   add('accent-foreground', 'accent', TEXT);
