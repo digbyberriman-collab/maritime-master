@@ -187,6 +187,14 @@
     /* Gradients: sign-in hero and empty-state art only, never data surfaces. */
     --gradient-primary: linear-gradient(135deg, hsl(198 100% 28%), hsl(194.3 100% 45.1%));
     --gradient-card: linear-gradient(180deg, hsl(218.8 33.3% 11%), hsl(218.8 33.3% 9%));
+    /* Sign-in hero (AuthLayout): Signal glow and bearing rings, decorative only. */
+    --auth-glow-opacity: 0.3;
+    --auth-rings-opacity: 0.09;
+    /* Inkfish watermark (D-DS5, DS24): a faint silhouette behind the content
+       layer (InkfishWatermark, `fixed -z-10` inside the shell's isolate root). */
+    --watermark-opacity: 0.02;
+    /* 1 = a light silhouette on Abyss; 0 = a dark one on Daylight and paper. */
+    --watermark-invert: 1;
 
     /* Elevation (A.4): depth from surface steps, a top highlight and a border. */
     --shadow-e1: inset 0 1px 0 hsl(0 0% 100% / 0.04), 0 1px 2px hsl(216 60% 2% / 0.5);
@@ -294,6 +302,10 @@
 
     --gradient-primary: linear-gradient(135deg, hsl(198 100% 21.6%), hsl(195.3 100% 36.1%));
     --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(216 33.3% 98%));
+    --auth-glow-opacity: 0.16;
+    --auth-rings-opacity: 0.1;
+    --watermark-opacity: 0.015;
+    --watermark-invert: 0;
 
     --shadow-e1: 0 1px 2px hsl(215 30% 20% / 0.06), 0 1px 3px hsl(215 30% 20% / 0.08);
     --shadow-e2: 0 4px 12px hsl(215 30% 20% / 0.1), 0 2px 4px hsl(215 30% 20% / 0.06);
@@ -453,6 +465,11 @@
   .focus-ring:focus-visible {
     outline: var(--focus-ring-width) solid hsl(var(--focus));
     outline-offset: var(--focus-ring-offset);
+  }
+
+  /* Loading indicators fade in after 200 ms, so fast loads show nothing (LazyLoader). */
+  .appear-delayed {
+    animation: appear-delayed var(--motion-menu) var(--ease-tide) 200ms both;
   }
 
   /* Inset variant for matrix cells and edge-to-edge rows. */
@@ -995,12 +1012,25 @@ path.storm-map-heat--low {
 
     --gradient-primary: linear-gradient(135deg, hsl(198 100% 21.6%), hsl(195.3 100% 36.1%));
     --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(216 33.3% 98%));
+    --auth-glow-opacity: 0.16;
+    --auth-rings-opacity: 0.1;
+    --watermark-opacity: 0.015;
+    --watermark-invert: 0;
 
     /* print: no elevation on paper. */
     --shadow-e1: none;
     --shadow-e2: none;
     --shadow-e3: none;
     --shadow-glow-signal: none;
+  }
+}
+
+@keyframes appear-delayed {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }
 

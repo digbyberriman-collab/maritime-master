@@ -1,23 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { ArrowLeft, Loader2, MailCheck } from 'lucide-react';
+import { z } from 'zod';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
-import { useToast } from '@/shared/hooks/use-toast';
-import { z } from 'zod';
-import InkfishWatermark from '@/shared/components/InkfishWatermark';
+import { notify, normaliseError } from '@/shared/lib/notify';
 import { lovable } from '@/integrations/lovable';
 import { supabase } from '@/integrations/supabase/client';
+import { AuthCard, AuthLayout } from '@/modules/auth/components/brand/AuthLayout';
+import { FieldError, FormAlert, PasswordField, PasswordStrengthMeter } from '@/modules/auth/components/brand/AuthFields';
+import { describedBy } from '@/modules/auth/components/brand/describedBy';
+import { PASSWORD_MIN_LENGTH } from '@/modules/auth/components/brand/passwordStrength';
+import googleMark from '@/modules/auth/components/brand/google-g.svg';
+import { afterSignInPath, initialAuthMode, type AuthMode } from './authRedirect';
 
-
-type AuthMode = 'login' | 'register' | 'forgot-password';
-
-const emailSchema = z.string().trim().email('Invalid email address');
-const passwordSchema = z.string().min(8, 'Password must be at least 8 characters');
+const emailSchema = z
+  .string()
+  .trim()
+  .min(1, 'Enter your email address')
+  .email('Enter a valid email address, like name@company.com');
+const newPasswordSchema = z.string().min(PASSWORD_MIN_LENGTH, `Use at least ${PASSWORD_MIN_LENGTH} characters`);
 
 const roles = [
   { value: 'master', label: 'Master' },
@@ -28,429 +33,432 @@ const roles = [
   { value: 'shore_management', label: 'Shore Management' },
 ] as const;
 
-const getPasswordStrength = (password: string): { strength: number; label: string; color: string } => {
-  let strength = 0;
-  if (password.length >= 8) strength++;
-  if (password.length >= 12) strength++;
-  if (/[A-Z]/.test(password)) strength++;
-  if (/[0-9]/.test(password)) strength++;
-  if (/[^A-Za-z0-9]/.test(password)) strength++;
+type FieldName = 'email' | 'password' | 'firstName' | 'lastName' | 'companyName';
+type FieldErrors = Partial<Record<FieldName, string>>;
 
-  if (strength <= 2) return { strength, label: 'Weak', color: 'bg-destructive' };
-  if (strength <= 3) return { strength, label: 'Medium', color: 'bg-yellow-500' };
-  return { strength, label: 'Strong', color: 'bg-success' };
+/** DOM order, so the first invalid field gets focus. */
+const FIELD_IDS: Record<FieldName, string> = {
+  email: 'auth-email',
+  password: 'auth-password',
+  firstName: 'auth-first-name',
+  lastName: 'auth-last-name',
+  companyName: 'auth-company',
+};
+const FIELD_ORDER = Object.keys(FIELD_IDS) as FieldName[];
+const errorIdFor = (field: FieldName) => `${FIELD_IDS[field]}-error`;
+const FORM_ERROR_ID = 'auth-form-error';
+
+const COPY: Record<AuthMode, { title: string; description: string; submit: string; busy: string }> = {
+  login: {
+    title: 'Sign in',
+    description: 'Welcome back. Use your STORM account to continue.',
+    submit: 'Sign in',
+    busy: 'Signing in…',
+  },
+  register: {
+    title: 'Create your account',
+    description: 'Set up STORM for your fleet.',
+    submit: 'Create account',
+    busy: 'Creating account…',
+  },
+  'forgot-password': {
+    title: 'Reset your password',
+    description: "Enter your account email and we'll send you a link to set a new password.",
+    submit: 'Send reset link',
+    busy: 'Sending…',
+  },
 };
 
-const Auth: React.FC = () => {
-  const [mode, setMode] = useState<AuthMode>('login');
+/** Auth API messages, reworded where the raw text does not say what to do. */
+function signInErrorMessage(error: unknown): string {
+  const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  if (/invalid login credentials/i.test(raw)) {
+    return 'That email and password do not match an account. Check the email address, or use "Forgot password?" to set a new password.';
+  }
+  if (/email not confirmed/i.test(raw)) {
+    return 'This account has not been confirmed yet. Check your inbox for the confirmation email.';
+  }
+  return normaliseError(error, 'Sign-in failed. Try again.').message;
+}
+
+/** A text button that is a 44 px target on touch screens (D-35). */
+const textButtonClass =
+  'inline-flex items-center gap-1.5 rounded-sm type-body-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card [@media(pointer:coarse)]:min-h-11';
+
+interface AuthProps {
+  /** Opens the screen in this mode (tests, and `state.mode` from other screens). */
+  initialMode?: AuthMode;
+}
+
+/**
+ * Sign-in screen (BUILD-PLAN S6, gap/10 DS22): Abyss hero, STORM wordmark,
+ * one card. Self-registration is closed (accounts come by invitation, see the
+ * sign-up backstop migration); the register mode stays for `initialMode`.
+ */
+const Auth: React.FC<AuthProps> = ({ initialMode }) => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { signIn, signUp, resetPassword, user } = useAuth();
+
+  const [mode, setMode] = useState<AuthMode>(() => initialAuthMode(location.state, initialMode ?? 'login'));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [companyName, setCompanyName] = useState('');
-  const [role, setRole] = useState<typeof roles[number]['value']>('crew');
+  const [role, setRole] = useState<(typeof roles)[number]['value']>('crew');
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [authError, setAuthError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [resetSentTo, setResetSentTo] = useState<string | null>(null);
 
-  const { signIn, signUp, resetPassword, user } = useAuth();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-
-  const handleGoogleSignIn = async () => {
-    setIsLoading(true);
-    setAuthError(null);
-    const fail = (message: string) => {
-      setAuthError(message);
-      toast({ title: 'Google sign-in failed', description: message, variant: 'destructive' });
-      setIsLoading(false);
-    };
-    try {
-      // Watchdog: if the Google flow neither redirects nor answers, stop
-      // spinning and tell the user instead of hanging on the loading state.
-      const timeout = new Promise<'timeout'>((resolve) =>
-        window.setTimeout(() => resolve('timeout'), 20000),
-      );
-      const result = await Promise.race([
-        lovable.auth.signInWithOAuth('google', {
-          redirect_uri: window.location.origin,
-          extraParams: {
-            prompt: 'select_account',
-          },
-        }),
-        timeout,
-      ]);
-      if (result === 'timeout') {
-        fail(
-          'Google sign-in did not respond. Check that pop-ups are allowed, or sign in with your email and password.',
-        );
-        return;
-      }
-
-      if (result.error) {
-        fail(result.error.message ?? 'Please try again.');
-        return;
-      }
-      if (result.redirected) return;
-
-      // No redirect and no error: confirm a session actually exists before
-      // navigating, otherwise the protected route bounces straight back here
-      // and the button is left spinning forever.
-      const { data, error } = await supabase.auth.getUser();
-      if (error || !data.user) {
-        fail(
-          'Google did not return a signed-in session. Try again, or sign in with your email and password.',
-        );
-        return;
-      }
-      navigate('/dashboard');
-    } catch (err) {
-      fail(err instanceof Error ? err.message : 'Please try again.');
-    }
-  };
-
+  const fieldRefs = useRef<Partial<Record<FieldName, HTMLInputElement | null>>>({});
+  const focusEmailOnModeChange = useRef(false);
+  const afterSignIn = afterSignInPath(location.state);
+  const copy = COPY[mode];
 
   useEffect(() => {
-    if (user) {
-      navigate('/dashboard');
-    }
-  }, [user, navigate]);
+    if (user) navigate(afterSignIn, { replace: true });
+  }, [user, navigate, afterSignIn]);
 
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
+  useEffect(() => {
+    if (!focusEmailOnModeChange.current) return;
+    focusEmailOnModeChange.current = false;
+    fieldRefs.current.email?.focus();
+  }, [mode, resetSentTo]);
 
-    try {
-      emailSchema.parse(email);
-    } catch (e) {
-      if (e instanceof z.ZodError) {
-        newErrors.email = e.errors[0].message;
-      }
-    }
-
-    if (mode !== 'forgot-password') {
-      try {
-        passwordSchema.parse(password);
-      } catch (e) {
-        if (e instanceof z.ZodError) {
-          newErrors.password = e.errors[0].message;
-        }
-      }
-    }
-
-    if (mode === 'register') {
-      if (!firstName.trim()) newErrors.firstName = 'First name is required';
-      if (!lastName.trim()) newErrors.lastName = 'Last name is required';
-      if (!companyName.trim()) newErrors.companyName = 'Company name is required';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const switchMode = (next: AuthMode) => {
+    focusEmailOnModeChange.current = true;
+    setMode(next);
+    setFieldErrors({});
+    setFormError(null);
+    setResetSentTo(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAuthError(null);
-    if (!validateForm()) return;
+  const setRef = (field: FieldName) => (el: HTMLInputElement | null) => {
+    fieldRefs.current[field] = el;
+  };
+
+  /** Clears a field's error as soon as the user edits it. */
+  const edit = (field: FieldName, setter: (value: string) => void) => (event: React.ChangeEvent<HTMLInputElement>) => {
+    setter(event.target.value);
+    if (fieldErrors[field]) setFieldErrors((current) => ({ ...current, [field]: undefined }));
+  };
+
+  const fieldA11y = (field: FieldName, ...extra: Array<string | false | undefined>) => ({
+    'aria-invalid': fieldErrors[field] ? true : undefined,
+    'aria-describedby': describedBy(fieldErrors[field] && errorIdFor(field), ...extra),
+  });
+
+  const validate = (): FieldErrors => {
+    const next: FieldErrors = {};
+    const emailResult = emailSchema.safeParse(email);
+    if (!emailResult.success) next.email = emailResult.error.issues[0]?.message;
+    if (mode === 'login' && !password) next.password = 'Enter your password';
+    if (mode === 'register') {
+      const passwordResult = newPasswordSchema.safeParse(password);
+      if (!passwordResult.success) next.password = passwordResult.error.issues[0]?.message;
+      if (!firstName.trim()) next.firstName = 'Enter your first name';
+      if (!lastName.trim()) next.lastName = 'Enter your last name';
+      if (!companyName.trim()) next.companyName = 'Enter your company name';
+    }
+    return next;
+  };
+
+  const fail = (message: string, title: string, id: string) => {
+    setFormError(message);
+    notify.error(message, { title, id });
+  };
+
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setFormError(null);
+    const errors = validate();
+    setFieldErrors(errors);
+    const firstInvalid = FIELD_ORDER.find((field) => errors[field]);
+    if (firstInvalid) {
+      fieldRefs.current[firstInvalid]?.focus();
+      return;
+    }
 
     setIsLoading(true);
-
     try {
       if (mode === 'login') {
-        const { error } = await signIn(email, password);
+        const { error } = await signIn(email.trim(), password);
         if (error) {
-          const friendly =
-            /invalid login credentials/i.test(error.message)
-              ? 'That email and password combination does not match an account. Check the email address, or use "Forgot password?" to set a new password.'
-              : /email not confirmed/i.test(error.message)
-                ? 'This account has not been confirmed yet. Check your inbox for the confirmation email.'
-                : error.message;
-          setAuthError(friendly);
-          toast({
-            title: 'Login failed',
-            description: friendly,
-            variant: 'destructive',
-          });
-        } else {
-          toast({
-            title: 'Welcome back!',
-            description: 'You have successfully logged in.',
-          });
-          navigate('/dashboard');
+          fail(signInErrorMessage(error), 'Sign-in failed', 'auth-sign-in');
+          return;
         }
+        navigate(afterSignIn, { replace: true });
       } else if (mode === 'register') {
-        const { error } = await signUp({
-          email,
-          password,
-          firstName,
-          lastName,
-          companyName,
-          role,
-        });
+        const { error } = await signUp({ email: email.trim(), password, firstName, lastName, companyName, role });
         if (error) {
-          toast({
-            title: 'Registration failed',
-            description: error.message,
-            variant: 'destructive',
-          });
-        } else {
-          toast({
-            title: 'Account created!',
-            description: 'Welcome to STORM.',
-          });
-          navigate('/dashboard');
+          fail(normaliseError(error, 'The account could not be created.').message, 'Could not create the account', 'auth-register');
+          return;
         }
-      } else if (mode === 'forgot-password') {
-        const { error } = await resetPassword(email);
+        notify.success('Account created', { description: 'Welcome to STORM.' });
+        navigate(afterSignIn, { replace: true });
+      } else {
+        const { error } = await resetPassword(email.trim());
         if (error) {
-          toast({
-            title: 'Error',
-            description: error.message,
-            variant: 'destructive',
-          });
-        } else {
-          toast({
-            title: 'Email sent',
-            description: 'Check your inbox for password reset instructions.',
-          });
-          setMode('login');
+          fail(normaliseError(error, 'The reset link could not be sent.').message, 'Could not send the reset link', 'auth-reset');
+          return;
         }
+        setResetSentTo(email.trim());
+        notify.success('Reset link sent', { description: 'Check your inbox for an email from STORM.' });
       }
+    } catch (error) {
+      fail(normaliseError(error).message, 'Something went wrong', 'auth-unexpected');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const passwordStrength = getPasswordStrength(password);
+  const handleGoogleSignIn = async () => {
+    setIsLoading(true);
+    setFormError(null);
+    const failGoogle = (message: string) => {
+      fail(message, 'Google sign-in failed', 'auth-google');
+      setIsLoading(false);
+    };
+    try {
+      // Watchdog: if the Google flow neither redirects nor answers, stop
+      // spinning and say so instead of hanging on the loading state.
+      const timeout = new Promise<'timeout'>((resolve) => window.setTimeout(() => resolve('timeout'), 20000));
+      const result = await Promise.race([
+        lovable.auth.signInWithOAuth('google', {
+          redirect_uri: window.location.origin,
+          extraParams: { prompt: 'select_account' },
+        }),
+        timeout,
+      ]);
+      if (result === 'timeout') {
+        failGoogle('Google sign-in did not respond. Check that pop-ups are allowed, or sign in with your email and password.');
+        return;
+      }
+      if (result.error) {
+        failGoogle(normaliseError(result.error, 'Please try again.').message);
+        return;
+      }
+      if (result.redirected) return;
+
+      // No redirect and no error: confirm a session exists before navigating,
+      // or the protected route bounces straight back here.
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data.user) {
+        failGoogle('Google did not return a signed-in session. Try again, or sign in with your email and password.');
+        return;
+      }
+      navigate(afterSignIn, { replace: true });
+    } catch (error) {
+      failGoogle(normaliseError(error, 'Please try again.').message);
+    }
+  };
+
+  if (mode === 'forgot-password' && resetSentTo) {
+    return (
+      <AuthLayout>
+        <AuthCard
+          title="Check your inbox"
+          icon={
+            <span className="mb-3 grid size-11 place-items-center rounded-full bg-signal-muted text-primary" aria-hidden="true">
+              <MailCheck className="size-5" />
+            </span>
+          }
+          description={
+            <p role="status">
+              If an account exists for <span className="break-all font-medium text-foreground">{resetSentTo}</span>, a link to set a
+              new password is on its way. It can take a few minutes to arrive.
+            </p>
+          }
+        >
+          {/* The form is gone, so focus moves to the one action left. */}
+          <Button type="button" variant="outline" className="w-full" onClick={() => switchMode('login')} autoFocus>
+            <ArrowLeft aria-hidden="true" />
+            Back to sign in
+          </Button>
+        </AuthCard>
+      </AuthLayout>
+    );
+  }
+
+  const isNewPassword = mode === 'register';
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative">
-      {/* Inkfish watermark - renders behind all content */}
-      <InkfishWatermark />
-      
-      <div className="w-full max-w-md animate-fade-in relative z-10">
-        {/* Logo */}
-        <div className="flex flex-col items-center justify-center mb-8">
-          <span className="text-4xl font-black tracking-tight text-primary">STORM</span>
-          <span className="text-xs text-muted-foreground tracking-widest uppercase mt-1">
-            Superyacht Technical Operations, Research & Management
-          </span>
-        </div>
+    <AuthLayout>
+      <AuthCard title={copy.title} description={copy.description}>
+        <form
+          noValidate
+          onSubmit={handleSubmit}
+          className="space-y-4"
+          aria-label={copy.title}
+          aria-busy={isLoading || undefined}
+          aria-describedby={formError ? FORM_ERROR_ID : undefined}
+        >
+          {formError ? <FormAlert id={FORM_ERROR_ID}>{formError}</FormAlert> : null}
 
-        <Card className="shadow-card">
-          <CardHeader className="text-center">
-            <CardTitle>
-              {mode === 'login' && 'Welcome back'}
-              {mode === 'register' && 'Create your account'}
-              {mode === 'forgot-password' && 'Reset password'}
-            </CardTitle>
-            <CardDescription>
-              {mode === 'login' && 'Sign in to your STORM account'}
-              {mode === 'register' && 'Get started with yacht management'}
-              {mode === 'forgot-password' && "Enter your email and we'll send you a reset link"}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Email */}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="captain@yacht.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className={errors.email ? 'border-destructive' : ''}
-                />
-                {errors.email && <p className="text-sm text-destructive">{errors.email}</p>}
-              </div>
+          <div className="space-y-1.5">
+            <Label htmlFor={FIELD_IDS.email}>Email</Label>
+            <Input
+              ref={setRef('email')}
+              id={FIELD_IDS.email}
+              name="email"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint={mode === 'forgot-password' ? 'send' : 'next'}
+              placeholder="name@company.com"
+              value={email}
+              onChange={edit('email', setEmail)}
+              className="aria-[invalid=true]:border-destructive"
+              {...fieldA11y('email')}
+            />
+            <FieldError id={errorIdFor('email')}>{fieldErrors.email}</FieldError>
+          </div>
 
-              {/* Password */}
-              {mode !== 'forgot-password' && (
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className={errors.password ? 'border-destructive pr-10' : 'pr-10'}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-                  {errors.password && <p className="text-sm text-destructive">{errors.password}</p>}
-                  
-                  {/* Password strength indicator */}
-                  {mode === 'register' && password && (
-                    <div className="space-y-1">
-                      <div className="flex gap-1">
-                        {[1, 2, 3, 4, 5].map((i) => (
-                          <div
-                            key={i}
-                            className={`h-1 flex-1 rounded-full transition-colors ${
-                              i <= passwordStrength.strength ? passwordStrength.color : 'bg-muted'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <p className="text-xs text-muted-foreground">{passwordStrength.label}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Registration fields */}
-              {mode === 'register' && (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name</Label>
-                      <Input
-                        id="firstName"
-                        placeholder="John"
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                        className={errors.firstName ? 'border-destructive' : ''}
-                      />
-                      {errors.firstName && <p className="text-sm text-destructive">{errors.firstName}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
-                      <Input
-                        id="lastName"
-                        placeholder="Doe"
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        className={errors.lastName ? 'border-destructive' : ''}
-                      />
-                      {errors.lastName && <p className="text-sm text-destructive">{errors.lastName}</p>}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="companyName">Company Name</Label>
-                    <Input
-                      id="companyName"
-                      placeholder="Blue Ocean Yachts"
-                      value={companyName}
-                      onChange={(e) => setCompanyName(e.target.value)}
-                      className={errors.companyName ? 'border-destructive' : ''}
-                    />
-                    {errors.companyName && <p className="text-sm text-destructive">{errors.companyName}</p>}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="role">Role</Label>
-                    <Select value={role} onValueChange={(v) => setRole(v as typeof role)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select your role" />
-                      </SelectTrigger>
-                      <SelectContent className="bg-popover">
-                        {roles.map((r) => (
-                          <SelectItem key={r.value} value={r.value}>
-                            {r.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </>
-              )}
-
-              {/* Forgot password link */}
-              {mode === 'login' && (
-                <button
-                  type="button"
-                  onClick={() => setMode('forgot-password')}
-                  className="text-sm text-primary hover:underline"
-                >
-                  Forgot password?
-                </button>
-              )}
-
-              {authError && (
-                <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                  {authError}
-                </p>
-              )}
-
-              {/* Submit button */}
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {mode === 'login' && 'Sign in'}
-                {mode === 'register' && 'Create account'}
-                {mode === 'forgot-password' && 'Send reset link'}
-              </Button>
-
-              {mode !== 'forgot-password' && (
-                <>
-                  <div className="relative my-2">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-border" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-card px-2 text-muted-foreground">Or continue with</span>
-                    </div>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full"
-                    onClick={handleGoogleSignIn}
-                    disabled={isLoading}
-                  >
-                    <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24">
-                      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-                    </svg>
-                    Continue with Google
-                  </Button>
-                </>
-              )}
-
-              {/* Mode switch */}
-              <div className="text-center text-sm text-muted-foreground">
-                {/* Self-registration is closed: accounts are created by invitation
-                    (see supabase/migrations/20260919170100_signup_backstop.sql). */}
-                {mode === 'login' && <>Need an account? Ask your DPA or fleet administrator for an invitation.</>}
-                {mode === 'register' && (
-                  <>
-                    Already have an account?{' '}
-                    <button
-                      type="button"
-                      onClick={() => setMode('login')}
-                      className="text-primary hover:underline font-medium"
-                    >
-                      Sign in
-                    </button>
-                  </>
-                )}
-                {mode === 'forgot-password' && (
-                  <button
-                    type="button"
-                    onClick={() => setMode('login')}
-                    className="text-primary hover:underline font-medium"
-                  >
-                    Back to login
+          {mode !== 'forgot-password' ? (
+            <div className="space-y-1.5">
+              <div className="flex min-h-5 items-center justify-between gap-2">
+                <Label htmlFor={FIELD_IDS.password}>Password</Label>
+                {mode === 'login' ? (
+                  <button type="button" onClick={() => switchMode('forgot-password')} className={textButtonClass}>
+                    Forgot password?
                   </button>
-                )}
+                ) : null}
               </div>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+              <PasswordField
+                ref={setRef('password')}
+                id={FIELD_IDS.password}
+                name="password"
+                autoComplete={isNewPassword ? 'new-password' : 'current-password'}
+                enterKeyHint={isNewPassword ? 'next' : 'go'}
+                value={password}
+                onChange={edit('password', setPassword)}
+                visible={showPassword}
+                onToggleVisible={() => setShowPassword((v) => !v)}
+                {...fieldA11y('password', isNewPassword && password ? 'auth-password-strength' : undefined)}
+              />
+              <FieldError id={errorIdFor('password')}>{fieldErrors.password}</FieldError>
+              {isNewPassword ? <PasswordStrengthMeter id="auth-password-strength" password={password} /> : null}
+            </div>
+          ) : null}
+
+          {mode === 'register' ? (
+            <>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor={FIELD_IDS.firstName}>First name</Label>
+                  <Input
+                    ref={setRef('firstName')}
+                    id={FIELD_IDS.firstName}
+                    name="given-name"
+                    autoComplete="given-name"
+                    enterKeyHint="next"
+                    value={firstName}
+                    onChange={edit('firstName', setFirstName)}
+                    className="aria-[invalid=true]:border-destructive"
+                    {...fieldA11y('firstName')}
+                  />
+                  <FieldError id={errorIdFor('firstName')}>{fieldErrors.firstName}</FieldError>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor={FIELD_IDS.lastName}>Last name</Label>
+                  <Input
+                    ref={setRef('lastName')}
+                    id={FIELD_IDS.lastName}
+                    name="family-name"
+                    autoComplete="family-name"
+                    enterKeyHint="next"
+                    value={lastName}
+                    onChange={edit('lastName', setLastName)}
+                    className="aria-[invalid=true]:border-destructive"
+                    {...fieldA11y('lastName')}
+                  />
+                  <FieldError id={errorIdFor('lastName')}>{fieldErrors.lastName}</FieldError>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor={FIELD_IDS.companyName}>Company</Label>
+                <Input
+                  ref={setRef('companyName')}
+                  id={FIELD_IDS.companyName}
+                  name="organization"
+                  autoComplete="organization"
+                  enterKeyHint="next"
+                  value={companyName}
+                  onChange={edit('companyName', setCompanyName)}
+                  className="aria-[invalid=true]:border-destructive"
+                  {...fieldA11y('companyName')}
+                />
+                <FieldError id={errorIdFor('companyName')}>{fieldErrors.companyName}</FieldError>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="auth-role">Role</Label>
+                <Select value={role} onValueChange={(v) => setRole(v as typeof role)}>
+                  <SelectTrigger id="auth-role">
+                    <SelectValue placeholder="Select your role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((r) => (
+                      <SelectItem key={r.value} value={r.value}>
+                        {r.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          ) : null}
+
+          <Button type="submit" variant="signal" className="w-full" disabled={isLoading}>
+            {isLoading ? <Loader2 aria-hidden="true" className="animate-spin" /> : null}
+            {isLoading ? copy.busy : copy.submit}
+          </Button>
+
+          {mode === 'forgot-password' ? (
+            <div className="flex justify-center">
+              <button type="button" onClick={() => switchMode('login')} className={textButtonClass}>
+                <ArrowLeft aria-hidden="true" className="size-4" />
+                Back to sign in
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-3" aria-hidden="true">
+                <span className="h-px flex-1 bg-border" />
+                <span className="type-caption text-muted-foreground">or</span>
+                <span className="h-px flex-1 bg-border" />
+              </div>
+              <Button type="button" variant="outline" className="w-full bg-transparent" onClick={handleGoogleSignIn} disabled={isLoading}>
+                <img src={googleMark} alt="" aria-hidden="true" className="size-4" />
+                Continue with Google
+              </Button>
+            </>
+          )}
+
+          {mode === 'register' ? (
+            <p className="text-center type-body-sm text-muted-foreground">
+              Already have an account?{' '}
+              <button type="button" onClick={() => switchMode('login')} className={textButtonClass}>
+                Sign in
+              </button>
+            </p>
+          ) : null}
+        </form>
+      </AuthCard>
+
+      {mode === 'login' ? (
+        <p className="mt-6 text-balance text-center type-body-sm text-muted-foreground">
+          Need an account? Ask your DPA or fleet administrator for an invitation.
+        </p>
+      ) : null}
+    </AuthLayout>
   );
 };
 

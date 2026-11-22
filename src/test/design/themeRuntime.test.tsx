@@ -11,6 +11,7 @@ import {
   DENSITY_STORAGE_KEY,
   THEME_COLOR,
   THEME_STORAGE_KEY,
+  applyThemeColor,
   getDensity,
   hasStoredThemeChoice,
   resolveDensity,
@@ -143,6 +144,82 @@ describe('index.html first paint', () => {
     } finally {
       if (original) Object.defineProperty(window, 'localStorage', original);
     }
+  });
+});
+
+describe('theme-color metas (BUILD-PLAN S6, IA26)', () => {
+  /** The theme-color metas in document order: [media or null, content]. */
+  const themeColorMetas = [...html.matchAll(/<meta\b[^>]*name="theme-color"[^>]*>/g)].map((m) => [
+    /\bmedia="([^"]+)"/.exec(m[0])?.[1] ?? null,
+    /\bcontent="([^"]+)"/.exec(m[0])?.[1] ?? null,
+  ]);
+
+  it('keeps the script-managed meta (no media) first, then one per colour scheme', () => {
+    // Browsers use the first theme-color whose media matches: the user's
+    // choice (set by the pre-paint script) must win over the OS scheme, or a
+    // Daylight user on a dark OS gets a dark status bar.
+    expect(themeColorMetas).toEqual([
+      [null, THEME_COLOR.dark],
+      ['(prefers-color-scheme: dark)', THEME_COLOR.dark],
+      ['(prefers-color-scheme: light)', THEME_COLOR.light],
+    ]);
+  });
+
+  const addSchemeMetas = () => {
+    for (const [media, content] of [
+      ['(prefers-color-scheme: dark)', THEME_COLOR.dark],
+      ['(prefers-color-scheme: light)', THEME_COLOR.light],
+    ]) {
+      const meta = document.createElement('meta');
+      meta.setAttribute('name', 'theme-color');
+      meta.setAttribute('media', media);
+      meta.setAttribute('content', content);
+      document.head.appendChild(meta);
+    }
+  };
+  const schemeMetas = () =>
+    [...document.querySelectorAll('meta[name="theme-color"][media]')].map((m) => [m.getAttribute('media'), m.getAttribute('content')]);
+
+  it('the pre-paint script sets only the script-managed meta', () => {
+    addSchemeMetas();
+    localStorage.setItem(THEME_STORAGE_KEY, 'light');
+    runPrepaint();
+    expect(themeColor()).toBe(THEME_COLOR.light);
+    expect(schemeMetas()).toEqual([
+      ['(prefers-color-scheme: dark)', THEME_COLOR.dark],
+      ['(prefers-color-scheme: light)', THEME_COLOR.light],
+    ]);
+  });
+
+  it('applyThemeColor sets only the script-managed meta, even after the per-scheme ones', () => {
+    addSchemeMetas();
+    applyThemeColor('light');
+    expect(document.querySelector('meta[name="theme-color"]:not([media])')?.getAttribute('content')).toBe(THEME_COLOR.light);
+    applyThemeColor('dark');
+    expect(themeColor()).toBe(THEME_COLOR.dark);
+    expect(schemeMetas()).toEqual([
+      ['(prefers-color-scheme: dark)', THEME_COLOR.dark],
+      ['(prefers-color-scheme: light)', THEME_COLOR.light],
+    ]);
+  });
+
+  it('pre-paint and theme-config agree on the colours', () => {
+    expect(prepaint).toContain(`theme === 'light' ? '${THEME_COLOR.light}' : '${THEME_COLOR.dark}'`);
+    expect(prepaint).toContain('meta[name="theme-color"]:not([media])');
+  });
+
+  it('never blocks first paint on the font stylesheet (no blank screen on a slow link)', () => {
+    const fontLink = /<link\b[^>]*fonts\.googleapis\.com\/css2[^>]*>/.exec(html)?.[0] ?? '';
+    expect(fontLink).toContain('media="print"');
+    expect(fontLink).toContain(`onload="this.media='all'"`);
+    expect(html).toMatch(/<noscript>\s*<link\s+rel="stylesheet"\s+href="https:\/\/fonts\.googleapis\.com\/css2/);
+  });
+
+  it('paints the boot screen with the STORM lockup and a reduced-motion-safe progress line', () => {
+    expect(html).toMatch(/<div data-storm-placeholder class="storm-boot">/);
+    expect(html).toContain('data-storm-boot-logo');
+    expect(html).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*\.storm-boot-progress::after \{ animation: none;/);
+    expect(html).toMatch(/html\.light \.storm-boot-button \{ background: #00648F; color: #FFFFFF; \}/);
   });
 });
 

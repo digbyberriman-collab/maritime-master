@@ -174,6 +174,12 @@ export default {
           muted: "hsl(var(--signal-muted))",
         },
       },
+      // Gradients (gap/10 A.2): the sign-in hero and empty-state art only,
+      // never data surfaces or buttons. `bg-gradient-card` layers over `bg-card`.
+      backgroundImage: {
+        "gradient-primary": "var(--gradient-primary)",
+        "gradient-card": "var(--gradient-card)",
+      },
       fontFamily: {
         sans: ["Inter", ...FONT_FALLBACK],
         display: ['"Barlow Semi Condensed"', "Inter", ...FONT_FALLBACK],

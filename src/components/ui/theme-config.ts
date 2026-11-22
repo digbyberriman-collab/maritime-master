@@ -65,9 +65,13 @@ const safeSet = (key: string, value: string) => {
 /** True when this browser has never stored a theme choice (a "new device", W1). */
 export const hasStoredThemeChoice = (): boolean => isThemePreference(safeGet(THEME_STORAGE_KEY));
 
-/** Update `<meta name="theme-color">` for the resolved theme. */
+/**
+ * Update the script-managed `<meta name="theme-color">` (the one without
+ * `media`; index.html keeps it ahead of the per-scheme fallbacks, because
+ * browsers use the first match) for the resolved theme.
+ */
 export function applyThemeColor(theme: ThemeName, doc: Document = document) {
-  const meta = doc.querySelector('meta[name="theme-color"]');
+  const meta = doc.querySelector('meta[name="theme-color"]:not([media])');
   if (meta) meta.setAttribute('content', THEME_COLOR[theme]);
 }
 

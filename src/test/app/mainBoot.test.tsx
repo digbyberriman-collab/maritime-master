@@ -40,10 +40,10 @@ const tick = () => act(async () => {
 });
 
 /** Load main.tsx as a fresh page load would. */
-async function boot() {
+async function boot(placeholder = 'placeholder') {
   for (const [type, fn] of added) window.removeEventListener(type, fn);
   added = [];
-  document.body.innerHTML = '<div id="root">placeholder</div>';
+  document.body.innerHTML = `<div id="root">${placeholder}</div>`;
   const add = window.addEventListener.bind(window);
   const spy = vi.spyOn(window, 'addEventListener').mockImplementation(((
     type: string,
@@ -150,6 +150,20 @@ describe('main.tsx reload guard', () => {
     document.getElementById('storm-recovery-reload')!.click();
     expect(reloads).toBe(3);
     expect(sessionStorage.getItem(RELOAD_KEY)).toBeNull();
+  });
+
+  it('the panel reuses the boot screen STORM lockup and puts focus on Reload', async () => {
+    const lockup =
+      '<div class="storm-boot"><div class="storm-boot-lockup" data-storm-boot-logo><span class="storm-boot-mark">STORM</span></div></div>';
+    for (let i = 0; i < 3; i += 1) {
+      await boot(lockup);
+      await failChunk();
+    }
+    const panel = document.querySelector('[data-storm-recovery]');
+    expect(panel).not.toBeNull();
+    expect(panel?.querySelector('[data-storm-boot-logo]')).not.toBeNull();
+    expect(panel?.querySelector('[role="alert"]')).toHaveTextContent("We couldn't finish loading STORM");
+    expect(document.getElementById('storm-recovery-reload')).toHaveFocus();
   });
 
   it('fails closed when sessionStorage cannot be written: panel, no automatic reload', async () => {

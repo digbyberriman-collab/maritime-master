@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="32" height="32">
+  <!-- Browser-tab icon: the STORM mark on a rounded Abyss tile, glyph
+       enlarged and stroke thickened so it holds at 16 px. Same paths as
+       storm-mark.svg. -->
+  <rect width="48" height="48" rx="11" fill="#0A0E14"/>
+  <g transform="translate(24 24) scale(1.28) translate(-24 -24)">
+    <g fill="none" stroke="#00AFE6" stroke-width="4" stroke-linecap="round">
+      <path d="M24 18a6 6 0 0 1 6 6c0 8.5-6.5 13.5-15.5 13.5"/>
+      <path d="M24 30a6 6 0 0 1-6-6c0-8.5 6.5-13.5 15.5-13.5"/>
+    </g>
+    <circle cx="24" cy="24" r="2.5" fill="#00AFE6"/>
+  </g>
+</svg>

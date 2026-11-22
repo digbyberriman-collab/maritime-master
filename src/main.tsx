@@ -38,6 +38,10 @@ const readRecord = (): ReloadRecord => {
 };
 
 let reactRoot: Root | null = null;
+// The STORM lockup from index.html's static placeholder, kept for the recovery
+// panel (the placeholder itself is cleared when the app mounts). Its SVG draws
+// in currentColor; the .storm-boot classes colour it per theme.
+let bootLogoHtml = "";
 // One recovery decision per page load: a failed import can raise several of
 // the events below, and each must not count as another reload.
 let recovering = false;
@@ -53,16 +57,17 @@ const showRecoveryPanel = () => {
   }
   reactRoot = null;
   // Styled by the .storm-boot classes in index.html's head <style>, so the
-  // panel follows the theme without the app's CSS.
+  // panel follows the theme (Abyss / Daylight) without the app's CSS.
   el.innerHTML = `
-    <div class="storm-boot">
-      <div style="max-width:24rem">
-        <div class="storm-boot-mark">STORM</div>
-        <p class="storm-boot-text">We couldn't finish loading STORM. This is usually a temporary connection problem.</p>
+    <div class="storm-boot" data-storm-recovery>
+      <div class="storm-boot-inner">
+        ${bootLogoHtml || '<div class="storm-boot-mark">STORM</div>'}
+        <p class="storm-boot-text storm-boot-message" role="alert">We couldn't finish loading STORM. This is usually a temporary connection problem.</p>
         <button type="button" id="storm-recovery-reload" class="storm-boot-button">Reload</button>
       </div>
     </div>`;
-  document.getElementById("storm-recovery-reload")?.addEventListener("click", () => {
+  const reload = document.getElementById("storm-recovery-reload");
+  reload?.addEventListener("click", () => {
     try {
       sessionStorage.removeItem(RELOAD_KEY);
     } catch {
@@ -70,6 +75,8 @@ const showRecoveryPanel = () => {
     }
     window.location.reload();
   });
+  // The page under the keyboard focus is gone; put it on the one action left.
+  reload?.focus();
 };
 
 const recoverFromStaleChunk = () => {
@@ -111,6 +118,7 @@ window.addEventListener("unhandledrejection", (e) => {
 });
 
 const rootEl = document.getElementById("root")!;
+bootLogoHtml = rootEl.querySelector("[data-storm-boot-logo]")?.outerHTML ?? "";
 // Clear the static first-paint placeholder from index.html.
 rootEl.innerHTML = "";
 reactRoot = createRoot(rootEl);
