@@ -1,0 +1,118 @@
+{
+  "counts": {
+    "scenarios": 7,
+    "steps": 51
+  },
+  "description": "Status-update thread scenarios replayed by supabase/tests/sql/p4_threads through record_post_thread_entry / record_resolve_thread_request (thread status_updates). Expected codes, whose move (whoseMove()), open requests and the follow-up date (followUpDue(), as a day offset from today) after every step come from threads.ts and whoseMove.ts with today = 2026-11-23; the SQL test uses current_date and the same offsets. set_status steps put the envelope in a status directly (test setup). Actors: SG.crew1-2 (vessel), SG.admin1-2 (company). Entry ids are keyUuid(\"entry:<scenario>:<ref>\"). Regenerate with node scripts/db/gen-record-fixtures.mjs; never edit by hand.",
+  "generator": "scripts/db/gen-record-fixtures.mjs",
+  "scenarios": [
+    {
+      "description": "A company request makes it the vessel's move; the vessel replies (company's move); marking it done hands back to the status rule.",
+      "name": "request_reply_done",
+      "status": "awaiting_company_close",
+      "steps": [
+        {"actor":"SG.admin1","after":{"entries":1,"followUpOffset":3,"openRequests":1,"whoseMove":"vessel"},"body":"Send the gas test readings","dueOffset":3,"expected":{"ok":true},"op":"request","ref":"r1"},
+        {"actor":"SG.crew1","after":{"entries":2,"followUpOffset":3,"openRequests":1,"whoseMove":"company"},"body":"Readings attached","expected":{"ok":true},"op":"reply","ref":"p1","target":"r1"},
+        {"actor":"SG.admin1","after":{"entries":2,"followUpOffset":null,"openRequests":0,"whoseMove":"company"},"expected":{"ok":true},"op":"done","target":"r1"}
+      ]
+    },
+    {
+      "description": "Only the company posts requests (with a due date); only the vessel replies, and only to an open request.",
+      "name": "party_rules",
+      "status": "in_review",
+      "steps": [
+        {"actor":"SG.crew1","after":{"entries":0,"followUpOffset":null,"openRequests":0,"whoseMove":"vessel"},"body":"Can we close?","dueOffset":1,"expected":{"code":"wrong_party","ok":false},"op":"request","ref":"r0"},
+        {"actor":"SG.admin1","after":{"entries":0,"followUpOffset":null,"openRequests":0,"whoseMove":"vessel"},"body":"Photos please","expected":{"code":"invalid_date","ok":false},"op":"request","ref":"r1"},
+        {"actor":"SG.admin1","after":{"entries":1,"followUpOffset":2,"openRequests":1,"whoseMove":"vessel"},"body":"Photos please","dueOffset":2,"expected":{"ok":true},"op":"request","ref":"r2"},
+        {"actor":"SG.admin1","after":{"entries":1,"followUpOffset":2,"openRequests":1,"whoseMove":"vessel"},"body":"Company answering itself","expected":{"code":"wrong_party","ok":false},"op":"reply","ref":"p0","target":"r2"},
+        {"actor":"SG.crew2","after":{"entries":2,"followUpOffset":2,"openRequests":1,"whoseMove":"vessel"},"body":"Working on it","expected":{"ok":true},"op":"update","ref":"u1"},
+        {"actor":"SG.crew1","after":{"entries":2,"followUpOffset":2,"openRequests":1,"whoseMove":"vessel"},"body":"Not a request","expected":{"code":"not_a_request","ok":false},"op":"reply","ref":"p1","target":"u1"},
+        {"actor":"SG.crew1","after":{"entries":3,"followUpOffset":2,"openRequests":1,"whoseMove":"company"},"body":"Photos uploaded","expected":{"ok":true},"op":"reply","ref":"p2","target":"r2"},
+        {"actor":"SG.admin1","after":{"entries":3,"followUpOffset":2,"openRequests":1,"whoseMove":"company"},"expected":{"code":"reason_required","ok":false},"op":"cancel","target":"r2"},
+        {"actor":"SG.admin1","after":{"entries":3,"followUpOffset":null,"openRequests":0,"whoseMove":"vessel"},"expected":{"ok":true},"note":"No longer needed","op":"cancel","target":"r2"},
+        {"actor":"SG.crew1","after":{"entries":3,"followUpOffset":null,"openRequests":0,"whoseMove":"vessel"},"body":"Late reply","expected":{"code":"request_closed","ok":false},"op":"reply","ref":"p3","target":"r2"},
+        {"actor":"SG.admin1","after":{"entries":3,"followUpOffset":null,"openRequests":0,"whoseMove":"vessel"},"expected":{"code":"request_closed","ok":false},"op":"done","target":"r2"}
+      ]
+    },
+    {
+      "description": "Empty and over-long bodies are refused; bodies are trimmed.",
+      "name": "bodies",
+      "status": "open",
+      "steps": [
+        {"actor":"SG.crew1","after":{"entries":0,"followUpOffset":null,"openRequests":0,"whoseMove":"vessel"},"body":"   ","expected":{"code":"empty_body","ok":false},"op":"update","ref":"u0"},
+        {"actor":"SG.crew1","after":{"entries":0,"followUpOffset":null,"openRequests":0,"whoseMove":"vessel"},"body":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx","expected":{"code":"body_too_long","ok":false},"op":"update","ref":"u1"},
+        {"actor":"SG.crew1","after":{"entries":1,"followUpOffset":null,"openRequests":0,"whoseMove":"vessel"},"body":"  yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy  ","expected":{"ok":true},"op":"update","ref":"u2"}
+      ]
+    },
+    {
+      "description": "Changing a due date needs a valid new date and a reason, and a different date; the earliest open request drives the follow-up date.",
+      "name": "change_due_and_follow_up",
+      "status": "acknowledged",
+      "steps": [
+        {"actor":"SG.crew1","after":{"entries":1,"followUpOffset":10,"openRequests":0,"whoseMove":"company"},"body":"Spares ordered","expected":{"ok":true},"followUpOffset":10,"op":"update","ref":"u1"},
+        {"actor":"SG.admin1","after":{"entries":2,"followUpOffset":5,"openRequests":1,"whoseMove":"vessel"},"body":"Confirm delivery","dueOffset":5,"expected":{"ok":true},"op":"request","ref":"r1"},
+        {"actor":"SG.admin2","after":{"entries":3,"followUpOffset":5,"openRequests":2,"whoseMove":"vessel"},"body":"Confirm fitting","dueOffset":8,"expected":{"ok":true},"op":"request","ref":"r2"},
+        {"actor":"SG.admin1","after":{"entries":3,"followUpOffset":5,"openRequests":2,"whoseMove":"vessel"},"expected":{"code":"invalid_date","ok":false},"note":"Supplier delay","op":"change_date","target":"r1"},
+        {"actor":"SG.admin1","after":{"entries":3,"followUpOffset":5,"openRequests":2,"whoseMove":"vessel"},"dueOffset":9,"expected":{"code":"reason_required","ok":false},"op":"change_date","target":"r1"},
+        {"actor":"SG.admin1","after":{"entries":3,"followUpOffset":5,"openRequests":2,"whoseMove":"vessel"},"dueOffset":5,"expected":{"code":"same_date","ok":false},"note":"Same","op":"change_date","target":"r1"},
+        {"actor":"SG.crew1","after":{"entries":3,"followUpOffset":5,"openRequests":2,"whoseMove":"vessel"},"dueOffset":9,"expected":{"code":"wrong_party","ok":false},"note":"Vessel cannot move it","op":"change_date","target":"r1"},
+        {"actor":"SG.admin1","after":{"entries":3,"followUpOffset":8,"openRequests":2,"whoseMove":"vessel"},"dueOffset":9,"expected":{"ok":true},"note":"Supplier delay","op":"change_date","target":"r1"},
+        {"actor":"SG.admin2","after":{"entries":3,"followUpOffset":9,"openRequests":1,"whoseMove":"vessel"},"expected":{"ok":true},"op":"done","target":"r2"},
+        {"actor":"SG.admin1","after":{"entries":3,"followUpOffset":10,"openRequests":0,"whoseMove":"vessel"},"expected":{"ok":true},"note":"Delivered","op":"done","target":"r1"},
+        {"actor":"SG.admin1","after":{"entries":3,"followUpOffset":10,"openRequests":0,"whoseMove":"vessel"},"expected":{"code":"request_closed","ok":false},"op":"done","target":"r1"}
+      ]
+    },
+    {
+      "description": "In acknowledged, whose move goes to the side that did not post last; vessel when nobody has posted.",
+      "name": "acknowledged_last_poster",
+      "status": "acknowledged",
+      "steps": [
+        {"actor":"SG.crew1","after":{"entries":1,"followUpOffset":null,"openRequests":0,"whoseMove":"company"},"body":"Investigation started","expected":{"ok":true},"op":"update","ref":"u1"},
+        {"actor":"SG.admin1","after":{"entries":2,"followUpOffset":null,"openRequests":0,"whoseMove":"vessel"},"body":"Thanks, keep us posted","expected":{"ok":true},"op":"update","ref":"u2"},
+        {"actor":"SG.crew2","after":{"entries":3,"followUpOffset":null,"openRequests":0,"whoseMove":"company"},"body":"Root cause found","expected":{"ok":true},"op":"update","ref":"u3"},
+        {"after":{"entries":3,"followUpOffset":null,"openRequests":0,"whoseMove":"none"},"op":"set_status","status":"closed"},
+        {"after":{"entries":3,"followUpOffset":null,"openRequests":0,"whoseMove":"company"},"op":"set_status","status":"acknowledged"}
+      ]
+    },
+    {
+      "description": "Edits post a replacement: only the author, only the newest version, never a request; follow-up comes from the newest unedited update.",
+      "name": "edits",
+      "status": "in_review",
+      "steps": [
+        {"actor":"SG.crew1","after":{"entries":1,"followUpOffset":4,"openRequests":0,"whoseMove":"vessel"},"body":"Draft plan","expected":{"ok":true},"followUpOffset":4,"op":"update","ref":"u1"},
+        {"actor":"SG.crew2","after":{"entries":1,"followUpOffset":4,"openRequests":0,"whoseMove":"vessel"},"body":"Not mine to edit","expected":{"code":"not_author","ok":false},"op":"edit","ref":"e0","target":"u1"},
+        {"actor":"SG.crew1","after":{"entries":2,"followUpOffset":4,"openRequests":0,"whoseMove":"vessel"},"body":"Final plan","expected":{"ok":true},"op":"edit","ref":"e1","target":"u1"},
+        {"actor":"SG.crew1","after":{"entries":2,"followUpOffset":4,"openRequests":0,"whoseMove":"vessel"},"body":"Edit the old version","expected":{"code":"already_edited","ok":false},"op":"edit","ref":"e2","target":"u1"},
+        {"actor":"SG.crew1","after":{"entries":2,"followUpOffset":4,"openRequests":0,"whoseMove":"vessel"},"body":"  ","expected":{"code":"empty_body","ok":false},"op":"edit","ref":"e3","target":"e1"},
+        {"actor":"SG.crew1","after":{"entries":3,"followUpOffset":4,"openRequests":0,"whoseMove":"vessel"},"body":"Final plan, rev 2","expected":{"ok":true},"op":"edit","ref":"e4","target":"e1"},
+        {"actor":"SG.admin1","after":{"entries":4,"followUpOffset":2,"openRequests":1,"whoseMove":"vessel"},"body":"Add the drawings","dueOffset":2,"expected":{"ok":true},"op":"request","ref":"r1"},
+        {"actor":"SG.admin1","after":{"entries":4,"followUpOffset":2,"openRequests":1,"whoseMove":"vessel"},"body":"Add the drawings and photos","expected":{"code":"not_editable","ok":false},"op":"edit","ref":"e5","target":"r1"},
+        {"actor":"SG.admin1","after":{"entries":5,"followUpOffset":2,"openRequests":1,"whoseMove":"vessel"},"body":"Plan accepted","expected":{"ok":true},"followUpOffset":-1,"op":"update","ref":"u2"}
+      ]
+    },
+    {
+      "description": "Without open requests the status decides: submitted is the company's move, info requested the vessel's.",
+      "name": "status_wins_without_requests",
+      "status": "submitted",
+      "steps": [
+        {"actor":"SG.crew1","after":{"entries":1,"followUpOffset":null,"openRequests":0,"whoseMove":"company"},"body":"Initial report","expected":{"ok":true},"op":"update","ref":"u1"},
+        {"after":{"entries":1,"followUpOffset":null,"openRequests":0,"whoseMove":"vessel"},"op":"set_status","status":"info_requested"},
+        {"actor":"SG.admin1","after":{"entries":2,"followUpOffset":null,"openRequests":0,"whoseMove":"vessel"},"body":"See the questions","expected":{"ok":true},"op":"update","ref":"u2"},
+        {"actor":"SG.admin1","after":{"entries":3,"followUpOffset":0,"openRequests":1,"whoseMove":"vessel"},"body":"Answer the questions","dueOffset":0,"expected":{"ok":true},"op":"request","ref":"r1"},
+        {"after":{"entries":3,"followUpOffset":0,"openRequests":1,"whoseMove":"vessel"},"op":"set_status","status":"awaiting_company_close"},
+        {"actor":"SG.crew1","after":{"entries":4,"followUpOffset":0,"openRequests":1,"whoseMove":"company"},"body":"Answered","expected":{"ok":true},"op":"reply","ref":"p1","target":"r1"},
+        {"actor":"SG.admin2","after":{"entries":5,"followUpOffset":-2,"openRequests":2,"whoseMove":"vessel"},"body":"One more","dueOffset":-2,"expected":{"ok":true},"op":"request","ref":"r2"},
+        {"actor":"SG.admin1","after":{"entries":5,"followUpOffset":-2,"openRequests":1,"whoseMove":"vessel"},"expected":{"ok":true},"op":"done","target":"r1"},
+        {"actor":"SG.admin2","after":{"entries":5,"followUpOffset":null,"openRequests":0,"whoseMove":"company"},"expected":{"ok":true},"note":"Covered elsewhere","op":"cancel","target":"r2"}
+      ]
+    }
+  ],
+  "sourceSha256": {
+    "src/lib/records/dates.ts": "726e2517275916c1cc1a93b063b1e6d2fd7060f437907762367185299d7f21a3",
+    "src/lib/records/threads.ts": "b4dedb75ce7ac2763fe10637db2a38b0b31e125b3e3ec40aefc9dcd369a8f6dc",
+    "src/lib/records/types.ts": "0116bcd5621578c97c51636d611d512548566dff38e845276a4cf3d42ded5bfd",
+    "src/lib/records/whoseMove.ts": "6dc28300e4a833a8f1f8b57faf8fb513c073cc5f64eb48399a19aa9933dc9513"
+  },
+  "today": "2026-11-23",
+  "version": 1
+}

@@ -1,0 +1,43 @@
+{
+  "version": 1,
+  "description": "Upload engine policy shared by SQL and TS (Phase 2 spec §A.13, gap/08 UP1, UP2; DECISIONS C7). The 'records' bucket's file_size_limit and allowed_mime_types, the file_objects CHECK constraints and src/lib/records/services/attachments.ts must all equal these values; the SQL test (p4_files) and the TS test (src/test/lib/records/services/attachments.test.ts) both assert it.",
+  "bucket": "records",
+  "maxBytes": 52428800,
+  "mimeTypes": [
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+    "image/gif",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  ],
+  "pathPattern": "<company_id>/<vessel_id|fleet>/<module_key>/<entity_type>/<entity_id>/<uuid>-<safe_name>",
+  "safeNamePattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$",
+  "segmentPattern": "^[a-z][a-z0-9_]{0,62}$",
+  "paths": [
+    { "path": "COMPANY/VESSEL/safety/incident/ENTITY/00000000-0000-4000-8000-000000000001-photo.jpg", "valid": true },
+    { "path": "COMPANY/fleet/documents/policy/ENTITY/00000000-0000-4000-8000-000000000002-manual.pdf", "valid": true },
+    { "path": "COMPANY/VESSEL/safety/incident/ENTITY/photo.jpg", "valid": false, "why": "file segment without the uuid prefix" },
+    { "path": "COMPANY/VESSEL/Safety/incident/ENTITY/00000000-0000-4000-8000-000000000003-a.pdf", "valid": false, "why": "module segment not snake_case" },
+    { "path": "COMPANY/VESSEL/safety/incident/ENTITY/../00000000-0000-4000-8000-000000000004-a.pdf", "valid": false, "why": "extra segment / traversal" },
+    { "path": "COMPANY/VESSEL/safety/incident/ENTITY/00000000-0000-4000-8000-000000000005-.hidden", "valid": false, "why": "name starts with a dot" },
+    { "path": "OTHERCOMPANY/VESSEL/safety/incident/ENTITY/00000000-0000-4000-8000-000000000006-a.pdf", "valid": false, "why": "company prefix of another tenant" },
+    { "path": "COMPANY/VESSEL/safety/incident_report/ENTITY/00000000-0000-4000-8000-000000000013-Report_v2.final.PDF", "valid": true, "why": "snake_case entity type, dots and an upper-case extension in the name" },
+    { "path": "COMPANY/OTHERVESSEL/safety/incident/ENTITY/00000000-0000-4000-8000-000000000007-a.pdf", "valid": false, "why": "a vessel of another tenant under this company" },
+    { "path": "COMPANY/VESSEL/safety/incident/ENTITY", "valid": false, "why": "five segments (no file)" },
+    { "path": "COMPANY/VESSEL//incident/ENTITY/00000000-0000-4000-8000-000000000008-a.pdf", "valid": false, "why": "empty segment" },
+    { "path": "COMPANY/VESSEL/safety/incident/not-a-uuid/00000000-0000-4000-8000-000000000009-a.pdf", "valid": false, "why": "entity id is not a uuid" },
+    { "path": "COMPANY/VESSEL/safety/incident/ENTITY/00000000-0000-4000-8000-00000000000A-a.pdf", "valid": false, "why": "upper-case uuid in the file segment" },
+    { "path": "COMPANY/VESSEL/safety/incident/ENTITY/00000000-0000-4000-8000-000000000010-a..pdf", "valid": false, "why": "'..' inside the name" },
+    { "path": "COMPANY/VESSEL/safety/incident/ENTITY/00000000-0000-4000-8000-000000000011-_a.pdf", "valid": false, "why": "name starts with an underscore" },
+    { "path": "COMPANY/VESSEL/safety/incident/ENTITY/00000000-0000-4000-8000-000000000012-a b.pdf", "valid": false, "why": "space in the name" },
+    { "path": "COMPANY/VESSEL/safety/incident/ENTITY/00000000-0000-4000-8000-000000000014-a.pdf/extra", "valid": false, "why": "seven segments" },
+    { "path": "COMPANY/VESSEL/1safety/incident/ENTITY/00000000-0000-4000-8000-000000000015-a.pdf", "valid": false, "why": "module segment starts with a digit" },
+    { "path": "COMPANY/fleets/documents/policy/ENTITY/00000000-0000-4000-8000-000000000016-a.pdf", "valid": false, "why": "vessel segment neither a uuid nor 'fleet'" }
+  ]
+}

@@ -1,0 +1,580 @@
+{
+  "counts": {
+    "scenarios": 19,
+    "steps": 152
+  },
+  "description": "Signature-sheet scenarios replayed by supabase/tests/sql/p4_signatures through record_sign_slot / record_pass_slot / record_cancel_pass / record_remove_signature / record_resign_slot / record_transition / record_set_section_digests. Expected values come from signatures.ts (signSlot, passSlotTo, cancelPass, removeSignature, reSignSlot, startNextCycle, slotState, isSignatureStale) composed with companyStep.ts as the SQL engine composes them (see the generator header). World: company SG, vessel SG.v, SG.crew1-3, SG.master (on board), SG.admin1-2 (company actors). Eligibility is by namedProfileIds only. Signature ids are keyUuid(\"signature:<scenario>:<ref>\"), profile ids keyUuid(\"profile:<key>\"). Regenerate with node scripts/db/gen-record-fixtures.mjs; never edit by hand.",
+  "generator": "scripts/db/gen-record-fixtures.mjs",
+  "scenarios": [
+    {
+      "creator": "SG.crew1",
+      "description": "Later slots wait for the earlier required slot; signing in order completes the vessel side.",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": true,
+        "companyStep": "sign_off",
+        "decisionKind": false,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "order_and_waiting",
+      "slots": [
+        {"key":"prepared_by","label":"prepared by","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e","77939468-e893-542a-87d4-41387e249745"],"order":1,"party":"vessel"},
+        {"key":"checked_by","label":"checked by","namedProfileIds":["77939468-e893-542a-87d4-41387e249745","9145e6e1-ea2f-143b-1ab3-66c7ec20b404"],"order":2,"party":"vessel"},
+        {"key":"master","label":"master","namedProfileIds":["effac53d-efd0-bb1c-5eb5-1a7ce0d26938"],"order":3,"party":"vessel"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"digests":{"*":"d66e4a9759521ecc4757deb88d2e04dba4b32cc4254e85c84e8664d888b21c8f"},"op":"set_digests"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"expected":{"code":"slot_waiting","ok":false},"method":"verified","op":"sign","ref":"s1","slot":"master"},
+        {"actor":"SG.crew3","after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"expected":{"code":"slot_waiting","ok":false},"method":"verified","op":"sign","ref":"s2","slot":"checked_by"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s3","slot":"prepared_by"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{"checked_by":false,"prepared_by":false},"states":{"checked_by":"signed","master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s4","slot":"checked_by"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s5","slot":"master"}
+      ]
+    },
+    {
+      "creator": "SG.crew1",
+      "description": "Slots that share an order sign in parallel; an optional slot does not gate later slots.",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": true,
+        "companyStep": "sign_off",
+        "decisionKind": false,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "parallel_order_group",
+      "slots": [
+        {"key":"deck","label":"deck","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e"],"order":1,"party":"vessel"},
+        {"key":"engine","label":"engine","namedProfileIds":["77939468-e893-542a-87d4-41387e249745"],"order":1,"party":"vessel"},
+        {"key":"optional_note","label":"optional note","namedProfileIds":["9145e6e1-ea2f-143b-1ab3-66c7ec20b404"],"order":2,"party":"vessel","required":false},
+        {"key":"master","label":"master","namedProfileIds":["effac53d-efd0-bb1c-5eb5-1a7ce0d26938"],"order":3,"party":"vessel"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"deck":"open","engine":"open","master":"waiting","optional_note":"waiting"},"status":"open"},"digests":{"*":"d66e4a9759521ecc4757deb88d2e04dba4b32cc4254e85c84e8664d888b21c8f"},"op":"set_digests"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{"engine":false},"states":{"deck":"open","engine":"signed","master":"waiting","optional_note":"waiting"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s1","slot":"engine"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"engine":false},"states":{"deck":"open","engine":"signed","master":"waiting","optional_note":"waiting"},"status":"in_review"},"expected":{"code":"slot_waiting","ok":false},"method":"verified","op":"sign","ref":"s2","slot":"master"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"deck":false,"engine":false},"states":{"deck":"signed","engine":"signed","master":"open","optional_note":"open"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s3","slot":"deck"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"deck":false,"engine":false,"master":false},"states":{"deck":"signed","engine":"signed","master":"signed","optional_note":"open"},"status":"awaiting_company_close"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s4","slot":"master"},
+        {"actor":"SG.crew3","after":{"cycle":1,"stale":{"deck":false,"engine":false,"master":false,"optional_note":false},"states":{"deck":"signed","engine":"signed","master":"signed","optional_note":"signed"},"status":"awaiting_company_close"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s5","slot":"optional_note"}
+      ]
+    },
+    {
+      "creator": "SG.crew1",
+      "description": "Only the named people may sign; a Master is not eligible for a slot that names someone else.",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": true,
+        "companyStep": "sign_off",
+        "decisionKind": false,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "eligibility_named_only",
+      "slots": [
+        {"key":"prepared_by","label":"prepared by","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e","77939468-e893-542a-87d4-41387e249745"],"order":1,"party":"vessel"},
+        {"key":"checked_by","label":"checked by","namedProfileIds":["77939468-e893-542a-87d4-41387e249745","9145e6e1-ea2f-143b-1ab3-66c7ec20b404"],"order":2,"party":"vessel"},
+        {"key":"master","label":"master","namedProfileIds":["effac53d-efd0-bb1c-5eb5-1a7ce0d26938"],"order":3,"party":"vessel"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"digests":{"*":"d66e4a9759521ecc4757deb88d2e04dba4b32cc4254e85c84e8664d888b21c8f"},"op":"set_digests"},
+        {"actor":"SG.crew3","after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"expected":{"code":"not_eligible","ok":false},"method":"verified","op":"sign","ref":"s1","slot":"prepared_by"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"expected":{"code":"not_eligible","ok":false},"method":"verified","op":"sign","ref":"s2","slot":"prepared_by"},
+        {"actor":"SG.admin1","after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"expected":{"code":"not_eligible","ok":false},"method":"verified","op":"sign","ref":"s3","slot":"prepared_by"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s4","slot":"prepared_by"}
+      ]
+    },
+    {
+      "creator": "SG.crew1",
+      "description": "Re-sending the same signature id on the same slot is a no-op; reusing it elsewhere is refused.",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": true,
+        "companyStep": "sign_off",
+        "decisionKind": false,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "idempotent_replay_and_id_conflict",
+      "slots": [
+        {"key":"prepared_by","label":"prepared by","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e","77939468-e893-542a-87d4-41387e249745"],"order":1,"party":"vessel"},
+        {"key":"checked_by","label":"checked by","namedProfileIds":["77939468-e893-542a-87d4-41387e249745","9145e6e1-ea2f-143b-1ab3-66c7ec20b404"],"order":2,"party":"vessel"},
+        {"key":"master","label":"master","namedProfileIds":["effac53d-efd0-bb1c-5eb5-1a7ce0d26938"],"order":3,"party":"vessel"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"digests":{"*":"d66e4a9759521ecc4757deb88d2e04dba4b32cc4254e85c84e8664d888b21c8f"},"op":"set_digests"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s1","slot":"prepared_by"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s1","slot":"prepared_by"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"code":"invalid_input","ok":false},"method":"verified","op":"sign","ref":"s1","slot":"checked_by"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"code":"slot_signed","ok":false},"method":"verified","op":"sign","ref":"s2","slot":"prepared_by"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{"checked_by":false,"prepared_by":false},"states":{"checked_by":"signed","master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s3","slot":"checked_by"}
+      ]
+    },
+    {
+      "creator": "SG.crew1",
+      "description": "A login-as session can neither sign nor remove.",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": true,
+        "companyStep": "sign_off",
+        "decisionKind": false,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "impersonation_refused",
+      "slots": [
+        {"key":"prepared_by","label":"prepared by","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e","77939468-e893-542a-87d4-41387e249745"],"order":1,"party":"vessel"},
+        {"key":"checked_by","label":"checked by","namedProfileIds":["77939468-e893-542a-87d4-41387e249745","9145e6e1-ea2f-143b-1ab3-66c7ec20b404"],"order":2,"party":"vessel"},
+        {"key":"master","label":"master","namedProfileIds":["effac53d-efd0-bb1c-5eb5-1a7ce0d26938"],"order":3,"party":"vessel"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"digests":{"*":"d66e4a9759521ecc4757deb88d2e04dba4b32cc4254e85c84e8664d888b21c8f"},"op":"set_digests"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"expected":{"code":"impersonating","ok":false},"impersonating":true,"method":"verified","op":"sign","ref":"s1","slot":"prepared_by"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s2","slot":"prepared_by"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"code":"impersonating","ok":false},"impersonating":true,"op":"remove","reason":null,"signatureId":"3807193b-6a92-cba6-18e5-2f4a37c4165e","slot":"prepared_by"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"impersonating":true,"method":"verified","op":"sign","ref":"s2","slot":"prepared_by"}
+      ]
+    },
+    {
+      "creator": "SG.crew1",
+      "description": "Pass to an eligible person, refused for an ineligible one or a waiting / signed slot; cancel; signing clears the pass.",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": true,
+        "companyStep": "sign_off",
+        "decisionKind": false,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "pass_and_cancel",
+      "slots": [
+        {"key":"prepared_by","label":"prepared by","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e","77939468-e893-542a-87d4-41387e249745"],"order":1,"party":"vessel"},
+        {"key":"checked_by","label":"checked by","namedProfileIds":["77939468-e893-542a-87d4-41387e249745","9145e6e1-ea2f-143b-1ab3-66c7ec20b404"],"order":2,"party":"vessel"},
+        {"key":"master","label":"master","namedProfileIds":["effac53d-efd0-bb1c-5eb5-1a7ce0d26938"],"order":3,"party":"vessel"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"digests":{"*":"d66e4a9759521ecc4757deb88d2e04dba4b32cc4254e85c84e8664d888b21c8f"},"op":"set_digests"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"expected":{"code":"not_open","ok":false},"op":"pass","slot":"checked_by","to":"SG.crew2"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"expected":{"code":"not_eligible","ok":false},"op":"pass","slot":"prepared_by","to":"SG.crew3"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"requested"},"status":"open"},"expected":{"ok":true},"op":"pass","slot":"prepared_by","to":"SG.crew2"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"requested"},"status":"open"},"expected":{"code":"not_open","ok":false},"op":"pass","slot":"prepared_by","to":"SG.crew1"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"expected":{"ok":true},"op":"cancel","slot":"prepared_by"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"expected":{"code":"not_requested","ok":false},"op":"cancel","slot":"prepared_by"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"requested"},"status":"open"},"expected":{"ok":true},"op":"pass","slot":"prepared_by","to":"SG.crew2"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s1","slot":"prepared_by"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"code":"not_open","ok":false},"op":"pass","slot":"prepared_by","to":"SG.crew1"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"code":"not_requested","ok":false},"op":"cancel","slot":"checked_by"}
+      ]
+    },
+    {
+      "creator": "SG.crew1",
+      "description": "Witnessed signing: allowed slots only, a signer is required, the witness is not the signer, the signer must be eligible, visitors only where allowed.",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": true,
+        "companyStep": "sign_off",
+        "decisionKind": false,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "witnessed_rules",
+      "slots": [
+        {"key":"prepared_by","label":"prepared by","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e","77939468-e893-542a-87d4-41387e249745"],"order":1,"party":"vessel"},
+        {"allowVisitor":true,"key":"visitor_ack","label":"visitor ack","namedProfileIds":["9145e6e1-ea2f-143b-1ab3-66c7ec20b404"],"order":1,"party":"vessel","required":false},
+        {"allowWitnessed":false,"key":"no_witness","label":"no witness","namedProfileIds":["9145e6e1-ea2f-143b-1ab3-66c7ec20b404"],"order":1,"party":"vessel","required":false},
+        {"key":"master","label":"master","namedProfileIds":["effac53d-efd0-bb1c-5eb5-1a7ce0d26938"],"order":2,"party":"vessel"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"master":"waiting","no_witness":"open","prepared_by":"open","visitor_ack":"open"},"status":"open"},"digests":{"*":"d66e4a9759521ecc4757deb88d2e04dba4b32cc4254e85c84e8664d888b21c8f"},"op":"set_digests"},
+        {"actor":"SG.crew3","after":{"cycle":1,"stale":{},"states":{"master":"waiting","no_witness":"open","prepared_by":"open","visitor_ack":"open"},"status":"open"},"expected":{"code":"method_not_allowed","ok":false},"method":"witnessed","op":"sign","ref":"s1","signer":{"profile":"SG.crew3"},"slot":"no_witness"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{},"states":{"master":"waiting","no_witness":"open","prepared_by":"open","visitor_ack":"open"},"status":"open"},"expected":{"code":"witness_is_signer","ok":false},"method":"witnessed","op":"sign","ref":"s2","signer":{"profile":"SG.crew1"},"slot":"prepared_by"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{},"states":{"master":"waiting","no_witness":"open","prepared_by":"open","visitor_ack":"open"},"status":"open"},"expected":{"code":"not_eligible","ok":false},"method":"witnessed","op":"sign","ref":"s3","signer":{"profile":"SG.crew3"},"slot":"prepared_by"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{},"states":{"master":"waiting","no_witness":"open","prepared_by":"open","visitor_ack":"open"},"status":"open"},"expected":{"code":"visitor_not_allowed","ok":false},"method":"witnessed","op":"sign","ref":"s4","signer":{"visitor":"Surveyor"},"slot":"prepared_by"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"master":"open","no_witness":"open","prepared_by":"signed","visitor_ack":"open"},"status":"in_review"},"expected":{"ok":true},"method":"witnessed","op":"sign","ref":"s5","signer":{"profile":"SG.crew2"},"slot":"prepared_by"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false,"visitor_ack":false},"states":{"master":"open","no_witness":"open","prepared_by":"signed","visitor_ack":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"witnessed","op":"sign","ref":"s6","signer":{"visitor":"Class surveyor"},"slot":"visitor_ack"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"master":"open","no_witness":"open","prepared_by":"signed","visitor_ack":"open"},"status":"in_review"},"expected":{"ok":true},"op":"remove","reason":null,"signatureId":"5662731f-2a49-632f-1c7b-ca8a678c6d0b","slot":"visitor_ack"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{},"states":{"master":"waiting","no_witness":"open","prepared_by":"open","visitor_ack":"open"},"status":"open"},"expected":{"ok":true},"op":"remove","reason":null,"signatureId":"1a09343a-a8c5-c14f-32b8-a95b0cda623a","slot":"prepared_by"}
+      ]
+    },
+    {
+      "creator": "SG.crew1",
+      "description": "D-48: on-behalf signing fails closed (method not allowed where the slot does not allow it, not eligible everywhere else).",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": true,
+        "companyStep": "sign_off",
+        "decisionKind": false,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "on_behalf_refused",
+      "slots": [
+        {"key":"prepared_by","label":"prepared by","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e"],"order":1,"party":"vessel"},
+        {"allowOnBehalf":true,"key":"master","label":"master","namedProfileIds":["effac53d-efd0-bb1c-5eb5-1a7ce0d26938"],"onBehalfReasonRequired":true,"order":2,"party":"vessel"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"master":"waiting","prepared_by":"open"},"status":"open"},"digests":{"*":"d66e4a9759521ecc4757deb88d2e04dba4b32cc4254e85c84e8664d888b21c8f"},"op":"set_digests"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{},"states":{"master":"waiting","prepared_by":"open"},"status":"open"},"expected":{"code":"method_not_allowed","ok":false},"method":"on_behalf","op":"sign","reason":"Away","ref":"s1","slot":"prepared_by"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s2","slot":"prepared_by"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"code":"not_eligible","ok":false},"method":"on_behalf","op":"sign","reason":"Master ashore","ref":"s3","slot":"master"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"code":"not_eligible","ok":false},"method":"on_behalf","op":"sign","ref":"s4","slot":"master"}
+      ]
+    },
+    {
+      "creator": "SG.crew1",
+      "description": "distinctFrom: the creator cannot sign a creator-distinct slot, nor one person both of two distinct slots.",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": true,
+        "companyStep": "sign_off",
+        "decisionKind": false,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "separation_of_duties",
+      "slots": [
+        {"distinctFrom":["creator"],"key":"authority","label":"authority","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e","77939468-e893-542a-87d4-41387e249745"],"order":1,"party":"vessel"},
+        {"distinctFrom":["authority"],"key":"competent_person","label":"competent person","namedProfileIds":["77939468-e893-542a-87d4-41387e249745","9145e6e1-ea2f-143b-1ab3-66c7ec20b404"],"order":2,"party":"vessel"},
+        {"key":"master","label":"master","namedProfileIds":["effac53d-efd0-bb1c-5eb5-1a7ce0d26938"],"order":3,"party":"vessel"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"authority":"open","competent_person":"waiting","master":"waiting"},"status":"open"},"digests":{"*":"d66e4a9759521ecc4757deb88d2e04dba4b32cc4254e85c84e8664d888b21c8f"},"op":"set_digests"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{},"states":{"authority":"open","competent_person":"waiting","master":"waiting"},"status":"open"},"expected":{"code":"separation_of_duties","ok":false},"method":"verified","op":"sign","ref":"s1","slot":"authority"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{"authority":false},"states":{"authority":"signed","competent_person":"open","master":"waiting"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s2","slot":"authority"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{"authority":false},"states":{"authority":"signed","competent_person":"open","master":"waiting"},"status":"in_review"},"expected":{"code":"separation_of_duties","ok":false},"method":"verified","op":"sign","ref":"s3","slot":"competent_person"},
+        {"actor":"SG.crew3","after":{"cycle":1,"stale":{"authority":false,"competent_person":false},"states":{"authority":"signed","competent_person":"signed","master":"open"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s4","slot":"competent_person"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"authority":false,"competent_person":false},"states":{"authority":"signed","competent_person":"signed","master":"open"},"status":"in_review"},"expected":{"code":"slot_signed","ok":false},"method":"witnessed","op":"sign","ref":"s5","signer":{"profile":"SG.crew2"},"slot":"authority"}
+      ]
+    },
+    {
+      "creator": "SG.crew1",
+      "description": "Signatures are removed in reverse order, by the signer or the Master; a required removal sends later slots back to waiting and drops their passes.",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": true,
+        "companyStep": "sign_off",
+        "decisionKind": false,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "reverse_order_removal",
+      "slots": [
+        {"key":"prepared_by","label":"prepared by","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e","77939468-e893-542a-87d4-41387e249745"],"order":1,"party":"vessel"},
+        {"key":"checked_by","label":"checked by","namedProfileIds":["77939468-e893-542a-87d4-41387e249745","9145e6e1-ea2f-143b-1ab3-66c7ec20b404"],"order":2,"party":"vessel"},
+        {"key":"master","label":"master","namedProfileIds":["effac53d-efd0-bb1c-5eb5-1a7ce0d26938"],"order":3,"party":"vessel"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"digests":{"*":"d66e4a9759521ecc4757deb88d2e04dba4b32cc4254e85c84e8664d888b21c8f"},"op":"set_digests"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s1","slot":"prepared_by"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{"checked_by":false,"prepared_by":false},"states":{"checked_by":"signed","master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s2","slot":"checked_by"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"checked_by":false,"prepared_by":false},"states":{"checked_by":"signed","master":"requested","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"op":"pass","slot":"master","to":"SG.master"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"checked_by":false,"prepared_by":false},"states":{"checked_by":"signed","master":"requested","prepared_by":"signed"},"status":"in_review"},"expected":{"code":"not_latest","ok":false},"op":"remove","reason":null,"signatureId":"9edece1b-8e51-d00f-f61f-20cac8f85231","slot":"prepared_by"},
+        {"actor":"SG.crew3","after":{"cycle":1,"stale":{"checked_by":false,"prepared_by":false},"states":{"checked_by":"signed","master":"requested","prepared_by":"signed"},"status":"in_review"},"expected":{"code":"not_allowed","ok":false},"op":"remove","reason":null,"signatureId":"19377244-0abf-613a-3744-3c4a686ec3ee","slot":"checked_by"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"op":"remove","reason":null,"signatureId":"19377244-0abf-613a-3744-3c4a686ec3ee","slot":"checked_by"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"code":"not_signed","ok":false},"op":"remove","reason":null,"signatureId":"19377244-0abf-613a-3744-3c4a686ec3ee","slot":"checked_by"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"expected":{"ok":true},"op":"remove","reason":null,"signatureId":"9edece1b-8e51-d00f-f61f-20cac8f85231","slot":"prepared_by"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s3","slot":"prepared_by"},
+        {"actor":"SG.crew3","after":{"cycle":1,"stale":{"checked_by":false,"prepared_by":false},"states":{"checked_by":"signed","master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s4","slot":"checked_by"},
+        {"actor":"SG.crew3","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"op":"remove","reason":null,"signatureId":"f506d13b-840b-3fa4-7f1c-73acbf2de734","slot":"checked_by"}
+      ]
+    },
+    {
+      "creator": "SG.crew1",
+      "description": "A content change makes live signatures stale; re-sign by the same signer only, not when fresh, witnessed ones need a new ceremony; completion waits for fresh signatures.",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": true,
+        "companyStep": "sign_off",
+        "decisionKind": false,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "stale_and_resign",
+      "slots": [
+        {"key":"prepared_by","label":"prepared by","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e","77939468-e893-542a-87d4-41387e249745"],"order":1,"party":"vessel"},
+        {"key":"checked_by","label":"checked by","namedProfileIds":["77939468-e893-542a-87d4-41387e249745","9145e6e1-ea2f-143b-1ab3-66c7ec20b404"],"order":2,"party":"vessel"},
+        {"key":"master","label":"master","namedProfileIds":["effac53d-efd0-bb1c-5eb5-1a7ce0d26938"],"order":3,"party":"vessel"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"digests":{"*":"d66e4a9759521ecc4757deb88d2e04dba4b32cc4254e85c84e8664d888b21c8f"},"op":"set_digests"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s1","slot":"prepared_by"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"checked_by":false,"prepared_by":false},"states":{"checked_by":"signed","master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"witnessed","op":"sign","ref":"s2","signer":{"profile":"SG.crew3"},"slot":"checked_by"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"checked_by":false,"prepared_by":false},"states":{"checked_by":"signed","master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"code":"not_stale","ok":false},"op":"resign","ref":"s3","slot":"prepared_by"},
+        {"after":{"cycle":1,"stale":{"checked_by":true,"prepared_by":true},"states":{"checked_by":"signed","master":"open","prepared_by":"signed"},"status":"in_review"},"digests":{"*":"fab30c2020bf1101ce48bc928b3c000cf6f15225f6333d4a7e9d9d201f9a7d15"},"op":"set_digests"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{"checked_by":true,"prepared_by":true},"states":{"checked_by":"signed","master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"code":"different_signer","ok":false},"op":"resign","ref":"s4","slot":"prepared_by"},
+        {"actor":"SG.crew3","after":{"cycle":1,"stale":{"checked_by":true,"prepared_by":true},"states":{"checked_by":"signed","master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"code":"needs_ceremony","ok":false},"op":"resign","ref":"s5","slot":"checked_by"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"checked_by":true,"master":false,"prepared_by":true},"states":{"checked_by":"signed","master":"signed","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s6","slot":"master"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"checked_by":true,"master":false,"prepared_by":false},"states":{"checked_by":"signed","master":"signed","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"op":"resign","ref":"s7","slot":"prepared_by"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"checked_by":true,"master":false,"prepared_by":false},"states":{"checked_by":"signed","master":"signed","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"op":"resign","ref":"s7","slot":"prepared_by"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"checked_by":true,"prepared_by":false},"states":{"checked_by":"signed","master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"op":"remove","reason":null,"signatureId":"e0c5d938-c5ed-9c72-8b8f-63e8c4533e3a","slot":"master"},
+        {"actor":"SG.crew3","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"op":"remove","reason":null,"signatureId":"a3fa386d-bd66-6616-6740-092950743933","slot":"checked_by"},
+        {"actor":"SG.crew3","after":{"cycle":1,"stale":{"checked_by":false,"prepared_by":false},"states":{"checked_by":"signed","master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s8","slot":"checked_by"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s9","slot":"master"}
+      ]
+    },
+    {
+      "creator": "SG.crew1",
+      "description": "A slot covering one section goes stale only when that section changes.",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": true,
+        "companyStep": "sign_off",
+        "decisionKind": false,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "section_coverage",
+      "slots": [
+        {"coversSections":["hazards"],"key":"hazards","label":"hazards","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e"],"order":1,"party":"vessel"},
+        {"key":"master","label":"master","namedProfileIds":["effac53d-efd0-bb1c-5eb5-1a7ce0d26938"],"order":2,"party":"vessel"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"hazards":"open","master":"waiting"},"status":"open"},"digests":{"*":"5c93ca9063360d63f4087128dbefc0e349942c1d14e1e0dccb913b37651e0e1d","crew":"ff753a965d0cb42cb9fec9f66cda8dfba9a0668e7c2d52a036fea197f07322ab","hazards":"a7fde6a46c3df79951c8ffb94b73b1ec09e40d7a14d7e20917b642cf929f0d08"},"op":"set_digests"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"hazards":false},"states":{"hazards":"signed","master":"open"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s1","slot":"hazards"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"hazards":false,"master":false},"states":{"hazards":"signed","master":"signed"},"status":"awaiting_company_close"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s2","slot":"master"},
+        {"after":{"cycle":1,"stale":{"hazards":false,"master":true},"states":{"hazards":"signed","master":"signed"},"status":"awaiting_company_close"},"digests":{"*":"a779b54f3d3e64cfe1a37ac94bfc1799ce5e6252c72ba90b70dc8ef7540efa78","crew":"1f7890813ef94f26810282063f3f46e4139397b2cedc8b0fadb994376ad2d9ce"},"op":"set_digests"},
+        {"after":{"cycle":1,"stale":{"hazards":true,"master":true},"states":{"hazards":"signed","master":"signed"},"status":"awaiting_company_close"},"digests":{"hazards":"20ac2d5698b7fd7373049574246d0513e4ca07358daf7f6a9b3a43d1bf23345d"},"op":"set_digests"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"hazards":false,"master":true},"states":{"hazards":"signed","master":"signed"},"status":"awaiting_company_close"},"expected":{"ok":true},"op":"resign","ref":"s3","slot":"hazards"}
+      ]
+    },
+    {
+      "creator": "SG.crew1",
+      "description": "The vessel completes, the company acknowledges the cycle (D-51 lock: vessel signatures cannot be removed), signs off on the company slot; removing the company signature reopens the company step.",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": true,
+        "companyStep": "sign_off",
+        "decisionKind": false,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "company_sign_off_and_lock",
+      "slots": [
+        {"key":"prepared_by","label":"prepared by","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e","77939468-e893-542a-87d4-41387e249745"],"order":1,"party":"vessel"},
+        {"key":"checked_by","label":"checked by","namedProfileIds":["77939468-e893-542a-87d4-41387e249745","9145e6e1-ea2f-143b-1ab3-66c7ec20b404"],"order":2,"party":"vessel"},
+        {"key":"master","label":"master","namedProfileIds":["effac53d-efd0-bb1c-5eb5-1a7ce0d26938"],"order":3,"party":"vessel"},
+        {"key":"company_review","label":"company review","namedProfileIds":["23f4605c-69f5-97e0-8203-5fbd1b4e6719","5944cb36-3dab-2e67-f01c-a6b75362d399"],"order":4,"party":"company"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","company_review":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"digests":{"*":"d66e4a9759521ecc4757deb88d2e04dba4b32cc4254e85c84e8664d888b21c8f"},"op":"set_digests"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","company_review":"waiting","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s1","slot":"prepared_by"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{"checked_by":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"waiting","master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s2","slot":"checked_by"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s3","slot":"master"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"code":"reason_required","ok":false},"op":"remove","reason":null,"signatureId":"df49ac1f-366c-165c-a8e6-7ee2fa02e642","slot":"master"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"code":"slot_signed","ok":false},"method":"verified","op":"sign","ref":"s4","slot":"master"},
+        {"action":"acknowledge","actor":"SG.crew1","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"code":"wrong_party","ok":false},"op":"transition"},
+        {"action":"acknowledge","actor":"SG.admin1","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"ok":true},"op":"transition"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"code":"company_acknowledged","ok":false},"op":"remove","reason":null,"signatureId":"df49ac1f-366c-165c-a8e6-7ee2fa02e642","slot":"master"},
+        {"action":"acknowledge","actor":"SG.admin1","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"code":"already_acknowledged","ok":false},"op":"transition"},
+        {"action":"sign_off","actor":"SG.admin2","after":{"cycle":1,"stale":{"checked_by":false,"company_review":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"signed","master":"signed","prepared_by":"signed"},"status":"closed"},"expected":{"ok":true},"op":"transition"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"checked_by":false,"company_review":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"signed","master":"signed","prepared_by":"signed"},"status":"closed"},"expected":{"code":"company_acknowledged","ok":false},"op":"remove","reason":null,"signatureId":"df49ac1f-366c-165c-a8e6-7ee2fa02e642","slot":"master"},
+        {"action":"remove_company_signature","actor":"SG.admin1","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"ok":true},"op":"transition","reason":"Signed too early"},
+        {"action":"sign_off","actor":"SG.admin1","after":{"cycle":1,"stale":{"checked_by":false,"company_review":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"signed","master":"signed","prepared_by":"signed"},"status":"closed"},"expected":{"ok":true},"op":"transition"}
+      ]
+    },
+    {
+      "creator": "SG.crew1",
+      "description": "D-30: the company returns the record; vessel signatures are superseded, cycle 2 starts unlocked and unsigned, the vessel signs again, the company closes.",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": true,
+        "companyStep": "sign_off",
+        "decisionKind": false,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "return_to_vessel_new_cycle",
+      "slots": [
+        {"key":"prepared_by","label":"prepared by","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e","77939468-e893-542a-87d4-41387e249745"],"order":1,"party":"vessel"},
+        {"key":"checked_by","label":"checked by","namedProfileIds":["77939468-e893-542a-87d4-41387e249745","9145e6e1-ea2f-143b-1ab3-66c7ec20b404"],"order":2,"party":"vessel"},
+        {"key":"master","label":"master","namedProfileIds":["effac53d-efd0-bb1c-5eb5-1a7ce0d26938"],"order":3,"party":"vessel"},
+        {"key":"company_review","label":"company review","namedProfileIds":["23f4605c-69f5-97e0-8203-5fbd1b4e6719","5944cb36-3dab-2e67-f01c-a6b75362d399"],"order":4,"party":"company"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","company_review":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"digests":{"*":"d66e4a9759521ecc4757deb88d2e04dba4b32cc4254e85c84e8664d888b21c8f"},"op":"set_digests"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","company_review":"waiting","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s1","slot":"prepared_by"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{"checked_by":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"waiting","master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s2","slot":"checked_by"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s3","slot":"master"},
+        {"action":"acknowledge","actor":"SG.admin1","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"ok":true},"op":"transition"},
+        {"action":"return_to_vessel","actor":"SG.admin1","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"code":"reason_required","ok":false},"op":"transition"},
+        {"action":"return_to_vessel","actor":"SG.admin1","after":{"cycle":2,"stale":{},"states":{"checked_by":"waiting","company_review":"waiting","master":"waiting","prepared_by":"open"},"status":"info_requested"},"expected":{"ok":true},"op":"transition","reason":"Attach the risk assessment"},
+        {"actor":"SG.crew2","after":{"cycle":2,"stale":{"prepared_by":false},"states":{"checked_by":"open","company_review":"waiting","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s4","slot":"prepared_by"},
+        {"actor":"SG.crew2","after":{"cycle":2,"stale":{"prepared_by":false},"states":{"checked_by":"open","company_review":"waiting","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"code":"reason_required","ok":false},"op":"remove","reason":null,"signatureId":"3d4cf47a-5229-e86b-1c73-ea8c98ab7aac","slot":"prepared_by"},
+        {"actor":"SG.crew1","after":{"cycle":2,"stale":{"prepared_by":false},"states":{"checked_by":"open","company_review":"waiting","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"code":"slot_signed","ok":false},"method":"verified","op":"sign","ref":"s5","slot":"prepared_by"},
+        {"actor":"SG.crew3","after":{"cycle":2,"stale":{"checked_by":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"waiting","master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s6","slot":"checked_by"},
+        {"actor":"SG.master","after":{"cycle":2,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s7","slot":"master"},
+        {"action":"sign_off","actor":"SG.admin2","after":{"cycle":2,"stale":{"checked_by":false,"company_review":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"signed","master":"signed","prepared_by":"signed"},"status":"closed"},"expected":{"ok":true},"op":"transition"}
+      ]
+    },
+    {
+      "creator": "SG.crew1",
+      "description": "A decision kind: not approved returns it for cycle 2; approved with conditions closes it.",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": true,
+        "companyStep": "sign_off",
+        "decisionKind": true,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "decision_kind_not_approved",
+      "slots": [
+        {"key":"prepared_by","label":"prepared by","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e","77939468-e893-542a-87d4-41387e249745"],"order":1,"party":"vessel"},
+        {"key":"checked_by","label":"checked by","namedProfileIds":["77939468-e893-542a-87d4-41387e249745","9145e6e1-ea2f-143b-1ab3-66c7ec20b404"],"order":2,"party":"vessel"},
+        {"key":"master","label":"master","namedProfileIds":["effac53d-efd0-bb1c-5eb5-1a7ce0d26938"],"order":3,"party":"vessel"},
+        {"key":"company_review","label":"company review","namedProfileIds":["23f4605c-69f5-97e0-8203-5fbd1b4e6719","5944cb36-3dab-2e67-f01c-a6b75362d399"],"order":4,"party":"company"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","company_review":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"digests":{"*":"d66e4a9759521ecc4757deb88d2e04dba4b32cc4254e85c84e8664d888b21c8f"},"op":"set_digests"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","company_review":"waiting","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s1","slot":"prepared_by"},
+        {"actor":"SG.crew3","after":{"cycle":1,"stale":{"checked_by":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"waiting","master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s2","slot":"checked_by"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s3","slot":"master"},
+        {"action":"sign_off","actor":"SG.admin1","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"code":"not_for_kind","ok":false},"op":"transition"},
+        {"action":"decide","actor":"SG.admin1","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"decision":"not_approved","expected":{"code":"reason_required","ok":false},"op":"transition"},
+        {"action":"decide","actor":"SG.admin1","after":{"cycle":2,"stale":{},"states":{"checked_by":"waiting","company_review":"waiting","master":"waiting","prepared_by":"open"},"status":"info_requested"},"decision":"not_approved","expected":{"ok":true},"op":"transition","reason":"Gas test missing"},
+        {"actor":"SG.crew1","after":{"cycle":2,"stale":{"prepared_by":false},"states":{"checked_by":"open","company_review":"waiting","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s4","slot":"prepared_by"},
+        {"actor":"SG.crew3","after":{"cycle":2,"stale":{"checked_by":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"waiting","master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s5","slot":"checked_by"},
+        {"actor":"SG.master","after":{"cycle":2,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s6","slot":"master"},
+        {"action":"decide","actor":"SG.admin1","after":{"cycle":2,"stale":{"checked_by":false,"company_review":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"signed","master":"signed","prepared_by":"signed"},"status":"closed"},"conditions":"Fire watch for one hour","decision":"approved_with_conditions","expected":{"ok":true},"op":"transition"}
+      ]
+    },
+    {
+      "creator": "SG.crew1",
+      "description": "A stale required signature keeps the record in review when the last vessel slot signs; re-signing completes it.",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": true,
+        "companyStep": "acknowledge",
+        "decisionKind": false,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "stale_blocks_completion",
+      "slots": [
+        {"key":"prepared_by","label":"prepared by","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e"],"order":1,"party":"vessel"},
+        {"key":"master","label":"master","namedProfileIds":["effac53d-efd0-bb1c-5eb5-1a7ce0d26938"],"order":2,"party":"vessel"},
+        {"key":"company_review","label":"company review","namedProfileIds":["23f4605c-69f5-97e0-8203-5fbd1b4e6719"],"order":3,"party":"company"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"company_review":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"digests":{"*":"d66e4a9759521ecc4757deb88d2e04dba4b32cc4254e85c84e8664d888b21c8f"},"op":"set_digests"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"company_review":"waiting","master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s1","slot":"prepared_by"},
+        {"after":{"cycle":1,"stale":{"prepared_by":true},"states":{"company_review":"waiting","master":"open","prepared_by":"signed"},"status":"in_review"},"digests":{"*":"fab30c2020bf1101ce48bc928b3c000cf6f15225f6333d4a7e9d9d201f9a7d15"},"op":"set_digests"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"master":false,"prepared_by":true},"states":{"company_review":"open","master":"signed","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s2","slot":"master"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"master":false,"prepared_by":false},"states":{"company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"ok":true},"op":"resign","ref":"s3","slot":"prepared_by"},
+        {"action":"acknowledge","actor":"SG.admin1","after":{"cycle":1,"stale":{"company_review":false,"master":false,"prepared_by":false},"states":{"company_review":"signed","master":"signed","prepared_by":"signed"},"status":"closed"},"expected":{"ok":true},"op":"transition"}
+      ]
+    },
+    {
+      "creator": "SG.crew1",
+      "description": "company_step none: the last vessel slot closes the record (closed by the vessel, not locked).",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": false,
+        "companyStep": "none",
+        "decisionKind": false,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "no_company_step_closes",
+      "slots": [
+        {"key":"prepared_by","label":"prepared by","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e"],"order":1,"party":"vessel"},
+        {"key":"master","label":"master","namedProfileIds":["effac53d-efd0-bb1c-5eb5-1a7ce0d26938"],"order":2,"party":"vessel"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"master":"waiting","prepared_by":"open"},"status":"open"},"digests":{"*":"d66e4a9759521ecc4757deb88d2e04dba4b32cc4254e85c84e8664d888b21c8f"},"op":"set_digests"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s1","slot":"prepared_by"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"master":false,"prepared_by":false},"states":{"master":"signed","prepared_by":"signed"},"status":"closed"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s2","slot":"master"}
+      ]
+    },
+    {
+      "creator": "SG.crew1",
+      "description": "A company slot: only its named company people, never witnessed (company slots default to no witness), removed by a company actor.",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": true,
+        "companyStep": "sign_off",
+        "decisionKind": false,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "company_slot_rules",
+      "slots": [
+        {"key":"prepared_by","label":"prepared by","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e"],"order":1,"party":"vessel"},
+        {"key":"company_review","label":"company review","namedProfileIds":["23f4605c-69f5-97e0-8203-5fbd1b4e6719"],"order":2,"party":"company"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"company_review":"waiting","prepared_by":"open"},"status":"open"},"digests":{"*":"d66e4a9759521ecc4757deb88d2e04dba4b32cc4254e85c84e8664d888b21c8f"},"op":"set_digests"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"company_review":"open","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s1","slot":"prepared_by"},
+        {"actor":"SG.admin2","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"company_review":"open","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"code":"not_eligible","ok":false},"method":"verified","op":"sign","ref":"s2","slot":"company_review"},
+        {"actor":"SG.admin2","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"company_review":"open","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"code":"method_not_allowed","ok":false},"method":"witnessed","op":"sign","ref":"s3","signer":{"profile":"SG.admin1"},"slot":"company_review"},
+        {"actor":"SG.admin1","after":{"cycle":1,"stale":{"company_review":false,"prepared_by":false},"states":{"company_review":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s4","slot":"company_review"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"company_review":false,"prepared_by":false},"states":{"company_review":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"code":"not_allowed","ok":false},"op":"remove","reason":null,"signatureId":"85b51043-624a-c2d9-b775-4c5c7fba6202","slot":"company_review"},
+        {"actor":"SG.admin2","after":{"cycle":1,"stale":{"company_review":false,"prepared_by":false},"states":{"company_review":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"code":"reason_required","ok":false},"op":"remove","reason":null,"signatureId":"85b51043-624a-c2d9-b775-4c5c7fba6202","slot":"company_review"}
+      ]
+    },
+    {
+      "creator": "SG.crew1",
+      "description": "Once submitted to the company, removing a signature needs a reason (while the cycle is not acknowledged).",
+      "kind": {
+        "allowCloseAs": false,
+        "allowReopen": true,
+        "companyStep": "sign_off",
+        "decisionKind": false,
+        "deleteRule": "draft_only",
+        "reportFirst": false
+      },
+      "name": "submitted_removal_needs_reason",
+      "slots": [
+        {"key":"prepared_by","label":"prepared by","namedProfileIds":["273468d8-1726-666c-46fe-c17637af7a0e","77939468-e893-542a-87d4-41387e249745"],"order":1,"party":"vessel"},
+        {"key":"checked_by","label":"checked by","namedProfileIds":["77939468-e893-542a-87d4-41387e249745","9145e6e1-ea2f-143b-1ab3-66c7ec20b404"],"order":2,"party":"vessel"},
+        {"key":"master","label":"master","namedProfileIds":["effac53d-efd0-bb1c-5eb5-1a7ce0d26938"],"order":3,"party":"vessel"},
+        {"key":"company_review","label":"company review","namedProfileIds":["23f4605c-69f5-97e0-8203-5fbd1b4e6719","5944cb36-3dab-2e67-f01c-a6b75362d399"],"order":4,"party":"company"}
+      ],
+      "steps": [
+        {"after":{"cycle":1,"stale":{},"states":{"checked_by":"waiting","company_review":"waiting","master":"waiting","prepared_by":"open"},"status":"open"},"digests":{"*":"d66e4a9759521ecc4757deb88d2e04dba4b32cc4254e85c84e8664d888b21c8f"},"op":"set_digests"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"checked_by":"open","company_review":"waiting","master":"waiting","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s1","slot":"prepared_by"},
+        {"actor":"SG.crew2","after":{"cycle":1,"stale":{"checked_by":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"waiting","master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s2","slot":"checked_by"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s3","slot":"master"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"code":"reason_required","ok":false},"op":"remove","reason":null,"signatureId":"f6e8b040-eda0-39b2-9a27-3357e46bf044","slot":"master"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"checked_by":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"waiting","master":"open","prepared_by":"signed"},"status":"in_review"},"expected":{"ok":true},"op":"remove","reason":"Wrong date on the sheet","signatureId":"f6e8b040-eda0-39b2-9a27-3357e46bf044","slot":"master"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"checked_by":false,"master":false,"prepared_by":false},"states":{"checked_by":"signed","company_review":"open","master":"signed","prepared_by":"signed"},"status":"awaiting_company_close"},"expected":{"ok":true},"method":"verified","op":"sign","ref":"s4","slot":"master"}
+      ]
+    }
+  ],
+  "sourceSha256": {
+    "src/lib/records/companyStep.ts": "f8649873163df4222de352c6395789696e8840c9ec9533ff1bfd5c51ce371373",
+    "src/lib/records/signatures.ts": "c78a5463d645c65a9098eaaddeee6825c1ffbefe468ce68e02c063da06bdb873",
+    "src/lib/records/types.ts": "0116bcd5621578c97c51636d611d512548566dff38e845276a4cf3d42ded5bfd"
+  },
+  "version": 1,
+  "world": {
+    "company": "SG",
+    "people": {
+      "SG.admin1": {
+        "name": "Admin one",
+        "role": "admin"
+      },
+      "SG.admin2": {
+        "name": "Admin two",
+        "role": "admin"
+      },
+      "SG.crew1": {
+        "name": "Crew one",
+        "role": "crew"
+      },
+      "SG.crew2": {
+        "name": "Crew two",
+        "role": "crew"
+      },
+      "SG.crew3": {
+        "name": "Crew three",
+        "role": "crew"
+      },
+      "SG.master": {
+        "name": "Master",
+        "role": "master"
+      }
+    },
+    "vessel": "SG.v"
+  }
+}
