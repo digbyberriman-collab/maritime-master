@@ -55,3 +55,75 @@ jobs:
         env:
           VITE_SUPABASE_URL: https://example.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+
+  # Phase 2 DB harness (scripts/db/README.md): a throwaway PostgreSQL cluster
+  # with a Supabase stub, the legacy replay, the fidelity check against
+  # types.ts, the build-out migrations applied twice, the pending-type
+  # contract check and the SQL tests. The live Supabase is never contacted.
+  # The runner is not root, so the harness runs PostgreSQL as itself.
+  db:
+    name: Database harness
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: PostgreSQL binaries
+        run: |
+          if ls -d /usr/lib/postgresql/*/bin >/dev/null 2>&1; then
+            ls -d /usr/lib/postgresql/*/bin
+          else
+            sudo apt-get update
+            sudo apt-get install -y postgresql
+          fi
+
+      - name: Harness unit tests
+        run: npm run test:db:unit
+
+      - name: Generated SQL/TS fixtures are up to date
+        run: npm run test:fixtures
+
+      - name: Harness (replay, fidelity, build-out twice, contract, SQL tests)
+        run: npm run test:db -- --report "$RUNNER_TEMP/storm-db-report.json"
+
+      - name: Harness report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: storm-db-report
+          path: ${{ runner.temp }}/storm-db-report.json
+          if-no-files-found: ignore
+
+  # Edge functions (D-129, D-130): deno check of _shared and every function on
+  # npm:/jsr: specifiers, a verify_jwt entry for every function, the edge
+  # check script's own tests, and deno test with the functions config.
+  edge:
+    name: Edge functions
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Edge check script tests
+        run: node --test scripts/edge/check.test.mjs
+
+      - name: deno check and verify_jwt policy
+        run: npm run check:edge
+
+      - name: deno lint (migrated functions)
+        run: npx -y deno@2.9.6 lint --config supabase/functions/deno.json supabase/functions/_shared supabase/functions/send-invitation supabase/functions/accept-invitation supabase/functions/bulk-invite supabase/functions/admin-actions supabase/functions/send-email
+
+      - name: deno test
+        run: npm run test:edge
