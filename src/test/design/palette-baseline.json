@@ -1,6 +1,6 @@
 {
   "$comment": "Palette ratchet baseline (gap/10 DS21). Counts of raw palette classes, hex literals and dark: variants per file. Counts may only go down: lower them with `node scripts/design/palette-ratchet.mjs --write`. New files must be at zero.",
-  "totals": {"palette": 1704, "hex": 82, "dark": 88, "files": 224},
+  "totals": {"palette": 1703, "hex": 82, "dark": 88, "files": 223},
   "files": {
     "src/modules/analytics/components/SeverityMatrix.tsx": { "palette": 1, "hex": 0, "dark": 0 },
     "src/modules/audits/components/AuditCalendarTab.tsx": { "palette": 9, "hex": 0, "dark": 0 },
@@ -20,7 +20,6 @@
     "src/modules/crew/components/CrewAttachments.tsx": { "palette": 2, "hex": 0, "dark": 0 },
     "src/modules/crew/components/CrewAuditLog.tsx": { "palette": 19, "hex": 0, "dark": 0 },
     "src/modules/crew/components/CrewCertificates.tsx": { "palette": 15, "hex": 0, "dark": 0 },
-    "src/modules/crew/components/CrewFormModal.tsx": { "palette": 1, "hex": 0, "dark": 0 },
     "src/modules/crew/leaveConstants.ts": { "palette": 0, "hex": 22, "dark": 0 },
     "src/modules/crew/pages/CrewDashboard.tsx": { "palette": 6, "hex": 0, "dark": 0 },
     "src/modules/crew/pages/CrewTasksPage.tsx": { "palette": 18, "hex": 0, "dark": 0 },
