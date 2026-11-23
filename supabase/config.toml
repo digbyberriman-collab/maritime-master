@@ -1,76 +1,125 @@
 project_id = "pfvtrtkqkvjbnbaabgpv"
 
-[functions.extract-flight-data]
-verify_jwt = false
+# verify_jwt policy (Phase 2 spec §C.2; proposed D-129). Every function has an
+# explicit entry so the policy is visible in review.
+#
+#   verify_jwt = true   called by signed-in users (or, for send-email, by other
+#                       functions with the service-role key). The gateway
+#                       rejects requests without a valid JWT. It is a second
+#                       layer only: a valid anon key is also a JWT, so every
+#                       function still checks its caller in code
+#                       (`_shared/auth.ts` getAuthContext, or its own check).
+#   verify_jwt = false  only for public token flows, webhooks and machine
+#                       callers that authenticate themselves in code (API key,
+#                       webhook secret, system key, cron secret).
+#
+# A new function called by signed-in users needs verify_jwt = true here too.
 
-[functions.create-crew-member]
-verify_jwt = false
-
+# Public token flow before sign-in: token lookup, per-IP and per-token rate
+# limits, constant-time token compare (legacy: nothing issues tokens today).
 [functions.accept-invitation]
 verify_jwt = false
 
-[functions.send-invitation]
-verify_jwt = false
+# Signed-in admins: getAuthContext + assertCapability('admin.access.users_access.admin').
+[functions.admin-actions]
+verify_jwt = true
 
-[functions.bulk-invite]
-verify_jwt = false
+# Signed-in users. No in-code auth yet (paid AI API): followup to add getAuthContext.
+[functions.ai-route-planner]
+verify_jwt = true
 
-[functions.notify-shipping-master]
-verify_jwt = false
+# Signed-in admins; checks its own user in code.
+[functions.airtable-sync]
+verify_jwt = true
 
-[functions.send-to-agent]
-verify_jwt = false
-
-[functions.generate-travel-letter]
-verify_jwt = false
-
-[functions.submit-form]
-verify_jwt = false
-
-[functions.complete-drill]
-verify_jwt = false
-
-[functions.update-familiarization]
-verify_jwt = false
-
-[functions.review-certificate]
-verify_jwt = false
-
-[functions.external-api]
-verify_jwt = false
-
+# Cron with x-system-key (not a JWT) as well as users; the system key is checked in code.
 [functions.ais-refresh]
 verify_jwt = false
 
+# Signed-in admins / masters: getAuthContext + assertCapability('admin.access.users_access.assign').
+[functions.bulk-invite]
+verify_jwt = true
+
+# Signed-in users; own getUser check in code.
+[functions.complete-drill]
+verify_jwt = true
+
+# Signed-in admins; own getUser check. Followup: capability check and role derived from position.
+[functions.create-crew-member]
+verify_jwt = true
+
+# External systems with x-api-key (not a JWT); the API key is checked in code.
+[functions.external-api]
+verify_jwt = false
+
+# Signed-in users. SECURITY followup: no in-code auth and it reads storage with
+# the service role; add getAuthContext and a path check.
+[functions.extract-flight-data]
+verify_jwt = true
+
+# Signed-in users. Followup: in-code auth.
+[functions.extract-form-fields]
+verify_jwt = true
+
+# Signed-in users; own getClaims check in code.
+[functions.generate-travel-letter]
+verify_jwt = true
+
+# Signed-in users (geocoding proxy). Followup: in-code auth.
+[functions.geocode-search]
+verify_jwt = true
+
+# Cron with a shared secret / service key, checked in code.
+[functions.hr-daily-sweeper]
+verify_jwt = false
+
+# Cron with x-system-key (not a JWT) as well as users; the system key is checked in code.
 [functions.idea-sync]
 verify_jwt = false
 
-[functions.send-email]
-verify_jwt = false
-
-[functions.parse-crew-csv]
-verify_jwt = false
-
-[functions.update-crew-assignment]
-verify_jwt = false
-
-[functions.extract-form-fields]
-verify_jwt = false
-
+# Webhooks: x-webhook-secret / signature checked in code.
 [functions.inbound-webhook]
 verify_jwt = false
 
-[functions.admin-actions]
-verify_jwt = false
+# Signed-in users; own getClaims check in code.
+[functions.notify-shipping-master]
+verify_jwt = true
 
-[functions.geocode-search]
-verify_jwt = false
+# Signed-in admins; own getUser check in code.
+[functions.parse-crew-csv]
+verify_jwt = true
 
-[functions.airtable-sync]
-verify_jwt = false
+# Signed-in users; own getUser check in code. (Entry added: it had none, so the
+# gateway default applied silently.)
+[functions.pt-exercise-import]
+verify_jwt = true
 
-[functions.ai-route-planner]
-verify_jwt = false
+# Signed-in users; own getUser check in code.
+[functions.review-certificate]
+verify_jwt = true
 
-[functions.hr-daily-sweeper]
-verify_jwt = false
+# Internal: other functions with the service-role key only. In code: the bearer
+# must equal SUPABASE_SERVICE_ROLE_KEY (constant-time), caller from / cc / bcc
+# dropped, fixed sender, escaped variables. No browser caller exists.
+[functions.send-email]
+verify_jwt = true
+
+# Signed-in admins / masters: getAuthContext + assertCapability('admin.access.users_access.assign').
+[functions.send-invitation]
+verify_jwt = true
+
+# Signed-in users; own getClaims check in code.
+[functions.send-to-agent]
+verify_jwt = true
+
+# Dead: no client call (gap/08 says delete). Followup: remove the source and undeploy.
+[functions.submit-form]
+verify_jwt = true
+
+# Signed-in admins; own getUser check in code.
+[functions.update-crew-assignment]
+verify_jwt = true
+
+# Signed-in users; own getUser check in code.
+[functions.update-familiarization]
+verify_jwt = true
