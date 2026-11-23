@@ -55,10 +55,35 @@ In version order. *Lovable copy* is the UUID-named file that carries the same st
 | 25 | `20260919210000_ism_form_workflow.sql` | applied | `form_submission_counters`, 7 `form_*` functions and both `signing_cycle` columns are in `types.ts`. | — | **Not idempotent:** it drops the old update policy by its old name and creates `"Users can update their own submissions"` without dropping that name first, so a second run fails. Never re-run. |
 | 26 | `20260919220000_reference_numbers.sql` | applied | Copy matches 100 %. | `20260925192821_a80c3990-da9f-454b-a717-648e00af254d.sql` | |
 | 27 | `20260927120000_wire_crew_flags_into_frp_access.sql` | unknown | Replaces `frp_can_edit` / `frp_can_view` with the same signatures; no copy. | — | Makes the `crew.*` flags in Users & Access take effect in the leave and rotation planner. Check query E. Idempotent. |
+| 28 | `20261123000100_platform_vessel_tenancy.sql` | written, not applied | `vessels.code` and the other seven P1 columns are not in `types.ts`; no copy. Verified on the DB harness (23 Nov 2026): legacy replay, build-out pass 1 and pass 2, and its SQL tests green. (`p1_vessel_tenancy`). | — | P1 (D-03, D-25; spec §A.1): vessel codes backfilled with the client derivation, set-code and Sold ⇔ archived triggers. Idempotent. Check query G. After the apply, review organisational pseudo-vessels (`is_counted`, `lifecycle_status`) and the codes users see (spec §G 2). |
+| 29 | `20261123000200_platform_user_preferences.sql` | written, not applied | `user_preferences.density` and `show_roadmap` are not in `types.ts`; no copy. Verified on the DB harness (23 Nov 2026): legacy replay, build-out pass 1 and pass 2, and its SQL tests green. (`p2_user_preferences`). | — | D-19, D-29, D-69: density and roadmap preference columns; theme default `dark`. Existing rows untouched. Idempotent. Check query H. |
+| 30 | `20261123000300_platform_account_memberships.sql` | written, not applied | `account_memberships`, `account_membership_vessels`, `user_is_active` and the reach functions are not in `types.ts`; no copy. Verified on the DB harness (23 Nov 2026): legacy replay, build-out pass 1 and pass 2, and its SQL tests green. (`p2_memberships`, `p2_reach`: 22/22 users). | — | P2 (spec §A.3): memberships, the disabled-user status, internal and caller-checked reach helpers, profile sync, legacy-managed backfill. **Needs rows 12 and 23 live first** (its guard refuses otherwise: check queries A and D). Idempotent. Check query I. |
+| 31 | `20261123000400_platform_capabilities.sql` | written, not applied | `has_capability` and `is_company_actor` are not in `types.ts`; no copy. Verified on the DB harness (23 Nov 2026): legacy replay, build-out pass 1 and pass 2, and its SQL tests green. (`p2_capabilities`). | — | Server capability check (spec §A.4): seven keys, `user_roles` rows count only for the user's own company (CC-5), admin read policies on memberships. Idempotent. Check query J. |
+| 32 | `20261123000500_platform_module_settings.sql` | written, not applied | `vessel_module_settings`, `company_module_settings` and `module_enabled` are not in `types.ts`; no copy. Verified on the DB harness (23 Nov 2026): legacy replay, build-out pass 1 and pass 2, and its SQL tests green. (`p2_module_settings`). | — | P2 (spec §A.5; D-63, D-86, C13): per-vessel / per-company module flags, reach reads, fleet-admin writes, `module_enabled()` mirrors the client resolver. Idempotent. Check query K. |
+| 33 | `20261123000600_platform_format_reference.sql` | written, not applied | `format_reference` and the formatters are not in `types.ts`; no copy. Verified on the DB harness (23 Nov 2026): legacy replay, build-out pass 1 and pass 2, and its SQL tests green. (`p2_reference`). | — | P2 (spec §A.6; C21, D-126): references on the live `reference_counters`; allocation is service role only. Idempotent. Check query L. |
+| 34 | `20261123010000_platform_user_status.sql` | written, not applied | Redefines live helpers (unchanged signatures) and two policies, adds `set_membership_status` / `auth_user_id_for_email` (not in `types.ts`); no copy. Verified on the DB harness (23 Nov 2026): legacy replay, build-out pass 1 and pass 2, and its SQL tests green (`p3_user_status`: the disabled-user matrix, the policy inventory). | — | P3 (spec §A.7; D-122): `user_belongs_to_company`, `get_user_company_id`, `my_profile_id`, `current_user_company_id`, `has_role`, `has_any_role`, `legacy_profile_role` and the own-row profile policies deny a disabled user; no self change of role / status / company / login; W7 guards on `set_membership_status`. **Changes every policy in the app:** apply in a quiet window, then run the two-company sign-in check and sign in as a disabled test user. Needs rows 12 and 23 live (its guard refuses otherwise). Idempotent. Check query M. |
+| 35 | `20261123010100_platform_access_rls.sql` | written, not applied | `user_permission_overrides.company_id` / `vessel_id` and `permission_audit_log.company_id` are not in `types.ts`; no copy. Verified on the DB harness (23 Nov 2026): legacy replay, build-out pass 1 and pass 2, and its SQL tests green (`p3_access_rls`: vessel reads per persona, no self-escalation, one `log_permission_change`). | — | P3 (spec §A.8; D-25, D-124): vessel reads by reach (writes admin-only), role definitions frozen to the service role, `rbac_user_roles` / overrides / `user_roles` company-scoped with rank caps, audited by trigger; the audit log has no browser insert path. **Needs P1 (row 28) first:** its guard refuses otherwise (D-25). Idempotent. Check query N. |
+| 36 | `20261123010200_platform_user_invitations.sql` | written, not applied | `user_invitations` and `revoke_invitation` are not in `types.ts`; no copy. Verified on the DB harness (23 Nov 2026): legacy replay, build-out pass 1 and pass 2, and its SQL tests green (`p3_invitations`). | — | P3 (spec §A.9; D-121): honest invitation status (sent only after a send that worked), legacy invited profiles backfilled as pending / `legacy_unverified`. Idempotent. Check query O. |
+| 37 | `20261123020000_platform_record_registry.sql` | written, not applied | `record_kinds`, `record_envelopes`, `record_events`, `record_snapshots` and `record_transition` are not in `types.ts`; no copy. Verified on the DB harness (23 Nov 2026): legacy replay, build-out pass 1 and pass 2, and its SQL tests green (`p4_registry`: `record_transition_decide` = `transitionEnvelope` on 100 % of `record-transitions.json`, the D-51 lock on 100 % of `record-vessel-lock.json`). | — | P4 record engine, unit 1 of 3 (spec §A.10; D-132): **apply rows 37, 38 and 39 together, in order, in one sitting** (CC-18). Status changes only through the engine (a trigger refuses any other status write, for every role). Idempotent. Check query P. |
+| 38 | `20261123020100_platform_record_signatures.sql` | written, not applied | `record_signature_slots`, `record_signatures`, the `record_signature_slot_states` view and `record_sign_slot` are not in `types.ts`; no copy. Verified on the DB harness (23 Nov 2026): legacy replay, build-out pass 1 and pass 2, and its SQL tests green (`p4_signatures`: every scenario of `record-signature-scenarios.json`). | — | P4 record engine, unit 2 of 3 (spec §A.11; D-48, D-51): ordered slots, sign / pass / remove / re-sign, on-behalf refused. With rows 37 and 39 in one sitting. Idempotent. Check query Q. |
+| 39 | `20261123020200_platform_record_threads.sql` | written, not applied | `record_threads`, `record_thread_entries` and `record_post_thread_entry` are not in `types.ts`; no copy. Verified on the DB harness (23 Nov 2026): legacy replay, build-out pass 1 and pass 2, and its SQL tests green (`p4_threads`: every scenario of `record-thread-scenarios.json`, the engine integration tests). | — | P4 record engine, unit 3 of 3 (spec §A.12): status-update threads, whose move and follow-up dates. With rows 37 and 38 in one sitting. Idempotent. Check query R. |
+| 40 | `20261123020300_platform_record_files.sql` | written, not applied | `file_objects`, `record_attachments`, `record_links`, `storage_path_allowed` and `register_file_object` are not in `types.ts`; no copy. Verified on the DB harness (23 Nov 2026): legacy replay, build-out pass 1 and pass 2, and its SQL tests green (`p4_files`: the bucket equals `upload-policy.json`, every path case, cross-tenant upload and read refused, the stored object required, attach to a closed record refused). | — | P4 files and links (spec §A.13; C7, C8): the private `records` bucket (50 MB, MIME allow-list) and its `records_select` / `records_insert` storage policies, file registration, attachments, generic links. Needs rows 37–39 (its guard refuses otherwise). Idempotent. Check query S. |
+| 41 | `20261123020400_platform_export_jobs.sql` | written, not applied | `export_jobs`, `request_export` and `export_job_transition` are not in `types.ts`; no copy. Verified on the DB harness (23 Nov 2026): legacy replay, build-out pass 1 and pass 2, and its SQL tests green (`p4_exports`: every legal and illegal pair of the machine, a client can never set ready). | — | P4 exports (spec §A.14; C10): server jobs queued and moved only by the service-role machine, browser exports logged before the download. `export_downloads` comes with the export builder (C10, deferred). Needs rows 37–39. Idempotent. Check query T. |
+| 42 | `20261123030000_platform_notification_outbox.sql` | written, not applied | `notification_outbox`, `notification_inbox`, `emit_notification_event` and `notification_inbox_mark_all_read` are not in `types.ts`; no copy. Verified on the DB harness (23 Nov 2026): legacy replay, build-out pass 1 and pass 2, and its SQL tests green (`p5_notifications`: recipients through the internal reach functions, no cross-tenant / disabled / no-reach / actor delivery, the fan-out failure path, an emit failure keeps the engine transition; `zz_platform`: the ACL inventory of all 15 files). | — | P5 (spec §A.15; D-62, proposed D-127, D-128): outbox and per-user inbox (own rows; only `read_at` / `archived_at` writable), inline fan-out with a retry processor, the `record_events` emit trigger, the engine notification types seeded into `notification_types`, the inbox added to `supabase_realtime`. **Apply last** (needs rows 37–41). Idempotent. Check query U. |
 
 ## Apply queue
 
 What the product owner should do, in this order (version order). Run the check query first: if it shows the change is already live, mark the row `applied` and skip the file.
+
+Dependencies of the Phase 2 files (orders 6–20; each file also asserts its prerequisites in a leading `DO` block and refuses to run without them, D-138):
+
+- legacy rows 12 (`hris_review_fixes`) and 23 (`signup_backstop`), orders 1 and 4, are live (check queries A and D) **before order 8** (file 3); files 3 and 7 refuse to run otherwise;
+- P1 (order 6, file 1) before order 13 (file 8): vessel RLS tightens only once every vessel has its code (D-25), enforced by file 8's guard;
+- orders 8 and 9 (files 3–4, the reach and capability helpers) before every file whose policies call them (orders 10–20);
+- order 11 (file 6, references) before order 15 (file 10, which allocates record references);
+- orders 15–17 (files 10–12) are **one unit**: apply them together, in order, in one sitting (CC-18);
+- orders 18 and 19 (files 13–14) after the unit; order 20 (file 15) **last** (it adds the `record_events` emit trigger and reads `export_jobs`);
+- order 12 (file 7) changes `user_belongs_to_company`, `has_role`, `has_any_role` and the own-row profile policies for the whole app: apply it in a quiet window, then run the two-company sign-in check and sign in as a disabled test user.
 
 | Order | File | Check first | If not live |
 |---|---|---|---|
@@ -67,6 +92,21 @@ What the product owner should do, in this order (version order). Run the check q
 | 3 | `20260919170000_nb_company_scope.sql` | Query C | Apply. Security fix. |
 | 4 | `20260919170100_signup_backstop.sql` | Query D | Apply. Security fix; also switch off public sign-up in Supabase Auth. |
 | 5 | `20260927120000_wire_crew_flags_into_frp_access.sql` | Query E | Apply. |
+| 6 | `20261123000100_platform_vessel_tenancy.sql` | Query G | Apply (Phase 2 file 1, P1). Then review the backfilled codes and pseudo-vessels (spec §G 2). |
+| 7 | `20261123000200_platform_user_preferences.sql` | Query H | Apply (Phase 2 file 2). |
+| 8 | `20261123000300_platform_account_memberships.sql` | Query I | Apply only after orders 1 and 4 (rows 12 and 23) are live: the file refuses to run otherwise (Phase 2 file 3). |
+| 9 | `20261123000400_platform_capabilities.sql` | Query J | Apply (Phase 2 file 4). |
+| 10 | `20261123000500_platform_module_settings.sql` | Query K | Apply (Phase 2 file 5). |
+| 11 | `20261123000600_platform_format_reference.sql` | Query L | Apply (Phase 2 file 6). |
+| 12 | `20261123010000_platform_user_status.sql` | Query M | Apply in a quiet window, only after orders 1, 4 and 8 (Phase 2 file 7): it changes `user_belongs_to_company`, `has_role` and `has_any_role` for every policy. Then sign in as users of two companies (each sees only its own data) and as a disabled test user (the "access disabled" screen). |
+| 13 | `20261123010100_platform_access_rls.sql` | Query N | Apply only after order 6 (P1, D-25); the file refuses otherwise (Phase 2 file 8). Vessel writes become admin-only and the Roles & Permissions matrix read-only. |
+| 14 | `20261123010200_platform_user_invitations.sql` | Query O | Apply (Phase 2 file 9). |
+| 15 | `20261123020000_platform_record_registry.sql` | Query P | Apply orders 15, 16 and 17 together, in this order, in one sitting (Phase 2 files 10–12, the record engine unit). |
+| 16 | `20261123020100_platform_record_signatures.sql` | Query Q | Apply right after order 15. |
+| 17 | `20261123020200_platform_record_threads.sql` | Query R | Apply right after order 16. |
+| 18 | `20261123020300_platform_record_files.sql` | Query S | Apply after orders 15–17 (Phase 2 file 13): the private `records` bucket and its storage policies, file registration, attachments and links. |
+| 19 | `20261123020400_platform_export_jobs.sql` | Query T | Apply after order 18 (Phase 2 file 14). |
+| 20 | `20261123030000_platform_notification_outbox.sql` | Query U | Apply last (Phase 2 file 15): the outbox, the inbox (with realtime) and the record-engine emit trigger. Then sign in, open the bell and confirm the inbox loads (empty is fine). |
 | — | `20260228120000_create_feedback_submissions.sql` | Query F | Hold until X6 decides (R3). Apply once only if Quick feedback must work before Support exists. |
 
 Check queries (read-only; run in the Supabase SQL editor):
@@ -91,6 +131,67 @@ SELECT position('crew.edit_crew_profiles' IN pg_get_functiondef('public.frp_can_
 
 -- F. create_feedback_submissions: true means applied.
 SELECT to_regclass('public.feedback_submissions') IS NOT NULL AS applied;
+
+-- G. platform_vessel_tenancy (Phase 2 file 1): true means applied.
+SELECT count(*) = 8 AS applied FROM information_schema.columns
+ WHERE table_schema = 'public' AND table_name = 'vessels'
+   AND column_name IN ('code', 'short_code', 'lifecycle_status', 'is_counted', 'vessel_purpose', 'archived_at', 'archived_by', 'archive_reason');
+
+-- H. platform_user_preferences (Phase 2 file 2): true means applied.
+SELECT count(*) = 2 AS applied FROM information_schema.columns
+ WHERE table_schema = 'public' AND table_name = 'user_preferences' AND column_name IN ('density', 'show_roadmap');
+
+-- I. platform_account_memberships (Phase 2 file 3): true means applied.
+SELECT to_regclass('public.account_memberships') IS NOT NULL
+   AND to_regprocedure('public.user_can_reach_vessel(uuid,uuid)') IS NOT NULL AS applied;
+
+-- J. platform_capabilities (Phase 2 file 4): true means applied.
+SELECT to_regprocedure('public.has_capability(text,uuid,uuid)') IS NOT NULL AS applied;
+
+-- K. platform_module_settings (Phase 2 file 5): true means applied.
+SELECT to_regclass('public.vessel_module_settings') IS NOT NULL
+   AND to_regprocedure('public.module_enabled(uuid,text,date)') IS NOT NULL AS applied;
+
+-- L. platform_format_reference (Phase 2 file 6): true means applied.
+SELECT to_regprocedure('public.format_reference(text,uuid,uuid,date)') IS NOT NULL AS applied;
+
+-- M. platform_user_status (Phase 2 file 7): true means applied.
+SELECT to_regprocedure('public.set_membership_status(uuid,text,uuid,text)') IS NOT NULL
+   AND position('user_is_active' IN pg_get_functiondef('public.user_belongs_to_company(uuid,uuid)'::regprocedure)) > 0 AS applied;
+
+-- N. platform_access_rls (Phase 2 file 8): true means applied.
+SELECT count(*) = 2 AS applied FROM pg_policies
+ WHERE schemaname = 'public' AND ((tablename = 'vessels' AND policyname = 'vessels_select') OR (tablename = 'user_roles' AND policyname = 'user_roles_select_admin'));
+
+-- O. platform_user_invitations (Phase 2 file 9): true means applied.
+SELECT to_regclass('public.user_invitations') IS NOT NULL
+   AND to_regprocedure('public.record_invitation_send(uuid,text,text,text,uuid,text,timestamptz,uuid)') IS NOT NULL AS applied;
+
+-- P. platform_record_registry (Phase 2 file 10): true means applied.
+SELECT to_regclass('public.record_envelopes') IS NOT NULL
+   AND to_regprocedure('public.record_transition(uuid,text,jsonb,integer)') IS NOT NULL AS applied;
+
+-- Q. platform_record_signatures (Phase 2 file 11): true means applied.
+SELECT to_regclass('public.record_signatures') IS NOT NULL
+   AND to_regclass('public.record_signature_slot_states') IS NOT NULL AS applied;
+
+-- R. platform_record_threads (Phase 2 file 12): true means applied.
+SELECT to_regclass('public.record_thread_entries') IS NOT NULL
+   AND to_regprocedure('public.record_post_thread_entry(uuid,uuid,text,text,text,date,date,uuid,uuid)') IS NOT NULL AS applied;
+
+-- S. platform_record_files (Phase 2 file 13): true means applied.
+SELECT to_regclass('public.file_objects') IS NOT NULL
+   AND to_regprocedure('public.register_file_object(text,text,text,text,bigint,text)') IS NOT NULL
+   AND EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'records') AS applied;
+
+-- T. platform_export_jobs (Phase 2 file 14): true means applied.
+SELECT to_regclass('public.export_jobs') IS NOT NULL
+   AND to_regprocedure('public.export_job_transition(uuid,text,jsonb)') IS NOT NULL AS applied;
+
+-- U. platform_notification_outbox (Phase 2 file 15): true means applied.
+SELECT to_regclass('public.notification_inbox') IS NOT NULL
+   AND to_regprocedure('public.notification_inbox_mark_all_read(timestamptz)') IS NOT NULL
+   AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname = 'trg_record_events_emit') AS applied;
 ```
 
 ## How to apply a migration
@@ -110,7 +211,7 @@ Lovable stays the publish and database-apply path (D-01). Either route works; th
 
 - **Duplicate version `20260919120000`.** `20260919120000_health_phase3_wellness.sql` and `20260919120000_legal_module.sql` share one 14-digit version, which the Supabase CLI treats as a single migration. Both are applied. They stay as they are (renaming an applied file would desynchronise the histories); do not use `supabase db push` or `db reset` against this folder until the history is repaired. `migrations.test.ts` accepts this one duplicate and fails on any other.
 - **Legacy non-idempotent files.** `20260228120000_create_feedback_submissions.sql` (not applied: apply once), and `20260917200100_logbook_meridian_books.sql` and `20260919210000_ism_form_workflow.sql` (applied: never re-run). Files before `20261123` are not held to the idempotency rule; they are history, and editing an applied file is never the fix (gap/00 W1).
-- **Fresh replay fails.** The full set does not replay on an empty database (an HRIS follow-up policy compares uuid to text, `docs/HEALTH.md`). A forward-only fix is planned (gap/00 E5); until then no CI job can stand up a fresh database.
+- **Fresh replay needs the harness's governance.** As written, the full set does not replay on an empty database: two hand-written HRIS files (`20260917113000_hris_phase1_followups.sql`, `20260917150000_hris_phase5_retention.sql`) compare uuid to text and never ran live as written (their Lovable copies, rows 7 and 11, carry the corrected statements), and a few files need schema state no migration creates (`docs/HEALTH.md`; gap/00 E5). The local DB harness (`node scripts/db/harness.mjs`, `scripts/db/README.md`) replays the whole folder onto a fresh database under `supabase/tests/harness/replay.json` (those two files as expected failures with evidence, two drift patches for live schema state, row 1 skipped as not applied) and checks the result against `types.ts`. `supabase db reset` against this folder still fails.
 
 ## Build-out migrations (from `20261123`)
 
