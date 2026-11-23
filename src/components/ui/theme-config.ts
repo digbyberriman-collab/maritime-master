@@ -94,12 +94,23 @@ export function getDensity(): Density {
   return resolveDensity(safeGet(DENSITY_STORAGE_KEY), matches('(pointer: coarse)'), window.innerWidth);
 }
 
+/**
+ * Apply and store a density on this device. Device only: the mirror to
+ * `user_preferences.density` is the setter's job (`useDensity`, D-19), so an
+ * adopted server value (`applyStoredDensity`) is never written back.
+ */
 export function setDensity(next: Density) {
   if (!isDensity(next)) return;
   document.documentElement.setAttribute('data-density', next);
   safeSet(DENSITY_STORAGE_KEY, next);
   listeners.forEach((l) => l());
 }
+
+/** A density adopted from the account on a device that has none (D-19); same as `setDensity`. */
+export const applyStoredDensity = (next: Density): void => setDensity(next);
+
+/** True when this browser has stored its own density choice (D-19: it then wins over the account's). */
+export const hasStoredDensityChoice = (): boolean => isDensity(safeGet(DENSITY_STORAGE_KEY));
 
 export function subscribeDensity(listener: Listener): () => void {
   listeners.add(listener);

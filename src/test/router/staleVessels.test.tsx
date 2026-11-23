@@ -74,6 +74,10 @@ vi.mock('@/integrations/supabase/client', () => {
       then: (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => {
         const key = `${table}:${keys.join('&')}`;
         const result = () => {
+          // account_memberships is not live (D-01): VesselContext keeps the D-26 legacy rules.
+          if (table === 'account_memberships') {
+            return { data: null, error: { code: 'PGRST205', message: "Could not find the table 'public.account_memberships' in the schema cache" } };
+          }
           if (table === 'profiles') {
             const uid = keys.find((k) => k.startsWith('user_id='))?.slice('user_id='.length) ?? '';
             if (h.profileFails.has(uid)) return { data: null, error: { message: 'profile read failed' } };
@@ -94,6 +98,8 @@ vi.mock('@/integrations/supabase/client', () => {
       from,
       // Held by 'rpc' (every call) or 'rpc:<user id>' (that user's calls).
       rpc: (name: string, args: { p_user_id: string }) => {
+        // The account check after sign-in (Phase 2 spec §B.3): everyone here is active.
+        if (name === 'record_session_start') return Promise.resolve({ data: 'active', error: null });
         const hold = h.holds.get(`rpc:${args.p_user_id}`) ?? h.holds.get('rpc');
         const result = () => ({
           data: name === 'get_user_roles_full' ? h.roles.get(args.p_user_id) ?? [] : [],

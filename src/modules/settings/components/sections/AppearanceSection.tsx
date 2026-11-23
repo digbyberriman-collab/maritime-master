@@ -13,6 +13,7 @@ import { notify } from '@/shared/lib/notify';
 import { cn } from '@/lib/utils';
 import { DEFAULT_THEME, isDensity, isThemePreference, type Density, type ThemePreference } from '@/components/ui/theme-config';
 import { useDensity } from '@/components/ui/use-density';
+import { useUiPreferenceColumns, useUiPreferenceSync } from '@/app/shell/useUiPreferenceSync';
 import SettingsCard from '../common/SettingsCard';
 
 // The theme itself lives in the theme provider (localStorage, applied before
@@ -47,6 +48,10 @@ const AppearanceSection: React.FC = () => {
   const { theme: activeTheme, setTheme } = useTheme();
   const theme: ThemePreference = isThemePreference(activeTheme) ? activeTheme : DEFAULT_THEME;
   const [density, setDensity] = useDensity();
+  // Density follows the account once `user_preferences.density` is live
+  // (D-19, Phase 2 spec §B.5); until then it stays on this device.
+  useUiPreferenceSync(user?.id ?? null);
+  const densityFollowsAccount = useUiPreferenceColumns() === 'present';
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [vessels, setVessels] = useState<Vessel[]>([]);
@@ -262,7 +267,11 @@ const AppearanceSection: React.FC = () => {
       {/* Density */}
       <SettingsCard
         title="Density"
-        description="Row and control sizes. Saved on this device."
+        description={
+          densityFollowsAccount
+            ? 'Row and control sizes. Saved on this device and to your account, so a new device starts with it.'
+            : 'Row and control sizes. Saved on this device.'
+        }
       >
         <RadioGroupPrimitive.Root
           value={density}

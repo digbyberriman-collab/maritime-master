@@ -2,10 +2,16 @@
  * Pending-table ratchet (BUILD-PLAN B9; gap/00 D2, W1 "types_regenerated →
  * shim_removed"; DECISIONS D-01).
  *
- * 1. A table, view or RPC listed in any `src/modules/<m>/types/db.pending.ts`
- *    must not exist in the generated types. When a migration is applied and
- *    `types.ts` regenerated, this fails until the module deletes its entry
- *    and uses the generated type, so a shim never outlives its table.
+ * 1. A table, view or RPC listed in any `db.pending.ts` under `src/` (the
+ *    module shims in `src/modules/<m>/types/` and shared ones such as
+ *    `src/lib/records/services/db.pending.ts`) must not exist in the
+ *    generated types. When a migration is applied and `types.ts`
+ *    regenerated, this fails until the shim deletes its entry and the code
+ *    uses the generated type, so a shim never outlives its table. New
+ *    columns on a live table (`*PendingColumns`, D-133) are checked the
+ *    other way round: the table must be in the generated types (else it
+ *    belongs in `*PendingTables`) and none of the listed columns may be
+ *    ("remove <table>.<column> from the shim" once they are generated).
  * 2. Casts of the client may appear only in a file on the allow-list
  *    (pendingTables.allowlist.json), at no more than its listed count. A
  *    TypeScript AST walk (`clientCasts`) counts `.from(…)` / `.rpc(…)`
@@ -32,7 +38,7 @@
  * counted here), and fails on a new one.
  */
 import { describe, expect, it } from 'vitest';
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import ts from 'typescript';
 import allowlist from './pendingTables.allowlist.json';
@@ -65,18 +71,22 @@ const memberType = (node: ts.TypeNode | undefined, name: string): ts.TypeNode | 
   return m?.type;
 };
 
-/** Table, view and function names in the generated `Database['public']`. */
-function generatedNames(): { tables: Set<string>; views: Set<string>; functions: Set<string> } {
+/** Table, view and function names in the generated `Database['public']`, with each table's Row columns. */
+function generatedNames(): { tables: Set<string>; views: Set<string>; functions: Set<string>; columns: Map<string, Set<string>> } {
   const source = parse(TYPES_FILE);
   let db: ts.TypeNode | undefined;
   source.forEachChild((node) => {
     if (ts.isTypeAliasDeclaration(node) && node.name.text === 'Database') db = node.type;
   });
   const pub = memberType(db, 'public');
+  const tables = memberType(pub, 'Tables');
+  const columns = new Map<string, Set<string>>();
+  for (const t of memberNames(tables)) columns.set(t, new Set(memberNames(memberType(memberType(tables, t), 'Row'))));
   return {
-    tables: new Set(memberNames(memberType(pub, 'Tables'))),
+    tables: new Set(memberNames(tables)),
     views: new Set(memberNames(memberType(pub, 'Views'))),
     functions: new Set(memberNames(memberType(pub, 'Functions'))),
+    columns,
   };
 }
 
@@ -85,28 +95,100 @@ interface PendingFile {
   tables: string[];
   views: string[];
   functions: string[];
+  /** `*PendingColumns`: live table → the new columns the shim declares on it. */
+  columns: Record<string, string[]>;
+  /** `*PendingColumns` entries whose column list could not be read (a shape the scanner does not know). */
+  unreadable: string[];
 }
 
-/** Every `*PendingTables`, `*PendingViews` and `*PendingFunctions` type in a module's db.pending.ts. */
+/** Every `db.pending.ts` under src/ (module shims and shared ones such as src/lib/records/services). */
+function pendingShimPaths(): string[] {
+  return walk(SRC)
+    .filter((file) => file.endsWith('/db.pending.ts'))
+    .map((file) => relative(ROOT, file))
+    .sort();
+}
+
+/** Property names of an object type: a type literal, or a type alias / interface declared in the same file. */
+function objectMembers(node: ts.TypeNode | undefined, locals: Map<string, ts.TypeNode | ts.InterfaceDeclaration>): string[] | null {
+  if (!node) return null;
+  if (ts.isTypeLiteralNode(node)) return memberNames(node);
+  if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) {
+    const local = locals.get(node.typeName.text);
+    if (!local) return null;
+    if (ts.isInterfaceDeclaration(local)) return local.members.filter(ts.isPropertySignature).map((p) => p.name.getText().replace(/^['"]|['"]$/g, ''));
+    return objectMembers(local, locals);
+  }
+  return null;
+}
+
+/**
+ * The new columns one `*PendingColumns` entry declares: `PendingColumns<Row>`
+ * (Row a literal or a local alias / interface) or a literal `{ Row: {…} }`.
+ */
+function pendingColumnNames(node: ts.TypeNode | undefined, locals: Map<string, ts.TypeNode | ts.InterfaceDeclaration>): string[] | null {
+  if (!node) return null;
+  if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName) && node.typeName.text === 'PendingColumns') {
+    return objectMembers(node.typeArguments?.[0], locals);
+  }
+  if (ts.isTypeLiteralNode(node)) return objectMembers(memberType(node, 'Row'), locals);
+  if (ts.isTypeReferenceNode(node) && ts.isIdentifier(node.typeName)) {
+    const local = locals.get(node.typeName.text);
+    return local && !ts.isInterfaceDeclaration(local) ? pendingColumnNames(local, locals) : null;
+  }
+  return null;
+}
+
+/** Every `*PendingTables`, `*PendingViews`, `*PendingFunctions` and `*PendingColumns` type in a db.pending.ts. */
+export function readPendingFile(rel: string, text: string): PendingFile {
+  const source = ts.createSourceFile(rel, text, ts.ScriptTarget.Latest, true);
+  const entry: PendingFile = { file: rel, tables: [], views: [], functions: [], columns: {}, unreadable: [] };
+  const locals = new Map<string, ts.TypeNode | ts.InterfaceDeclaration>();
+  source.forEachChild((node) => {
+    if (ts.isTypeAliasDeclaration(node)) locals.set(node.name.text, node.type);
+    if (ts.isInterfaceDeclaration(node)) locals.set(node.name.text, node);
+  });
+  source.forEachChild((node) => {
+    const name = ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node) ? node.name.text : '';
+    const props: ts.PropertySignature[] = ts.isTypeAliasDeclaration(node)
+      ? ts.isTypeLiteralNode(node.type)
+        ? node.type.members.filter(ts.isPropertySignature)
+        : []
+      : ts.isInterfaceDeclaration(node)
+        ? node.members.filter(ts.isPropertySignature)
+        : [];
+    const members = props.map((p) => p.name.getText().replace(/^['"]|['"]$/g, ''));
+    if (name.endsWith('PendingTables')) entry.tables.push(...members);
+    if (name.endsWith('PendingViews')) entry.views.push(...members);
+    if (name.endsWith('PendingFunctions')) entry.functions.push(...members);
+    if (name.endsWith('PendingColumns')) {
+      props.forEach((p, i) => {
+        const cols = pendingColumnNames(p.type, locals);
+        if (cols === null) entry.unreadable.push(`${name}.${members[i]}`);
+        else entry.columns[members[i]] = [...(entry.columns[members[i]] ?? []), ...cols];
+      });
+    }
+  });
+  return entry;
+}
+
 function pendingFiles(): PendingFile[] {
-  const modules = join(ROOT, 'src/modules');
-  const out: PendingFile[] = [];
-  for (const m of readdirSync(modules)) {
-    const file = join(modules, m, 'types/db.pending.ts');
-    if (!existsSync(file)) continue;
-    const entry: PendingFile = { file: relative(ROOT, file), tables: [], views: [], functions: [] };
-    parse(file).forEachChild((node) => {
-      const name = ts.isTypeAliasDeclaration(node) || ts.isInterfaceDeclaration(node) ? node.name.text : '';
-      const members = ts.isTypeAliasDeclaration(node)
-        ? memberNames(node.type)
-        : ts.isInterfaceDeclaration(node)
-          ? node.members.filter(ts.isPropertySignature).map((p) => p.name.getText())
-          : [];
-      if (name.endsWith('PendingTables')) entry.tables.push(...members);
-      if (name.endsWith('PendingViews')) entry.views.push(...members);
-      if (name.endsWith('PendingFunctions')) entry.functions.push(...members);
-    });
-    out.push(entry);
+  return pendingShimPaths().map((rel) => readPendingFile(rel, readFileSync(join(ROOT, rel), 'utf8')));
+}
+
+/** Pending columns that are no longer pending, or that sit on a table types.ts does not have. */
+export function pendingColumnProblems(files: PendingFile[], generated: { tables: Set<string>; columns: Map<string, Set<string>> }): string[] {
+  const out: string[] = [];
+  for (const f of files) {
+    for (const u of f.unreadable) out.push(`${f.file}: ${u} is not PendingColumns<{…}> or a local row type; the ratchet cannot read its columns`);
+    for (const [table, cols] of Object.entries(f.columns)) {
+      if (!generated.tables.has(table)) {
+        out.push(`${f.file}: ${table} is not a generated table; new tables belong in *PendingTables, not *PendingColumns`);
+        continue;
+      }
+      const live = generated.columns.get(table) ?? new Set<string>();
+      for (const c of cols) if (live.has(c)) out.push(`${f.file}: ${table}.${c} is now generated; remove ${table}.${c} from the shim`);
+    }
   }
   return out;
 }
@@ -301,6 +383,54 @@ describe('pending tables (gap/00 D2)', () => {
     expect(generated.tables.has('vessels')).toBe(true);
   });
 
+  it('scans every db.pending.ts under src/, not only module folders', () => {
+    const paths = files.map((f) => f.file);
+    expect(paths).toContain('src/modules/refit/types/db.pending.ts');
+    expect(paths).toContain('src/lib/records/services/db.pending.ts');
+    expect(paths).toContain('src/modules/vessels/types/db.pending.ts');
+    expect(paths).toContain('src/modules/settings/types/db.pending.ts');
+    const records = files.find((f) => f.file === 'src/lib/records/services/db.pending.ts');
+    expect(records?.tables).toContain('record_envelopes');
+    expect(records?.views).toEqual(['record_signature_slot_states']);
+    expect(records?.functions).toContain('record_transition');
+  });
+
+  it('reads the pending columns of live tables (D-133)', () => {
+    const vessels = files.find((f) => f.file === 'src/modules/vessels/types/db.pending.ts');
+    expect(vessels?.columns.vessels).toEqual(['code', 'short_code', 'lifecycle_status', 'is_counted', 'vessel_purpose', 'archived_at', 'archived_by', 'archive_reason']);
+    const settings = files.find((f) => f.file === 'src/modules/settings/types/db.pending.ts');
+    expect(settings?.columns.user_preferences).toEqual(['density', 'show_roadmap']);
+    const auth = files.find((f) => f.file === 'src/modules/auth/types/db.pending.ts');
+    expect(auth?.columns.user_permission_overrides).toEqual(['company_id', 'vessel_id']);
+    expect(auth?.columns.permission_audit_log).toEqual(['company_id']);
+    expect(files.flatMap((f) => f.unreadable)).toEqual([]);
+  });
+
+  it('no pending column is in types.ts yet, and every one sits on a generated table', () => {
+    expect(pendingColumnProblems(files, generated)).toEqual([]);
+  });
+
+  it('the column check names the column to remove, and refuses new tables declared as columns', () => {
+    const sample = readPendingFile(
+      'src/modules/x/types/db.pending.ts',
+      `type Cols = { code: string; theme: string | null };
+       export type XPendingColumns = {
+         vessels: PendingColumns<Cols>;
+         user_preferences: PendingColumns<{ theme: string | null }>;
+         brand_new_table: PendingColumns<{ id: string }>;
+         odd: SomethingElse<Cols>;
+       };`,
+    );
+    expect(sample.columns).toEqual({ vessels: ['code', 'theme'], user_preferences: ['theme'], brand_new_table: ['id'] });
+    expect(sample.unreadable).toEqual(['XPendingColumns.odd']);
+    const fake = { tables: new Set(['vessels', 'user_preferences']), columns: new Map([['vessels', new Set(['id', 'name'])], ['user_preferences', new Set(['id', 'theme'])]]) };
+    expect(pendingColumnProblems([sample], fake)).toEqual([
+      'src/modules/x/types/db.pending.ts: XPendingColumns.odd is not PendingColumns<{…}> or a local row type; the ratchet cannot read its columns',
+      'src/modules/x/types/db.pending.ts: user_preferences.theme is now generated; remove user_preferences.theme from the shim',
+      'src/modules/x/types/db.pending.ts: brand_new_table is not a generated table; new tables belong in *PendingTables, not *PendingColumns',
+    ]);
+  });
+
   it('finds the module shims, Refit first', () => {
     const refit = files.find((f) => f.file === 'src/modules/refit/types/db.pending.ts');
     expect(refit?.tables.length).toBeGreaterThanOrEqual(30);
@@ -331,8 +461,17 @@ describe('pending tables (gap/00 D2)', () => {
 
   it('every module with a shim builds its client through pending.ts', () => {
     const missing = files
+      .filter((f) => /^src\/modules\/[^/]+\/types\/db\.pending\.ts$/.test(f.file))
       .map((f) => f.file.replace(/\/types\/db\.pending\.ts$/, ''))
       .filter((dir) => !walk(join(ROOT, dir)).some((file) => IMPORTS_SHIM.test(readFileSync(file, 'utf8')) && !file.endsWith('db.pending.ts')));
+    expect(missing).toEqual([]);
+  });
+
+  it('every shared shim outside a module folder builds its client through pending.ts next to it', () => {
+    const missing = files
+      .filter((f) => !/^src\/modules\/[^/]+\/types\/db\.pending\.ts$/.test(f.file))
+      .map((f) => dirname(f.file))
+      .filter((dir) => !readdirSync(join(ROOT, dir)).some((name) => /\.tsx?$/.test(name) && name !== 'db.pending.ts' && IMPORTS_SHIM.test(readFileSync(join(ROOT, dir, name), 'utf8'))));
     expect(missing).toEqual([]);
   });
 });

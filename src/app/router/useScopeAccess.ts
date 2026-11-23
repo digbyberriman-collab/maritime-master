@@ -2,14 +2,17 @@
  * What the scope routes need to know about the signed-in user: whether access
  * has loaded, fleet reach, the reachable vessels and their codes. Read from
  * AuthContext, VesselContext and the RBAC store; the decisions themselves are
- * the pure functions in ./reach.ts and ./legacyResolve.ts.
+ * the pure functions in ./reach.ts, ./membershipReach.ts (through
+ * ./useMembershipReach.ts: memberships once live, the D-26 legacy rules
+ * until then) and ./legacyResolve.ts.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
 import { useVessel, type Vessel } from '@/modules/vessels/contexts/VesselContext';
 import { findVesselBySlug } from '@/modules/vessels/lib/vesselSlug';
-import { hasFleetReach, landingPath } from './reach';
+import { landingPath } from './reach';
+import { useMembershipReach } from './useMembershipReach';
 import type { LegacyRedirectContext } from './legacyResolve';
 
 export interface ScopeAccess {
@@ -60,8 +63,10 @@ export function useScopeAccess(): ScopeAccess {
   // previous user's, so the roles count only once they are this user's own
   // (D-41; fail closed, D-04). A same-user refresh keeps them counted.
   const rbacLoadedFor = usePermissionsStore((s) => s.loadedFor);
-  const hasFleetWideRole = usePermissionsStore((s) => s.hasFleetAccess);
-  const userRoles = usePermissionsStore((s) => s.userRoles);
+  // Fleet reach under the rules VesselContext's load applied: memberships
+  // once live, the legacy role and RBAC rules until then (Phase 2 §B.4).
+  // RBAC roles count only while they are this user's own.
+  const { fleetReach } = useMembershipReach();
 
   // The profile arrives a moment after the session, and VesselContext only
   // loads once it has one. Wait for it, but not forever: a signed-in user
@@ -93,14 +98,6 @@ export function useScopeAccess(): ScopeAccess {
   if (latchedFor.current !== userId) latchedFor.current = null;
   if (readyNow && userId) latchedFor.current = userId;
   const ready = readyNow || (userId !== null && latchedFor.current === userId);
-
-  // Roles give fleet reach only while they are this user's own.
-  const ownRoles = userId !== null && rbacLoadedFor === userId;
-  const fleetReach = hasFleetReach({
-    canAccessAllVessels: vessel.canAccessAllVessels,
-    hasFleetWideRole: ownRoles && hasFleetWideRole,
-    rbacRoles: ownRoles ? (userRoles ?? []).map((r) => r.role_name) : [],
-  });
 
   // No readable profile: no vessels, whatever the lists hold.
   const vessels = profile ? vessel.vessels : NO_VESSELS;

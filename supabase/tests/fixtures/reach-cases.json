@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "description": "Shared reach fixture (Phase 2 spec §E). One world of two companies, their vessels and users. 'legacy' is the D-26 rule set (account_memberships missing, or a legacy-managed membership); 'membership' is what user_vessel_reach()/user_has_fleet_reach() and membershipReach() return once memberships exist (backfilled legacy rows for users whose membership is null). Read by the SQL tests (supabase/tests/sql/p2_reach) and by the TS parity test (src/test/router/membershipReach.test.ts). RBAC roles are listed raw: the TS side keeps only isActive && (validUntil null or > now), and isFleetWide = vessel === null && defaultScope === 'fleet', as get_user_roles_full does. Emails, when a seeder needs one, are '<key with dots as dashes>@example.test'.",
+  "now": "2026-11-23T12:00:00Z",
+  "companies": ["A", "B"],
+  "roles": [
+    { "name": "harbour_ops", "defaultScope": "fleet", "note": "custom fleet-scope role (not in the seed)" }
+  ],
+  "vessels": [
+    { "key": "A.dra", "company": "A", "name": "M/Y DRAAK", "status": "Active", "lifecycleStatus": "active", "createdAt": "2026-01-01T00:00:00Z" },
+    { "key": "A.hyd", "company": "A", "name": "HYDRA", "status": "Active", "lifecycleStatus": "active", "createdAt": "2026-01-02T00:00:00Z" },
+    { "key": "A.gam", "company": "A", "name": "GAME CHANGER", "status": "Active", "lifecycleStatus": "active", "createdAt": "2026-01-03T00:00:00Z" },
+    { "key": "A.old", "company": "A", "name": "OLD TIMER", "status": "Sold", "lifecycleStatus": "archived", "createdAt": "2026-01-04T00:00:00Z" },
+    { "key": "A.nul", "company": "A", "name": "NO STATUS", "status": null, "lifecycleStatus": "active", "createdAt": "2026-01-05T00:00:00Z" },
+    { "key": "B.lev", "company": "B", "name": "LEVIATHAN", "status": "Active", "lifecycleStatus": "active", "createdAt": "2026-01-06T00:00:00Z" }
+  ],
+  "users": [
+    {
+      "key": "A.dpa", "company": "A", "profileRole": "dpa", "accountStatus": "active",
+      "rbacRoles": [], "assignments": [], "membership": null,
+      "expected": { "legacy": { "fleetReach": true, "vessels": ["A.dra", "A.hyd", "A.gam"] }, "membership": { "fleetReach": true, "vessels": ["A.dra", "A.hyd", "A.gam"] } }
+    },
+    {
+      "key": "A.shore", "company": "A", "profileRole": "shore_management", "accountStatus": null,
+      "rbacRoles": [], "assignments": [], "membership": null,
+      "expected": { "legacy": { "fleetReach": true, "vessels": ["A.dra", "A.hyd", "A.gam"] }, "membership": { "fleetReach": true, "vessels": ["A.dra", "A.hyd", "A.gam"] } }
+    },
+    {
+      "key": "A.master_dra", "company": "A", "profileRole": "master", "accountStatus": "active",
+      "rbacRoles": [], "assignments": [{ "vessel": "A.dra", "isCurrent": true }], "membership": null,
+      "expected": { "legacy": { "fleetReach": false, "vessels": ["A.dra"] }, "membership": { "fleetReach": false, "vessels": ["A.dra"] } }
+    },
+    {
+      "key": "A.crew_moved", "company": "A", "profileRole": "crew", "accountStatus": "invited",
+      "rbacRoles": [], "assignments": [{ "vessel": "A.hyd", "isCurrent": false }, { "vessel": "A.gam", "isCurrent": true }], "membership": null,
+      "expected": { "legacy": { "fleetReach": false, "vessels": ["A.gam"] }, "membership": { "fleetReach": false, "vessels": ["A.gam"] } }
+    },
+    {
+      "key": "A.crew_sold", "company": "A", "profileRole": "crew", "accountStatus": "active",
+      "rbacRoles": [], "assignments": [{ "vessel": "A.old", "isCurrent": true }, { "vessel": "A.nul", "isCurrent": true }], "membership": null,
+      "expected": { "legacy": { "fleetReach": false, "vessels": [] }, "membership": { "fleetReach": false, "vessels": [] } }
+    },
+    {
+      "key": "A.rbac_fleet_master", "company": "A", "profileRole": "crew", "accountStatus": "active",
+      "rbacRoles": [{ "roleName": "fleet_master", "vessel": null, "defaultScope": "fleet", "isActive": true, "validUntil": null }],
+      "assignments": [{ "vessel": "A.dra", "isCurrent": true }], "membership": null,
+      "expected": { "legacy": { "fleetReach": true, "vessels": ["A.dra"] }, "membership": { "fleetReach": true, "vessels": ["A.dra"] } }
+    },
+    {
+      "key": "A.rbac_fleetwide_custom", "company": "A", "profileRole": "chief_officer", "accountStatus": "active",
+      "rbacRoles": [{ "roleName": "harbour_ops", "vessel": null, "defaultScope": "fleet", "isActive": true, "validUntil": "2027-01-01T00:00:00Z" }],
+      "assignments": [], "membership": null,
+      "expected": { "legacy": { "fleetReach": true, "vessels": [] }, "membership": { "fleetReach": true, "vessels": [] } }
+    },
+    {
+      "key": "A.rbac_vessel_dpa", "company": "A", "profileRole": "crew", "accountStatus": "active",
+      "rbacRoles": [{ "roleName": "dpa", "vessel": "A.hyd", "defaultScope": "fleet", "isActive": true, "validUntil": null }],
+      "assignments": [], "membership": null,
+      "expected": { "legacy": { "fleetReach": true, "vessels": [] }, "membership": { "fleetReach": true, "vessels": [] } }
+    },
+    {
+      "key": "A.rbac_expired", "company": "A", "profileRole": "crew", "accountStatus": "active",
+      "rbacRoles": [{ "roleName": "fleet_master", "vessel": null, "defaultScope": "fleet", "isActive": true, "validUntil": "2026-01-01T00:00:00Z" }],
+      "assignments": [], "membership": null,
+      "expected": { "legacy": { "fleetReach": false, "vessels": [] }, "membership": { "fleetReach": false, "vessels": [] } }
+    },
+    {
+      "key": "A.rbac_inactive", "company": "A", "profileRole": "crew", "accountStatus": "active",
+      "rbacRoles": [{ "roleName": "superadmin", "vessel": null, "defaultScope": "fleet", "isActive": false, "validUntil": null }],
+      "assignments": [], "membership": null,
+      "expected": { "legacy": { "fleetReach": false, "vessels": [] }, "membership": { "fleetReach": false, "vessels": [] } }
+    },
+    {
+      "key": "A.rbac_captain_vessel", "company": "A", "profileRole": "crew", "accountStatus": "active",
+      "rbacRoles": [{ "roleName": "captain", "vessel": "A.dra", "defaultScope": "vessel", "isActive": true, "validUntil": null }],
+      "assignments": [], "membership": null,
+      "expected": { "legacy": { "fleetReach": false, "vessels": [] }, "membership": { "fleetReach": false, "vessels": [] } }
+    },
+    {
+      "key": "A.disabled_dpa", "company": "A", "profileRole": "dpa", "accountStatus": "disabled",
+      "rbacRoles": [], "assignments": [], "membership": null,
+      "expected": { "legacy": { "fleetReach": true, "vessels": ["A.dra", "A.hyd", "A.gam"] }, "membership": { "fleetReach": false, "vessels": [] } }
+    },
+    {
+      "key": "A.deactivated_crew", "company": "A", "profileRole": "crew", "accountStatus": "deactivated",
+      "rbacRoles": [], "assignments": [{ "vessel": "A.dra", "isCurrent": true }], "membership": null,
+      "expected": { "legacy": { "fleetReach": false, "vessels": ["A.dra"] }, "membership": { "fleetReach": false, "vessels": [] } }
+    },
+    {
+      "key": "B.dpa", "company": "B", "profileRole": "dpa", "accountStatus": "active",
+      "rbacRoles": [], "assignments": [], "membership": null,
+      "expected": { "legacy": { "fleetReach": true, "vessels": ["B.lev"] }, "membership": { "fleetReach": true, "vessels": ["B.lev"] } }
+    },
+    {
+      "key": "B.crew_cross", "company": "B", "profileRole": "crew", "accountStatus": "active",
+      "rbacRoles": [], "assignments": [{ "vessel": "A.dra", "isCurrent": true }], "membership": null,
+      "expected": { "legacy": { "fleetReach": false, "vessels": [] }, "membership": { "fleetReach": false, "vessels": [] } }
+    },
+    {
+      "key": "A.external_hyd", "company": "A", "profileRole": "crew", "accountStatus": "active",
+      "rbacRoles": [], "assignments": [{ "vessel": "A.gam", "isCurrent": true }],
+      "membership": { "kind": "external", "status": "active", "legacyManaged": false, "fleetAccess": false, "vesselScope": "assigned", "validFrom": null, "validUntil": "2027-01-01T00:00:00Z", "vessels": [{ "vessel": "A.hyd", "validFrom": null, "validUntil": null }] },
+      "expected": { "legacy": { "fleetReach": false, "vessels": ["A.gam"] }, "membership": { "fleetReach": false, "vessels": ["A.hyd"] } }
+    },
+    {
+      "key": "A.external_expired", "company": "A", "profileRole": "crew", "accountStatus": "active",
+      "rbacRoles": [], "assignments": [],
+      "membership": { "kind": "external", "status": "active", "legacyManaged": false, "fleetAccess": false, "vesselScope": "assigned", "validFrom": null, "validUntil": "2026-06-01T00:00:00Z", "vessels": [{ "vessel": "A.hyd", "validFrom": null, "validUntil": null }] },
+      "expected": { "legacy": { "fleetReach": false, "vessels": [] }, "membership": { "fleetReach": false, "vessels": [] } }
+    },
+    {
+      "key": "A.shore_assigned", "company": "A", "profileRole": "crew", "accountStatus": "active",
+      "rbacRoles": [], "assignments": [],
+      "membership": { "kind": "shore", "status": "active", "legacyManaged": false, "fleetAccess": false, "vesselScope": "assigned", "validFrom": null, "validUntil": null, "vessels": [{ "vessel": "A.dra", "validFrom": "2026-01-01T00:00:00Z", "validUntil": null }, { "vessel": "A.gam", "validFrom": null, "validUntil": "2026-11-01T00:00:00Z" }, { "vessel": "B.lev", "validFrom": null, "validUntil": null }] },
+      "expected": { "legacy": { "fleetReach": false, "vessels": [] }, "membership": { "fleetReach": false, "vessels": ["A.dra"] } }
+    },
+    {
+      "key": "A.admin_all", "company": "A", "profileRole": "crew", "accountStatus": "active",
+      "rbacRoles": [], "assignments": [],
+      "membership": { "kind": "admin", "status": "active", "legacyManaged": false, "fleetAccess": true, "vesselScope": "all", "validFrom": null, "validUntil": null, "vessels": [] },
+      "expected": { "legacy": { "fleetReach": false, "vessels": [] }, "membership": { "fleetReach": true, "vessels": ["A.dra", "A.hyd", "A.gam"] } }
+    },
+    {
+      "key": "A.shore_future", "company": "A", "profileRole": "crew", "accountStatus": "active",
+      "rbacRoles": [], "assignments": [],
+      "membership": { "kind": "shore", "status": "active", "legacyManaged": false, "fleetAccess": true, "vesselScope": "assigned", "validFrom": "2027-01-01T00:00:00Z", "validUntil": null, "vessels": [{ "vessel": "A.dra", "validFrom": null, "validUntil": null }] },
+      "expected": { "legacy": { "fleetReach": false, "vessels": [] }, "membership": { "fleetReach": false, "vessels": [] } }
+    },
+    {
+      "key": "A.removed_admin", "company": "A", "profileRole": "crew", "accountStatus": "active",
+      "rbacRoles": [], "assignments": [{ "vessel": "A.hyd", "isCurrent": true }],
+      "membership": { "kind": "admin", "status": "removed", "legacyManaged": false, "fleetAccess": true, "vesselScope": "all", "validFrom": null, "validUntil": null, "vessels": [] },
+      "expected": { "legacy": { "fleetReach": false, "vessels": ["A.hyd"] }, "membership": { "fleetReach": false, "vessels": [] } }
+    },
+    {
+      "key": "A.invited_shore", "company": "A", "profileRole": "crew", "accountStatus": "invited",
+      "rbacRoles": [], "assignments": [],
+      "membership": { "kind": "shore", "status": "invited", "legacyManaged": false, "fleetAccess": false, "vesselScope": "assigned", "validFrom": null, "validUntil": null, "vessels": [{ "vessel": "A.dra", "validFrom": null, "validUntil": null }] },
+      "expected": { "legacy": { "fleetReach": false, "vessels": [] }, "membership": { "fleetReach": false, "vessels": [] } }
+    }
+  ]
+}

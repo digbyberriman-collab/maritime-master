@@ -3,6 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { assignVesselCodes, resolveVesselByCode } from '@/modules/vessels/lib/vesselCode';
 import { normaliseError } from '@/shared/lib/notify';
+import { membershipReach, vesselInReachableState, type ReachVessel } from '@/app/router/membershipReach';
+import { LEGACY_REACH, NO_REACH, readOwnMembership, reachModeFor, type VesselReach } from '@/app/router/ownMembership';
+import type { VesselLifecycleStatus } from '@/modules/vessels/types/db.pending';
+import { useUiPreferenceSync } from '@/app/shell/useUiPreferenceSync';
 
 export interface Vessel {
   id: string;
@@ -21,6 +25,8 @@ export interface Vessel {
   code?: string | null;
   /** `vessels.fleet_group_id` (live column); the vessel switcher groups by it. */
   fleet_group_id?: string | null;
+  /** `vessels.lifecycle_status`, once the P1 column is live; an archived vessel is never reachable. */
+  lifecycle_status?: VesselLifecycleStatus | null;
 }
 
 /** A vessel of the company as the code derivation needs it (sold ones included). */
@@ -73,12 +79,36 @@ interface VesselContextType {
   loadError: { message: string } | null;
   /** Loads the vessel lists again (the Retry for `loadError`; same as `refreshVessels`). */
   retryVessels: () => Promise<void>;
+  /**
+   * Which reach rules the lists were cut with (Phase 2 spec §B.4, D-26,
+   * proposed D-123): `legacy` while `account_memberships` is not live or the
+   * user's row is legacy-managed (today's role and crew-assignment rules);
+   * `membership` for a row an admin manages (its own fleet access and
+   * vessel scope); `none` when the table is live but holds no usable row
+   * for the user (no reach at all, fail closed). Served behind the same
+   * guard as the lists: `none` while loading or while the state is another
+   * user's. Optional in the type only so a context built by hand (a test
+   * double that predates Phase 2) still reads as before: absent means the
+   * legacy rules. VesselProvider always sets it.
+   */
+  reach?: VesselReach;
 }
 
 /** The sentence a failed vessel-list load falls back to when the error has none. */
 const LOAD_ERROR_FALLBACK = 'Your vessels could not load.';
 
 const VesselContext = createContext<VesselContextType | undefined>(undefined);
+
+/** A vessel row as the reach rules read it. */
+const toReachVessel = (v: Vessel): ReachVessel => ({
+  id: v.id,
+  companyId: v.company_id,
+  status: v.status,
+  lifecycleStatus: v.lifecycle_status ?? null,
+});
+
+/** The legacy status rule (`.neq('status', 'Sold')`, which also drops a null status) plus "never archived". */
+const reachable = (v: Vessel): boolean => vesselInReachableState(toReachVessel(v));
 
 const STORAGE_KEY_VESSEL_ID = 'storm_selectedVesselId';
 const STORAGE_KEY_ALL_VESSELS = 'storm_isAllVessels';
@@ -115,9 +145,18 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // A profile that is not the signed-in user's own: AuthContext swaps the
   // profile with the session user, so this is a guard, not a normal state.
   const foreignProfile = profileUserId !== null && profileUserId !== authUserId;
+  // Density and Show roadmap follow the account once their columns are live
+  // (D-19, Phase 2 spec §B.5). Run here because every signed-in screen sits
+  // under this provider; the hook reads once per user and adopts only what
+  // this device has never chosen.
+  useUiPreferenceSync(authUserId);
 
-  // Check if user can access all vessels based on their role
-  const canAccessAllVessels = ALL_VESSELS_ROLES.includes(profile?.role || '');
+  // The legacy rule (D-26): DPA and shore management see every company
+  // vessel. It picks today's queries; what is served depends on the reach
+  // rules the load found (see `servedReach` below).
+  const legacyAllVessels = ALL_VESSELS_ROLES.includes(profile?.role || '');
+  // The reach rules of the last load (Phase 2 spec §B.4).
+  const [reach, setReach] = useState<VesselReach>(NO_REACH);
 
   // What is served: nothing while the state still belongs to another user
   // (or none), or the profile is not the signed-in user's, derived during
@@ -128,6 +167,13 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const servedVessels = useMemo(() => (stale ? [] : vessels), [stale, vessels]);
   const servedCompany = useMemo(() => (stale ? [] : companyVessels), [stale, companyVessels]);
   const servedSelection = stale ? null : selectedVessel;
+  // No profile: no membership is read, so today's rules apply (no vessels;
+  // fleet reach from the RBAC roles alone, as before Phase 2).
+  const servedReach: VesselReach = stale ? NO_REACH : profileUserId === null ? LEGACY_REACH : reach;
+  // "All vessels": the legacy role, or a membership scoped to every vessel.
+  const canAccessAllVessels =
+    !foreignProfile &&
+    (servedReach.source === 'legacy' ? legacyAllVessels : servedReach.source === 'membership' && servedReach.vesselScope === 'all');
 
   // Signed in, profile not here yet (a sign-in, or a switch straight to
   // another account): nothing has loaded for this user, so report loading,
@@ -151,7 +197,9 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const current = () => seq === loadSeq.current;
     const owner = profile?.user_id ?? null;
     if (!profile?.company_id) {
-      // No company: a definitive "no vessels", so not an error.
+      // No company: a definitive "no vessels", so not an error. No
+      // membership exists without a company: today's rules apply.
+      setReach(LEGACY_REACH);
       setLoadError(null);
       setLoading(false);
       setLoadedFor(owner);
@@ -162,38 +210,61 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setLoading(true);
 
       let vesselsData: Vessel[] = [];
+      const companyId = profile.company_id;
+      const userId = profile.user_id;
 
       // The whole company fleet, sold vessels included, so vessel codes
       // (D-03) come out the same for every user. A failure here must not
-      // stop the reachable vessels loading: codes then fall back to those.
+      // stop the reachable vessels loading on the legacy rules: codes then
+      // fall back to those.
       const directoryRequest = supabase
         .from('vessels')
         .select('*')
-        .eq('company_id', profile.company_id)
+        .eq('company_id', companyId)
         .order('name');
+      const assignmentsRequest = () =>
+        supabase
+          .from('crew_assignments')
+          .select('vessel_id')
+          .eq('user_id', userId)
+          .eq('is_current', true);
 
-      // DPA/Shore Management see all company vessels
-      if (canAccessAllVessels) {
-        const { data, error } = await directoryRequest;
-        if (!current()) return;
+      // The user's own membership decides which reach rules apply (Phase 2
+      // spec §B.4). It runs alongside the vessel reads; a failure (anything
+      // but "table not live") throws, so the lists show the error with
+      // Retry, never "no vessels" (D-04, D-119).
+      const [membershipRead, directoryRes, legacyAssignmentRes] = await Promise.all([
+        readOwnMembership(userId, companyId),
+        directoryRequest,
+        // DPA / shore management see every company vessel; other users
+        // their assigned ones, so only they need the assignments up front.
+        legacyAllVessels ? Promise.resolve(null) : assignmentsRequest(),
+      ]);
+      if (!current()) return;
+      const mode = reachModeFor(membershipRead, new Date().toISOString());
+      // Known as soon as the read lands, so fleet reach holds (a fleet user
+      // still reaches the fleet) even if a vessel read below fails.
+      setReach(
+        mode.source === 'membership'
+          ? { source: 'membership', fleetReach: mode.membership.fleetAccess, vesselScope: mode.membership.vesselScope }
+          : mode.source === 'legacy'
+            ? LEGACY_REACH
+            : NO_REACH,
+      );
+      let allowAllVessels = false;
 
-        if (error) throw error;
-        const directory: Vessel[] = data || [];
+      if (mode.source === 'legacy' && legacyAllVessels) {
+        // D-26: DPA / shore management see all company vessels.
+        if (directoryRes.error) throw directoryRes.error;
+        const directory: Vessel[] = directoryRes.data || [];
         setCompanyVessels(directory);
         // Same rows as `.neq('status', 'Sold')`, which also drops a null status.
-        vesselsData = directory.filter((v) => v.status != null && v.status !== 'Sold');
-      } else {
-        // Other users see only their assigned vessels
-        const [assignmentRes, directoryRes] = await Promise.all([
-          supabase
-            .from('crew_assignments')
-            .select('vessel_id')
-            .eq('user_id', profile.user_id)
-            .eq('is_current', true),
-          directoryRequest,
-        ]);
+        vesselsData = directory.filter(reachable);
+        allowAllVessels = true;
+      } else if (mode.source === 'legacy') {
+        // D-26: other users see only their assigned vessels.
+        const { data: assignments, error: assignmentError } = legacyAssignmentRes ?? (await assignmentsRequest());
         if (!current()) return;
-        const { data: assignments, error: assignmentError } = assignmentRes;
 
         if (assignmentError) throw assignmentError;
         if (directoryRes.error) {
@@ -212,9 +283,42 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           if (!current()) return;
 
           if (error) throw error;
-          vesselsData = data || [];
+          vesselsData = (data || []).filter(reachable);
         }
         setCompanyVessels(directory);
+      } else if (mode.source === 'membership') {
+        // A membership an admin manages: its reach is cut from the company
+        // list, so that list failing is an error here (fail closed).
+        const m = mode.membership;
+        if (directoryRes.error) throw directoryRes.error;
+        const directory: Vessel[] = directoryRes.data || [];
+        let assignments: { vessel_id: string }[] = [];
+        if (m.vesselScope === 'assigned' && m.kind !== 'external') {
+          const { data, error } = legacyAssignmentRes ?? (await assignmentsRequest());
+          if (!current()) return;
+          if (error) throw error;
+          assignments = data || [];
+        }
+        const ids = new Set(
+          membershipReach({
+            companyId,
+            profileRole: profile.role ?? null,
+            rbacRoles: [],
+            assignments: assignments.map((a) => ({ vesselId: a.vessel_id, isCurrent: true })),
+            companyVessels: directory.map(toReachVessel),
+            membership: m,
+            // The own-row policy hides the row from a disabled user, so a row
+            // read here belongs to an active user.
+            userActive: true,
+            now: new Date().toISOString(),
+          }).vesselIds,
+        );
+        setCompanyVessels(directory);
+        vesselsData = directory.filter((v) => ids.has(v.id));
+        allowAllVessels = m.vesselScope === 'all';
+      } else {
+        // Memberships are live and the user has no usable one: no reach.
+        setCompanyVessels([]);
       }
 
       setVessels(vesselsData);
@@ -224,7 +328,7 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const savedIsAllVessels = localStorage.getItem(STORAGE_KEY_ALL_VESSELS) === 'true';
       const savedVesselId = localStorage.getItem(STORAGE_KEY_VESSEL_ID);
 
-      if (savedIsAllVessels && canAccessAllVessels) {
+      if (savedIsAllVessels && allowAllVessels) {
         setIsAllVessels(true);
         setSelectedVesselState(null);
       } else if (savedVesselId) {
@@ -236,7 +340,7 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           // Saved vessel not found, default to first vessel
           setSelectedVesselState(vesselsData[0]);
           setIsAllVessels(false);
-        } else if (canAccessAllVessels) {
+        } else if (allowAllVessels) {
           // No vessels found but user can access all - set to all vessels mode
           setIsAllVessels(true);
         }
@@ -244,7 +348,7 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         // No saved selection, default to first vessel
         setSelectedVesselState(vesselsData[0]);
         setIsAllVessels(false);
-      } else if (canAccessAllVessels) {
+      } else if (allowAllVessels) {
         // No vessels but user can access all - set to all vessels mode
         setIsAllVessels(true);
       }
@@ -261,7 +365,7 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setLoadedFor(owner);
       }
     }
-  }, [profile?.company_id, profile?.user_id, canAccessAllVessels]);
+  }, [profile?.company_id, profile?.user_id, profile?.role, legacyAllVessels]);
 
   // A different user (or none): drop the previous user's vessels and
   // selection, and supersede any load still running for them. Declared
@@ -275,6 +379,7 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setSelectedVesselState(null);
     setIsAllVessels(false);
     setLoadError(null);
+    setReach(NO_REACH);
     if (!profileUserId) setLoadedFor(null);
   }, [profileUserId]);
 
@@ -362,7 +467,7 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     loading: stale || (awaitingProfile ? waitingForProfile : loading),
     refreshVessels,
     // Never another user's role (the profile is swapped with the session user).
-    canAccessAllVessels: foreignProfile ? false : canAccessAllVessels,
+    canAccessAllVessels,
     companyVessels: codeSource,
     vesselCodes,
     getVesselCodeById,
@@ -371,6 +476,7 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // Never another user's error, nor one served before their lists (D-25, D-41).
     loadError: stale ? null : loadError,
     retryVessels: refreshVessels,
+    reach: servedReach,
   };
 
   return <VesselContext.Provider value={value}>{children}</VesselContext.Provider>;

@@ -76,6 +76,10 @@ vi.mock('@/integrations/supabase/client', () => {
         // Decided when the result is produced, so a held read fails or not
         // as the table stands when it is released.
         const result = () => {
+          // account_memberships is not live (D-01): VesselContext keeps the D-26 legacy rules.
+          if (table === 'account_memberships') {
+            return { data: null, error: { code: 'PGRST205', message: "Could not find the table 'public.account_memberships' in the schema cache" } };
+          }
           if (h.failTables.has(table)) return { data: null, error: { message: 'Service Unavailable', code: '503' } };
           const rows = (tables[table] ?? []).filter((r) => filters.every((f) => f(r)));
           return { data: single ? rows[0] ?? null : rows, error: null };
@@ -91,7 +95,8 @@ vi.mock('@/integrations/supabase/client', () => {
   return {
     supabase: {
       from,
-      rpc: () => Promise.resolve({ data: [], error: null }),
+      // The account check after sign-in (Phase 2 spec §B.3) answers active; the role RPCs answer none.
+      rpc: (name: string) => Promise.resolve({ data: name === 'record_session_start' ? 'active' : [], error: null }),
       auth: {
         onAuthStateChange: (cb: (event: string, session: unknown) => void) => {
           h.listeners.push(cb);

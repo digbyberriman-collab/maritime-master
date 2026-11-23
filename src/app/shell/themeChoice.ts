@@ -7,8 +7,9 @@
  * `user_preferences.theme`, so a new device starts with it (D-19 decides
  * when a stored value is adopted). This is the same behaviour as the
  * Appearance page's own `chooseTheme`; the shell and the palette call this
- * hook so neither writes the preference its own way. Density stays
- * device-only (`useDensity`, D-19).
+ * hook so neither writes the preference its own way. Density follows the
+ * same device-first rule through `useDensity` and ./uiPreferenceSync.ts
+ * (mirrored to `user_preferences.density` once that column is live, D-19).
  *
  * A failed mirror never reverts the device choice: it shows a notice and the
  * theme stays applied here (no fake success, no silent failure).

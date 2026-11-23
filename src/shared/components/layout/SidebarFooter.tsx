@@ -1,6 +1,10 @@
 /**
  * The sidebar's footer (spec §4.5): the "Show roadmap" switch for owners and
- * admins (D-06, D-29) and the collapse-to-icons toggle (⌘/Ctrl+B). Both are
+ * admins (D-06, D-29) and the collapse-to-icons toggle (⌘/Ctrl+B). The
+ * switch stores the choice on this device and mirrors it to the account
+ * once `user_preferences.show_roadmap` is live; a failed mirror raises the
+ * "Show roadmap applied on this device only" notice from the setter
+ * (useShowRoadmapPreference, D-19) and the switch keeps its position. Both are
  * 44 px targets on the sidebar's own tokens, which stay Abyss in both themes.
  * The toggle names itself and its shortcut in the shell's icon tooltip
  * (IconTooltip, D-92) on hover and keyboard focus, to its right like the

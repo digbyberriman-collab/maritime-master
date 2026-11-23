@@ -59,11 +59,38 @@ export interface PendingFunctionShape {
   Returns: unknown;
 }
 
+/**
+ * New columns on a table that is already in the generated types (Phase 2:
+ * `vessels.code`, `user_preferences.density`, …). No `Relationships` key, so
+ * the intersection with the generated table keeps the generated relationships
+ * (embedded selects keep working). Declared in a module's
+ * `*PendingColumns` type, never in `*PendingTables`: the table itself is live.
+ */
+export interface PendingColumnsShape {
+  Row: object;
+  Insert: object;
+  Update: object;
+}
+
 export type PendingTables = Record<string, PendingTableShape>;
 export type PendingViews = Record<string, PendingViewShape>;
 export type PendingFunctions = Record<string, PendingFunctionShape>;
+export type PendingColumnSets = Record<string, PendingColumnsShape>;
 
 type None = Record<never, never>;
+/** "No pending tables / views / functions" for a `pendingClient` type argument slot. */
+export type NoPending = None;
+
+/**
+ * Pending columns of a live table, from the new columns' row type: every new
+ * column optional on insert and update (they all have defaults or are
+ * nullable, or are set by a trigger).
+ */
+export type PendingColumns<Row extends object> = {
+  Row: Row;
+  Insert: Partial<Row>;
+  Update: Partial<Row>;
+};
 
 /**
  * A pending table from its row type: every column optional on insert except
@@ -90,12 +117,14 @@ export type UndeclaredRow = { id: string } & Record<string, unknown>;
  * The generated `Database` with a module's pending tables, views and
  * functions merged into `public`.
  */
-export type WithPending<T extends PendingTables, V extends PendingViews = None, F extends PendingFunctions = None> = Omit<
-  Database,
-  'public'
-> & {
+export type WithPending<
+  T extends PendingTables,
+  V extends PendingViews = None,
+  F extends PendingFunctions = None,
+  C extends PendingColumnSets = None,
+> = Omit<Database, 'public'> & {
   public: Omit<Database['public'], 'Tables' | 'Views' | 'Functions'> & {
-    Tables: Database['public']['Tables'] & T;
+    Tables: Database['public']['Tables'] & T & C;
     Views: Database['public']['Views'] & V;
     Functions: Database['public']['Functions'] & F;
   };
@@ -103,11 +132,15 @@ export type WithPending<T extends PendingTables, V extends PendingViews = None, 
 
 /**
  * The app's Supabase client, typed with a module's pending tables (and
- * optionally views and functions). The same client instance (session, RLS);
- * only the type is widened.
+ * optionally views, functions and new columns of live tables). The same
+ * client instance (session, RLS); only the type is widened.
  */
-export const pendingClient = <T extends PendingTables, V extends PendingViews = None, F extends PendingFunctions = None>() =>
-  supabase as unknown as SupabaseClient<WithPending<T, V, F>>;
+export const pendingClient = <
+  T extends PendingTables,
+  V extends PendingViews = None,
+  F extends PendingFunctions = None,
+  C extends PendingColumnSets = None,
+>() => supabase as unknown as SupabaseClient<WithPending<T, V, F, C>>;
 
 /**
  * True when a query failed because a table, view, column or RPC is not in
