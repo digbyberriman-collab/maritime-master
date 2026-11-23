@@ -32,6 +32,11 @@
 -- export.requested, export.logged, export.<status>; ready / failed carry the
 -- notification export_ready / export_failed (file 15 fans them out to the
 -- requester). Payloads carry the kind and source key, never the params.
+-- Who exported whose data is itself personal data: the RESTRICTIVE policy
+-- record_events_export_job_audience narrows export events to the
+-- export_jobs audience (the requester while active, permission-audit
+-- viewers of the company), whatever record_readable() allows for other
+-- record events.
 --
 -- Errors: a business rule raises 22023 with a stable code as the message;
 -- authorisation 42501; an unknown id P0002.
@@ -119,6 +124,16 @@ CREATE POLICY export_jobs_select ON public.export_jobs
   FOR SELECT TO authenticated
   USING ((requested_by = auth.uid() AND public.user_is_active(auth.uid()))
          OR public.has_capability('admin.access.permission_audit_log.view', company_id));
+
+-- Export events in record_events follow the export_jobs audience: the
+-- EXISTS runs under export_jobs RLS, so the audience is exactly
+-- export_jobs_select and never drifts from it (jobs are never deleted, so
+-- it holds through purged). Other record events keep record_events_select.
+DROP POLICY IF EXISTS record_events_export_job_audience ON public.record_events;
+CREATE POLICY record_events_export_job_audience ON public.record_events
+  AS RESTRICTIVE FOR SELECT TO authenticated
+  USING (entity_type IS DISTINCT FROM 'export_job'
+         OR EXISTS (SELECT 1 FROM public.export_jobs AS j WHERE j.id = record_events.entity_id));
 
 -- ---------------------------------------------------------------- guard (storm.record_engine, every role)
 
@@ -464,7 +479,7 @@ GRANT EXECUTE ON FUNCTION public.cancel_export_job(uuid) TO authenticated;
 
 -- ---------------------------------------------------------------- comments
 
-COMMENT ON TABLE public.export_jobs IS 'Export jobs (gap/08 EX1, EX3, EX4; C10): server jobs requested -> running -> ready | failed (-> expired -> purged), client exports logged as ready before the download. Read: the requester, and admins who may read the permission audit log. No client writes: request_export / log_client_export / cancel_export_job; only export_job_transition (service role) moves a server job (trg_export_jobs_guard, every role). export_downloads lands with the export builder (C10, deferred).';
+COMMENT ON TABLE public.export_jobs IS 'Export jobs (gap/08 EX1, EX3, EX4; C10): server jobs requested -> running -> ready | failed (-> expired -> purged), client exports logged as ready before the download. Read: the requester, and admins who may read the permission audit log; their record_events (entity export_job) have the same audience (record_events_export_job_audience). No client writes: request_export / log_client_export / cancel_export_job; only export_job_transition (service role) moves a server job (trg_export_jobs_guard, every role). export_downloads lands with the export builder (C10, deferred).';
 COMMENT ON FUNCTION public.export_jobs_guard() IS 'Trigger: export jobs change only under storm.record_engine (every role); never deleted; a job created outside the engine starts requested (server).';
 COMMENT ON FUNCTION public.export_module_key(text) IS 'The module of an export source key (its first snake_case word). Pure.';
 COMMENT ON FUNCTION public.export_job_log(public.export_jobs, text, text, text, text) IS 'Internal: one record_events row for an export job (entity export_job; ids and codes only).';

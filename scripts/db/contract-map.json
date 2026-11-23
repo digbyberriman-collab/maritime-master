@@ -56,7 +56,9 @@
       "notification_outbox": "service role only: the browser never reads it (spec §A.15, §B.1)"
     },
     "views": {},
-    "columns": {},
+    "columns": {
+      "admin_action_log.company_id": "server-side only: the service role and definers write the admin action log and no browser code reads it (20261123010400)"
+    },
     "functions": {
       "export_module_key": "pure helper of the export engine (a source key's module); no browser caller",
       "format_reference_text": "pure formatter; the client has its TS original (src/lib/records/reference.ts)",
@@ -70,7 +72,7 @@
       "vessel_in_reachable_state": "pure helper of the reach rules; the client has its TS original (membershipReach.ts)",
       "permission_override_write_allowed": "RLS predicate (rule 11): policies call it, the browser does not",
       "rbac_user_roles_write_allowed": "RLS predicate (rule 11): policies call it, the browser does not",
-      "user_roles_write_allowed": "RLS predicate (rule 11): policies call it, the browser does not",
+      "has_role_in_company": "RLS predicate (rule 11) of the company-scoped legacy role policies (20261123010500): policies call it, the browser does not",
       "user_company_for_admin": "RLS predicate of rbac_user_roles (spec §A.4, §A.8): policies call it",
       "record_readable": "RLS predicate of every record table (spec §A.10): policies call it",
       "storage_path_allowed": "RLS predicate of the records bucket (spec §A.13): storage policies call it",

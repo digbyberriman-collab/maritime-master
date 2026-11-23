@@ -14,6 +14,13 @@
  * tests (supabase/tests/sql/**\/*.test.sql, each in a rolled-back
  * transaction) -> JSON report -> teardown.
  *
+ * Every exit path is honest and leaves nothing behind: a provisional report
+ * (exitCode null, "run did not finish") replaces any earlier report as soon
+ * as the report path is known; success, failure, SIGINT / SIGTERM / SIGHUP
+ * and uncaught errors all tear the cluster down, kill the helper processes,
+ * remove the schema snapshots ($TMPDIR/storm-schema-*-<pid>.json) and write
+ * the final report with the exit code the process exits with.
+ *
  * Exit codes: 0 green, 1 failure, 2 no PostgreSQL (without --allow-skip),
  * 3 usage error. The live Supabase project is never contacted.
  */
@@ -61,6 +68,39 @@ const short = (text, max = 600) => {
 let activeCluster = null;
 let keepCluster = false;
 let finalised = false;
+/** Writes the run's report with an exit code (set by main once the report path is known; synchronous). */
+let emitReport = null;
+/** The run's problem list (the report's `problems`), so the exit paths can add to it. */
+let runProblems = null;
+/** Node helpers (schema-export, check-pending-contract) still running; killed on teardown so none writes after it. */
+const runningNode = new Set();
+
+/** The contract phase's schema snapshots for this run (spec §D.7); none may outlive it. */
+function snapshotFiles() {
+  return [join(tmpdir(), `storm-schema-legacy-${process.pid}.json`), join(tmpdir(), `storm-schema-buildout-${process.pid}.json`)];
+}
+
+/** Removes this run's schema snapshots. Synchronous and idempotent: it runs from the exit and signal handlers. */
+function cleanupSnapshots() {
+  for (const f of snapshotFiles()) {
+    try {
+      rmSync(f, { force: true });
+    } catch {
+      // nothing more can be done from an exit handler
+    }
+  }
+}
+
+function killRunningNode() {
+  for (const child of runningNode) {
+    try {
+      child.kill('SIGKILL');
+    } catch {
+      // already gone
+    }
+  }
+  runningNode.clear();
+}
 
 function printKept(cluster) {
   note(`cluster kept: ${cluster.root} (data ${cluster.dataDir})`);
@@ -68,11 +108,17 @@ function printKept(cluster) {
   note(`stop:    ${stopCommandLine(cluster)}`);
 }
 
-/** Tears the cluster down (or prints how to reach it with --keep). Idempotent, synchronous. */
+/**
+ * Tears the run down: kills psql and the node helpers, removes the schema
+ * snapshots, then stops and removes the cluster (or prints how to reach it
+ * with --keep; the snapshots go either way). Idempotent, synchronous.
+ */
 function finaliseCluster() {
   if (finalised) return;
   finalised = true;
   killRunningPsql();
+  killRunningNode();
+  cleanupSnapshots();
   if (!activeCluster) return;
   if (keepCluster) {
     try {
@@ -87,25 +133,41 @@ function finaliseCluster() {
   note(removed ? `cluster removed: ${activeCluster.root}` : `WARNING: could not remove ${activeCluster.root}; stop it with: ${stopCommandLine(activeCluster)}`);
 }
 
+/**
+ * Ends the run from an exit path that is not main's own return (a signal,
+ * an uncaught error, main rejecting): records `problem`, tears down, writes
+ * the final report with `code`, and exits with the same code.
+ */
+function abortRun(problem, code) {
+  runProblems?.push(problem);
+  note(`FAIL: ${problem}`);
+  finaliseCluster();
+  emitReport?.(code);
+  process.exit(code);
+}
+
+let exitHandlersInstalled = false;
 function installExitHandlers() {
+  if (exitHandlersInstalled) return;
+  exitHandlersInstalled = true;
   const onSignal = (signal, code) => () => {
     note(`${signal}: stopping`);
-    finaliseCluster();
-    process.exit(code);
+    abortRun(`interrupted by ${signal}`, code);
   };
   process.on('SIGINT', onSignal('SIGINT', 130));
   process.on('SIGTERM', onSignal('SIGTERM', 143));
   process.on('SIGHUP', onSignal('SIGHUP', 129));
   process.on('uncaughtException', (err) => {
     process.stderr.write(`harness: uncaught error: ${err?.stack ?? err}\n`);
-    finaliseCluster();
-    process.exit(1);
+    abortRun(`harness error: ${err?.message ?? err}`, 1);
   });
   process.on('unhandledRejection', (err) => {
     process.stderr.write(`harness: unhandled rejection: ${err?.stack ?? err}\n`);
-    finaliseCluster();
-    process.exit(1);
+    abortRun(`harness error: ${err?.message ?? err}`, 1);
   });
+  // Last resort (e.g. process.exit from elsewhere): no cluster, process or
+  // snapshot outlives the run; the report then keeps its provisional
+  // "run did not finish".
   process.on('exit', () => finaliseCluster());
 }
 
@@ -123,8 +185,12 @@ function removeStaleClusters(binDir) {
       alive = err.code === 'EPERM';
     }
     if (alive) continue;
-    stopCluster({ root, binDir, dataDir: join(root, 'data'), started: true, asPostgres: process.getuid?.() === 0 });
-    note(`removed stale cluster ${root} (its harness run is gone)`);
+    const { removed } = stopCluster({ root, binDir, dataDir: join(root, 'data'), started: true, asPostgres: process.getuid?.() === 0 });
+    note(
+      removed
+        ? `removed stale cluster ${root} (its harness run is gone)`
+        : `WARNING: could not remove stale cluster ${root} (its harness run is gone); remove it by hand`,
+    );
   }
 }
 
@@ -286,6 +352,7 @@ async function loadTestlib(ctx) {
 function runNode(script, args) {
   return new Promise((resolvePromise) => {
     const child = spawn(process.execPath, [script, ...args], { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] });
+    runningNode.add(child);
     let stdout = '';
     let stderr = '';
     child.stdout.on('data', (d) => {
@@ -294,7 +361,13 @@ function runNode(script, args) {
     child.stderr.on('data', (d) => {
       stderr += d;
     });
-    child.on('close', (code) => resolvePromise({ code: code ?? 1, stdout, stderr }));
+    child.on('error', (err) => {
+      stderr += `${err.message}\n`;
+    });
+    child.on('close', (code) => {
+      runningNode.delete(child);
+      resolvePromise({ code: code ?? 1, stdout, stderr });
+    });
   });
 }
 
@@ -309,8 +382,8 @@ const CONTRACT = {
   exporter: join(ROOT, 'scripts/db/schema-export.mjs'),
   checker: join(ROOT, 'scripts/db/check-pending-contract.mjs'),
   configured: () => existsSync(CONTRACT.exporter) && existsSync(CONTRACT.checker),
-  legacySnapshot: () => join(tmpdir(), `storm-schema-legacy-${process.pid}.json`),
-  buildOutSnapshot: () => join(tmpdir(), `storm-schema-buildout-${process.pid}.json`),
+  legacySnapshot: () => snapshotFiles()[0],
+  buildOutSnapshot: () => snapshotFiles()[1],
 };
 
 const exporterArgs = (ctx) => ['--psql', psqlConnectionArgs(ctx.cluster).join(' '), '--psql-bin', join(ctx.cluster.binDir, 'psql')];
@@ -347,7 +420,8 @@ async function contract(ctx) {
       else problems.push(...result.mismatches.map((m) => `${m.message} [${m.key}]`));
     }
   }
-  for (const f of [CONTRACT.legacySnapshot(), CONTRACT.buildOutSnapshot()]) rmSync(f, { force: true });
+  // Done with them; teardown removes them too, on every other path.
+  cleanupSnapshots();
   ctx.report.contract = {
     ok: problems.length === 0,
     status: 'checked',
@@ -459,16 +533,39 @@ async function main() {
     problems: [],
     exitCode: null,
   };
-  const writeReport = (exitCode) => {
+  // One list for the whole run: the phases, the exit paths and the report share it.
+  const problems = report.problems;
+  runProblems = problems;
+  const writeReport = (exitCode, { quiet = false } = {}) => {
     report.exitCode = exitCode;
     report.durationMs = Date.now() - started;
     try {
       writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
-      note(`report: ${reportPath}`);
+      if (!quiet) note(`report: ${reportPath}`);
+      return true;
     } catch (err) {
       note(`WARNING: could not write the report to ${reportPath}: ${err.message}`);
+      return false;
     }
   };
+  // Provisional, at once: an earlier run's report (green or not) never
+  // survives this one. Every exit path below replaces it with the final one.
+  report.problems.push('run did not finish');
+  if (!writeReport(null, { quiet: true })) {
+    // A stale report the provisional one could not replace must not be read as this run's.
+    try {
+      rmSync(reportPath, { force: true });
+    } catch {
+      // the warning above already names the path
+    }
+  }
+  report.problems.length = 0;
+  emitReport = (exitCode) => {
+    if (exitCode !== 0 && problems.length === 0) problems.push(`exit code ${exitCode}`);
+    writeReport(exitCode);
+  };
+  keepCluster = options.keep;
+  installExitHandlers();
 
   const pg = discoverPgBin({ pgBin: options.pgBin });
   if (!pg.binDir) {
@@ -482,6 +579,7 @@ async function main() {
     }
     process.stderr.write(`harness: no PostgreSQL binaries found (need initdb, pg_ctl, postgres, psql; PostgreSQL >= 15).${tried ? ` Tried: ${tried}.` : ''} Pass --pg-bin <dir>, install PostgreSQL, or use --allow-skip.\n`);
     report.phases.discover = { ok: false, tried: pg.tried };
+    problems.push('no PostgreSQL binaries found');
     writeReport(2);
     return 2;
   }
@@ -490,18 +588,19 @@ async function main() {
   // Static inputs first: a bad replay.json or --file never starts a cluster.
   let migrations;
   let replayConfig;
-  const problems = [];
   try {
     migrations = listMigrations(MIGRATIONS_DIR);
     replayConfig = readReplayConfig(REPLAY_JSON);
   } catch (err) {
     process.stderr.write(`harness: ${err.message}\n`);
-    report.problems.push(err.message);
+    problems.push(err.message);
     writeReport(1);
     return 1;
   }
   if (options.file && !buildOutUpTo(migrations.buildOut, options.file)) {
     process.stderr.write(`harness: --file ${options.file}: not a build-out migration (version >= 20261123000000) in supabase/migrations\n\n${USAGE}\n`);
+    problems.push(`usage: --file ${options.file} is not a build-out migration`);
+    writeReport(3);
     return 3;
   }
 
@@ -510,27 +609,27 @@ async function main() {
   const replayProblems = validateReplayConfig(replayConfig, { legacyFiles: migrations.legacy, harnessDir: HARNESS_DIR });
   if (replayProblems.length) {
     notOk('replay.json is valid', replayProblems);
-    report.problems.push(...replayProblems.map((p) => `replay.json: ${p}`));
+    problems.push(...replayProblems.map((p) => `replay.json: ${p}`));
+    out(`1..${tapCount}`);
     writeReport(1);
     return 1;
   }
   ok(`replay.json is valid (${Object.keys(replayConfig.files ?? {}).length} governed file(s))`);
 
-  keepCluster = options.keep;
-  installExitHandlers();
   removeStaleClusters(pg.binDir);
-  const cluster = await startCluster({
-    binDir: pg.binDir,
-    onCreated: (c) => {
-      activeCluster = c;
-    },
-  });
-  report.cluster = { root: cluster.root, socketDir: cluster.sockDir, port: cluster.port, locale: cluster.locale, asPostgres: cluster.asPostgres };
-  note(`cluster ${cluster.root} (socket ${cluster.sockDir}, port ${cluster.port}, locale ${cluster.locale}${cluster.asPostgres ? ', running as postgres via runuser' : ''})`);
-
-  const ctx = { options, cluster, migrations, replayConfig, report, problems };
   const phases = plannedPhases(options);
   try {
+    // Inside the try: an initdb or pg_ctl failure is a harness error with a
+    // FAIL summary and a report, never a bare stack trace.
+    const cluster = await startCluster({
+      binDir: pg.binDir,
+      onCreated: (c) => {
+        activeCluster = c;
+      },
+    });
+    report.cluster = { root: cluster.root, socketDir: cluster.sockDir, port: cluster.port, locale: cluster.locale, asPostgres: cluster.asPostgres };
+    note(`cluster ${cluster.root} (socket ${cluster.sockDir}, port ${cluster.port}, locale ${cluster.locale}${cluster.asPostgres ? ', running as postgres via runuser' : ''})`);
+    const ctx = { options, cluster, migrations, replayConfig, report, problems };
     const created = await runPsql(cluster, { sql: `CREATE DATABASE ${cluster.database}`, database: 'postgres' });
     if (created.code !== 0) throw new Error(`CREATE DATABASE failed: ${firstError(created.stderr) ?? created.stderr}`);
     await runPhases(ctx, phases);
@@ -541,7 +640,6 @@ async function main() {
   }
 
   out(`1..${tapCount}`);
-  report.problems = problems;
   const exitCode = problems.length ? 1 : 0;
   note(exitCode === 0 ? `PASS (${((Date.now() - started) / 1000).toFixed(1)} s)` : `FAIL: ${problems.length} problem(s)`);
   for (const p of problems) note(`  - ${short(p, 300)}`);
@@ -578,7 +676,6 @@ main().then(
   },
   (err) => {
     process.stderr.write(`harness: ${err?.stack ?? err}\n`);
-    finaliseCluster();
-    process.exitCode = 1;
+    abortRun(`harness error: ${err?.message ?? err}`, 1);
   },
 );

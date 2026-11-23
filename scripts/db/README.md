@@ -27,7 +27,9 @@ flock /tmp/storm-db.lock node scripts/db/harness.mjs --keep
 # CI without PostgreSQL: exit 0 with a SKIP line instead of 2
 node scripts/db/harness.mjs --allow-skip
 
-# Unit tests of the harness itself (no cluster)
+# Tests of the harness itself. All but harness-lifecycle.test.mjs are unit tests (no cluster);
+# that file starts throwaway clusters, each through the lock itself, so never run this under the lock
+# (it is skipped without PostgreSQL binaries or flock)
 node --test scripts/db/test/*.test.mjs
 ```
 
@@ -59,10 +61,15 @@ Never start ad-hoc clusters on fixed ports: the harness picks a free port and a 
 | 1 | any failure: invalid `replay.json`, an unexpected replay failure, an `expect_failure` file that applied, a drift patch that failed, a fidelity miss without an exception, a build-out file that fails (pass 1) or fails on its second run (pass 2, not idempotent), an object defined in two build-out files (rule §0.2), a contract mismatch, a failing or aborted SQL test file, a test file with no assertion, or no test file matching `--tests` |
 | 2 | no PostgreSQL binaries (without `--allow-skip`) |
 | 3 | usage error (bad flag, `--report` inside the repo, `--file` that is not a build-out migration) |
+| 129, 130, 143 | interrupted by `SIGHUP`, `SIGINT`, `SIGTERM` (torn down, with a report that says so) |
+
+The report's `exitCode` is always the exit code the process exits with.
 
 ### Output
 
-TAP-like lines on stdout (`ok N - …`, `not ok N - …` with `  # ` diagnostics, `1..N` at the end), a `# PASS` / `# FAIL` summary and the report path. The JSON report:
+TAP-like lines on stdout (`ok N - …`, `not ok N - …` with `  # ` diagnostics, `1..N` at the end), a `# PASS` / `# FAIL` summary and the report path.
+
+The report records every run. As soon as the report path is known (after the flags parse), a provisional report replaces whatever the path held (`"exitCode": null`, `"problems": ["run did not finish"]`), so an earlier run's green report never survives a later run; when it cannot be written, the old file is removed. Every exit then writes the final one with the exit code: a pass or a failure, a usage error found after the path is known (`--file` that is not a build-out migration, exit 3), no PostgreSQL (exit 2), a signal (`"problems"` ends with `interrupted by SIGTERM` and so on; exit 129 / 130 / 143), an error in the harness itself, including `initdb` or `pg_ctl` failing (`not ok - harness error`, the `# FAIL` summary, `harness error: …`, exit 1). Only a run killed outright (`SIGKILL`) keeps the provisional report, which still says it did not finish. The JSON report:
 
 ```json
 {
@@ -84,7 +91,7 @@ TAP-like lines on stdout (`ok N - …`, `not ok N - …` with `  # ` diagnostics
 
 Binaries: `--pg-bin`, else `pg_config --bindir`, else the highest `/usr/lib/postgresql/<n>/bin`, else `PATH`. A directory counts when it has `initdb`, `pg_ctl`, `postgres` and `psql` and `postgres --version` is 15 or newer (`security_invoker` views).
 
-The cluster is `/tmp/storm-pg-<pid>/` with `data/`, the socket directory `s/` (unix socket paths must stay under 107 bytes, so never under the scratchpad) and `server.log`. `initdb -U postgres -A trust -E UTF8 --locale=C.UTF-8` (`--locale=C` when the system has no C.UTF-8); the server listens on the socket only (`listen_addresses=''`, a free port picked on 127.0.0.1 names the socket), with `fsync`, `synchronous_commit` and `full_page_writes` off. PostgreSQL refuses to run as root, so when the uid is 0 the directory is chowned to `postgres` and `initdb` / `pg_ctl` run through `runuser -u postgres --`; `psql` runs as the current user. Teardown (`pg_ctl stop -m immediate`, `rm -rf`) runs on success, failure, `SIGINT`, `SIGTERM`, `SIGHUP` and uncaught errors. A cluster left by a crashed run (its pid gone, no `KEPT` marker) is removed by the next run.
+The cluster is `/tmp/storm-pg-<pid>/` with `data/`, the socket directory `s/` (unix socket paths must stay under 107 bytes, so never under the scratchpad) and `server.log`. `initdb -U postgres -A trust -E UTF8 --locale=C.UTF-8` (`--locale=C` when the system has no C.UTF-8); the server listens on the socket only (`listen_addresses=''`, a free port picked on 127.0.0.1 names the socket), with `fsync`, `synchronous_commit` and `full_page_writes` off. PostgreSQL refuses to run as root, so when the uid is 0 the directory is chowned to `postgres` and `initdb` / `pg_ctl` run through `runuser -u postgres --`; `psql` runs as the current user. Teardown runs on success, failure, `SIGINT`, `SIGTERM`, `SIGHUP`, uncaught errors and process exit: it kills the psql and node helper processes still running, removes the contract phase's schema snapshots (`$TMPDIR/storm-schema-legacy-<pid>.json`, `$TMPDIR/storm-schema-buildout-<pid>.json`; also with `--keep`, which keeps only the cluster), then stops the cluster (`pg_ctl stop -m immediate`) and removes its directory (`rm -rf`); a directory it cannot remove is reported as a `WARNING` with the stop command, never as removed. A cluster left by a crashed run (its pid gone, no `KEPT` marker) is removed by the next run, which says `removed stale cluster …` only when the directory is gone, else `WARNING: could not remove stale cluster …; remove it by hand`.
 
 Locale note: the harness runs in `C.UTF-8`, Supabase in `en_US.UTF-8`. SQL that must agree with JS on letter case (vessel codes, D-03) uses `translate()` for ASCII, never `upper()` / `lower()`.
 
@@ -181,6 +188,8 @@ The client reads every build-out table, column and RPC through hand-written pend
 
 1. After the legacy replay, `schema-export.mjs --psql … --psql-bin … --out <legacy.json>` snapshots the public schema: every table and view with its columns (`format_type`, nullability, default, enum labels, single-column CHECKs and, when a CHECK is exactly an `IN (…)` list, its values) and every function by identity (argument names, modes and defaults, return type, set / relation / enum returns, SECURITY DEFINER, volatility, language, EXECUTE grantees, a body hash).
 2. After the build-out, `schema-export.mjs … --baseline <legacy.json> --out <export.json>` writes only what the build-out added or changed: new tables and views, new columns on legacy tables, new or redefined functions.
+
+The two snapshots are `$TMPDIR/storm-schema-legacy-<pid>.json` and `$TMPDIR/storm-schema-buildout-<pid>.json`. They live only for the run: the phase removes them when it is done, and teardown removes them on every other exit (a failed build-out that skips the phase, a signal, an error), with `--keep` too.
 3. `check-pending-contract.mjs --export <export.json> --json` loads the files and type names of `contract-map.json` with a TypeScript Program + TypeChecker (`@/` -> `src/`, `strictNullChecks` on so `| null` survives) and fails on a missing table / view / column / function, a type or nullability mismatch (tables and new columns; view columns are always nullable in the catalogue), a literal union without an `IN (…)` CHECK or a CHECK without its union (CC-13; on a view, a union is a warning: views carry no CHECK), an argument name or optionality (`?` = has a DEFAULT) mismatch, a return-shape mismatch (the table's row type for `RETURNS <table>`, `T[]` for `SETOF`), a pending function `authenticated` cannot execute, and any new table, view, legacy column or browser-executable function that no pending file declares.
 
 `contract-map.json` governs it: `files` (= spec §B.1: each pending file, its type names and the names it must declare), `notMirrored` (new objects the browser never calls, each with a reason: the service-only outbox, RLS predicates, pure helpers) and `knownMismatches` (`{ key, followup }`: a reported mismatch whose fix is a Lane 2 followup; listed, not failed). A `notMirrored` or `knownMismatches` entry that no longer matches anything fails the run ("remove the entry"), so the map cannot rot. The checker never edits a TS file. Warnings (never failures) name view unions and legacy functions in `types.ts` that the browser can no longer execute.
@@ -312,7 +321,7 @@ The kept database holds the replay, the build-out and the test library (each tes
 | `scripts/db/lib/migrations.mjs` | version order, `replay.json` validation and verdicts |
 | `scripts/db/lib/sql.mjs` | statement splitter, one-definition scanner |
 | `scripts/db/lib/tests.mjs` | test discovery, globs, wrapper, TAP parsing |
-| `scripts/db/test/*.test.mjs` | `node --test` unit tests (no cluster) |
+| `scripts/db/test/*.test.mjs` | `node --test` unit tests (no cluster), plus `harness-lifecycle.test.mjs`: a failing build-out, a `SIGTERM`, an `initdb` failure and a late usage error each leave no cluster and no schema snapshot, and a report whose `exitCode` is the exit code (real throwaway clusters, each run through the lock; skipped without PostgreSQL or `flock`) |
 | `supabase/tests/harness/supabase-stub.sql` | the Supabase stub |
 | `supabase/tests/harness/testlib.sql` | the `tests` schema |
 | `supabase/tests/harness/replay.json`, `drift/*.sql` | replay governance and drift patches |

@@ -1220,13 +1220,29 @@ BEGIN
     END IF;
   END IF;
 
-  -- Idempotent on (kind, entity), serialised per pair.
+  -- An entity id binds the envelope to a domain row: from a signed-in
+  -- session only a domain definer that has verified that row (company,
+  -- vessel, module) may pass one, and it says so with the transaction-local
+  -- flag storm.record_domain (D-159 style refusal otherwise). The browser
+  -- opens entity-less envelopes; the service role is trusted.
+  IF p_entity_id IS NOT NULL AND v_uid IS NOT NULL AND coalesce(current_setting('storm.record_domain', true), '') <> 'on' THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'entity_unverified',
+      DETAIL = 'An entity-bound envelope is opened by the domain function that owns the entity.';
+  END IF;
+
+  -- Idempotent on (kind, entity), serialised per pair; never an envelope of
+  -- another company (42501) or of another vessel than the one asked for
+  -- (22023 envelope_scope_mismatch).
   IF p_entity_id IS NOT NULL THEN
     PERFORM pg_advisory_xact_lock(hashtextextended('record_envelope:' || k.key || ':' || p_entity_id::text, 0));
     SELECT * INTO e FROM public.record_envelopes WHERE kind_key = k.key AND entity_id = p_entity_id;
     IF FOUND THEN
       IF e.company_id <> v_company OR (v_uid IS NOT NULL AND NOT public.record_readable(e.company_id, e.vessel_id)) THEN
         RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'record_access_denied';
+      END IF;
+      IF e.vessel_id IS DISTINCT FROM p_vessel_id THEN
+        RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'envelope_scope_mismatch',
+          DETAIL = 'That entity already has an envelope on another vessel.';
       END IF;
       RETURN e;
     END IF;
@@ -1482,7 +1498,7 @@ COMMENT ON FUNCTION public.record_caller_reaches(uuid, uuid, uuid) IS 'Internal:
 COMMENT ON FUNCTION public.record_impersonating() IS 'Internal: the JWT marks a login-as session (app_metadata.impersonating).';
 COMMENT ON FUNCTION public.record_engine_apply(uuid, text, text, jsonb, jsonb) IS 'Internal: applies an engine outcome (status, stamps, effects, whose move, version, one event) under storm.record_engine.';
 COMMENT ON FUNCTION public.record_whose_move(uuid) IS 'whoseMove() over the envelope status and its status_updates thread. Internal (service role).';
-COMMENT ON FUNCTION public.record_open_envelope(text, uuid, uuid, text) IS 'Opens a record envelope for a kind (vessel or fleet), with its reference and cycle-1 slots; idempotent on (kind, entity).';
+COMMENT ON FUNCTION public.record_open_envelope(text, uuid, uuid, text) IS 'Opens a record envelope for a kind (vessel or fleet), with its reference and cycle-1 slots; idempotent on (kind, entity) within the same company and vessel (42501 record_access_denied / 22023 envelope_scope_mismatch otherwise). From a signed-in session an entity id needs the transaction-local storm.record_domain flag a domain definer sets after verifying the entity (22023 entity_unverified).';
 COMMENT ON FUNCTION public.record_transition(uuid, text, jsonb, integer) IS 'The only status change path for a record (D-132): server-derived party and guards, record_transition_decide, effects applied, one event. Returns a result envelope.';
 COMMENT ON FUNCTION public.record_set_section_digests(uuid, jsonb) IS 'Merges section digests (sha256 hex) into an envelope and recomputes content_digest. Service role / domain definers only.';
 COMMENT ON FUNCTION public.record_slot_digest(uuid, text[]) IS 'The current digest of the covered sections of an envelope. Service role only.';

@@ -44,12 +44,24 @@ SELECT tests.is_empty(
      WHERE storable AND public.module_enabled(tests.id('ms-vessel:' || ord), key, today::date) IS DISTINCT FROM expected$q$,
   'module_enabled = resolveModuleSettings(...).isModuleOn(key) for every storable case (missing row, enabled false, enabled_from past / today / future, dotted parents, odd keys)');
 -- The other cases hold strings a date column never returns: the TS branch for them is unreachable from server data.
+-- pg_temp.is_date is pg_input_is_valid(v, 'date') for PostgreSQL 15 too (that function is 16+; the harness floor
+-- is 15). The file runs in a transaction that is rolled back, so the helper never outlives it. The casts sit in a
+-- CASE behind it: the planner orders plain AND quals by cost, so they could otherwise run first and raise.
+CREATE FUNCTION pg_temp.is_date(v text) RETURNS boolean LANGUAGE plpgsql AS $f$
+BEGIN
+  PERFORM v::date;
+  RETURN true;
+EXCEPTION WHEN others THEN
+  RETURN false;
+END
+$f$;
 SELECT tests.is_empty(
   $q$SELECT c.name, r ->> 'enabledFrom' AS v FROM ms_cases AS c CROSS JOIN LATERAL jsonb_array_elements(c.rows) AS r
      WHERE NOT c.storable AND r ->> 'enabledFrom' IS NOT NULL
-       AND pg_input_is_valid(r ->> 'enabledFrom', 'date')
-       AND (r ->> 'enabledFrom')::date BETWEEN DATE '0001-01-01' AND DATE '9999-12-31'
-       AND (r ->> 'enabledFrom')::date::text = r ->> 'enabledFrom'$q$,
+       AND CASE WHEN pg_temp.is_date(r ->> 'enabledFrom')
+                THEN (r ->> 'enabledFrom')::date BETWEEN DATE '0001-01-01' AND DATE '9999-12-31'
+                     AND (r ->> 'enabledFrom')::date::text = r ->> 'enabledFrom'
+                ELSE false END$q$,
   'no non-storable case value is a YYYY-MM-DD a date column can return (garbage, timestamps, year 10000, impossible days are refused or normalised)');
 SELECT tests.ok((SELECT count(*) FROM ms_cases WHERE NOT storable) >= 10, 'the fixture pins at least 10 malformed-date cases');
 SELECT tests.throws(format($q$INSERT INTO public.vessel_module_settings (vessel_id, module_key, enabled_from) VALUES (%L, 'crew_hor', 'infinity')$q$, tests.id('ms-vessel:1')), '23514', 'enabled_from infinity is refused (it would read back as a non-date)');

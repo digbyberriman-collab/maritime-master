@@ -61,7 +61,14 @@ SELECT tests.reset_role();
 -- ------------------------------------------------------------ record_open_envelope
 
 SELECT tests.as_user(tests.user_id('A.crew_dra'));
+-- An entity-bound envelope from a session needs the domain flag (a domain
+-- definer that verified the entity sets it); the browser call is refused.
+SELECT tests.throws_like(format($q$SELECT public.record_open_envelope('test.permit', %L, %L)$q$, tests.vessel_id('A.dra'), tests.id('permit:1')),
+                         '22023', 'entity_unverified', 'a browser call with an entity id is refused');
+SELECT tests.is((SELECT count(*) FROM public.record_envelopes WHERE entity_id = tests.id('permit:1')), 0::bigint, 'and opens nothing');
+SELECT set_config('storm.record_domain', 'on', true);
 CREATE TEMP TABLE env ON COMMIT DROP AS SELECT * FROM public.record_open_envelope('test.permit', tests.vessel_id('A.dra'), tests.id('permit:1'), '  Hot work, engine room  ');
+SELECT set_config('storm.record_domain', '', true);
 GRANT SELECT ON env TO PUBLIC;
 SELECT tests.reset_role();
 SELECT tests.results_eq(
@@ -77,7 +84,29 @@ SELECT tests.results_eq(
   'template defaults: required, witnessed on vessel slots only');
 SELECT tests.is((SELECT count(*) FROM public.record_events WHERE envelope_id = (SELECT id FROM env) AND action = 'created' AND party = 'vessel'), 1::bigint, 'event created');
 SELECT tests.as_user(tests.user_id('A.crew_dra'));
-SELECT tests.is((public.record_open_envelope('test.permit', tests.vessel_id('A.dra'), tests.id('permit:1'))).id, (SELECT id FROM env), 'idempotent on (kind, entity): the same envelope');
+SELECT set_config('storm.record_domain', 'on', true);
+SELECT tests.is((public.record_open_envelope('test.permit', tests.vessel_id('A.dra'), tests.id('permit:1'))).id, (SELECT id FROM env), 'idempotent on (kind, entity): the same envelope (with the domain flag the call works)');
+-- The idempotent branch never hands back an envelope of another vessel.
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.throws_like(format($q$SELECT public.record_open_envelope('test.permit', %L, %L, 'real')$q$, tests.vessel_id('A.hyd'), tests.id('permit:1')),
+                         '22023', 'envelope_scope_mismatch', 'the same entity asked for on another vessel is refused (not the DRAAK envelope)');
+SELECT set_config('storm.record_domain', '', true);
+-- A second company cannot pre-bind an entity id: its browser call is refused,
+-- so the id stays free for its real owner. (Inside a savepoint: the extra
+-- envelopes are rolled back so the counts below stay as they were.)
+SAVEPOINT entity_checks;
+SELECT tests.as_user(tests.user_id('B.admin'));
+SELECT tests.throws_like(format($q$SELECT public.record_open_envelope('test.permit', %L, %L)$q$, tests.vessel_id('B.lev'), tests.id('a-entity-2')),
+                         '22023', 'entity_unverified', 'company B cannot pre-bind an entity id from a session');
+SELECT tests.as_user(tests.user_id('A.crew_dra'));
+SELECT set_config('storm.record_domain', 'on', true);
+SELECT tests.ok((public.record_open_envelope('test.permit', tests.vessel_id('A.dra'), tests.id('a-entity-2'))).company_id = tests.company_id('A'), 'its owner opens it');
+SELECT set_config('storm.record_domain', '', true);
+SELECT tests.reset_role();
+-- The service role (no JWT) is trusted with entity ids.
+SELECT tests.as_service();
+SELECT tests.ok((public.record_open_envelope('test.permit', tests.vessel_id('A.dra'), tests.id('svc-entity'))).id IS NOT NULL, 'the service role opens an entity-bound envelope without the flag');
+ROLLBACK TO SAVEPOINT entity_checks;
 SELECT tests.reset_role();
 SELECT tests.is((SELECT count(*) FROM public.record_envelopes WHERE kind_key = 'test.permit'), 1::bigint, 'no second envelope, no second reference');
 SELECT tests.as_user(tests.user_id('A.crew_dra'));

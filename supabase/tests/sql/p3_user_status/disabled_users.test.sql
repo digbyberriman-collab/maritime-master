@@ -67,7 +67,7 @@ INSERT INTO guarded VALUES
   ('crew_assignments', 'user_belongs_to_company subquery'),
   ('alerts', 'user_belongs_to_company'),
   ('activity_log', 'inline profiles subquery'),
-  ('admin_action_log', 'has_any_role'),
+  ('admin_action_log', 'has_capability (company-scoped, 20261123010400)'),
   ('crew_certificates', 'inline profiles EXISTS + user_belongs_to_company'),
   ('vessel_module_settings', 'reach helpers'),
   ('account_memberships', 'own row + user_is_active'),
@@ -179,6 +179,10 @@ SELECT tests.lives(format($q$UPDATE public.profiles SET last_login_at = now(), a
 SELECT set_config('storm.access_engine', '', true);
 SELECT tests.reset_role();
 SELECT tests.is((SELECT role::text FROM public.profiles WHERE user_id = tests.user_id('A.crew_hyd')), 'chief_officer', 'the admin''s role change stuck');
+SELECT tests.results_eq(
+  format($q$SELECT actor_user_id, action_type::text, company_id, before_state ->> 'profile_role', after_state ->> 'profile_role' FROM public.permission_audit_log WHERE target_user_id = %L AND after_state ? 'profile_role'$q$, tests.user_id('A.crew_hyd')),
+  format($q$VALUES (%L::uuid, 'role_assigned', %L::uuid, 'crew', 'chief_officer')$q$, tests.user_id('A.fleet_manager'), tests.company_id('A')),
+  'the role change wrote one permission_audit_log row (actor, target, old and new role, company)');
 
 -- The service role (no JWT) changes anything.
 SELECT tests.as_service();
@@ -259,6 +263,96 @@ SELECT tests.throws_like(format($q$SELECT public.set_membership_status(%L, 'disa
 SELECT tests.lives(format($q$SELECT public.set_membership_status(%L, 'disabled', %L, 'Role ended')$q$, tests.user_id('A.ua_admin'), tests.user_id('A.fleet_manager')), 'the DPA can');
 SELECT tests.reset_role();
 SELECT tests.is((SELECT status FROM public.account_memberships WHERE user_id = tests.user_id('A.ua_admin')), 'disabled', 'non-legacy membership disabled');
+
+-- ------------------------------------------------------------ W7 through a direct profiles UPDATE (no bypass of set_membership_status)
+
+-- A.shore (shore_management, rank 80) is a users-access admin who does not
+-- manage admins: the HR policy lets them UPDATE company profiles, the guard
+-- does not let them touch access columns or administrators.
+SELECT tests.seed_user('A', 'A.shore2', 'shore_management');
+SELECT tests.ok(NOT public.user_manages_admins_for(tests.user_id('A.shore'), tests.company_id('A')) AND public.has_capability_for(tests.user_id('A.shore'), 'admin.access.users_access.admin', tests.company_id('A')),
+                'A.shore: users-access admin, not a manager of admins');
+SELECT tests.as_user(tests.user_id('A.shore'));
+SELECT tests.throws_like(format($q$UPDATE public.profiles SET account_status = 'disabled' WHERE user_id = %L$q$, tests.user_id('A.fleet_manager')), '42501', 'profile_access_columns_locked', 'shore management cannot disable the DPA through profiles');
+SELECT tests.throws_like(format($q$UPDATE public.profiles SET account_status = 'disabled' WHERE user_id = %L$q$, tests.user_id('A.colleague')), '42501', 'profile_access_columns_locked', 'nor anyone (account_status goes through admin-actions / set_membership_status)');
+SELECT tests.throws(format($q$UPDATE public.profiles SET role = 'dpa' WHERE user_id = %L$q$, tests.user_id('A.crew_hyd')), '42501', 'shore management cannot set role dpa on crew');
+SELECT tests.throws_like(format($q$UPDATE public.profiles SET role = 'dpa' WHERE user_id = %L$q$, tests.user_id('A.crew_hyd')), '42501', 'manages_admins_required', '(manages_admins_required)');
+SELECT tests.throws(format($q$UPDATE public.profiles SET role = 'crew' WHERE user_id = %L$q$, tests.user_id('A.fleet_manager')), '42501', 'shore management cannot demote the DPA');
+SELECT tests.throws_like(format($q$UPDATE public.profiles SET role = 'master' WHERE user_id = %L$q$, tests.user_id('A.shore2')), '42501', 'manages_admins_required', 'nor change another administrator''s role');
+SELECT tests.throws_like(format($q$SELECT public.hr_anonymize_profile(%L, 'Erasure request')$q$, tests.profile_id('A.fleet_manager')), '42501', 'manages_admins_required', 'hr_anonymize_profile on the DPA by shore management is refused');
+SELECT tests.lives(format($q$UPDATE public.profiles SET role = 'chief_engineer' WHERE user_id = %L$q$, tests.user_id('A.crew_hyd')), 'shore management still changes a crew member''s role (rank 50)');
+SELECT tests.reset_role();
+SELECT tests.results_eq(
+  format($q$SELECT role::text, account_status FROM public.profiles WHERE user_id = %L$q$, tests.user_id('A.fleet_manager')),
+  $q$VALUES ('dpa', 'active')$q$, 'the DPA is untouched');
+SELECT tests.is((SELECT role::text FROM public.profiles WHERE user_id = tests.user_id('A.shore2')), 'shore_management', 'the other administrator is untouched');
+-- The rank cap: A.colleague (crew profile, rank 10, a users-access admin
+-- through a user_roles dpa row of A) cannot give a role ranked above 10.
+SELECT tests.as_user(tests.user_id('A.colleague'));
+SELECT tests.ok(public.has_capability('admin.access.users_access.admin', tests.company_id('A')), 'A.colleague is a users-access admin (rank 10)');
+SELECT tests.throws_like(format($q$UPDATE public.profiles SET role = 'master' WHERE user_id = %L$q$, tests.user_id('A.crew_hyd')), '42501', 'rank_exceeded', 'never a role ranked above your own (master 60 > 10)');
+SELECT tests.lives(format($q$UPDATE public.profiles SET role = 'crew' WHERE user_id = %L$q$, tests.user_id('A.crew_hyd')), 'a role at your own rank is fine (crew)');
+SELECT tests.reset_role();
+-- INSERT of an administrator profile: users-access admin, manager of admins, rank.
+SELECT tests._set_claims(jsonb_build_object('sub', tests.user_id('A.shore'), 'role', 'authenticated'));
+SELECT tests.throws_like(format($q$INSERT INTO public.profiles (id, email, first_name, last_name, company_id, role) VALUES (%L, 'shore-dpa@example.test', 'DPA', 'by-shore', %L, 'dpa')$q$, tests.id('profile:shore_dpa'), tests.company_id('A')), '42501', 'manages_admins_required', 'shore management cannot create a dpa profile');
+SELECT tests.reset_role();
+-- The DPA (a manager of admins) changes a shore management user's role; audited.
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.lives(format($q$UPDATE public.profiles SET role = 'master' WHERE user_id = %L$q$, tests.user_id('A.shore2')), 'the DPA changes a shore management user''s role');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT role::text FROM public.profiles WHERE user_id = tests.user_id('A.shore2')), 'master', 'it stuck');
+SELECT tests.is((SELECT count(*) FROM public.permission_audit_log WHERE target_user_id = tests.user_id('A.shore2') AND actor_user_id = tests.user_id('A.fleet_manager')
+                 AND before_state ->> 'profile_role' = 'shore_management' AND after_state ->> 'profile_role' = 'master'), 1::bigint, 'one audit row for it');
+-- The DPA anonymises a leaver: the W7 guards pass, the account is disabled under the engine flag, logged.
+SELECT tests.seed_user('A', 'A.leaver', 'crew');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.throws_like(format($q$SELECT public.hr_anonymize_profile(%L, '   ')$q$, tests.profile_id('A.leaver')), '22023', 'reason_required', 'anonymising needs a reason');
+SELECT tests.lives(format($q$SELECT public.hr_anonymize_profile(%L, 'Erasure request')$q$, tests.profile_id('A.leaver')), 'the DPA anonymises a leaver');
+SELECT tests.reset_role();
+SELECT tests.results_eq(
+  format($q$SELECT p.account_status, m.status FROM public.profiles AS p JOIN public.account_memberships AS m ON m.user_id = p.user_id WHERE p.id = %L$q$, tests.profile_id('A.leaver')),
+  $q$VALUES ('disabled'::text, 'disabled'::text)$q$, 'the anonymised account is disabled (profile and membership)');
+SELECT tests.is((SELECT count(*) FROM public.admin_action_log WHERE action_type = 'TOGGLE_ACCESS' AND target_crew_id = tests.profile_id('A.leaver') AND actor_user_id = tests.user_id('A.fleet_manager')
+                 AND reason = 'Erasure request' AND after_json ->> 'via' = 'hr_anonymize_profile'), 1::bigint, 'and logged as TOGGLE_ACCESS with the reason');
+SELECT tests.is(current_setting('storm.access_engine', true), '', 'the engine flag is reset after the call');
+
+-- ------------------------------------------------------------ membership window (C17): outside it the user is not active
+
+SELECT tests.seed_user('A', 'A.ext_expired', 'crew');
+SELECT tests.seed_user('A', 'A.ext_future', 'crew');
+SELECT tests.seed_user('A', 'A.ext_window', 'crew');
+UPDATE public.account_memberships SET legacy_managed = false, source = 'admin', kind = 'external', vessel_scope = 'assigned', fleet_access = false,
+       valid_from = now() - interval '30 days', valid_until = now() - interval '1 day'
+WHERE user_id = tests.user_id('A.ext_expired');
+UPDATE public.account_memberships SET legacy_managed = false, source = 'admin', kind = 'external', vessel_scope = 'assigned', fleet_access = false,
+       valid_from = now() + interval '1 day', valid_until = now() + interval '30 days'
+WHERE user_id = tests.user_id('A.ext_future');
+UPDATE public.account_memberships SET legacy_managed = false, source = 'admin', kind = 'external', vessel_scope = 'assigned', fleet_access = false,
+       valid_from = now() - interval '1 day', valid_until = now() + interval '7 days'
+WHERE user_id = tests.user_id('A.ext_window');
+INSERT INTO public.account_membership_vessels (membership_id, company_id, vessel_id)
+SELECT id, company_id, tests.vessel_id('A.dra') FROM public.account_memberships WHERE user_id IN (tests.user_id('A.ext_expired'), tests.user_id('A.ext_future'), tests.user_id('A.ext_window'));
+DO $$
+DECLARE p text;
+BEGIN
+  FOREACH p IN ARRAY ARRAY['A.ext_expired', 'A.ext_future'] LOOP
+    PERFORM tests.as_user(tests.user_id(p));
+    PERFORM tests.ok(NOT public.user_is_active(auth.uid()), p || ': user_is_active is false outside the window');
+    PERFORM tests.ok(NOT public.user_belongs_to_company(auth.uid(), tests.company_id('A')), p || ': user_belongs_to_company is false');
+    PERFORM tests.is_empty('SELECT 1 FROM public.profiles', p || ': reads no profile');
+    PERFORM tests.is_empty('SELECT 1 FROM public.companies', p || ': reads no company');
+    PERFORM tests.is(public.my_account_status(), 'disabled', p || ': my_account_status() disabled');
+    PERFORM tests.is(public.record_session_start(), 'disabled', p || ': record_session_start() disabled');
+  END LOOP;
+END
+$$;
+SELECT tests.as_user(tests.user_id('A.ext_window'));
+SELECT tests.ok(public.user_is_active(auth.uid()), 'an in-window external user is active');
+SELECT tests.ok(public.user_belongs_to_company(auth.uid(), tests.company_id('A')), 'and belongs to the company');
+SELECT tests.is(public.my_account_status(), 'active', 'my_account_status() active');
+SELECT tests.results_eq('SELECT id FROM public.vessels', format('VALUES (%L::uuid)', tests.vessel_id('A.dra')), 'and reads the assigned vessel');
+SELECT tests.reset_role();
 
 -- ------------------------------------------------------------ auth_user_id_for_email
 

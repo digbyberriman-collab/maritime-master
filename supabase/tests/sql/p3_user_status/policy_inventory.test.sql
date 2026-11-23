@@ -10,9 +10,17 @@
 --   service_role   TO service_role only
 --   deny           USING / WITH CHECK false only
 --   restrictive    AS RESTRICTIVE (can only narrow)
+--   role_gated_unscoped  calls has_role / has_any_role and names no company   residual
+--                  or vessel anywhere (no company_id / vessel_id column, no
+--                  company or reach helper): a user_roles row of any company
+--                  passes it, so it reaches every tenant (an own-row branch
+--                  OR-ed beside the role does not scope the role branch).
+--                  Ratcheted separately; the target is 0
+--                  (20261123010500_platform_role_scoped_policies.sql)
 --   active_aware   calls user_is_active, one of the seven redefined helpers
 --                  or a phase 2 helper (reach, capability, record_readable,
---                  the *_write_allowed predicates, storage_path_allowed), or
+--                  the *_write_allowed predicates, storage_path_allowed,
+--                  has_role_in_company), or
 --                  reads profiles in a subquery (a disabled user reads no
 --                  profile row)
 --   via_helper     calls a function whose body reaches one of those
@@ -45,7 +53,7 @@ INSERT INTO aware_base VALUES
   ('has_role'), ('has_any_role'), ('legacy_profile_role'),
   ('user_can_reach_vessel'), ('user_has_fleet_reach'), ('user_vessel_reach'), ('has_capability'), ('user_company_for_admin'),
   ('is_company_actor'), ('record_readable'), ('rbac_user_roles_write_allowed'), ('permission_override_write_allowed'),
-  ('user_roles_write_allowed'), ('storage_path_allowed');
+  ('storage_path_allowed'), ('has_role_in_company');
 
 CREATE TEMP TABLE aware_via ON COMMIT DROP AS
 WITH RECURSIVE reach(name, depth) AS (
@@ -85,6 +93,9 @@ SELECT p.schemaname, p.tablename, p.policyname, p.cmd, p.roles,
     WHEN p.roles = ARRAY['service_role'] THEN 'service_role'
     WHEN btrim(p.qual) IN ('', 'false') AND btrim(p.with_check) IN ('', 'false') AND (p.qual = 'false' OR p.with_check = 'false') THEN 'deny'
     WHEN p.permissive = 'RESTRICTIVE' THEN 'restrictive'
+    WHEN p.expr ~ '\mhas_(any_)?role\s*\('
+         AND NOT p.expr ~ '(company_id|vessel_id|user_belongs_to_company|get_user_company_id|current_user_company_id|user_can_reach_vessel|user_has_fleet_reach|user_company_for_admin|has_role_in_company|has_capability)'
+      THEN 'role_gated_unscoped'
     WHEN coalesce(c.fns && (SELECT array_agg(name) FROM aware_base), false) OR coalesce('profiles' = ANY (s.tbls), false) THEN 'active_aware'
     WHEN coalesce(c.fns && (SELECT array_agg(name) FROM aware_via), false) THEN 'via_helper'
     WHEN coalesce(s.tbls && (SELECT array_agg(tablename) FROM rls_tables), false) THEN 'inherits'
@@ -108,8 +119,9 @@ SELECT tests.ok((SELECT count(*) FROM aware_via) > 10, format('%s domain helpers
 
 -- ------------------------------------------------------------ build-out policies (rules 3, 15)
 
--- Every build-out policy exists after the build-out and is active-aware.
-SELECT tests.ok(i.class IN ('active_aware', 'service_role'),
+-- Every build-out policy exists after the build-out and is active-aware
+-- (or TO service_role, or RESTRICTIVE: it can only narrow).
+SELECT tests.ok(i.class IN ('active_aware', 'service_role', 'restrictive'),
                 format('build-out policy %s.%s "%s" is %s', b.schemaname, b.tablename, b.policyname, coalesce(i.class, 'missing')))
 FROM bo_policy AS b
 LEFT JOIN inventory AS i USING (schemaname, tablename, policyname)
@@ -156,7 +168,7 @@ BEGIN
   END LOOP;
   FOR r IN
     SELECT * FROM inventory
-    WHERE class IN ('rbac_only', 'own_row', 'signed_in', 'unscoped', 'other')
+    WHERE class IN ('role_gated_unscoped', 'rbac_only', 'own_row', 'signed_in', 'unscoped', 'other')
     ORDER BY class, schemaname, tablename, policyname
   LOOP
     RAISE NOTICE '# residual (%): %.% "%" %', r.class, r.schemaname, r.tablename, r.policyname, r.cmd;
@@ -166,6 +178,18 @@ $$;
 
 -- The residual set may shrink, never grow (raise the bound only with a
 -- reason in the D3/D4 report). 2026-11-23 after files 1-12: see the notes.
-SELECT tests.ok((SELECT count(*) FROM inventory WHERE class IN ('rbac_only', 'own_row', 'signed_in', 'unscoped', 'other')) <= 92,
-                format('residual policies: %s (ratchet <= 92)', (SELECT count(*) FROM inventory WHERE class IN ('rbac_only', 'own_row', 'signed_in', 'unscoped', 'other'))));
+SELECT tests.ok((SELECT count(*) FROM inventory WHERE class IN ('role_gated_unscoped', 'rbac_only', 'own_row', 'signed_in', 'unscoped', 'other')) <= 92,
+                format('residual policies: %s (ratchet <= 92)', (SELECT count(*) FROM inventory WHERE class IN ('role_gated_unscoped', 'rbac_only', 'own_row', 'signed_in', 'unscoped', 'other'))));
 SELECT tests.is((SELECT count(*) FROM inventory WHERE class = 'other'), 0::bigint, 'every policy falls in a named class');
+-- Role-gated policies with no company or vessel scope (a user_roles row of
+-- any company passes them): 45 before 20261123010400 / 20261123010500, 0
+-- after. The ratchet is its own and stays at 0.
+SELECT tests.is((SELECT count(*) FROM inventory WHERE class = 'role_gated_unscoped'), 0::bigint,
+                format('role-gated policies without a company or vessel scope: %s (ratchet = 0)', (SELECT count(*) FROM inventory WHERE class = 'role_gated_unscoped')));
+SELECT tests.ok((SELECT count(*) FROM inventory WHERE policyname IN (
+                   'DPA and Captain can manage medical reports', 'Medical reports visible to authorized users', 'Travel agents and DPA can manage bookings',
+                   'Users can view own flight requests', 'Authorized users can manage flight requests') AND class = 'active_aware') = 5,
+                'the medical-report and flight policies are company-scoped and active-aware');
+SELECT tests.ok(EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'record_events' AND policyname = 'record_events_export_job_audience'
+                          AND permissive = 'RESTRICTIVE' AND cmd = 'SELECT' AND roles = '{authenticated}'),
+                'record_events_export_job_audience is a RESTRICTIVE select policy for authenticated');

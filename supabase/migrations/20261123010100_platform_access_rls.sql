@@ -5,11 +5,11 @@
 --   vessel_id, permission_audit_log.company_id
 -- Policies: vessels_select / insert / update / delete; roles and
 --   role_permissions frozen to service_role; rbac_user_roles_*,
---   user_permission_overrides_*, user_roles_select_admin / insert / update /
---   delete, permission_audit_log_select
--- Helpers: rbac_user_roles_write_allowed(), permission_override_write_allowed(),
---   user_roles_write_allowed() (caller-scoped predicates for policies, rule
---   11); log_permission_change() (live, exact signature, service role);
+--   user_permission_overrides_*, user_roles_select_admin (user_roles is
+--   written by the service role only), permission_audit_log_select
+-- Helpers: rbac_user_roles_write_allowed(), permission_override_write_allowed()
+--   (caller-scoped predicates for policies, rule 11); log_permission_change()
+--   (live, exact signature, service role);
 --   triggers trg_user_permission_overrides_stamp and the audit triggers
 --   trg_rbac_user_roles_audit, trg_user_permission_overrides_audit,
 --   trg_user_roles_audit
@@ -25,19 +25,25 @@
 -- service role are unaffected.
 --
 -- Role definitions (roles, role_permissions) are global rows shared by
--- every tenant: frozen to the service role (gap/01 F6). Role assignments
--- (rbac_user_roles, user_roles) and permission overrides are company-scoped
--- through the target user: users-access admin of the target's company,
--- never on yourself, never superadmin, never above your own rank or module
--- level (CC-5 closes the live "Superadmin and DPA can manage roles" hole).
+-- every tenant: frozen to the service role (gap/01 F6). RBAC role
+-- assignments (rbac_user_roles) and permission overrides are
+-- company-scoped through the target user: users-access admin of the
+-- target's company, never on yourself, never superadmin, never your own
+-- rank or above (an equal rank only for a manager of admins), never above
+-- your own module level. Legacy app roles (user_roles) have no browser
+-- write path at all (CC-5 closes the live "Superadmin and DPA can manage
+-- roles" hole): about 40 legacy policies honour a user_roles row without
+-- asking which company it names, so a tenant admin who could write one
+-- would reach every tenant; the service role writes them, and
+-- 20261123010500_platform_role_scoped_policies.sql scopes those policies.
 -- Every change is audited by trigger with actor = auth.uid(); the audit log
 -- has no insert path for a browser any more, and log_permission_change()
 -- stamps the caller as actor (CC-4: same signature, one overload).
 --
 -- Policies call only functions authenticated may execute (rule 11): the
 -- predicates that need service-only helpers (role_rank, user_role_rank,
--- legacy_user_admin, has_capability_for) are wrapped in caller-scoped
--- definers evaluated for auth.uid() only.
+-- legacy_user_admin, has_capability_for, user_manages_admins_for) are
+-- wrapped in caller-scoped definers evaluated for auth.uid() only.
 --
 -- Idempotent (D-12).
 
@@ -56,6 +62,9 @@ BEGIN
      OR to_regprocedure('public.user_role_rank(uuid)') IS NULL
      OR to_regprocedure('public.legacy_user_admin(uuid)') IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010100_platform_access_rls needs has_capability(), user_company_for_admin(), role_rank(), user_role_rank() and legacy_user_admin(): apply 20261123000400_platform_capabilities.sql first';
+  END IF;
+  IF to_regprocedure('public.user_manages_admins_for(uuid,uuid)') IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010100_platform_access_rls needs user_manages_admins_for(): apply 20261123010000_platform_user_status.sql first';
   END IF;
   IF to_regprocedure('public.user_can_reach_vessel(uuid,uuid)') IS NULL OR to_regprocedure('public.user_has_fleet_reach(uuid,uuid)') IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010100_platform_access_rls needs the reach helpers: apply 20261123000300_platform_account_memberships.sql first';
@@ -126,7 +135,11 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON TABLE public.role_permissions FROM an
 -- May the caller assign / change / remove this RBAC role for that user?
 -- Not on yourself; users-access admin in the target's company (and over the
 -- vessel when one is given); the vessel belongs to that company; the role
--- exists, is not superadmin and ranks no higher than the caller.
+-- exists, is not superadmin and ranks strictly below the caller, or equal
+-- to the caller when the caller manages admins in that company (so a DPA
+-- can appoint a DPA, shore management cannot mint its own rank). Role ranks
+-- of 0 (role_rank's unknown and auditor-style names) are below every
+-- signed-in admin.
 CREATE OR REPLACE FUNCTION public.rbac_user_roles_write_allowed(_user_id uuid, _role_id uuid, _vessel_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -138,6 +151,8 @@ DECLARE
   v_caller uuid := auth.uid();
   v_company uuid;
   v_role_name text;
+  v_rank integer;
+  v_caller_rank integer;
 BEGIN
   IF v_caller IS NULL OR _user_id IS NULL OR _role_id IS NULL OR _user_id = v_caller OR NOT public.user_is_active(v_caller) THEN
     RETURN false;
@@ -156,7 +171,10 @@ BEGIN
   IF v_role_name IS NULL OR v_role_name = 'superadmin' THEN
     RETURN false;
   END IF;
-  RETURN public.role_rank(v_role_name) <= public.user_role_rank(v_caller);
+  v_rank := public.role_rank(v_role_name);
+  v_caller_rank := public.user_role_rank(v_caller);
+  RETURN v_rank < v_caller_rank
+      OR (v_rank = v_caller_rank AND public.user_manages_admins_for(v_caller, v_company));
 END;
 $$;
 
@@ -185,36 +203,6 @@ BEGIN
     RETURN false;
   END IF;
   RETURN public.legacy_user_admin(v_caller) OR coalesce(public.rbac_company_permission(v_caller, _module_key, _permission), false);
-END;
-$$;
-
--- May the caller write this legacy app-role row (user_roles)? Not on
--- yourself; the row names the target's company; users-access admin there;
--- never superadmin; never a role ranked above the caller.
-CREATE OR REPLACE FUNCTION public.user_roles_write_allowed(_user_id uuid, _company_id uuid, _role public.app_role)
-RETURNS boolean
-LANGUAGE plpgsql
-STABLE
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_caller uuid := auth.uid();
-BEGIN
-  IF v_caller IS NULL OR _user_id IS NULL OR _company_id IS NULL OR _role IS NULL
-     OR _user_id = v_caller OR NOT public.user_is_active(v_caller) THEN
-    RETURN false;
-  END IF;
-  IF public.user_company_for_admin(_user_id) IS DISTINCT FROM _company_id THEN
-    RETURN false;
-  END IF;
-  IF NOT public.has_capability_for(v_caller, 'admin.access.users_access.admin', _company_id) THEN
-    RETURN false;
-  END IF;
-  IF _role::text = 'superadmin' THEN
-    RETURN false;
-  END IF;
-  RETURN public.role_rank(_role::text) <= public.user_role_rank(v_caller);
 END;
 $$;
 
@@ -261,6 +249,14 @@ ALTER TABLE public.user_permission_overrides
 ALTER TABLE public.user_permission_overrides
   DROP CONSTRAINT IF EXISTS user_permission_overrides_vessel_id_fkey,
   ADD CONSTRAINT user_permission_overrides_vessel_id_fkey FOREIGN KEY (vessel_id) REFERENCES public.vessels(id) ON DELETE CASCADE;
+-- No evaluator honours a vessel limit yet (user_has_permission,
+-- rbac_company_permission, legacy_user_admin and the write predicate read
+-- user / module / permission only), so a vessel-limited row would grant
+-- company-wide rights. Reserved: NULL only until they do (D-124; the
+-- vessel-scoped override design is X6).
+ALTER TABLE public.user_permission_overrides
+  DROP CONSTRAINT IF EXISTS user_permission_overrides_vessel_unsupported,
+  ADD CONSTRAINT user_permission_overrides_vessel_unsupported CHECK (vessel_id IS NULL);
 CREATE INDEX IF NOT EXISTS idx_user_permission_overrides_company ON public.user_permission_overrides (company_id, user_id);
 
 -- Backfill: the target's profile company (rows of users without one stay NULL).
@@ -336,6 +332,9 @@ REVOKE TRUNCATE ON TABLE public.user_permission_overrides FROM anon, authenticat
 
 -- ---------------------------------------------------------------- user_roles (CC-5)
 
+-- Legacy app roles are written by the service role only: no browser
+-- INSERT, UPDATE or DELETE policy (an insert is refused with 42501, an
+-- update or delete changes no row). Admins read their company's rows.
 DROP POLICY IF EXISTS "Superadmin and DPA can manage roles" ON public.user_roles;
 DROP POLICY IF EXISTS "Admins can view all roles in company" ON public.user_roles;
 -- "Users can view their own roles" (own rows) stays.
@@ -346,20 +345,10 @@ CREATE POLICY user_roles_select_admin ON public.user_roles
   USING (company_id IS NOT NULL AND public.has_capability('admin.access.users_access.view', company_id));
 
 DROP POLICY IF EXISTS user_roles_insert ON public.user_roles;
-CREATE POLICY user_roles_insert ON public.user_roles
-  FOR INSERT TO authenticated
-  WITH CHECK (public.user_roles_write_allowed(user_id, company_id, role));
-
 DROP POLICY IF EXISTS user_roles_update ON public.user_roles;
-CREATE POLICY user_roles_update ON public.user_roles
-  FOR UPDATE TO authenticated
-  USING (public.user_roles_write_allowed(user_id, company_id, role))
-  WITH CHECK (public.user_roles_write_allowed(user_id, company_id, role));
-
 DROP POLICY IF EXISTS user_roles_delete ON public.user_roles;
-CREATE POLICY user_roles_delete ON public.user_roles
-  FOR DELETE TO authenticated
-  USING (public.user_roles_write_allowed(user_id, company_id, role));
+-- The predicate of those three policies (an earlier draft of this file).
+DROP FUNCTION IF EXISTS public.user_roles_write_allowed(uuid, uuid, public.app_role);
 
 REVOKE TRUNCATE ON TABLE public.user_roles FROM anon, authenticated;
 
@@ -579,24 +568,21 @@ $$;
 
 REVOKE ALL ON FUNCTION public.rbac_user_roles_write_allowed(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.permission_override_write_allowed(uuid, uuid, text, public.permission_level) FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON FUNCTION public.user_roles_write_allowed(uuid, uuid, public.app_role) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.user_permission_overrides_stamp() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.access_change_audit() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.log_permission_change(uuid, text, public.audit_action_type, uuid, uuid, text, jsonb, jsonb, text, uuid, inet, text) FROM PUBLIC, anon, authenticated, service_role;
 
 GRANT EXECUTE ON FUNCTION public.rbac_user_roles_write_allowed(uuid, uuid, uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.permission_override_write_allowed(uuid, uuid, text, public.permission_level) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.user_roles_write_allowed(uuid, uuid, public.app_role) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.log_permission_change(uuid, text, public.audit_action_type, uuid, uuid, text, jsonb, jsonb, text, uuid, inet, text) TO service_role;
 
 -- ---------------------------------------------------------------- comments
 
-COMMENT ON FUNCTION public.rbac_user_roles_write_allowed(uuid, uuid, uuid) IS 'Policy predicate (rule 11) for rbac_user_roles writes, for auth.uid() only: not on yourself, users-access admin of the target''s company (and vessel), vessel of that company, role not superadmin and ranked no higher than the caller.';
+COMMENT ON FUNCTION public.rbac_user_roles_write_allowed(uuid, uuid, uuid) IS 'Policy predicate (rule 11) for rbac_user_roles writes, for auth.uid() only: not on yourself, users-access admin of the target''s company (and vessel), vessel of that company, role not superadmin and ranked strictly below the caller (equal only for a manager of admins of that company).';
 COMMENT ON FUNCTION public.permission_override_write_allowed(uuid, uuid, text, public.permission_level) IS 'Policy predicate (rule 11) for user_permission_overrides writes, for auth.uid() only: not on yourself, the target''s company, users-access admin there, and the caller holds the module level (full admin or rbac_company_permission).';
-COMMENT ON FUNCTION public.user_roles_write_allowed(uuid, uuid, public.app_role) IS 'Policy predicate (rule 11, CC-5) for user_roles writes, for auth.uid() only: not on yourself, the row names the target''s company, users-access admin there, never superadmin, never above the caller''s rank.';
 COMMENT ON FUNCTION public.user_permission_overrides_stamp() IS 'Trigger: company_id = the target''s profile company (client value overwritten), created_by = the signed-in caller on insert (kept on update), vessel of that company only.';
 COMMENT ON FUNCTION public.access_change_audit() IS 'Trigger (gap/01 F53): one permission_audit_log row per change of rbac_user_roles, user_permission_overrides or user_roles, actor = auth.uid(), ids / keys / levels only. Skipped without a JWT (service-role maintenance).';
 COMMENT ON FUNCTION public.log_permission_change(uuid, text, public.audit_action_type, uuid, uuid, text, jsonb, jsonb, text, uuid, inet, text) IS 'CC-4: the live signature, one overload. With a JWT the actor, role and company are the caller''s (users-access admin required; target and vessel of that company); without, the parameters are used. Service role only.';
 COMMENT ON COLUMN public.user_permission_overrides.company_id IS 'The target user''s company (stamped by trg_user_permission_overrides_stamp); scopes reads and writes.';
-COMMENT ON COLUMN public.user_permission_overrides.vessel_id IS 'Limits the override to one vessel of the company; NULL = every vessel (the old global behaviour).';
+COMMENT ON COLUMN public.user_permission_overrides.vessel_id IS 'Reserved: must be NULL until the evaluators honour a vessel limit (D-124)';
 COMMENT ON COLUMN public.permission_audit_log.company_id IS 'The company the change belongs to (the target''s company; backfilled from the actor''s profile). Reads: permission-audit viewers of that company only.';

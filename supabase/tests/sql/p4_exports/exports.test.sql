@@ -167,3 +167,45 @@ SELECT tests.is((SELECT count(*) FROM public.export_jobs WHERE id = :'b1'), 1::b
 SELECT tests.as_user(tests.user_id('A.disabled'));
 SELECT tests.is((SELECT count(*) FROM public.export_jobs), 0::bigint, 'a disabled requester reads not even their own job');
 SELECT tests.reset_role();
+
+-- ------------------------------------------------------------ export events follow the export_jobs audience
+
+-- record_events_select (record_readable) admits every member with reach;
+-- the RESTRICTIVE record_events_export_job_audience narrows export events
+-- to the export_jobs audience. Four readers of a vessel-A.dra export by the
+-- Master and of one ordinary record event on A.dra.
+SELECT tests.seed_user('A', 'A.fleet_master', 'crew');
+SELECT tests.seed_rbac_role('A.fleet_master', 'fleet_master');
+SELECT tests.as_user(tests.user_id('A.master_dra'));
+SELECT (public.request_export('gdpr_subject', 'hr.subject:' || tests.user_id('A.crew_hyd'), '{}', true, tests.vessel_id('A.dra'))).id AS master_job \gset
+SELECT tests.reset_role();
+INSERT INTO public.record_events (id, company_id, vessel_id, module_key, entity_type, entity_id, action, party)
+VALUES (tests.id('event:note'), tests.company_id('A'), tests.vessel_id('A.dra'), 'safety', 'test_note', tests.id('note:1'), 'test.noted', 'vessel');
+CREATE TEMP TABLE export_audience (user_key text, export_events bigint, other_events bigint) ON COMMIT DROP;
+GRANT INSERT, SELECT ON export_audience TO authenticated;
+DO $$
+DECLARE k text;
+BEGIN
+  FOREACH k IN ARRAY ARRAY['A.master_dra', 'A.crew_dra', 'A.fleet_master', 'A.fleet_manager'] LOOP
+    PERFORM tests.as_user(tests.user_id(k));
+    INSERT INTO export_audience
+    SELECT k,
+           (SELECT count(*) FROM public.record_events WHERE entity_type = 'export_job' AND entity_id = (SELECT id FROM public.export_jobs WHERE source_key = 'hr.subject:' || tests.user_id('A.crew_hyd') AND requested_by = tests.user_id('A.master_dra') LIMIT 1)),
+           (SELECT count(*) FROM public.record_events WHERE id = tests.id('event:note'));
+  END LOOP;
+END
+$$;
+SELECT tests.reset_role();
+SELECT tests.ok(public.fleet_reach_for(tests.user_id('A.fleet_master'), tests.company_id('A'))
+                AND NOT public.has_capability_for(tests.user_id('A.fleet_master'), 'admin.access.permission_audit_log.view', tests.company_id('A')),
+                'A.fleet_master: fleet reach, no audit capability');
+SELECT tests.is((SELECT count(*) FROM public.record_events WHERE entity_id = :'master_job' AND action = 'export.requested'), 1::bigint, 'the export logged one export.requested event');
+SELECT tests.results_eq(
+  'SELECT user_key, export_events, other_events FROM export_audience',
+  $q$VALUES ('A.master_dra', 1::bigint, 1::bigint), ('A.crew_dra', 0, 1), ('A.fleet_master', 0, 1), ('A.fleet_manager', 1, 1)$q$,
+  'export events visible / other events visible: the requester 1/1, the deckhand 0/1, fleet_master without the audit capability 0/1, the fleet manager 1/1');
+SELECT tests.as_user(tests.user_id('A.crew_dra'));
+SELECT tests.is_empty($q$SELECT 1 FROM public.record_events WHERE entity_type = 'export_job' AND payload ->> 'requested_by' IS DISTINCT FROM auth.uid()::text$q$, 'the deckhand reads no export event of anyone else');
+SELECT tests.as_user(tests.user_id('B.admin'));
+SELECT tests.is_empty(format($q$SELECT 1 FROM public.record_events WHERE entity_id = %L$q$, :'master_job'), 'company B reads none of them');
+SELECT tests.reset_role();

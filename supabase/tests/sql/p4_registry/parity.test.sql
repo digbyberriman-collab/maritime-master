@@ -31,18 +31,23 @@ SELECT c.ord, c.state, c.input, c.expected,
 FROM t_cases AS c
 LEFT JOIN t_values AS v ON v.idx = CASE WHEN jsonb_typeof(c.expected) = 'number' THEN (c.expected #>> '{}')::integer END;
 
+-- NULL-safe: a NULL answer, a missing ok / error.code / error.message, or a JSON-null expectation is a mismatch,
+-- never a row that drops out of the filter (NOT NULL is NULL), so the gate cannot pass vacuously.
 CREATE TEMP TABLE t_mismatch ON COMMIT DROP AS
 SELECT * FROM t_results
-WHERE NOT CASE
+WHERE got IS NULL OR NOT coalesce(CASE
   WHEN jsonb_typeof(expected) = 'number' THEN got = want_ok
   ELSE (got ->> 'ok') = 'false' AND got #>> '{error,code}' = expected #>> '{}' AND length(got #>> '{error,message}') > 0
-END;
+END, false);
 
+SELECT tests.is((SELECT count(*) FROM t_results WHERE got IS NULL), 0::bigint, 'no case answers NULL');
+SELECT tests.is((SELECT count(*) FROM t_results WHERE jsonb_typeof(got -> 'ok') IS DISTINCT FROM 'boolean'), 0::bigint,
+  'every answer is an envelope with a boolean ok');
 SELECT tests.is((SELECT count(*) FROM t_mismatch), 0::bigint,
   format('record_transition_decide = transitionEnvelope on all %s cases%s', (SELECT count(*) FROM t_results),
     coalesce(' # first mismatches: ' || (SELECT string_agg(format('case %s state=%s input=%s want=%s got=%s', ord, state, input, coalesce(want_ok, expected), got), ' | ')
                                           FROM (SELECT * FROM t_mismatch ORDER BY ord LIMIT 3) AS m), '')));
-SELECT tests.is((SELECT count(*) FROM t_results WHERE (got ->> 'ok')::boolean), ((:'transitions'::jsonb) #>> '{counts,ok}')::bigint, 'the same number of allowed transitions');
+SELECT tests.is((SELECT count(*) FILTER (WHERE got ->> 'ok' = 'true') FROM t_results), ((:'transitions'::jsonb) #>> '{counts,ok}')::bigint, 'the same number of allowed transitions');
 -- Spot checks that the comparison really looks at the value and the effect order.
 SELECT tests.ok(EXISTS (SELECT 1 FROM t_results WHERE got #> '{value,effects}' = '["snapshot", "supersede_vessel_signatures", "new_cycle"]'::jsonb), 'return / not approved effects in TS order are covered');
 SELECT tests.ok(EXISTS (SELECT 1 FROM t_results WHERE got #> '{value,effects}' = '["company_acknowledgement", "company_signature", "snapshot"]'::jsonb), 'acknowledge-and-close effects in TS order are covered');

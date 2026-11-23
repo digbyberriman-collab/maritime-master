@@ -90,6 +90,17 @@ BEGIN
   PERFORM setval('tests.assertion_seq', 1, false);
   PERFORM setval('tests.failure_seq', 1, false);
   PERFORM set_config('tests.file', coalesce(p_file, ''), false);
+  -- Test-only stand-in for the Phase 3 domain definers: from a signed-in
+  -- session, record_open_envelope() binds an entity id only under the
+  -- transaction-local flag storm.record_domain (20261123020000; 22023
+  -- entity_unverified otherwise). These files open entity-bound envelopes
+  -- as a signed-in user only to set up their records; until each sets the
+  -- flag itself before those calls, the flag is on for its whole
+  -- (rolled-back) transaction. p4_registry/registry.test.sql asserts the
+  -- refusal without it. Remove an entry once its file sets the flag.
+  IF coalesce(p_file, '') ~ '(^|/)(p4_files/files|p4_threads/engine_integration|p4_threads/scenarios|p5_notifications/notifications)\.test\.sql$' THEN
+    PERFORM set_config('storm.record_domain', 'on', true);
+  END IF;
 END;
 $$;
 

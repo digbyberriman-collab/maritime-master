@@ -4,7 +4,8 @@
 -- DECISIONS D-26; Phase 2 spec §A.3; proposed D-122, D-123, D-136)
 -- Tables: account_memberships, account_membership_vessels
 -- Helpers: user_is_active(), my_account_status(), record_session_start(),
---   legacy_all_vessels(), legacy_fleet_reach(), vessel_in_reachable_state(),
+--   invitation_withdrawn_for(), legacy_all_vessels(), legacy_fleet_reach(),
+--   vessel_in_reachable_state(),
 --   internal reach_vessels_for() / reach_vessel_for() / fleet_reach_for(),
 --   public user_vessel_reach() / user_can_reach_vessel() /
 --   user_has_fleet_reach(); triggers trg_profiles_sync_membership,
@@ -156,7 +157,10 @@ GRANT ALL ON TABLE public.account_membership_vessels TO service_role;
 
 -- True iff the user has a profile whose account_status is not disabled /
 -- deactivated, no membership in the profile's company is disabled or
--- removed, and auth has no ban in force. NULL → false. Asked about another
+-- removed or (a non-legacy one) outside its valid_from / valid_until window
+-- (an external viewer's access ends with the window, C17), and auth has no
+-- ban in force. Legacy-managed rows have no window, so nobody's access
+-- changes when this file is applied. NULL → false. Asked about another
 -- user, a signed-in caller gets the truth only for an active member of
 -- their own company (no cross-tenant probing); without a JWT (SQL editor,
 -- cron, the service-role client) it answers for anyone.
@@ -173,7 +177,11 @@ AS $$
            (lower(coalesce(p.account_status, 'active')) NOT IN ('disabled', 'deactivated')
             AND NOT EXISTS (
               SELECT 1 FROM public.account_memberships AS m
-              WHERE m.user_id = p.user_id AND m.company_id = p.company_id AND m.status IN ('disabled', 'removed'))
+              WHERE m.user_id = p.user_id AND m.company_id = p.company_id
+                AND (m.status IN ('disabled', 'removed')
+                     OR (NOT m.legacy_managed AND (
+                           (m.valid_from IS NOT NULL AND m.valid_from > now())
+                        OR (m.valid_until IS NOT NULL AND m.valid_until <= now())))))
             AND NOT EXISTS (
               SELECT 1 FROM auth.users AS u
               WHERE u.id = p.user_id AND u.banned_until IS NOT NULL AND u.banned_until > now())
@@ -192,7 +200,47 @@ AS $$
   ), false)
 $$;
 
+-- Whether the user's access was withdrawn with their invitation: the
+-- profile is neither invited nor active (e.g. not_invited after a revoke)
+-- and the newest invitation of the user (by login or by profile) is revoked
+-- or expired and was never accepted. False until
+-- 20261123010200_platform_user_invitations.sql creates the table (read
+-- through EXECUTE behind to_regclass). Internal: my_account_status() and
+-- record_session_start() answer 'disabled' for it (D-141 vocabulary).
+CREATE OR REPLACE FUNCTION public.invitation_withdrawn_for(_user_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_profile_id uuid;
+  v_status text;
+  v_withdrawn boolean := false;
+BEGIN
+  IF _user_id IS NULL THEN
+    RETURN false;
+  END IF;
+  SELECT p.id, lower(coalesce(p.account_status, 'active')) INTO v_profile_id, v_status
+  FROM public.profiles AS p WHERE p.user_id = _user_id;
+  IF NOT FOUND OR v_status IN ('invited', 'active') OR to_regclass('public.user_invitations') IS NULL THEN
+    RETURN false;
+  END IF;
+  EXECUTE 'SELECT ui.status IN (''revoked'', ''expired'') AND ui.accepted_at IS NULL
+             FROM public.user_invitations AS ui
+            WHERE ui.user_id = $1 OR ui.profile_id = $2
+            ORDER BY ui.created_at DESC, ui.id DESC
+            LIMIT 1'
+    INTO v_withdrawn
+    USING _user_id, v_profile_id;
+  RETURN coalesce(v_withdrawn, false);
+END;
+$$;
+
 -- The caller's own status: works for a disabled user (that is its purpose).
+-- 'disabled' also when the access was withdrawn with a revoked or expired
+-- invitation that was never accepted (invitation_withdrawn_for()).
 CREATE OR REPLACE FUNCTION public.my_account_status()
 RETURNS text
 LANGUAGE sql
@@ -202,7 +250,7 @@ SET search_path = public
 AS $$
   SELECT CASE
     WHEN auth.uid() IS NULL OR NOT EXISTS (SELECT 1 FROM public.profiles WHERE user_id = auth.uid()) THEN 'no_profile'
-    WHEN public.user_is_active(auth.uid()) THEN 'active'
+    WHEN public.user_is_active(auth.uid()) AND NOT public.invitation_withdrawn_for(auth.uid()) THEN 'active'
     ELSE 'disabled'
   END
 $$;
@@ -453,8 +501,9 @@ $$;
 -- 'active' (the first sign-in after an invitation, CC-19), the membership's
 -- accepted_at (once) and last_active_at, and, once
 -- 20261123010200_platform_user_invitations.sql exists, the caller's live
--- invitations (by user id or by profile) → accepted. A disabled user or a
--- user without a profile writes nothing. The bookkeeping sits in its own
+-- invitations (by user id or by profile) → accepted. A disabled user, a user
+-- whose access was withdrawn with a revoked or expired invitation
+-- (invitation_withdrawn_for()) or a user without a profile writes nothing. The bookkeeping sits in its own
 -- block: if it fails, the status is still answered (with a WARNING), so a
 -- bookkeeping problem never blocks a sign-in.
 CREATE OR REPLACE FUNCTION public.record_session_start()
@@ -483,7 +532,7 @@ BEGIN
   IF NOT FOUND THEN
     RETURN 'no_profile';
   END IF;
-  IF NOT public.user_is_active(v_uid) THEN
+  IF NOT public.user_is_active(v_uid) OR public.invitation_withdrawn_for(v_uid) THEN
     RETURN 'disabled';
   END IF;
 
@@ -566,7 +615,12 @@ $$;
 -- fleet_access = legacy_fleet_reach() at sync time (legacy rows are
 -- evaluated live, the flag is informational), status disabled for a
 -- disabled / deactivated profile (else active). A company or login change
--- marks the old legacy row removed.
+-- marks the old legacy row removed. A removed row stays removed on a later
+-- profile update (a revoked or expired invitation removes it,
+-- 20261123010200): only a sent invitation (record_invitation_send),
+-- set_membership_status, or the profile moving (back) into the company
+-- (a company or login change, which only the service role can make) bring
+-- it back.
 CREATE OR REPLACE FUNCTION public.account_memberships_sync_from_profile()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -577,6 +631,7 @@ DECLARE
   v_role text := NEW.role::text;
   v_status text;
   v_profile_id uuid;
+  v_moved boolean := TG_OP = 'INSERT' OR OLD.company_id IS DISTINCT FROM NEW.company_id OR OLD.user_id IS DISTINCT FROM NEW.user_id;
 BEGIN
   IF TG_OP = 'UPDATE' AND OLD.user_id IS NOT NULL AND OLD.company_id IS NOT NULL
      AND (OLD.company_id IS DISTINCT FROM NEW.company_id OR OLD.user_id IS DISTINCT FROM NEW.user_id) THEN
@@ -613,7 +668,7 @@ BEGIN
   ON CONFLICT (company_id, user_id) WHERE user_id IS NOT NULL DO UPDATE
   SET profile_id = coalesce(EXCLUDED.profile_id, m.profile_id),
       kind = EXCLUDED.kind,
-      status = EXCLUDED.status,
+      status = CASE WHEN m.status = 'removed' AND NOT v_moved THEN 'removed' ELSE EXCLUDED.status END,
       fleet_access = EXCLUDED.fleet_access,
       vessel_scope = EXCLUDED.vessel_scope,
       is_dpa = EXCLUDED.is_dpa,
@@ -621,7 +676,7 @@ BEGIN
       disabled_at = CASE WHEN EXCLUDED.status = 'disabled' THEN coalesce(m.disabled_at, now()) END,
       disabled_by = CASE WHEN EXCLUDED.status = 'disabled' THEN m.disabled_by END,
       disabled_reason = CASE WHEN EXCLUDED.status = 'disabled' THEN m.disabled_reason END,
-      removed_at = NULL,
+      removed_at = CASE WHEN m.status = 'removed' AND NOT v_moved THEN m.removed_at END,
       source = CASE WHEN m.source = 'backfill' THEN 'backfill' ELSE 'profile_sync' END
   WHERE m.legacy_managed;
   RETURN NULL;
@@ -691,6 +746,7 @@ CREATE POLICY account_membership_vessels_select ON public.account_membership_ves
 
 REVOKE ALL ON FUNCTION public.user_is_active(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.my_account_status() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.invitation_withdrawn_for(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.record_session_start() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.legacy_all_vessels(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.legacy_fleet_reach(uuid) FROM PUBLIC, anon, authenticated, service_role;
@@ -706,6 +762,7 @@ REVOKE ALL ON FUNCTION public.account_memberships_sync_from_profile() FROM PUBLI
 
 GRANT EXECUTE ON FUNCTION public.user_is_active(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.my_account_status() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.invitation_withdrawn_for(uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.record_session_start() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.legacy_all_vessels(uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.legacy_fleet_reach(uuid) TO service_role;
@@ -727,8 +784,9 @@ COMMENT ON COLUMN public.account_memberships.vessel_scope IS 'all = every reacha
 COMMENT ON COLUMN public.account_memberships.is_dpa IS 'DECISIONS C19: DPA is a flag on the membership (legacy dpa profiles).';
 COMMENT ON COLUMN public.account_memberships.valid_until IS 'End of the membership window; required for external viewers (C17).';
 
-COMMENT ON FUNCTION public.user_is_active(uuid) IS 'D-122: profile not disabled / deactivated, no disabled / removed membership in the profile''s company, no auth ban in force. Signed-in callers get the truth about themselves and active members of their own company only; no JWT: anyone. Reads the tables directly (file 7 builds the legacy helpers on it).';
-COMMENT ON FUNCTION public.my_account_status() IS 'The caller''s status: active | disabled | no_profile. Works for a disabled user (the sign-in screen uses it).';
+COMMENT ON FUNCTION public.user_is_active(uuid) IS 'D-122: profile not disabled / deactivated, no disabled / removed membership in the profile''s company and no non-legacy membership outside its valid_from / valid_until window (C17), no auth ban in force. Signed-in callers get the truth about themselves and active members of their own company only; no JWT: anyone. Reads the tables directly (file 7 builds the legacy helpers on it).';
+COMMENT ON FUNCTION public.my_account_status() IS 'The caller''s status: active | disabled | no_profile (D-141). disabled also when the access was withdrawn with a revoked or expired invitation that was never accepted. Works for a disabled user (the sign-in screen uses it).';
+COMMENT ON FUNCTION public.invitation_withdrawn_for(uuid) IS 'Internal (service role; definers): the profile is neither invited nor active and the user''s newest invitation is revoked or expired and was never accepted. False before user_invitations exists.';
 COMMENT ON FUNCTION public.record_session_start() IS 'Called by the client after sign-in: same answer as my_account_status(); for an active user records last_login_at (5-minute throttle), invited -> active, membership accepted_at / last_active_at and accepted invitations (once user_invitations exists), under storm.access_engine.';
 COMMENT ON FUNCTION public.legacy_all_vessels(uuid) IS 'D-26: legacy profiles.role dpa / shore_management reach every vessel of the company. Internal (service role; definers).';
 COMMENT ON FUNCTION public.legacy_fleet_reach(uuid) IS 'D-26 fleet reach: legacy dpa / shore_management, or an active in-date RBAC role that is fleet-wide or named superadmin / dpa / fleet_master. Internal (service role; definers).';
@@ -740,4 +798,4 @@ COMMENT ON FUNCTION public.user_vessel_reach(uuid) IS 'The vessels a user reache
 COMMENT ON FUNCTION public.user_can_reach_vessel(uuid, uuid) IS 'Whether a user reaches a vessel; caller rule as user_vessel_reach. RLS calls it with auth.uid().';
 COMMENT ON FUNCTION public.user_has_fleet_reach(uuid, uuid) IS 'Whether a user has fleet reach (in _company_id when given); caller rule as user_vessel_reach.';
 COMMENT ON FUNCTION public.account_membership_vessels_company() IS 'Trigger: stamps company_id from the membership and refuses a vessel of another company (membership_vessel_company_mismatch).';
-COMMENT ON FUNCTION public.account_memberships_sync_from_profile() IS 'Trigger trg_profiles_sync_membership: upserts the legacy-managed membership of a profile with a login; never touches a non-legacy row; a company or login change removes the old legacy row.';
+COMMENT ON FUNCTION public.account_memberships_sync_from_profile() IS 'Trigger trg_profiles_sync_membership: upserts the legacy-managed membership of a profile with a login; never touches a non-legacy row; a company or login change removes the old legacy row; a removed row is not set active again by a later profile update (record_invitation_send sent, set_membership_status or a move back into the company restore it).';

@@ -122,7 +122,11 @@ export type AuthPendingTables = {
 };
 
 export type AuthPendingColumns = {
-  user_permission_overrides: PendingColumns<{ company_id: string | null; vessel_id: string | null }>;
+  user_permission_overrides: PendingColumns<{
+    company_id: string | null;
+    /** Reserved: must be NULL until the evaluators honour a vessel limit (D-124). */
+    vessel_id: string | null;
+  }>;
   permission_audit_log: PendingColumns<{ company_id: string | null }>;
 };
 

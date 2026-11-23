@@ -73,37 +73,117 @@ SELECT tests.as_anon();
 SELECT tests.denied('SELECT * FROM public.permission_audit_log', 'anon reads no audit rows');
 SELECT tests.reset_role();
 
--- ------------------------------------------------------------ user_roles (CC-5)
+-- ------------------------------------------------------------ user_roles (CC-5): no browser write path
 
+-- A users-access admin of A (the DPA) cannot write a user_roles row at all,
+-- whatever the role, the target or the company (the service role does).
 SELECT tests.as_user(tests.user_id('A.fleet_manager'));
-SELECT tests.throws_like(format($q$INSERT INTO public.user_roles (user_id, role, company_id) VALUES (%L, 'crew', %L)$q$, tests.user_id('B.crew'), tests.company_id('B')), '42501', 'new row violates row-level security%', 'a company-A DPA cannot grant a role to a company-B user');
-SELECT tests.throws_like(format($q$INSERT INTO public.user_roles (user_id, role, company_id) VALUES (%L, 'crew', %L)$q$, tests.user_id('A.crew_hyd'), tests.company_id('B')), '42501', 'new row violates row-level security%', 'a row naming another company is refused');
-SELECT tests.throws_like(format($q$INSERT INTO public.user_roles (user_id, role, company_id) VALUES (%L, 'crew', NULL)$q$, tests.user_id('A.master_dra')), '42501', 'new row violates row-level security%', 'a row without a company is refused');
-SELECT tests.throws_like(format($q$INSERT INTO public.user_roles (user_id, role, company_id) VALUES (%L, 'superadmin', %L)$q$, tests.user_id('A.master_dra'), tests.company_id('A')), '42501', 'new row violates row-level security%', 'superadmin is never granted by a tenant');
-SELECT tests.throws_like(format($q$INSERT INTO public.user_roles (user_id, role, company_id) VALUES (%L, 'captain', %L)$q$, tests.user_id('A.fleet_manager'), tests.company_id('A')), '42501', 'new row violates row-level security%', 'no grant to yourself');
-SELECT tests.lives(format($q$INSERT INTO public.user_roles (id, user_id, role, company_id) VALUES (%L, %L, 'captain', %L)$q$, tests.id('ur:new_captain'), tests.user_id('A.master_dra'), tests.company_id('A')), 'the DPA grants captain to a colleague (the predicate runs for authenticated)');
+SELECT tests.throws_like(format($q$INSERT INTO public.user_roles (user_id, role, company_id) VALUES (%L, %L, %L)$q$, tests.user_id('A.crew_hyd'), r, tests.company_id('A')),
+                         '42501', 'new row violates row-level security%', format('the A DPA cannot grant %s in their own company', r))
+FROM unnest(ARRAY['captain', 'dpa', 'travel_agent', 'crew', 'auditor_flag']) AS r;
+SELECT tests.throws_like(format($q$INSERT INTO public.user_roles (user_id, role, company_id) VALUES (%L, 'crew', %L)$q$, tests.user_id('B.crew'), tests.company_id('B')), '42501', 'new row violates row-level security%', 'nor to a company-B user');
+SELECT tests.throws_like(format($q$INSERT INTO public.user_roles (user_id, role, company_id) VALUES (%L, 'captain', %L)$q$, tests.user_id('A.fleet_manager'), tests.company_id('A')), '42501', 'new row violates row-level security%', 'nor to themselves');
+SELECT tests.reset_role();
+SELECT tests.seed_user_role('A.master_dra', 'captain', 'A');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.denied(format($q$UPDATE public.user_roles SET is_active = false WHERE id = %L RETURNING id$q$, tests.id('user_role:A.master_dra:captain:A')), 'the DPA cannot update a service-seeded row of their company');
+SELECT tests.denied(format($q$UPDATE public.user_roles SET role = 'dpa' WHERE id = %L RETURNING id$q$, tests.id('user_role:A.master_dra:captain:A')), 'nor raise its role');
+SELECT tests.denied(format($q$DELETE FROM public.user_roles WHERE id = %L RETURNING id$q$, tests.id('user_role:A.master_dra:captain:A')), 'nor delete it');
+SELECT tests.denied(format($q$UPDATE public.user_roles SET is_active = false WHERE user_id = %L RETURNING id$q$, tests.user_id('B.crew')), 'nor touch a company-B row');
 SELECT tests.is_empty(format('SELECT 1 FROM public.user_roles WHERE company_id = %L', tests.company_id('B')), 'the A DPA reads none of company B''s user_roles rows');
-SELECT tests.denied(format($q$UPDATE public.user_roles SET is_active = false WHERE user_id = %L RETURNING id$q$, tests.user_id('B.crew')), 'the A DPA cannot update a company-B row');
-SELECT tests.denied(format($q$DELETE FROM public.user_roles WHERE user_id = %L RETURNING id$q$, tests.user_id('B.crew')), 'the A DPA cannot delete a company-B row');
-SELECT tests.lives(format($q$UPDATE public.user_roles SET is_active = false WHERE id = %L$q$, tests.id('ur:new_captain')), 'the DPA revokes (useRevokeRole sets is_active false)');
 SELECT tests.ok((SELECT count(*) FROM public.user_roles WHERE company_id = tests.company_id('A')) >= 2, 'the DPA reads company A''s rows');
 SELECT tests.reset_role();
-SELECT tests.is((SELECT count(*) FROM public.permission_audit_log WHERE target_user_id = tests.user_id('A.master_dra') AND actor_user_id = tests.user_id('A.fleet_manager') AND action_type IN ('role_assigned', 'role_removed') AND after_state ->> 'app_role' = 'captain'), 2::bigint, 'user_roles grant and revoke are audited with actor = auth.uid()');
--- Rank cap: a users-access admin of rank 10 grants crew, not captain.
+SELECT tests.ok((SELECT is_active AND role::text = 'captain' FROM public.user_roles WHERE id = tests.id('user_role:A.master_dra:captain:A')), 'the service-seeded row is unchanged');
+SELECT tests.is((SELECT count(*) FROM public.permission_audit_log WHERE target_user_id = tests.user_id('A.master_dra') AND after_state ? 'app_role'), 0::bigint, 'no audit row: nothing was written');
+-- A non-legacy users-access admin and a Master cannot write either.
 SELECT tests.as_user(tests.user_id('A.ua_admin'));
-SELECT tests.lives(format($q$INSERT INTO public.user_roles (user_id, role, company_id) VALUES (%L, 'crew', %L)$q$, tests.user_id('A.master_dra'), tests.company_id('A')), 'a rank-10 admin grants crew');
-SELECT tests.throws_like(format($q$INSERT INTO public.user_roles (user_id, role, company_id) VALUES (%L, 'captain', %L)$q$, tests.user_id('A.crew_hyd'), tests.company_id('A')), '42501', 'new row violates row-level security%', 'never a role ranked above your own');
--- Non-admins.
+SELECT tests.throws_like(format($q$INSERT INTO public.user_roles (user_id, role, company_id) VALUES (%L, 'travel_agent', %L)$q$, tests.user_id('A.crew_hyd'), tests.company_id('A')), '42501', 'new row violates row-level security%', 'a non-legacy users-access admin cannot grant a rank-0 role (travel_agent)');
 SELECT tests.as_user(tests.user_id('A.master_dra'));
 SELECT tests.throws_like(format($q$INSERT INTO public.user_roles (user_id, role, company_id) VALUES (%L, 'crew', %L)$q$, tests.user_id('A.crew_hyd'), tests.company_id('A')), '42501', 'new row violates row-level security%', 'a Master cannot grant app roles');
-SELECT tests.is((SELECT count(*) FROM public.user_roles WHERE user_id = auth.uid()), 2::bigint, 'a user still reads their own user_roles rows');
+SELECT tests.is((SELECT count(*) FROM public.user_roles WHERE user_id = auth.uid()), 1::bigint, 'a user still reads their own user_roles rows');
 SELECT tests.is_empty(format('SELECT 1 FROM public.user_roles WHERE user_id = %L', tests.user_id('A.crew_hyd')), 'a non-admin reads nobody else''s rows');
 -- A dpa row that names company A does not make a company-B user an admin of A.
 SELECT tests.seed_user_role('B.crew', 'dpa', 'A');
 SELECT tests.as_user(tests.user_id('B.crew'));
 SELECT tests.throws_like(format($q$INSERT INTO public.user_roles (user_id, role, company_id) VALUES (%L, 'crew', %L)$q$, tests.user_id('A.crew_hyd'), tests.company_id('A')), '42501', 'new row violates row-level security%', 'a forged dpa row naming company A grants nothing in A');
 SELECT tests.is_empty(format('SELECT 1 FROM public.user_roles WHERE company_id = %L AND user_id <> auth.uid()', tests.company_id('A')), 'nor any read of A''s rows');
+SELECT tests.ok(NOT public.has_role_in_company(auth.uid(), ARRAY['dpa']::public.app_role[], tests.company_id('A')), 'has_role_in_company: a row naming company A does not count for a company-B user');
 SELECT tests.reset_role();
+
+-- ------------------------------------------------------------ legacy role policies are company-scoped (has_role_in_company)
+
+-- Company B data, written as the superuser.
+INSERT INTO public.medical_reports (id, vessel_id, crew_id, report_number, injury_type, treatment_given)
+VALUES (tests.id('med:B'), tests.vessel_id('B.lev'), tests.user_id('B.crew'), 'MED-B-1', 'Fracture', 'Splint; evacuation'),
+       (tests.id('med:A'), tests.vessel_id('A.hyd'), tests.user_id('A.master_dra'), 'MED-A-1', 'Sprain', 'Rest'),
+       (tests.id('med:A2'), NULL, tests.user_id('A.master_dra'), 'MED-A-2', 'Cut', 'Dressing');
+INSERT INTO public.flight_requests (id, crew_id, vessel_id, company_id, request_number, request_type, depart_from, arrive_to, earliest_departure_date)
+VALUES (tests.id('fr:B'), tests.user_id('B.crew'), tests.vessel_id('B.lev'), tests.company_id('B'), 'FR-B-1', 'rotation', 'AAA', 'BBB', current_date + 7),
+       (tests.id('fr:A'), tests.user_id('A.master_dra'), tests.vessel_id('A.dra'), tests.company_id('A'), 'FR-A-1', 'rotation', 'CCC', 'DDD', current_date + 7);
+INSERT INTO public.flight_bookings (id, flight_request_id, airline, booking_reference, ticket_number)
+VALUES (tests.id('fb:B'), tests.id('fr:B'), 'Air B', 'PNR-B', 'TKT-B'),
+       (tests.id('fb:A'), tests.id('fr:A'), 'Air A', 'PNR-A', 'TKT-A');
+INSERT INTO public.admin_action_log (id, actor_user_id, action_type, target_user_id, reason)
+VALUES (tests.id('aal:B'), tests.user_id('B.admin'), 'RESET_ACCOUNT', tests.user_id('B.crew'), 'B internal');
+INSERT INTO public.planner_periods (id, vessel_id, period_type, start_date, end_date)
+VALUES (tests.id('pp:B'), tests.vessel_id('B.lev'), 'yard', current_date, current_date + 10);
+
+-- Service-seeded roles of company A for A.crew_hyd (the rows a tenant admin
+-- could mint before this phase): captain, dpa, travel_agent.
+SELECT tests.seed_user_role('A.crew_hyd', r, 'A') FROM unnest(ARRAY['captain', 'dpa', 'travel_agent']::public.app_role[]) AS r;
+SELECT tests.as_user(tests.user_id('A.crew_hyd'));
+SELECT tests.ok(public.has_any_role(auth.uid(), ARRAY['captain', 'dpa', 'travel_agent']::public.app_role[]), 'A.crew_hyd holds the three app roles (unscoped helper)');
+SELECT tests.ok(public.has_role_in_company(auth.uid(), ARRAY['captain']::public.app_role[], tests.company_id('A')), 'has_role_in_company: captain in A');
+SELECT tests.ok(NOT public.has_role_in_company(auth.uid(), ARRAY['captain', 'dpa', 'travel_agent']::public.app_role[], tests.company_id('B')), 'has_role_in_company: none of them in B');
+SELECT tests.is_empty('SELECT 1 FROM public.medical_reports WHERE id = ' || quote_literal(tests.id('med:B')), 'A.crew_hyd reads none of company B''s medical reports');
+SELECT tests.is_empty(format('SELECT 1 FROM public.flight_requests WHERE company_id = %L', tests.company_id('B')), 'nor company B''s flight requests');
+SELECT tests.is_empty('SELECT 1 FROM public.flight_bookings WHERE id = ' || quote_literal(tests.id('fb:B')), 'nor company B''s flight bookings');
+SELECT tests.is_empty('SELECT 1 FROM public.admin_action_log WHERE id = ' || quote_literal(tests.id('aal:B')), 'nor company B''s admin action log');
+SELECT tests.is_empty('SELECT 1 FROM public.planner_periods WHERE id = ' || quote_literal(tests.id('pp:B')), 'nor company B''s planner periods');
+SELECT tests.denied(format($q$UPDATE public.medical_reports SET treatment_given = 'tampered by A' WHERE id = %L RETURNING id$q$, tests.id('med:B')), 'an UPDATE of B''s medical report changes no row');
+SELECT tests.denied(format($q$UPDATE public.flight_bookings SET ticket_number = 'X' WHERE id = %L RETURNING id$q$, tests.id('fb:B')), 'nor of B''s flight booking');
+SELECT tests.throws_like(format($q$INSERT INTO public.medical_reports (vessel_id, report_number) VALUES (%L, 'MED-FORGED')$q$, tests.vessel_id('B.lev')), '42501', 'new row violates row-level security%', 'no medical report on a company-B vessel');
+SELECT tests.throws_like(format($q$INSERT INTO public.planner_periods (vessel_id, period_type, start_date, end_date) VALUES (%L, 'yard', current_date, current_date)$q$, tests.vessel_id('B.lev')), '42501', 'new row violates row-level security%', 'no planner period on a company-B vessel');
+-- Company A rows stay readable for the same roles (vessel in reach; vessel-less via the crew's company).
+SELECT tests.results_eq('SELECT report_number::text FROM public.medical_reports', $$VALUES ('MED-A-1'), ('MED-A-2')$$, 'the captain of A reads company A''s medical reports (by vessel, and by crew when there is no vessel)');
+SELECT tests.results_eq('SELECT request_number::text FROM public.flight_requests', $$VALUES ('FR-A-1')$$, 'and company A''s flight requests');
+SELECT tests.results_eq('SELECT booking_reference::text FROM public.flight_bookings', $$VALUES ('PNR-A')$$, 'and company A''s flight bookings');
+SELECT tests.lives(format($q$UPDATE public.medical_reports SET treatment_given = 'Rest and ice' WHERE id = %L$q$, tests.id('med:A')), 'the captain of A updates an A medical report');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT treatment_given FROM public.medical_reports WHERE id = tests.id('med:B')), 'Splint; evacuation', 'B''s medical report is unchanged');
+SELECT tests.is((SELECT ticket_number::text FROM public.flight_bookings WHERE id = tests.id('fb:B')), 'TKT-B', 'B''s booking is unchanged');
+-- Company B's own DPA (user_roles dpa of B) still manages B's reports.
+SELECT tests.as_user(tests.user_id('B.admin'));
+SELECT tests.results_eq('SELECT report_number::text FROM public.medical_reports', $$VALUES ('MED-B-1')$$, 'company B''s DPA reads B''s medical report only');
+SELECT tests.results_eq('SELECT booking_reference::text FROM public.flight_bookings', $$VALUES ('PNR-B')$$, 'and B''s booking only');
+SELECT tests.reset_role();
+-- The crew member's own rows stay readable through the own-row branch.
+SELECT tests.as_user(tests.user_id('B.crew'));
+SELECT tests.results_eq('SELECT request_number::text FROM public.flight_requests', $$VALUES ('FR-B-1')$$, 'a crew member reads their own flight request');
+SELECT tests.reset_role();
+
+-- has_role_in_company: the platform superadmin (a user_roles row with no
+-- company) passes for any company; a company-less row of another role
+-- counts for nobody; a signed-in caller never asks about someone else.
+SELECT tests.seed_user('A', 'A.platform', 'crew');
+SELECT tests.seed_user_role('A.platform', 'superadmin', NULL);
+SELECT tests.seed_user('A', 'A.nullrole', 'crew');
+SELECT tests.seed_user_role('A.nullrole', 'dpa', NULL);
+SELECT tests.as_user(tests.user_id('A.platform'));
+SELECT tests.ok(public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa']::public.app_role[], tests.company_id('B')), 'a company-less superadmin passes has_role_in_company for company B');
+SELECT tests.ok(public.has_role_in_company(auth.uid(), ARRAY['superadmin']::public.app_role[], tests.company_id('A')), 'and for company A');
+SELECT tests.ok(NOT public.has_role_in_company(auth.uid(), ARRAY['dpa']::public.app_role[], tests.company_id('A')), 'but not for a role they do not hold');
+SELECT tests.ok(NOT public.has_role_in_company(auth.uid(), ARRAY['superadmin']::public.app_role[], NULL), 'a NULL company is false');
+SELECT tests.ok(NOT public.has_role_in_company(tests.user_id('A.crew_hyd'), ARRAY['captain']::public.app_role[], tests.company_id('A')), 'a signed-in caller asking about someone else gets false');
+SELECT tests.as_user(tests.user_id('A.nullrole'));
+SELECT tests.ok(NOT public.has_role_in_company(auth.uid(), ARRAY['dpa']::public.app_role[], tests.company_id('A')), 'a company-less dpa row counts for no company');
+SELECT tests.as_user(tests.user_id('A.disabled'));
+SELECT tests.ok(NOT public.has_role_in_company(auth.uid(), ARRAY['crew']::public.app_role[], tests.company_id('A')), 'a disabled caller: false');
+SELECT tests.reset_role();
+SELECT tests.ok(public.has_role_in_company(tests.user_id('A.crew_hyd'), ARRAY['captain']::public.app_role[], tests.company_id('A')), 'no JWT (service, cron): answers for anyone');
+SELECT tests.ok(NOT public.has_role_in_company(NULL, ARRAY['captain']::public.app_role[], tests.company_id('A')), 'a NULL user is false');
+-- Back to plain crew for the rest of the file.
+DELETE FROM public.user_roles WHERE user_id = tests.user_id('A.crew_hyd') AND role IN ('captain', 'dpa', 'travel_agent');
 
 -- ------------------------------------------------------------ rbac_user_roles
 
@@ -121,10 +201,21 @@ SELECT tests.results_eq(
   format($q$VALUES ('role_assigned', %1$L::uuid, %2$L::uuid, true), ('role_removed', %1$L::uuid, %2$L::uuid, true), ('role_removed', %1$L::uuid, %2$L::uuid, true)$q$, tests.company_id('A'), tests.vessel_id('A.dra')),
   'rbac assign / deactivate / delete are audited (actor, company, vessel scope, role id)');
 SELECT tests.ok(NOT EXISTS (SELECT 1 FROM public.permission_audit_log WHERE target_user_id = tests.user_id('A.crew_hyd') AND (before_state::text || after_state::text) ~ '@'), 'audit states carry no email address');
--- Rank cap: shore management (80) assigns fleet_master (80), not dpa (90).
+-- Rank cap: strictly below your own rank; an equal rank only for a manager
+-- of admins. Shore management (80, does not manage admins) assigns captain
+-- (60), not fleet_master (80) nor dpa (90); the DPA (90, manages admins)
+-- assigns fleet_master and dpa; nobody assigns superadmin.
 SELECT tests.as_user(tests.user_id('A.shore'));
-SELECT tests.lives(format($q$INSERT INTO public.rbac_user_roles (user_id, role_id) VALUES (%L, (SELECT id FROM public.roles WHERE name = 'fleet_master'))$q$, tests.user_id('A.master_dra')), 'rank 80 assigns a rank-80 role');
+SELECT tests.lives(format($q$INSERT INTO public.rbac_user_roles (user_id, role_id) VALUES (%L, (SELECT id FROM public.roles WHERE name = 'captain'))$q$, tests.user_id('A.master_dra')), 'rank 80 assigns a rank-60 role');
+SELECT tests.throws_like(format($q$INSERT INTO public.rbac_user_roles (user_id, role_id) VALUES (%L, (SELECT id FROM public.roles WHERE name = 'fleet_master'))$q$, tests.user_id('A.master_dra')), '42501', 'new row violates row-level security%', 'rank 80 without manages_admins cannot assign a rank-80 role');
 SELECT tests.throws_like(format($q$INSERT INTO public.rbac_user_roles (user_id, role_id) VALUES (%L, (SELECT id FROM public.roles WHERE name = 'dpa'))$q$, tests.user_id('A.master_dra')), '42501', 'new row violates row-level security%', 'not a role ranked above your own');
+SELECT tests.throws_like(format($q$INSERT INTO public.rbac_user_roles (user_id, role_id) VALUES (%L, (SELECT id FROM public.roles WHERE name = 'superadmin'))$q$, tests.user_id('A.master_dra')), '42501', 'new row violates row-level security%', 'shore management never assigns superadmin');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.lives(format($q$INSERT INTO public.rbac_user_roles (id, user_id, role_id) VALUES (%L, %L, (SELECT id FROM public.roles WHERE name = 'fleet_master'))$q$, tests.id('rbac:fm'), tests.user_id('A.crew_hyd')), 'the DPA assigns a role below 90 (fleet_master)');
+SELECT tests.lives(format($q$INSERT INTO public.rbac_user_roles (id, user_id, role_id) VALUES (%L, %L, (SELECT id FROM public.roles WHERE name = 'dpa'))$q$, tests.id('rbac:dpa'), tests.user_id('A.shore')), 'the DPA, a manager of admins, assigns the equal rank dpa');
+SELECT tests.throws_like(format($q$INSERT INTO public.rbac_user_roles (user_id, role_id) VALUES (%L, (SELECT id FROM public.roles WHERE name = 'superadmin'))$q$, tests.user_id('A.master_dra')), '42501', 'new row violates row-level security%', 'nor does the DPA assign superadmin');
+SELECT tests.reset_role();
+DELETE FROM public.rbac_user_roles WHERE id IN (tests.id('rbac:fm'), tests.id('rbac:dpa'));
 -- Reads.
 SELECT tests.as_user(tests.user_id('A.master_dra'));
 SELECT tests.ok((SELECT count(*) FROM public.rbac_user_roles WHERE user_id = auth.uid()) >= 1, 'a user reads their own RBAC roles');
@@ -148,6 +239,8 @@ SELECT tests.as_user(tests.user_id('A.fleet_manager'));
 SELECT tests.throws_like(format($q$INSERT INTO public.user_permission_overrides (user_id, module_key, permission, is_granted, reason, created_by) VALUES (%L, 'drills', 'edit', true, 'x', %L)$q$, tests.user_id('B.crew'), tests.user_id('A.fleet_manager')), '42501', 'new row violates row-level security%', 'no override for a company-B user');
 SELECT tests.throws_like(format($q$INSERT INTO public.user_permission_overrides (user_id, module_key, permission, is_granted, reason, created_by) VALUES (%L, 'settings', 'admin', true, 'x', %L)$q$, tests.user_id('A.fleet_manager'), tests.user_id('A.fleet_manager')), '42501', 'new row violates row-level security%', 'no override for yourself');
 SELECT tests.throws_like(format($q$INSERT INTO public.user_permission_overrides (user_id, module_key, permission, is_granted, reason, created_by, vessel_id) VALUES (%L, 'ptw', 'edit', true, 'x', %L, %L)$q$, tests.user_id('A.crew_hyd'), tests.user_id('A.fleet_manager'), tests.vessel_id('B.lev')), '23514', 'override_vessel_company_mismatch', 'no override on another company''s vessel');
+SELECT tests.throws_like(format($q$INSERT INTO public.user_permission_overrides (user_id, module_key, permission, is_granted, reason, created_by, vessel_id) VALUES (%L, 'ptw', 'edit', true, 'x', %L, %L)$q$, tests.user_id('A.crew_hyd'), tests.user_id('A.fleet_manager'), tests.vessel_id('A.hyd')), '23514', '%user_permission_overrides_vessel_unsupported%', 'a vessel-limited override is refused even on a company vessel (no evaluator honours it yet, D-124)');
+SELECT tests.throws_like(format($q$UPDATE public.user_permission_overrides SET vessel_id = %L WHERE id = %L$q$, tests.vessel_id('A.hyd'), tests.id('upo:new')), '23514', '%user_permission_overrides_vessel_unsupported%', 'nor can an override be narrowed to a vessel');
 SELECT tests.lives(format($q$UPDATE public.user_permission_overrides SET permission = 'view' WHERE id = %L$q$, tests.id('upo:new')), 'the DPA updates it');
 SELECT tests.lives(format($q$DELETE FROM public.user_permission_overrides WHERE id = %L$q$, tests.id('upo:new')), 'and removes it');
 SELECT tests.reset_role();
@@ -173,25 +266,31 @@ SELECT tests.reset_role();
 
 SELECT tests.ok(bool_and(has_function_privilege('authenticated', p.oid, 'EXECUTE')),
                 format('every function the policies on %s call is executable by authenticated', t.tbl))
-FROM (VALUES ('vessels'), ('rbac_user_roles'), ('user_permission_overrides'), ('user_roles'), ('permission_audit_log'), ('roles'), ('role_permissions')) AS t(tbl)
+FROM (VALUES ('vessels'), ('rbac_user_roles'), ('user_permission_overrides'), ('user_roles'), ('permission_audit_log'), ('roles'), ('role_permissions'),
+             ('medical_reports'), ('flight_requests'), ('flight_bookings'), ('planner_periods'), ('work_rest_monthly_submissions'), ('work_rest_blocks'),
+             ('notification_logs'), ('support_tickets'), ('admin_action_log')) AS t(tbl)
 JOIN pg_policies AS pol ON pol.schemaname = 'public' AND pol.tablename = t.tbl AND 'authenticated' = ANY (pol.roles)
 CROSS JOIN LATERAL regexp_matches(coalesce(pol.qual, '') || ' ' || coalesce(pol.with_check, ''), '([a-z_][a-z0-9_]*)\(', 'g') AS m
 JOIN pg_proc AS p ON p.proname = m[1] AND p.pronamespace IN ('public'::regnamespace, 'auth'::regnamespace)
 GROUP BY t.tbl;
 SELECT tests.ok(has_function_privilege('authenticated', f, 'EXECUTE') AND NOT has_function_privilege('anon', f, 'EXECUTE') AND NOT has_function_privilege('service_role', f, 'EXECUTE'),
                 f || ': authenticated only')
-FROM unnest(ARRAY['public.rbac_user_roles_write_allowed(uuid,uuid,uuid)', 'public.permission_override_write_allowed(uuid,uuid,text,public.permission_level)', 'public.user_roles_write_allowed(uuid,uuid,public.app_role)']) AS f;
+FROM unnest(ARRAY['public.rbac_user_roles_write_allowed(uuid,uuid,uuid)', 'public.permission_override_write_allowed(uuid,uuid,text,public.permission_level)']) AS f;
+SELECT tests.ok(to_regprocedure('public.user_roles_write_allowed(uuid,uuid,public.app_role)') IS NULL, 'user_roles_write_allowed is gone (no browser write path for user_roles)');
+SELECT tests.is((SELECT count(*) FROM pg_policies WHERE schemaname = 'public' AND tablename = 'user_roles' AND cmd <> 'SELECT'), 0::bigint, 'user_roles has no write policy');
+SELECT tests.ok(has_function_privilege('authenticated', 'public.has_role_in_company(uuid,public.app_role[],uuid)', 'EXECUTE')
+            AND has_function_privilege('service_role', 'public.has_role_in_company(uuid,public.app_role[],uuid)', 'EXECUTE')
+            AND NOT has_function_privilege('anon', 'public.has_role_in_company(uuid,public.app_role[],uuid)', 'EXECUTE'), 'has_role_in_company: authenticated + service_role, not anon');
 SELECT tests.ok(NOT has_function_privilege(r, f, 'EXECUTE'), f || ' (trigger) is not executable by ' || r)
 FROM unnest(ARRAY['public.user_permission_overrides_stamp()', 'public.access_change_audit()']) AS f, unnest(ARRAY['anon', 'authenticated', 'service_role']) AS r;
 -- The predicates answer false (not an error) for unknown ids and no caller.
-SELECT tests.ok(NOT public.user_roles_write_allowed(tests.user_id('A.crew_hyd'), tests.company_id('A'), 'crew'), 'no caller: user_roles_write_allowed false');
 SELECT tests.as_user(tests.user_id('A.fleet_manager'));
 SELECT tests.ok(NOT public.rbac_user_roles_write_allowed(tests.id('user:nobody'), (SELECT id FROM public.roles WHERE name = 'crew'), NULL), 'unknown target: false');
 SELECT tests.ok(NOT public.rbac_user_roles_write_allowed(tests.user_id('A.crew_hyd'), tests.id('role:nope'), NULL), 'unknown role: false');
 SELECT tests.ok(NOT public.permission_override_write_allowed(tests.user_id('A.crew_hyd'), tests.company_id('B'), 'drills', 'edit'), 'a company that is not the target''s: false');
 SELECT tests.reset_role();
 SELECT tests.as_user(tests.user_id('A.disabled'));
-SELECT tests.ok(NOT public.user_roles_write_allowed(tests.user_id('A.crew_hyd'), tests.company_id('A'), 'crew'), 'a disabled caller: false');
+SELECT tests.ok(NOT public.rbac_user_roles_write_allowed(tests.user_id('A.crew_hyd'), (SELECT id FROM public.roles WHERE name = 'crew'), NULL), 'a disabled caller: false');
 SELECT tests.reset_role();
 
 -- ------------------------------------------------------------ vessels: writes admin-only, reads scoped
@@ -239,3 +338,23 @@ SELECT tests.lives($q$UPDATE public.roles SET description = coalesce(description
 SELECT tests.reset_role();
 SELECT tests.ok(EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'roles' AND policyname = 'roles_write_service' AND roles = '{service_role}'), 'roles_write_service is TO service_role only');
 SELECT tests.ok(NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename IN ('roles', 'role_permissions') AND cmd <> 'SELECT' AND roles <> '{service_role}'), 'no tenant write policy remains on roles / role_permissions');
+
+-- ------------------------------------------------------------ legacy user_roles rows without a company (20261123010500 backfill)
+
+-- Re-running the file on legacy rows: a company-less row of a tenant role is
+-- given its user's profile company (one per user / role / vessel, so
+-- duplicates never collide); a company-less superadmin row stays platform-wide.
+INSERT INTO public.user_roles (id, user_id, role, company_id, vessel_id, is_active) VALUES
+  (tests.id('ur:legacy:captain:1'), tests.user_id('A.master_dra'), 'captain', NULL, tests.vessel_id('A.dra'), true),
+  (tests.id('ur:legacy:captain:2'), tests.user_id('A.master_dra'), 'captain', NULL, tests.vessel_id('A.dra'), true),
+  (tests.id('ur:legacy:fm'), tests.user_id('A.master_dra'), 'fleet_master', NULL, NULL, true),
+  (tests.id('ur:legacy:sa'), tests.user_id('A.master_dra'), 'superadmin', NULL, NULL, true);
+SELECT tests.ok(NOT public.has_role_in_company(tests.user_id('A.master_dra'), ARRAY['fleet_master']::public.app_role[], tests.company_id('A')), 'before the backfill a company-less fleet_master row counts for no company');
+\i supabase/migrations/20261123010500_platform_role_scoped_policies.sql
+SELECT tests.results_eq(
+  format($q$SELECT role::text, count(*) FILTER (WHERE company_id = %L), count(*) FILTER (WHERE company_id IS NULL) FROM public.user_roles WHERE id IN (%L, %L, %L, %L) GROUP BY role$q$,
+         tests.company_id('A'), tests.id('ur:legacy:captain:1'), tests.id('ur:legacy:captain:2'), tests.id('ur:legacy:fm'), tests.id('ur:legacy:sa')),
+  $q$VALUES ('captain', 1::bigint, 1::bigint), ('fleet_master', 1, 0), ('superadmin', 0, 1)$q$,
+  'the backfill gives tenant roles the profile company (one of two duplicates), never a superadmin row');
+SELECT tests.ok(public.has_role_in_company(tests.user_id('A.master_dra'), ARRAY['fleet_master']::public.app_role[], tests.company_id('A')), 'after it the legacy holder keeps the role in their own company');
+SELECT tests.ok(NOT public.has_role_in_company(tests.user_id('A.master_dra'), ARRAY['fleet_master', 'captain']::public.app_role[], tests.company_id('B')), 'and gains nothing in company B');
