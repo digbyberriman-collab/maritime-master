@@ -6,6 +6,12 @@
  *   /me/*, /inbox        PersonalScope     login
  *   /hris, /health, …   WorkspaceScope    login (pages keep their module gates)
  *
+ * Outermost, before sign-in and every gate, each scope puts its URL prefix
+ * in canonical (lower) case (D-111): the router matches without regard to
+ * case, but the nav tree, breadcrumbs, tabs, favourites and the vessel route
+ * gate read the path as written, so `/V/dra/crew/list` and `/FLEET/…`
+ * redirect to `/v/dra/crew/list` and `/fleet/…` (query, hash and state kept).
+ *
  * Each renders the shell (DashboardLayout) once around an <Outlet/>. Pages
  * that still wrap themselves in DashboardLayout get the idempotent version
  * (ShellContext), so they are mounted here unchanged and moving between two
@@ -21,7 +27,14 @@ import ProtectedRoute from '@/shared/components/ProtectedRoute';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
-import { isVesselCodeParam, normaliseVesselCode, parseVesselPath, vesselPath } from '@/modules/vessels/lib/vesselCode';
+import {
+  canonicalVesselPathname,
+  isVesselCodeParam,
+  normaliseVesselCode,
+  parseVesselPath,
+  vesselPath,
+} from '@/modules/vessels/lib/vesselCode';
+import { WORKSPACE_TREES } from '@/config/navSlots';
 import { ModuleOff, PageError } from '@/shared/components/states';
 import { usePageLocationOverride, type PageLocationOverride } from '@/shared/components/layout/pageLocationOverride';
 import { useVesselNav, type VesselNavModel } from '@/app/nav/useVesselNav';
@@ -57,6 +70,50 @@ const ScopeOutlet: React.FC = () => (
     </RouteSuspense>
   </RouteErrorBoundary>
 );
+
+// ─── Canonical scope prefixes (D-111) ─────────────────────────────────────
+
+/**
+ * `pathname` with the first of `prefixes` it sits under (`/me`, `/me/…`;
+ * matched without regard to case) written as given, the rest exactly as it
+ * was; null when it is already so, or under none of them. Prefixes are
+ * lower case.
+ */
+function canonicalPrefixPath(pathname: string, prefixes: readonly string[]): string | null {
+  for (const prefix of prefixes) {
+    const head = pathname.slice(0, prefix.length);
+    const next = pathname.charAt(prefix.length);
+    if (head.toLowerCase() !== prefix || (next !== '' && next !== '/')) continue;
+    return head === prefix ? null : `${prefix}${pathname.slice(prefix.length)}`;
+  }
+  return null;
+}
+
+const FLEET_PREFIXES: readonly string[] = ['/fleet'];
+// PersonalScope is pathless: its routes sit under these three roots.
+const PERSONAL_PREFIXES: readonly string[] = ['/me', '/inbox', '/help'];
+const NO_PREFIXES: readonly string[] = [];
+
+const canonicalFleetPath = (pathname: string) => canonicalPrefixPath(pathname, FLEET_PREFIXES);
+const canonicalPersonalPath = (pathname: string) => canonicalPrefixPath(pathname, PERSONAL_PREFIXES);
+
+/**
+ * Outermost in every scope layout, before sign-in and any gate (D-111): a
+ * URL whose scope prefix is not in canonical form is replaced by the same
+ * URL with only the prefix (and a vessel code) lower-cased, keeping the
+ * rest of the path, the query, the hash and the history state. Every path
+ * consumer below (header, sidebar, tabs, favourites, the vessel route gate)
+ * then reads one form.
+ */
+const CanonicalScopePath: React.FC<{ canonical: (pathname: string) => string | null; children: React.ReactNode }> = ({
+  canonical,
+  children,
+}) => {
+  const location = useLocation();
+  const target = canonical(location.pathname);
+  if (target === null) return <>{children}</>;
+  return <Navigate replace state={location.state} to={withSearch(target, location.search, location.hash)} />;
+};
 
 /** The shell once, around the matched child route. */
 export const ScopeShell: React.FC = () => (
@@ -111,9 +168,11 @@ const FleetScopeBody: React.FC = () => {
 
 /** `/fleet/*`: oversight across every vessel the user can reach. */
 export const FleetScope: React.FC = () => (
-  <ProtectedRoute>
-    <FleetScopeBody />
-  </ProtectedRoute>
+  <CanonicalScopePath canonical={canonicalFleetPath}>
+    <ProtectedRoute>
+      <FleetScopeBody />
+    </ProtectedRoute>
+  </CanonicalScopePath>
 );
 
 // ─── Vessel ───────────────────────────────────────────────────────────────
@@ -292,10 +351,14 @@ const VesselScopeBody: React.FC = () => {
     body = <ScopeLoading />;
   } else if (currentVesselLink) {
     // The selected vessel, else the first reachable one; same page, same query.
-    const rest = parseVesselPath(location.pathname)?.rest ?? '';
-    body = access.lastVesselCode ? (
+    // A parse miss (never expected: the router and the parser both ignore the
+    // prefix's case, D-111) waits rather than opening the vessel home.
+    const parsed = parseVesselPath(location.pathname);
+    body = !parsed ? (
+      <ScopeLoading />
+    ) : access.lastVesselCode ? (
       <Navigate
-        to={withSearch(vesselPath(access.lastVesselCode, rest), location.search, location.hash)}
+        to={withSearch(vesselPath(access.lastVesselCode, parsed.rest), location.search, location.hash)}
         replace
         state={location.state}
       />
@@ -325,8 +388,13 @@ const VesselScopeBody: React.FC = () => {
       </>
     );
   } else {
-    body = (
-      <VesselRouteGate nav={nav} rest={parseVesselPath(location.pathname)?.rest ?? ''} vesselName={vessel.name} code={code} />
+    // Fail closed (D-04, D-111): a parse miss keeps the loading state. The
+    // gate reads '' as the always-open vessel home, so it never gets one.
+    const parsed = parseVesselPath(location.pathname);
+    body = parsed ? (
+      <VesselRouteGate nav={nav} rest={parsed.rest} vesselName={vessel.name} code={code} />
+    ) : (
+      <ScopeLoading label={`Opening ${vessel.name}…`} />
     );
   }
 
@@ -348,9 +416,11 @@ const VesselScopeBody: React.FC = () => {
  * the first reachable one. With no vessel at all it says so.
  */
 export const VesselScopeRoute: React.FC = () => (
-  <ProtectedRoute>
-    <VesselScopeBody />
-  </ProtectedRoute>
+  <CanonicalScopePath canonical={canonicalVesselPathname}>
+    <ProtectedRoute>
+      <VesselScopeBody />
+    </ProtectedRoute>
+  </CanonicalScopePath>
 );
 
 // ─── Personal and workspaces ──────────────────────────────────────────────
@@ -363,11 +433,13 @@ export const VesselScopeRoute: React.FC = () => (
  * URL (`/me/security`); the old `?tab=` form redirects (personalRoutes.tsx).
  */
 export const PersonalScope: React.FC = () => (
-  <ProtectedRoute>
-    <ScopeContext.Provider value={PERSONAL_SCOPE}>
-      <ScopeShell />
-    </ScopeContext.Provider>
-  </ProtectedRoute>
+  <CanonicalScopePath canonical={canonicalPersonalPath}>
+    <ProtectedRoute>
+      <ScopeContext.Provider value={PERSONAL_SCOPE}>
+        <ScopeShell />
+      </ScopeContext.Provider>
+    </ProtectedRoute>
+  </CanonicalScopePath>
 );
 
 /**
@@ -377,12 +449,21 @@ export const PersonalScope: React.FC = () => (
  */
 export const WorkspaceScope: React.FC<{ workspace: string }> = ({ workspace }) => {
   const value = useMemo<ScopeValue>(() => ({ scope: 'workspace', workspace }), [workspace]);
+  // The workspace's tree root (`/hris`, `/departments/legal`). Its other
+  // routes (old URLs that redirect in) are left as they are.
+  const canonical = useMemo(() => {
+    const root = WORKSPACE_TREES.find((w) => w.id === workspace)?.path;
+    const prefixes = root ? [root] : NO_PREFIXES;
+    return (pathname: string) => canonicalPrefixPath(pathname, prefixes);
+  }, [workspace]);
   return (
-    <ProtectedRoute>
-      <ScopeContext.Provider value={value}>
-        <ScopeShell />
-      </ScopeContext.Provider>
-    </ProtectedRoute>
+    <CanonicalScopePath canonical={canonical}>
+      <ProtectedRoute>
+        <ScopeContext.Provider value={value}>
+          <ScopeShell />
+        </ScopeContext.Provider>
+      </ProtectedRoute>
+    </CanonicalScopePath>
   );
 };
 

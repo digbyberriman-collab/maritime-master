@@ -15,9 +15,11 @@
  *   │       same sidebar, never collapsed (IA19; spec §9)
  *   └─ feedback panel, keyboard shortcuts dialog
  *
- * Print (DS23, D-36): the chrome (sticky header with the tab row, sidebar,
- * notices, footer) is `print:hidden`, and `<main>` drops its scroll box and
- * padding, so a printout carries the page only.
+ * Print (DS23, D-36, D-108): the chrome (sticky header with the tab row,
+ * sidebar, notices, footer) is `print:hidden`, and `<main>` drops its scroll
+ * box and padding, so a printout carries the page. The breadcrumb row in
+ * `<main>` prints as plain text: it gives the page its scope identity on
+ * paper (the vessel's name, the workspace, or Fleet).
  *
  * Providers, outermost first: ShellContext (nested layouts ask for the wide
  * mode), ShellActionsContext (what the palette and shortcuts may open),

@@ -36,7 +36,7 @@ import { useNavBadges, type NavBadge } from '@/app/nav/badges';
 import { sidebarHref } from '@/app/nav/sidebarLinks';
 import { toNavPathname } from '@/app/router/legacyResolve';
 import AddOnLock from './AddOnLock';
-import IconTooltip from './IconTooltip';
+import IconTooltip, { RAIL_TOOLTIP_OFFSET } from './IconTooltip';
 
 export interface SidebarNavigationProps {
   nodes: readonly FilteredNavNode[];
@@ -108,9 +108,6 @@ const statusSuffix = (node: FilteredNavNode) => (node.status === 'planned' ? ', 
 /** A row's status as the collapsed tooltip shows it, after the label. */
 const statusText = (node: FilteredNavNode): string | null =>
   node.status === 'planned' ? 'Planned' : node.status === 'beta' ? 'Beta' : null;
-
-/** Clears the 64 px rail: the 44 px row sits 10 px in from its edge. */
-const RAIL_TOOLTIP_OFFSET = 14;
 
 /**
  * A locked add-on in the collapsed rail: the add-on explanation outside the

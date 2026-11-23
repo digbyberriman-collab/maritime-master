@@ -429,7 +429,7 @@
     "    Bell {\"id\":\"me-notifications\",\"kind\":\"leaf\",\"label\":\"In-app\",\"path\":\"/me/notifications\",\"scope\":\"personal\",\"status\":\"live\"}",
     "    BellRing {\"id\":\"me-notifications-channels\",\"kind\":\"leaf\",\"label\":\"Channels & alerts\",\"path\":\"/me/notifications/channels\",\"scope\":\"personal\",\"status\":\"live\"}",
     "  CircleDot {\"id\":\"me-my-work\",\"kind\":\"section\",\"label\":\"My work\",\"path\":\"/me\",\"scope\":\"personal\"}",
-    "    Clock {\"id\":\"me-hours-of-rest\",\"kind\":\"leaf\",\"label\":\"Hours of rest\",\"path\":\"/me/hours-of-rest\",\"scope\":\"personal\",\"status\":\"live\"}",
+    "    Clock {\"id\":\"me-hours-of-rest\",\"kind\":\"leaf\",\"label\":\"Hours of rest\",\"moduleSetting\":\"crew_hor\",\"path\":\"/me/hours-of-rest\",\"scope\":\"personal\",\"status\":\"live\"}",
     "    GraduationCap {\"id\":\"me-training\",\"kind\":\"leaf\",\"label\":\"Training\",\"path\":\"/me/training\",\"scope\":\"personal\",\"status\":\"live\"}",
     "    Inbox {\"id\":\"me-inbox\",\"kind\":\"leaf\",\"label\":\"Inbox\",\"path\":\"/inbox\",\"scope\":\"personal\",\"status\":\"live\"}",
     "    FileText {\"id\":\"me-documents\",\"kind\":\"leaf\",\"label\":\"Documents\",\"path\":\"/me/documents\",\"scope\":\"personal\",\"status\":\"planned\"}",

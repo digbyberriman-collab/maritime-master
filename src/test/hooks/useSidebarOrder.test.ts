@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import {
   useSidebarOrder,
@@ -158,6 +158,45 @@ describe('useSidebarOrder — deep drag-and-drop reordering', () => {
 
     expect(result.current.getGroupOrder('a')).toEqual(['1', '3', '2']);
     expect(result.current.getGroupOrder('b')).toEqual(['x', 'y', 'z']);
+  });
+
+  it('removeGroups drops stale keys on the same write path, and is a no-op when none is stored', () => {
+    const { result } = renderHook(() => useSidebarOrder());
+    act(() => {
+      result.current.setGroupOrder(SIDEBAR_ROOT, ['b', 'a']);
+      result.current.setGroupOrder('vessel', ['vessel-safety', 'vessel-home']);
+      result.current.setGroupOrder('fleet', ['fleet-compliance', 'fleet-overview']);
+    });
+    act(() => {
+      result.current.removeGroups([SIDEBAR_ROOT, 'vessel']);
+    });
+    expect(result.current.map).toEqual({ fleet: ['fleet-compliance', 'fleet-overview'] });
+    expect(JSON.parse(localStorage.getItem('storm:sidebar-order:v2')!)).toEqual({ fleet: ['fleet-compliance', 'fleet-overview'] });
+
+    const changed = vi.fn();
+    window.addEventListener('storm:sidebar-order-changed', changed);
+    try {
+      act(() => {
+        result.current.removeGroups([SIDEBAR_ROOT, 'vessel']);
+      });
+      expect(changed).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('storm:sidebar-order-changed', changed);
+    }
+  });
+
+  it('a second hook instance sees a write at once (localStorage is the source of truth)', () => {
+    const editor = renderHook(() => useSidebarOrder());
+    const shell = renderHook(() => useSidebarOrder());
+    act(() => {
+      editor.result.current.moveInGroup('grp', 'a', 'down', ['a', 'b', 'c']);
+    });
+    expect(shell.result.current.getGroupOrder('grp')).toEqual(['b', 'a', 'c']);
+    // The shell's own write builds on the editor's, not on its stale copy.
+    act(() => {
+      shell.result.current.moveInGroup('grp', 'c', 'up', ['a', 'b', 'c']);
+    });
+    expect(editor.result.current.getGroupOrder('grp')).toEqual(['b', 'c', 'a']);
   });
 
   it('reset clears every nested group at once', () => {

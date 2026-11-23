@@ -9,7 +9,9 @@
  *   alerts (the same `or` filter the bell uses);
  * - nothing is read before access has loaded, and the state says `loading`
  *   meanwhile (D-04, no fake "all clear");
- * - a failed read is `error`, not zero.
+ * - once it has, an account with no company is `error` (`no-company`,
+ *   D-103), not zeros and not an endless skeleton, and still reads nothing;
+ * - a failed read is `error` (`read`), not zero.
  *
  * The real useAlertScope runs; auth, scope access and the vessel list are
  * in-memory fakes, and the Supabase client records each call.
@@ -32,7 +34,7 @@ const h = vi.hoisted(() => ({
   calls: [] as RecordedCall[],
   rows: [] as Array<{ severity_color: string | null; status: string }>,
   error: null as { message: string } | null,
-  auth: { user: { id: 'u1' }, profile: { id: 'p1', company_id: 'c1' } as { id: string; company_id: string } | null },
+  auth: { user: { id: 'u1' }, profile: { id: 'p1', company_id: 'c1' } as { id: string; company_id: string | null } | null },
   access: { ready: true, fleetReach: false },
   vessel: {
     vessels: [] as Vessel[],
@@ -77,7 +79,7 @@ vi.mock('@/modules/auth/contexts/AuthContext', () => ({ useAuth: () => h.auth })
 vi.mock('@/app/router/useScopeAccess', () => ({ useScopeAccess: () => h.access }));
 vi.mock('@/modules/vessels/contexts/VesselContext', () => ({ useVessel: () => h.vessel }));
 
-import { useOpenAlertCounts, OPEN_ALERT_STATUSES } from '@/modules/dashboard/hooks/useOpenAlertCounts';
+import { useOpenAlertCounts, OPEN_ALERT_STATUSES, alertKpiTileProps, NO_COMPANY_MESSAGE } from '@/modules/dashboard/hooks/useOpenAlertCounts';
 import { ScopeContext, type ScopeValue } from '@/app/router/scopeContext';
 import { alertOrFilter } from '@/modules/notifications/lib/alertScope';
 
@@ -178,18 +180,27 @@ describe('useOpenAlertCounts', () => {
     expect(h.calls).toEqual([]);
   });
 
-  it('reads nothing while the vessel list loads, or without a company', async () => {
+  it('reads nothing and says loading while the vessel list loads', async () => {
     h.vessel = { ...h.vessel, loading: true };
-    const first = renderCounts();
+    const { result } = renderCounts();
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(first.result.current.status).toBe('loading');
-    first.unmount();
+    expect(result.current.status).toBe('loading');
+    expect(h.calls).toEqual([]);
+  });
 
-    h.vessel = { ...h.vessel, loading: false };
-    h.auth = { user: { id: 'u1' }, profile: null };
-    const second = renderCounts();
+  it.each([
+    ['a profile with no company', { id: 'p1', company_id: null }],
+    ['no readable profile', null],
+  ])('once access has loaded, %s is an error (no company), never an endless skeleton, and reads nothing', async (_name, profile) => {
+    h.access = { ready: true, fleetReach: true };
+    h.auth = { user: { id: 'u1' }, profile };
+    const { result, rerender } = renderCounts();
+    expect(result.current).toMatchObject({ status: 'error', reason: 'no-company', counts: null });
+    // A retry cannot help, and reads nothing either.
+    result.current.retry();
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(second.result.current.status).toBe('loading');
+    rerender();
+    expect(result.current).toMatchObject({ status: 'error', reason: 'no-company' });
     expect(h.calls).toEqual([]);
   });
 
@@ -198,6 +209,25 @@ describe('useOpenAlertCounts', () => {
     h.error = { message: 'boom' };
     const { result } = renderCounts();
     await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current).toMatchObject({ status: 'error', reason: 'read' });
     expect(result.current.counts).toBeNull();
+  });
+});
+
+describe('alertKpiTileProps', () => {
+  const retry = () => undefined;
+  it('loading: the skeleton; ready: the tile decides from its value', () => {
+    expect(alertKpiTileProps({ status: 'loading', counts: null, retry })).toEqual({ state: 'loading', onRetry: retry });
+    expect(alertKpiTileProps({ status: 'ready', counts: { RED: 0, ORANGE: 0, YELLOW: 0, GREEN: 0, total: 0 }, retry })).toEqual({ state: undefined, onRetry: retry });
+  });
+
+  it('a failed read keeps its Retry; no company says why and offers none', () => {
+    expect(alertKpiTileProps({ status: 'error', reason: 'read', counts: null, retry })).toEqual({ state: 'error', onRetry: retry });
+    expect(alertKpiTileProps({ status: 'error', reason: 'no-company', counts: null, retry })).toEqual({
+      state: 'error',
+      errorMessage: NO_COMPANY_MESSAGE,
+      onRetry: undefined,
+    });
+    expect(NO_COMPANY_MESSAGE).toBe('No company on your account');
   });
 });

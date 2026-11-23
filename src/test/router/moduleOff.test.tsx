@@ -104,6 +104,16 @@ describe('a module switched off for the vessel', () => {
     expect(await screen.findByRole('heading', { name: 'Surveys page' })).toBeInTheDocument();
   });
 
+  it('gates an upper-case prefix too: /V/dra/crew/list with crew off ends on ModuleOff, never the page (D-111)', async () => {
+    asFleetUser([DRAAK, HYDRA, XIPHIAS]);
+    fakeDb.tables.vessel_module_settings = [row(DRAAK.id, 'crew', false)];
+    renderAt('/V/dra/crew/list');
+    const heading = await screen.findByRole('heading', { level: 1, name: 'Crew is switched off for DRAAK' });
+    expect(main()).toContainElement(heading);
+    expect(screen.queryByRole('heading', { name: 'Crew list page' })).toBeNull();
+    expect(screen.getByTestId('location').textContent).toBe('/v/dra/crew/list');
+  });
+
   it('applies to the vessel whose settings say so only', async () => {
     fakeDb.tables.vessel_module_settings = [row(DRAAK.id, 'technical', false)];
     renderAt('/v/hyd/technical');

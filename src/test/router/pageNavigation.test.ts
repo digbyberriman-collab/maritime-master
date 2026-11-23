@@ -90,6 +90,16 @@ describe('scoped breadcrumbs', () => {
     expect(nav('/fleet/reports/incident-analytics').title).toBe('Incident Analytics');
   });
 
+  // The router matches `/V/…` too; the trail comes from the nav tree, never the URL segment (D-111).
+  it.each([null, 'vessel'])('an upper-case vessel prefix still reads Crew › Crew List (module %s)', (moduleId) => {
+    expect(nav('/V/dra/crew/list', moduleId)).toEqual({
+      crumbs: 'Vessel > Crew > Crew List',
+      title: 'Crew List',
+      links: ['/v/:vesselCode', '/v/:vesselCode/crew', null],
+    });
+    expect(nav('/V/DRA/crew/list', moduleId).title).toBe('Crew List');
+  });
+
   it('pages with a leaf of their own are unchanged', () => {
     expect(nav('/v/dra/crew/list')).toMatchObject({ crumbs: 'Vessel > Crew > Crew List', title: 'Crew List' });
     expect(nav('/fleet/dashboard')).toMatchObject({ crumbs: 'Fleet > Overview > Dashboard', title: 'Dashboard' });

@@ -36,6 +36,7 @@ import { useScopedPath, useVesselScope } from '@/app/router/scopes';
 import { useScopeAccess } from '@/app/router/useScopeAccess';
 
 import { useMonthlyWorkRest } from '../hooks/useMonthlyWorkRest';
+import { PersonalHorGate } from '../components/PersonalHorGate';
 import { CompliancePanel } from '../components/CompliancePanel';
 import { MonthCalendar } from '../components/MonthCalendar';
 import { NonConformityList } from '../components/NonConformityList';
@@ -75,8 +76,68 @@ const sb = supabase as any;
  *
  * The same component is reused by both flows: the difference is purely
  * permission-based and detected at render time.
+ *
+ * It first resolves the vessel the month logs against (the selected vessel,
+ * else the crew member's current assignment), then opens the month only
+ * while that vessel's Hours of Rest (`crew_hor`) is on (PersonalHorGate,
+ * D-109): /me/hours-of-rest and the legacy /crew/work-rest both render this
+ * page, so both are gated.
  */
 const MyWorkRestMonth: React.FC = () => {
+  const { user } = useAuth();
+  const { selectedVessel, vessels } = useVessel();
+  const params = useParams<{ crewId?: string }>();
+  const targetCrewId = params.crewId || user?.id || '';
+  const isOwner = !params.crewId || params.crewId === user?.id;
+
+  // Determine vessel: if reviewing someone else, use the active assignment.
+  const [vesselId, setVesselId] = useState<string | null>(selectedVessel?.id ?? null);
+  useEffect(() => {
+    if (selectedVessel?.id && isOwner) {
+      setVesselId(selectedVessel.id);
+      return;
+    }
+    if (!targetCrewId) return;
+    sb.from('crew_assignments')
+      .select('vessel_id, is_current')
+      .eq('user_id', targetCrewId)
+      .eq('is_current', true)
+      .maybeSingle()
+      .then(({ data }: any) => {
+        if (data?.vessel_id) setVesselId(data.vessel_id);
+      });
+  }, [targetCrewId, selectedVessel?.id, isOwner]);
+
+  if (!user || !targetCrewId) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">No user.</div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!vesselId) {
+    return (
+      <DashboardLayout>
+        <Card>
+          <CardContent className="py-8 text-sm text-muted-foreground">
+            No vessel selected. Pick a vessel from the top bar to start logging hours.
+          </CardContent>
+        </Card>
+      </DashboardLayout>
+    );
+  }
+
+  const vessel = selectedVessel?.id === vesselId ? selectedVessel : vessels.find((v) => v.id === vesselId);
+  return (
+    <PersonalHorGate vesselId={vesselId} vesselName={vessel?.name ?? null}>
+      <WorkRestMonth vesselId={vesselId} />
+    </PersonalHorGate>
+  );
+};
+
+/** The month for one vessel, once its Hours of Rest is known to be on. */
+const WorkRestMonth: React.FC<{ vesselId: string }> = ({ vesselId }) => {
   const { user, profile, userRole } = useAuth();
   const { selectedVessel, isAllVessels } = useVessel();
   const { toast } = useToast();
@@ -117,24 +178,6 @@ const MyWorkRestMonth: React.FC = () => {
       .maybeSingle()
       .then(({ data }: any) => setCrewProfile(data));
   }, [targetCrewId]);
-
-  // Determine vessel: if reviewing someone else, use the active assignment.
-  const [vesselId, setVesselId] = useState<string | null>(selectedVessel?.id ?? null);
-  useEffect(() => {
-    if (selectedVessel?.id && isOwner) {
-      setVesselId(selectedVessel.id);
-      return;
-    }
-    if (!targetCrewId) return;
-    sb.from('crew_assignments')
-      .select('vessel_id, is_current')
-      .eq('user_id', targetCrewId)
-      .eq('is_current', true)
-      .maybeSingle()
-      .then(({ data }: any) => {
-        if (data?.vessel_id) setVesselId(data.vessel_id);
-      });
-  }, [targetCrewId, selectedVessel?.id, isOwner]);
 
   // Roles for permissions
   const { roles } = useActiveRoles();
@@ -201,7 +244,7 @@ const MyWorkRestMonth: React.FC = () => {
 
   const wr = useMonthlyWorkRest({
     crewId: targetCrewId,
-    vesselId: vesselId || '',
+    vesselId,
     year: yearParam,
     month: monthParam,
     actorId: user?.id || '',
@@ -272,25 +315,8 @@ const MyWorkRestMonth: React.FC = () => {
       ['superadmin', 'dpa', 'captain', 'hod', 'purser'].includes(r)
     ) || isOwner;
 
-  if (!user || !targetCrewId) {
-    return (
-      <DashboardLayout>
-        <div className="p-6">No user.</div>
-      </DashboardLayout>
-    );
-  }
-
-  if (!vesselId) {
-    return (
-      <DashboardLayout>
-        <Card>
-          <CardContent className="py-8 text-sm text-muted-foreground">
-            No vessel selected. Pick a vessel from the top bar to start logging hours.
-          </CardContent>
-        </Card>
-      </DashboardLayout>
-    );
-  }
+  // MyWorkRestMonth only mounts the month with a user and a crew member.
+  if (!user || !targetCrewId) return null;
 
   return (
     <DashboardLayout>

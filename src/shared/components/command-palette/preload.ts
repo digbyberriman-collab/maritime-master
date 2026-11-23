@@ -7,10 +7,12 @@
  * The chunk is an optional UI chunk (src/app/optionalChunks.ts): it is
  * imported once and shared with the `React.lazy` that renders it. A failed
  * import, or one that resolves to something other than the module, is
- * forgotten, so the next preload or open tries again. It never reloads the
- * page (main.tsx leaves it out of the stale-chunk reload, D-39); the open path
- * shows "Search could not load" with Try again instead (D-81). A preload never
- * throws and never rejects unhandled.
+ * forgotten, so the next preload or open tries again. A failure never reloads
+ * the page on its own (main.tsx leaves it out of the stale-chunk reload, D-39,
+ * D-100): a hover, focus or shortcut preload fails silently, and the open path
+ * shows "Search could not load" with Try again (a new import) and Reload, the
+ * user's way through the bounded reload guard (D-81). A preload never throws
+ * and never rejects unhandled.
  */
 import type { ComponentType } from 'react';
 import { createOptionalChunkLoader, type OptionalChunkLoader } from '@/app/optionalChunks';

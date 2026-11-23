@@ -30,7 +30,7 @@ vi.mock('@/modules/auth/store/permissionsStore', () => ({
     selector({ isInitialized: false, isLoading: false, loadedFor: null, hasFleetAccess: false, userRoles: [], error: null, loadPermissions: async () => undefined }),
 }));
 vi.mock('@/shared/contexts/BrandingContext', () => ({
-  useBrandingContext: () => ({ clientDisplayName: 'Demo Fleet', clientLogoUrl: null, brandColor: '', isLoading: false }),
+  useBrandingContext: () => ({ clientDisplayName: 'Demo Fleet', clientLogoUrl: null, brandColor: '', tenantBrandColor: null, isLoading: false }),
 }));
 vi.mock('@/shared/components/layout/InkfishFooter', () => ({ default: () => null }));
 vi.mock('@/shared/components/InkfishWatermark', () => ({ default: () => null }));

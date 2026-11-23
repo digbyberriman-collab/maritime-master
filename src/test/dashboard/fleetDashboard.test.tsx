@@ -28,7 +28,7 @@ const failed = <T,>(): QueryLike<T> => ({ data: undefined, isPending: false, isE
 
 type AlertState =
   | { status: 'loading'; counts: null; retry: () => void }
-  | { status: 'error'; counts: null; retry: () => void }
+  | { status: 'error'; reason: 'read' | 'no-company'; counts: null; retry: () => void }
   | { status: 'ready'; counts: { RED: number; ORANGE: number; YELLOW: number; GREEN: number; total: number }; retry: () => void };
 
 const state = vi.hoisted(() => ({
@@ -62,7 +62,13 @@ vi.mock('@/modules/auth/hooks/useAcknowledgments', () => ({
   useMandatoryDocumentsPending: () => state.pendingDocs,
   useAcknowledgmentStats: () => ({ data: [] }),
 }));
-vi.mock('@/modules/dashboard/hooks/useOpenAlertCounts', () => ({ useOpenAlertCounts: () => state.alerts }));
+// The hook is a fake; the tile helper (alertKpiTileProps) stays real, so its
+// module loads, with a client that is never called.
+vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
+vi.mock('@/modules/dashboard/hooks/useOpenAlertCounts', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/modules/dashboard/hooks/useOpenAlertCounts')>()),
+  useOpenAlertCounts: () => state.alerts,
+}));
 vi.mock('@/modules/dashboard/hooks/useDashboardLayout', () => ({
   useDashboardLayout: (defs: Array<{ id: string; defaultOrder: number; defaultVisible: boolean; defaultColSpan: number }>) => {
     const widgets = defs.map((d) => ({ widget_id: d.id, sort_order: d.defaultOrder, is_visible: d.defaultVisible, column_span: d.defaultColSpan }));
@@ -181,13 +187,24 @@ describe('DPA KPI row', () => {
 
   it('says it could not load, with a retry, when the read fails', () => {
     const retry = vi.fn();
-    state.alerts = { status: 'error', counts: null, retry };
+    state.alerts = { status: 'error', reason: 'read', counts: null, retry };
     renderDashboard();
     const red = tile('Red alerts');
     expect(red).toHaveAttribute('data-state', 'error');
     expect(red).toHaveTextContent('Could not load');
     fireEvent.click(within(red).getByRole('button', { name: /try again/i }));
     expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('says the account has no company, with no Retry that cannot help (D-103)', () => {
+    state.alerts = { status: 'error', reason: 'no-company', counts: null, retry: vi.fn() };
+    renderDashboard();
+    for (const label of ['Red alerts', 'Orange alerts', 'Yellow alerts']) {
+      expect(tile(label)).toHaveAttribute('data-state', 'error');
+      expect(tile(label)).toHaveTextContent('No company on your account');
+      expect(tile(label)).not.toHaveTextContent('Could not load');
+      expect(within(tile(label)).queryByRole('button', { name: /try again/i })).toBeNull();
+    }
   });
 
   it('shows "All clear" only for a real zero, and a plain 0 for vessels and crew', () => {
@@ -243,6 +260,15 @@ describe('fleet overview KPI row (other fleet roles)', () => {
     expect(alerts).toHaveTextContent('6');
     expect(alerts).toHaveTextContent('2 red · 1 orange · 3 yellow');
     expect(alerts).toHaveAttribute('data-tone', 'danger');
+  });
+
+  it('Open alerts says the account has no company, with no Retry', () => {
+    state.alerts = { status: 'error', reason: 'no-company', counts: null, retry: vi.fn() };
+    renderDashboard();
+    const alerts = tile('Open alerts');
+    expect(alerts).toHaveAttribute('data-state', 'error');
+    expect(alerts).toHaveTextContent('No company on your account');
+    expect(within(alerts).queryByRole('button', { name: /try again/i })).toBeNull();
   });
 });
 

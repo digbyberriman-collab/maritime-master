@@ -16,13 +16,21 @@
  * which name themselves through the page location override. ModuleOff keeps
  * the star: its page exists, only switched off.
  *
- * Only in-app paths become links (`isInAppPath`): a stored target such as
- * `javascript:…`, `https://…` or `//host` is listed as "Not a page in STORM"
- * with Remove, and never navigates. Each in-app pin is then resolved by scope
- * (`usePinAvailability`: fleet reach, vessel reach, that vessel's module
- * settings, the workspace's Apps entry): a pin the viewer can no longer open
- * is listed as "No longer available" with Remove, and a pin waits (no link)
- * while access loads.
+ * Each pin is drawn from its row state (`usePinRowState`, ./pinRowState.ts,
+ * shared with Manage favourites; D-107):
+ *
+ * - Only in-app paths become links (`isInAppPath`): a stored target such as
+ *   `javascript:…`, `https://…` or `//host` is listed as "Not a page in
+ *   STORM" with Remove, and never navigates.
+ * - Each in-app pin is resolved the way its destination route would resolve
+ *   it (`usePinAvailability`: fleet reach, vessel reach, that vessel's module
+ *   settings, a workspace page's ModuleRoute guard, else the workspace's Apps
+ *   entry). A pin the viewer can no longer open is listed as "No longer
+ *   available" with Remove, and a pin waits (no link) while access loads.
+ * - A pin whose check failed (the vessel's module settings did not load) is
+ *   "Could not check access": disabled, no link, no Remove (selecting it
+ *   deletes nothing), with a "Check again" item beside it. A failed read is
+ *   never offered as a one-click removal (D-04); Manage favourites removes.
  */
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -36,11 +44,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { isInAppPath, usePinnedShortcuts, type PinnedShortcut } from '@/shared/hooks/usePinnedShortcuts';
+import { usePinnedShortcuts, type PinnedShortcut } from '@/shared/hooks/usePinnedShortcuts';
 import { SHELL_TEST_IDS } from '@/app/shell/testIds';
 import { topBarIconButton } from './styles';
 import { useCurrentFavourite } from './useCurrentFavourite';
-import { usePinAvailability } from './pinAvailability';
+import { usePinRowState } from './pinRowState';
 import TopBarTooltip from './TopBarTooltip';
 
 const MANAGE_FAVOURITES_PATH = '/me/shortcuts';
@@ -65,14 +73,40 @@ const RemovablePin: React.FC<{ pin: PinnedShortcut; reason: string; onRemove: (t
 );
 
 /**
- * One in-app pin, resolved by scope while the menu is open (D-93, D-04): a
- * link when the viewer can open it, "No longer available" with Remove when
- * they cannot, and a muted row with no link while access loads.
+ * One pin, resolved while the menu is open (D-93, D-04, D-107): a link when
+ * the viewer can open it, "No longer available" or "Not a page in STORM"
+ * with Remove when they cannot, "Could not check access" with "Check again"
+ * when the check failed, and a muted row with no link while access loads.
  */
 const PinItem: React.FC<{ pin: PinnedShortcut; current: boolean; onRemove: (target: string) => void }> = ({ pin, current, onRemove }) => {
-  const availability = usePinAvailability(pin.shortcut_target);
-  if (availability === 'unavailable') return <RemovablePin pin={pin} reason="No longer available" onRemove={onRemove} />;
-  if (availability === 'waiting') {
+  const row = usePinRowState(pin);
+  if (row.kind === 'remove') return <RemovablePin pin={pin} reason={row.reason} onRemove={onRemove} />;
+  if (row.kind === 'error') {
+    return (
+      <>
+        {/* Disabled: no link, and selecting it removes nothing (the page may well open). */}
+        <DropdownMenuItem disabled data-pin-state="error" className="gap-2 text-muted-foreground">
+          <Star className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} aria-hidden="true" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate">{pin.shortcut_label}</span>
+            <span className="type-caption block">Could not check access</span>
+          </span>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          aria-label={`Check again for ${pin.shortcut_label}`}
+          className="gap-2 pl-8"
+          onSelect={(event) => {
+            event.preventDefault();
+            row.retry();
+          }}
+        >
+          <RotateCw className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />
+          <span className="type-body-sm">Check again</span>
+        </DropdownMenuItem>
+      </>
+    );
+  }
+  if (row.kind === 'waiting') {
     return (
       // Disabled: aria-disabled, skipped by the arrow keys, never a link until access is in.
       <DropdownMenuItem disabled data-pin-state="waiting" className="gap-2 text-muted-foreground">
@@ -132,14 +166,7 @@ export const FavouritesMenuItems: React.FC = () => {
         <p className="type-body-sm max-w-[16rem] px-2 py-2 text-muted-foreground">Star a page to keep it here.</p>
       )}
       {status === 'ready' &&
-        pins.map((pin) =>
-          isInAppPath(pin.shortcut_target) ? (
-            <PinItem key={pin.id} pin={pin} current={pin.shortcut_target === here} onRemove={remove} />
-          ) : (
-            // Not a page of this app: never a link. Selecting it removes the pin.
-            <RemovablePin key={pin.id} pin={pin} reason="Not a page in STORM" onRemove={remove} />
-          ),
-        )}
+        pins.map((pin) => <PinItem key={pin.id} pin={pin} current={pin.shortcut_target === here} onRemove={remove} />)}
       <DropdownMenuSeparator />
       <DropdownMenuItem asChild>
         <Link to={MANAGE_FAVOURITES_PATH} className="gap-2">

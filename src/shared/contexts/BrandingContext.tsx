@@ -7,17 +7,36 @@ import { hasStoredThemeChoice } from '@/components/ui/theme-config';
 
 interface BrandingContextType {
   clientDisplayName: string | null;
+  /**
+   * The tenant colour, or the pre-Abyss default navy when none is set. For
+   * the PDF exports (logbook export, payslips via pdfTemplate) and the
+   * `--brand-primary` variable; the shell reads `tenantBrandColor`.
+   */
   brandColor: string;
+  /**
+   * The colour the tenant set (`companies.brand_color`, a `#rrggbb` hex),
+   * or null when none is set or it is not a hex colour. The tenant logo's
+   * plate edge takes it, and nothing else in the shell (D-DS4).
+   */
+  tenantBrandColor: string | null;
   clientLogoUrl: string | null;
   companyName: string | null;
+  /**
+   * Still deciding what to show: auth, the user's profile, or their company
+   * row is loading. False once the profile is known to have no company, and
+   * once the company read has answered or failed.
+   */
   isLoading: boolean;
 }
 
 const DEFAULT_PRIMARY_COLOR = '#1e3a8a';
 
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
 const BrandingContext = createContext<BrandingContextType>({
   clientDisplayName: null,
   brandColor: DEFAULT_PRIMARY_COLOR,
+  tenantBrandColor: null,
   clientLogoUrl: null,
   companyName: null,
   isLoading: true,
@@ -58,27 +77,38 @@ function useProfileThemeOnNewDevice(userId: string | undefined) {
 }
 
 export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading, profileResolved } = useAuth();
   useProfileThemeOnNewDevice(user?.id);
+  const companyId = profile?.company_id ?? null;
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['company-branding', profile?.company_id],
+  const query = useQuery({
+    queryKey: ['company-branding', companyId],
     queryFn: async () => {
-      if (!profile?.company_id) return null;
-      
+      if (!companyId) return null;
+
       const { data, error } = await supabase
         .from('companies')
         .select('client_display_name, brand_color, client_logo_url, name')
-        .eq('id', profile.company_id)
+        .eq('id', companyId)
         .maybeSingle();
-      
+
       if (error) throw error;
       return data;
     },
-    enabled: !!profile?.company_id,
+    enabled: Boolean(companyId),
   });
+  const { data } = query;
 
-  const brandColor = data?.brand_color || DEFAULT_PRIMARY_COLOR;
+  // A disabled query (no company yet) is not "loading" to React Query, so
+  // the profile counts here: until it has resolved, the logo cannot know
+  // which tenant it is, and the STORM wordmark would flash first (D-04). A
+  // profile that failed to load or has no company resolves too, so the
+  // skeleton never stays up for good.
+  const isLoading = authLoading || (Boolean(user) && !profileResolved) || (Boolean(companyId) && query.isLoading);
+
+  const tenantBrandColor =
+    typeof data?.brand_color === 'string' && HEX_COLOR.test(data.brand_color.trim()) ? data.brand_color.trim() : null;
+  const brandColor = tenantBrandColor ?? DEFAULT_PRIMARY_COLOR;
 
   // Apply brand color as CSS custom property
   useEffect(() => {
@@ -96,10 +126,11 @@ export const BrandingProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const value = useMemo(() => ({
     clientDisplayName: data?.client_display_name ?? null,
     brandColor,
+    tenantBrandColor,
     clientLogoUrl: data?.client_logo_url ?? null,
     companyName: data?.name ?? null,
     isLoading,
-  }), [data, brandColor, isLoading]);
+  }), [data, brandColor, tenantBrandColor, isLoading]);
 
   return (
     <BrandingContext.Provider value={value}>

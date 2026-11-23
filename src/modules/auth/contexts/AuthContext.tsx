@@ -100,6 +100,13 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
+  /**
+   * The profile read for the current session user has answered (a row, no
+   * row, or an error), so `profile` is final for that user. True with no
+   * session. Lets a consumer tell "still loading" from "no profile" or "no
+   * company", which `profile === null` alone cannot.
+   */
+  profileResolved: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (data: SignUpData) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -140,6 +147,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [profileResolved, setProfileResolved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [practitionerDisciplines, setPractitionerDisciplines] = useState<string[]>([]);
   const [practitionerDisciplinesLoaded, setPractitionerDisciplinesLoaded] = useState(false);
@@ -148,6 +156,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // fetch for A (say, started by A's TOKEN_REFRESHED) that resolves after a
   // switch to B is dropped rather than shown as B's profile (D-41).
   const sessionUserIdRef = useRef<string | null>(null);
+  // The user whose profile read last settled: `profileResolved` holds for
+  // them alone, and a new session user starts unresolved.
+  const profileResolvedForRef = useRef<string | null>(null);
   
   // RBAC store integration
   const {
@@ -332,24 +343,49 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user, userRole, rbacInitialized, rbacLoading, canView, hasRBACRole, rbacPermissions, rbacUserRoles, practitionerDisciplines, practitionerDisciplinesLoaded]);
 
   useEffect(() => {
+    // The profile read settles for the session user it was started for: a
+    // row, no row or an error all resolve it (an error leaves no profile), so
+    // nothing waits on a profile that will never come.
+    const resolveProfileFor = (userId: string) => {
+      profileResolvedForRef.current = userId;
+      setProfileResolved(true);
+    };
     const loadProfileFor = (userId: string) => {
       fetchProfile(userId)
         .then((next) => {
-          if (sessionUserIdRef.current === userId) setProfile(next);
+          if (sessionUserIdRef.current !== userId) return;
+          setProfile(next);
+          resolveProfileFor(userId);
         })
-        .catch(() => {});
+        .catch(() => {
+          if (sessionUserIdRef.current === userId) resolveProfileFor(userId);
+        });
     };
 
     // A session for `userId` is now current. Nothing of another user's may
     // stand for it while its own profile and roles load: their profile goes
     // in the same render as the new user, and a direct switch from another
     // account (another tab signing in, no SIGNED_OUT here) drops the roles
-    // and any role load still running for the previous user.
+    // and any role load still running for the previous user. The profile is
+    // unresolved again unless it already settled for this user (a token
+    // refresh keeps it, and its reload replaces it quietly).
     const adoptSessionUser = (userId: string) => {
       const previous = sessionUserIdRef.current;
       sessionUserIdRef.current = userId;
       setProfile((prev) => (prev?.user_id === userId ? prev : null));
+      if (profileResolvedForRef.current !== userId) {
+        profileResolvedForRef.current = null;
+        setProfileResolved(false);
+      }
       if (previous !== null && previous !== userId) resetPermissions();
+    };
+
+    // No session: no profile, and none to wait for.
+    const clearSessionUser = () => {
+      sessionUserIdRef.current = null;
+      profileResolvedForRef.current = null;
+      setProfile(null);
+      setProfileResolved(true);
     };
 
     // Set up auth state listener FIRST
@@ -369,8 +405,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             loadPermissions();
           }, 0);
         } else {
-          sessionUserIdRef.current = null;
-          setProfile(null);
+          clearSessionUser();
           // Reset RBAC permissions when user logs out
           resetPermissions();
         }
@@ -388,11 +423,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           loadProfileFor(session.user.id);
           loadPermissions();
         } else {
-          sessionUserIdRef.current = null;
+          clearSessionUser();
         }
       })
       .catch((err) => {
         console.error('getSession failed:', err);
+        // No session user known: nothing to wait for (a later auth event still adopts one).
+        if (sessionUserIdRef.current === null) setProfileResolved(true);
       })
       .finally(() => {
         setLoading(false);
@@ -402,6 +439,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // without this the app would wait forever on a blank loading screen.
     const safetyTimer = window.setTimeout(() => {
       setLoading(false);
+      if (sessionUserIdRef.current === null) setProfileResolved(true);
     }, 5000);
 
     return () => {
@@ -461,9 +499,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     await supabase.auth.signOut();
     sessionUserIdRef.current = null;
+    profileResolvedForRef.current = null;
     setUser(null);
     setSession(null);
     setProfile(null);
+    setProfileResolved(true);
   };
 
   const resetPassword = async (email: string) => {
@@ -480,6 +520,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         session,
         profile,
         loading,
+        profileResolved,
         signIn,
         signUp,
         signOut,

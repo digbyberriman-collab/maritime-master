@@ -79,6 +79,26 @@ export interface VesselModuleSettingsResult {
 
 const LOADING: ModuleSettingsState = { status: 'loading' };
 
+/** The parts of a settings query (`useQuery`, or one of `useQueries`' results) the state is built from. */
+export interface ModuleSettingsQueryResult {
+  data: ReadyModuleSettings | undefined;
+  isError: boolean;
+  error: unknown;
+}
+
+/**
+ * One settings query as a `ModuleSettingsState` (pure): its data once loaded
+ * (kept while a refetch fails), else `error`, else `loading`. A missing
+ * table arrives as data (`TABLE_MISSING_STATE`), so it is never an error.
+ */
+export function moduleSettingsStateOf({ data, isError, error }: ModuleSettingsQueryResult): ModuleSettingsState {
+  if (data) return data;
+  if (isError) {
+    return { status: 'error', message: normaliseError(error, "This vessel's modules could not load.").message };
+  }
+  return LOADING;
+}
+
 /** `vesselId` absent: `loading` (nothing is known, so nothing gated shows). */
 export function useVesselModuleSettings(vesselId: string | null | undefined): VesselModuleSettingsResult {
   const query = useQuery({
@@ -86,14 +106,10 @@ export function useVesselModuleSettings(vesselId: string | null | undefined): Ve
     enabled: Boolean(vesselId),
   });
   const { data, error, isError, isFetching, refetch } = query;
-  const state = useMemo<ModuleSettingsState>(() => {
-    if (!vesselId) return LOADING;
-    if (data) return data;
-    if (isError) {
-      return { status: 'error', message: normaliseError(error, "This vessel's modules could not load.").message };
-    }
-    return LOADING;
-  }, [vesselId, data, isError, error]);
+  const state = useMemo<ModuleSettingsState>(
+    () => (vesselId ? moduleSettingsStateOf({ data, isError, error }) : LOADING),
+    [vesselId, data, isError, error],
+  );
   const retry = useCallback(() => {
     void refetch();
   }, [refetch]);

@@ -4,7 +4,7 @@
  * favourite star, the bell and the account menu, and the impersonation bar.
  */
 import React from 'react';
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 const spies = vi.hoisted(() => ({ preload: vi.fn() }));
@@ -48,6 +48,7 @@ import HelpMenu from '@/shared/components/layout/topbar/HelpMenu';
 import ImpersonationBar from '@/shared/components/layout/topbar/ImpersonationBar';
 import TenantLogo from '@/shared/components/layout/topbar/TenantLogo';
 import NotificationBell from '@/shared/components/layout/NotificationBell';
+import { TOOLTIP_DELAY_MS } from '@/shared/components/layout/IconTooltip';
 import { CommandPaletteContext } from '@/shared/components/command-palette/context';
 import { CommandPaletteProvider, type CommandPaletteApi } from '@/shared/components/command-palette';
 import { ShellActionsContext } from '@/app/shell/shellActions';
@@ -247,6 +248,109 @@ describe('tooltips', () => {
   });
 });
 
+describe('tooltips after a menu choice (D-92: never left open by a pointer or touch choice)', () => {
+  // jsdom 20 has no PointerEvent, and without one fireEvent drops pointerType
+  // and button, so Radix's menu triggers (which open on pointerdown) ignore it.
+  class TestPointerEvent extends MouseEvent {
+    readonly pointerType: string;
+    readonly pointerId: number;
+    constructor(type: string, init: PointerEventInit = {}) {
+      super(type, init);
+      this.pointerType = init.pointerType ?? '';
+      this.pointerId = init.pointerId ?? 1;
+    }
+  }
+  const nativePointerEvent = 'PointerEvent' in window;
+  beforeAll(() => {
+    if (!nativePointerEvent) Object.defineProperty(window, 'PointerEvent', { value: TestPointerEvent, configurable: true, writable: true });
+  });
+  afterAll(() => {
+    if (!nativePointerEvent) Reflect.deleteProperty(window, 'PointerEvent');
+  });
+
+  type Pointer = 'mouse' | 'touch';
+  interface MenuCase {
+    trigger: string;
+    menu: string;
+    item: string;
+    tooltip: string;
+    mount: () => Promise<void>;
+  }
+  const MENUS: Record<'account' | 'favourites', MenuCase> = {
+    account: {
+      trigger: SHELL_TEST_IDS.accountTrigger,
+      menu: SHELL_TEST_IDS.accountMenu,
+      item: 'Security',
+      tooltip: 'Account',
+      mount: async () => {
+        wide();
+        renderShell(<AccountMenu />, { path: '/fleet/dashboard' });
+      },
+    },
+    favourites: {
+      trigger: SHELL_TEST_IDS.favouritesTrigger,
+      menu: SHELL_TEST_IDS.favouritesMenu,
+      item: 'Manage favourites',
+      tooltip: 'Favourites',
+      mount: async () => {
+        fakeDb.tables.user_pinned_shortcuts = [];
+        renderShell(<FavouritesControl />, { path: '/fleet/documents', scope: { scope: 'fleet' } });
+        await waitFor(() => expect(screen.getByTestId(SHELL_TEST_IDS.favouriteToggle)).not.toHaveAttribute('aria-disabled'));
+      },
+    },
+  };
+  const afterDelay = () => act(async () => new Promise((resolve) => setTimeout(resolve, TOOLTIP_DELAY_MS + 150)));
+
+  /** Open the menu and choose its item with the pointer, as a mouse or a finger does; focus comes back to the trigger. */
+  async function chooseWithPointer(menu: MenuCase, pointerType: Pointer): Promise<HTMLElement> {
+    await menu.mount();
+    const trigger = screen.getByTestId(menu.trigger);
+    fireEvent.pointerDown(trigger, { pointerType, button: 0, ctrlKey: false });
+    fireEvent.pointerUp(trigger, { pointerType, button: 0 });
+    fireEvent.click(trigger);
+    const content = await screen.findByTestId(menu.menu);
+    const item = within(content).getByRole('menuitem', { name: menu.item });
+    if (pointerType === 'mouse') fireEvent.pointerMove(item, { pointerType });
+    fireEvent.pointerDown(item, { pointerType, button: 0 });
+    fireEvent.pointerUp(item, { pointerType, button: 0 });
+    fireEvent.click(item);
+    await waitFor(() => expect(screen.queryByTestId(menu.menu)).toBeNull());
+    // Radix gives focus back to the trigger (kept, for keyboard and screen-reader users).
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+    return trigger;
+  }
+
+  it.each([
+    ['account', 'mouse'],
+    ['account', 'touch'],
+    ['favourites', 'mouse'],
+    ['favourites', 'touch'],
+  ] as const)('%s menu, %s: choosing an item leaves no tooltip, though focus is back on the trigger', async (key, pointerType) => {
+    await chooseWithPointer(MENUS[key], pointerType);
+    await afterDelay();
+    expect(screen.queryByRole('tooltip')).toBeNull();
+  });
+
+  it.each(['account', 'favourites'] as const)('%s menu: hovering the trigger afterwards still shows the tooltip, after the delay', async (key) => {
+    const trigger = await chooseWithPointer(MENUS[key], 'mouse');
+    await afterDelay();
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    fireEvent.pointerMove(trigger, { pointerType: 'mouse' });
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    await waitFor(() => expect(tooltipText()).toBe(MENUS[key].tooltip));
+  });
+
+  it.each(['account', 'favourites'] as const)('%s menu: tabbing away and back shows the tooltip on keyboard focus', async (key) => {
+    const trigger = await chooseWithPointer(MENUS[key], 'touch');
+    await afterDelay();
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    act(() => trigger.blur());
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    act(() => trigger.focus());
+    await waitFor(() => expect(tooltipText()).toBe(MENUS[key].tooltip));
+  });
+});
+
 describe('tenant logo', () => {
   it('shows the display name and links home', async () => {
     renderShell(<TenantLogo />, { path: '/v/dra' });
@@ -256,11 +360,28 @@ describe('tenant logo', () => {
   });
 
   it('puts a logo on a light plate edged in the tenant colour (data, never a literal)', () => {
-    shellState.branding = { ...shellState.branding, clientLogoUrl: 'https://example.invalid/logo.png', brandColor: 'rgb(30, 58, 138)' };
+    shellState.branding = { ...shellState.branding, clientLogoUrl: 'https://example.invalid/logo.png', tenantBrandColor: '#C0392B' };
     renderShell(<TenantLogo />);
     const plate = screen.getByTestId(SHELL_TEST_IDS.tenantLogo).querySelector('img')?.parentElement as HTMLElement;
-    expect(plate).toHaveClass('bg-drift-50', 'rounded-md', 'p-1');
-    expect(plate.style.borderColor).toBe('rgb(30, 58, 138)');
+    expect(plate).toHaveClass('bg-drift-50', 'rounded-md', 'p-1', 'border-transparent');
+    // jsdom keeps the hex (lower-cased) where a browser reports rgb(192, 57, 43).
+    expect(plate.style.borderColor).toBe('#c0392b');
+  });
+
+  it('without a tenant colour the plate edge stays transparent, whatever the PDF fallback colour is', () => {
+    shellState.branding = { ...shellState.branding, clientLogoUrl: 'https://example.invalid/logo.png', brandColor: '#1e3a8a', tenantBrandColor: null };
+    renderShell(<TenantLogo />);
+    const plate = screen.getByTestId(SHELL_TEST_IDS.tenantLogo).querySelector('img')?.parentElement as HTMLElement;
+    expect(plate).toHaveClass('border-transparent');
+    expect(plate.style.borderColor).toBe('');
+  });
+
+  it('shows a skeleton, not the STORM wordmark, while the branding loads', () => {
+    shellState.branding = { ...shellState.branding, clientDisplayName: null, isLoading: true };
+    renderShell(<TenantLogo />);
+    const logo = screen.getByTestId(SHELL_TEST_IDS.tenantLogo);
+    expect(logo).not.toHaveTextContent('STORM');
+    expect(logo.querySelector('span[aria-hidden="true"]')).not.toBeNull();
   });
 
   it('falls back to the STORM wordmark', () => {

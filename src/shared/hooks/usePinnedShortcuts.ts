@@ -2,7 +2,8 @@
  * The signed-in user's favourites (`user_pinned_shortcuts`, live table;
  * gap/10 IA13). Read through React Query (`['pinned-shortcuts', userId]`) so
  * the top-bar star, its menu and /me/shortcuts share one cache and agree.
- * Real pins only: no default set, no suggestions.
+ * Real pins only: no default set, no suggestions, no list of pages to add
+ * (D-68): a page is pinned from the star on the page itself.
  *
  * Writes never fake success: a failed insert or delete shows a notice and
  * the list is re-read. `togglePin` resolves to whether the write went
@@ -26,34 +27,12 @@ export interface PinnedShortcut {
   sort_order: number;
 }
 
+/** A page as the star pins it: its scope-qualified URL, nav title and scope icon key (`useCurrentFavourite`). */
 export interface AvailableShortcut {
   target: string;
   label: string;
   icon: string;
 }
-
-/** All pages that can be pinned as shortcuts */
-export const ALL_AVAILABLE_SHORTCUTS: AvailableShortcut[] = [
-  { target: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
-  { target: '/crew', label: 'Crew List', icon: 'users' },
-  { target: '/crew?new=true', label: 'Add Crew Member', icon: 'users' },
-  { target: '/certificates', label: 'Certificates', icon: 'award' },
-  { target: '/crew/flights', label: 'Flights', icon: 'plane' },
-  { target: '/compliance', label: 'Compliance', icon: 'shield' },
-  { target: '/maintenance', label: 'Maintenance', icon: 'wrench' },
-  { target: '/documents', label: 'Documents', icon: 'file-text' },
-  { target: '/itinerary', label: 'Itinerary', icon: 'compass' },
-  { target: '/notifications/center', label: 'Alerts', icon: 'bell' },
-  { target: '/incidents', label: 'Incidents', icon: 'alert-triangle' },
-  { target: '/incidents?new=true', label: 'Report Incident', icon: 'alert-triangle' },
-  { target: '/fleet-map', label: 'Fleet Map', icon: 'map' },
-  { target: '/vessels/list', label: 'Vessels', icon: 'ship' },
-  { target: '/vessels/list?new=true', label: 'Add Vessel', icon: 'ship' },
-  { target: '/ism/forms/templates', label: 'Forms', icon: 'file-text' },
-  { target: '/ism/audits-surveys', label: 'Audits', icon: 'check-square' },
-  { target: '/ism/drills', label: 'Drills', icon: 'target' },
-  { target: '/risk-assessments', label: 'Risk Assessments', icon: 'shield' },
-];
 
 /**
  * True for a path inside this app (`/fleet/dashboard`): one leading slash,
@@ -142,10 +121,6 @@ export function usePinnedShortcuts() {
     },
   });
 
-  const addPin = useCallback(async (shortcut: AvailableShortcut) => {
-    await insertPin(shortcut);
-  }, [insertPin]);
-
   const removePin = useCallback(async (target: string) => {
     await deletePin(target);
   }, [deletePin]);
@@ -161,7 +136,6 @@ export function usePinnedShortcuts() {
     error: query.error,
     retry: refresh,
     loading: status === 'loading',
-    addPin,
     removePin,
     togglePin,
     toggling: toggle.isPending,

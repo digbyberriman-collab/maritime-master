@@ -6,13 +6,17 @@
  * vessel has not resolved, and on any shell-owned state but ModuleOff, there
  * is no page to pin: the star is not shown. An in-app pin the viewer can no
  * longer open (fleet reach, vessel reach, the vessel's module settings, the
- * workspace's Apps entry) is "No longer available" with Remove; while access
- * loads a pin waits, with no link.
+ * workspace page's ModuleRoute guard, else the workspace's Apps entry) is "No
+ * longer available" with Remove; while access loads a pin waits, with no
+ * link. A pin whose check failed (the vessel's module settings did not load)
+ * is "Could not check access": disabled, no link, no Remove, with Check
+ * again (D-107). ModuleRoute's denials name themselves and show no star.
  */
 import React from 'react';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
+import { QueryClient } from '@tanstack/react-query';
 
 vi.mock('@/integrations/supabase/client', async () => (await import('./fakeSupabase')).fakeSupabaseModule);
 vi.mock('@/modules/auth/contexts/AuthContext', async () => {
@@ -47,10 +51,13 @@ vi.mock('@/shared/components/layout/topbar/ShellShortcuts', () => ({ default: ()
 vi.mock('@/modules/feedback/components/FeedbackPanel', () => ({ default: () => null }));
 vi.mock('@/modules/feedback/components/FeedbackResolvedToast', () => ({ default: () => null }));
 
-import FavouritesControl from '@/shared/components/layout/topbar/FavouritesControl';
+import FavouritesControl, { FavouritesMenuItems } from '@/shared/components/layout/topbar/FavouritesControl';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import ModuleRoute from '@/shared/components/ModuleRoute';
+import type { CapabilityKey } from '@/lib/permissions/types';
 import { isInAppPath, usePinnedShortcuts } from '@/shared/hooks/usePinnedShortcuts';
 import { SHELL_TEST_IDS } from '@/app/shell/testIds';
-import { FleetScope, ScopeNotFound, VesselScopeRoute } from '@/app/router/scopes';
+import { FleetScope, ScopeNotFound, VesselScopeRoute, WorkspaceScope } from '@/app/router/scopes';
 import { fakeDb, resetFakeDb } from './fakeSupabase';
 import {
   DRAAK,
@@ -252,6 +259,69 @@ describe('shell-owned states (D-93, D-96)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Fleet dashboard' })).toBeInTheDocument();
     expect(screen.getByTestId(SHELL_TEST_IDS.favouriteToggle)).toBeInTheDocument();
   });
+
+  /** Workspace pages behind ModuleRoute, as the registry mounts them (the shell is the workspace scope's). */
+  const WorkspaceApp: React.FC = () => (
+    <Routes>
+      <Route element={<WorkspaceScope workspace="health" />}>
+        <Route
+          path="/health/medical/dashboard"
+          element={
+            <ModuleRoute moduleId="health" medicalLevel="view">
+              <h1>Medical dashboard</h1>
+            </ModuleRoute>
+          }
+        />
+      </Route>
+      <Route element={<WorkspaceScope workspace="hris" />}>
+        <Route
+          path="/hris/compensation/payroll"
+          element={
+            <ModuleRoute moduleId="hris" payrollLevel="view">
+              <h1>Payroll</h1>
+            </ModuleRoute>
+          }
+        />
+        <Route
+          path="/hris/locked"
+          element={
+            <ModuleRoute capability={'hr.nothing.here.view' as CapabilityKey}>
+              <h1>Locked</h1>
+            </ModuleRoute>
+          }
+        />
+      </Route>
+    </Routes>
+  );
+
+  /** The breadcrumb's visible items, as text. */
+  const trail = () =>
+    within(screen.getByRole('navigation', { name: 'Breadcrumb' }))
+      .getAllByRole('listitem')
+      .filter((li) => !li.classList.contains('sm:hidden'))
+      .map((li) => li.textContent ?? '');
+
+  it.each([
+    ['a clinical denial (medicalLevel)', '/health/medical/dashboard', 'Clinical access required', 'Health & Wellness'],
+    ['a finance denial (payrollLevel)', '/hris/compensation/payroll', 'Finance access required', 'HRIS'],
+    ['a capability denial (unknown key)', '/hris/locked', 'No access to this page', 'HRIS'],
+  ])('ModuleRoute’s %s names itself and shows no star (D-96, D-107)', async (_case, path, state, root) => {
+    // A master: no clinical access, finance for their own payslips only; the module itself opens.
+    asVesselMaster([DRAAK]);
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    fakeDb.tables.user_pinned_shortcuts = [];
+    renderShell(<WorkspaceApp />, { path, access: { ...VESSEL_ONLY_ACCESS, can: () => true } });
+    expect(await screen.findByText(state, { selector: 'h1, h2' })).toBeInTheDocument();
+    await act(async () => {});
+    expect(screen.queryByRole('heading', { name: /Medical dashboard|Payroll|Locked/ })).toBeNull();
+    expect(screen.queryByTestId(SHELL_TEST_IDS.favouriteToggle)).toBeNull();
+    expect(screen.queryByRole('button', { name: /to favourites/ })).toBeNull();
+    expect(screen.getByTestId(SHELL_TEST_IDS.favouritesTrigger)).toBeInTheDocument();
+    expect(document.title).toBe(`${state} | STORM`);
+    expect(trail()).toEqual([root, state]);
+    expect(fakeDb.calls.some((c) => c.table === 'user_pinned_shortcuts' && c.op === 'insert')).toBe(false);
+    warn.mockRestore();
+  });
 });
 
 describe('pins to pages the viewer can no longer open (D-93, D-04)', () => {
@@ -352,6 +422,54 @@ describe('pins to pages the viewer can no longer open (D-93, D-04)', () => {
       expect(item).not.toHaveTextContent('No longer available');
     }
     expect(anchors(menu)).toEqual(['/me/shortcuts']);
+  });
+
+  it('a pin whose check failed is "Could not check access": disabled, no link, no Remove; Check again re-reads (D-04, D-107)', async () => {
+    // The vessel's module settings answer 503 (twice: the read retries once).
+    fakeDb.failures.vessel_module_settings = { message: 'Service unavailable', code: '503' };
+    fakeDb.tables.user_pinned_shortcuts = [pin('/v/dra/crew/list', 'Crew List', 0), pin('/v/zzz/technical', 'Gone vessel', 1)];
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false, retryDelay: 0, gcTime: Infinity }, mutations: { retry: false } },
+    });
+    renderShell(
+      <DropdownMenu open>
+        <DropdownMenuTrigger>Favourites</DropdownMenuTrigger>
+        <DropdownMenuContent data-testid="menu">
+          <FavouritesMenuItems />
+        </DropdownMenuContent>
+      </DropdownMenu>,
+      { path: '/fleet/documents', scope: { scope: 'fleet' }, queryClient },
+    );
+    const menu = await screen.findByTestId('menu');
+    const item = await within(menu).findByRole('menuitem', { name: /^Crew List/ });
+    await waitFor(() => expect(item).toHaveTextContent('Could not check access'));
+    expect(item).toHaveAttribute('aria-disabled', 'true');
+    expect(item).toHaveAttribute('data-pin-state', 'error');
+    expect(item.tagName).not.toBe('A');
+    expect(item.closest('a')).toBeNull();
+    expect(item.querySelector('a')).toBeNull();
+    expect(item).not.toHaveTextContent('No longer available');
+    expect(item).not.toHaveTextContent('Remove');
+    expect(within(menu).queryByRole('menuitem', { name: /^Remove Crew List/ })).toBeNull();
+    // An unknown vessel is still gone: only a failed check is spared the Remove.
+    expect(await within(menu).findByRole('menuitem', { name: 'Remove Gone vessel, no longer available' })).toBeInTheDocument();
+
+    // Selecting the row deletes nothing.
+    fakeDb.applyWrites = true;
+    fireEvent.click(item);
+    fireEvent.keyDown(item, { key: 'Enter' });
+    await act(async () => {});
+    expect(fakeDb.calls.some((c) => c.table === 'user_pinned_shortcuts' && c.op === 'delete')).toBe(false);
+
+    // Check again re-reads the vessel's module settings; once they load, the pin is a link.
+    const reads = () => fakeDb.calls.filter((c) => c.table === 'vessel_module_settings' && c.op === 'select').length;
+    const before = reads();
+    fakeDb.failures.vessel_module_settings = undefined;
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Check again for Crew List' }));
+    await waitFor(() => expect(reads()).toBeGreaterThan(before));
+    await waitFor(() => expect(within(menu).getByRole('menuitem', { name: 'Crew List' })).toHaveAttribute('href', '/v/dra/crew/list'));
+    expect(screen.getByTestId('menu')).toBeInTheDocument();
+    expect(fakeDb.calls.some((c) => c.table === 'user_pinned_shortcuts' && c.op === 'delete')).toBe(false);
   });
 
   it('a workspace waits for its Apps entry while nav access loads', async () => {

@@ -49,6 +49,11 @@ export interface NotificationCenterData {
 export interface AlertScopeState {
   /** Auth, roles and the vessel list have loaded and there is a company: reading may start. */
   ready: boolean;
+  /**
+   * Auth, roles and the vessel list have loaded, with or without a company:
+   * the scope is final, so a missing company is known to be missing.
+   */
+  settled: boolean;
   companyId: string | null;
   scope: AlertScope;
   /** `alertScopeKey(scope)`, for query keys. */
@@ -64,7 +69,8 @@ export function useAlertScope(): AlertScopeState {
   const { vessels, loading, canAccessAllVessels } = useVessel();
   const route = useScope();
   const companyId = profile?.company_id ?? null;
-  const ready = access.ready && !loading && Boolean(companyId);
+  const settled = access.ready && !loading;
+  const ready = settled && Boolean(companyId);
   const reachKey = vessels.map((v) => v.id).join(',');
   const routeVessel = route.scope === 'vessel' ? route.vessel ?? null : null;
   const scope = useMemo(
@@ -79,6 +85,7 @@ export function useAlertScope(): AlertScopeState {
   );
   return {
     ready,
+    settled,
     companyId,
     scope,
     scopeKey: alertScopeKey(scope),

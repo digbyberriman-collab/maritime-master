@@ -22,8 +22,11 @@
  *   archived, a module switched off) names itself through
  *   `usePageLocationOverride` (./pageLocationOverride.ts): the document
  *   title and the current crumb are the state's, never the URL's nav title.
- * - Print (DS23): the breadcrumb row is shell chrome and does not print; the
- *   fallback h1, when the shell adds one, does (it is the page's title).
+ * - Print (DS23, D-108): the breadcrumb row prints, as plain text with the
+ *   full trail (the narrow-width "…" fold does not print, its crumbs do), so
+ *   a page on paper keeps its scope identity: the vessel's name, the
+ *   workspace, or Fleet. The fallback h1, when the shell adds one, prints
+ *   too (it is the page's title).
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
@@ -139,15 +142,15 @@ const PageLocationHeader: React.FC = () => {
 
   return (
     <div ref={rootRef} data-testid={SHELL_TEST_IDS.pageHeader} className={cn('min-w-0', showFallback ? 'mb-3' : 'mb-2 print:mb-0')}>
-      <nav aria-label="Breadcrumb" className="min-w-0 print:hidden">
-        <ol className="type-caption flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-muted-foreground">
+      <nav aria-label="Breadcrumb" className="min-w-0">
+        <ol className="type-caption flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-muted-foreground print:text-foreground">
           {crumbs.map((crumb, index) => {
             const current = index === crumbs.length - 1;
             const hiddenOnNarrow = fold && index > 0 && !current;
             return (
               <React.Fragment key={crumb.key}>
                 {fold && index === 1 && (
-                  <li className="inline-flex items-center gap-1.5 sm:hidden">
+                  <li className="inline-flex items-center gap-1.5 sm:hidden print:hidden">
                     <Separator />
                     <DropdownMenu>
                       <DropdownMenuTrigger
@@ -176,7 +179,13 @@ const PageLocationHeader: React.FC = () => {
                     </DropdownMenu>
                   </li>
                 )}
-                <li className={cn('min-w-0 items-center gap-1.5', hiddenOnNarrow ? 'hidden sm:inline-flex' : 'inline-flex')}>
+                <li
+                  className={cn(
+                    'min-w-0 items-center gap-1.5',
+                    // Folded on a narrow screen, never on paper: the whole trail prints.
+                    hiddenOnNarrow ? 'hidden sm:inline-flex print:inline-flex' : 'inline-flex',
+                  )}
+                >
                   {index > 0 && <Separator />}
                   {current ? (
                     <span aria-current="page" className={cn(crumbText, 'text-foreground')}>

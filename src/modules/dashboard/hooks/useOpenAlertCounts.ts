@@ -4,6 +4,7 @@ import { useAlertScope } from '@/modules/notifications/hooks/useNotificationCent
 import { alertOrFilter } from '@/modules/notifications/lib/alertScope';
 import type { AlertCounts } from '@/modules/alerts/hooks/useAlerts';
 import type { AlertSeverity } from '@/modules/alerts/constants';
+import type { KpiTileProps } from '@/shared/components/data/KpiTile';
 
 /** Alert states that still need someone (the alert engine's open set). */
 export const OPEN_ALERT_STATUSES = ['OPEN', 'ACKNOWLEDGED', 'SNOOZED', 'ESCALATED'] as const;
@@ -22,9 +23,15 @@ export function countAlertsBySeverity(rows: ReadonlyArray<{ severity_color: stri
   return counts;
 }
 
+/**
+ * Why there is no number: the read failed (`read`, a Retry may help), or the
+ * signed-in account has no company to count for (`no-company`, it cannot).
+ */
+export type OpenAlertCountsErrorReason = 'read' | 'no-company';
+
 export type OpenAlertCountsState =
   | { status: 'loading'; counts: null }
-  | { status: 'error'; counts: null }
+  | { status: 'error'; reason: OpenAlertCountsErrorReason; counts: null }
   | { status: 'ready'; counts: AlertCounts };
 
 /**
@@ -45,10 +52,13 @@ export type OpenAlertCountsState =
  * It never hands back zeros it did not read (D-04, no fake "all clear"):
  * nothing is read until auth, roles and the vessel list have loaded, and
  * until then, and while the query runs, the state is `loading`; a failed
- * read is `error`, so a tile can say why it has no number.
+ * read is `error` (reason `read`), so a tile can say why it has no number.
+ * Once all of that has loaded, an account with no company (no company_id,
+ * or a profile that could not be read) is `error` with reason `no-company`
+ * (D-103): not zeros, not a skeleton that never clears, and nothing read.
  */
 export function useOpenAlertCounts(): OpenAlertCountsState & { retry: () => void } {
-  const { ready, companyId, scope, scopeKey } = useAlertScope();
+  const { ready, settled, companyId, scope, scopeKey } = useAlertScope();
 
   const query = useQuery({
     queryKey: ['alert-counts', companyId ?? undefined, 'scope', scopeKey],
@@ -73,8 +83,25 @@ export function useOpenAlertCounts(): OpenAlertCountsState & { retry: () => void
   const retry = () => {
     if (ready) void query.refetch();
   };
-  if (!ready) return { status: 'loading', counts: null, retry };
-  if (query.isError) return { status: 'error', counts: null, retry };
+  if (!settled) return { status: 'loading', counts: null, retry };
+  if (!companyId) return { status: 'error', reason: 'no-company', counts: null, retry };
+  if (query.isError) return { status: 'error', reason: 'read', counts: null, retry };
   if (query.isPending || !query.data) return { status: 'loading', counts: null, retry };
   return { status: 'ready', counts: query.data, retry };
+}
+
+export const NO_COMPANY_MESSAGE = 'No company on your account';
+
+/**
+ * A KPI tile's state for these counts: the skeleton while loading; for an
+ * error, why, with a Retry only where one can help (a failed read, not an
+ * account with no company).
+ */
+export function alertKpiTileProps(
+  alerts: OpenAlertCountsState & { retry: () => void },
+): Pick<KpiTileProps, 'state' | 'errorMessage' | 'onRetry'> {
+  if (alerts.status === 'ready') return { state: undefined, onRetry: alerts.retry };
+  if (alerts.status === 'loading') return { state: 'loading', onRetry: alerts.retry };
+  if (alerts.reason === 'no-company') return { state: 'error', errorMessage: NO_COMPANY_MESSAGE, onRetry: undefined };
+  return { state: 'error', onRetry: alerts.retry };
 }

@@ -1,9 +1,12 @@
 /**
  * The account's logo at the left of the top bar (gap/10 top bar element 1,
  * DS5; spec §2.1). A tenant logo sits on a light plate so dark ink stays
- * legible on Abyss; the plate's 1 px edge takes the tenant brand colour,
- * which is data (D-DS4: the brand colour never replaces Signal). No logo:
+ * legible on Abyss; the plate's 1 px edge takes the tenant brand colour
+ * when the tenant set one (`tenantBrandColor`, data: D-DS4, the brand
+ * colour never replaces Signal), and stays transparent otherwise. No logo:
  * the display name in the display face. Neither: the STORM wordmark.
+ * While auth, the profile or the company row is loading it is a skeleton,
+ * never the STORM wordmark in place of a tenant that has not loaded (D-04).
  * The link goes to the user's home (gap/01 landing rules).
  */
 import React from 'react';
@@ -31,7 +34,7 @@ export interface TenantLogoProps {
 
 const TenantLogo: React.FC<TenantLogoProps> = ({ className, surface = 'topbar' }) => {
   const onSidebar = surface === 'sidebar';
-  const { clientLogoUrl, clientDisplayName, brandColor, isLoading } = useBrandingContext();
+  const { clientLogoUrl, clientDisplayName, tenantBrandColor, isLoading } = useBrandingContext();
   const access = useScopeAccess();
   const [logoFailed, setLogoFailed] = React.useState(false);
   React.useEffect(() => setLogoFailed(false), [clientLogoUrl]);
@@ -55,7 +58,7 @@ const TenantLogo: React.FC<TenantLogoProps> = ({ className, surface = 'topbar' }
       ) : showLogo ? (
         <span
           className="flex h-7 max-w-[140px] items-center rounded-md border border-transparent bg-drift-50 p-1"
-          style={brandColor ? { borderColor: brandColor } : undefined}
+          style={tenantBrandColor ? { borderColor: tenantBrandColor } : undefined}
         >
           <img
             src={clientLogoUrl ?? undefined}

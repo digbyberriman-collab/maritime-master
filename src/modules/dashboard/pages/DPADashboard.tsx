@@ -12,7 +12,7 @@ import DashboardLayoutControls from '@/modules/dashboard/components/DashboardLay
 import FleetDashboardHeader from '@/modules/dashboard/components/FleetDashboardHeader';
 import { OverdueCapasBanner, RecentCrewChangesCard } from '@/modules/dashboard/components/FleetDashboardWidgets';
 import { useDashboardLayout, type WidgetDefinition } from '@/modules/dashboard/hooks/useDashboardLayout';
-import { useOpenAlertCounts } from '@/modules/dashboard/hooks/useOpenAlertCounts';
+import { alertKpiTileProps, useOpenAlertCounts } from '@/modules/dashboard/hooks/useOpenAlertCounts';
 import { kpiStateFor } from '@/modules/dashboard/lib/kpiState';
 
 /*
@@ -43,7 +43,8 @@ const DPADashboard: React.FC = () => {
   const overdueCapas = useOverdueCAPAs();
   const recentChanges = useRecentCrewChanges(5);
 
-  const alertState = alerts.status === 'ready' ? undefined : alerts.status;
+  // Skeleton, ready, or why there is no number (a Retry only for a failed read).
+  const alertTile = alertKpiTileProps(alerts);
   const capaCount = overdueCapas.data?.length ?? 0;
   const roleLabel = profile?.role ? (ROLE_LABELS[profile.role] ?? null) : null;
 
@@ -78,31 +79,28 @@ const DPADashboard: React.FC = () => {
               label="Red alerts"
               icon={AlertCircle}
               value={alerts.counts?.RED}
-              state={alertState}
+              {...alertTile}
               tone={alerts.counts && alerts.counts.RED > 0 ? 'danger' : undefined}
               sub="Urgent: act now"
               href="/notifications/center"
-              onRetry={alerts.retry}
             />
             <KpiTile
               label="Orange alerts"
               icon={AlertTriangle}
               value={alerts.counts?.ORANGE}
-              state={alertState}
+              {...alertTile}
               tone={alerts.counts && alerts.counts.ORANGE > 0 ? 'orange' : undefined}
               sub="Overdue items"
               href="/notifications/center"
-              onRetry={alerts.retry}
             />
             <KpiTile
               label="Yellow alerts"
               icon={Clock}
               value={alerts.counts?.YELLOW}
-              state={alertState}
+              {...alertTile}
               tone={alerts.counts && alerts.counts.YELLOW > 0 ? 'warn' : undefined}
               sub="Upcoming deadlines"
               href="/notifications/center"
-              onRetry={alerts.retry}
             />
             <KpiTile
               label="Overdue CAPAs"

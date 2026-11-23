@@ -1,7 +1,9 @@
 /**
  * main.tsx stale-chunk recovery (BUILD-PLAN B2: a chunk-load failure ends in a
  * recoverable state, not a blank page or a reload loop), and the optional UI
- * chunks it leaves to their own boundaries (src/app/optionalChunks.ts, D-81).
+ * chunks it leaves to their own boundaries (src/app/optionalChunks.ts, D-81,
+ * D-100): they never reload on their own, and a boundary's Reload goes
+ * through the same guard (src/app/staleChunkRecovery.ts) and its panel.
  *
  * Each "boot" re-imports main.tsx into a fresh #root, as a page reload would,
  * then fails a route chunk the way Vite's preload helper does (a cancelable
@@ -173,6 +175,29 @@ describe('main.tsx reload guard', () => {
     expect(panel?.querySelector('[data-storm-boot-logo]')).not.toBeNull();
     expect(panel?.querySelector('[role="alert"]')).toHaveTextContent("We couldn't finish loading STORM");
     expect(document.getElementById('storm-recovery-reload')).toHaveFocus();
+  });
+
+  it("an optional chunk boundary's Reload at the cap ({count: 2, at: now}) shows the recovery panel, not a reload", async () => {
+    await boot();
+    sessionStorage.setItem(RELOAD_KEY, JSON.stringify({ count: 2, at: Date.now() }));
+    // The instance main.tsx registered its panel with (the same module after boot).
+    const { requestChunkRecovery } = await import('@/app/staleChunkRecovery');
+    requestChunkRecovery();
+    await tick();
+    expect(reloads).toBe(0);
+    expect(panelShown()).toBe(true);
+    expect(hoisted.unmounts).toBe(1);
+  });
+
+  it("an optional chunk boundary's Reload below the cap reloads once and counts in the guard", async () => {
+    await boot();
+    const { requestChunkRecovery } = await import('@/app/staleChunkRecovery');
+    requestChunkRecovery();
+    requestChunkRecovery();
+    await tick();
+    expect(reloads).toBe(1);
+    expect(panelShown()).toBe(false);
+    expect(JSON.parse(sessionStorage.getItem(RELOAD_KEY) ?? 'null')).toMatchObject({ count: 1 });
   });
 
   it('fails closed when sessionStorage cannot be written: panel, no automatic reload', async () => {

@@ -75,7 +75,8 @@ describe('DashboardLayout sidebar accessibility regressions', () => {
     expect(collapse.className).toContain('focus-visible:ring-2');
     expect(collapse).toHaveAttribute('data-testid', 'shell-sidebar-collapse');
 
-    collapse.focus();
+    // Focus opens the toggle's tooltip (D-106), a state update.
+    act(() => collapse.focus());
     expect(collapse).toHaveFocus();
     fireEvent.keyDown(window, { key: 'b', code: 'KeyB', ctrlKey: true });
 

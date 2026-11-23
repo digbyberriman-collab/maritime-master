@@ -164,7 +164,7 @@ describe('page heading contract', () => {
     expect(document.title).toBe('Dashboard | STORM');
   });
 
-  it('the breadcrumb row does not print; the shell title does (it is the page title on paper; DS23)', async () => {
+  it('the breadcrumb row prints as plain text, and so does the shell title (the page on paper; DS23, D-108)', async () => {
     renderShell(
       <Main>
         <p>Review queue</p>
@@ -172,9 +172,47 @@ describe('page heading contract', () => {
       { path: '/fleet/dashboard', scope: FLEET },
     );
     await waitFor(() => expect(screen.getByTestId(SHELL_TEST_IDS.fallbackHeading)).toBeInTheDocument());
-    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveClass('print:hidden');
+    const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });
+    expect(crumbs).not.toHaveClass('print:hidden');
+    expect(crumbs.closest('.print\\:hidden')).toBeNull();
+    expect(within(crumbs).getByRole('list')).toHaveClass('print:text-foreground');
+    expect(crumbs).toHaveTextContent('Fleet');
     expect(screen.getByTestId(SHELL_TEST_IDS.fallbackHeading)).not.toHaveClass('print:hidden');
     expect(screen.getByTestId(SHELL_TEST_IDS.pageHeader)).not.toHaveClass('print:hidden');
+  });
+
+  it('a vessel page on paper names its vessel: the printed breadcrumb carries DRAAK (D-108)', async () => {
+    renderShell(
+      <Main>
+        <h1>Crew list</h1>
+      </Main>,
+      { path: '/v/dra/crew/list', scope: VESSEL },
+    );
+    const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });
+    await waitFor(() => expect(within(crumbs).getByRole('link', { name: 'DRAAK' })).toBeInTheDocument());
+    expect(crumbs).not.toHaveClass('print:hidden');
+    expect(crumbs.closest('.print\\:hidden')).toBeNull();
+    expect(crumbs.textContent).toContain('DRAAK');
+    expect(trail()).toEqual({ items: ['DRAAK', 'Crew', 'Crew List'], current: 'Crew List' });
+  });
+
+  it('a folded trail prints whole: the "…" menu does not print, the crumbs it folds do', async () => {
+    renderShell(
+      <Main>
+        <h1>Timeline</h1>
+      </Main>,
+      { path: '/v/dra/crew/planner/timeline', scope: VESSEL },
+    );
+    const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });
+    await waitFor(() => expect(within(crumbs).getByRole('link', { name: 'DRAAK' })).toBeInTheDocument());
+    const items = within(crumbs).getAllByRole('listitem');
+    const foldItem = items.find((li) => li.classList.contains('sm:hidden'));
+    expect(foldItem).toBeDefined();
+    expect(foldItem).toHaveClass('print:hidden');
+    // The folded middle crumbs (hidden below 640 px) are shown on paper.
+    const folded = items.filter((li) => li.classList.contains('hidden'));
+    expect(folded.map((li) => li.textContent)).toEqual(['Crew', 'Planner']);
+    for (const li of folded) expect(li).toHaveClass('sm:inline-flex', 'print:inline-flex');
   });
 
   it.each([

@@ -79,7 +79,16 @@ vi.mock('@/integrations/supabase/client', () => {
 vi.mock('@/modules/vessels/hooks/useVesselModuleSettings', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/modules/vessels/hooks/useVesselModuleSettings')>();
   const { TABLE_MISSING_STATE } = await import('@/modules/vessels/lib/moduleSettings');
-  return { ...actual, useVesselModuleSettings: () => ({ state: TABLE_MISSING_STATE, fetching: false, retry: () => undefined }) };
+  return {
+    ...actual,
+    useVesselModuleSettings: () => ({ state: TABLE_MISSING_STATE, fetching: false, retry: () => undefined }),
+    // The personal tree reads the same settings through useQueries (D-109): served from the cache, so no read lands after a test.
+    vesselModuleSettingsQueryOptions: (vesselId: string) => ({
+      ...actual.vesselModuleSettingsQueryOptions(vesselId),
+      initialData: TABLE_MISSING_STATE,
+      staleTime: Infinity,
+    }),
+  };
 });
 vi.mock('@/modules/auth/contexts/AuthContext', () => ({ useAuth: () => mocks.auth }));
 vi.mock('@/modules/auth/store/permissionsStore', () => ({
@@ -144,7 +153,7 @@ vi.mock('@/modules/settings/components/sections', async () => {
     InsuranceAuditModeSection: section('Insurance Audit Mode'),
     HRAuditAccessSection: section('HR Audit Access Controls'),
     GDPRRequestsSection: section('GDPR Data Subject Requests'),
-    ShortcutsSection: section('Quick Action Shortcuts'),
+    ShortcutsSection: section('Favourites'),
     SidebarLayoutSection: section('Sidebar layout'),
   };
 });
@@ -243,7 +252,7 @@ describe('/me sections', () => {
   it.each([
     ['/me/security', 'Security'],
     ['/me/appearance', 'Appearance'],
-    ['/me/shortcuts', 'Quick Action Shortcuts'],
+    ['/me/shortcuts', 'Favourites'],
     ['/me/sidebar-layout', 'Sidebar layout'],
     ['/me/data-exports', 'Data & Exports'],
     ['/me/notifications/channels', 'Notification channels'],

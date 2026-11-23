@@ -192,7 +192,14 @@ const FakeVesselProvider: React.FC<FakeVesselProps> = ({ reachable, selected = n
 
 const LocationProbe: React.FC = () => {
   const location = useLocation();
-  return <output aria-label="location">{`${location.pathname}${location.search}`}</output>;
+  return (
+    <>
+      <output aria-label="location">{`${location.pathname}${location.search}${location.hash}`}</output>
+      {/* 'default' until something navigates (a redirect replaces it). */}
+      <output aria-label="location key">{location.key}</output>
+      <output aria-label="location state">{JSON.stringify(location.state ?? null)}</output>
+    </>
+  );
 };
 
 /** A legacy-style page: renders DashboardLayout itself, like ~90 real pages. */
@@ -247,7 +254,9 @@ const FleetPage: React.FC<{ title: string }> = ({ title }) => {
   );
 };
 
-function renderApp(url: string, vessels: Omit<FakeVesselProps, 'children'>) {
+type InitialEntry = NonNullable<React.ComponentProps<typeof MemoryRouter>['initialEntries']>[number];
+
+function renderApp(url: InitialEntry, vessels: Omit<FakeVesselProps, 'children'>) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
@@ -272,12 +281,19 @@ function renderApp(url: string, vessels: Omit<FakeVesselProps, 'children'>) {
               <Route path="/me">
                 <Route index element={<h1>My profile</h1>} />
                 <Route path="hours-of-rest" element={<h1>My hours of rest</h1>} />
+                <Route path="profile" element={<h1>Profile section</h1>} />
               </Route>
               <Route path="/inbox" element={<h1>Inbox</h1>} />
+              <Route path="/help/support" element={<h1>Support</h1>} />
             </Route>
             <Route element={<WorkspaceScope workspace="hris" />}>
               <Route path="/hris/one" element={<HrisOne />} />
               <Route path="/hris/two" element={<HrisTwo />} />
+              {/* An old URL the workspace redirects in: outside its tree root. */}
+              <Route path="/hr/old" element={<h1>Old HR page</h1>} />
+            </Route>
+            <Route element={<WorkspaceScope workspace="legal" />}>
+              <Route path="/departments/legal/dashboard" element={<h1>Legal dashboard</h1>} />
             </Route>
             <Route path="/crew/list" element={<LegacyRoute from="/crew/list"><h1>Legacy crew list</h1></LegacyRoute>} />
             <Route path="/documents" element={<LegacyRoute from="/documents"><h1>Legacy documents</h1></LegacyRoute>} />
@@ -610,6 +626,109 @@ describe('PersonalScope and WorkspaceScope', () => {
     expect(await screen.findByRole('heading', { name: 'HRIS two' })).toBeInTheDocument();
     expect(mocks.shellMounts).toBe(1);
     expect(shells()).toBe(1);
+  });
+});
+
+// ─── Canonical scope prefixes (D-111) ─────────────────────────────────────
+
+describe('canonical scope prefixes (D-111)', () => {
+  const key = () => screen.getByLabelText('location key').textContent;
+  const state = () => screen.getByLabelText('location state').textContent;
+
+  it('lower-cases the vessel prefix, keeping the rest of the path', async () => {
+    renderApp('/V/dra/crew/list', { reachable: [DRAAK], selected: DRAAK.id });
+    expect(await screen.findByRole('heading', { name: 'Scoped crew list' })).toBeInTheDocument();
+    expect(location()).toBe('/v/dra/crew/list');
+    expect(shells()).toBe(1);
+  });
+
+  it('lower-cases the vessel code', async () => {
+    renderApp('/v/DRA/crew/list', { reachable: [DRAAK], selected: DRAAK.id });
+    expect(await screen.findByRole('heading', { name: 'Scoped crew list' })).toBeInTheDocument();
+    expect(location()).toBe('/v/dra/crew/list');
+  });
+
+  it('only the prefix and the code change; the rest of the path is kept exactly', async () => {
+    renderApp('/V/DRA/Nope/Thing/', { reachable: [DRAAK], selected: DRAAK.id });
+    await waitFor(() => expect(location()).toBe('/v/dra/Nope/Thing/'));
+  });
+
+  it('keeps the query, the hash and the history state', async () => {
+    renderApp(
+      { pathname: '/FLEET/dashboard', search: '?x=1', hash: '#h', state: { from: 'bookmark' } },
+      { reachable: [DRAAK], selected: DRAAK.id, canAccessAllVessels: true },
+    );
+    expect(await screen.findByRole('heading', { name: 'Fleet dashboard' })).toBeInTheDocument();
+    expect(location()).toBe('/fleet/dashboard?x=1#h');
+    expect(state()).toBe('{"from":"bookmark"}');
+  });
+
+  it('canonicalises before the gate: a user without fleet reach is denied on the canonical URL', async () => {
+    renderApp('/Fleet/dashboard', { reachable: [DRAAK], selected: DRAAK.id });
+    expect(await screen.findByRole('heading', { name: 'The Fleet view is not available to you' })).toBeInTheDocument();
+    expect(location()).toBe('/fleet/dashboard');
+  });
+
+  it('lower-cases the personal roots: /me, /inbox and /help', async () => {
+    for (const [url, canonical, heading] of [
+      ['/ME/profile', '/me/profile', 'Profile section'],
+      ['/Me', '/me', 'My profile'],
+      ['/INBOX', '/inbox', 'Inbox'],
+      ['/Help/support', '/help/support', 'Support'],
+    ] as const) {
+      const { unmount } = renderApp(url, { reachable: [] });
+      expect(await screen.findByRole('heading', { name: heading })).toBeInTheDocument();
+      expect(location()).toBe(canonical);
+      unmount();
+    }
+  });
+
+  it("lower-cases a workspace's tree root, the two-segment Legal root included", async () => {
+    const hris = renderApp('/HRIS/one', { reachable: [DRAAK], selected: DRAAK.id });
+    expect(await screen.findByRole('heading', { name: 'HRIS one' })).toBeInTheDocument();
+    expect(location()).toBe('/hris/one');
+    hris.unmount();
+    renderApp('/Departments/LEGAL/dashboard', { reachable: [DRAAK], selected: DRAAK.id });
+    expect(await screen.findByRole('heading', { name: 'Legal dashboard' })).toBeInTheDocument();
+    expect(location()).toBe('/departments/legal/dashboard');
+  });
+
+  it("leaves a workspace's routes outside its tree root alone", () => {
+    renderApp('/HR/old', { reachable: [DRAAK], selected: DRAAK.id });
+    expect(screen.getByRole('heading', { name: 'Old HR page' })).toBeInTheDocument();
+    expect(location()).toBe('/HR/old');
+    expect(key()).toBe('default');
+  });
+
+  it('keeps a literal :vesselCode segment as written (only the prefix is lower-cased)', async () => {
+    renderApp('/V/:VesselCode/a', { reachable: [] });
+    expect(await screen.findByRole('heading', { name: 'No vessel to open' })).toBeInTheDocument();
+    expect(location()).toBe('/v/:VesselCode/a');
+  });
+
+  it('does not rewrite the literal current-vessel link (the scope opens it on the current vessel)', async () => {
+    renderApp('/v/:vesselCode/crew/list', { reachable: [] });
+    expect(await screen.findByRole('heading', { name: 'No vessel to open' })).toBeInTheDocument();
+    expect(location()).toBe('/v/:vesselCode/crew/list');
+    expect(key()).toBe('default');
+  });
+
+  it('renders canonical paths with no redirect', () => {
+    const cases: [string, string, Omit<FakeVesselProps, 'children'>][] = [
+      ['/v/dra/crew/list', 'Scoped crew list', { reachable: [DRAAK], selected: DRAAK.id }],
+      ['/fleet/dashboard', 'Fleet dashboard', { reachable: [DRAAK], selected: DRAAK.id, canAccessAllVessels: true }],
+      ['/me/profile', 'Profile section', { reachable: [] }],
+      ['/inbox', 'Inbox', { reachable: [] }],
+      ['/hris/one', 'HRIS one', { reachable: [DRAAK], selected: DRAAK.id }],
+      ['/departments/legal/dashboard', 'Legal dashboard', { reachable: [DRAAK], selected: DRAAK.id }],
+    ];
+    for (const [url, heading, vessels] of cases) {
+      const { unmount } = renderApp(url, vessels);
+      expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument();
+      expect(location()).toBe(url);
+      expect(key()).toBe('default');
+      unmount();
+    }
   });
 });
 

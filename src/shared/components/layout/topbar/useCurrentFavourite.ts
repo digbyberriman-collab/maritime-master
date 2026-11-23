@@ -7,9 +7,11 @@
  * unreachable or sold vessel, and while it resolves): that page has no title
  * of its own yet and must not be pinned under another vessel's nav (D-04).
  * Null too on a shell-owned state other than ModuleOff (the in-scope 404,
- * "Vessel not found", access denied, archived, no vessel, the module-settings
- * error): it names itself through the page location override with
- * `scope-root` or `none` crumbs, and is not a page to pin (D-93, D-96).
+ * "Vessel not found", the scope denials, archived, no vessel, the
+ * module-settings error, and ModuleRoute's `AccessDenied`: the module, HR,
+ * finance, clinical, wellness and capability denials): it names itself
+ * through the page location override with `scope-root` or `none` crumbs, and
+ * is not a page to pin (D-93, D-96, D-107).
  * ModuleOff keeps its page's crumbs (`page`): that page exists, so it can be
  * pinned under its nav title. Outside a provider the override is null.
  */

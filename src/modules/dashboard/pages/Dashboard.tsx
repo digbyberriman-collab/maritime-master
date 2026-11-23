@@ -20,7 +20,7 @@ import {
   RecentIncidentsCard,
 } from '@/modules/dashboard/components/FleetDashboardWidgets';
 import { useDashboardLayout, type WidgetDefinition } from '@/modules/dashboard/hooks/useDashboardLayout';
-import { useOpenAlertCounts } from '@/modules/dashboard/hooks/useOpenAlertCounts';
+import { alertKpiTileProps, useOpenAlertCounts } from '@/modules/dashboard/hooks/useOpenAlertCounts';
 import { kpiStateFor } from '@/modules/dashboard/lib/kpiState';
 import DPADashboard from './DPADashboard';
 
@@ -114,11 +114,10 @@ const FleetOverviewDashboard: React.FC<{ roleLabel: string | null }> = ({ roleLa
             label="Open alerts"
             icon={AlertTriangle}
             value={alerts.counts?.total}
-            state={alerts.status === 'ready' ? undefined : alerts.status}
+            {...alertKpiTileProps(alerts)}
             tone={redAlerts > 0 ? 'danger' : alerts.counts && alerts.counts.ORANGE > 0 ? 'orange' : undefined}
             sub={alerts.counts ? `${alerts.counts.RED} red · ${alerts.counts.ORANGE} orange · ${alerts.counts.YELLOW} yellow` : undefined}
             href="/notifications/center"
-            onRetry={alerts.retry}
           />
           <KpiTile
             label="Overdue CAPAs"

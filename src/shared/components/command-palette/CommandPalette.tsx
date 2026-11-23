@@ -6,14 +6,20 @@
  * The dialog body (cmdk, the sources, the fuzzy matcher) is a lazy chunk,
  * loaded on the first open or earlier by `preloadCommandPalette()`. Nothing
  * renders before the first open; afterwards the dialog stays mounted so it
- * can animate out. If the chunk cannot load, a small dialog says so and
- * offers to try again (the import is retried, never a blank or a fake list).
+ * can animate out. If the chunk cannot load, a small dialog says so, never a
+ * blank or a fake list, and names both causes: STORM may have been updated
+ * (the old hashed file is gone after a deploy) or the connection dropped. It
+ * offers Close, Try again (a new import of the same chunk) and Reload, which
+ * goes through the bounded reload guard (`requestChunkRecovery`: at most 2
+ * reloads in 60 s, then the recovery panel). A failed Try again never reloads
+ * on its own: the page underneath may hold unsaved input (D-04, D-100).
  */
 import React, { Suspense, lazy, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PALETTE_TEST_IDS } from '@/app/shell/testIds';
+import { requestChunkRecovery } from '@/app/staleChunkRecovery';
 import { useCommandPalette, useCommandPaletteInitialQuery } from './context';
 import { usePaletteInternals } from './internal';
 import { paletteLoader } from './preload';
@@ -44,14 +50,17 @@ class PaletteLoadBoundary extends React.Component<LoadBoundaryProps, { failed: b
               Search could not load
             </DialogTitle>
             <DialogDescription>
-              STORM could not load the search. Check your connection, then try again.
+              STORM may have been updated, or the connection dropped. Reload to get the latest version, or try again.
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="gap-2">
+          <DialogFooter className="gap-2 sm:space-x-0">
             <Button variant="outline" onClick={onClose}>
               Close
             </Button>
-            <Button onClick={onRetry}>Try again</Button>
+            <Button variant="outline" onClick={onRetry}>
+              Try again
+            </Button>
+            <Button onClick={() => requestChunkRecovery()}>Reload</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

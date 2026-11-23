@@ -46,7 +46,7 @@ vi.mock('@/integrations/supabase/client', () => {
 });
 
 vi.mock('@/modules/auth/contexts/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 'user-1' }, profile: { company_id: 'company-1' } }),
+  useAuth: () => ({ user: { id: 'user-1' }, profile: { company_id: 'company-1' }, loading: false, profileResolved: true }),
 }));
 
 vi.mock('@/shared/hooks/use-toast', () => ({ useToast: () => ({ toast: state.toast }) }));

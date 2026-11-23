@@ -1,7 +1,7 @@
 /**
  * The personal tree (spec §8; gap/10 "Personal and global"): its sections,
- * the company settings gate, the planned leaves, and the routes and titles
- * built from it.
+ * the company settings gate, the vessel module setting on Hours of rest
+ * (D-109), the planned leaves, and the routes and titles built from it.
  */
 import { describe, expect, it, vi } from 'vitest';
 
@@ -58,6 +58,19 @@ describe('buildPersonalNav', () => {
     expect(labels('master')).toEqual(expect.arrayContaining(['Vessel access', 'Audit visibility']));
     expect(labels('master')).not.toContain('Permissions');
     expect(labels(null)).not.toContain('Vessel access');
+  });
+
+  it('My work: Hours of rest carries the vessel module setting crew_hor; Training carries none (D-109)', () => {
+    const section = buildPersonalNav(() => true).find((s) => s.label === 'My work');
+    const leaf = (label: string) => section?.children?.find((l) => l.label === label);
+    expect(leaf('Hours of rest')?.path).toBe('/me/hours-of-rest');
+    expect(leaf('Hours of rest')?.moduleSetting).toBe('crew_hor');
+    // /me/training is the user's own development plan, not the vessel's Crew Training.
+    expect(leaf('Training')?.path).toBe('/me/training');
+    expect(leaf('Training')?.moduleSetting).toBeUndefined();
+    // No other personal leaf depends on a vessel's settings.
+    const gated = navLeaves(buildPersonalNav(() => true)).filter((l) => l.moduleSetting).map((l) => l.id);
+    expect(gated).toEqual(['me-hours-of-rest']);
   });
 
   it('marks the leaves with no page yet as planned', () => {

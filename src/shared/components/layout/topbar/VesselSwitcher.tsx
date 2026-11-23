@@ -5,8 +5,10 @@
  * cmdk) is a lazy chunk: it is warmed when the pointer enters, focuses or
  * presses the chevron and whenever the switcher opens, and while it loads
  * the popover shows a small loading row. If the chunk cannot load, the
- * popover says so with Retry, never an empty list, and the page is not
- * reloaded for it (an optional UI chunk, src/app/optionalChunks.ts).
+ * popover says so with Retry and Reload, never an empty list. The page is
+ * never reloaded for it on its own (an optional UI chunk,
+ * src/app/optionalChunks.ts, D-100); Reload is the user's way through the
+ * bounded reload guard when STORM was updated under them.
  *
  * Choosing a vessel goes through `useVesselSwitch()`, which keeps the user's
  * place when it can. The row shows a spinner until the navigation lands; the
@@ -17,7 +19,7 @@
  */
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { AlertTriangle, ChevronDown, Loader2, RotateCw } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Loader2, RefreshCw, RotateCw } from 'lucide-react';
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -26,6 +28,7 @@ import { cancelPendingVesselSwitch, useVesselSwitch } from '@/app/nav/useVesselS
 import { SHELL_TEST_IDS } from '@/app/shell/testIds';
 import { useShellSurface } from '@/app/shell/shellUi';
 import { createOptionalChunkLoader } from '@/app/optionalChunks';
+import { requestChunkRecovery } from '@/app/staleChunkRecovery';
 import { FLEET_HOME } from './useFleetTarget';
 import type { VesselAlertSummary } from './useVesselAlertSummary';
 import { ALL_VESSELS, type SwitcherTarget, type SwitcherVessel } from './vesselSwitcherModel';
@@ -46,12 +49,19 @@ type PanelModule = typeof import('./VesselSwitcherPanel');
 /**
  * The panel is an optional UI chunk (src/app/optionalChunks.ts): one import
  * at a time, shared by the preloads and the lazy component, and a failed
- * import is forgotten so the next try loads again. It never reloads the page;
- * a failure shows PanelLoadBoundary's "could not load" state with Retry.
+ * import is forgotten so the next try loads again. A failure never reloads
+ * the page on its own: a hover, focus or open preload fails silently, and
+ * PanelLoadBoundary shows "could not load" with Retry (a new import of the
+ * same chunk, which never reloads either) and Reload, which goes through the
+ * bounded guard (`requestChunkRecovery`: at most 2 reloads in 60 s, then the
+ * recovery panel). After a deploy only Reload can reach the new file.
  */
 const panelLoader = createOptionalChunkLoader<PanelModule>(() => import('./VesselSwitcherPanel'));
 
 const newAttempt = (attempt: number) => ({ attempt, Panel: React.lazy(panelLoader.load) });
+
+/** The failure state's buttons: 44 px on touch (D-35); the Button's focus ring, offset from the popover. */
+const PANEL_ACTION = 'gap-1.5 ring-offset-popover [@media(pointer:coarse)]:h-11';
 
 class PanelLoadBoundary extends React.Component<{ onRetry: () => void; children: React.ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -63,15 +73,21 @@ class PanelLoadBoundary extends React.Component<{ onRetry: () => void; children:
   render() {
     if (!this.state.failed) return this.props.children;
     return (
-      <div role="alert" className="flex flex-col items-start gap-2 p-3">
-        <p className="type-body-sm flex items-center gap-2 text-foreground">
-          <AlertTriangle className="h-4 w-4 shrink-0 text-warning" strokeWidth={1.75} aria-hidden="true" />
-          The vessel list could not load
+      <div className="flex flex-col items-start gap-2 p-3">
+        <p role="alert" className="type-body-sm flex items-start gap-2 text-foreground">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" strokeWidth={1.75} aria-hidden="true" />
+          The vessel list could not load. STORM may have been updated.
         </p>
-        <Button variant="outline" size="sm" className="gap-1.5 [@media(pointer:coarse)]:h-11" onClick={this.props.onRetry}>
-          <RotateCw className="h-4 w-4" aria-hidden="true" />
-          Retry
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" className={PANEL_ACTION} onClick={this.props.onRetry}>
+            <RotateCw className="h-4 w-4" aria-hidden="true" />
+            Retry
+          </Button>
+          <Button variant="outline" size="sm" className={PANEL_ACTION} onClick={() => requestChunkRecovery()}>
+            <RefreshCw className="h-4 w-4" aria-hidden="true" />
+            Reload
+          </Button>
+        </div>
       </div>
     );
   }

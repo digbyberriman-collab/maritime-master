@@ -84,6 +84,7 @@ export const shellState = {
       job_title: 'Fleet Manager',
     } as Record<string, unknown> | null,
     loading: false,
+    profileResolved: true,
     signOut: async () => undefined,
     canAccessModule: (_module: string) => true,
     practitionerDisciplines: [] as string[],
@@ -102,7 +103,13 @@ export const shellState = {
     hasPermission: () => true,
     setCurrentVessel: () => undefined,
   } as PermState,
-  branding: { clientDisplayName: 'Demo Fleet' as string | null, clientLogoUrl: null as string | null, brandColor: '', isLoading: false },
+  branding: {
+    clientDisplayName: 'Demo Fleet' as string | null,
+    clientLogoUrl: null as string | null,
+    brandColor: '',
+    tenantBrandColor: null as string | null,
+    isLoading: false,
+  },
   feedback: { panelOpen: false, setPanelOpen: (open: boolean) => void (shellState.feedback.panelOpen = open) },
   theme: { theme: 'dark' as string | undefined, setTheme: (next: string) => void (shellState.theme.theme = next) },
 };
@@ -146,7 +153,7 @@ export function asLoading(): void {
 
 export function resetShellState(): void {
   shellState.auth.canAccessModule = () => true;
-  shellState.branding = { clientDisplayName: 'Demo Fleet', clientLogoUrl: null, brandColor: '', isLoading: false };
+  shellState.branding = { clientDisplayName: 'Demo Fleet', clientLogoUrl: null, brandColor: '', tenantBrandColor: null, isLoading: false };
   shellState.feedback.panelOpen = false;
   shellState.theme.theme = 'dark';
   asFleetUser();

@@ -22,6 +22,13 @@
  * may open. The sitemap carries `buildPersonalNav(() => true)` in
  * `NAVIGATION_ITEMS` for titles and breadcrumbs only.
  *
+ * Hours of rest carries the vessel module setting `crew_hor`: a personal
+ * page, but one that logs against a vessel. `usePersonalNav` shows it only
+ * when `crew_hor` is on for at least one of the user's vessels, and the page
+ * gates on the vessel it writes to (PersonalHorGate, D-109). Training
+ * (`/me/training`, the user's own development plan) is not vessel-bound, so
+ * `crew_training` (the vessel's Crew Training) does not govern it.
+ *
  * The company settings stay under `/me` until gap/03 moves them to
  * `/fleet/admin`.
  */
@@ -98,7 +105,8 @@ export function buildPersonalNav(canAccessSection: (id: string) => boolean): Nav
       { slug: 'notifications-section' },
     ),
     S('My work', me, [
-      L('Hours of rest', me, { slug: 'hours-of-rest', icon: Clock, ...LIVE }),
+      // Shown only while crew_hor is on for one of the user's vessels (usePersonalNav, D-109).
+      L('Hours of rest', me, { slug: 'hours-of-rest', icon: Clock, moduleSetting: 'crew_hor', ...LIVE }),
       L('Training', me, { icon: GraduationCap, ...LIVE }),
       L('Inbox', me, { existing: INBOX_PATH, icon: Inbox }),
       L('Documents', me, { icon: FileText, ...PLANNED }),

@@ -254,11 +254,46 @@ function safeDecode(segment: string): string {
   }
 }
 
-/** `/v/dra/crew/list?x=1` → `{ code: 'DRA', rest: 'crew/list' }`; null outside the vessel scope. */
+/**
+ * `/v/dra/crew/list?x=1` → `{ code: 'DRA', rest: 'crew/list' }`; null outside
+ * the vessel scope. The prefix matches in any case (`/V/dra/…`), as the router
+ * does (D-111), so a path the vessel scope renders always parses.
+ */
 export function parseVesselPath(pathname: string): { code: string; rest: string } | null {
-  const match = /^\/v\/([^/?#]+)(?:\/([^?#]*))?/.exec(pathname);
+  const match = /^\/v\/([^/?#]+)(?:\/([^?#]*))?/i.exec(pathname);
   if (!match) return null;
   return { code: normaliseVesselCode(safeDecode(match[1])), rest: (match[2] ?? '').replace(/\/+$/, '') };
+}
+
+const VESSEL_PREFIX_SEGMENT = /^\/v\/([^/?#]+)/i;
+
+/**
+ * A vessel-scope pathname in its canonical form (D-111): `/v/` and the code
+ * lower case, as `vesselPath` writes them, and the rest exactly as written:
+ * `/V/DRA/crew/list` → `/v/dra/crew/list`. A literal `:vesselCode` segment is
+ * kept as written (`/V/:vesselCode/a` → `/v/:vesselCode/a`). Null when the
+ * pathname is already canonical, outside the vessel scope, or has no stable
+ * canonical form (so a redirect can never loop).
+ */
+export function canonicalVesselPathname(pathname: string): string | null {
+  const canonical = canonicalVesselHead(pathname);
+  if (canonical === null) return null;
+  // A fixed point only: the target must already be canonical.
+  return canonicalVesselHead(canonical) === null ? canonical : null;
+}
+
+function canonicalVesselHead(pathname: string): string | null {
+  const match = VESSEL_PREFIX_SEGMENT.exec(pathname);
+  const parsed = match ? parseVesselPath(pathname) : null;
+  // A blank code (`/v/%20/…`) has no canonical form; the scope says "not found".
+  if (!match || !parsed || !parsed.code) return null;
+  let head: string;
+  try {
+    head = isVesselCodeParam(parsed.code) ? `${VESSEL_SCOPE_PREFIX}/${match[1]}` : vesselPath(parsed.code);
+  } catch {
+    return null;
+  }
+  return head === match[0] ? null : `${head}${pathname.slice(match[0].length)}`;
 }
 
 /**

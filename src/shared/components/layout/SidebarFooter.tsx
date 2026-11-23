@@ -2,6 +2,10 @@
  * The sidebar's footer (spec §4.5): the "Show roadmap" switch for owners and
  * admins (D-06, D-29) and the collapse-to-icons toggle (⌘/Ctrl+B). Both are
  * 44 px targets on the sidebar's own tokens, which stay Abyss in both themes.
+ * The toggle names itself and its shortcut in the shell's icon tooltip
+ * (IconTooltip, D-92) on hover and keyboard focus, to its right like the
+ * rail's rows (clear of the roadmap switch above it when expanded), with no
+ * native title; its aria-label stays its name.
  */
 import React from 'react';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
@@ -11,6 +15,7 @@ import { useNavAccess } from '@/app/nav/navAccess';
 import { canUseRoadmap, useShowRoadmapPreference } from '@/app/nav/roadmap';
 import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
 import { isApplePlatform } from '@/app/shell/keyboard';
+import IconTooltip, { RAIL_TOOLTIP_OFFSET } from './IconTooltip';
 
 export interface SidebarFooterProps {
   /** The sidebar is drawn as icons only. */
@@ -69,21 +74,27 @@ const SidebarFooter: React.FC<SidebarFooterProps> = ({ collapsed, onToggleCollap
         </button>
       )}
       {onToggleCollapsed && (
-        <button
-          type="button"
-          data-testid={SHELL_TEST_IDS.sidebarCollapse}
-          onClick={onToggleCollapsed}
-          aria-label={collapseLabel}
-          title={`${collapseLabel} (${modifier}+B)`}
-          className={cn(sidebarControl, 'w-full gap-3 text-xs font-medium', collapsed ? 'justify-center px-0' : 'px-3')}
+        <IconTooltip
+          label={collapsed ? collapseLabel : 'Collapse sidebar'}
+          shortcut={`${modifier}+B`}
+          side="right"
+          sideOffset={RAIL_TOOLTIP_OFFSET}
         >
-          {collapsed ? (
-            <PanelLeftOpen className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} aria-hidden="true" />
-          ) : (
-            <PanelLeftClose className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} aria-hidden="true" />
-          )}
-          {!collapsed && <span>Collapse</span>}
-        </button>
+          <button
+            type="button"
+            data-testid={SHELL_TEST_IDS.sidebarCollapse}
+            onClick={onToggleCollapsed}
+            aria-label={collapseLabel}
+            className={cn(sidebarControl, 'w-full gap-3 text-xs font-medium', collapsed ? 'justify-center px-0' : 'px-3')}
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} aria-hidden="true" />
+            ) : (
+              <PanelLeftClose className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} aria-hidden="true" />
+            )}
+            {!collapsed && <span>Collapse</span>}
+          </button>
+        </IconTooltip>
       )}
     </div>
   );

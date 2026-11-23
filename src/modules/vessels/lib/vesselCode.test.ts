@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   assignVesselCodes,
+  canonicalVesselPathname,
   getVesselCode,
   isVesselCodeParam,
   normaliseVesselCode,
@@ -189,6 +190,39 @@ describe('vessel paths', () => {
     expect(parseVesselPath('/v/dra/')).toEqual({ code: 'DRA', rest: '' });
     expect(parseVesselPath('/vessel/dra')).toBeNull();
     expect(parseVesselPath('/fleet/dashboard')).toBeNull();
+  });
+
+  it('parses the prefix in any case, as the router matches it (D-111)', () => {
+    expect(parseVesselPath('/V/dra/crew/list')).toEqual({ code: 'DRA', rest: 'crew/list' });
+    expect(parseVesselPath('/V/DRA')).toEqual({ code: 'DRA', rest: '' });
+    expect(switchVesselInPath('/V/dra/crew/list?x=1', 'HYD')).toBe('/v/hyd/crew/list?x=1');
+  });
+
+  it('canonicalises the prefix and the code only, keeping the rest as written (D-111)', () => {
+    expect(canonicalVesselPathname('/V/dra/crew/list')).toBe('/v/dra/crew/list');
+    expect(canonicalVesselPathname('/v/DRA/crew/list')).toBe('/v/dra/crew/list');
+    expect(canonicalVesselPathname('/V/Dra/Crew/List/')).toBe('/v/dra/Crew/List/');
+    expect(canonicalVesselPathname('/V/DRA')).toBe('/v/dra');
+    expect(canonicalVesselPathname('/v/dr%41/a')).toBe('/v/dra/a');
+    // Already canonical, or not a vessel path: nothing to do.
+    expect(canonicalVesselPathname('/v/dra/crew/list')).toBeNull();
+    expect(canonicalVesselPathname('/v/dra')).toBeNull();
+    expect(canonicalVesselPathname('/fleet/dashboard')).toBeNull();
+    expect(canonicalVesselPathname('/vessel/DRA')).toBeNull();
+    // The literal param stays as written; only the prefix changes.
+    expect(canonicalVesselPathname('/v/:vesselCode/crew/list')).toBeNull();
+    expect(canonicalVesselPathname('/v/:VESSELCODE/crew/list')).toBeNull();
+    expect(canonicalVesselPathname('/V/:vesselCode/crew/list')).toBe('/v/:vesselCode/crew/list');
+    // A blank code has no canonical form.
+    expect(canonicalVesselPathname('/v/%20/a')).toBeNull();
+  });
+
+  it('gives a canonical form that is a fixed point, so a redirect never loops', () => {
+    for (const path of ['/V/dra/a', '/v/%zz/a', '/v/%E0%A4%A/crew', '/v/%c3%a9t/a', '/V/stra%C3%9Fe/a', '/v/%CE%A3%CE%A3/x']) {
+      const once = canonicalVesselPathname(path) ?? path;
+      expect(canonicalVesselPathname(once)).toBeNull();
+      expect(parseVesselPath(once)?.rest).toBe(parseVesselPath(path)?.rest);
+    }
   });
 
   it('switches vessel and keeps the sub-path, query and hash', () => {

@@ -4,14 +4,19 @@
  * Two kinds of lazy chunk fail differently:
  *
  * - Route chunks (`lazyPage`) are the page itself. When one cannot load after
- *   a deploy, main.tsx reloads the page, at most twice in a minute, and then
- *   shows the recovery panel (D-39).
+ *   a deploy, main.tsx reloads the page through the bounded guard
+ *   (src/app/staleChunkRecovery.ts): at most twice in a minute, then the
+ *   recovery panel (D-39).
  * - Optional UI chunks, listed here, are a dialog or a popover on top of a
  *   page that already works: the command palette's dialog and the vessel
- *   switcher's list. A failed one rejects to its own boundary, which says
- *   "Search could not load" or "The vessel list could not load" with a retry
- *   (D-81). It never triggers the reload guard: a hover preload on a flaky link
- *   must not reload the page and lose what the user has typed (D-04).
+ *   switcher's list. They never reload the page on their own (D-100): a hover
+ *   or background preload on a flaky link, or a failed Try again, must not
+ *   throw away what the user has typed (D-04). A failed one rejects to its
+ *   own boundary, which says "Search could not load" or "The vessel list
+ *   could not load", names both causes (an update or the connection) and
+ *   offers Try again / Retry (a new import) and Reload. Only the user's
+ *   Reload goes through the guard (`requestChunkRecovery`), so after a deploy,
+ *   when the old hashed file is gone, the page can still pick up the new one.
  *
  * main.tsx imports this module at boot, before React, so it must not import
  * React or anything that does.
