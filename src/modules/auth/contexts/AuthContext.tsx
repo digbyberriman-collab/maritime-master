@@ -7,6 +7,7 @@ import { resolveWellnessAccess } from '@/modules/auth/lib/wellnessAccess';
 import { canEnterHealth } from '@/modules/auth/lib/healthAccess';
 import { resolveHrAccess } from '@/modules/auth/lib/hrAccess';
 import { endSession } from '@/modules/auth/lib/endSession';
+import { isBannedSignInError, startAccountSession } from '@/modules/auth/services/accountStatus';
 
 interface Profile {
   id: string;
@@ -96,11 +97,38 @@ const SENSITIVE_MODULES = new Set(['hris']);
 // module map. Medical pages carry a further medicalLevel gate.
 const HEALTH_MODULE = 'health';
 
+/**
+ * The account check after sign-in (Phase 2 spec §B.3; proposed D-122):
+ * `checking` while `record_session_start()` answers, `allowed` (active, or
+ * no profile: today's behaviour), `disabled` while the session is being
+ * ended, `error` when the status could not be read (the app does not open;
+ * the sign-in screen offers Retry). `idle` with no session.
+ */
+export type AccountCheckState = 'idle' | 'checking' | 'allowed' | 'disabled' | 'error';
+
+/** Why the sign-in screen shows a notice instead of the form. */
+export type AccessNotice = 'disabled';
+
+/** How long the account check may take before it counts as failed (fail closed, with Retry). */
+export const ACCOUNT_CHECK_TIMEOUT_MS = 15000;
+
 interface AuthContextType {
+  /**
+   * The signed-in user, once the account check let them in. Null while the
+   * check runs, when it failed and when the account is disabled, so nothing
+   * reads data for a session STORM has not admitted.
+   */
   user: User | null;
   session: Session | null;
   profile: Profile | null;
+  /** True until the session is known and, with a session, its account check has answered. */
   loading: boolean;
+  accountCheck: AccountCheckState;
+  /** Runs the account check again after it failed. */
+  retryAccountCheck: () => void;
+  /** Set when the account was found disabled (at sign-in, or by Supabase's ban); survives the sign-out it causes. */
+  accessNotice: AccessNotice | null;
+  clearAccessNotice: () => void;
   /**
    * The profile read for the current session user has answered (a row, no
    * row, or an error), so `profile` is final for that user. True with no
@@ -108,7 +136,8 @@ interface AuthContextType {
    * company", which `profile === null` alone cannot.
    */
   profileResolved: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  /** `accountDisabled`: Supabase refused the sign-in because the login is banned (access turned off). */
+  signIn: (email: string, password: string) => Promise<{ error: Error | null; accountDisabled?: boolean }>;
   signUp: (data: SignUpData) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
@@ -145,11 +174,20 @@ export const useAuth = () => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [sessionUser, setUser] = useState<User | null>(null);
+  const [rawSession, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [profileResolved, setProfileResolved] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [profileResolvedRaw, setProfileResolved] = useState(false);
+  const [sessionLoading, setLoading] = useState(true);
+  // The account check for the session user (spec §B.3).
+  const [check, setCheck] = useState<{ state: AccountCheckState; userId: string | null }>({ state: 'idle', userId: null });
+  const [accessNotice, setAccessNotice] = useState<AccessNotice | null>(null);
+  // The user whose check let them in (a token refresh keeps it), and the
+  // user whose check is running (so INITIAL_SESSION and getSession do not
+  // both ask).
+  const allowedForRef = useRef<string | null>(null);
+  const checkingForRef = useRef<string | null>(null);
+  const runCheckRef = useRef<(userId: string) => void>(() => undefined);
   const [practitionerDisciplines, setPractitionerDisciplines] = useState<string[]>([]);
   const [practitionerDisciplinesLoaded, setPractitionerDisciplinesLoaded] = useState(false);
   // The session user right now, written synchronously on every auth event.
@@ -172,6 +210,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     permissions: rbacPermissions,
     userRoles: rbacUserRoles,
   } = usePermissionsStore();
+
+  // Only an admitted session is visible to the app (fail closed, D-04).
+  const admitted = Boolean(sessionUser && check.state === 'allowed' && check.userId === sessionUser.id);
+  const user = admitted ? sessionUser : null;
+  const session = admitted ? rawSession : null;
+  const checkPending = Boolean(sessionUser) && !admitted && check.state !== 'error';
+  const loading = sessionLoading || checkPending;
+  // With no admitted user there is no profile to wait for once loading ends.
+  const profileResolved = user ? profileResolvedRaw : !loading;
 
   const userRole = profile?.role ?? null;
 
@@ -369,7 +416,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // account (another tab signing in, no SIGNED_OUT here) drops the roles
     // and any role load still running for the previous user. The profile is
     // unresolved again unless it already settled for this user (a token
-    // refresh keeps it, and its reload replaces it quietly).
+    // refresh keeps it, and its reload replaces it quietly). A user whose
+    // account check has not passed yet is checking again (spec §B.3).
     const adoptSessionUser = (userId: string) => {
       const previous = sessionUserIdRef.current;
       sessionUserIdRef.current = userId;
@@ -379,14 +427,87 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setProfileResolved(false);
       }
       if (previous !== null && previous !== userId) resetPermissions();
+      if (allowedForRef.current !== userId) {
+        allowedForRef.current = null;
+        setCheck((current) => (current.userId === userId && current.state !== 'idle' ? current : { state: 'checking', userId }));
+      }
     };
 
     // No session: no profile, and none to wait for.
     const clearSessionUser = () => {
       sessionUserIdRef.current = null;
       profileResolvedForRef.current = null;
+      allowedForRef.current = null;
+      checkingForRef.current = null;
       setProfile(null);
       setProfileResolved(true);
+      setCheck({ state: 'idle', userId: null });
+    };
+
+    // Let the user in: their profile and roles load only now, so nothing
+    // reads a disabled user's (missing) profile row as "no profile".
+    const admit = (userId: string) => {
+      allowedForRef.current = userId;
+      setCheck({ state: 'allowed', userId });
+      setAccessNotice(null);
+      loadProfileFor(userId);
+      loadPermissions();
+    };
+
+    /**
+     * The account check (spec §B.3), once per session user, before anything
+     * else loads: `record_session_start()` (missing → the profile fallback).
+     * Active or no profile → admitted (no profile keeps today's behaviour);
+     * disabled → the session is ended and the sign-in screen says why; any
+     * error or a check that takes too long → the app stays closed, with Retry.
+     */
+    const runCheck = (userId: string) => {
+      if (checkingForRef.current === userId) return;
+      checkingForRef.current = userId;
+      setCheck({ state: 'checking', userId });
+      let timer: number | undefined;
+      const timeout = new Promise<never>((_, reject) => {
+        timer = window.setTimeout(() => reject(new Error('The account check took too long.')), ACCOUNT_CHECK_TIMEOUT_MS);
+      });
+      Promise.race([startAccountSession(userId), timeout])
+        .then(async ({ status }) => {
+          if (sessionUserIdRef.current !== userId || checkingForRef.current !== userId) return;
+          if (status !== 'disabled') {
+            checkingForRef.current = null;
+            admit(userId);
+            return;
+          }
+          // Stays marked as checked (no second check) until the sign-out clears the session.
+          setCheck({ state: 'disabled', userId });
+          setAccessNotice('disabled');
+          resetPermissions();
+          await endSession();
+          if (sessionUserIdRef.current === userId) {
+            clearSessionUser();
+            setUser(null);
+            setSession(null);
+          }
+        })
+        .catch((error: unknown) => {
+          if (sessionUserIdRef.current !== userId || checkingForRef.current !== userId) return;
+          checkingForRef.current = null;
+          console.warn('[auth] the account check failed', error);
+          setCheck({ state: 'error', userId });
+        })
+        .finally(() => window.clearTimeout(timer));
+    };
+    runCheckRef.current = runCheck;
+
+    // After a session is adopted: an admitted user (token refresh) reloads
+    // the profile quietly; anyone else is checked first.
+    const afterAdopt = (userId: string) => {
+      if (sessionUserIdRef.current !== userId) return;
+      if (allowedForRef.current === userId) {
+        loadProfileFor(userId);
+        loadPermissions();
+      } else {
+        runCheck(userId);
+      }
     };
 
     // Set up auth state listener FIRST
@@ -396,15 +517,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         setLoading(false);
 
-        // Defer profile fetch with setTimeout
+        // Defer the check and the loads with setTimeout (no Supabase call inside the callback).
         if (session?.user) {
           const userId = session.user.id;
           adoptSessionUser(userId);
-          setTimeout(() => {
-            loadProfileFor(userId);
-            // Load RBAC permissions when user logs in
-            loadPermissions();
-          }, 0);
+          setTimeout(() => afterAdopt(userId), 0);
         } else {
           clearSessionUser();
           // Reset RBAC permissions when user logs out
@@ -421,8 +538,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (session?.user) {
           adoptSessionUser(session.user.id);
-          loadProfileFor(session.user.id);
-          loadPermissions();
+          afterAdopt(session.user.id);
         } else {
           clearSessionUser();
         }
@@ -438,6 +554,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Safety net: in the preview frame the session broker can go silent, and
     // without this the app would wait forever on a blank loading screen.
+    // (The account check has its own timeout.)
     const safetyTimer = window.setTimeout(() => {
       setLoading(false);
       if (sessionUserIdRef.current === null) setProfileResolved(true);
@@ -449,8 +566,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [loadPermissions, resetPermissions]);
 
+  const retryAccountCheck = useCallback(() => {
+    const userId = sessionUserIdRef.current;
+    if (userId && allowedForRef.current !== userId) runCheckRef.current(userId);
+  }, []);
+
+  const clearAccessNotice = useCallback(() => setAccessNotice(null), []);
+
   const signIn = async (email: string, password: string) => {
+    setAccessNotice(null);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error && isBannedSignInError(error)) {
+      // Access turned off by an admin: Supabase refuses the login (spec §C.3 ban).
+      setAccessNotice('disabled');
+      return { error: new Error(error.message), accountDisabled: true };
+    }
     return { error: error ? new Error(error.message) : null };
   };
 
@@ -504,6 +634,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await endSession();
     sessionUserIdRef.current = null;
     profileResolvedForRef.current = null;
+    allowedForRef.current = null;
+    checkingForRef.current = null;
+    setCheck({ state: 'idle', userId: null });
     setUser(null);
     setSession(null);
     setProfile(null);
@@ -524,6 +657,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         session,
         profile,
         loading,
+        accountCheck: check.state === 'allowed' && !admitted ? 'checking' : check.state,
+        retryAccountCheck,
+        accessNotice,
+        clearAccessNotice,
         profileResolved,
         signIn,
         signUp,

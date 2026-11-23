@@ -36,6 +36,7 @@ const h = vi.hoisted(() => ({
   session: null as { user: { id: string } } | null,
   reads: [] as ProfileRead[],
   renders: [] as Snapshot[],
+  rpc: (_fn: string): Promise<{ data: unknown; error: unknown }> => Promise.resolve({ data: 'active', error: null }),
   permissions: {
     loadPermissions: async () => undefined,
     reset: () => undefined,
@@ -70,6 +71,8 @@ vi.mock('@/integrations/supabase/client', () => {
   return {
     supabase: {
       from,
+      // The account check (record_session_start): active unless a test says otherwise.
+      rpc: (fn: string) => h.rpc(fn),
       auth: {
         onAuthStateChange: (cb: (event: string, session: { user: { id: string } } | null) => void) => {
           h.listeners.push(cb);

@@ -1,8 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { PermissionLevel } from '../lib/presets';
+import { accountStateOf, type AccountState } from '../lib/invitationStatus';
 
 export interface AccessDetail {
+  profileId: string;
+  companyId: string | null;
+  account: AccountState;
   userId: string;
   firstName: string;
   lastName: string;
@@ -17,11 +21,13 @@ export function useUserAccessDetail(userId?: string) {
     enabled: !!userId,
     queryKey: ['users-access', 'detail', userId],
     queryFn: async (): Promise<AccessDetail | null> => {
-      const { data: prof } = await supabase
+      const { data: prof, error } = await supabase
         .from('profiles')
-        .select('user_id, first_name, last_name, email')
+        .select('id, company_id, account_status, user_id, first_name, last_name, email')
         .eq('user_id', userId!)
         .maybeSingle();
+      // A failed read is an error state, not "not found" (fail closed).
+      if (error) throw error;
       if (!prof) return null;
 
       const [{ data: assignment }, { data: overrides }, { data: rolesRows }] = await Promise.all([
@@ -42,6 +48,9 @@ export function useUserAccessDetail(userId?: string) {
       const roleDisplayName = (rolesRows ?? [])[0]?.role_display_name ?? null;
 
       return {
+        profileId: prof.id,
+        companyId: prof.company_id ?? null,
+        account: accountStateOf(prof.account_status, true),
         userId: prof.user_id,
         firstName: prof.first_name ?? '',
         lastName: prof.last_name ?? '',

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, MailCheck } from 'lucide-react';
+import { ArrowLeft, Loader2, LogOut, MailCheck, RefreshCw, ShieldOff, TriangleAlert } from 'lucide-react';
 import { z } from 'zod';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ import { FieldError, FormAlert, PasswordField, PasswordStrengthMeter } from '@/m
 import { describedBy } from '@/modules/auth/components/brand/describedBy';
 import { PASSWORD_MIN_LENGTH } from '@/modules/auth/components/brand/passwordStrength';
 import googleMark from '@/modules/auth/components/brand/google-g.svg';
+import { ACCOUNT_CHECK_FAILED_MESSAGE, ACCOUNT_DISABLED_MESSAGE } from '@/modules/auth/services/accountStatus';
 import { afterSignInPath, initialAuthMode, type AuthMode } from './authRedirect';
 
 const emailSchema = z
@@ -81,6 +82,34 @@ function signInErrorMessage(error: unknown): string {
   return normaliseError(error, 'Sign-in failed. Try again.').message;
 }
 
+/**
+ * Supabase sends a banned login back from an OAuth sign-in with
+ * `error_code=user_banned` in the hash or query. Only that code is read;
+ * the URL's description is never shown (attacker-controlled text).
+ */
+function urlSaysBanned(): boolean {
+  try {
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const query = new URLSearchParams(window.location.search);
+    return (hash.get('error_code') ?? query.get('error_code')) === 'user_banned';
+  } catch {
+    return false;
+  }
+}
+
+const stateIcon = (tone: 'critical' | 'warning', icon: React.ReactNode) => (
+  <span
+    aria-hidden="true"
+    className={
+      tone === 'critical'
+        ? 'mb-3 grid size-11 place-items-center rounded-full bg-critical-muted text-critical'
+        : 'mb-3 grid size-11 place-items-center rounded-full bg-warning-muted text-warning'
+    }
+  >
+    {icon}
+  </span>
+);
+
 /** A text button that is a 44 px target on touch screens (D-35). */
 const textButtonClass =
   'inline-flex items-center gap-1.5 rounded-sm type-body-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card [@media(pointer:coarse)]:min-h-11';
@@ -98,7 +127,7 @@ interface AuthProps {
 const Auth: React.FC<AuthProps> = ({ initialMode }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { signIn, signUp, resetPassword, user } = useAuth();
+  const { signIn, signUp, resetPassword, signOut, user, accountCheck, retryAccountCheck, accessNotice, clearAccessNotice } = useAuth();
 
   const [mode, setMode] = useState<AuthMode>(() => initialAuthMode(location.state, initialMode ?? 'login'));
   const [email, setEmail] = useState('');
@@ -112,6 +141,8 @@ const Auth: React.FC<AuthProps> = ({ initialMode }) => {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [resetSentTo, setResetSentTo] = useState<string | null>(null);
+  const [bannedFromUrl, setBannedFromUrl] = useState(urlSaysBanned);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   const fieldRefs = useRef<Partial<Record<FieldName, HTMLInputElement | null>>>({});
   const focusEmailOnModeChange = useRef(false);
@@ -127,6 +158,27 @@ const Auth: React.FC<AuthProps> = ({ initialMode }) => {
     focusEmailOnModeChange.current = false;
     fieldRefs.current.email?.focus();
   }, [mode, resetSentTo]);
+
+  const showDisabled = accessNotice === 'disabled' || bannedFromUrl;
+  // The account check runs after a sign-in (spec §B.3): the form stays busy until it answers.
+  const busy = isLoading || accountCheck === 'checking' || accountCheck === 'disabled';
+
+  const leaveDisabledNotice = () => {
+    clearAccessNotice();
+    setBannedFromUrl(false);
+    focusEmailOnModeChange.current = true;
+    setMode('login');
+    setPassword('');
+  };
+
+  const signOutAfterFailedCheck = async () => {
+    setIsSigningOut(true);
+    try {
+      await signOut();
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
 
   const switchMode = (next: AuthMode) => {
     focusEmailOnModeChange.current = true;
@@ -185,12 +237,14 @@ const Auth: React.FC<AuthProps> = ({ initialMode }) => {
     setIsLoading(true);
     try {
       if (mode === 'login') {
-        const { error } = await signIn(email.trim(), password);
+        const { error, accountDisabled } = await signIn(email.trim(), password);
+        // A banned login: the disabled notice replaces the form (no toast on top).
+        if (accountDisabled) return;
         if (error) {
           fail(signInErrorMessage(error), 'Sign-in failed', 'auth-sign-in');
           return;
         }
-        navigate(afterSignIn, { replace: true });
+        // The account check runs next; the effect above continues once it lets the user in.
       } else if (mode === 'register') {
         const { error } = await signUp({ email: email.trim(), password, firstName, lastName, companyName, role });
         if (error) {
@@ -250,11 +304,66 @@ const Auth: React.FC<AuthProps> = ({ initialMode }) => {
         failGoogle('Google did not return a signed-in session. Try again, or sign in with your email and password.');
         return;
       }
-      navigate(afterSignIn, { replace: true });
+      // The account check runs next; the effect above continues once it lets the user in.
+      setIsLoading(false);
     } catch (error) {
       failGoogle(normaliseError(error, 'Please try again.').message);
     }
   };
+
+  if (showDisabled) {
+    return (
+      <AuthLayout>
+        <AuthCard
+          title="Access disabled"
+          icon={stateIcon('critical', <ShieldOff className="size-5" />)}
+          description={
+            <div className="space-y-2" data-auth-notice="disabled">
+              <p role="alert" className="font-medium text-foreground">
+                {ACCOUNT_DISABLED_MESSAGE}
+              </p>
+              <p>If you think this is a mistake, contact your DPA or fleet administrator.</p>
+            </div>
+          }
+        >
+          <Button type="button" variant="outline" className="w-full" onClick={leaveDisabledNotice} autoFocus>
+            <ArrowLeft aria-hidden="true" />
+            Sign in with another account
+          </Button>
+        </AuthCard>
+      </AuthLayout>
+    );
+  }
+
+  if (accountCheck === 'error') {
+    return (
+      <AuthLayout>
+        <AuthCard
+          title="Account check failed"
+          icon={stateIcon('warning', <TriangleAlert className="size-5" />)}
+          description={
+            <div className="space-y-2" data-auth-notice="check-failed">
+              <p role="alert" className="font-medium text-foreground">
+                {ACCOUNT_CHECK_FAILED_MESSAGE}
+              </p>
+              <p>STORM confirms your access before it opens. Nothing else has loaded.</p>
+            </div>
+          }
+        >
+          <div className="space-y-3">
+            <Button type="button" variant="signal" className="w-full" onClick={retryAccountCheck} disabled={isSigningOut} autoFocus>
+              <RefreshCw aria-hidden="true" />
+              Retry
+            </Button>
+            <Button type="button" variant="ghost" className="w-full" onClick={() => void signOutAfterFailedCheck()} disabled={isSigningOut}>
+              {isSigningOut ? <Loader2 aria-hidden="true" className="animate-spin" /> : <LogOut aria-hidden="true" />}
+              Sign out
+            </Button>
+          </div>
+        </AuthCard>
+      </AuthLayout>
+    );
+  }
 
   if (mode === 'forgot-password' && resetSentTo) {
     return (
@@ -293,7 +402,7 @@ const Auth: React.FC<AuthProps> = ({ initialMode }) => {
           onSubmit={handleSubmit}
           className="space-y-4"
           aria-label={copy.title}
-          aria-busy={isLoading || undefined}
+          aria-busy={busy || undefined}
           aria-describedby={formError ? FORM_ERROR_ID : undefined}
         >
           {formError ? <FormAlert id={FORM_ERROR_ID}>{formError}</FormAlert> : null}
@@ -416,9 +525,9 @@ const Auth: React.FC<AuthProps> = ({ initialMode }) => {
             </>
           ) : null}
 
-          <Button type="submit" variant="signal" className="w-full" disabled={isLoading}>
-            {isLoading ? <Loader2 aria-hidden="true" className="animate-spin" /> : null}
-            {isLoading ? copy.busy : copy.submit}
+          <Button type="submit" variant="signal" className="w-full" disabled={busy}>
+            {busy ? <Loader2 aria-hidden="true" className="animate-spin" /> : null}
+            {isLoading ? copy.busy : busy ? 'Checking your account…' : copy.submit}
           </Button>
 
           {mode === 'forgot-password' ? (
@@ -435,7 +544,7 @@ const Auth: React.FC<AuthProps> = ({ initialMode }) => {
                 <span className="type-caption text-muted-foreground">or</span>
                 <span className="h-px flex-1 bg-border" />
               </div>
-              <Button type="button" variant="outline" className="w-full bg-transparent" onClick={handleGoogleSignIn} disabled={isLoading}>
+              <Button type="button" variant="outline" className="w-full bg-transparent" onClick={handleGoogleSignIn} disabled={busy}>
                 <img src={googleMark} alt="" aria-hidden="true" className="size-4" />
                 Continue with Google
               </Button>

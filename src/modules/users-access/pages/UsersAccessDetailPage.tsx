@@ -5,8 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2, Send } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
+import { PageEmpty, PageError, PageLoading } from '@/shared/components/states';
+import { useCan } from '@/lib/permissions/useCan';
+import { useInvitationActions, useInvitationStatuses } from '../hooks/useInvitations';
+import { invitationCell } from '../lib/invitationStatus';
+import { AccountStatusPill, InvitationStatus } from '../components/InvitationStatus';
 import { useUserAccessDetail, useModulesList } from '../hooks/useUserAccessDetail';
 import { useApplyPreset, useSavePermissionOverride } from '../hooks/useSavePermissionOverride';
 import {
@@ -33,13 +38,17 @@ const parsePerm = (v: string): PermissionLevel | null => (v === 'none' ? null : 
 
 const UsersAccessDetailPage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
-  const { data: detail, isLoading } = useUserAccessDetail(userId);
+  const { data: detail, isLoading, error, refetch } = useUserAccessDetail(userId);
   const { data: modules } = useModulesList();
   const saveOverride = useSavePermissionOverride();
   const applyPreset = useApplyPreset();
   const { toast } = useToast();
   const { data: deptScope = [] } = useDepartmentScope(userId);
   const saveDept = useSaveDepartmentScope();
+  const profileIds = useMemo(() => (detail ? [detail.profileId] : []), [detail]);
+  const invitations = useInvitationStatuses(detail?.companyId, profileIds);
+  const invitationActions = useInvitationActions();
+  const canAssign = useCan('admin.access.users_access.assign');
 
   const currentPreset: AccessPreset = useMemo(
     () => (detail ? derivePreset(detail.permissions) : 'custom'),
@@ -52,13 +61,30 @@ const UsersAccessDetailPage: React.FC = () => {
     return map;
   }, [modules]);
 
-  if (isLoading || !detail) {
+  if (isLoading) {
     return (
       <DashboardLayout>
-        <div className="p-6 text-sm text-muted-foreground">Loading…</div>
+        <PageLoading variant="detail" />
       </DashboardLayout>
     );
   }
+  if (error) {
+    return (
+      <DashboardLayout>
+        <PageError error={error} onRetry={() => void refetch()} />
+      </DashboardLayout>
+    );
+  }
+  if (!detail) {
+    return (
+      <DashboardLayout>
+        <PageEmpty headingLevel={1} title="Person not found" body="They may have been removed, or you may not have access to them." />
+      </DashboardLayout>
+    );
+  }
+
+  const cell = invitationCell(detail.account, invitations.byProfile.get(detail.profileId), invitations.source);
+  const name = `${detail.firstName} ${detail.lastName}`.trim();
 
   const handlePresetChange = (value: string) => {
     if (value === 'custom' || !userId) return;
@@ -67,7 +93,7 @@ const UsersAccessDetailPage: React.FC = () => {
       { userId, matrix },
       {
         onSuccess: () => toast({ title: 'Access preset applied' }),
-        onError: (e: any) => toast({ title: 'Failed to apply preset', description: e.message, variant: 'destructive' }),
+        onError: (e: Error) => toast({ title: 'Failed to apply preset', description: e.message, variant: 'destructive' }),
       }
     );
   };
@@ -78,7 +104,7 @@ const UsersAccessDetailPage: React.FC = () => {
       { userId, moduleKey, permission: parsePerm(value) },
       {
         onSuccess: () => toast({ title: 'Permission updated' }),
-        onError: (e: any) => toast({ title: 'Failed to update', description: e.message, variant: 'destructive' }),
+        onError: (e: Error) => toast({ title: 'Failed to update', description: e.message, variant: 'destructive' }),
       }
     );
   };
@@ -91,7 +117,7 @@ const UsersAccessDetailPage: React.FC = () => {
       { userId, matrix },
       {
         onSuccess: () => toast({ title: 'Applied to all modules' }),
-        onError: (e: any) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
+        onError: (e: Error) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
       }
     );
   };
@@ -106,7 +132,7 @@ const UsersAccessDetailPage: React.FC = () => {
       { userId, matrix },
       {
         onSuccess: () => toast({ title: `${group.label} updated` }),
-        onError: (e: any) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
+        onError: (e: Error) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
       }
     );
   };
@@ -116,7 +142,7 @@ const UsersAccessDetailPage: React.FC = () => {
     saveOverride.mutate(
       { userId, moduleKey: capKey, permission: enabled ? 'view' : null },
       {
-        onError: (e: any) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
+        onError: (e: Error) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
       }
     );
   };
@@ -138,8 +164,8 @@ const UsersAccessDetailPage: React.FC = () => {
             <CardTitle className="text-2xl">
               {detail.firstName} {detail.lastName}
             </CardTitle>
-            <div className="flex items-center gap-2 pt-1">
-              <Badge variant="outline" className="rounded-full bg-muted text-muted-foreground border-transparent">active</Badge>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <AccountStatusPill account={detail.account} />
               {detail.roleDisplayName && (
                 <Badge variant="outline" className="rounded-full bg-primary/10 text-primary border-transparent">
                   {detail.roleDisplayName}
@@ -149,6 +175,24 @@ const UsersAccessDetailPage: React.FC = () => {
                 <span className="text-sm text-muted-foreground">· {detail.position}</span>
               )}
             </div>
+            {cell.status !== 'none' ? (
+              <div className="flex flex-wrap items-start gap-3 pt-3" data-invitation-status="">
+                <span className="type-body-sm text-muted-foreground">Invitation</span>
+                <InvitationStatus cell={cell} loading={invitations.source === 'loading'} />
+                {canAssign && (cell.canInvite || cell.canResend) ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="[@media(pointer:coarse)]:min-h-11"
+                    disabled={invitationActions.invitingProfileId === detail.profileId}
+                    onClick={() => void invitationActions.inviteOne({ profileId: detail.profileId, name, email: detail.email })}
+                  >
+                    {invitationActions.invitingProfileId === detail.profileId ? <Loader2 aria-hidden="true" className="animate-spin" /> : <Send aria-hidden="true" />}
+                    {cell.canInvite ? 'Send invitation' : 'Resend invitation'}
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
           </CardHeader>
         </Card>
 

@@ -7,6 +7,8 @@ import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useHrAccess } from '@/modules/auth/hooks/useHrAccess';
 import { usePayrollAccess } from '@/modules/auth/hooks/usePayrollAccess';
 import { useToast } from '@/shared/hooks/use-toast';
+import { inviteNotice, sendInvitation as sendInvitationCall } from '@/modules/auth/services/adminActions';
+import { showOutcomeNotice } from '@/modules/auth/lib/outcomeNotices';
 import { removeCrewDocument, uploadCrewDocument } from '@/lib/storage/crewDocuments';
 import { useHrCrewDirectory } from '@/modules/hris/hooks/useHrCrewDirectory';
 import { useCompanyVessels } from '@/modules/hris/hooks/useCrewContracts';
@@ -785,21 +787,19 @@ export function useOnboardingMutations() {
     onError: fail('Could not reopen onboarding'),
   });
 
+  // Honest outcome (spec §C.3): "sent" only after the function said so; a
+  // failed email says why, with Retry. No client redirectTo.
   const sendInvitation = useMutation({
-    mutationFn: async ({ profileId, email }: { profileId: string; email?: string | null }): Promise<string | null> => {
-      const { data, error } = await supabase.functions.invoke<{ error?: string }>('send-invitation', {
-        body: { profileId, redirectTo: `${window.location.origin}/auth/accept-invitation` },
-      });
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
-      return email ?? null;
-    },
-    onSuccess: (email) => {
+    mutationFn: ({ profileId }: { profileId: string; email?: string | null }) => sendInvitationCall(profileId),
+    onSuccess: (outcome, variables) => {
       invalidate();
       void queryClient.invalidateQueries({ queryKey: ['hris', 'crew-directory'] });
-      toast({ title: 'Invitation sent', description: email ? `Verification email sent to ${email}.` : 'Verification email sent.' });
+      showOutcomeNotice(inviteNotice(outcome, variables.email ?? null), {
+        id: `invite-${variables.profileId}`,
+        onRetry: () => sendInvitation.mutate(variables),
+      });
     },
-    onError: fail('Could not send invitation'),
+    onError: fail('Could not send the invitation'),
   });
 
   return { start, toggleItem, updateItem, uploadEvidence, addAdHocItem, removeItem, setBuddy, updateNotes, cancel, reopen, sendInvitation };

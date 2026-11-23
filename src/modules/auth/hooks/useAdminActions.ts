@@ -1,217 +1,166 @@
+/**
+ * Admin actions on another person's account (crew roster: PIN-gated reset,
+ * access on / off, reallocate). Every call goes through the typed wrappers
+ * in `services/adminActions.ts`, so the answer is the honest outcome the
+ * edge function gave (Phase 2 spec §C.3): never "sent", "reset" or
+ * "disabled" unless that step worked.
+ *
+ * - `setPin` / `verifyPin` resolve `{ success: true }` (and the confirmation
+ *   time) or reject with one sentence of STORM copy (wrong PIN with the
+ *   attempts left, locked with the wait).
+ * - `resetAccount` and `toggleAccess` resolve the outcome itself; the modal
+ *   that called them shows it (inline, with Try again), so nothing here
+ *   toasts a result it did not check.
+ * - `reallocateVessel` toasts "updated" only for a confirmed assignment and
+ *   rejects with the part that failed otherwise.
+ */
+import { useCallback, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/shared/hooks/use-toast';
-import { useState, useCallback } from 'react';
+import { notify } from '@/shared/lib/notify';
+import {
+  endAllSessions,
+  reallocateVessel as reallocateVesselCall,
+  resendInvitation,
+  sendPasswordReset,
+  setAccess,
+  setAdminPin,
+  verifyAdminPin,
+  type EndSessionsOutcome,
+  type InviteOutcome,
+  type PasswordResetOutcome,
+  type ReallocatedAssignment,
+  type ReallocateInput,
+  type ToggleAccessOutcome,
+} from '../services/adminActions';
 
-interface AdminActionResult {
-  success: boolean;
-  message?: string;
-  error?: string;
-  needsSetup?: boolean;
-  locked?: boolean;
-  attemptsRemaining?: number;
+export interface PinResult {
+  success: true;
   confirmedUntil?: string;
-  newStatus?: string;
-  newAssignment?: any;
 }
 
-// Session-based confirmation tracking (10 minute window)
-const CONFIRMATION_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+export type ResetType = 'password_reset' | 'invalidate_sessions' | 'resend_invitation';
+
+export interface ResetAccountInput {
+  targetUserId: string | null;
+  /** For a resend to someone without a login yet. */
+  targetProfileId?: string | null;
+  resetType: ResetType;
+  reason?: string;
+}
+
+export type ResetAccountResult =
+  | { resetType: 'password_reset'; outcome: PasswordResetOutcome }
+  | { resetType: 'resend_invitation'; outcome: InviteOutcome }
+  | { resetType: 'invalidate_sessions'; outcome: EndSessionsOutcome };
+
+export interface ToggleAccessInput {
+  targetUserId: string;
+  enableAccess: boolean;
+  reason?: string;
+}
+
+// Session-based confirmation tracking (the server's 10 minute window).
+const CONFIRMED_KEY = 'admin_confirmed_until';
+
+function storedConfirmation(): Date | null {
+  try {
+    const stored = sessionStorage.getItem(CONFIRMED_KEY);
+    if (!stored) return null;
+    const date = new Date(stored);
+    return date > new Date() ? date : null;
+  } catch {
+    return null;
+  }
+}
+
+const CREW_KEYS = [['crew'], ['users-access'], ['hris', 'crew-directory']] as const;
 
 export const useAdminActions = () => {
   const queryClient = useQueryClient();
-  const [confirmedUntil, setConfirmedUntil] = useState<Date | null>(() => {
-    const stored = sessionStorage.getItem('admin_confirmed_until');
-    if (stored) {
-      const date = new Date(stored);
-      if (date > new Date()) return date;
-    }
-    return null;
-  });
+  const [confirmedUntil, setConfirmedUntil] = useState<Date | null>(storedConfirmation);
 
-  const isConfirmed = useCallback(() => {
-    return confirmedUntil && confirmedUntil > new Date();
-  }, [confirmedUntil]);
+  const isConfirmed = useCallback(() => Boolean(confirmedUntil && confirmedUntil > new Date()), [confirmedUntil]);
 
   const setConfirmation = useCallback((until: Date) => {
     setConfirmedUntil(until);
-    sessionStorage.setItem('admin_confirmed_until', until.toISOString());
+    try {
+      sessionStorage.setItem(CONFIRMED_KEY, until.toISOString());
+    } catch {
+      // The confirmation still holds for this page.
+    }
   }, []);
 
-  // Check if user has PIN set
+  const invalidatePeople = useCallback(() => {
+    for (const queryKey of CREW_KEYS) void queryClient.invalidateQueries({ queryKey: [...queryKey] });
+  }, [queryClient]);
+
+  // Whether the caller has a PIN set (own row only, RLS).
   const { data: hasPinSet, refetch: refetchPinStatus } = useQuery({
     queryKey: ['admin-pin-status'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('admin_pins')
-        .select('id')
-        .limit(1);
-      
-      if (error) {
-        console.error('Error checking PIN status:', error);
-        return false;
-      }
-      return data && data.length > 0;
+      const { data, error } = await supabase.from('admin_pins').select('id').limit(1);
+      if (error) throw error;
+      return Boolean(data && data.length > 0);
     },
   });
 
-  // Set PIN mutation
   const setPin = useMutation({
-    mutationFn: async (pin: string): Promise<AdminActionResult> => {
-      const { data, error } = await supabase.functions.invoke('admin-actions', {
-        body: { action: 'set_pin', pin }
-      });
-      if (error) throw new Error(error.message);
-      if (data.error) throw new Error(data.error);
-      return data;
+    mutationFn: async (pin: string): Promise<PinResult> => {
+      const outcome = await setAdminPin(pin);
+      if (outcome.kind === 'failed') throw new Error(outcome.failure.message);
+      return { success: true };
     },
     onSuccess: () => {
-      refetchPinStatus();
-      toast({
-        title: 'PIN Set',
-        description: 'Your admin PIN has been configured successfully.',
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      void refetchPinStatus();
+      notify.success('Admin PIN set', { description: 'STORM asks for it before sensitive admin actions.' });
     },
   });
 
-  // Verify PIN mutation
   const verifyPin = useMutation({
-    mutationFn: async (pin: string): Promise<AdminActionResult> => {
-      const { data, error } = await supabase.functions.invoke('admin-actions', {
-        body: { action: 'verify_pin', pin }
-      });
-      if (error) throw new Error(error.message);
-      if (data.error) throw new Error(data.error);
-      return data;
+    mutationFn: async (pin: string): Promise<PinResult> => {
+      const outcome = await verifyAdminPin(pin);
+      if (outcome.kind === 'failed') throw new Error(outcome.failure.message);
+      return { success: true, confirmedUntil: outcome.confirmedUntil };
     },
     onSuccess: (data) => {
-      if (data.confirmedUntil) {
-        setConfirmation(new Date(data.confirmedUntil));
-      }
+      if (data.confirmedUntil) setConfirmation(new Date(data.confirmedUntil));
     },
   });
 
-  // Reset account mutation
   const resetAccount = useMutation({
-    mutationFn: async ({ 
-      targetUserId, 
-      resetType, 
-      reason 
-    }: { 
-      targetUserId: string; 
-      resetType: 'password_reset' | 'invalidate_sessions' | 'resend_invitation';
-      reason?: string;
-    }): Promise<AdminActionResult> => {
-      const { data, error } = await supabase.functions.invoke('admin-actions', {
-        body: { action: 'reset_account', targetUserId, resetType, reason }
-      });
-      if (error) throw new Error(error.message);
-      if (data.error) throw new Error(data.error);
-      return data;
+    mutationFn: async ({ targetUserId, targetProfileId, resetType, reason }: ResetAccountInput): Promise<ResetAccountResult> => {
+      if (resetType === 'resend_invitation') {
+        return { resetType, outcome: await resendInvitation({ userId: targetUserId, profileId: targetProfileId }, reason) };
+      }
+      if (!targetUserId) throw new Error('This person has not joined STORM yet. Send an invitation instead.');
+      if (resetType === 'password_reset') return { resetType, outcome: await sendPasswordReset(targetUserId, reason) };
+      return { resetType, outcome: await endAllSessions(targetUserId, reason) };
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['crew'] });
-      toast({
-        title: 'Account Reset',
-        description: data.message || 'Action completed successfully.',
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
+    onSettled: invalidatePeople,
   });
 
-  // Toggle access mutation
   const toggleAccess = useMutation({
-    mutationFn: async ({ 
-      targetUserId, 
-      enableAccess,
-      reason 
-    }: { 
-      targetUserId: string; 
-      enableAccess: boolean;
-      reason?: string;
-    }): Promise<AdminActionResult> => {
-      const { data, error } = await supabase.functions.invoke('admin-actions', {
-        body: { action: 'toggle_access', targetUserId, enableAccess, reason }
-      });
-      if (error) throw new Error(error.message);
-      if (data.error) throw new Error(data.error);
-      return data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['crew'] });
-      toast({
-        title: 'Access Updated',
-        description: data.message || 'Account access has been updated.',
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
+    mutationFn: ({ targetUserId, enableAccess, reason }: ToggleAccessInput): Promise<ToggleAccessOutcome> =>
+      setAccess(targetUserId, enableAccess, reason?.trim() || undefined),
+    onSettled: invalidatePeople,
   });
 
-  // Reallocate vessel mutation
   const reallocateVessel = useMutation({
-    mutationFn: async ({ 
-      targetUserId, 
-      vesselId,
-      position,
-      effectiveDate,
-      endDate,
-      reason 
-    }: { 
-      targetUserId: string; 
-      vesselId: string;
-      position?: string;
-      effectiveDate?: string;
-      endDate?: string;
-      reason: string;
-    }): Promise<AdminActionResult> => {
-      const { data, error } = await supabase.functions.invoke('admin-actions', {
-        body: { 
-          action: 'reallocate_vessel', 
-          targetUserId, 
-          vesselId,
-          position,
-          effectiveDate,
-          endDate,
-          reason 
-        }
-      });
-      if (error) throw new Error(error.message);
-      if (data.error) throw new Error(data.error);
-      return data;
+    mutationFn: async (input: ReallocateInput): Promise<ReallocatedAssignment> => {
+      const outcome = await reallocateVesselCall(input);
+      if (outcome.kind === 'done') return outcome.assignment;
+      if (outcome.kind === 'partial_failure') throw new Error(outcome.message);
+      if (outcome.kind === 'unconfirmed') throw new Error("STORM could not confirm the new assignment. Check the person's vessel before trying again.");
+      throw new Error(outcome.failure.message);
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['crew'] });
-      toast({
-        title: 'Vessel Assignment Updated',
-        description: data.message || 'Crew member has been reassigned.',
-      });
+    onSuccess: () => {
+      notify.success('Vessel assignment updated', { description: 'The crew member has been reassigned.' });
     },
     onError: (error: Error) => {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      notify.error(error.message, { title: 'Could not change the vessel assignment' });
     },
+    onSettled: invalidatePeople,
   });
 
   return {

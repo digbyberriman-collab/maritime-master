@@ -16,6 +16,11 @@ const h = vi.hoisted(() => ({
     signIn: vi.fn(),
     signUp: vi.fn(),
     resetPassword: vi.fn(),
+    signOut: vi.fn(),
+    accountCheck: 'idle' as 'idle' | 'checking' | 'allowed' | 'disabled' | 'error',
+    retryAccountCheck: vi.fn(),
+    accessNotice: null as null | 'disabled',
+    clearAccessNotice: vi.fn(),
   },
   notify: { error: vi.fn(), success: vi.fn(), info: vi.fn(), warning: vi.fn(), dismiss: vi.fn() },
   supabaseAuth: {
@@ -47,16 +52,20 @@ function Where() {
   return <p data-testid="where">{`${location.pathname}${location.search}${location.hash}`}</p>;
 }
 
-function renderAt(entry: string | { pathname: string; state?: unknown }, element: React.ReactElement, path = '/auth') {
-  return render(
+function tree(entry: string | { pathname: string; state?: unknown }, element: React.ReactElement, path = '/auth') {
+  return (
     <MemoryRouter initialEntries={[entry]}>
       <Routes>
         <Route path={path} element={element} />
         {path === '/auth' ? null : <Route path="/auth" element={<Auth />} />}
         <Route path="*" element={<Where />} />
       </Routes>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+}
+
+function renderAt(entry: string | { pathname: string; state?: unknown }, element: React.ReactElement, path = '/auth') {
+  return render(tree(entry, element, path));
 }
 
 const session = (email = 'fleet.manager@demo-fleet.example') => ({ user: { id: 'u1', email } }) as unknown as Session;
@@ -68,6 +77,11 @@ const errorTextFor = (input: HTMLElement) => {
 
 beforeEach(() => {
   h.auth.user = null;
+  h.auth.accountCheck = 'idle';
+  h.auth.accessNotice = null;
+  h.auth.retryAccountCheck.mockReset();
+  h.auth.clearAccessNotice.mockReset();
+  h.auth.signOut.mockReset().mockResolvedValue(undefined);
   h.auth.signIn.mockReset().mockResolvedValue({ error: null });
   h.auth.signUp.mockReset().mockResolvedValue({ error: null });
   h.auth.resetPassword.mockReset().mockResolvedValue({ error: null });
@@ -155,11 +169,22 @@ describe('sign-in screen', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent("Can't reach the server");
   });
 
-  it('returns to the page the user asked for after signing in', async () => {
-    renderAt({ pathname: '/auth', state: { from: { pathname: '/v/dra/crew/list', search: '?tab=active', hash: '#top' } } }, <Auth />);
+  it('returns to the page the user asked for once the account check lets the user in', async () => {
+    const entry = { pathname: '/auth', state: { from: { pathname: '/v/dra/crew/list', search: '?tab=active', hash: '#top' } } };
+    const view = renderAt(entry, <Auth />);
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'master@demo-fleet.example' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret-pass' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    await waitFor(() => expect(h.auth.signIn).toHaveBeenCalled());
+    // Signed in, account check running: the app does not open yet.
+    h.auth.accountCheck = 'checking';
+    view.rerender(tree(entry, <Auth />));
+    expect(await screen.findByRole('button', { name: /Checking your account/ })).toBeDisabled();
+    expect(screen.queryByTestId('where')).not.toBeInTheDocument();
+    // Admitted: the context's user appears and the screen moves on.
+    h.auth.accountCheck = 'allowed';
+    h.auth.user = { id: 'u1' };
+    view.rerender(tree(entry, <Auth />));
     expect(await screen.findByTestId('where')).toHaveTextContent('/v/dra/crew/list?tab=active#top');
     expect(h.notify.error).not.toHaveBeenCalled();
   });
@@ -355,6 +380,97 @@ describe('reset password screen', () => {
     window.history.replaceState(null, '', `/reset-password?error_code=${code}`);
     renderAt('/reset-password', <ResetPassword />, '/reset-password');
     expect(screen.getByText(sentence, { exact: false })).toBeInTheDocument();
+  });
+});
+
+describe('sign-in screen: account check states (spec §B.3)', () => {
+  it('a disabled account shows the notice instead of the form, and "Sign in with another account" clears it', async () => {
+    h.auth.accessNotice = 'disabled';
+    const view = renderAt('/auth', <Auth />);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Access disabled');
+    expect(screen.getByRole('alert')).toHaveTextContent('Your access has been disabled by your account administrator.');
+    expect(screen.queryByRole('form', { name: 'Sign in' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in with another account' }));
+    expect(h.auth.clearAccessNotice).toHaveBeenCalled();
+    h.auth.accessNotice = null;
+    view.rerender(tree('/auth', <Auth />));
+    expect(await screen.findByRole('form', { name: 'Sign in' })).toBeInTheDocument();
+  });
+
+  it('a banned sign-in raises the notice in the context and shows no failure toast', async () => {
+    h.auth.signIn.mockResolvedValue({ error: new Error('User is banned'), accountDisabled: true });
+    renderAt('/auth', <Auth />);
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'deckhand@demo-fleet.example' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret-pass' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
+    await waitFor(() => expect(h.auth.signIn).toHaveBeenCalled());
+    expect(h.notify.error).not.toHaveBeenCalled();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('an OAuth return with error_code=user_banned shows the notice (the URL description is never shown)', () => {
+    window.history.replaceState(null, '', '/auth#error=access_denied&error_code=user_banned&error_description=Call+this+number');
+    renderAt('/auth', <Auth />);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Access disabled');
+    expect(document.body).not.toHaveTextContent('Call this number');
+  });
+
+  it('a failed check keeps the app closed: the error sentence with Retry and Sign out', async () => {
+    h.auth.accountCheck = 'error';
+    renderAt('/auth', <Auth />);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Account check failed');
+    expect(screen.getByRole('alert')).toHaveTextContent('We could not check your account. Try again.');
+    expect(screen.queryByTestId('where')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(h.auth.retryAccountCheck).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await waitFor(() => expect(h.auth.signOut).toHaveBeenCalledTimes(1));
+  });
+
+  it('while the check runs the form is busy and does not move on', () => {
+    h.auth.accountCheck = 'checking';
+    renderAt({ pathname: '/auth', state: { from: { pathname: '/fleet/dashboard' } } }, <Auth />);
+    expect(screen.getByRole('button', { name: /Checking your account/ })).toBeDisabled();
+    expect(screen.getByRole('form', { name: 'Sign in' })).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByTestId('where')).toBeNull();
+  });
+});
+
+describe('reset password screen: invitation links (flow=invite)', () => {
+  it('uses the invite copy: "Set your password to finish joining STORM"', async () => {
+    h.supabaseAuth.getSession.mockResolvedValue({ data: { session: session('deckhand@demo-fleet.example') }, error: null });
+    renderAt('/reset-password?flow=invite', <ResetPassword />, '/reset-password');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Checking your invitation link');
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('Set your password to finish joining STORM');
+    expect(screen.getByRole('form', { name: 'Set your password to finish joining STORM' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Password')).toHaveAttribute('autocomplete', 'new-password');
+    expect(screen.getByRole('button', { name: 'Save password and join' })).toBeInTheDocument();
+  });
+
+  it('saves the first password and says the person is in', async () => {
+    h.supabaseAuth.getSession.mockResolvedValue({ data: { session: session() }, error: null });
+    renderAt('/reset-password?flow=invite', <ResetPassword />, '/reset-password');
+    await screen.findByRole('button', { name: 'Save password and join' });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'a-long-password-1' } });
+    fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'a-long-password-1' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save password and join' }));
+    expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent("You're in");
+    expect(h.notify.success).toHaveBeenCalledWith('Password saved');
+  });
+
+  it('an expired invitation link says so and points to the administrator, not a self-service reset', () => {
+    window.history.replaceState(null, '', '/reset-password?flow=invite#error=access_denied&error_code=otp_expired');
+    renderAt('/reset-password?flow=invite', <ResetPassword />, '/reset-password');
+    expect(screen.getByText(/This invitation link has expired or was already used\./)).toBeInTheDocument();
+    expect(screen.getByText(/send a new invitation/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Request a new link' })).toBeNull();
+    expect(screen.getByRole('button', { name: /Back to sign in/ })).toBeInTheDocument();
+  });
+
+  it('without flow=invite the reset copy stays', () => {
+    window.history.replaceState(null, '', '/reset-password?flow=recovery#error_code=otp_expired');
+    renderAt('/reset-password?flow=recovery', <ResetPassword />, '/reset-password');
+    expect(screen.getByText(/This reset link has expired or was already used\./)).toBeInTheDocument();
   });
 });
 

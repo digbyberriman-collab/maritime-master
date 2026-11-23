@@ -258,6 +258,24 @@ export const STATUS_REGISTRY = {
     invited: ['info', 'Invited'],
     not_invited: ['neutral', 'Not invited'],
     disabled: ['danger', 'Disabled'],
+    /** Users & Access: no login in use yet (invited or not); the invitation column says which. */
+    not_joined: ['neutral', 'Not joined'],
+  }),
+  /**
+   * Invitations (`user_invitations.status`, Phase 2 honest vocabulary,
+   * proposed D-121). "Sent" only when the email provider accepted it;
+   * `invited` is the legacy profile status shown when no invitation row is
+   * visible (it never proves an email went, so it never reads "Sent").
+   */
+  invitation: vocab({
+    pending: ['info', 'Pending'],
+    sent: ['signal', 'Sent'],
+    send_failed: ['danger', 'Send failed'],
+    accepted: ['ok', 'Accepted'],
+    expired: ['warn', 'Expired'],
+    revoked: ['neutral', 'Revoked'],
+    invited: ['info', 'Invited'],
+    not_invited: ['neutral', 'Not invited'],
   }),
 
   // ── Support and feedback ──

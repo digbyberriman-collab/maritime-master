@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { Session } from '@supabase/supabase-js';
 import { ArrowLeft, CheckCircle2, Link2Off, Loader2 } from 'lucide-react';
 import { z } from 'zod';
@@ -31,6 +31,61 @@ const IDS = {
 } as const;
 const errorIdFor = (field: Field) => `${IDS[field]}-error`;
 
+/** `?flow=invite`: the invitation link lands here to set a first password (spec §C.3, CC-24); anything else is a reset. */
+export type PasswordFlow = 'invite' | 'recovery';
+
+function passwordFlowFrom(search: string): PasswordFlow {
+  return new URLSearchParams(search).get('flow') === 'invite' ? 'invite' : 'recovery';
+}
+
+/** Copy per flow: an invited person finishes joining; everyone else resets. */
+const FLOW_COPY: Readonly<
+  Record<
+    PasswordFlow,
+    {
+      checking: string;
+      linkErrors: Readonly<Record<string, string>>;
+      genericLinkError: string;
+      invalidHelp: string;
+      title: string;
+      submit: string;
+      done: string;
+      doneBody: string;
+    }
+  >
+> = {
+  recovery: {
+    checking: 'Checking your reset link',
+    linkErrors: {
+      otp_expired: 'This reset link has expired or was already used.',
+      flow_state_expired: 'This reset link has expired.',
+      flow_state_not_found: 'This reset link is no longer valid.',
+      access_denied: 'This reset link cannot be used.',
+    },
+    genericLinkError: 'This reset link cannot be used.',
+    invalidHelp: 'Reset links work once and expire after a short time. Ask for a new one and use the latest email.',
+    title: 'Set a new password',
+    submit: 'Save new password',
+    done: 'Password changed',
+    doneBody: "You're signed in with your new password. Taking you to STORM…",
+  },
+  invite: {
+    checking: 'Checking your invitation link',
+    linkErrors: {
+      otp_expired: 'This invitation link has expired or was already used.',
+      flow_state_expired: 'This invitation link has expired.',
+      flow_state_not_found: 'This invitation link is no longer valid.',
+      access_denied: 'This invitation link cannot be used.',
+    },
+    genericLinkError: 'This invitation link cannot be used.',
+    invalidHelp: 'Invitation links work once and expire after a short time. Ask your DPA or fleet administrator to send a new invitation.',
+    title: 'Set your password to finish joining STORM',
+    submit: 'Save password and join',
+    done: "You're in",
+    doneBody: 'Your password is saved. Taking you to STORM…',
+  },
+};
+
 /**
  * STORM's own sentence for each known link-error code Supabase puts in the
  * hash (or query) when a link is expired or used. The URL's
@@ -38,22 +93,15 @@ const errorIdFor = (field: Field) => `${IDS[field]}-error`;
  * auth page, so an unknown code (or only a description) gets the generic
  * sentence instead.
  */
-const LINK_ERROR_COPY: Readonly<Record<string, string>> = Object.freeze({
-  otp_expired: 'This reset link has expired or was already used.',
-  flow_state_expired: 'This reset link has expired.',
-  flow_state_not_found: 'This reset link is no longer valid.',
-  access_denied: 'This reset link cannot be used.',
-});
-const GENERIC_LINK_ERROR = 'This reset link cannot be used.';
-
-function linkErrorFromUrl(): string | null {
+function linkErrorFromUrl(flow: PasswordFlow): string | null {
+  const copy = FLOW_COPY[flow];
   const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
   const query = new URLSearchParams(window.location.search);
   const code = hash.get('error_code') ?? query.get('error_code') ?? hash.get('error') ?? query.get('error');
   const hasError = code !== null || hash.has('error_description') || query.has('error_description');
   if (!hasError) return null;
-  if (code && Object.prototype.hasOwnProperty.call(LINK_ERROR_COPY, code)) return LINK_ERROR_COPY[code];
-  return GENERIC_LINK_ERROR;
+  if (code && Object.prototype.hasOwnProperty.call(copy.linkErrors, code)) return copy.linkErrors[code];
+  return copy.genericLinkError;
 }
 
 const iconTile = (tone: 'critical' | 'success' | 'signal', icon: React.ReactNode) => (
@@ -75,10 +123,15 @@ const iconTile = (tone: 'critical' | 'success' | 'signal', icon: React.ReactNode
  * Set a new password from the email link (BUILD-PLAN S6). The link signs the
  * user in with a recovery session; until that session exists the form is not
  * shown, and an expired or used link says so with a way to ask for another.
+ * With `?flow=invite` (invitation links, spec §C.3) the same page sets the
+ * first password, with invite copy.
  */
 const ResetPassword: React.FC = () => {
   const navigate = useNavigate();
-  const [linkError] = useState<string | null>(linkErrorFromUrl);
+  const location = useLocation();
+  const [flow] = useState<PasswordFlow>(() => passwordFlowFrom(location.search));
+  const copy = FLOW_COPY[flow];
+  const [linkError] = useState<string | null>(() => linkErrorFromUrl(flow));
   const [status, setStatus] = useState<Status>(() => (linkError ? 'invalid' : 'checking'));
   const [accountEmail, setAccountEmail] = useState<string | null>(null);
   const [password, setPassword] = useState('');
@@ -155,7 +208,7 @@ const ResetPassword: React.FC = () => {
         return;
       }
       setStatus('done');
-      notify.success('Password changed');
+      notify.success(flow === 'invite' ? 'Password saved' : 'Password changed');
     } catch (error) {
       const message = normaliseError(error, 'The password could not be changed.').message;
       setFormError(message);
@@ -174,7 +227,7 @@ const ResetPassword: React.FC = () => {
     return (
       <AuthLayout>
         <AuthCard
-          title="Checking your reset link"
+          title={copy.checking}
           icon={iconTile('signal', <Loader2 className="size-5 animate-spin" />)}
           description={
             <p role="status" aria-busy="true">
@@ -194,21 +247,23 @@ const ResetPassword: React.FC = () => {
           icon={iconTile('critical', <Link2Off className="size-5" />)}
           description={
             <p>
-              {linkError ? `${linkError} ` : ''}Reset links work once and expire after a short time. Ask for a new one and use the
-              latest email.
+              {linkError ? `${linkError} ` : ''}
+              {copy.invalidHelp}
             </p>
           }
         >
           <div className="space-y-3">
-            <Button
-              type="button"
-              variant="signal"
-              className="w-full"
-              onClick={() => navigate('/auth', { state: { mode: 'forgot-password' } })}
-            >
-              Request a new link
-            </Button>
-            <Button type="button" variant="ghost" className="w-full" onClick={() => navigate('/auth')}>
+            {flow === 'recovery' ? (
+              <Button
+                type="button"
+                variant="signal"
+                className="w-full"
+                onClick={() => navigate('/auth', { state: { mode: 'forgot-password' } })}
+              >
+                Request a new link
+              </Button>
+            ) : null}
+            <Button type="button" variant={flow === 'recovery' ? 'ghost' : 'outline'} className="w-full" onClick={() => navigate('/auth')}>
               <ArrowLeft aria-hidden="true" />
               Back to sign in
             </Button>
@@ -222,9 +277,9 @@ const ResetPassword: React.FC = () => {
     return (
       <AuthLayout>
         <AuthCard
-          title="Password changed"
+          title={copy.done}
           icon={iconTile('success', <CheckCircle2 className="size-5" />)}
-          description={<p role="status">You're signed in with your new password. Taking you to STORM…</p>}
+          description={<p role="status">{copy.doneBody}</p>}
         >
           <Button type="button" variant="signal" className="w-full" onClick={() => navigate(AFTER_RESET_PATH, { replace: true })}>
             Continue to STORM
@@ -237,7 +292,7 @@ const ResetPassword: React.FC = () => {
   return (
     <AuthLayout>
       <AuthCard
-        title="Set a new password"
+        title={copy.title}
         description={
           accountEmail ? (
             <>
@@ -253,7 +308,7 @@ const ResetPassword: React.FC = () => {
           noValidate
           onSubmit={handleSubmit}
           className="space-y-4"
-          aria-label="Set a new password"
+          aria-label={copy.title}
           aria-busy={isSaving || undefined}
           aria-describedby={formError ? IDS.formError : undefined}
         >
@@ -272,7 +327,7 @@ const ResetPassword: React.FC = () => {
           {formError ? <FormAlert id={IDS.formError}>{formError}</FormAlert> : null}
 
           <div className="space-y-1.5">
-            <Label htmlFor={IDS.password}>New password</Label>
+            <Label htmlFor={IDS.password}>{flow === 'invite' ? 'Password' : 'New password'}</Label>
             <PasswordField
               ref={passwordRef}
               id={IDS.password}
@@ -291,7 +346,7 @@ const ResetPassword: React.FC = () => {
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor={IDS.confirm}>Confirm new password</Label>
+            <Label htmlFor={IDS.confirm}>{flow === 'invite' ? 'Confirm password' : 'Confirm new password'}</Label>
             <PasswordField
               ref={confirmRef}
               id={IDS.confirm}
@@ -310,7 +365,7 @@ const ResetPassword: React.FC = () => {
 
           <Button type="submit" variant="signal" className="w-full" disabled={isSaving}>
             {isSaving ? <Loader2 aria-hidden="true" className="animate-spin" /> : null}
-            {isSaving ? 'Saving…' : 'Save new password'}
+            {isSaving ? 'Saving…' : copy.submit}
           </Button>
         </form>
       </AuthCard>

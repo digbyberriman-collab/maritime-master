@@ -68,6 +68,9 @@ import { useCrew, type CrewMember } from '@/modules/crew/hooks/useCrew';
 import { useVessels } from '@/modules/vessels/hooks/useVessels';
 import { useVesselFilter } from '@/modules/vessels/hooks/useVesselFilter';
 import { useAdminActions } from '@/modules/auth/hooks/useAdminActions';
+import { inviteNotice, sendInvitation } from '@/modules/auth/services/adminActions';
+import { showOutcomeNotice } from '@/modules/auth/lib/outcomeNotices';
+import { notify } from '@/shared/lib/notify';
 import CrewFormModal from '@/modules/crew/components/CrewFormModal';
 import CrewProfileModal from '@/modules/crew/components/CrewProfileModal';
 import TransferCrewModal from '@/modules/crew/components/TransferCrewModal';
@@ -285,29 +288,21 @@ const CrewRoster: React.FC = () => {
     );
   };
 
+  // Honest outcome (spec §C.3): "sent" only after the function said so;
+  // a failed email says why, with Retry. No client redirectTo; links land
+  // on STORM's own /reset-password?flow=invite.
   const handleSendInvite = async (member: CrewMember) => {
     if (!canManageCrew && !isDPAAdmin) return;
     setIsInviting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('send-invitation', {
-        body: {
-          profileId: member.id,
-          redirectTo: `${window.location.origin}/auth/accept-invitation`,
-        },
-      });
-      if (error) throw new Error(error.message);
-      if (data?.error) throw new Error(data.error);
-      toast({
-        title: 'Invitation sent',
-        description: `Verification email sent to ${member.email}.`,
+      const outcome = await sendInvitation(member.id);
+      showOutcomeNotice(inviteNotice(outcome, member.email), {
+        id: `invite-${member.id}`,
+        onRetry: () => void handleSendInvite(member),
       });
       refetchCrew();
     } catch (err) {
-      toast({
-        title: 'Could not send invitation',
-        description: err instanceof Error ? err.message : 'Unexpected error',
-        variant: 'destructive',
-      });
+      notify.error(err, { title: 'Could not send the invitation', id: `invite-${member.id}` });
     } finally {
       setIsInviting(false);
     }

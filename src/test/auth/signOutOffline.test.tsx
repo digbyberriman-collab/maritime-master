@@ -79,6 +79,8 @@ function answerWith(logout: LogoutMode) {
       return new Response(null, { status: 204 });
     }
     if (url.includes('/auth/v1/token')) return json({ message: 'unexpected' }, 500);
+    // The account check after sign-in (spec §B.3).
+    if (url.includes('/rest/v1/rpc/record_session_start')) return json('active');
     if (url.includes('/rest/v1/')) return json([]);
     return json({ message: 'not found' }, 404);
   });
