@@ -1,10 +1,10 @@
 // node --test scripts/edge/check.test.mjs
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { classifySpecifier, configFunctions, functionNames, importsOf, scanEntrypoint } from './check.mjs';
+import { classifySpecifier, configFunctions, functionNames, hasInCodeAuth, importsOf, jwtOnlyFunctions, ownFiles, scanEntrypoint } from './check.mjs';
 
 test('classifySpecifier', () => {
   assert.equal(classifySpecifier('./x.ts'), 'local');
@@ -67,7 +67,6 @@ test('configFunctions reads every [functions.x] table and its verify_jwt', () =>
 });
 
 test('the repo config.toml has an entry for every function, false only for the six machine / token callers', async () => {
-  const { readFileSync } = await import('node:fs');
   const { fileURLToPath } = await import('node:url');
   const root = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
   const map = configFunctions(readFileSync(join(root, 'supabase', 'config.toml'), 'utf8'));
@@ -88,3 +87,55 @@ test('importsOf: words like "import" inside strings and code are not imports', (
   ].join('\n');
   assert.deepEqual(importsOf(src), ['https://deno.land/std@0.190.0/http/server.ts']);
 });
+
+test('hasInCodeAuth: getAuthContext / getUser / getClaims calls and a service-role bearer compare count; definitions and comments do not', () => {
+  assert.equal(hasInCodeAuth(['const ctx = await getAuthContext(req, deps);']), true);
+  assert.equal(hasInCodeAuth(['const { data } = await supabase.auth.getUser(token);']), true);
+  assert.equal(hasInCodeAuth(['const { data } = await client.auth.getClaims(token);']), true);
+  assert.equal(hasInCodeAuth(['if (!token || !timingSafeEqual(token, env.serviceRoleKey)) throw x;']), true);
+  assert.equal(hasInCodeAuth(['export async function getAuthContext(req) { return null; }']), false, 'a definition is not a check');
+  assert.equal(hasInCodeAuth(['// const ctx = await getAuthContext(req);', '/* supabase.auth.getUser(token) */']), false);
+  assert.equal(hasInCodeAuth(['Deno.serve(async (req) => new Response(await callModel(req)));']), false);
+  assert.equal(hasInCodeAuth(['if (timingSafeEqual(a, b)) ok();']), false, 'a compare that is not the service-role key');
+});
+
+test('verify_jwt = true without an in-code check is a warning (ownFiles ignores shared helpers and tests)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'edge-check-'));
+  try {
+    for (const fn of ['guarded', 'open', 'shared-only']) mkdirSync(join(dir, fn));
+    mkdirSync(join(dir, '_shared'));
+    writeFileSync(join(dir, '_shared', 'auth.ts'), 'export async function getAuthContext(req) { return await client.auth.getUser(req); }\n');
+    writeFileSync(join(dir, 'guarded', 'index.ts'), "import { getAuthContext } from '../_shared/auth.ts';\nDeno.serve(async (req) => { await getAuthContext(req); return new Response(); });\n");
+    writeFileSync(join(dir, 'open', 'index.ts'), 'Deno.serve(() => new Response());\n');
+    writeFileSync(join(dir, 'open', 'index.test.ts'), 'await getAuthContext(req);\n');
+    writeFileSync(join(dir, 'shared-only', 'index.ts'), "import { NO_SESSION } from '../_shared/auth.ts';\nDeno.serve(() => new Response(String(NO_SESSION)));\n");
+    const entries = ['guarded', 'open', 'shared-only'].map((name) => {
+      const scan = scanEntrypoint(join(dir, name, 'index.ts'));
+      const own = ownFiles([...scan.files, join(dir, name, 'index.test.ts')], join(dir, name)).filter((f) => existsSync(f));
+      return { name, verifyJwt: true, inCodeAuth: hasInCodeAuth(own.map((f) => readFileSync(f, 'utf8'))) };
+    });
+    assert.deepEqual(jwtOnlyFunctions(entries), ['open', 'shared-only']);
+    assert.deepEqual(jwtOnlyFunctions([{ name: 'machine', verifyJwt: false, inCodeAuth: false }]), [], 'verify_jwt = false is not warned here');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('the repo: only the four documented followups rely on the gateway flag alone; create-crew-member is migrated', async () => {
+  const { main } = await import('./check.mjs');
+  const lines = [];
+  const original = console.log;
+  console.log = (line) => lines.push(String(line));
+  let code;
+  try {
+    code = main(['--list', '--json']);
+  } finally {
+    console.log = original;
+  }
+  assert.equal(code, 0);
+  const summary = JSON.parse(lines.join('\n'));
+  assert.deepEqual(summary.jwtOnly, ['ai-route-planner', 'extract-flight-data', 'extract-form-fields', 'geocode-search']);
+  assert.ok(summary.checkable.includes('create-crew-member'), 'create-crew-member is on npm: specifiers');
+  assert.ok(!summary.remote.some((r) => r.name === 'create-crew-member'));
+});
+

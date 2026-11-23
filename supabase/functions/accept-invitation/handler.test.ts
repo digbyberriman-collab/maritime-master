@@ -2,13 +2,13 @@ import { assert, assertEquals } from 'jsr:@std/assert@1.0.13';
 import { RateLimiter } from '../_shared/rateLimit.ts';
 import { callsOf, fail, fakeClientFactory } from '../_shared/testing/fakeSupabase.ts';
 import { bodyOf, buildWorld, obj, P, profileRow, request, TEST_ENV } from '../_shared/testing/world.ts';
-import { createHandler } from './handler.ts';
+import { createHandler, FAILURE_LIMIT } from './handler.ts';
 
 const NOW = new Date('2026-11-23T10:00:00Z');
 const TOKEN = 'inv_0123456789abcdefABCDEF';
 const PASSWORD = 'correct horse battery';
 
-function setup(limits: { ip?: number; token?: number } = {}) {
+function setup(limits: { ip?: number; token?: number; failures?: number } = {}) {
   const world = buildWorld({ p3: false });
   const p = profileRow(world, P.invitedA.profileId);
   p.invitation_token = TOKEN;
@@ -19,12 +19,13 @@ function setup(limits: { ip?: number; token?: number } = {}) {
     now: () => NOW,
     ipLimiter: new RateLimiter({ limit: limits.ip ?? 100, windowMs: 60_000 }),
     tokenLimiter: new RateLimiter({ limit: limits.token ?? 100, windowMs: 60_000 }),
+    failureLimiter: new RateLimiter({ limit: limits.failures ?? 1000, windowMs: 60_000 }),
   });
   return { world, handler };
 }
 
 const accept = (h: ReturnType<typeof setup>, body: unknown, ip = '203.0.113.9') =>
-  h.handler(request(null, body, { headers: { 'x-forwarded-for': ip } }));
+  h.handler(request(null, body, { headers: { 'cf-connecting-ip': ip } }));
 
 async function reasonOf(res: Response): Promise<unknown> {
   const error = obj(await bodyOf(res), 'error');
@@ -112,3 +113,46 @@ Deno.test('accept-invitation: a lookup error is 503 and leaks nothing', async ()
   const text = JSON.stringify(await bodyOf(res));
   assert(!text.includes('secret_table'));
 });
+
+const guess = (i: number) => `inv_guess_${String(i).padStart(14, '0')}`;
+
+Deno.test('accept-invitation: 25 guesses that rotate the X-Forwarded-For first hop are still limited (429)', async () => {
+  // Default limits, as deployed: the per-IP key ignores X-Forwarded-For.
+  const world = buildWorld({ p3: false });
+  const handler = createHandler({ env: () => TEST_ENV, createClient: fakeClientFactory(world), now: () => NOW });
+  const statuses: number[] = [];
+  for (let i = 0; i < 25; i++) {
+    const res = await handler(request(null, { token: guess(i), password: PASSWORD }, { headers: { 'x-forwarded-for': `10.0.${i}.1, 203.0.113.9` } }));
+    statuses.push(res.status);
+  }
+  assertEquals(statuses.slice(0, 20), Array(20).fill(400));
+  assertEquals(statuses.slice(20), Array(5).fill(429));
+});
+
+Deno.test('accept-invitation: rotating every address header still hits the failure limiter (one fixed key)', async () => {
+  const h = setup({ ip: 1000, failures: FAILURE_LIMIT });
+  const statuses: number[] = [];
+  for (let i = 0; i < FAILURE_LIMIT + 5; i++) {
+    const headers = { 'cf-connecting-ip': `198.51.${i}.7`, 'x-real-ip': `192.0.${i}.8`, 'x-forwarded-for': `10.0.${i}.1` };
+    statuses.push((await h.handler(request(null, { token: guess(i), password: PASSWORD }, { headers }))).status);
+  }
+  assertEquals(statuses.filter((s) => s === 400).length, FAILURE_LIMIT);
+  assertEquals(statuses.slice(FAILURE_LIMIT), Array(5).fill(429));
+  // While it is exhausted the lookup is not even made (a valid token waits too).
+  const before = h.world.calls.length;
+  const valid = await accept(h, { token: TOKEN, password: PASSWORD }, '198.51.200.1');
+  assertEquals(valid.status, 429);
+  assert(valid.headers.get('Retry-After'));
+  assertEquals(h.world.calls.length, before, 'refused before the lookup');
+});
+
+Deno.test('accept-invitation: the failure limiter counts only well-formed invalid tokens', async () => {
+  const h = setup({ failures: 2 });
+  for (let i = 0; i < 5; i++) assertEquals((await accept(h, { token: 'short', password: PASSWORD }, `198.51.100.${i}`)).status, 400, 'malformed: not counted');
+  for (let i = 0; i < 5; i++) assertEquals((await accept(h, { token: guess(i), password: 'short' }, `198.51.101.${i}`)).status, 400, 'bad password: no lookup, not counted');
+  assertEquals((await accept(h, { token: TOKEN, password: PASSWORD })).status, 200, 'a valid token still works');
+  assertEquals((await accept(h, { token: guess(1), password: PASSWORD })).status, 400);
+  assertEquals((await accept(h, { token: guess(2), password: PASSWORD })).status, 400);
+  assertEquals((await accept(h, { token: guess(3), password: PASSWORD })).status, 429);
+});
+

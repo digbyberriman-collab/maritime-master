@@ -31,3 +31,50 @@ export function fakeFetcher(script: Array<number | 'network'> = []): FakeFetcher
   };
   return { fetcher, calls };
 }
+
+export interface ProviderLogEntry {
+  key: string;
+  status: number | 'timeout';
+}
+
+export interface IdempotentProvider {
+  fetcher: Fetcher;
+  log: ProviderLogEntry[];
+  /** Bodies the provider accepted (one per delivered email). */
+  delivered: string[];
+}
+
+/**
+ * The email provider's idempotency rule: the same key with the same body is
+ * answered from cache (200, no second email); the same key with a different
+ * body is 409 `invalid_idempotent_request`. `script` can make an accepted
+ * request time out on the way back (`'timeout_after_accept'`: the email was
+ * delivered, the caller sees a network failure).
+ */
+export function idempotentProvider(script: Array<'ok' | 'timeout_after_accept'> = []): IdempotentProvider {
+  const seen = new Map<string, string>();
+  const log: ProviderLogEntry[] = [];
+  const delivered: string[] = [];
+  let i = 0;
+  const fetcher: Fetcher = (_url, init) => {
+    const key = new Headers(init.headers).get('Idempotency-Key') ?? '';
+    const body = String(init.body);
+    const step = script[i++] ?? 'ok';
+    const prior = seen.get(key);
+    if (prior !== undefined && prior !== body) {
+      log.push({ key, status: 409 });
+      return Promise.resolve(new Response('{"name":"invalid_idempotent_request"}', { status: 409 }));
+    }
+    if (prior === undefined) {
+      seen.set(key, body);
+      delivered.push(body);
+    }
+    if (step === 'timeout_after_accept') {
+      log.push({ key, status: 'timeout' });
+      return Promise.reject(new DOMException('timeout', 'TimeoutError'));
+    }
+    log.push({ key, status: 200 });
+    return Promise.resolve(new Response(JSON.stringify({ id: `msg-${log.length}` }), { status: 200 }));
+  };
+  return { fetcher, log, delivered };
+}

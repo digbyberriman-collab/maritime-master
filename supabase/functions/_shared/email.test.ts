@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertFalse, assertStringIncludes } from 'jsr:@std/assert@1.0.13';
-import { type EmailErrorCode, escapeHtml, isSafeLink, renderEmail, sendEmail, type EmailMessage } from './email.ts';
-import { fakeFetcher } from './testing/fakeFetch.ts';
+import { type EmailErrorCode, escapeHtml, isSafeLink, payloadTag, renderEmail, sendEmail, type EmailMessage } from './email.ts';
+import { fakeFetcher, idempotentProvider } from './testing/fakeFetch.ts';
 import { envWith, TEST_ENV } from './testing/world.ts';
 
 const LINK = 'https://project.supabase.test/auth/v1/verify?token=t&type=invite&redirect_to=https%3A%2F%2Fapp.storm.test%2Freset-password%3Fflow%3Dinvite';
@@ -71,6 +71,7 @@ Deno.test('sendEmail: honest provider outcomes (never "sent" unless accepted)', 
   const cases: Array<[number | 'network', EmailErrorCode]> = [
     [422, 'provider_rejected'],
     [401, 'provider_rejected'],
+    [409, 'provider_duplicate'],
     [429, 'provider_unavailable'],
     [500, 'provider_unavailable'],
     [503, 'provider_unavailable'],
@@ -100,3 +101,23 @@ Deno.test('isSafeLink: https only, no whitespace or quotes', () => {
   assertFalse(isSafeLink(undefined));
   assertFalse(isSafeLink(`https://x.test/${'a'.repeat(3000)}`));
 });
+
+Deno.test('sendEmail: a provider 409 on the idempotency key is provider_duplicate (retryable), never provider_rejected', async () => {
+  const provider = idempotentProvider();
+  const first = await sendEmail(message({ idempotencyKey: 'reset:u1:1' }), TEST_ENV, provider.fetcher);
+  assertEquals(first.ok, true);
+  const other = message({ idempotencyKey: 'reset:u1:1', variables: { action_link: `${LINK}&n=2` } });
+  assertEquals(await sendEmail(other, TEST_ENV, provider.fetcher), { ok: false, errorCode: 'provider_duplicate' });
+  assertEquals(provider.delivered.length, 1);
+});
+
+Deno.test('payloadTag: 16 lower-case hex characters of SHA-256 of the link; a new link is a new tag', async () => {
+  const tag = await payloadTag(LINK);
+  assert(/^[0-9a-f]{16}$/.test(tag));
+  assertEquals(tag, await payloadTag(LINK));
+  assertFalse(tag === (await payloadTag(`${LINK}&n=2`)));
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(LINK)));
+  assertEquals(tag, Array.from(digest.slice(0, 8), (b) => b.toString(16).padStart(2, '0')).join(''));
+  assertFalse(LINK.includes(tag), 'the tag does not carry the link');
+});
+

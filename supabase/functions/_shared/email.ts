@@ -9,15 +9,31 @@
  * not accepted by the provider (`not_configured`: `RESEND_API_KEY` or
  * `EMAIL_FROM` missing; `invalid_recipient`; `invalid_link`: an action link
  * that is missing or not https; `provider_rejected`: the provider refused;
- * `provider_unavailable`: 429 / 5xx / network / timeout). Callers report that
- * as a failed send; they never say "sent". Provider response text is never
- * returned or logged.
+ * `provider_unavailable`: 429 / 5xx / network / timeout; `provider_duplicate`:
+ * the provider answered 409 for the idempotency key, i.e. a send with this key
+ * is in flight or the key was already used for another payload: retryable,
+ * and never a reason to mark an earlier delivered email as failed). Callers
+ * report that as a failed send; they never say "sent". Provider response text
+ * is never returned or logged.
+ *
+ * Idempotency keys (D-146 as amended): `invite:<profileId>:<attempt>:<h16>`
+ * and `reset:<userId>:<minuteBucket>:<h16>`, where `h16` = `payloadTag()` of
+ * the generated action link. One key only ever goes with one payload: a new
+ * link (a new one-time token) is a new key, so a retry never hits the
+ * provider's "same key, different body" 409.
  */
 import type { EdgeEnv } from './env.ts';
 import { stripControls } from './log.ts';
 
 export type EmailTemplate = 'CREW_INVITATION' | 'PASSWORD_RESET';
-export type EmailErrorCode = 'not_configured' | 'provider_rejected' | 'provider_unavailable' | 'invalid_recipient' | 'invalid_link';
+export type EmailErrorCode =
+  | 'not_configured'
+  | 'provider_rejected'
+  | 'provider_unavailable'
+  /** Provider 409 on the idempotency key (`invalid_idempotent_request` / `concurrent_idempotent_requests`): retryable. */
+  | 'provider_duplicate'
+  | 'invalid_recipient'
+  | 'invalid_link';
 export type EmailResult = { ok: true; providerMessageId: string | null } | { ok: false; errorCode: EmailErrorCode };
 
 export interface EmailMessage {
@@ -46,6 +62,16 @@ const MAX_VARIABLE = 200;
 const MAX_LINK = 2048;
 const PROVIDER_URL = 'https://api.resend.com/emails';
 const TIMEOUT_MS = 10_000;
+
+/**
+ * The payload part of an idempotency key: the first 16 lower-case hex
+ * characters of SHA-256 of the action link. Not a secret and not reversible
+ * to the link's token; it only makes the key unique per payload.
+ */
+export async function payloadTag(actionLink: string): Promise<string> {
+  const bytes = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(actionLink)));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
+}
 
 export function isValidRecipient(to: string): boolean {
   return to.length <= 254 && EMAIL.test(to);
@@ -234,6 +260,11 @@ export async function deliverEmail(to: string, email: RenderedEmail, idempotency
     if (res.status >= 500 || res.status === 429) {
       await res.body?.cancel();
       return { ok: false, errorCode: 'provider_unavailable' };
+    }
+    if (res.status === 409) {
+      // Idempotency conflict: the body is never read (provider text stays out of logs and answers).
+      await res.body?.cancel();
+      return { ok: false, errorCode: 'provider_duplicate' };
     }
     if (!res.ok) {
       await res.body?.cancel();

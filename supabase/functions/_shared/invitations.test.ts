@@ -1,10 +1,11 @@
 import { assert, assertEquals, assertFalse, assertStringIncludes } from 'jsr:@std/assert@1.0.13';
 import { getAuthContext } from './auth.ts';
-import type { EmailMessage, EmailResult } from './email.ts';
+import { type EmailMessage, type EmailResult, payloadTag, sendEmail } from './email.ts';
 import type { EdgeEnv } from './env.ts';
 import { HttpError } from './http.ts';
 import { bulkRow, bulkSummary, type InviteDeps, inviteProfile, invitationResponse, isFakeEmail } from './invitations.ts';
-import { callsOf, fail, fakeClientFactory, type FakeWorld } from './testing/fakeSupabase.ts';
+import { idempotentProvider } from './testing/fakeFetch.ts';
+import { callsOf, fail, fakeClientFactory, type FakeWorld, ok } from './testing/fakeSupabase.ts';
 import { buildWorld, CO_A, envWith, P, type Persona, profileRow, request, TEST_ENV, V_A1, V_A2 } from './testing/world.ts';
 
 const NOW = new Date('2026-11-23T10:00:00Z');
@@ -26,6 +27,13 @@ function mailer(results: EmailResult[] = []) {
 const ctxFor = (world: FakeWorld, who: Persona, env: EdgeEnv = TEST_ENV) =>
   getAuthContext(request(who.token, {}), { env, createClient: fakeClientFactory(world) });
 
+const linkCalls = (world: FakeWorld) => callsOf(world, 'admin').filter((c) => c.method === 'generateLink');
+
+/** The key the invite path must use for a message: `invite:<profileId>:<attempt>:<h16 of its link>`. */
+async function expectedKey(m: EmailMessage, profileId: string, attempt: number): Promise<string> {
+  return `invite:${profileId}:${attempt}:${await payloadTag(m.variables.action_link)}`;
+}
+
 Deno.test('isFakeEmail: placeholder and disposable domains are refused (the real check)', () => {
   for (const e of ['crew@example.com', 'a@example.test', 'b@x.invalid', 'testcrew@ship.org', 'c@mailinator.com', 'nodomain']) assert(isFakeEmail(e), e);
   assertFalse(isFakeEmail('captain@realfleet.org'));
@@ -43,7 +51,11 @@ Deno.test('invite (P3 live): sent, recorded by record_invitation_send, profile s
   assertEquals(m.sent.length, 1);
   assertEquals(m.sent[0].template, 'CREW_INVITATION');
   assertEquals(m.sent[0].to, P.importedA.email);
-  assertEquals(m.sent[0].idempotencyKey, `invite:${P.importedA.profileId}:1`);
+  assertEquals(m.sent[0].idempotencyKey, await expectedKey(m.sent[0], P.importedA.profileId, 1));
+  assert(/^invite:[0-9a-f-]{36}:1:[0-9a-f]{16}$/.test(m.sent[0].idempotencyKey), 'D-146 as amended: attempt plus payload tag');
+  const reserve = callsOf(world, 'rpc').find((c) => c.fn === 'reserve_invitation_attempt');
+  assert(reserve && reserve.caller.role === 'service', 'the attempt is reserved with the service client');
+  assert(world.calls.indexOf(reserve) < world.calls.indexOf(linkCalls(world)[0]), 'reserved before any link exists');
   assertStringIncludes(m.sent[0].variables.action_link, encodeURIComponent('https://app.storm.test/reset-password?flow=invite'));
   assertEquals(m.sent[0].variables.company_name, 'Demo Fleet A');
   assertEquals(m.sent[0].variables.vessel_name, 'Aurora');
@@ -160,7 +172,7 @@ Deno.test('invite: the next attempt after the cooldown uses a new idempotency ke
   const m = mailer();
   const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.invitedA.profileId, m.deps);
   assertEquals(outcome.status, 'sent');
-  assertEquals(m.sent[0].idempotencyKey, `invite:${P.invitedA.profileId}:3`);
+  assertEquals(m.sent[0].idempotencyKey, await expectedKey(m.sent[0], P.invitedA.profileId, 3));
   const link = callsOf(world, 'admin').find((c) => c.method === 'generateLink');
   assertEquals(link?.args.type, 'magiclink', 'existing unconfirmed login → magic link');
   assertEquals((world.tables.user_invitations ?? [])[0].send_attempts, 3);
@@ -226,6 +238,7 @@ Deno.test('invite: an email that belongs to another person\'s login → 409 conf
   assert(outcome.status === 'refused' && outcome.error.code === 'conflict');
   assertEquals(m.sent.length, 0);
   assertEquals(callsOf(world, 'admin').filter((c) => c.method === 'generateLink').length, 0);
+  assertEquals(callsOf(world, 'rpc').filter((c) => c.fn === 'reserve_invitation_attempt').length, 0, 'refused before an attempt is reserved');
 });
 
 Deno.test('invite: a profile email that differs from the linked login → 409, no link (no stray login created)', async () => {
@@ -283,3 +296,120 @@ Deno.test('bulk rows: sent / send_failed / refused counts; server errors count a
   assertEquals(rows[4].status, 'send_failed');
   assertEquals(rows[4].code, 'status_unavailable');
 });
+
+// ---- reservation, per-payload keys, revoked invitees ------------------------------------------
+
+Deno.test('invite (P3): two concurrent invites for one person → one send, one 429; the second makes no link', async () => {
+  const world = buildWorld({ p3: true });
+  const provider = idempotentProvider();
+  const deps: Partial<InviteDeps> = { isFakeEmail: () => false, now: () => NOW, sendEmail: (msg, env) => sendEmail(msg, env, provider.fetcher) };
+  const ctx = await ctxFor(world, P.adminA);
+  const outcomes = await Promise.all([inviteProfile(ctx, P.invitedA.profileId, deps), inviteProfile(ctx, P.invitedA.profileId, deps)]);
+  assertEquals(outcomes.map((o) => o.status).sort(), ['refused', 'sent']);
+  const refused = outcomes.find((o) => o.status === 'refused');
+  assert(refused?.status === 'refused');
+  assertEquals([refused.error.status, refused.error.code], [429, 'cooldown']);
+  assert(Number(refused.error.details?.retry_after_seconds) > 0);
+  assertEquals(linkCalls(world).length, 1, 'the refused request made no link, so the delivered one stays valid');
+  assertEquals(provider.log.map((l) => l.status), [200], 'one email, no 409');
+  const row = (world.tables.user_invitations ?? [])[0];
+  assertEquals([row.status, row.send_attempts], ['sent', 1]);
+});
+
+Deno.test('invite (D-01): a retry after a timed-out send uses a new key; the provider never answers 409', async () => {
+  let t = NOW.getTime();
+  const world = buildWorld({ p3: false, now: () => new Date(t) });
+  const provider = idempotentProvider(['timeout_after_accept']);
+  const deps: Partial<InviteDeps> = { isFakeEmail: () => false, now: () => new Date(t), sendEmail: (msg, env) => sendEmail(msg, env, provider.fetcher) };
+  const ctx = await ctxFor(world, P.adminA);
+  const first = await inviteProfile(ctx, P.importedA.profileId, deps);
+  assert(first.status === 'send_failed' && first.emailError === 'provider_unavailable', 'the caller saw a timeout');
+  const outcomes: string[] = [];
+  for (const minutes of [1, 60, 600]) {
+    t += minutes * 60_000;
+    outcomes.push((await inviteProfile(ctx, P.importedA.profileId, deps)).status);
+  }
+  assertEquals(outcomes, ['sent', 'sent', 'sent']);
+  const keys = provider.log.map((l) => l.key);
+  assertEquals(new Set(keys).size, keys.length, 'every payload has its own key');
+  assertFalse(provider.log.some((l) => l.status === 409));
+  assert(keys.every((k) => /^invite:[0-9a-f-]{36}:\d+:[0-9a-f]{16}$/.test(k)));
+});
+
+Deno.test('invite: reservation answers map to 404 / 409 / 503, and nothing is linked or sent', async () => {
+  const cases: Array<[ReturnType<typeof ok> | ReturnType<typeof fail>, number, string]> = [
+    [ok({ ok: false, code: 'not_found' }), 404, 'not_found'],
+    [ok({ ok: false, code: 'disabled' }), 409, 'conflict'],
+    [ok({ ok: false, code: 'surprise' }), 503, 'status_unavailable'],
+    [ok({ ok: true, invitation_id: 'inv-x' }), 503, 'status_unavailable'],
+    [fail('XX000', 'lock timeout'), 503, 'status_unavailable'],
+  ];
+  for (const [answer, status, code] of cases) {
+    const world = buildWorld({ p3: true });
+    world.hooks.rpc = (r) => (r.fn === 'reserve_invitation_attempt' ? answer : undefined);
+    const m = mailer();
+    const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, m.deps);
+    assert(outcome.status === 'refused', code);
+    assertEquals([outcome.error.status, outcome.error.code], [status, code]);
+    assertEquals(linkCalls(world).length, 0);
+    assertEquals(m.sent.length, 0);
+  }
+});
+
+Deno.test('invite: a revoked invitee\'s banned login is unbanned before the link; the email goes out', async () => {
+  const world = buildWorld({ p3: true });
+  profileRow(world, P.invitedA.profileId).account_status = 'not_invited';
+  const login = world.authUsers.find((u) => u.id === P.invitedA.userId);
+  assert(login);
+  login.banned_until = '2126-01-01T00:00:00Z';
+  const m = mailer();
+  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.invitedA.profileId, m.deps);
+  assertEquals(outcome.status, 'sent');
+  const unban = callsOf(world, 'admin').find((c) => c.method === 'updateUserById');
+  assert(unban);
+  assertEquals(unban.args, { id: P.invitedA.userId, attrs: { ban_duration: 'none' } });
+  assert(world.calls.indexOf(unban) < world.calls.indexOf(linkCalls(world)[0]), 'unbanned before the link is made');
+  assertEquals(login.banned_until, null);
+  assertEquals(m.sent.length, 1);
+});
+
+Deno.test('invite: a failed unban is an honest link_failed send failure; no link, no email', async () => {
+  const world = buildWorld({ p3: true });
+  profileRow(world, P.invitedA.profileId).account_status = 'not_invited';
+  const login = world.authUsers.find((u) => u.id === P.invitedA.userId);
+  assert(login);
+  login.banned_until = '2126-01-01T00:00:00Z';
+  world.hooks.admin = (a) => (a.method === 'updateUserById' ? fail('unexpected_failure', 'auth down', 500) : undefined);
+  const m = mailer();
+  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.invitedA.profileId, m.deps);
+  assert(outcome.status === 'send_failed' && outcome.emailError === 'link_failed' && outcome.stored);
+  assertEquals(linkCalls(world).length, 0);
+  assertEquals(m.sent.length, 0);
+  const row = (world.tables.user_invitations ?? [])[0];
+  assertEquals([row.status, row.last_error_code], ['send_failed', 'link_failed']);
+  assertEquals(profileRow(world, P.invitedA.profileId).account_status, 'not_invited');
+});
+
+Deno.test('invite: a ban is never lifted for an active profile', async () => {
+  const world = buildWorld({ p3: true });
+  // Active in STORM but the login was never confirmed (so the invite path runs) and is banned.
+  profileRow(world, P.invitedA.profileId).account_status = 'active';
+  const login = world.authUsers.find((u) => u.id === P.invitedA.userId);
+  assert(login);
+  login.banned_until = '2126-01-01T00:00:00Z';
+  await inviteProfile(await ctxFor(world, P.adminA), P.invitedA.profileId, mailer().deps);
+  assertEquals(callsOf(world, 'admin').filter((c) => c.method === 'updateUserById').length, 0);
+  assertEquals(login.banned_until, '2126-01-01T00:00:00Z');
+});
+
+Deno.test('invite: a provider_duplicate answer is a failed attempt for the caller; a sent row is not downgraded', async () => {
+  const world = buildWorld({ p3: true });
+  (world.tables.user_invitations ??= []).push({
+    id: 'inv-1', company_id: CO_A, profile_id: P.invitedA.profileId, status: 'sent', send_attempts: 1,
+    last_attempt_at: new Date(NOW.getTime() - 10 * 60_000).toISOString(), last_sent_at: new Date(NOW.getTime() - 10 * 60_000).toISOString(),
+  });
+  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.invitedA.profileId, mailer([{ ok: false, errorCode: 'provider_duplicate' }]).deps);
+  assert(outcome.status === 'send_failed' && outcome.emailError === 'provider_duplicate');
+  assertEquals((world.tables.user_invitations ?? [])[0].status, 'sent');
+});
+

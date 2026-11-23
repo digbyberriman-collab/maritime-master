@@ -5,15 +5,19 @@
  *
  * - `auth.getUser(token)`: tokens map to users in `world.authUsers`.
  * - `from(table)`: `select / insert / update / upsert / delete` with `eq`,
- *   `neq`, `in`, `is`, `gt`, `gte`, `lt`, `lte`, `order`, `limit`, `single`,
- *   `maybeSingle` over `world.tables` (mutable rows). A user client sees only
+ *   `neq`, `in`, `is`, `gt`, `gte`, `lt`, `lte`, `ilike` (`%` / `_`
+ *   wildcards, `\` escapes), `order`, `limit`, `single`, `maybeSingle` over
+ *   `world.tables` (mutable rows). A filter column may be a PostgREST JSON
+ *   path `col->>key` (text of one key of a json column). A user client sees only
  *   the rows `world.rls(table, row, caller)` allows (emulated RLS); the
  *   service client sees everything. Tables listed in `world.missingTables`
  *   answer PGRST205 (D-01 "not live yet").
  * - `rpc(fn, args)`: handlers in `world.rpcs`; an unknown function answers
  *   PGRST202, exactly like PostgREST for a migration that is not applied.
  * - `auth.admin.{generateLink, getUserById, updateUserById, signOut}` over
- *   `world.authUsers`.
+ *   `world.authUsers`. Like the real auth server, every `generateLink` call
+ *   issues a new one-time token (`world.linkSerial`), so two links for the
+ *   same person differ.
  * - `world.hooks` can answer any call first (inject errors).
  * - Every call is recorded in `world.calls` for assertions.
  *
@@ -55,7 +59,7 @@ export interface FakeAuthUser {
   password_set?: boolean;
 }
 
-type FilterOp = 'eq' | 'neq' | 'in' | 'is' | 'gt' | 'gte' | 'lt' | 'lte';
+type FilterOp = 'eq' | 'neq' | 'in' | 'is' | 'gt' | 'gte' | 'lt' | 'lte' | 'ilike';
 
 export interface Filter {
   column: string;
@@ -121,6 +125,8 @@ export interface FakeWorld {
   anonKey: string;
   /** Clock for timestamps the fake writes. */
   now: () => Date;
+  /** Counter behind the one-time token of each generated link. */
+  linkSerial: number;
 }
 
 export function createWorld(init: Partial<Omit<FakeWorld, 'calls'>> = {}): FakeWorld {
@@ -136,6 +142,7 @@ export function createWorld(init: Partial<Omit<FakeWorld, 'calls'>> = {}): FakeW
     serviceKey: init.serviceKey ?? 'service-role-key',
     anonKey: init.anonKey ?? 'anon-key',
     now: init.now ?? (() => new Date()),
+    linkSerial: init.linkSerial ?? 0,
   };
 }
 
@@ -159,8 +166,31 @@ function compare(a: unknown, b: unknown): number {
   return String(a) < String(b) ? -1 : 1;
 }
 
+/** A column value, or the text of `key` for a PostgREST JSON path `col->>key`. */
+function columnValue(row: FakeRow, column: string): unknown {
+  const path = /^([A-Za-z0-9_]+)->>([A-Za-z0-9_]+)$/.exec(column);
+  if (!path) return row[column];
+  const json = row[path[1]];
+  if (json === null || typeof json !== 'object' || Array.isArray(json)) return null;
+  const v = (json as Record<string, unknown>)[path[2]];
+  return v === null || v === undefined ? null : typeof v === 'string' ? v : JSON.stringify(v);
+}
+
+/** SQL ILIKE: `%` any run, `_` one character, `\` escapes the next one; case-insensitive. */
+function ilike(value: string, pattern: string): boolean {
+  let re = '';
+  for (let i = 0; i < pattern.length; i++) {
+    const c = pattern[i];
+    if (c === '\\' && i + 1 < pattern.length) re += pattern[++i].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    else if (c === '%') re += '.*';
+    else if (c === '_') re += '.';
+    else re += c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+  return new RegExp(`^${re}$`, 'is').test(value);
+}
+
 function matches(row: FakeRow, f: Filter): boolean {
-  const v = row[f.column];
+  const v = columnValue(row, f.column);
   switch (f.op) {
     case 'eq':
       return v !== null && v !== undefined && String(v) === String(f.value);
@@ -178,6 +208,8 @@ function matches(row: FakeRow, f: Filter): boolean {
       return v !== null && v !== undefined && compare(v, f.value) < 0;
     case 'lte':
       return v !== null && v !== undefined && compare(v, f.value) <= 0;
+    case 'ilike':
+      return v !== null && v !== undefined && typeof f.value === 'string' && ilike(String(v), f.value);
   }
 }
 
@@ -256,6 +288,9 @@ class FakeQuery implements PromiseLike<FakeResult> {
   lte(column: string, value: unknown): this {
     return this.filter(column, 'lte', value);
   }
+  ilike(column: string, pattern: string): this {
+    return this.filter(column, 'ilike', pattern);
+  }
   order(column: string, options: { ascending?: boolean } = {}): this {
     this.q.order.push({ column, ascending: options.ascending ?? true });
     return this;
@@ -298,7 +333,7 @@ class FakeQuery implements PromiseLike<FakeResult> {
       case 'select': {
         out = matched();
         for (const o of [...q.order].reverse()) {
-          out = [...out].sort((a, b) => (o.ascending ? 1 : -1) * compare(a[o.column], b[o.column]));
+          out = [...out].sort((a, b) => (o.ascending ? 1 : -1) * compare(columnValue(a, o.column), columnValue(b, o.column)));
         }
         if (q.limit !== null) out = out.slice(0, q.limit);
         if (q.head) return { data: null, error: null, count: out.length };
@@ -418,10 +453,12 @@ export class FakeClient {
             world.authUsers.push(user);
           }
           const redirect = params.options?.redirectTo ?? '';
-          const action_link = `https://project.supabase.test/auth/v1/verify?token=hashed-${user.id}&type=${params.type}&redirect_to=${encodeURIComponent(redirect)}`;
+          world.linkSerial += 1;
+          const hashed = `hashed-${world.linkSerial}-${user.id}`;
+          const action_link = `https://project.supabase.test/auth/v1/verify?token=${hashed}&type=${params.type}&redirect_to=${encodeURIComponent(redirect)}`;
           return {
             data: {
-              properties: { action_link, email_otp: '000000', hashed_token: `hashed-${user.id}`, redirect_to: redirect, verification_type: params.type },
+              properties: { action_link, email_otp: '000000', hashed_token: hashed, redirect_to: redirect, verification_type: params.type },
               user: publicUser(user),
             },
             error: null,

@@ -12,18 +12,22 @@
  * |---|---|---|---|
  * | `set_pin` | `pin` (6 digits) | 200 `{ ok: true }` | 400 |
  * | `verify_pin` | `pin` | 200 `{ ok: true, confirmedUntil }` | 400 `reason: pin_format / pin_not_set`, 403 `reason: pin_invalid` (+ `attempts_remaining`) / `pin_locked` (+ `retry_after_seconds`), 429 |
- * | `reset_account` + `resetType: 'password_reset'` | `targetUserId`, `reason?` | 200 `{ ok: true, reset: { status: 'sent' } }` | 502 `send_failed` `details.email_error`; 409 `conflict` (access disabled) |
+ * | `reset_account` + `resetType: 'password_reset'` | `targetUserId`, `reason?` | 200 `{ ok: true, reset: { status: 'sent' } }` | 502 `send_failed` `details.email_error`; 409 `conflict` (access disabled); 429 `cooldown` (`retry_after_seconds`, `Retry-After`: a reset for this person in the last 60 s, no link made); 503 (the cooldown could not be checked) |
  * | `reset_account` + `resetType: 'resend_invitation'` | `targetUserId` or `targetProfileId` | as send-invitation (200 / 502 / 409 / 429 …) | |
  * | `reset_account` + `resetType: 'invalidate_sessions'` | `targetUserId` | — | 501 `not_supported` (no supported revoke by user id; never faked) |
  * | `toggle_access` | `targetUserId`, `enableAccess`, `reason` (required to disable) | 200 `{ ok: true, statusStored: true, banApplied: true, accountStatus }` | 502 `partial_failure` `details: { statusStored, banApplied }`; 403 refusal (self, owner, admin without manages-admins, last manager); 400 |
  * | `reallocate_vessel` | `targetUserId`, `vesselId`, `reason`, `position?`, `effectiveDate?`, `endDate?` | 200 `{ ok: true, assignment }` | 502 `partial_failure` `details: { assignmentCreated, previousEnded }`; 404 vessel; 409 |
+ * | `revoke_invitation` | `invitationId`, `reason?` | 200 `{ ok: true, invitation: { id, status: 'revoked', profileId, revokedAt }, loginBlocked, loginNote }`: `loginNote` `banned` (a login that never signed in is banned, so the emailed link and "Forgot password" stop working; `loginBlocked: true`), `no_login` (`loginBlocked: true`), `signed_in_before` (not banned; `loginBlocked: false`: turn access off to stop them) | 404 `not_found` (not visible, not live); 403 `forbidden` (capability, own / owner login); 501 `not_supported` `details.reason: invitations_not_live`; 502 `partial_failure` `details: { revoked: true, loginBlocked: false }` + `invitation`; 503 |
+ *
+ * Email idempotency keys (D-146 as amended): `reset:<userId>:<minute>:<h16>`
+ * of the recovery link; invitations use `_shared/invitations.ts`.
  */
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.49.2';
 import { type AuthContext, getAuthContext } from '../_shared/auth.ts';
 import { assertCapability } from '../_shared/capability.ts';
 import { asRow, bool, errorCode, errorMessage, int, isMissingFunction, isMissingTable, rowsOf, text, timeOf, type Row } from '../_shared/db.ts';
 import { type EdgeDeps, edgeDeps, originsOf } from '../_shared/deps.ts';
-import { type EmailMessage, type EmailResult, sendEmail } from '../_shared/email.ts';
+import { type EmailMessage, type EmailResult, payloadTag, sendEmail } from '../_shared/email.ts';
 import { type EdgeEnv, linkLanding } from '../_shared/env.ts';
 import { errorBody, type Handler, HttpError, json, type JsonValue, readJson, withHttp } from '../_shared/http.ts';
 import { type InviteDeps, inviteProfile, invitationResponse, outcomeDetails } from '../_shared/invitations.ts';
@@ -38,11 +42,15 @@ export interface AdminActionsDeps extends EdgeDeps {
   now: () => Date;
   limiter: RateLimiter;
   pinLimiter: RateLimiter;
+  /** One password reset per target per 60 s in this isolate (`reset:<targetUserId>`), on top of the logged-reset check. */
+  resetLimiter: RateLimiter;
 }
 
 const PIN_MAX_ATTEMPTS = 5;
 const PIN_LOCK_MS = 15 * 60 * 1000;
 const PIN_CONFIRM_MS = 10 * 60 * 1000;
+/** A password reset for the same person waits this long after the last one (a new link would kill the delivered one). */
+export const RESET_COOLDOWN_MS = 60 * 1000;
 /** `ban_duration` for a disabled account: about 100 years (refresh tokens stop working). */
 export const DISABLE_BAN = '876000h';
 const ADMIN_ROLES = new Set(['dpa', 'shore_management']);
@@ -222,6 +230,8 @@ async function resetAccount(ctx: AuthContext, body: Body, deps: AdminActionsDeps
   if (DISABLED.has(target.status)) {
     throw new HttpError(409, 'conflict', "This person's access is disabled. Turn access on first.", { reason: 'access_disabled' });
   }
+  // Every recovery link replaces the last one: refuse a second reset inside the window before any link is made.
+  await assertResetWindow(ctx, target.userId, deps);
   const landing = linkLanding(ctx.env, 'recovery');
   const link = await ctx.serviceClient().auth.admin.generateLink({ type: 'recovery', email: target.email, options: { redirectTo: landing } });
   let result: EmailResult | { ok: false; errorCode: 'link_failed' };
@@ -233,7 +243,8 @@ async function resetAccount(ctx: AuthContext, body: Body, deps: AdminActionsDeps
     const firstName = text(target.row, 'first_name');
     if (firstName) variables.first_name = firstName;
     const minute = Math.floor(deps.now().getTime() / 60_000);
-    result = await deps.sendEmail({ to: target.email, template: 'PASSWORD_RESET', variables, idempotencyKey: `reset:${target.userId}:${minute}` }, ctx.env);
+    const idempotencyKey = `reset:${target.userId}:${minute}:${await payloadTag(link.data.properties.action_link)}`;
+    result = await deps.sendEmail({ to: target.email, template: 'PASSWORD_RESET', variables, idempotencyKey }, ctx.env);
   }
   await audit(ctx, {
     action_type: 'RESET_ACCOUNT',
@@ -247,6 +258,147 @@ async function resetAccount(ctx: AuthContext, body: Body, deps: AdminActionsDeps
     throw new HttpError(502, 'send_failed', 'The reset email could not be sent.', { email_error: result.errorCode });
   }
   return json({ ok: true, reset: { status: 'sent' } });
+}
+
+function resetCooldown(seconds: number): HttpError {
+  const wait = Math.max(1, Math.ceil(seconds));
+  return new HttpError(429, 'cooldown', 'A reset email was sent to this person a moment ago. Wait a minute before sending another.', {
+    retry_after_seconds: wait,
+  }, { 'Retry-After': String(wait) });
+}
+
+/**
+ * The reset window (60 s): the latest logged password reset for this person
+ * (`admin_action_log` RESET_ACCOUNT, any outcome: a timed-out send may still
+ * have been delivered), then the in-isolate limiter (it also catches two
+ * concurrent clicks, which both read the log before either writes it). A read
+ * error is 503: never assume there was no recent reset.
+ */
+async function assertResetWindow(ctx: AuthContext, targetUserId: string, deps: AdminActionsDeps): Promise<void> {
+  const now = deps.now().getTime();
+  const last = await ctx.serviceClient()
+    .from('admin_action_log')
+    .select('created_at')
+    .eq('action_type', 'RESET_ACCOUNT')
+    .eq('target_user_id', targetUserId)
+    .eq('after_json->>reset_type', 'password_reset')
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (last.error) throw new HttpError(503, 'status_unavailable', 'Recent reset emails could not be checked. Try again.');
+  const at = timeOf(rowsOf(last.data)[0] ?? null, 'created_at');
+  if (at !== null && now - at < RESET_COOLDOWN_MS) throw resetCooldown((at + RESET_COOLDOWN_MS - now) / 1000);
+  const verdict = deps.resetLimiter.hit(`reset:${targetUserId}`);
+  if (!verdict.ok) throw resetCooldown(verdict.retryAfterSeconds);
+}
+
+// ---- revoke_invitation ------------------------------------------------------------------------
+
+const INVITATION_NOT_FOUND = (): HttpError => new HttpError(404, 'not_found', 'That invitation was not found, or it is no longer open.');
+const INVITATIONS_NOT_LIVE = (): HttpError =>
+  new HttpError(501, 'not_supported', 'Revoking an invitation is not available in STORM yet.', { reason: 'invitations_not_live' });
+
+function isUserNotFound(error: unknown): boolean {
+  const status = error && typeof error === 'object' ? (error as { status?: unknown }).status : undefined;
+  return errorCode(error) === 'user_not_found' || status === 404;
+}
+
+type LoginNote = 'banned' | 'no_login' | 'signed_in_before';
+
+/**
+ * Revoke a live invitation (gap/01 W2 row 8): the SQL `revoke_invitation()`
+ * as the caller (it marks the row revoked, resets a never-signed-in profile
+ * and removes the never-accepted membership), then, with the service client,
+ * the login: one that never signed in is banned, so neither the emailed link
+ * nor "Forgot password" lets the invitee in; a re-invite lifts the ban
+ * (`_shared/invitations.ts`). Someone who has signed in before is not banned
+ * here: turning their access off is the honest tool for that.
+ */
+async function revokeInvitation(ctx: AuthContext, body: Body, _deps: AdminActionsDeps): Promise<Response> {
+  const invitationId = requiredUuid(body, 'invitationId');
+  const reason = optionalString(body, 'reason', 500);
+
+  const read = await ctx.userClient.from('user_invitations').select('id, company_id, profile_id, user_id, status').eq('id', invitationId).maybeSingle();
+  if (read.error) {
+    if (isMissingTable(read.error)) throw INVITATIONS_NOT_LIVE();
+    throw UNAVAILABLE();
+  }
+  const row = asRow(read.data);
+  const companyId = text(row, 'company_id');
+  const profileId = text(row, 'profile_id');
+  if (!row || !companyId || !profileId) throw INVITATION_NOT_FOUND();
+  await assertCapability(ctx, 'admin.access.users_access.admin', { companyId });
+
+  // The login to block: the invitation's, else the profile's (read as the caller).
+  let userId = text(row, 'user_id');
+  if (!userId) {
+    const profile = await ctx.userClient.from('profiles').select('user_id').eq('id', profileId).maybeSingle();
+    if (profile.error) throw UNAVAILABLE();
+    userId = text(asRow(profile.data), 'user_id');
+  }
+  if (userId && (userId === ctx.user.id || profileId === ctx.profileId)) {
+    throw new HttpError(403, 'forbidden', 'You cannot do this to your own account.');
+  }
+  if (userId) {
+    const owner = await ctx.serviceClient().from('account_memberships').select('id').eq('user_id', userId).eq('kind', 'owner').neq('status', 'removed').limit(1);
+    if (owner.error && !isMissingTable(owner.error)) throw UNAVAILABLE();
+    if (!owner.error && rowsOf(owner.data).length > 0) throw new HttpError(403, 'forbidden', "The account owner's access cannot be changed here.");
+  }
+
+  const rpc = await ctx.userClient.rpc('revoke_invitation', { p_invitation_id: invitationId });
+  if (rpc.error) {
+    const code = errorCode(rpc.error);
+    if (code === '42501') throw new HttpError(403, 'forbidden', 'You do not have permission to do that.');
+    if (isMissingFunction(rpc.error) || isMissingTable(rpc.error)) throw INVITATIONS_NOT_LIVE();
+    if (code === 'P0002') throw INVITATION_NOT_FOUND();
+    log('warn', 'revoke_invitation_failed', { code: code || 'none' });
+    throw new HttpError(503, 'status_unavailable', 'The invitation could not be revoked. Nothing was changed. Try again.');
+  }
+  const revoked = asRow(rpc.data);
+  if (!revoked || text(revoked, 'status') !== 'revoked') throw INVITATION_NOT_FOUND();
+  userId = text(revoked, 'user_id') ?? userId;
+  const invitation: Record<string, JsonValue> = {
+    id: text(revoked, 'id') ?? invitationId,
+    status: 'revoked',
+    profileId,
+    revokedAt: text(revoked, 'revoked_at'),
+  };
+
+  let loginNote: LoginNote | null = null;
+  if (!userId) {
+    loginNote = 'no_login';
+  } else {
+    const admin = ctx.serviceClient().auth.admin;
+    const found = await admin.getUserById(userId);
+    if (found.error) {
+      if (isUserNotFound(found.error)) loginNote = 'no_login';
+      else log('warn', 'revoke_login_read_failed', { code: errorCode(found.error) || 'none' });
+    } else if (text(asRow(found.data?.user), 'last_sign_in_at')) {
+      loginNote = 'signed_in_before';
+    } else {
+      const ban = await admin.updateUserById(userId, { ban_duration: DISABLE_BAN });
+      if (ban.error) log('warn', 'revoke_ban_failed', { code: errorCode(ban.error) || 'none' });
+      else loginNote = 'banned';
+    }
+  }
+  const loginBlocked = loginNote === 'banned' || loginNote === 'no_login';
+
+  await audit(ctx, {
+    action_type: 'RESET_ACCOUNT',
+    target_user_id: userId,
+    target_crew_id: profileId,
+    before_json: { invitation_status: text(row, 'status') },
+    after_json: { reset_type: 'revoke_invitation', invitation_id: invitation.id, login_blocked: loginBlocked, login_note: loginNote ?? 'failed' },
+    reason,
+  });
+
+  if (loginNote === null) {
+    const err = new HttpError(502, 'partial_failure', 'The invitation is revoked, but sign-in could not be blocked. Turn off their access, or try again.', {
+      revoked: true,
+      loginBlocked: false,
+    });
+    return json({ ...errorBody(err), invitation }, { status: 502 });
+  }
+  return json({ ok: true, invitation, loginBlocked, loginNote });
 }
 
 // ---- toggle_access ----------------------------------------------------------------------------
@@ -459,6 +611,7 @@ export function createHandler(patch: Partial<AdminActionsDeps> = {}): Handler {
     now: patch.now ?? (() => new Date()),
     limiter: patch.limiter ?? new RateLimiter({ limit: 30, windowMs: 60_000 }),
     pinLimiter: patch.pinLimiter ?? new RateLimiter({ limit: 10, windowMs: 5 * 60_000 }),
+    resetLimiter: patch.resetLimiter ?? new RateLimiter({ limit: 1, windowMs: RESET_COOLDOWN_MS }),
   };
 
   return withHttp(
@@ -479,6 +632,8 @@ export function createHandler(patch: Partial<AdminActionsDeps> = {}): Handler {
           return toggleAccess(ctx, body, deps);
         case 'reallocate_vessel':
           return reallocateVessel(ctx, body, deps);
+        case 'revoke_invitation':
+          return revokeInvitation(ctx, body, deps);
         default:
           throw new HttpError(400, 'invalid_request', 'Unknown action.', { field: 'action' });
       }

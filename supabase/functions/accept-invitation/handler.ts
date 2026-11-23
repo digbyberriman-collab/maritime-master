@@ -7,8 +7,14 @@
  * auth link flow), so this answers only for tokens issued earlier.
  *
  * Guards: per-IP and per-token rate limits (in-memory, per isolate; the
- * token is hashed before it becomes a key); token format check; lookup then
- * constant-time comparison; an expiry is required (a token without one is
+ * token is hashed before it becomes a key; the IP comes from
+ * `cf-connecting-ip` / `x-real-ip`, never from X-Forwarded-For, which the
+ * caller writes); a failure limiter on one fixed key that no header can
+ * rotate (50 invalid-token answers per minute per isolate, checked before
+ * the lookup, so a guessing run that rotates addresses is still slowed; it
+ * counts only well-formed tokens that turned out invalid, and while it is
+ * exhausted every request is 429, valid tokens too); token format check;
+ * lookup then constant-time comparison; an expiry is required (a token without one is
  * treated as expired: fail closed); the token is claimed (cleared) before the
  * password is set, so it works once, and restored only if setting the
  * password fails; `password.length >= 12` (at most 72, the auth limit); the
@@ -18,7 +24,8 @@
  * Errors: 400 `invalid_request` (`reason`: `invalid_or_expired`,
  * `password_too_short`, `password_too_long`, `password_rejected`), 403
  * `account_disabled`, 429 `rate_limited`, 500 `internal_error`, 503
- * `status_unavailable`.
+ * `status_unavailable`. Cross-isolate quotas need database-backed limits (a
+ * recorded followup); the live gateway's address headers are not verified.
  */
 import { NO_SESSION } from '../_shared/auth.ts';
 import { errorCode, rowsOf, text, timeOf } from '../_shared/db.ts';
@@ -31,8 +38,13 @@ import { objectBody } from '../_shared/validate.ts';
 export interface AcceptInvitationDeps extends EdgeDeps {
   ipLimiter: RateLimiter;
   tokenLimiter: RateLimiter;
+  /** Invalid-token answers for well-formed tokens, on the one key `FAILURE_KEY` (no header decides it). */
+  failureLimiter: RateLimiter;
   now: () => Date;
 }
+
+const FAILURE_KEY = 'accept-invitation:invalid';
+export const FAILURE_LIMIT = 50;
 
 const TOKEN = /^[A-Za-z0-9_-]{16,256}$/;
 export const MIN_PASSWORD = 12;
@@ -51,7 +63,14 @@ export function createHandler(patch: Partial<AcceptInvitationDeps> = {}): Handle
     ...base,
     ipLimiter: patch.ipLimiter ?? new RateLimiter({ limit: 20, windowMs: 10 * 60_000 }),
     tokenLimiter: patch.tokenLimiter ?? new RateLimiter({ limit: 5, windowMs: 10 * 60_000 }),
+    failureLimiter: patch.failureLimiter ?? new RateLimiter({ limit: FAILURE_LIMIT, windowMs: 60_000 }),
     now: patch.now ?? (() => new Date()),
+  };
+
+  /** Count one invalid answer for a well-formed token, then refuse. */
+  const invalidToken = (): HttpError => {
+    deps.failureLimiter.hit(FAILURE_KEY);
+    return INVALID();
   };
 
   return withHttp(
@@ -69,6 +88,12 @@ export function createHandler(patch: Partial<AcceptInvitationDeps> = {}): Handle
       if (password.length > MAX_PASSWORD) {
         throw new HttpError(400, 'invalid_request', `Choose a password of at most ${MAX_PASSWORD} characters.`, { reason: 'password_too_long' });
       }
+      const failures = deps.failureLimiter.peek(FAILURE_KEY);
+      if (!failures.ok) {
+        throw new HttpError(429, 'rate_limited', 'Too many attempts. Wait a moment and try again.', { retry_after_seconds: failures.retryAfterSeconds }, {
+          'Retry-After': String(failures.retryAfterSeconds),
+        });
+      }
 
       // No caller identity in this flow: the service client is the only way to find the token's profile.
       const service = deps.createClient(env.supabaseUrl, env.serviceRoleKey, NO_SESSION);
@@ -85,7 +110,7 @@ export function createHandler(patch: Partial<AcceptInvitationDeps> = {}): Handle
       const userId = text(profile, 'user_id');
       const profileId = text(profile, 'id');
       if (!profile || !stored || !timingSafeEqual(stored, token) || expires === null || expires <= deps.now().getTime() || !userId || !profileId) {
-        throw INVALID();
+        throw invalidToken();
       }
       if (DISABLED.has((text(profile, 'account_status') ?? '').toLowerCase())) {
         throw new HttpError(403, 'account_disabled', 'Your access has been disabled by your account administrator.');
@@ -99,7 +124,7 @@ export function createHandler(patch: Partial<AcceptInvitationDeps> = {}): Handle
         .eq('invitation_token', token)
         .select('id');
       if (claim.error) throw UNAVAILABLE();
-      if (rowsOf(claim.data).length !== 1) throw INVALID();
+      if (rowsOf(claim.data).length !== 1) throw invalidToken();
 
       const set = await service.auth.admin.updateUserById(userId, { password, email_confirm: true });
       if (set.error) {

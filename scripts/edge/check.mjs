@@ -18,7 +18,13 @@
  * time so a failure names its function.
  *
  * It also enforces the verify_jwt policy's first rule: every function folder
- * has an explicit `[functions.<name>]` entry in `supabase/config.toml`.
+ * has an explicit `[functions.<name>]` entry in `supabase/config.toml`, and
+ * warns (never fails) about every function with `verify_jwt = true` whose own
+ * files show no in-code caller check (`getAuthContext(`, `auth.getUser(`,
+ * `getClaims(`, or a constant-time compare of the bearer with the
+ * service-role key). For those the gateway flag is the only check, and it
+ * stops working for asymmetric signing keys (D-129), so they need an in-code
+ * check before the flag can be turned off.
  *
  * Exit codes: 0 all checkable entrypoints pass and every function has a
  * config entry (remote entrypoints are listed, not failed, unless --strict);
@@ -27,7 +33,7 @@
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -115,6 +121,32 @@ export function configFunctions(toml) {
   return out;
 }
 
+const IN_CODE_AUTH = [
+  /(?<!function\s)\bgetAuthContext\s*\(/,
+  /\.auth\.getUser\s*\(/,
+  /\bgetClaims\s*\(/,
+  /\btimingSafeEqual\s*\([^)]*(?:serviceRoleKey|SUPABASE_SERVICE_ROLE_KEY)/,
+];
+
+/** True when a function's own source (comments stripped) calls one of the in-code caller checks. */
+export function hasInCodeAuth(sources) {
+  return sources.some((source) => {
+    const text = stripComments(source);
+    return IN_CODE_AUTH.some((pattern) => pattern.test(text));
+  });
+}
+
+/** The function's own non-test files among `files` (shared helpers define the checks; they do not prove a call). */
+export function ownFiles(files, functionDir) {
+  const dir = resolve(functionDir);
+  return files.filter((f) => f.startsWith(`${dir}${sep}`) && !f.endsWith('.test.ts'));
+}
+
+/** Names of verify_jwt = true functions without an in-code caller check. */
+export function jwtOnlyFunctions(entries) {
+  return entries.filter((e) => e.verifyJwt === true && !e.inCodeAuth).map((e) => e.name);
+}
+
 export function functionNames(dir = FUNCTIONS) {
   return readdirSync(dir)
     .filter((name) => !name.startsWith('_') && !name.startsWith('.'))
@@ -166,10 +198,12 @@ export function main(argv = process.argv.slice(2)) {
     const entry = join(FUNCTIONS, name, 'index.ts');
     const scan = scanEntrypoint(entry);
     const blocked = scan.external.filter((e) => e.kind === 'esm.sh' || e.kind === 'deno.land' || e.kind === 'remote' || e.kind === 'bare');
+    const own = ownFiles(scan.files, join(FUNCTIONS, name)).filter((f) => existsSync(f));
     return {
       name,
       entry: relative(ROOT, entry),
       verifyJwt: config.get(name) ?? null,
+      inCodeAuth: hasInCodeAuth(own.map((f) => readFileSync(f, 'utf8'))),
       checkable: blocked.length === 0 && scan.missing.length === 0,
       blocked: [...new Set(blocked.map((b) => b.spec))],
       missing: scan.missing.map((m) => relative(ROOT, m)),
@@ -196,6 +230,8 @@ export function main(argv = process.argv.slice(2)) {
     remote: remote.map((e) => ({ name: e.name, imports: e.blocked, missing: e.missing })),
     shared: sharedResult ? (sharedResult.ok ? 'pass' : 'fail') : 'not run',
     missingConfig,
+    /** Warnings only: verify_jwt = true with no in-code caller check. */
+    jwtOnly: jwtOnlyFunctions(entries),
   };
 
   if (opts.json) {
@@ -214,6 +250,10 @@ export function main(argv = process.argv.slice(2)) {
       for (const e of remote) console.log(`  remote    ${e.name}: ${[...e.blocked, ...e.missing.map((m) => `missing ${m}`)].join(', ')}`);
     }
     if (missingConfig.length > 0) console.log(`Missing verify_jwt entry in supabase/config.toml: ${missingConfig.join(', ')}`);
+    if (summary.jwtOnly.length > 0) {
+      console.log('Warning: verify_jwt = true with no in-code caller check (the gateway flag is the only check; it 401s every call under asymmetric signing keys, D-129):');
+      for (const name of summary.jwtOnly) console.log(`  warn      ${name}`);
+    }
   }
 
   if (failed.length > 0 || (sharedResult && !sharedResult.ok) || missingConfig.length > 0) return 1;

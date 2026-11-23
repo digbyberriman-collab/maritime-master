@@ -48,6 +48,19 @@ export class RateLimiter {
     return { ok: false, retryAfterSeconds: Math.max(1, Math.ceil((bucket.start + this.rule.windowMs - t) / 1000)) };
   }
 
+  /**
+   * The verdict for `key` without counting a request: not ok once the key has
+   * used its whole allowance in the current window. For limits that count
+   * only some outcomes (e.g. failures) but must refuse every request while
+   * they are exhausted.
+   */
+  peek(key: string): RateLimitVerdict {
+    const t = this.now();
+    const bucket = this.buckets.get(key);
+    if (!bucket || t - bucket.start >= this.rule.windowMs || bucket.count < this.rule.limit) return { ok: true, retryAfterSeconds: 0 };
+    return { ok: false, retryAfterSeconds: Math.max(1, Math.ceil((bucket.start + this.rule.windowMs - t) / 1000)) };
+  }
+
   /** `hit` that throws 429 `rate_limited` (with `Retry-After`) when over the rule. */
   enforce(key: string, message = 'Too many attempts. Wait a moment and try again.'): void {
     const verdict = this.hit(key);
@@ -72,10 +85,17 @@ export class RateLimiter {
   }
 }
 
-/** The client IP as the platform reports it (`x-forwarded-for` first hop, then `cf-connecting-ip`), else 'unknown'. */
+/**
+ * The client IP for rate-limit keys: `cf-connecting-ip` (set by Cloudflare in
+ * front of the Supabase gateway, overwritten on every request), then
+ * `x-real-ip`, else 'unknown'. `X-Forwarded-For` is never used: its first hop
+ * is whatever the caller wrote, and its last hop can be a shared proxy, so
+ * rotating it would open a fresh bucket per request. How the live gateway
+ * sets these headers is not verified from here; a request without either
+ * header shares the one 'unknown' bucket (stricter, never looser).
+ */
 export function clientIp(req: Request): string {
-  const forwarded = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim();
-  const ip = forwarded || req.headers.get('cf-connecting-ip')?.trim() || req.headers.get('x-real-ip')?.trim();
+  const ip = req.headers.get('cf-connecting-ip')?.trim() || req.headers.get('x-real-ip')?.trim();
   return ip && ip.length <= 64 ? ip : 'unknown';
 }
 

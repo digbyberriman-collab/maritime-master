@@ -19,18 +19,31 @@
  *    `invalid_request`; access disabled → 409 `conflict`.
  * 5. With the service client (capability passed): an existing, confirmed
  *    login whose profile is `active` → 409 `already_active`.
- * 6. Cooldown: 5 minutes from the last successful send (the live
- *    invitation's `last_sent_at`, or the profile's `last_invited_at`) and
- *    30 seconds from a failed attempt (`send_failed`), so Retry after a
- *    failed send works almost at once → 429 `cooldown`.
- * 7. Auth user: none → `generateLink('invite')` (creates the user); an
+ * 6. Reserve the attempt before any link exists: the service-role
+ *    `reserve_invitation_attempt()` locks the live invitation row, applies
+ *    the cooldown under that lock (5 minutes from the last successful send,
+ *    30 seconds from a failed attempt, so Retry after a failed send works
+ *    almost at once) and returns the attempt number → 429 `cooldown` (with
+ *    `Retry-After`), 404 `not_found`, 409 `conflict` (disabled). Two
+ *    concurrent requests: one reserves, the other gets 429 and makes no
+ *    link. D-01 (RPC or table missing): the same cooldown computed here from
+ *    the live row (when the table exists) and the profile's `last_invited_at`,
+ *    and the attempt from `max(send_attempts, invitation_count) + 1`.
+ * 7. A revoked invitee's login was banned (admin-actions `revoke_invitation`):
+ *    for a `not_invited` / `invited` profile whose login is banned, the ban is
+ *    lifted first. If that fails, the attempt is an honest `link_failed`
+ *    send failure and no email goes out. Never for a disabled, deactivated
+ *    or active profile.
+ * 8. Auth user: none → `generateLink('invite')` (creates the user); an
  *    existing unconfirmed one (the profile's `user_id`, the service-role
  *    `auth_user_id_for_email()`, or `generateLink`'s "already registered")
  *    → `generateLink('magiclink')`. An email that belongs to another
- *    person's login → 409 `conflict`.
- * 8. `sendEmail(CREW_INVITATION)` with idempotency key
- *    `invite:<profileId>:<attempt>`.
- * 9. `record_invitation_send()` (service role) stores the honest outcome
+ *    person's login → 409 `conflict` (the lookup runs before step 6, so a
+ *    refusal reserves nothing).
+ * 9. `sendEmail(CREW_INVITATION)` with idempotency key
+ *    `invite:<profileId>:<attempt>:<h16>` (`payloadTag` of the action link:
+ *    one key, one payload; D-146 as amended).
+ * 10. `record_invitation_send()` (service role) stores the honest outcome
  *    and links `user_id`; when the RPC is missing (D-01) the legacy profile
  *    columns are updated **only after a successful send** and the answer
  *    says `stored: false`.
@@ -38,7 +51,7 @@
 import type { AuthContext } from './auth.ts';
 import { assertCapability } from './capability.ts';
 import { asRow, errorCode, errorMessage, int, isMissingFunction, isMissingTable, rowsOf, text, timeOf, type Row } from './db.ts';
-import { type EmailErrorCode, type EmailMessage, type EmailResult, isValidRecipient, sendEmail } from './email.ts';
+import { type EmailErrorCode, type EmailMessage, type EmailResult, isValidRecipient, payloadTag, sendEmail } from './email.ts';
 import { type EdgeEnv, linkLanding } from './env.ts';
 import { errorBody, HttpError, json, type JsonValue } from './http.ts';
 import { log } from './log.ts';
@@ -93,8 +106,19 @@ export const defaultInviteDeps: InviteDeps = {
 const LIVE_STATUSES = ['pending', 'sent', 'send_failed'];
 const ADMIN_ROLES = new Set(['dpa', 'shore_management']);
 const DISABLED = new Set(['disabled', 'deactivated']);
+/** Profiles whose banned login may be unbanned by a new invitation (a revoked invitee). */
+const REINVITABLE = new Set(['not_invited', 'invited']);
 
 const UNAVAILABLE = (): HttpError => new HttpError(503, 'status_unavailable', 'The invitation could not be checked. Try again.');
+const ACCESS_DISABLED = (): HttpError =>
+  new HttpError(409, 'conflict', "This person's access is disabled. Turn access on before sending an invitation.", { reason: 'access_disabled' });
+
+function cooldownError(seconds: number): HttpError {
+  const wait = Math.max(1, Math.ceil(seconds));
+  return new HttpError(429, 'cooldown', 'An invitation was sent a moment ago. Wait a few minutes before sending another.', { retry_after_seconds: wait }, {
+    'Retry-After': String(wait),
+  });
+}
 
 function confirmed(user: Row | null): boolean {
   return !!(text(user, 'email_confirmed_at') ?? text(user, 'confirmed_at'));
@@ -179,19 +203,26 @@ interface Link {
   userId: string | null;
 }
 
-async function generateInviteLink(ctx: AuthContext, target: Target, email: string, landing: string): Promise<Link | { ok: false }> {
-  const admin = ctx.serviceClient().auth.admin;
-  let knownUserId = target.userId;
-  if (!knownUserId) {
-    const lookup = await ctx.serviceClient().rpc('auth_user_id_for_email', { p_email: email });
-    if (lookup.error) {
-      if (!isMissingFunction(lookup.error)) throw UNAVAILABLE();
-    } else if (typeof lookup.data === 'string' && lookup.data) {
-      knownUserId = lookup.data;
-      if (await linkedElsewhere(ctx, knownUserId, target.profileId)) throw EMAIL_TAKEN();
-    }
+/**
+ * The login this invitation is for, when one exists: the profile's, else the
+ * service-role `auth_user_id_for_email()` (D-01: missing → unknown). An
+ * address that belongs to another person's login is refused here, before an
+ * attempt is reserved.
+ */
+async function knownLogin(ctx: AuthContext, target: Target, email: string): Promise<string | null> {
+  if (target.userId) return target.userId;
+  const lookup = await ctx.serviceClient().rpc('auth_user_id_for_email', { p_email: email });
+  if (lookup.error) {
+    if (!isMissingFunction(lookup.error)) throw UNAVAILABLE();
+    return null;
   }
+  if (typeof lookup.data !== 'string' || !lookup.data) return null;
+  if (await linkedElsewhere(ctx, lookup.data, target.profileId)) throw EMAIL_TAKEN();
+  return lookup.data;
+}
 
+async function generateInviteLink(ctx: AuthContext, target: Target, email: string, landing: string, knownUserId: string | null): Promise<Link | { ok: false }> {
+  const admin = ctx.serviceClient().auth.admin;
   let type: 'invite' | 'magiclink' = knownUserId ? 'magiclink' : 'invite';
   let res = await admin.generateLink({ type, email, options: { redirectTo: landing } });
   if (res.error && type === 'invite' && isAlreadyRegistered(res.error)) {
@@ -235,6 +266,73 @@ async function stampLegacyProfile(ctx: AuthContext, target: Target, linkUserId: 
   if (res.error) log('warn', 'invite_legacy_stamp_failed', { profile_id: target.profileId, code: errorCode(res.error) || 'none' });
 }
 
+function bannedNow(user: Row | null, now: Date): boolean {
+  const until = timeOf(user, 'banned_until');
+  return until !== null && until > now.getTime();
+}
+
+interface Reservation {
+  attempt: number;
+  invitationId: string | null;
+  /** True when `reserve_invitation_attempt()` answered (the cooldown ran under its lock). */
+  reserved: boolean;
+}
+
+/**
+ * Step 6: the attempt number, reserved before any link is generated. Refusals
+ * throw (429 cooldown, 404, 409); a database without the reservation RPC
+ * (D-01) gets the same cooldown computed here.
+ */
+async function reserveAttempt(ctx: AuthContext, target: Target, kind: string, now: Date): Promise<Reservation> {
+  const service = ctx.serviceClient();
+  const res = await service.rpc('reserve_invitation_attempt', { p_profile_id: target.profileId, p_invited_by: ctx.user.id, p_kind: kind });
+  if (!res.error) {
+    const row = asRow(res.data);
+    if (row?.ok === true) {
+      const attempt = int(row, 'attempt');
+      if (attempt === null || attempt < 1) throw UNAVAILABLE();
+      return { attempt, invitationId: text(row, 'invitation_id'), reserved: true };
+    }
+    switch (text(row, 'code')) {
+      case 'cooldown':
+        throw cooldownError(int(row, 'retry_after_seconds') ?? INVITE_COOLDOWN_MS / 1000);
+      case 'not_found':
+        throw new HttpError(404, 'not_found', 'That person was not found.');
+      case 'disabled':
+        throw ACCESS_DISABLED();
+      default:
+        throw UNAVAILABLE();
+    }
+  }
+  if (!isMissingFunction(res.error) && !isMissingTable(res.error)) {
+    log('warn', 'invite_reserve_failed', { profile_id: target.profileId, code: errorCode(res.error) || 'none' });
+    throw UNAVAILABLE();
+  }
+
+  // D-01: 5 minutes from the latest successful send (live invitation or the
+  // legacy stamp), 30 seconds from a failed attempt, whichever ends later.
+  const live = await service
+    .from('user_invitations')
+    .select('id, status, send_attempts, last_attempt_at, last_sent_at')
+    .eq('profile_id', target.profileId)
+    .in('status', LIVE_STATUSES)
+    .maybeSingle();
+  let liveRow: Row | null = null;
+  if (live.error) {
+    if (!isMissingTable(live.error)) throw UNAVAILABLE();
+  } else {
+    liveRow = asRow(live.data);
+  }
+  const lastSent = Math.max(timeOf(liveRow, 'last_sent_at') ?? 0, timeOf(target.row, 'last_invited_at') ?? 0);
+  const lastAttempt = timeOf(liveRow, 'last_attempt_at') ?? 0;
+  const attemptCooldown = text(liveRow, 'status') === 'send_failed' ? INVITE_RETRY_COOLDOWN_MS : INVITE_COOLDOWN_MS;
+  const until = Math.max(lastSent > 0 ? lastSent + INVITE_COOLDOWN_MS : 0, lastAttempt > 0 ? lastAttempt + attemptCooldown : 0);
+  if (until > now.getTime()) throw cooldownError((until - now.getTime()) / 1000);
+  // The attempt does not move after a failed send here; the payload tag in the key keeps it unique per link.
+  const attempt = Math.max(int(liveRow, 'send_attempts') ?? 0, int(target.row, 'invitation_count') ?? 0) + 1;
+  return { attempt, invitationId: text(liveRow, 'id'), reserved: false };
+}
+
 async function runInvite(ctx: AuthContext, profileId: string, deps: InviteDeps): Promise<InviteOutcome> {
   const landing = linkLanding(ctx.env, 'invite');
   const target = await readTarget(ctx, profileId);
@@ -247,11 +345,10 @@ async function runInvite(ctx: AuthContext, profileId: string, deps: InviteDeps):
   if (!isValidRecipient(email) || deps.isFakeEmail(email)) {
     throw new HttpError(400, 'invalid_request', 'Only a real inbox can be invited. Fix the email address and try again.', { reason: 'placeholder_email' });
   }
-  if (DISABLED.has(target.status)) {
-    throw new HttpError(409, 'conflict', "This person's access is disabled. Turn access on before sending an invitation.", { reason: 'access_disabled' });
-  }
+  if (DISABLED.has(target.status)) throw ACCESS_DISABLED();
 
   const service = ctx.serviceClient();
+  let authUser: Row | null = null;
   if (target.userId) {
     const existing = await service.auth.admin.getUserById(target.userId);
     if (existing.error) {
@@ -260,7 +357,7 @@ async function runInvite(ctx: AuthContext, profileId: string, deps: InviteDeps):
       }
       throw UNAVAILABLE();
     }
-    const authUser = asRow(existing.data?.user);
+    authUser = asRow(existing.data?.user);
     if (target.status === 'active' && confirmed(authUser)) {
       throw new HttpError(409, 'already_active', 'This person has already joined STORM. Send a password reset instead.');
     }
@@ -273,38 +370,25 @@ async function runInvite(ctx: AuthContext, profileId: string, deps: InviteDeps):
     }
   }
 
-  // Cooldown: 5 minutes from the latest successful send (live invitation or
-  // the legacy stamp), 30 seconds from a failed attempt, whichever ends later.
-  const live = await service
-    .from('user_invitations')
-    .select('id, status, send_attempts, last_attempt_at, last_sent_at')
-    .eq('profile_id', profileId)
-    .in('status', LIVE_STATUSES)
-    .maybeSingle();
-  let liveRow: Row | null = null;
-  if (live.error) {
-    if (!isMissingTable(live.error)) throw UNAVAILABLE();
-  } else {
-    liveRow = asRow(live.data);
-  }
+  const knownUserId = await knownLogin(ctx, target, email);
+  const kind = ADMIN_ROLES.has((text(target.row, 'role') ?? '').toLowerCase()) ? 'admin' : 'crew';
   const now = deps.now();
-  const lastSent = Math.max(timeOf(liveRow, 'last_sent_at') ?? 0, timeOf(target.row, 'last_invited_at') ?? 0);
-  const lastAttempt = timeOf(liveRow, 'last_attempt_at') ?? 0;
-  const attemptCooldown = text(liveRow, 'status') === 'send_failed' ? INVITE_RETRY_COOLDOWN_MS : INVITE_COOLDOWN_MS;
-  const until = Math.max(lastSent > 0 ? lastSent + INVITE_COOLDOWN_MS : 0, lastAttempt > 0 ? lastAttempt + attemptCooldown : 0);
-  if (until > now.getTime()) {
-    const wait = Math.max(1, Math.ceil((until - now.getTime()) / 1000));
-    throw new HttpError(429, 'cooldown', 'An invitation was sent a moment ago. Wait a few minutes before sending another.', { retry_after_seconds: wait }, {
-      'Retry-After': String(wait),
-    });
+  const reservation = await reserveAttempt(ctx, target, kind, now);
+
+  // A revoked invitee's login is banned: lift the ban for the new invitation, or fail honestly before any link.
+  let banLifted = true;
+  if (authUser && target.userId && REINVITABLE.has(target.status) && bannedNow(authUser, now)) {
+    const lift = await service.auth.admin.updateUserById(target.userId, { ban_duration: 'none' });
+    banLifted = !lift.error;
+    if (lift.error) log('warn', 'invite_unban_failed', { profile_id: profileId, code: errorCode(lift.error) || 'none' });
   }
 
-  const link = await generateInviteLink(ctx, target, email, landing);
+  const link = banLifted ? await generateInviteLink(ctx, target, email, landing, knownUserId) : ({ ok: false } as const);
   let result: EmailResult | { ok: false; errorCode: 'link_failed' };
   let linkUserId: string | null = null;
   if (link.ok) {
     linkUserId = link.userId;
-    const attempt = Math.max(int(liveRow, 'send_attempts') ?? 0, int(target.row, 'invitation_count') ?? 0) + 1;
+    const attempt = reservation.attempt;
     const variables: Record<string, string> = { action_link: link.actionLink };
     const firstName = text(target.row, 'first_name');
     if (firstName) variables.first_name = firstName;
@@ -312,7 +396,8 @@ async function runInvite(ctx: AuthContext, profileId: string, deps: InviteDeps):
     if (company) variables.company_name = company;
     const vessel = await bestEffortName(ctx, 'vessels', target.vesselId);
     if (vessel) variables.vessel_name = vessel;
-    result = await deps.sendEmail({ to: email, template: 'CREW_INVITATION', variables, idempotencyKey: `invite:${profileId}:${attempt}` }, ctx.env);
+    const idempotencyKey = `invite:${profileId}:${attempt}:${await payloadTag(link.actionLink)}`;
+    result = await deps.sendEmail({ to: email, template: 'CREW_INVITATION', variables, idempotencyKey }, ctx.env);
   } else {
     result = { ok: false, errorCode: 'link_failed' };
   }
@@ -324,12 +409,12 @@ async function runInvite(ctx: AuthContext, profileId: string, deps: InviteDeps):
     p_error_code: result.ok ? null : result.errorCode,
     p_provider_message_id: result.ok ? result.providerMessageId : null,
     p_invited_by: ctx.user.id,
-    p_kind: ADMIN_ROLES.has((text(target.row, 'role') ?? '').toLowerCase()) ? 'admin' : 'crew',
+    p_kind: kind,
     p_expires_at: null,
     p_user_id: linkUserId,
   });
   let stored = false;
-  let invitationId: string | null = null;
+  let invitationId: string | null = reservation.invitationId;
   if (record.error) {
     if (!isMissingFunction(record.error)) {
       log('warn', 'invite_record_failed', { profile_id: profileId, outcome, code: errorCode(record.error) || 'none' });
@@ -337,10 +422,10 @@ async function runInvite(ctx: AuthContext, profileId: string, deps: InviteDeps):
     if (result.ok) await stampLegacyProfile(ctx, target, linkUserId, now);
   } else {
     stored = true;
-    invitationId = text(asRow(record.data), 'id');
+    invitationId = text(asRow(record.data), 'id') ?? invitationId;
   }
 
-  log('info', 'invite_attempt', { profile_id: profileId, outcome, stored, code: result.ok ? null : result.errorCode });
+  log('info', 'invite_attempt', { profile_id: profileId, outcome, stored, reserved: reservation.reserved, code: result.ok ? null : result.errorCode });
   if (result.ok) return { status: 'sent', profileId, invitationId, stored };
   return { status: 'send_failed', profileId, invitationId, stored, emailError: result.errorCode };
 }

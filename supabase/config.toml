@@ -6,14 +6,29 @@ project_id = "pfvtrtkqkvjbnbaabgpv"
 #   verify_jwt = true   called by signed-in users (or, for send-email, by other
 #                       functions with the service-role key). The gateway
 #                       rejects requests without a valid JWT. It is a second
-#                       layer only: a valid anon key is also a JWT, so every
-#                       function still checks its caller in code
-#                       (`_shared/auth.ts` getAuthContext, or its own check).
+#                       layer only, so every function still checks its caller
+#                       in code (`_shared/auth.ts` getAuthContext, or its own
+#                       check): a legacy anon key is itself a valid JWT and
+#                       passes the gateway. (A new `sb_publishable_` key is not
+#                       a JWT; the gateway check is about the user's session
+#                       token, which functions.invoke sends.)
 #   verify_jwt = false  only for public token flows, webhooks and machine
 #                       callers that authenticate themselves in code (API key,
 #                       webhook secret, system key, cron secret).
 #
-# A new function called by signed-in users needs verify_jwt = true here too.
+# verify_jwt = true assumes the project still signs user tokens with the
+# legacy HS256 JWT secret (D-129): the gateway check does not accept tokens
+# signed with the newer asymmetric (ECC / RSA) signing keys and would answer
+# 401 before the function runs. Before redeploying with these flags, or before
+# rotating to asymmetric signing keys, check Project Settings > JWT Keys and
+# follow the owner checklist. `scripts/edge/check.mjs` warns about every
+# verify_jwt = true function with no in-code caller check that it can see
+# (getAuthContext / getUser / getClaims / a service-role bearer compare): for
+# those the gateway flag is the only check, so it must not be turned off
+# before one is added.
+#
+# A new function called by signed-in users needs verify_jwt = true here too,
+# and its own in-code caller check.
 
 # Public token flow before sign-in: token lookup, per-IP and per-token rate
 # limits, constant-time token compare (legacy: nothing issues tokens today).
@@ -44,7 +59,9 @@ verify_jwt = true
 [functions.complete-drill]
 verify_jwt = true
 
-# Signed-in admins; own getUser check. Followup: capability check and role derived from position.
+# Signed-in admins (user-called; verifies in code): getAuthContext +
+# assertCapability('admin.access.users_access.admin'), crew roles only, invites
+# through _shared/invitations.ts.
 [functions.create-crew-member]
 verify_jwt = true
 

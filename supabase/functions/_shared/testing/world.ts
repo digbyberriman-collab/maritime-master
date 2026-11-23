@@ -3,11 +3,22 @@
  * addresses on `example.test`, vessel names only, no personal data.
  *
  * `p3: true` = the Phase 2 P2/P3 migrations are applied: `my_account_status`,
- * `has_capability`, `record_invitation_send`, `auth_user_id_for_email` and
- * `set_membership_status` answer, `user_invitations` exists, and a disabled
- * user reads no rows at all (file 7). `p3: false` = today's live database:
- * those RPCs answer PGRST202 and `user_invitations` PGRST205 (D-01), so every
- * function takes its documented legacy branch.
+ * `has_capability`, `reserve_invitation_attempt`, `record_invitation_send`,
+ * `revoke_invitation`, `auth_user_id_for_email` and `set_membership_status`
+ * answer, `user_invitations` exists, and a disabled user reads no rows at all
+ * (file 7). `p3: false` = today's live database: those RPCs answer PGRST202
+ * and `user_invitations` PGRST205 (D-01), so every function takes its
+ * documented legacy branch.
+ *
+ * The invitation fakes follow the SQL contracts: the reservation locks the
+ * profile's live row, applies the 5 min (after a send) / 30 s (after a
+ * failed send) cooldown, and increments `send_attempts` (monotonic across a
+ * revoke: a new live row starts from the profile's highest count);
+ * `record_invitation_send` records the outcome without incrementing, never
+ * downgrades a `sent` row on `provider_duplicate`, and a `sent` outcome
+ * restores a removed membership; `revoke_invitation` (users-access admin)
+ * also resets a never-signed-in `invited` profile to `not_invited` and
+ * removes the never-accepted membership.
  */
 import type { EdgeEnv } from '../env.ts';
 import { createWorld, fail, type Caller, type FakeAuthUser, type FakeResult, type FakeRow, type FakeWorld, ok } from './fakeSupabase.ts';
@@ -202,6 +213,47 @@ function w(world: FakeWorld): Record<string, FakeRow[]> {
 const SERVICE_ONLY = (caller: Caller): FakeResult | null =>
   caller.role === 'service' ? null : fail('42501', 'permission denied for function', 403);
 
+const LIVE = ['pending', 'sent', 'send_failed'];
+export const INVITE_COOLDOWN_MS = 5 * 60_000;
+export const INVITE_RETRY_COOLDOWN_MS = 30_000;
+
+/**
+ * `has_capability_for` as the SQL defines it: an active profile of the
+ * company, and an admin profile role or an active, unexpired dpa / superadmin
+ * `user_roles` row of that company or of no company (CC-5: another company's
+ * row, or an expired one, never counts).
+ */
+export function fakeCapability(wd: FakeWorld, userId: string | null, key: string, companyId: unknown, vesselId: unknown = null): boolean {
+  const me = profileOf(wd, userId);
+  if (!userId || !me || isDisabled(me) || me.company_id !== companyId) return false;
+  const vessel = vesselId ?? null;
+  if (vessel !== null && vesselCompany(wd, vessel) !== companyId) return false;
+  const now = wd.now().getTime();
+  const roleRow = (wd.tables.user_roles ?? []).some((r) =>
+    r.user_id === userId && ['dpa', 'superadmin'].includes(String(r.role).toLowerCase()) && r.is_active === true &&
+    (r.expires_at === null || r.expires_at === undefined || Date.parse(String(r.expires_at)) > now) &&
+    (r.company_id === null || r.company_id === undefined || r.company_id === companyId)
+  );
+  const fullAdmin = me.role === 'dpa' || me.role === 'shore_management' || roleRow;
+  switch (key) {
+    case 'admin.access.users_access.view':
+    case 'admin.access.users_access.admin':
+    case 'fleet.operations.vessels.admin':
+    case 'admin.access.permission_audit_log.view':
+      return fullAdmin;
+    case 'admin.access.users_access.assign':
+      return fullAdmin || (me.role === 'master' && vessel !== null && currentAssignment(wd, userId, vessel));
+    case 'fleet.operations.vessels.view':
+      return fullAdmin || (vessel !== null && currentAssignment(wd, userId, vessel));
+    default:
+      return false;
+  }
+}
+
+function invitationRows(wd: FakeWorld): FakeRow[] {
+  return (wd.tables.user_invitations ??= []);
+}
+
 function installP3Rpcs(world: FakeWorld): void {
   world.rpcs.my_account_status = (_args, caller, wd) => {
     const me = profileOf(wd, caller.userId);
@@ -209,26 +261,66 @@ function installP3Rpcs(world: FakeWorld): void {
     return ok(isDisabled(me) ? 'disabled' : 'active');
   };
 
-  world.rpcs.has_capability = (args, caller, wd) => {
-    const me = profileOf(wd, caller.userId);
-    if (!me || isDisabled(me) || me.company_id !== args.p_company_id) return ok(false);
-    const key = String(args.p_key);
-    const vessel = args.p_vessel_id ?? null;
-    if (vessel !== null && vesselCompany(wd, vessel) !== args.p_company_id) return ok(false);
-    const fullAdmin = me.role === 'dpa' || me.role === 'shore_management';
-    switch (key) {
-      case 'admin.access.users_access.view':
-      case 'admin.access.users_access.admin':
-      case 'fleet.operations.vessels.admin':
-      case 'admin.access.permission_audit_log.view':
-        return ok(fullAdmin);
-      case 'admin.access.users_access.assign':
-        return ok(fullAdmin || (me.role === 'master' && vessel !== null && currentAssignment(wd, String(caller.userId), vessel)));
-      case 'fleet.operations.vessels.view':
-        return ok(fullAdmin || (vessel !== null && currentAssignment(wd, String(caller.userId), vessel)));
-      default:
-        return ok(false);
+  world.rpcs.has_capability = (args, caller, wd) =>
+    ok(fakeCapability(wd, caller.userId, String(args.p_key), args.p_company_id, args.p_vessel_id ?? null));
+
+  world.rpcs.reserve_invitation_attempt = (args, caller, wd) => {
+    const denied = SERVICE_ONLY(caller);
+    if (denied) return denied;
+    const profile = (wd.tables.profiles ?? []).find((p) => p.id === args.p_profile_id);
+    if (!profile) return ok({ ok: false, code: 'not_found' });
+    if (isDisabled(profile)) return ok({ ok: false, code: 'disabled' });
+    const rows = invitationRows(wd);
+    const now = wd.now().getTime();
+    let live = rows.find((r) => r.profile_id === profile.id && LIVE.includes(String(r.status)));
+    if (live) {
+      const time = (k: string): number => (live && typeof live[k] === 'string' ? Date.parse(String(live[k])) : 0);
+      const legacy = typeof profile.last_invited_at === 'string' ? Date.parse(profile.last_invited_at) : 0;
+      const lastSent = Math.max(time('last_sent_at'), legacy);
+      const lastAttempt = time('last_attempt_at');
+      const attemptCooldown = live.status === 'send_failed' ? INVITE_RETRY_COOLDOWN_MS : INVITE_COOLDOWN_MS;
+      const until = Math.max(lastSent > 0 ? lastSent + INVITE_COOLDOWN_MS : 0, lastAttempt > 0 ? lastAttempt + attemptCooldown : 0);
+      if (until > now) return ok({ ok: false, code: 'cooldown', retry_after_seconds: Math.max(1, Math.ceil((until - now) / 1000)) });
+    } else {
+      const legacy = typeof profile.last_invited_at === 'string' ? Date.parse(profile.last_invited_at) : 0;
+      if (legacy > 0 && legacy + INVITE_COOLDOWN_MS > now) {
+        return ok({ ok: false, code: 'cooldown', retry_after_seconds: Math.max(1, Math.ceil((legacy + INVITE_COOLDOWN_MS - now) / 1000)) });
+      }
+      // Monotonic across revoke / expire: start from the profile's highest count so far.
+      const carried = Math.max(
+        Number(profile.invitation_count ?? 0),
+        ...rows.filter((r) => r.profile_id === profile.id).map((r) => Number(r.send_attempts ?? 0)),
+      );
+      live = {
+        id: crypto.randomUUID(), company_id: profile.company_id, profile_id: profile.id, user_id: profile.user_id ?? null,
+        kind: args.p_kind ?? 'crew', status: 'pending', send_attempts: carried, last_attempt_at: null, last_sent_at: null,
+        last_error_code: null, invited_by: args.p_invited_by ?? null, accepted_at: null, revoked_at: null, revoked_by: null,
+      };
+      rows.push(live);
     }
+    live.send_attempts = Number(live.send_attempts ?? 0) + 1;
+    live.last_attempt_at = new Date(now).toISOString();
+    return ok({ ok: true, invitation_id: live.id, attempt: live.send_attempts });
+  };
+
+  world.rpcs.revoke_invitation = (args, caller, wd) => {
+    const me = profileOf(wd, caller.userId);
+    if (caller.role !== 'user' || !me || isDisabled(me)) return fail('42501', 'not_permitted');
+    const inv = invitationRows(wd).find((r) => r.id === args.p_invitation_id);
+    if (!inv) return fail('P0002', 'invitation_not_found');
+    if (!fakeCapability(wd, caller.userId, 'admin.access.users_access.admin', inv.company_id)) return fail('42501', 'not_permitted');
+    if (!LIVE.includes(String(inv.status))) return fail('P0002', 'invitation_not_live');
+    const at = wd.now().toISOString();
+    Object.assign(inv, { status: 'revoked', revoked_at: at, revoked_by: caller.userId });
+    const profile = (wd.tables.profiles ?? []).find((p) => p.id === inv.profile_id);
+    if (profile && profile.account_status === 'invited' && !profile.last_login_at) profile.account_status = 'not_invited';
+    const userId = inv.user_id ?? profile?.user_id ?? null;
+    for (const m of wd.tables.account_memberships ?? []) {
+      if (userId && m.user_id === userId && m.company_id === inv.company_id && !m.accepted_at && m.status !== 'removed') {
+        Object.assign(m, { status: 'removed', removed_at: at });
+      }
+    }
+    return ok({ ...inv });
   };
 
   world.rpcs.auth_user_id_for_email = (args, caller, wd) => {
@@ -246,16 +338,18 @@ function installP3Rpcs(world: FakeWorld): void {
     const outcome = String(args.p_outcome);
     if (outcome !== 'sent' && outcome !== 'send_failed') return fail('22023', 'invalid_outcome');
     if (outcome === 'send_failed' && !args.p_error_code) return fail('22023', 'error_code_required');
-    const rows = (wd.tables.user_invitations ??= []);
-    let live = rows.find((r) => r.profile_id === profile.id && ['pending', 'sent', 'send_failed'].includes(String(r.status)));
+    const rows = invitationRows(wd);
+    let live = rows.find((r) => r.profile_id === profile.id && LIVE.includes(String(r.status)));
     const at = wd.now().toISOString();
     if (!live) {
-      live = { id: crypto.randomUUID(), company_id: profile.company_id, profile_id: profile.id, send_attempts: 0, status: 'pending', last_attempt_at: null, last_sent_at: null };
+      // Called without a reservation (an older caller): the row starts at one attempt.
+      live = { id: crypto.randomUUID(), company_id: profile.company_id, profile_id: profile.id, send_attempts: 1, status: 'pending', last_attempt_at: null, last_sent_at: null };
       rows.push(live);
     }
+    // A duplicate-key answer is no reason to mark a delivered invitation as failed.
+    if (outcome === 'send_failed' && args.p_error_code === 'provider_duplicate' && live.status === 'sent') return ok({ ...live });
     Object.assign(live, {
       status: outcome,
-      send_attempts: Number(live.send_attempts ?? 0) + 1,
       last_attempt_at: at,
       last_sent_at: outcome === 'sent' ? at : live.last_sent_at,
       last_error_code: outcome === 'sent' ? null : args.p_error_code,
@@ -270,6 +364,12 @@ function installP3Rpcs(world: FakeWorld): void {
       profile.last_invited_at = at;
       profile.invited_at ??= at;
       profile.invitation_count = Number(profile.invitation_count ?? 0) + 1;
+      const userId = profile.user_id ?? null;
+      for (const m of wd.tables.account_memberships ?? []) {
+        if (userId && m.user_id === userId && m.company_id === profile.company_id && m.status === 'removed' && !m.accepted_at) {
+          Object.assign(m, { status: 'active', removed_at: null });
+        }
+      }
     }
     return ok({ ...live });
   };
