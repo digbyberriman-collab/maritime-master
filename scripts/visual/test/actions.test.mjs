@@ -224,10 +224,19 @@ test('personaFor: the run flag wins, an unknown name fails fast; captureName kee
   assert.equal(captureName({ slug: 'vessel-master-dra', persona: 'vessel-master' }, 'vessel-master'), 'vessel-master-dra');
 });
 
-test('the shipped personas: vessel-master, module-settings, rbac-error', () => {
+test('the shipped personas: vessel-master, module-settings, rbac-error and the Phase 2 states', () => {
   const base = loadFixtures(path.join(VISUAL, 'fixtures'), NOW);
   const personas = loadPersonas(path.join(VISUAL, 'fixtures'), NOW);
-  assert.deepEqual(Object.keys(personas).sort(), ['module-settings', 'rbac-error', 'vessel-master']);
+  assert.deepEqual(Object.keys(personas).sort(), [
+    'access-not-live',
+    'account-check-error',
+    'account-disabled',
+    'inbox-empty',
+    'inbox-not-live',
+    'module-settings',
+    'rbac-error',
+    'vessel-master',
+  ]);
   const dra = base.tables.vessels.find((v) => v.name === 'DRAAK').id;
   const hyd = base.tables.vessels.find((v) => v.name === 'HYDRA').id;
 

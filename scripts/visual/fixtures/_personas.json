@@ -223,5 +223,45 @@
       "get_user_roles_full",
       "get_user_rbac_permissions"
     ]
+  },
+  "account-disabled": {
+    "note": "The fleet manager's access has been turned off (Phase 2 P3): record_session_start() answers disabled, so a sign-in ends the session and /auth says access is disabled.",
+    "rpc": {
+      "record_session_start": "disabled",
+      "my_account_status": "disabled"
+    }
+  },
+  "account-check-error": {
+    "note": "The account check cannot be read (record_session_start answers a value outside its vocabulary): the app stays closed and /auth offers Retry (fail closed, D-04).",
+    "rpc": {
+      "record_session_start": "unreadable",
+      "my_account_status": "unreadable"
+    }
+  },
+  "access-not-live": {
+    "note": "P3 not applied yet (D-01): no user_invitations table and none of the account RPCs. The sign-in check falls back to the profile, and Users & Access shows \"Invited\" from the profile, never \"Sent\".",
+    "missingTables": [
+      "user_invitations"
+    ],
+    "missingRpcs": [
+      "record_session_start",
+      "my_account_status",
+      "revoke_invitation"
+    ]
+  },
+  "inbox-not-live": {
+    "note": "P5 not applied yet (D-01): no notification_inbox table and no mark-all-read RPC. The bell falls back to the alerts bell, /inbox opens Attention, and All and Archived say the inbox is not set up yet. Warns by design: the missing table logs 404s.",
+    "missingTables": [
+      "notification_inbox"
+    ],
+    "missingRpcs": [
+      "notification_inbox_mark_all_read"
+    ]
+  },
+  "inbox-empty": {
+    "note": "P5 applied, nothing in the inbox yet: the bell and /inbox show their empty states.",
+    "tables": {
+      "notification_inbox": []
+    }
   }
 }

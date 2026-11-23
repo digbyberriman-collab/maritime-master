@@ -169,6 +169,7 @@ Tables listed in `missingTables` answer with the PostgREST "table not found" err
 - Twelve crew, named by role ("Demo Master", "Demo Bosun" …), with current assignments.
 - Alerts, vessel and crew certificates, incidents, corrective actions, equipment, PMS tasks, defects, spares and documents.
 - The dashboard RPCs.
+- Phase 2 (pending tables and RPCs, D-01): `account_memberships.json` (the legacy-managed rows the P2 backfill writes, one per profile with a login, so every persona keeps its reach), `user_invitations.json` (one row per invitation status: accepted, send failed, sent, pending legacy, sent but expired, revoked), seven more role-named profiles (imported, invited and disabled crew), `notification_inbox.json` (ten inbox rows across the four severities and the four link scopes, an unregistered record kind and two archived rows), and the RPC answers `record_session_start`, `my_account_status` (both `"active"`; without them the sign-in account check fails closed on every route) and `notification_inbox_mark_all_read`.
 
 **Rules (D-07, D-08):**
 
@@ -269,6 +270,11 @@ A persona is a named variation of the fixtures: another signed-in user, other ro
 | `vessel-master` | The DRAAK master (legacy role `master`, RBAC `captain`, the role catalogue's vessel master role, on DRAAK only, no fleet-wide role, assigned to DRAAK). No fleet reach (D-26), so no Fleet scope anywhere | `vessel-master-dra` |
 | `module-settings` | `vessel_module_settings` rows (pending table, S4): DRAAK `planner` labelled "Leave", DRAAK `charter` labelled "Trip", HYDRA `technical` off | `module-settings-hyd-technical` |
 | `rbac-error` | `user_roles` and the two role RPCs (`get_user_roles_full`, `get_user_rbac_permissions`) are not live, so the permissions store ends in its error state (D-56) and the shell offers Retry | any route, with `--persona rbac-error` |
+| `account-disabled` | The fleet manager's access is turned off (P3): `record_session_start()` answers `disabled`, so a sign-in ends the session and `/auth` says access is disabled | `auth-disabled` |
+| `account-check-error` | The account check answers outside its vocabulary, so the app stays closed and `/auth` offers Retry and Sign out (fail closed, D-04) | `auth-check-failed` |
+| `access-not-live` | P3 not applied (D-01): no `user_invitations` table and none of the account RPCs. The sign-in check falls back to the profile; Users & Access shows "Invited" from the profile, never "Sent". Warns by design (the missing table logs 404s) | `users-access-not-live` |
+| `inbox-not-live` | P5 not applied (D-01): no `notification_inbox` table and no mark-all-read RPC. The bell falls back to the alerts bell, `/inbox` opens Attention, All and Archived say the inbox is not set up. Warns by design | `shell-bell-open-alerts`, `inbox-not-live`, `inbox-all-not-live` |
+| `inbox-empty` | P5 applied, nothing in the inbox yet: the bell and `/inbox` show their empty states | `shell-bell-open-empty`, `inbox-empty` |
 
 Same rules as the base fixtures (D-07, D-08): roles not names, emails on the reserved `example` domain, no phone numbers. `test/actions.test.mjs` checks them.
 
