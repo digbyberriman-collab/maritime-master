@@ -21,6 +21,7 @@ const h = vi.hoisted(() => ({
   links: {
     ready: true,
     reachUnknown: false,
+    fleetReachUnknown: false,
     reach: new Set(['DRA']),
   },
 }));
@@ -36,6 +37,7 @@ vi.mock('@/modules/notifications/hooks/useInboxLinks', async () => {
     useInboxLinks: () => ({
       ready: h.links.ready,
       reachUnknown: h.links.reachUnknown,
+      fleetReachUnknown: h.links.fleetReachUnknown,
       resolve: (row: Parameters<typeof resolveInboxLink>[0]) =>
         resolveInboxLink(row, { fleetReach: false, reachableVesselCodes: h.links.reach, canOpenWorkspace: () => false }),
     }),
@@ -65,7 +67,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   resetInboxFake();
-  h.links = { ready: true, reachUnknown: false, reach: new Set(['DRA']) };
+  h.links = { ready: true, reachUnknown: false, fleetReachUnknown: false, reach: new Set(['DRA']) };
   localStorage.setItem('storm_alert_helper_shown', 'true');
 });
 afterEach(() => vi.restoreAllMocks());
@@ -319,6 +321,31 @@ describe('panel', () => {
     const row = (await within(panel()).findByText('Unknown reach')).closest('li') as HTMLElement;
     expect(row).toHaveTextContent('cannot be checked yet');
     expect(row).not.toHaveTextContent('No longer available');
+  });
+
+  it('a Fleet link while fleet reach is undecided (the membership read failed) is "cannot be checked" (D-165)', async () => {
+    h.links.reachUnknown = true;
+    h.links.fleetReachUnknown = true;
+    h.links.reach = new Set();
+    inboxFake.tables.notification_inbox = [
+      inboxRow({ title: 'Fleet unknown', link_scope: 'fleet', link_vessel_code: null, vessel_id: null, link_path: 'documents' }),
+    ];
+    renderBell({ open: true });
+    const row = (await within(panel()).findByText('Fleet unknown')).closest('li') as HTMLElement;
+    expect(row).toHaveTextContent('cannot be checked yet');
+    expect(row).not.toHaveTextContent('No longer available');
+  });
+
+  it('a Fleet link for a decided "no fleet reach" stays "no longer available", even with the vessel list in error', async () => {
+    h.links.reachUnknown = true;
+    h.links.reach = new Set();
+    inboxFake.tables.notification_inbox = [
+      inboxRow({ title: 'Fleet denied', link_scope: 'fleet', link_vessel_code: null, vessel_id: null, link_path: 'documents' }),
+    ];
+    renderBell({ open: true });
+    const row = (await within(panel()).findByText('Fleet denied')).closest('li') as HTMLElement;
+    expect(row).toHaveTextContent('No longer available');
+    expect(row).not.toHaveTextContent('cannot be checked yet');
   });
 
   it('"Mark all read" marks everything up to the newest item shown, and says when it fails', async () => {

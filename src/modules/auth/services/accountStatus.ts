@@ -13,8 +13,7 @@
  * the error with Retry and does not open the app; it never treats an
  * unknown status as active). A missing profile row is `no_profile`.
  *
- * Contract stub created by the Phase 2 architect; E2 wires it into
- * AuthContext and the sign-in screen and adds tests.
+ * Used by AuthContext (the sign-in check) and the sign-in screen.
  */
 import { supabase } from '@/integrations/supabase/client';
 import { isMissingRelation } from '@/integrations/supabase/pending';

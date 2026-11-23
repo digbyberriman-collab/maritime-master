@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   AlertTriangle, 
@@ -14,8 +14,6 @@ import {
 } from 'lucide-react';
 import { useRedRoomStore } from '@/modules/red-room/store/redRoomStore';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
-import { SnoozeDialog } from './SnoozeDialog';
-import { AssignTaskDialog } from './AssignTaskDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +22,11 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { RedRoomItem } from '@/modules/red-room/types';
+
+// The panel is on the dashboard, in the entry chunk, so its two dialogs load
+// the first time one opens and then stay mounted (gap/00 I6 budget).
+const SnoozeDialog = lazy(() => import('./SnoozeDialog').then((m) => ({ default: m.SnoozeDialog })));
+const AssignTaskDialog = lazy(() => import('./AssignTaskDialog').then((m) => ({ default: m.AssignTaskDialog })));
 
 interface RedRoomPanelProps {
   vesselId?: string | null;
@@ -46,6 +49,8 @@ export function RedRoomPanel({ vesselId }: RedRoomPanelProps) {
 
   const [snoozeDialogOpen, setSnoozeDialogOpen] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [snoozeDialogUsed, setSnoozeDialogUsed] = useState(false);
+  const [assignDialogUsed, setAssignDialogUsed] = useState(false);
   const [selectedItem, setSelectedItem] = useState<RedRoomItem | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
 
@@ -65,6 +70,7 @@ export function RedRoomPanel({ vesselId }: RedRoomPanelProps) {
   // Handle Snooze (for urgent items)
   const handleSnoozeClick = (item: RedRoomItem) => {
     setSelectedItem(item);
+    setSnoozeDialogUsed(true);
     setSnoozeDialogOpen(true);
   };
 
@@ -110,6 +116,7 @@ export function RedRoomPanel({ vesselId }: RedRoomPanelProps) {
     }
     
     setSelectedItem(item);
+    setAssignDialogUsed(true);
     setAssignDialogOpen(true);
   };
 
@@ -200,21 +207,27 @@ export function RedRoomPanel({ vesselId }: RedRoomPanelProps) {
         </CardContent>
       </Card>
 
-      {/* Snooze Dialog */}
-      <SnoozeDialog
-        open={snoozeDialogOpen}
-        onOpenChange={setSnoozeDialogOpen}
-        item={selectedItem}
-        onSuccess={handleSnoozeComplete}
-      />
+      <Suspense fallback={null}>
+        {/* Snooze Dialog */}
+        {snoozeDialogUsed && (
+          <SnoozeDialog
+            open={snoozeDialogOpen}
+            onOpenChange={setSnoozeDialogOpen}
+            item={selectedItem}
+            onSuccess={handleSnoozeComplete}
+          />
+        )}
 
-      {/* Assign Task Dialog */}
-      <AssignTaskDialog
-        open={assignDialogOpen}
-        onOpenChange={setAssignDialogOpen}
-        item={selectedItem}
-        onSuccess={handleAssignComplete}
-      />
+        {/* Assign Task Dialog */}
+        {assignDialogUsed && (
+          <AssignTaskDialog
+            open={assignDialogOpen}
+            onOpenChange={setAssignDialogOpen}
+            item={selectedItem}
+            onSuccess={handleAssignComplete}
+          />
+        )}
+      </Suspense>
     </>
   );
 }

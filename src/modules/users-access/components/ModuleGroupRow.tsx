@@ -14,6 +14,8 @@ interface Props {
   groupLevel: GroupLevel;
   onGroupChange: (value: string) => void;
   onModuleChange: (moduleKey: string, value: string) => void;
+  /** Read-only: the levels show, the selects cannot change them. */
+  disabled?: boolean;
 }
 
 const PERM_OPTIONS = [
@@ -34,7 +36,7 @@ const triggerClassFor = (level: GroupLevel) => {
   return '';
 };
 
-export const ModuleGroupRow: React.FC<Props> = ({ group, modules, perms, groupLevel, onGroupChange, onModuleChange }) => {
+export const ModuleGroupRow: React.FC<Props> = ({ group, modules, perms, groupLevel, onGroupChange, onModuleChange, disabled = false }) => {
   const [open, setOpen] = useState(false);
   const groupSelectValue = groupLevel === 'mixed' ? '' : (groupLevel === 'none' ? 'none' : groupLevel);
 
@@ -50,8 +52,8 @@ export const ModuleGroupRow: React.FC<Props> = ({ group, modules, perms, groupLe
           {group.label}
           <span className="text-xs text-muted-foreground font-normal">({group.moduleKeys.length})</span>
         </button>
-        <Select value={groupSelectValue} onValueChange={onGroupChange}>
-          <SelectTrigger className={cn('w-44 h-8', triggerClassFor(groupLevel))}>
+        <Select value={groupSelectValue} onValueChange={onGroupChange} disabled={disabled}>
+          <SelectTrigger className={cn('w-44 h-8', triggerClassFor(groupLevel))} aria-label={`${group.label} access`}>
             {groupLevel === 'mixed' ? (
               <span className="text-xs"><Dot className="bg-warning" />Mixed</span>
             ) : (
@@ -74,8 +76,8 @@ export const ModuleGroupRow: React.FC<Props> = ({ group, modules, perms, groupLe
             return (
               <div key={m.key} className="flex items-center justify-between gap-3 pl-6 pr-1 py-1.5">
                 <div className="text-sm text-foreground">{m.name}</div>
-                <Select value={v} onValueChange={(nv) => onModuleChange(m.key, nv)}>
-                  <SelectTrigger className="w-40 h-7 text-xs">
+                <Select value={v} onValueChange={(nv) => onModuleChange(m.key, nv)} disabled={disabled}>
+                  <SelectTrigger className="w-40 h-7 text-xs" aria-label={`${m.name} access`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

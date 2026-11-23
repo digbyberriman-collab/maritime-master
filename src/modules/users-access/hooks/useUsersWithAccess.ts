@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
-import { CHIP_GROUPS, permToChip, type ChipLevel, type PermissionLevel } from '../lib/presets';
+import { CHIP_GROUPS, permToChip, type ChipLevel } from '../lib/presets';
 import { derivePreset, type UserPermMap } from '../lib/derivePreset';
 import type { AccessPreset } from '../lib/presets';
 import { accountStateOf, type AccountState } from '../lib/invitationStatus';
+import { highestPermissionByModule } from '../lib/permissionRank';
 
 export interface UserAccessRow {
   /** `profiles.id`: every person, with or without a login. */
@@ -20,8 +21,6 @@ export interface UserAccessRow {
   preset: AccessPreset;
   chips: Array<{ label: string; level: ChipLevel }>;
 }
-
-const rank = (p?: PermissionLevel | null) => (p === 'admin' ? 3 : p === 'edit' ? 2 : p === 'view' ? 1 : 0);
 
 export const usersAccessKeys = {
   list: (companyId: string | null | undefined) => ['users-access', 'list', companyId ?? null] as const,
@@ -62,10 +61,8 @@ export function useUsersWithAccess() {
 
       const permByUser = new Map<string, UserPermMap>();
       (overrides.data ?? []).forEach((o) => {
-        const map = permByUser.get(o.user_id) ?? {};
-        // Keep the highest permission seen per module.
-        if (rank(o.permission as PermissionLevel) > rank(map[o.module_key])) map[o.module_key] = o.permission as PermissionLevel;
-        permByUser.set(o.user_id, map);
+        // Keep the highest permission seen per module (the same rule as the detail page).
+        permByUser.set(o.user_id, highestPermissionByModule([o], permByUser.get(o.user_id) ?? {}));
       });
 
       return profiles.map((p) => {

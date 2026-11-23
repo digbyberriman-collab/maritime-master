@@ -14,6 +14,8 @@
  * have loaded, `ready` is false and callers show "Checking access…" rather
  * than an answer. While the vessel list is in error, a vessel link the
  * viewer seems not to reach is unknown, not gone: `reachUnknown` says so.
+ * When the membership read failed, fleet reach was never decided, so a
+ * Fleet link is unknown too: `fleetReachUnknown` (D-165, D-119).
  */
 import { useCallback, useMemo } from 'react';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
@@ -29,6 +31,8 @@ export interface InboxLinks {
   ready: boolean;
   /** The vessel list failed: "no reach" may only mean "not known". */
   reachUnknown: boolean;
+  /** The membership read failed before fleet reach was decided: "no fleet reach" only means "not known". */
+  fleetReachUnknown: boolean;
   resolve: (row: DeepLinkSource) => DeepLinkResult;
 }
 
@@ -63,6 +67,7 @@ export function useInboxLinks(): InboxLinks {
   return {
     ready: access.ready && workspace.ready,
     reachUnknown: Boolean(access.vesselsError),
+    fleetReachUnknown: access.reachUnknown,
     resolve,
   };
 }

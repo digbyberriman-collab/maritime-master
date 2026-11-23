@@ -164,7 +164,7 @@ export function InboxBellPanel({ counts, list, badge, onClose, focusPanelStart }
         // A plain scroller (rows truncate at the panel's width); up to 400 px, shrinking with the panel.
         <ul aria-labelledby={headingId} className="min-h-0 max-h-[400px] shrink divide-y divide-border overflow-y-auto overflow-x-hidden overscroll-contain">
           {items.map((item) => {
-            const link = linkStateFor(links.ready, links.reachUnknown, links.resolve, item);
+            const link = linkStateFor(links.ready, links.reachUnknown, links.resolve, item, links.fleetReachUnknown);
             const unread = !item.read_at || seenUnread.has(item.id);
             const tone = inboxSeverityMeta(item.severity).tone;
             const summary = (

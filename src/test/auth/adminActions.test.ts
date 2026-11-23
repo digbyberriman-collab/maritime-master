@@ -16,6 +16,9 @@ vi.mock('@/integrations/supabase/client', () => ({ supabase: { functions: { invo
 
 import {
   accessNotice,
+  EMAIL_ERROR_CODES,
+  EMAIL_ERROR_COPY,
+  emailErrorIsRetryable,
   bulkInvite,
   bulkInviteNotice,
   endAllSessions,
@@ -86,6 +89,7 @@ describe('sendInvitation', () => {
     ['invalid_recipient', /not valid/, false],
     ['invalid_link', /link/, false],
     ['link_failed', /sign-in link/, true],
+    ['provider_duplicate', /already being sent/, true],
   ])('send_failed with %s', async (code, copy, retry) => {
     httpError(502, { ...edgeError('send_failed', 'The invitation email could not be sent.', { email_error: code }), invitation: { status: 'send_failed', stored: false, id: null } });
     const notice = inviteNotice(await sendInvitation('p-1'));
@@ -149,6 +153,41 @@ describe('sendInvitation', () => {
   it('invoke throwing is a network failure', async () => {
     h.invoke.mockRejectedValueOnce(new TypeError('Failed to fetch'));
     await expect(sendInvitation('p-1')).resolves.toMatchObject({ kind: 'failed', failure: { code: 'network' } });
+  });
+});
+
+describe('provider_duplicate (the email service already has a send with this key)', () => {
+  it('is its own code with its own copy, and retryable everywhere', async () => {
+    expect(EMAIL_ERROR_CODES).toContain('provider_duplicate');
+    expect(EMAIL_ERROR_COPY.provider_duplicate).toBe('An email to this person is already being sent. Wait a minute, then try again.');
+    expect(emailErrorIsRetryable('provider_duplicate')).toBe(true);
+
+    httpError(502, { ...edgeError('send_failed', 'The invitation email could not be sent.', { email_error: 'provider_duplicate' }), invitation: { status: 'send_failed', stored: true, id: 'inv-9' } });
+    const invite = await sendInvitation('p-1');
+    expect(invite).toEqual({ kind: 'send_failed', stored: true, invitationId: 'inv-9', emailError: 'provider_duplicate' });
+    expect(inviteNotice(invite)).toMatchObject({ tone: 'error', retry: true, description: 'An email to this person is already being sent. Wait a minute, then try again.' });
+
+    httpError(502, edgeError('send_failed', 'The reset email could not be sent.', { email_error: 'provider_duplicate' }));
+    const reset = await sendPasswordReset('u-1');
+    expect(reset).toEqual({ kind: 'send_failed', emailError: 'provider_duplicate' });
+    expect(passwordResetNotice(reset)).toMatchObject({ retry: true });
+  });
+
+  it('a bulk row that failed with it is retryable; a bad address is not', async () => {
+    ok({
+      ok: true,
+      results: [
+        { profileId: 'p-1', status: 'send_failed', stored: true, invitationId: null, code: 'send_failed', emailError: 'provider_duplicate' },
+        { profileId: 'p-2', status: 'send_failed', stored: true, invitationId: null, code: 'send_failed', emailError: 'invalid_recipient' },
+        { profileId: 'p-3', status: 'sent', stored: true, invitationId: 'i-3' },
+      ],
+    });
+    const outcome = await bulkInvite(['p-1', 'p-2', 'p-3']);
+    expect(outcome.results.map((r) => [r.profileId, r.retryable])).toEqual([
+      ['p-1', true],
+      ['p-2', false],
+      ['p-3', false],
+    ]);
   });
 });
 

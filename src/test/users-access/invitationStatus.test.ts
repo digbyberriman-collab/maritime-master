@@ -91,6 +91,12 @@ describe('invitationCell', () => {
     expect(cell.note).toMatch(/did not answer/);
   });
 
+  it('a send that failed as provider_duplicate says an email is already on its way, with resend', () => {
+    const cell = invitationCell('invited', row({ status: 'send_failed', last_error_code: 'provider_duplicate', last_sent_at: null }), 'table', NOW);
+    expect(cell).toMatchObject({ status: 'send_failed', canResend: true });
+    expect(cell.note).toBe('An email to this person is already being sent. Wait a minute, then try again.');
+  });
+
   it('a backfilled legacy row says it was sent before delivery tracking', () => {
     const cell = invitationCell('invited', row({ status: 'pending', last_error_code: 'legacy_unverified' }), 'table', NOW);
     expect(cell).toMatchObject({ status: 'pending', note: LEGACY_UNVERIFIED_NOTE, canResend: true });

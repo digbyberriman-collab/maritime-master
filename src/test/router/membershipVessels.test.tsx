@@ -12,7 +12,9 @@
  *   access (RBAC fleet roles no longer add fleet reach);
  * - the table live but no row → no vessels and no fleet reach (fail closed);
  * - any other error → the vessel-list error with Retry, never "no vessels"
- *   or the `/me` landing.
+ *   or the `/me` landing; on a Fleet URL, never "not available to you"
+ *   either (fleet reach was not decided, D-165), while a decided denial (a
+ *   legacy crew user whose assignments failed to load) stays a denial.
  *
  * Company cA has ALPHA and BRAVO (active) and OLDIE (sold, archived);
  * company cB has XRAY. Role names only; no personal data.
@@ -156,7 +158,7 @@ vi.mock('@/shared/components/layout/DashboardLayout', () => ({
 import { AuthProvider, useAuth } from '@/modules/auth/contexts/AuthContext';
 import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
 import { VesselProvider, useVessel } from '@/modules/vessels/contexts/VesselContext';
-import { HomeRedirect, VesselScopeRoute, useVesselScope } from '@/app/router/scopes';
+import { FleetScope, HomeRedirect, LegacyRoute, VesselScopeRoute, useVesselScope } from '@/app/router/scopes';
 import { useScopeAccess } from '@/app/router/useScopeAccess';
 import { useMembershipReach } from '@/app/router/useMembershipReach';
 
@@ -191,6 +193,7 @@ const PathSpy: React.FC = () => {
 interface Snapshot {
   ready: boolean;
   fleetReach: boolean;
+  reachUnknown: boolean;
   source: string;
   vessels: string[];
   allVessels: boolean;
@@ -204,6 +207,7 @@ const Probe: React.FC = () => {
   const snap: Snapshot = {
     ready: scope.ready,
     fleetReach: scope.fleetReach,
+    reachUnknown: scope.reachUnknown,
     source: reach.source,
     vessels: v.vessels.map((x) => x.name),
     allVessels: v.canAccessAllVessels,
@@ -225,6 +229,42 @@ function renderApp() {
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/" element={<HomeRedirect />} />
             <Route path="/fleet/dashboard" element={<h1>Fleet dashboard</h1>} />
+            <Route path="/v/:vesselCode" element={<VesselScopeRoute />}>
+              <Route index element={<VesselHome />} />
+            </Route>
+            <Route path="/me" element={<h1>My area</h1>} />
+            <Route path="*" element={<p>Elsewhere</p>} />
+          </Routes>
+        </VesselProvider>
+      </AuthProvider>
+    </MemoryRouter>,
+  );
+}
+
+/** Signed in already (a deep link or a reload), on `entry`, with the real Fleet scope. */
+function renderAt(entry: string) {
+  return render(
+    <MemoryRouter initialEntries={[entry]}>
+      <AuthProvider>
+        <VesselProvider>
+          <Control />
+          <PathSpy />
+          <Probe />
+          <Routes>
+            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/" element={<HomeRedirect />} />
+            <Route path="/fleet" element={<FleetScope />}>
+              <Route path="dashboard" element={<h1>Fleet dashboard</h1>} />
+              <Route path="planner" element={<h1>Fleet planner</h1>} />
+            </Route>
+            <Route
+              path="/crew/rotation-planner"
+              element={
+                <LegacyRoute from="/crew/rotation-planner">
+                  <h1>Old planner</h1>
+                </LegacyRoute>
+              }
+            />
             <Route path="/v/:vesselCode" element={<VesselScopeRoute />}>
               <Route index element={<VesselHome />} />
             </Route>
@@ -424,5 +464,70 @@ describe('reach once account_memberships is live (Phase 2 §B.4)', () => {
     await signIn(h.users.admin);
     // Fleet reach is known from the row; the vessels are not.
     expect(seen(view)).toMatchObject({ source: 'membership', fleetReach: true, vessels: [], loadError: 'Internal Server Error' });
+  });
+});
+
+describe('a failed membership read on a Fleet URL (D-165, D-119)', () => {
+  const FLEET_DENIAL = 'The Fleet view is not available to you';
+
+  it.each([
+    ['a legacy DPA (legacy-managed row)', 'dpa', membership('u-dpa', { kind: 'admin', legacy_managed: true, fleet_access: true, vessel_scope: 'all' })],
+    ['an admin-managed row with fleet access', 'admin', membership('u-admin', { kind: 'admin', fleet_access: true, vessel_scope: 'all' })],
+  ] as const)('%s: the vessel-list error with Retry, never the denial; Retry opens the Fleet dashboard', async (_name, who, row) => {
+    h.memberships = [row];
+    h.failTables.add('account_memberships');
+    h.current = h.users[who];
+    const view = renderAt('/fleet/dashboard');
+    await settle();
+    expect(seen(view)).toMatchObject({ ready: true, fleetReach: false, reachUnknown: true, source: 'none', loadError: 'Internal Server Error' });
+    expect(path).toBe('/fleet/dashboard');
+    expect(view.getByRole('heading', { level: 1, name: 'Your vessels could not load' })).toBeInTheDocument();
+    expect(view.queryByText(FLEET_DENIAL)).toBeNull();
+    expect(view.queryByRole('heading', { name: 'Fleet dashboard' })).toBeNull();
+
+    h.failTables.delete('account_memberships');
+    await act(async () => {
+      fireEvent.click(view.getByRole('button', { name: /try again/i }));
+    });
+    await settle();
+    expect(seen(view)).toMatchObject({ fleetReach: true, reachUnknown: false, loadError: null, vessels: ['ALPHA', 'BRAVO'] });
+    expect(view.getByRole('heading', { name: 'Fleet dashboard' })).toBeInTheDocument();
+    expect(view.queryByText(FLEET_DENIAL)).toBeNull();
+  });
+
+  it('an old URL with a Fleet target waits on the error with Retry, never the old page; Retry redirects', async () => {
+    h.memberships = [membership('u-dpa', { kind: 'admin', legacy_managed: true, fleet_access: true, vessel_scope: 'all' })];
+    h.failTables.add('account_memberships');
+    h.current = h.users.dpa;
+    const view = renderAt('/crew/rotation-planner');
+    await settle();
+    expect(view.getByRole('heading', { level: 1, name: 'Your vessels could not load' })).toBeInTheDocument();
+    expect(view.queryByRole('heading', { name: 'Old planner' })).toBeNull();
+    h.failTables.delete('account_memberships');
+    await act(async () => {
+      fireEvent.click(view.getByRole('button', { name: /try again/i }));
+    });
+    await settle();
+    expect(path).toBe('/fleet/planner');
+    expect(view.getByRole('heading', { name: 'Fleet planner' })).toBeInTheDocument();
+  });
+
+  it('control: a legacy crew user (table missing) whose assignments fail still sees the denial (the role decided it)', async () => {
+    h.failTables.add('crew_assignments');
+    h.current = h.users.crew;
+    const view = renderAt('/fleet/dashboard');
+    await settle();
+    expect(seen(view)).toMatchObject({ ready: true, fleetReach: false, reachUnknown: false, source: 'legacy', loadError: 'Internal Server Error' });
+    expect(view.getByText(FLEET_DENIAL)).toBeInTheDocument();
+    expect(view.queryByRole('heading', { name: 'Your vessels could not load' })).toBeNull();
+  });
+
+  it('control: a decided "no row" is a denial, not an error', async () => {
+    h.memberships = [membership('u-crew', {})];
+    h.current = h.users.dpa;
+    const view = renderAt('/fleet/dashboard');
+    await settle();
+    expect(seen(view)).toMatchObject({ ready: true, fleetReach: false, reachUnknown: false, source: 'none', loadError: null });
+    expect(view.getByText(FLEET_DENIAL)).toBeInTheDocument();
   });
 });

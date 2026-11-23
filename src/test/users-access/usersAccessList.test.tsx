@@ -194,18 +194,70 @@ describe('Users & Access list', () => {
     fireEvent.click(await screen.findByRole('menuitem', { name: /Revoke invitation/ }));
   };
 
-  it('Revoke (in the row menu) asks first, then calls revoke_invitation', async () => {
+  const edgeHttpError = (status: number, body: unknown) => ({
+    data: null,
+    error: { name: 'FunctionsHttpError', context: new Response(JSON.stringify(body), { status }) },
+  });
+  const REVOKED = { id: 'inv-p-3', status: 'revoked', profileId: 'p-3', revokedAt: '2026-11-23T10:00:00Z' };
+
+  it('the revoke dialog never promises the link "stops working"', async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getAllByText('Send failed').length).toBeGreaterThan(0));
+    await openRevoke('Demo Bosun');
+    const dialog = await screen.findByRole('alertdialog');
+    expect(within(dialog).getByText(/This marks the invitation to Demo Bosun as revoked and blocks the link where it can\./)).toBeInTheDocument();
+    expect(dialog.textContent).not.toMatch(/stops working|no longer works/);
+  });
+
+  it('Revoke (in the row menu) asks first, then revokes through admin-actions; "can no longer use the link" only when the login is blocked', async () => {
+    h.invoke.mockResolvedValueOnce({ data: { ok: true, invitation: REVOKED, loginBlocked: true, loginNote: 'banned' }, error: null });
+    renderPage();
+    await waitFor(() => expect(screen.getAllByText('Send failed').length).toBeGreaterThan(0));
+    await openRevoke('Demo Bosun');
+    fireEvent.click(await screen.findByRole('button', { name: 'Revoke invitation' }));
+    await waitFor(() => expect(h.invoke).toHaveBeenCalledWith('admin-actions', { body: { action: 'revoke_invitation', invitationId: 'inv-p-3' } }));
+    await waitFor(() => expect(h.notify.success).toHaveBeenCalledWith('Invitation revoked', expect.objectContaining({ description: 'Demo Bosun can no longer use the invitation link.' })));
+    expect(h.rpc).not.toHaveBeenCalled();
+  });
+
+  it('someone who signed in before: a warning to turn their access off, never a success', async () => {
+    h.invoke.mockResolvedValueOnce({ data: { ok: true, invitation: REVOKED, loginBlocked: false, loginNote: 'signed_in_before' }, error: null });
+    renderPage();
+    await waitFor(() => expect(screen.getAllByText('Send failed').length).toBeGreaterThan(0));
+    await openRevoke('Demo Bosun');
+    fireEvent.click(await screen.findByRole('button', { name: 'Revoke invitation' }));
+    await waitFor(() => expect(h.notify.warning).toHaveBeenCalled());
+    expect(h.notify.success).not.toHaveBeenCalled();
+    const [, options] = h.notify.warning.mock.calls[0] as [string, { description: string }];
+    expect(options.description).toBe('Demo Bosun has signed in before. To stop them signing in, turn their access off.');
+  });
+
+  it('a revoke whose sign-in block failed (502) says they may still sign in', async () => {
+    h.invoke.mockResolvedValueOnce(edgeHttpError(502, { error: { code: 'partial_failure', message: 'x', details: { revoked: true, loginBlocked: false } }, invitation: REVOKED }));
+    renderPage();
+    await waitFor(() => expect(screen.getAllByText('Send failed').length).toBeGreaterThan(0));
+    await openRevoke('Demo Bosun');
+    fireEvent.click(await screen.findByRole('button', { name: 'Revoke invitation' }));
+    await waitFor(() => expect(h.notify.warning).toHaveBeenCalled());
+    expect(h.notify.success).not.toHaveBeenCalled();
+    const [, options] = h.notify.warning.mock.calls[0] as [string, { description: string }];
+    expect(options.description).toBe('The invitation is marked revoked, but Demo Bosun may still be able to sign in. To stop that, turn their access off.');
+  });
+
+  it('an older admin-actions (400 unknown action): the database revoke runs, and the toast warns that sign-in may still work', async () => {
+    h.invoke.mockResolvedValueOnce(edgeHttpError(400, { error: { code: 'invalid_request', message: 'Unknown action.', details: { field: 'action' } } }));
     h.rpc.mockResolvedValueOnce({ data: { ...inv('p-3', 'revoked'), company_id: 'c-1' }, error: null });
     renderPage();
     await waitFor(() => expect(screen.getAllByText('Send failed').length).toBeGreaterThan(0));
     await openRevoke('Demo Bosun');
     fireEvent.click(await screen.findByRole('button', { name: 'Revoke invitation' }));
     await waitFor(() => expect(h.rpc).toHaveBeenCalledWith('revoke_invitation', { p_invitation_id: 'inv-p-3' }));
-    await waitFor(() => expect(h.notify.success).toHaveBeenCalledWith('Invitation revoked', expect.anything()));
+    await waitFor(() => expect(h.notify.warning).toHaveBeenCalled());
+    expect(h.notify.success).not.toHaveBeenCalled();
   });
 
-  it('revoke_invitation missing (D-01): says nothing was changed', async () => {
-    h.rpc.mockResolvedValueOnce({ data: null, error: { code: 'PGRST202', message: 'Could not find the function public.revoke_invitation' } });
+  it('invitations not live (501): says nothing was changed', async () => {
+    h.invoke.mockResolvedValueOnce(edgeHttpError(501, { error: { code: 'not_supported', message: 'x', details: { reason: 'invitations_not_live' } } }));
     renderPage();
     await waitFor(() => expect(screen.getAllByText('Send failed').length).toBeGreaterThan(0));
     await openRevoke('Demo Bosun');

@@ -5,15 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Loader2, Send } from 'lucide-react';
-import { useToast } from '@/shared/hooks/use-toast';
+import { ArrowLeft, Loader2, Lock, Send } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { notify } from '@/shared/lib/notify';
 import { PageEmpty, PageError, PageLoading } from '@/shared/components/states';
 import { useCan } from '@/lib/permissions/useCan';
+import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useInvitationActions, useInvitationStatuses } from '../hooks/useInvitations';
 import { invitationCell } from '../lib/invitationStatus';
 import { AccountStatusPill, InvitationStatus } from '../components/InvitationStatus';
 import { useUserAccessDetail, useModulesList } from '../hooks/useUserAccessDetail';
-import { useApplyPreset, useSavePermissionOverride } from '../hooks/useSavePermissionOverride';
+import { isOverrideRefused, useApplyPreset, useSavePermissionOverride } from '../hooks/useSavePermissionOverride';
 import {
   PRESET_MATRIX,
   PRESET_OPTIONS,
@@ -26,6 +28,7 @@ import { ModuleGroupRow } from '../components/ModuleGroupRow';
 import { CustomPermissionsCard } from '../components/CustomPermissionsCard';
 import { DepartmentScopeCard } from '../components/DepartmentScopeCard';
 import { useDepartmentScope, useSaveDepartmentScope } from '../hooks/useDepartmentScope';
+import { APPROVAL_CAPABILITIES, VIEW_CAPABILITIES } from '../lib/capabilityCatalog';
 
 const PERM_OPTIONS: Array<{ value: string; label: string; color: string }> = [
   { value: 'none', label: 'No Access', color: 'text-muted-foreground' },
@@ -36,14 +39,32 @@ const PERM_OPTIONS: Array<{ value: string; label: string; color: string }> = [
 
 const parsePerm = (v: string): PermissionLevel | null => (v === 'none' ? null : (v as PermissionLevel));
 
+const CAPABILITY_LABELS = new Map([...VIEW_CAPABILITIES, ...APPROVAL_CAPABILITIES].map((c) => [c.key, c.label]));
+const EXTRA_LABELS = new Map([
+  ['crew.department_scope', 'Department scope'],
+  ['crew_roster', 'Crew roster'],
+  ['crew_certificates', 'Crew certificates'],
+  ['hr', 'HR'],
+  ['training', 'Training'],
+]);
+
+/** "A", "A and B", "A, B and 3 more". */
+function listLabels(labels: readonly string[]): string {
+  if (labels.length <= 1) return labels[0] ?? 'these modules';
+  if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+  if (labels.length === 3) return `${labels[0]}, ${labels[1]} and ${labels[2]}`;
+  return `${labels[0]}, ${labels[1]} and ${labels.length - 2} more`;
+}
+
 const UsersAccessDetailPage: React.FC = () => {
   const { userId } = useParams<{ userId: string }>();
   const { data: detail, isLoading, error, refetch } = useUserAccessDetail(userId);
   const { data: modules } = useModulesList();
   const saveOverride = useSavePermissionOverride();
   const applyPreset = useApplyPreset();
-  const { toast } = useToast();
-  const { data: deptScope = [] } = useDepartmentScope(userId);
+  const { user } = useAuth();
+  const deptQuery = useDepartmentScope(userId);
+  const deptScope = deptQuery.data ?? [];
   const saveDept = useSaveDepartmentScope();
   const profileIds = useMemo(() => (detail ? [detail.profileId] : []), [detail]);
   const invitations = useInvitationStatuses(detail?.companyId, profileIds);
@@ -85,45 +106,68 @@ const UsersAccessDetailPage: React.FC = () => {
 
   const cell = invitationCell(detail.account, invitations.byProfile.get(detail.profileId), invitations.source);
   const name = `${detail.firstName} ${detail.lastName}`.trim();
+  // Nobody edits their own access (the server refuses it too): the page is read-only for yourself.
+  const isSelf = Boolean(user?.id) && detail.userId === user?.id;
+
+  const labelFor = (key: string) => moduleByKey.get(key)?.name ?? CAPABILITY_LABELS.get(key) ?? EXTRA_LABELS.get(key) ?? key;
+
+  /**
+   * A write that failed. A refusal (RLS kept a row, or refused the insert)
+   * names the modules; when part of the request was saved anyway, it says
+   * so (the matrix reloads what is saved). Never a success toast.
+   */
+  const reportWriteError = (fallbackTitle: string) => (e: unknown) => {
+    if (isOverrideRefused(e)) {
+      if (e.self) {
+        notify.error("You can't change your own access.", { title: 'Access not changed' });
+        return;
+      }
+      notify.error(e.partial ? 'Part of the change was saved. The page now shows their current access.' : 'Nothing was changed.', {
+        title: `You can't change this person's access for ${listLabels(e.moduleKeys.map(labelFor))}`,
+      });
+      return;
+    }
+    notify.error(e, { title: fallbackTitle });
+  };
 
   const handlePresetChange = (value: string) => {
-    if (value === 'custom' || !userId) return;
+    if (value === 'custom' || !userId || isSelf) return;
     const matrix = PRESET_MATRIX[value as Exclude<AccessPreset, 'custom'>];
     applyPreset.mutate(
       { userId, matrix },
       {
-        onSuccess: () => toast({ title: 'Access preset applied' }),
-        onError: (e: Error) => toast({ title: 'Failed to apply preset', description: e.message, variant: 'destructive' }),
+        onSuccess: () => notify.success('Access preset applied'),
+        onError: reportWriteError('Could not apply the preset'),
       }
     );
   };
 
   const handleModuleChange = (moduleKey: string, value: string) => {
-    if (!userId) return;
+    if (!userId || isSelf) return;
     saveOverride.mutate(
       { userId, moduleKey, permission: parsePerm(value) },
       {
-        onSuccess: () => toast({ title: 'Permission updated' }),
-        onError: (e: Error) => toast({ title: 'Failed to update', description: e.message, variant: 'destructive' }),
+        onSuccess: () => notify.success('Permission updated', { description: labelFor(moduleKey) }),
+        onError: reportWriteError('Could not update the permission'),
       }
     );
   };
 
   const handleSetAll = (value: string) => {
-    if (!userId) return;
+    if (!userId || isSelf) return;
     const matrix: Record<string, PermissionLevel | null> = {};
     OTHER_MODULE_GROUPS.forEach((g) => g.moduleKeys.forEach((k) => { matrix[k] = parsePerm(value); }));
     applyPreset.mutate(
       { userId, matrix },
       {
-        onSuccess: () => toast({ title: 'Applied to all modules' }),
-        onError: (e: Error) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
+        onSuccess: () => notify.success('Applied to all modules'),
+        onError: reportWriteError('Could not apply to all modules'),
       }
     );
   };
 
   const handleGroupChange = (groupKey: string, value: string) => {
-    if (!userId) return;
+    if (!userId || isSelf) return;
     const group = OTHER_MODULE_GROUPS.find((g) => g.key === groupKey);
     if (!group) return;
     const matrix: Record<string, PermissionLevel | null> = {};
@@ -131,25 +175,25 @@ const UsersAccessDetailPage: React.FC = () => {
     applyPreset.mutate(
       { userId, matrix },
       {
-        onSuccess: () => toast({ title: `${group.label} updated` }),
-        onError: (e: Error) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
+        onSuccess: () => notify.success(`${group.label} updated`),
+        onError: reportWriteError(`Could not update ${group.label}`),
       }
     );
   };
 
   const handleCapToggle = (capKey: string, enabled: boolean) => {
-    if (!userId) return;
+    if (!userId || isSelf) return;
     saveOverride.mutate(
       { userId, moduleKey: capKey, permission: enabled ? 'view' : null },
       {
-        onError: (e: Error) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
+        onError: reportWriteError('Could not update the permission'),
       }
     );
   };
 
   const handleDeptChange = (next: string[]) => {
-    if (!userId) return;
-    saveDept.mutate({ userId, departments: next });
+    if (!userId || isSelf) return;
+    saveDept.mutate({ userId, departments: next }, { onError: reportWriteError('Could not update the department scope') });
   };
 
   return (
@@ -196,6 +240,14 @@ const UsersAccessDetailPage: React.FC = () => {
           </CardHeader>
         </Card>
 
+        {isSelf ? (
+          <Alert variant="info" data-access-readonly="self">
+            <Lock aria-hidden="true" className="h-4 w-4" />
+            <AlertTitle>You can't change your own access.</AlertTitle>
+            <AlertDescription>This is what you can see and do. Ask another administrator to change it.</AlertDescription>
+          </Alert>
+        ) : null}
+
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Crew Module Access</CardTitle>
@@ -204,8 +256,8 @@ const UsersAccessDetailPage: React.FC = () => {
           <CardContent>
             <div className="flex items-center gap-4">
               <label className="text-sm font-medium min-w-[110px]">Access Preset</label>
-              <Select value={currentPreset} onValueChange={handlePresetChange}>
-                <SelectTrigger className="max-w-md">
+              <Select value={currentPreset} onValueChange={handlePresetChange} disabled={isSelf}>
+                <SelectTrigger className="max-w-md" aria-label="Access preset">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -231,8 +283,8 @@ const UsersAccessDetailPage: React.FC = () => {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground">Set all to:</span>
-              <Select onValueChange={handleSetAll}>
-                <SelectTrigger className="w-40 h-8">
+              <Select onValueChange={handleSetAll} disabled={isSelf}>
+                <SelectTrigger className="w-40 h-8" aria-label="Set all modules to">
                   <SelectValue placeholder="Choose…" />
                 </SelectTrigger>
                 <SelectContent>
@@ -258,6 +310,7 @@ const UsersAccessDetailPage: React.FC = () => {
                   groupLevel={groupLevel}
                   onGroupChange={(v) => handleGroupChange(group.key, v)}
                   onModuleChange={handleModuleChange}
+                  disabled={isSelf}
                 />
               );
             })}
@@ -265,10 +318,16 @@ const UsersAccessDetailPage: React.FC = () => {
         </Card>
 
         {currentPreset === 'custom' && (
-          <CustomPermissionsCard permissions={detail.permissions} onToggle={handleCapToggle} />
+          <CustomPermissionsCard permissions={detail.permissions} onToggle={handleCapToggle} disabled={isSelf} />
         )}
 
-        <DepartmentScopeCard selected={deptScope} onChange={handleDeptChange} />
+        <DepartmentScopeCard
+          selected={deptScope}
+          onChange={handleDeptChange}
+          disabled={isSelf || deptQuery.isLoading}
+          error={deptQuery.error}
+          onRetry={() => void deptQuery.refetch()}
+        />
       </div>
     </DashboardLayout>
   );

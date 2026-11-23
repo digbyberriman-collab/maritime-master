@@ -205,7 +205,22 @@ export function usePermissions() {
   };
 }
 
-// Assign role mutation
+/**
+ * Role writes the database no longer allows from the browser (P3 follow-up:
+ * no authenticated INSERT / UPDATE on `user_roles`; roles are given through
+ * Users & Access and memberships). A refused write is this error, never a
+ * success: RLS answers an UPDATE with 0 rows and no error, and an INSERT
+ * with 42501.
+ */
+export class RoleChangeRefusedError extends Error {
+  readonly code = 'role_change_refused' as const;
+  constructor(action: 'assign' | 'revoke') {
+    super(action === 'assign' ? "You can't give this role here. Roles are given in Users & Access." : "You can't remove this role here. Roles are changed in Users & Access.");
+    this.name = 'RoleChangeRefusedError';
+  }
+}
+
+// Assign role mutation (unused; kept exported for the module index)
 export function useAssignRole() {
   const queryClient = useQueryClient();
   const { user, profile } = useAuth();
@@ -243,7 +258,10 @@ export function useAssignRole() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '42501') throw new RoleChangeRefusedError('assign');
+        throw error;
+      }
       return data;
     },
     onSuccess: (_, variables) => {
@@ -252,30 +270,36 @@ export function useAssignRole() {
       toast.success('Role assigned successfully');
     },
     onError: (error) => {
-      toast.error(`Failed to assign role: ${error.message}`);
+      toast.error(error instanceof RoleChangeRefusedError ? error.message : `Failed to assign role: ${error.message}`);
     },
   });
 }
 
-// Revoke role mutation
+// Revoke role mutation (unused; kept exported for the module index)
 export function useRevokeRole() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (roleId: string) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('user_roles')
         .update({ is_active: false })
-        .eq('id', roleId);
+        .eq('id', roleId)
+        .select('id');
 
-      if (error) throw error;
+      if (error) {
+        if (error.code === '42501') throw new RoleChangeRefusedError('revoke');
+        throw error;
+      }
+      // RLS filters an UPDATE it refuses: 0 rows, no error. Nothing changed.
+      if (!data || data.length === 0) throw new RoleChangeRefusedError('revoke');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-roles'] });
       toast.success('Role revoked');
     },
     onError: (error) => {
-      toast.error(`Failed to revoke role: ${error.message}`);
+      toast.error(error instanceof RoleChangeRefusedError ? error.message : `Failed to revoke role: ${error.message}`);
     },
   });
 }

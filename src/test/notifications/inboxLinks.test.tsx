@@ -11,7 +11,7 @@ import { renderHook } from '@testing-library/react';
 
 const h = vi.hoisted(() => ({
   profile: { id: 'p1', company_id: 'c1' } as { id: string; company_id: string } | null,
-  access: { ready: true, fleetReach: false, vesselsError: null as { message: string } | null },
+  access: { ready: true, fleetReach: false, reachUnknown: false, vesselsError: null as { message: string } | null },
   vessels: [
     { id: 'v-dra', name: 'Draak' },
     { id: 'v-hyd', name: 'Hydra' },
@@ -45,7 +45,7 @@ const row = (over: Partial<DeepLinkSource>): DeepLinkSource => ({
 
 beforeEach(() => {
   h.profile = { id: 'p1', company_id: 'c1' };
-  h.access = { ready: true, fleetReach: false, vesselsError: null };
+  h.access = { ready: true, fleetReach: false, reachUnknown: false, vesselsError: null };
   h.workspace = { ready: true, open: new Set(['/hris']) };
 });
 
@@ -109,7 +109,17 @@ describe('useInboxLinks', () => {
 
   it('says reach is unknown while the vessel list is in error (D-119)', () => {
     h.access = { ...h.access, vesselsError: { message: 'timeout' } };
-    expect(renderHook(() => useInboxLinks()).result.current.reachUnknown).toBe(true);
+    const { result } = renderHook(() => useInboxLinks());
+    expect(result.current.reachUnknown).toBe(true);
+    // A decided "no fleet reach" (the vessel reads failed after the rules were known) stays decided.
+    expect(result.current.fleetReachUnknown).toBe(false);
+  });
+
+  it('says fleet reach is unknown when the membership read failed (D-165)', () => {
+    h.access = { ...h.access, reachUnknown: true, vesselsError: { message: 'Internal Server Error' } };
+    const { result } = renderHook(() => useInboxLinks());
+    expect(result.current.fleetReachUnknown).toBe(true);
+    expect(result.current.reachUnknown).toBe(true);
   });
 
   it('reaches no vessel without a readable profile', () => {

@@ -252,45 +252,11 @@ const FormTemplates: React.FC = () => {
     return { kind: 'Unknown error', detail: msg || 'No error message returned.' };
   };
 
-  // Audit-log every DPA template action. Best-effort: never block UX if the log write fails.
-  const writeAuditLog = async (
-    actionType:
-      | 'TEMPLATE_DELETE_SUCCESS'
-      | 'TEMPLATE_DELETE_BLOCKED'
-      | 'TEMPLATE_ARCHIVE_FALLBACK'
-      | 'TEMPLATE_ARCHIVE_FAILED'
-      | 'TEMPLATE_RESTORE_SUCCESS'
-      | 'TEMPLATE_RESTORE_FAILED'
-      | 'TEMPLATE_RESTORE_DENIED',
-    templateId: string | null,
-    payload: Record<string, unknown>,
-    reason?: string
-  ) => {
-    if (!user?.id) return;
-    try {
-      const tpl = templateId ? templates.find(t => t.id === templateId) : null;
-      const { error } = await supabase.from('admin_action_log').insert({
-        actor_user_id: user.id,
-        action_type: actionType,
-        after_json: {
-          template_id: templateId,
-          template_code: tpl?.template_code ?? null,
-          template_name: tpl?.template_name ?? null,
-          status_before: tpl?.status ?? null,
-          user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
-          ...payload,
-        },
-        reason: reason ?? null,
-      });
-      if (error) console.error('Audit log write failed:', error);
-    } catch (e) {
-      console.error('Audit log threw:', e);
-    }
-  };
-
+  // Template actions are not written to admin_action_log from the browser: the table takes no
+  // browser writes (tenant isolation). Auditing them through a definer or the record engine is an
+  // ISM-stream follow-up.
   const handleConfirmDelete = async () => {
     if (!pendingDeleteId) return;
-    const targetId = pendingDeleteId;
     setDeleting(true);
     setDeleteError(null);
     try {
@@ -337,12 +303,6 @@ const FormTemplates: React.FC = () => {
         );
       }
       toast({ title: 'Template deleted', description: 'The form template has been permanently removed.' });
-      await writeAuditLog(
-        'TEMPLATE_DELETE_SUCCESS',
-        targetId,
-        { outcome: 'success' },
-        'DPA permanent delete (PIN authorised)'
-      );
       setTemplates(prev => prev.filter(t => t.id !== pendingDeleteId));
       setConfirmOpen(false);
       setPendingDeleteId(null);
@@ -362,19 +322,6 @@ const FormTemplates: React.FC = () => {
         kind === 'Blocked by existing submissions' ||
         err?._stage === 'guard:submissions';
       setArchiveOffered(canArchive);
-      await writeAuditLog(
-        'TEMPLATE_DELETE_BLOCKED',
-        targetId,
-        {
-          outcome: 'blocked',
-          error_kind: kind,
-          error_code: err?.code ?? null,
-          error_stage: err?._stage ?? null,
-          error_message: detail,
-          archive_offered: canArchive,
-        },
-        `DPA permanent delete blocked: ${kind}`
-      );
       toast({
         title: `Delete failed — ${kind}`,
         description: full,
@@ -387,7 +334,6 @@ const FormTemplates: React.FC = () => {
 
   const handleArchiveInstead = async () => {
     if (!pendingDeleteId) return;
-    const targetId = pendingDeleteId;
     setArchiving(true);
     const archivedAt = new Date().toISOString();
     try {
@@ -404,12 +350,6 @@ const FormTemplates: React.FC = () => {
         title: 'Template archived',
         description: `History preserved. You have ${RESTORE_WINDOW_HOURS} hours to undo this from the Archived view.`,
       });
-      await writeAuditLog(
-        'TEMPLATE_ARCHIVE_FALLBACK',
-        targetId,
-        { outcome: 'archived', archived_at: archivedAt, restore_window_hours: RESTORE_WINDOW_HOURS },
-        'Archived after permanent delete was blocked'
-      );
       setTemplates(prev =>
         prev.map(t =>
           t.id === pendingDeleteId ? { ...t, status: 'ARCHIVED', archived_at: archivedAt } : t
@@ -422,12 +362,6 @@ const FormTemplates: React.FC = () => {
       pinConfirmedRef.current = false;
     } catch (err: any) {
       const { kind, detail } = classifyError(err);
-      await writeAuditLog(
-        'TEMPLATE_ARCHIVE_FAILED',
-        targetId,
-        { outcome: 'failed', error_kind: kind, error_code: err?.code ?? null, error_message: detail },
-        `Archive fallback failed: ${kind}`
-      );
       toast({
         title: `Archive failed — ${kind}`,
         description: `${kind}: ${detail}`,
@@ -458,12 +392,6 @@ const FormTemplates: React.FC = () => {
     const allowed = await checkDpaAccess();
     if (!allowed) return;
     if (!isWithinRestoreWindow(template.archived_at)) {
-      await writeAuditLog(
-        'TEMPLATE_RESTORE_DENIED',
-        template.id,
-        { outcome: 'denied', archived_at: template.archived_at, restore_window_hours: RESTORE_WINDOW_HOURS },
-        'Restore attempted after grace window expired'
-      );
       toast({
         title: 'Restore window expired',
         description: `This template was archived more than ${RESTORE_WINDOW_HOURS} hours ago. A DPA must re-publish it manually.`,
@@ -485,12 +413,6 @@ const FormTemplates: React.FC = () => {
         title: 'Template restored',
         description: `${template.template_name} is published again.`,
       });
-      await writeAuditLog(
-        'TEMPLATE_RESTORE_SUCCESS',
-        template.id,
-        { outcome: 'restored', previously_archived_at: template.archived_at },
-        'DPA restored archived template within grace window'
-      );
       setTemplates(prev =>
         prev.map(t =>
           t.id === template.id ? { ...t, status: 'PUBLISHED', archived_at: null } : t
@@ -498,12 +420,6 @@ const FormTemplates: React.FC = () => {
       );
     } catch (err: any) {
       const { kind, detail } = classifyError(err);
-      await writeAuditLog(
-        'TEMPLATE_RESTORE_FAILED',
-        template.id,
-        { outcome: 'failed', error_kind: kind, error_code: err?.code ?? null, error_message: detail },
-        `Restore failed: ${kind}`
-      );
       toast({
         title: `Restore failed — ${kind}`,
         description: `${kind}: ${detail}`,

@@ -140,6 +140,8 @@ const FleetScopeBody: React.FC = () => {
   // enter All-vessels mode (setAllVessels is guarded and VesselContext loads
   // only their assigned vessels); they keep their selection until vessel
   // memberships land (BUILD-PLAN P2 `account_memberships`, D-26).
+  // While reach is unknown (the membership read failed) fleetReach is false,
+  // so nothing is selected until a Retry decides it.
   const entered = useRef(false);
   useEffect(() => {
     if (entered.current || !access.ready) return;
@@ -150,6 +152,12 @@ const FleetScopeBody: React.FC = () => {
   let body: React.ReactNode;
   if (!access.ready) {
     body = <ScopeLoading />;
+  } else if (!access.fleetReach && access.reachUnknown && access.vesselsError) {
+    // The membership read failed, so fleet reach was never decided: not a
+    // denial (D-165, D-119; fail closed, D-04). A decided "no fleet reach"
+    // (a legacy crew user whose assignments then failed to load) is still
+    // the denial below: the role decided it, not the failed read.
+    body = <VesselListError error={access.vesselsError.message} onRetry={access.retryVessels} />;
   } else if (!access.fleetReach) {
     body = (
       <ScopeAccessDenied
@@ -533,7 +541,9 @@ function withoutModuleParam(search: string): string {
  * target for this user (no vessel to scope to, no fleet reach, or a fleet user
  * in "All vessels" mode for a vessel page), the old page renders where it is.
  * A vessel target missed because the vessel list failed to load is not that
- * case: the load error with Retry renders instead (D-04).
+ * case, nor a fleet target missed because the membership read failed (fleet
+ * reach not decided): the load error with Retry renders instead (D-04,
+ * D-165).
  */
 export const LegacyRoute: React.FC<{ from: string; children: React.ReactNode }> = ({ from, children }) => {
   const entry = legacyEntryFor(from);
@@ -557,9 +567,16 @@ export const LegacyRoute: React.FC<{ from: string; children: React.ReactNode }> 
   const kind = targetKind(entry.fleetTo && access.legacy.fleetReach ? entry.fleetTo : entry.to);
   const search = SCOPE_KINDS.has(kind) ? withoutModuleParam(location.search) : location.search;
   const target = resolveLegacyTarget(entry, params, search, location.hash, access.legacy);
-  // Only a vessel target hangs on the list; a fleet target missed for want
-  // of reach renders the old page as before.
-  if (!target && needsAccess && kind === 'vessel' && access.vesselsError) {
+  // A vessel target hangs on the list. A fleet target missed for want of
+  // reach renders the old page as before, unless that reach was never
+  // decided (the membership read failed): then the load error with Retry,
+  // so a fleet user is not left on the old page by a failed read (D-165).
+  if (
+    !target &&
+    needsAccess &&
+    access.vesselsError &&
+    (kind === 'vessel' || (Boolean(entry.fleetTo) && access.reachUnknown))
+  ) {
     return <FullPageVesselListError error={access.vesselsError.message} onRetry={access.retryVessels} />;
   }
   if (!target) return <>{children}</>;

@@ -175,14 +175,35 @@ describe('onboarding invite', () => {
 describe('no client redirectTo, and every invite goes through the wrapper', () => {
   it.each([
     'src/modules/crew/pages/CrewRoster.tsx',
+    'src/modules/crew/hooks/useCrew.ts',
+    'src/modules/crew/components/ImportCrewCSVModal.tsx',
     'src/modules/hris/hooks/useOnboarding.ts',
     'src/modules/auth/hooks/useAdminActions.ts',
+    'src/modules/auth/services/invitations.ts',
     'src/modules/users-access/hooks/useInvitations.ts',
   ])('%s', (file) => {
     const source = readRepoFile(file);
     expect(source).not.toMatch(/redirectTo\s*:/);
     expect(source).not.toContain('/auth/accept-invitation');
-    expect(source).not.toMatch(/functions\.invoke\(\s*['"](send-invitation|bulk-invite|admin-actions)/);
+    expect(source).not.toMatch(/functions\.invoke\(\s*['"](send-invitation|bulk-invite|admin-actions|create-crew-member)/);
+  });
+
+  it('revoking an invitation goes through admin-actions (the RPC only as the old-deploy fallback)', () => {
+    const source = readRepoFile('src/modules/auth/services/invitations.ts');
+    expect(source).toContain("invokeEdge('admin-actions', { action: 'revoke_invitation', invitationId })");
+  });
+
+  it('crew are added through the create-crew-member wrapper, never with a password', () => {
+    expect(readRepoFile('src/modules/crew/hooks/useCrew.ts')).toContain('createCrewMember(data)');
+    expect(readRepoFile('src/modules/crew/components/ImportCrewCSVModal.tsx')).toContain('createCrewMember({');
+    // No `password` key anywhere in the wrappers (the reset flow is `resetType: 'password_reset'`).
+    expect(readRepoFile('src/modules/auth/services/adminActions.ts')).not.toMatch(/\bpassword['"]?\s*:/);
+  });
+
+  it('the browser writes no admin_action_log rows (FormTemplates audited nothing it could write)', () => {
+    const source = readRepoFile('src/modules/ism/forms/pages/FormTemplates.tsx');
+    expect(source).not.toContain('writeAuditLog');
+    expect(source).not.toMatch(/from\(['"]admin_action_log['"]\)\s*\.insert/);
   });
 
   it('CrewRoster uses the invite wrapper and its notice', () => {

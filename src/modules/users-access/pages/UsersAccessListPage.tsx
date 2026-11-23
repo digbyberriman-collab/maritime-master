@@ -281,7 +281,7 @@ const UsersAccessListPage: React.FC = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Revoke this invitation?</AlertDialogTitle>
             <AlertDialogDescription>
-              The link sent to {revokeTarget?.name} stops working. You can send a new invitation later.
+              This marks the invitation to {revokeTarget?.name} as revoked and blocks the link where it can. You can send a new invitation later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

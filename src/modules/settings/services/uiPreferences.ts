@@ -16,8 +16,7 @@
  * chosen". Writes mirror the device choice to the server and report a
  * failure without changing the device value.
  *
- * Contract stub created by the Phase 2 architect; E3 wires it into the
- * density runtime and `src/app/nav/roadmap.ts` and adds tests.
+ * Consumed by src/app/shell/uiPreferenceSync.ts.
  */
 import { isMissingRelation, pendingClient, type NoPending } from '@/integrations/supabase/pending';
 import { isDensity, type Density } from '@/components/ui/theme-config';

@@ -3,6 +3,13 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { toast } from '@/shared/hooks/use-toast';
+// Types only: useCrew lands in the entry chunk, so the create-crew-member
+// wrapper (adminActions) is loaded when someone adds crew (gap/00 I6 budget).
+import type {
+  CreateCrewMemberInput,
+  CreateCrewOutcome,
+  EdgeFailure,
+} from '@/modules/auth/services/adminActions';
 
 export interface CrewMember {
   id: string;
@@ -77,18 +84,22 @@ export interface CrewAssignment {
   };
 }
 
-export interface AddCrewMemberData {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  phone?: string;
-  nationality?: string;
-  rank?: string;
-  role: 'master' | 'chief_engineer' | 'chief_officer' | 'crew' | 'dpa' | 'shore_management';
-  vesselId?: string;
-  position?: string;
-  joinDate?: string;
+/**
+ * A new crew member (create-crew-member). There is no password (the person
+ * sets one from the invitation link) and no company (the function uses the
+ * caller's).
+ * Crew roles only; admin roles are given in Users & Access (D-124).
+ */
+export type AddCrewMemberData = CreateCrewMemberInput;
+
+/** create-crew-member refused or failed: nothing was added. The form shows `message` and stays open. */
+export class CrewCreateFailedError extends Error {
+  readonly failure: EdgeFailure;
+  constructor(failure: EdgeFailure) {
+    super(failure.message);
+    this.name = 'CrewCreateFailedError';
+    this.failure = failure;
+  }
 }
 
 export interface UpdateCrewMemberData {
@@ -323,48 +334,28 @@ export const useCrew = (vesselFilter?: string) => {
     enabled: !!profile?.company_id,
   });
 
+  /**
+   * Add a crew member through create-crew-member (the typed wrapper). The
+   * toast says what the function answered (D-143): "added" only after its
+   * 201, the invitation as it went, a partial failure as such. A refusal
+   * (nothing added) rejects with `CrewCreateFailedError` so the form can show
+   * it and stay open.
+   */
   const addCrewMember = useMutation({
-    mutationFn: async (data: AddCrewMemberData) => {
-      // Create auth user via edge function (needed for admin creation)
-      const { data: result, error: fnError } = await supabase.functions.invoke(
-        'create-crew-member',
-        {
-          body: {
-            email: data.email,
-            password: data.password,
-            firstName: data.firstName,
-            lastName: data.lastName,
-            phone: data.phone,
-            nationality: data.nationality,
-            rank: data.rank,
-            role: data.role,
-            companyId: profile?.company_id,
-            vesselId: data.vesselId,
-            position: data.position,
-            joinDate: data.joinDate,
-          },
-        }
-      );
-
-      if (fnError) throw fnError;
-      if (result?.error) throw new Error(result.error);
-
-      return result;
+    mutationFn: async (data: AddCrewMemberData): Promise<CreateCrewOutcome> => {
+      const [{ createCrewMember, createCrewNotice }, { showOutcomeNotice }] = await Promise.all([
+        import('@/modules/auth/services/adminActions'),
+        import('@/modules/auth/lib/outcomeNotices'),
+      ]);
+      const outcome = await createCrewMember(data);
+      if (outcome.kind === 'failed') throw new CrewCreateFailedError(outcome.failure);
+      showOutcomeNotice(createCrewNotice(outcome, `${data.firstName} ${data.lastName}`.trim()));
+      return outcome;
     },
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['crew'] });
       queryClient.invalidateQueries({ queryKey: ['crew-count'] });
-      toast({
-        title: 'Success',
-        description: 'Crew member added successfully',
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      });
+      queryClient.invalidateQueries({ queryKey: ['users-access'] });
     },
   });
 

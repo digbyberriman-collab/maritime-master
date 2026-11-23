@@ -7,6 +7,9 @@
  * answer once it is: a backfilled legacy-managed row for users whose
  * `membership` is null). The SQL tests in `supabase/tests/sql/p2_reach` read
  * the same file, so client and server cannot drift apart unnoticed.
+ * `legacyReach` is the function VesselContext's legacy branch calls, and
+ * ./reachFixtureVessels.test.tsx renders VesselProvider for every fixture
+ * user, so the fixture also holds the code the app runs.
  *
  * RBAC roles are filtered as `get_user_roles_full` does before the client
  * sees them: active and in date only, `isFleetWide` = no vessel and the

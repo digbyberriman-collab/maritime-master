@@ -11,6 +11,14 @@
  * - `none` (memberships live, no usable row; or nothing loaded yet for this
  *   user): no fleet reach.
  *
+ * `reachUnknown`: the rules were never decided because the load failed (the
+ * membership read threw before VesselContext set its reach, so the source
+ * is still `none` and the served `loadError` is set). `fleetReach` is then
+ * false only for want of an answer: callers show the vessel-list error with
+ * Retry, never "not available to you" (D-165, D-119; fail closed, D-04).
+ * Nothing else gives `none` with a load error: a no-row read loads without
+ * one, and a failed refresh keeps the reach the previous load decided.
+ *
  * The vessel lists themselves come from VesselContext, which reads the
  * membership (./ownMembership.ts) inside its ticketed load, so a failed
  * read is its `loadError` with Retry, never "no vessels".
@@ -32,6 +40,12 @@ export interface MembershipReachState {
   /** Which rules decided (VesselContext's `reach.source`). */
   source: VesselReach['source'];
   fleetReach: boolean;
+  /**
+   * The load failed before any reach rules were decided: `fleetReach` is
+   * not an answer. Uses the served `loadError`, so it is never another
+   * user's or a stale state's.
+   */
+  reachUnknown: boolean;
 }
 
 export function useMembershipReach(): MembershipReachState {
@@ -50,6 +64,7 @@ export function useMembershipReach(): MembershipReachState {
   const ownRoles = userId !== null && rbacLoadedFor === userId;
   return {
     source: reach.source,
+    reachUnknown: reach.source === 'none' && Boolean(vessel.loadError),
     fleetReach: fleetReachFor(reach, {
       canAccessAllVessels,
       hasFleetWideRole: ownRoles && hasFleetWideRole,

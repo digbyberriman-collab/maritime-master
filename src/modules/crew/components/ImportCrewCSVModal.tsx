@@ -47,6 +47,16 @@ import { useVessels } from '@/modules/vessels/hooks/useVessels';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { toast } from '@/shared/hooks/use-toast';
+import { normaliseError } from '@/shared/lib/notify';
+import { Checkbox } from '@/components/ui/checkbox';
+import { KpiTile } from '@/shared/components/data';
+import {
+  createCrewMember,
+  crewImportRowResult,
+  crewImportSummary,
+  type CrewImportRowResult,
+  type CrewImportRowStatus,
+} from '@/modules/auth/services/adminActions';
 
 interface ImportCrewCSVModalProps {
   isOpen: boolean;
@@ -57,11 +67,29 @@ interface ImportCrewCSVModalProps {
 type ImportStep = 'upload' | 'validate' | 'importing' | 'complete';
 type DuplicateAction = 'skip' | 'update';
 
-interface ImportResults {
-  created: number;
-  skipped: number;
-  errors: string[];
+interface ImportedRow {
+  rowNumber: number;
+  name: string;
+  email: string;
+  result: CrewImportRowResult;
 }
+
+interface ImportResults {
+  rows: ImportedRow[];
+  skipped: number;
+  /** Invitations were asked for. */
+  invited: boolean;
+}
+
+/** How each row's result reads (Badge tone variants). */
+const ROW_STATUS: Readonly<Record<CrewImportRowStatus, { label: string; variant: 'ok' | 'warn' | 'danger' }>> = {
+  invited: { label: 'Added and invited', variant: 'ok' },
+  added: { label: 'Added', variant: 'ok' },
+  invite_failed: { label: 'Added, not invited', variant: 'warn' },
+  assignment_failed: { label: 'Added, vessel not assigned', variant: 'warn' },
+  unconfirmed: { label: 'Not confirmed', variant: 'warn' },
+  failed: { label: 'Not added', variant: 'danger' },
+};
 
 const ImportCrewCSVModal: React.FC<ImportCrewCSVModalProps> = ({
   isOpen,
@@ -80,6 +108,7 @@ const ImportCrewCSVModal: React.FC<ImportCrewCSVModalProps> = ({
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState(0);
   const [importResults, setImportResults] = useState<ImportResults | null>(null);
+  const [sendInvites, setSendInvites] = useState(true);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -108,6 +137,7 @@ const ImportCrewCSVModal: React.FC<ImportCrewCSVModalProps> = ({
     setIsImporting(false);
     setImportProgress(0);
     setImportResults(null);
+    setSendInvites(true);
   };
 
   const handleClose = () => {
@@ -129,16 +159,17 @@ const ImportCrewCSVModal: React.FC<ImportCrewCSVModalProps> = ({
         .filter(r => r.data.email)
         .map(r => r.data.email);
 
+      // Emails this company already uses (a hint: the function checks every company when importing).
+      let existing: string[] = [];
       if (emails.length > 0) {
-        const { data: existingProfiles } = await supabase
+        const { data: existingProfiles, error: existingError } = await supabase
           .from('profiles')
           .select('email')
           .in('email', emails);
-
-        if (existingProfiles) {
-          setExistingEmails(existingProfiles.map(p => p.email));
-        }
+        if (existingError) throw existingError;
+        existing = (existingProfiles ?? []).map(p => p.email);
       }
+      setExistingEmails(existing);
 
       // Build vessel mapping
       const vesselNames = [...new Set(result.results.map(r => r.data.vessel_assignment))];
@@ -160,7 +191,7 @@ const ImportCrewCSVModal: React.FC<ImportCrewCSVModalProps> = ({
       // Update validation results with additional checks
       result.results.forEach(r => {
         // Check for duplicate emails
-        if (existingEmails.includes(r.data.email)) {
+        if (existing.includes(r.data.email)) {
           r.warnings.push('Email already exists in system');
         }
 
@@ -179,10 +210,10 @@ const ImportCrewCSVModal: React.FC<ImportCrewCSVModalProps> = ({
 
       setParseResult({ ...result });
       setStep('validate');
-    } catch (error: any) {
+    } catch (error) {
       toast({
-        title: 'Error parsing CSV',
-        description: error.message,
+        title: 'Could not check the CSV',
+        description: normaliseError(error).message,
         variant: 'destructive',
       });
     } finally {
@@ -207,11 +238,7 @@ const ImportCrewCSVModal: React.FC<ImportCrewCSVModalProps> = ({
     setIsImporting(true);
     setImportProgress(0);
 
-    const results: ImportResults = {
-      created: 0,
-      skipped: 0,
-      errors: [],
-    };
+    const results: ImportResults = { rows: [], skipped: 0, invited: sendInvites };
 
     const rowsToImport = validRows.filter(r => {
       // Skip duplicates if action is 'skip'
@@ -222,67 +249,41 @@ const ImportCrewCSVModal: React.FC<ImportCrewCSVModalProps> = ({
       return true;
     });
 
+    // One call per row, one after another; each row keeps the outcome the function gave (D-143).
     for (let i = 0; i < rowsToImport.length; i++) {
       const row = rowsToImport[i];
-      const progress = Math.round(((i + 1) / rowsToImport.length) * 100);
-      setImportProgress(progress);
+      setImportProgress(Math.round(((i + 1) / rowsToImport.length) * 100));
+      const base = { rowNumber: row.rowNumber, name: `${row.data.first_name} ${row.data.last_name}`.trim(), email: row.data.email };
 
-      try {
-        const vesselId = vesselMapping.get(row.data.vessel_assignment.toLowerCase());
-        if (!vesselId) {
-          results.errors.push(`Row ${row.rowNumber}: Vessel not found`);
-          continue;
-        }
-
-        // Generate password
-        const password = generatePassword();
-
-        // Call edge function to create crew member
-        const { data, error } = await supabase.functions.invoke('create-crew-member', {
-          body: {
-            email: row.data.email,
-            password,
-            firstName: row.data.first_name,
-            lastName: row.data.last_name,
-            phone: row.data.phone_number,
-            nationality: row.data.nationality,
-            rank: row.data.rank,
-            role: 'crew',
-            companyId: profile.company_id,
-            vesselId,
-            position: row.data.position,
-            joinDate: row.data.join_date,
-          },
-        });
-
-        if (error) {
-          results.errors.push(`Row ${row.rowNumber}: ${error.message}`);
-        } else if (data?.error) {
-          results.errors.push(`Row ${row.rowNumber}: ${data.error}`);
-        } else {
-          results.created++;
-        }
-      } catch (error: any) {
-        results.errors.push(`Row ${row.rowNumber}: ${error.message}`);
+      const vesselId = vesselMapping.get(row.data.vessel_assignment.toLowerCase());
+      if (!vesselId) {
+        results.rows.push({ ...base, result: { status: 'failed', created: false, message: `Vessel not found: ${row.data.vessel_assignment}` } });
+        continue;
       }
+      // No password (the person sets one from the invitation) and no company (the function uses yours).
+      const outcome = await createCrewMember({
+        email: row.data.email,
+        firstName: row.data.first_name,
+        lastName: row.data.last_name,
+        phone: row.data.phone_number,
+        nationality: row.data.nationality,
+        rank: row.data.rank,
+        role: 'crew',
+        vesselId,
+        position: row.data.position,
+        joinDate: row.data.join_date,
+        sendInvite: sendInvites,
+      });
+      results.rows.push({ ...base, result: crewImportRowResult(outcome) });
     }
 
     setImportResults(results);
     setIsImporting(false);
     setStep('complete');
 
-    if (results.created > 0) {
+    if (crewImportSummary(results.rows.map((r) => r.result)).created > 0) {
       onSuccess();
     }
-  };
-
-  const generatePassword = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
-    let password = '';
-    for (let i = 0; i < 12; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return password;
   };
 
   const renderUploadStep = () => (
@@ -419,6 +420,22 @@ const ImportCrewCSVModal: React.FC<ImportCrewCSVModalProps> = ({
           </Alert>
         )}
 
+        {/* Invitations */}
+        <div className="flex items-start gap-3 rounded-lg border p-3">
+          <Checkbox
+            id="import-send-invites"
+            checked={sendInvites}
+            onCheckedChange={(v) => setSendInvites(v === true)}
+            className="mt-0.5"
+          />
+          <div className="space-y-1">
+            <Label htmlFor="import-send-invites">Email each new crew member an invitation</Label>
+            <p className="text-sm text-muted-foreground">
+              STORM emails a link to set a password and join. Without it, send the invitations later from Users &amp; Access.
+            </p>
+          </div>
+        </div>
+
         {/* Preview Table */}
         <div>
           <div className="flex items-center justify-between mb-2">
@@ -536,49 +553,62 @@ const ImportCrewCSVModal: React.FC<ImportCrewCSVModalProps> = ({
 
   const renderCompleteStep = () => {
     if (!importResults) return null;
+    const summary = crewImportSummary(importResults.rows.map((r) => r.result));
+    const problems = importResults.rows.filter((r) => r.result.status !== 'invited' && r.result.status !== 'added');
+    const clean = problems.length === 0;
 
     return (
-      <div className="space-y-6 py-4">
-      <div className="text-center">
-        <CheckCircle2 className="w-16 h-16 mx-auto mb-4 text-primary" />
-        <h3 className="text-xl font-medium mb-2">Import Complete!</h3>
-      </div>
+      <div className="space-y-6 py-4" data-import-summary="">
+        <div className="text-center">
+          {clean ? (
+            <CheckCircle2 aria-hidden="true" className="w-12 h-12 mx-auto mb-3 text-success" />
+          ) : (
+            <AlertTriangle aria-hidden="true" className="w-12 h-12 mx-auto mb-3 text-warning" />
+          )}
+          <h3 className="text-xl font-medium mb-1">{clean ? 'Import complete' : 'Import finished with problems'}</h3>
+          <p className="text-sm text-muted-foreground">
+            {summary.created} of {importResults.rows.length} {importResults.rows.length === 1 ? 'row was' : 'rows were'} added
+            {importResults.invited ? ` · ${summary.invited} invited` : ''}.
+          </p>
+        </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-primary/10 rounded-lg p-4 text-center">
-          <p className="text-2xl font-bold text-primary">{importResults.created}</p>
-          <p className="text-sm text-primary">Created</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <KpiTile label="Added" value={summary.created} state="ready" tone={summary.created > 0 ? 'ok' : undefined} />
+          {importResults.invited ? (
+            <KpiTile label="Not invited" value={summary.inviteFailed} state="ready" tone={summary.inviteFailed > 0 ? 'warn' : undefined} sub="Send from Users & Access" />
+          ) : (
+            <KpiTile label="Invitations" value="Not sent" textValue state="ready" sub="Send from Users & Access" />
+          )}
+          <KpiTile label="Not added" value={summary.failed} state="ready" tone={summary.failed > 0 ? 'danger' : undefined} />
+          <KpiTile label="Skipped" value={importResults.skipped} state="ready" sub="Already in STORM" />
         </div>
-        <div className="bg-muted rounded-lg p-4 text-center">
-          <p className="text-2xl font-bold">{importResults.skipped}</p>
-          <p className="text-sm text-muted-foreground">Skipped</p>
-        </div>
-        <div className="bg-destructive/10 rounded-lg p-4 text-center">
-          <p className="text-2xl font-bold text-destructive">{importResults.errors.length}</p>
-          <p className="text-sm text-destructive">Errors</p>
-        </div>
-      </div>
 
-        {importResults.errors.length > 0 && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Some rows failed to import</AlertTitle>
-            <AlertDescription>
-              <ScrollArea className="h-[100px] mt-2">
-                <ul className="text-sm space-y-1">
-                  {importResults.errors.map((error, index) => (
-                    <li key={index}>{error}</li>
-                  ))}
-                </ul>
-              </ScrollArea>
-            </AlertDescription>
-          </Alert>
+        {problems.length > 0 && (
+          <div>
+            <h4 className="font-medium mb-2">Rows that need attention</h4>
+            <div className="max-h-60 overflow-y-auto rounded-lg border">
+              <ul className="divide-y" aria-label="Rows that need attention">
+                {problems.map((row) => {
+                  const meta = ROW_STATUS[row.result.status];
+                  return (
+                    <li key={row.rowNumber} className="flex flex-col gap-1 p-3 sm:flex-row sm:items-start sm:gap-3" data-import-row={row.result.status}>
+                      <Badge variant={meta.variant} className="w-fit shrink-0">{meta.label}</Badge>
+                      <div className="min-w-0 text-sm">
+                        <p className="font-medium">
+                          Row {row.rowNumber} · {row.name || row.email}
+                        </p>
+                        <p className="text-muted-foreground">{row.result.message}</p>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
         )}
 
         <div className="flex justify-end">
-          <Button onClick={handleClose}>
-            Close
-          </Button>
+          <Button onClick={handleClose}>Close</Button>
         </div>
       </div>
     );
@@ -596,7 +626,7 @@ const ImportCrewCSVModal: React.FC<ImportCrewCSVModalProps> = ({
             {step === 'upload' && 'Upload a CSV file to bulk import crew members.'}
             {step === 'validate' && 'Review and validate the imported data.'}
             {step === 'importing' && 'Importing crew members...'}
-            {step === 'complete' && 'Import completed successfully.'}
+            {step === 'complete' && 'The import has finished. Each row says what happened.'}
           </DialogDescription>
         </DialogHeader>
 

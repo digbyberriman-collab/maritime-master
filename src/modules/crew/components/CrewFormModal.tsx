@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { format } from 'date-fns';
-import { CalendarIcon, Loader2, Copy, Check, AlertCircle } from 'lucide-react';
+import { CalendarIcon, Loader2, AlertCircle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -34,9 +34,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
+import { normaliseError } from '@/shared/lib/notify';
 import { RANKS, NATIONALITIES, CREW_ROLES } from '@/modules/crew/constants';
 import { useVessels } from '@/modules/vessels/hooks/useVessels';
-import { supabase } from '@/integrations/supabase/client';
+import { CREW_MEMBER_ROLES } from '@/modules/auth/services/adminActions';
 import type { AddCrewMemberData } from '@/modules/crew/hooks/useCrew';
 
 const formSchema = z.object({
@@ -46,31 +47,26 @@ const formSchema = z.object({
   phone: z.string().optional(),
   nationality: z.string().optional(),
   rank: z.string().optional(),
-  role: z.enum(['master', 'chief_engineer', 'chief_officer', 'crew']),
+  // The crew vocabulary only: admin roles are given in Users & Access (D-124).
+  role: z.enum(CREW_MEMBER_ROLES),
   vesselId: z.string().optional(),
   position: z.string().optional(),
   joinDate: z.date().optional(),
-  sendWelcomeEmail: z.boolean().default(true),
+  sendInvite: z.boolean().default(true),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
+/** The role options: the crew vocabulary the function accepts. */
+const ROLE_OPTIONS = CREW_ROLES.filter((r) => (CREW_MEMBER_ROLES as readonly string[]).includes(r.value));
+
 interface CrewFormModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: AddCrewMemberData) => Promise<void>;
+  /** Resolves when the person was added (the hook says how the invitation went); rejects when nothing was added. */
+  onSubmit: (data: AddCrewMemberData) => Promise<unknown>;
   isLoading: boolean;
 }
-
-// Generate a random password
-const generatePassword = () => {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
-  let password = '';
-  for (let i = 0; i < 12; i++) {
-    password += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return password;
-};
 
 const CrewFormModal: React.FC<CrewFormModalProps> = ({
   isOpen,
@@ -79,9 +75,7 @@ const CrewFormModal: React.FC<CrewFormModalProps> = ({
   isLoading,
 }) => {
   const { vessels } = useVessels();
-  const [generatedPassword, setGeneratedPassword] = useState('');
-  const [copied, setCopied] = useState(false);
-  const [emailError, setEmailError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<FormValues>({
@@ -96,52 +90,24 @@ const CrewFormModal: React.FC<CrewFormModalProps> = ({
       role: 'crew',
       vesselId: '',
       position: '',
-      sendWelcomeEmail: true,
+      sendInvite: true,
     },
   });
 
   useEffect(() => {
     if (isOpen) {
-      setGeneratedPassword(generatePassword());
-      setCopied(false);
-      setEmailError(null);
+      setFormError(null);
       form.reset();
     }
   }, [isOpen, form]);
 
-  const handleCopyPassword = () => {
-    navigator.clipboard.writeText(generatedPassword);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  // Check if email already exists in profiles table
-  const checkEmailExists = async (email: string): Promise<boolean> => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('email')
-      .eq('email', email.toLowerCase().trim())
-      .maybeSingle();
-    
-    return !!data && !error;
-  };
-
   const handleSubmit = async (values: FormValues) => {
-    setEmailError(null);
+    setFormError(null);
     setIsSubmitting(true);
-    
     try {
-      // Check if email already exists
-      const emailExists = await checkEmailExists(values.email);
-      if (emailExists) {
-        setEmailError(`The email "${values.email}" is already registered. Please use a different email address.`);
-        setIsSubmitting(false);
-        return;
-      }
-
+      // The function checks the email in every company (409 when it is in use) and sends the invitation.
       await onSubmit({
         email: values.email,
-        password: generatedPassword,
         firstName: values.firstName,
         lastName: values.lastName,
         phone: values.phone,
@@ -151,15 +117,12 @@ const CrewFormModal: React.FC<CrewFormModalProps> = ({
         vesselId: values.vesselId || undefined,
         position: values.position || undefined,
         joinDate: values.joinDate ? format(values.joinDate, 'yyyy-MM-dd') : undefined,
+        sendInvite: values.sendInvite,
       });
       onClose();
-    } catch (error: any) {
-      // Handle edge function errors
-      if (error.message?.includes('already been registered')) {
-        setEmailError(`The email "${values.email}" is already registered. Please use a different email address.`);
-      } else {
-        setEmailError(error.message || 'An error occurred while creating the crew member.');
-      }
+    } catch (error) {
+      // Nothing was added: say why and keep the form (the server's STORM sentence, never raw text).
+      setFormError(normaliseError(error, 'The crew member could not be added. Try again.').message);
     } finally {
       setIsSubmitting(false);
     }
@@ -173,17 +136,16 @@ const CrewFormModal: React.FC<CrewFormModalProps> = ({
         <DialogHeader>
           <DialogTitle>Add New Crew Member</DialogTitle>
           <DialogDescription>
-            Create a new crew member account and optionally assign them to a vessel.
+            Add a crew member and optionally assign them to a vessel. They choose their own password from the invitation.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-            {/* Email Error Alert */}
-            {emailError && (
-              <Alert variant="destructive">
+            {formError && (
+              <Alert variant="destructive" data-crew-form-error="">
                 <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{emailError}</AlertDescription>
+                <AlertDescription>{formError}</AlertDescription>
               </Alert>
             )}
 
@@ -201,7 +163,7 @@ const CrewFormModal: React.FC<CrewFormModalProps> = ({
                     <FormItem>
                       <FormLabel>First Name *</FormLabel>
                       <FormControl>
-                        <Input placeholder="John" {...field} />
+                        <Input autoComplete="off" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -214,7 +176,7 @@ const CrewFormModal: React.FC<CrewFormModalProps> = ({
                     <FormItem>
                       <FormLabel>Last Name *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Smith" {...field} />
+                        <Input autoComplete="off" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -229,7 +191,7 @@ const CrewFormModal: React.FC<CrewFormModalProps> = ({
                   <FormItem>
                     <FormLabel>Email *</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="john.smith@example.com" {...field} />
+                      <Input type="email" placeholder="name@example.com" autoComplete="off" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -420,7 +382,7 @@ const CrewFormModal: React.FC<CrewFormModalProps> = ({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent className="bg-popover">
-                        {CREW_ROLES.map((role) => (
+                        {ROLE_OPTIONS.map((role) => (
                           <SelectItem key={role.value} value={role.value}>
                             {role.label}
                           </SelectItem>
@@ -428,54 +390,28 @@ const CrewFormModal: React.FC<CrewFormModalProps> = ({
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      Determines what features the user can access.
+                      Determines what features the user can access. Admin roles are given in Users &amp; Access.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <div className="space-y-2">
-                <FormLabel>Initial Password</FormLabel>
-                <div className="flex gap-2">
-                  <Input
-                    value={generatedPassword}
-                    readOnly
-                    className="font-mono bg-muted"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={handleCopyPassword}
-                  >
-                    {copied ? (
-                      <Check className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Copy this password and share it securely with the crew member.
-                </p>
-              </div>
-
               <FormField
                 control={form.control}
-                name="sendWelcomeEmail"
+                name="sendInvite"
                 render={({ field }) => (
                   <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                     <FormControl>
                       <Checkbox
                         checked={field.value}
-                        onCheckedChange={field.onChange}
+                        onCheckedChange={(v) => field.onChange(v === true)}
                       />
                     </FormControl>
                     <div className="space-y-1 leading-none">
-                      <FormLabel>Send welcome email</FormLabel>
+                      <FormLabel>Send an invitation email</FormLabel>
                       <FormDescription>
-                        Notify the crew member about their new account.
+                        STORM emails a link to set a password and join. Without it, send the invitation later from Users &amp; Access.
                       </FormDescription>
                     </div>
                   </FormItem>

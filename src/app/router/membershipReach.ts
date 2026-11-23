@@ -8,10 +8,12 @@
  *
  * Two rule sets:
  *
- * - `legacyReach`: D-26, exactly what VesselContext and reach.ts do today.
- *   Used while `account_memberships` does not exist (D-01), and for a
- *   membership marked `legacy_managed` (the backfilled rows), whose reach the
- *   server also evaluates from the legacy sources.
+ * - `legacyReach`: D-26, the rules VesselContext's legacy branch runs (it
+ *   calls this function) and reach.ts `hasFleetReach` (which this function's
+ *   fleet answer delegates to). Used while `account_memberships` does not
+ *   exist (D-01), and for a membership marked `legacy_managed` (the
+ *   backfilled rows), whose reach the server also evaluates from the legacy
+ *   sources.
  *   - vessels: legacy `profiles.role` dpa / shore_management → every vessel
  *     of the company whose `status` is set and is not 'Sold'; anyone else →
  *     the vessels of their current crew assignments with the same status rule;
@@ -30,12 +32,18 @@
  * A vessel counts only while `lifecycle_status` is not 'archived' (when the
  * column is known) and `status` is set and not 'Sold' (legacy parity).
  *
- * Wired by `./ownMembership.ts` (the caller's own membership read, through
- * VesselContext's load) and `./useMembershipReach.ts` (fleet reach for the
- * scope routes); `src/test/router/membershipReach.test.ts` checks both rule
- * sets against the shared fixture.
+ * Wired by VesselContext's load (src/modules/vessels/contexts/VesselContext.tsx):
+ * `./ownMembership.ts` reads the caller's own row and `reachModeFor` picks
+ * the rules (`membershipIsLive`); a `legacy` mode cuts the vessel lists with
+ * `legacyReach` (the directory for DPA / shore management, else the assigned
+ * vessels' own rows), a `membership` mode with `membershipReach`. Fleet
+ * reach for the scope routes is `./useMembershipReach.ts` (`fleetReachFor`:
+ * reach.ts `hasFleetReach` for the legacy rules, the row's `fleet_access`
+ * otherwise). `src/test/router/membershipReach.test.ts` checks both rule sets
+ * against the shared fixture, and `src/test/router/reachFixtureVessels.test.tsx`
+ * checks the rendered VesselProvider (the code the app runs) against it.
  */
-import { FLEET_RBAC_ROLES } from './reach';
+import { hasFleetReach } from './reach';
 
 export interface ReachVessel {
   id: string;
@@ -121,9 +129,18 @@ export function membershipIsLive(m: Pick<ReachMembership, 'status' | 'validFrom'
   return m.status === 'active' && inWindow(m.validFrom, m.validUntil, Date.parse(now));
 }
 
+/**
+ * D-26 fleet reach: reach.ts `hasFleetReach` (one rule set, the one the
+ * scope routes apply through useMembershipReach), fed as VesselContext and
+ * the permissions store feed it: the legacy all-vessel role, a fleet-wide
+ * RBAC role, or a fleet RBAC role name (reach.ts `FLEET_RBAC_ROLES`).
+ */
 function legacyFleetReach(input: Pick<LegacyReachInput, 'profileRole' | 'rbacRoles'>): boolean {
-  if (input.profileRole && LEGACY_ALL_VESSEL_ROLES.includes(input.profileRole)) return true;
-  return input.rbacRoles.some((r) => r.isFleetWide || (!!r.roleName && FLEET_RBAC_ROLES.includes(r.roleName)));
+  return hasFleetReach({
+    canAccessAllVessels: !!input.profileRole && LEGACY_ALL_VESSEL_ROLES.includes(input.profileRole),
+    hasFleetWideRole: input.rbacRoles.some((r) => r.isFleetWide),
+    rbacRoles: input.rbacRoles.map((r) => r.roleName),
+  });
 }
 
 function ownVessels(input: LegacyReachInput): ReachVessel[] {
@@ -148,6 +165,11 @@ export function membershipReach(input: MembershipReachInput): Reach {
   if (!input.userActive || !membershipIsLive(m, input.now)) {
     return { fleetReach: false, vesselIds: [] };
   }
+  // A live legacy-managed row is the legacy rules, as the SQL
+  // `user_vessel_reach` evaluates it. VesselContext never gets here with one
+  // (`reachModeFor` sends such a row to its legacy branch, which calls
+  // `legacyReach` itself); this keeps the function a mirror of the SQL for
+  // any row, which the fixture test relies on for the backfilled rows.
   if (m.legacyManaged) return legacyReach(input);
 
   const own = ownVessels(input);

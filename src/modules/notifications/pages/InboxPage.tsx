@@ -18,7 +18,9 @@
  * opens Attention. Any other failure is an error with Retry, never "no
  * notifications" (D-04). Nothing is read for a vessel filter until the
  * vessel list has loaded, and a vessel code outside the viewer's reach never
- * widens the list.
+ * widens the list. While the vessel list is in error, a vessel the filter
+ * names but the list lacks is unknown, not out of reach: the list error with
+ * Retry, and still nothing read for that filter (D-119, D-04).
  */
 import React, { useId, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -58,6 +60,7 @@ export default function InboxPage() {
   const userId = useInboxUserId();
   const counts = useInboxCounts();
   const access = useScopeAccess();
+  const { vesselsError, retryVessels } = access;
   const { vessels, findVesselByCode } = useVessel();
 
   const requested = requestedInboxTab(params.get('tab'));
@@ -65,9 +68,13 @@ export default function InboxPage() {
   const listTab = requested === 'archived' ? 'archived' : 'all';
 
   // A vessel filter names a code; it applies only once the vessel list is in, and only to a vessel in reach.
+  // With the list in error, a code it lacks is unknown, not out of reach (D-119): neither reads anything.
+  // A vessel the same user's previous list still holds (a failed refresh) keeps filtering.
   const filterVessel = urlFilters.vessel ? findVesselByCode(urlFilters.vessel) : undefined;
   const vesselPending = Boolean(urlFilters.vessel) && !access.ready;
-  const vesselOutOfReach = Boolean(urlFilters.vessel) && access.ready && !filterVessel;
+  const vesselMissing = Boolean(urlFilters.vessel) && access.ready && !filterVessel;
+  const vesselUnknown = vesselMissing && Boolean(vesselsError);
+  const vesselOutOfReach = vesselMissing && !vesselsError;
 
   const [limitFor, setLimitFor] = useState<{ key: string; limit: number }>({ key: '', limit: INBOX_PAGE_SIZE });
   const filterKey = `${listTab}|${urlFilters.scope ?? ''}|${filterVessel?.id ?? urlFilters.vessel ?? ''}|${urlFilters.module ?? ''}`;
@@ -82,7 +89,7 @@ export default function InboxPage() {
     }),
     [listTab, urlFilters.scope, filterVessel?.id, urlFilters.module, limit],
   );
-  const listWanted = requested !== 'attention' && !vesselPending && !vesselOutOfReach;
+  const listWanted = requested !== 'attention' && !vesselPending && !vesselOutOfReach && !vesselUnknown;
   const list = useInbox(filters, { enabled: listWanted });
 
   const inboxState: InboxState =
@@ -193,6 +200,9 @@ export default function InboxPage() {
                     retryCounts={() => void counts.refetch()}
                     vesselPending={vesselPending}
                     vesselOutOfReach={vesselOutOfReach}
+                    vesselUnknown={vesselUnknown}
+                    vesselsError={vesselsError}
+                    retryVessels={retryVessels}
                     hasFilters={hasFilters}
                     clearFilters={clearFilters}
                     filters={
@@ -320,6 +330,10 @@ interface InboxListTabProps {
   retryCounts: () => void;
   vesselPending: boolean;
   vesselOutOfReach: boolean;
+  /** The filter names a vessel the list lacks while the list is in error: not known to be out of reach. */
+  vesselUnknown: boolean;
+  vesselsError: { message: string } | null;
+  retryVessels: () => void;
   hasFilters: boolean;
   clearFilters: () => void;
   filters: React.ReactNode;
@@ -337,6 +351,9 @@ function InboxListTab({
   retryCounts,
   vesselPending,
   vesselOutOfReach,
+  vesselUnknown,
+  vesselsError,
+  retryVessels,
   hasFilters,
   clearFilters,
   filters,
@@ -368,7 +385,26 @@ function InboxListTab({
   }
 
   let body: React.ReactNode;
-  if (vesselOutOfReach) {
+  if (vesselUnknown) {
+    // Inline, not VesselListError: that one names the page (an h1) and would
+    // replace the Inbox heading. The filter bar above stays, so the filters
+    // can still be cleared.
+    body = (
+      <div className="space-y-2">
+        <PageError
+          variant="inline"
+          title="Your vessels could not load"
+          error={vesselsError}
+          onRetry={retryVessels}
+          treatMissingAsOff={false}
+          className="[@media(pointer:coarse)]:[&_button]:h-11"
+        />
+        <p className="text-sm text-muted-foreground">
+          The vessel filter cannot be checked until your vessels load, so nothing is listed for it yet. Try again, or clear the filters.
+        </p>
+      </div>
+    );
+  } else if (vesselOutOfReach) {
     body = <PageEmpty bordered filtered title="That vessel is not one you can reach" body="Pick another vessel, or clear the filters." onClearFilters={clearFilters} />;
   } else if (vesselPending || list.isPending) {
     body = <PageLoading variant="list" rows={4} label={archived ? 'Loading archived notifications' : 'Loading notifications'} />;
@@ -432,7 +468,22 @@ function InboxItems({ items, archived }: { items: InboxItem[]; archived: boolean
       {
         onSuccess: () =>
           notify.success(to ? 'Archived' : 'Moved back to the inbox', {
-            action: to ? { label: 'Undo', onClick: () => setArchived.mutate({ ids: [item.id], archived: false }) } : undefined,
+            // Undo runs from the toast, often after this row (and, for the
+            // last row, the whole list) has unmounted, when react-query drops
+            // per-mutate callbacks: its outcome is handled on the promise, so
+            // a failed Undo always says so (gap/03 C9; no fake success).
+            action: to
+              ? {
+                  label: 'Undo',
+                  onClick: () => {
+                    void setArchived.mutateAsync({ ids: [item.id], archived: false }).then(
+                      () => notify.success('Moved back to the inbox'),
+                      (error) =>
+                        notify.error(error, { title: 'Could not move the notification back', fallback: 'Nothing was changed. Try again.' }),
+                    );
+                  },
+                }
+              : undefined,
           }),
         onError: (error) =>
           notify.error(error, { title: to ? 'Could not archive the notification' : 'Could not move the notification back', fallback: 'Nothing was changed. Try again.' }),
@@ -461,7 +512,7 @@ function InboxItems({ items, archived }: { items: InboxItem[]; archived: boolean
             key={item.id}
             item={item}
             archived={archived}
-            link={linkStateFor(links.ready, links.reachUnknown, links.resolve, item)}
+            link={linkStateFor(links.ready, links.reachUnknown, links.resolve, item, links.fleetReachUnknown)}
             place={inboxPlace(item, vesselName)}
             busy={busy.has(item.id)}
             onOpen={() => {

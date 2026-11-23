@@ -3,7 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { assignVesselCodes, resolveVesselByCode } from '@/modules/vessels/lib/vesselCode';
 import { normaliseError } from '@/shared/lib/notify';
-import { membershipReach, vesselInReachableState, type ReachVessel } from '@/app/router/membershipReach';
+import {
+  LEGACY_ALL_VESSEL_ROLES,
+  legacyReach,
+  membershipReach,
+  type ReachVessel,
+} from '@/app/router/membershipReach';
 import { LEGACY_REACH, NO_REACH, readOwnMembership, reachModeFor, type VesselReach } from '@/app/router/ownMembership';
 import type { VesselLifecycleStatus } from '@/modules/vessels/types/db.pending';
 import { useUiPreferenceSync } from '@/app/shell/useUiPreferenceSync';
@@ -107,14 +112,8 @@ const toReachVessel = (v: Vessel): ReachVessel => ({
   lifecycleStatus: v.lifecycle_status ?? null,
 });
 
-/** The legacy status rule (`.neq('status', 'Sold')`, which also drops a null status) plus "never archived". */
-const reachable = (v: Vessel): boolean => vesselInReachableState(toReachVessel(v));
-
 const STORAGE_KEY_VESSEL_ID = 'storm_selectedVesselId';
 const STORAGE_KEY_ALL_VESSELS = 'storm_isAllVessels';
-
-// Roles that can access all vessels and see \"All Vessels\" option
-const ALL_VESSELS_ROLES = ['dpa', 'shore_management'];
 
 /**
  * How long a signed-in user without a profile reads as loading. The same
@@ -152,9 +151,10 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   useUiPreferenceSync(authUserId);
 
   // The legacy rule (D-26): DPA and shore management see every company
-  // vessel. It picks today's queries; what is served depends on the reach
-  // rules the load found (see `servedReach` below).
-  const legacyAllVessels = ALL_VESSELS_ROLES.includes(profile?.role || '');
+  // vessel (LEGACY_ALL_VESSEL_ROLES, the same list legacyReach applies). It
+  // picks today's queries; what is served depends on the reach rules the
+  // load found (see `servedReach` below).
+  const legacyAllVessels = LEGACY_ALL_VESSEL_ROLES.includes(profile?.role || '');
   // The reach rules of the last load (Phase 2 spec §B.4).
   const [reach, setReach] = useState<VesselReach>(NO_REACH);
 
@@ -228,6 +228,21 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           .select('vessel_id')
           .eq('user_id', userId)
           .eq('is_current', true);
+      // The legacy rules (D-26) are legacyReach's, the function the shared
+      // fixture (reach-cases.json) checks against the SQL: the vessel ids it
+      // reaches among `rows`, given the current assignments. Fleet reach is
+      // not decided here: useMembershipReach applies reach.ts hasFleetReach,
+      // which legacyReach shares, with the RBAC roles this context never holds.
+      const legacyVesselIds = (rows: readonly Vessel[], assigned: readonly { vessel_id: string }[]) =>
+        new Set(
+          legacyReach({
+            companyId,
+            profileRole: profile.role ?? null,
+            rbacRoles: [],
+            assignments: assigned.map((a) => ({ vesselId: a.vessel_id, isCurrent: true })),
+            companyVessels: rows.map(toReachVessel),
+          }).vesselIds,
+        );
 
       // The user's own membership decides which reach rules apply (Phase 2
       // spec §B.4). It runs alongside the vessel reads; a failure (anything
@@ -254,12 +269,14 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       let allowAllVessels = false;
 
       if (mode.source === 'legacy' && legacyAllVessels) {
-        // D-26: DPA / shore management see all company vessels.
+        // D-26: DPA / shore management see all company vessels: legacyReach
+        // over the directory (the same rows as `.neq('status', 'Sold')`,
+        // which also drops a null status, and never an archived vessel).
         if (directoryRes.error) throw directoryRes.error;
         const directory: Vessel[] = directoryRes.data || [];
         setCompanyVessels(directory);
-        // Same rows as `.neq('status', 'Sold')`, which also drops a null status.
-        vesselsData = directory.filter(reachable);
+        const ids = legacyVesselIds(directory, []);
+        vesselsData = directory.filter((v) => ids.has(v.id));
         allowAllVessels = true;
       } else if (mode.source === 'legacy') {
         // D-26: other users see only their assigned vessels.
@@ -283,7 +300,12 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           if (!current()) return;
 
           if (error) throw error;
-          vesselsData = (data || []).filter(reachable);
+          // legacyReach over the assigned vessels' own rows, not the
+          // directory: a failed directory read then only degrades the codes,
+          // as before (the rows read here carry everything the rules check).
+          const rows: Vessel[] = data || [];
+          const ids = legacyVesselIds(rows, assignments);
+          vesselsData = rows.filter((v) => ids.has(v.id));
         }
         setCompanyVessels(directory);
       } else if (mode.source === 'membership') {

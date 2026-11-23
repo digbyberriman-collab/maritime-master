@@ -7,7 +7,7 @@
  */
 import { useCallback, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchInvitationsByProfile, revokeInvitation, type InvitationListRow } from '@/modules/auth/services/invitations';
+import { fetchInvitationsByProfile, revokeInvitation, revokeInvitationNotice, type InvitationListRow } from '@/modules/auth/services/invitations';
 import { bulkInvite, bulkInviteNotice, inviteNotice, sendInvitation } from '@/modules/auth/services/adminActions';
 import { showOutcomeNotice } from '@/modules/auth/lib/outcomeNotices';
 import { notify } from '@/shared/lib/notify';
@@ -85,24 +85,35 @@ export function useInvitationActions() {
     [bulk],
   );
 
-  const revoke = useMutation({
+  const revokeMutation = useMutation({
     mutationFn: ({ invitationId }: { invitationId: string; name: string }) => revokeInvitation(invitationId),
-    onSuccess: (outcome, { name }) => {
-      if (outcome.kind === 'revoked') notify.success('Invitation revoked', { description: `The link sent to ${name} no longer works.` });
-      else if (outcome.kind === 'missing') notify.warning('Not available yet', { description: 'Revoking needs invitation tracking, which is not set up yet. Nothing was changed.' });
-      else if (outcome.kind === 'refused') notify.error("You don't have permission to revoke invitations.", { title: 'Could not revoke the invitation' });
-      else notify.warning('Nothing to revoke', { description: 'This invitation was already accepted, expired or revoked.' });
-    },
-    onError: (error: unknown) => notify.error(error, { title: 'Could not revoke the invitation' }),
     onSettled: refresh,
   });
+
+  /**
+   * Revoke, then say what happened (admin-actions `revoke_invitation`):
+   * "can no longer use the link" only when the login was blocked; a warning
+   * when they may still sign in (turn their access off for that).
+   */
+  const revoke = useCallback(
+    async function run(target: { invitationId: string; name: string }): Promise<void> {
+      const id = `revoke-${target.invitationId}`;
+      try {
+        const outcome = await revokeMutation.mutateAsync(target);
+        showOutcomeNotice(revokeInvitationNotice(outcome, target.name), { id, onRetry: () => void run(target) });
+      } catch (error) {
+        notify.error(error, { title: 'Could not revoke the invitation', id });
+      }
+    },
+    [revokeMutation],
+  );
 
   return {
     inviteOne,
     inviteMany,
-    revoke: revoke.mutate,
+    revoke: (target: { invitationId: string; name: string }) => void revoke(target),
     invitingProfileId: invite.isPending ? invite.variables?.profileId ?? null : null,
     bulkPending: bulk.isPending,
-    revokePending: revoke.isPending,
+    revokePending: revokeMutation.isPending,
   };
 }

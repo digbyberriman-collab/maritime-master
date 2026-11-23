@@ -22,6 +22,15 @@ export interface ScopeAccess {
   /** Auth has finished and nobody is signed in. */
   signedOut: boolean;
   fleetReach: boolean;
+  /**
+   * The vessel-list load failed before the reach rules were decided (the
+   * membership read failed), so `fleetReach` is false for want of an
+   * answer, not a decided denial: show the vessel-list error with Retry,
+   * never "not available to you" (D-165, D-119, D-04). False once any load
+   * of this user's has decided, and for a decided "no fleet reach" whose
+   * vessel reads then failed (a legacy crew user: the role decides).
+   */
+  reachUnknown: boolean;
   /** The selected vessel's code, else the first reachable vessel's; null if none. */
   lastVesselCode: string | null;
   /**
@@ -66,7 +75,7 @@ export function useScopeAccess(): ScopeAccess {
   // Fleet reach under the rules VesselContext's load applied: memberships
   // once live, the legacy role and RBAC rules until then (Phase 2 §B.4).
   // RBAC roles count only while they are this user's own.
-  const { fleetReach } = useMembershipReach();
+  const { fleetReach, reachUnknown } = useMembershipReach();
 
   // The profile arrives a moment after the session, and VesselContext only
   // loads once it has one. Wait for it, but not forever: a signed-in user
@@ -134,6 +143,8 @@ export function useScopeAccess(): ScopeAccess {
     signedIn: !!user,
     signedOut: !authLoading && !user,
     fleetReach,
+    // Not for a signed-in user with no readable profile (as vesselsError).
+    reachUnknown: profile ? reachUnknown : false,
     lastVesselCode,
     // Fleet reach comes from the role, so a fleet user still lands on the
     // fleet dashboard; anyone else waits on `/` for the list (never `/me`).

@@ -1,7 +1,7 @@
 /**
  * Typed wrappers for the access edge functions (Phase 2 spec §B.3, §C.3;
  * gap/01 F46, F47, W7; proposed D-121, D-122): `send-invitation`,
- * `bulk-invite` and `admin-actions`.
+ * `bulk-invite`, `admin-actions` and `create-crew-member`.
  *
  * Every wrapper returns the honest outcome the function answered, never a
  * guess (non-negotiable 9):
@@ -61,6 +61,8 @@ export const EMAIL_ERROR_CODES = [
   'invalid_recipient',
   'invalid_link',
   'link_failed',
+  /** The email service is already handling a message with this idempotency key (a double click, two admins at once). */
+  'provider_duplicate',
 ] as const;
 export type EmailErrorCode = (typeof EMAIL_ERROR_CODES)[number];
 
@@ -80,7 +82,7 @@ export interface EdgeFailure {
   details: Readonly<Record<string, unknown>>;
 }
 
-export type EdgeFunctionName = 'send-invitation' | 'bulk-invite' | 'admin-actions';
+export type EdgeFunctionName = 'send-invitation' | 'bulk-invite' | 'admin-actions' | 'create-crew-member';
 
 // ─── Copy ──────────────────────────────────────────────────────────────────
 
@@ -128,6 +130,7 @@ export const EMAIL_ERROR_COPY: Readonly<Record<EmailErrorCode, string>> = {
   invalid_recipient: 'The email address is not valid. Fix it, then try again.',
   invalid_link: 'The link for the email could not be made. Contact STORM support.',
   link_failed: 'The sign-in link could not be created. Try again.',
+  provider_duplicate: 'An email to this person is already being sent. Wait a minute, then try again.',
 };
 const EMAIL_ERROR_FALLBACK = 'The email service did not accept the message. Try again.';
 
@@ -135,9 +138,11 @@ export function emailErrorMessage(code: EmailErrorCode | null): string {
   return code ? EMAIL_ERROR_COPY[code] : EMAIL_ERROR_FALLBACK;
 }
 
+const RETRYABLE_EMAIL_ERRORS: ReadonlySet<EmailErrorCode> = new Set<EmailErrorCode>(['provider_unavailable', 'link_failed', 'provider_rejected', 'provider_duplicate']);
+
 /** Retrying can help (the cause is temporary); a missing set-up or a bad address needs someone to fix it first. */
 export function emailErrorIsRetryable(code: EmailErrorCode | null): boolean {
-  return code === null || code === 'provider_unavailable' || code === 'link_failed' || code === 'provider_rejected';
+  return code === null || RETRYABLE_EMAIL_ERRORS.has(code);
 }
 
 const RETRYABLE_FAILURES: ReadonlySet<FailureCode> = new Set<FailureCode>([
@@ -181,7 +186,7 @@ function failureMessage(code: FailureCode, reason: string | null, details: Recor
 
 type JsonObject = Record<string, unknown>;
 
-interface EdgeAnswer {
+export interface EdgeAnswer {
   /** HTTP status; null when nothing answered. */
   status: number | null;
   body: unknown;
@@ -276,8 +281,10 @@ export function failureFrom(answer: EdgeAnswer): EdgeFailure {
   };
 }
 
-const isSuccess = (answer: EdgeAnswer) => answer.status !== null && answer.status >= 200 && answer.status < 300;
-const okBody = (answer: EdgeAnswer): JsonObject | null => (isSuccess(answer) && isObject(answer.body) && answer.body.ok === true ? answer.body : null);
+/** A 2xx answer (supabase-js hands back every 2xx, 201 included, as `data`). */
+export const isSuccess = (answer: EdgeAnswer): boolean => answer.status !== null && answer.status >= 200 && answer.status < 300;
+/** The body of a 2xx `{ ok: true, … }` answer; null for anything else (an older function's `{ success: true }`, `{}`). */
+export const okBody = (answer: EdgeAnswer): JsonObject | null => (isSuccess(answer) && isObject(answer.body) && answer.body.ok === true ? answer.body : null);
 
 // ─── Invitations ───────────────────────────────────────────────────────────
 
@@ -329,6 +336,8 @@ export interface BulkInviteRow {
   code: string | null;
   emailError: EmailErrorCode | null;
   reason: string | null;
+  /** A failed send that may work when tried again (`emailErrorIsRetryable`: a busy or duplicate send, a failed link). */
+  retryable: boolean;
 }
 
 export type BulkInviteOutcome =
@@ -342,14 +351,16 @@ function bulkRowFrom(value: unknown): BulkInviteRow | null {
   const profileId = stringOrNull(value.profileId);
   const status = value.status;
   if (!profileId || (status !== 'sent' && status !== 'send_failed' && status !== 'refused')) return null;
+  const emailError = isEmailCode(value.emailError) ? value.emailError : null;
   return {
     profileId,
     status,
     stored: value.stored === true,
     invitationId: stringOrNull(value.invitationId),
     code: stringOrNull(value.code),
-    emailError: isEmailCode(value.emailError) ? value.emailError : null,
+    emailError,
     reason: stringOrNull(value.reason),
+    retryable: status === 'send_failed' && emailErrorIsRetryable(emailError),
   };
 }
 
@@ -411,7 +422,8 @@ export async function verifyAdminPin(pin: string): Promise<PinVerifyOutcome> {
   return { kind: 'failed', failure: failureFrom(answer) };
 }
 
-function unconfirmedFailure(answer: EdgeAnswer): EdgeFailure {
+/** A 2xx without the body STORM needs to say what happened: never read as success. */
+export function unconfirmedFailure(answer: EdgeAnswer): EdgeFailure {
   return { status: answer.status, code: 'unexpected_response', reason: null, message: FAILURE_COPY.unexpected_response, retryAfterSeconds: null, details: {} };
 }
 
@@ -532,6 +544,164 @@ export async function reallocateVessel(input: ReallocateInput): Promise<Realloca
   return { kind: 'failed', failure };
 }
 
+// ─── create-crew-member ────────────────────────────────────────────────────
+
+/** `profiles.role` values the function accepts (its `CREW_ROLES`). Admin roles are given in Users & Access (D-124). */
+export const CREW_MEMBER_ROLES = ['crew', 'master', 'chief_officer', 'chief_engineer'] as const;
+export type CrewMemberRole = (typeof CREW_MEMBER_ROLES)[number];
+
+/**
+ * A new crew member. No password (the person sets one from the invitation
+ * link) and no company (the function takes the caller's).
+ */
+export interface CreateCrewMemberInput {
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone?: string;
+  nationality?: string;
+  rank?: string;
+  role?: CrewMemberRole;
+  vesselId?: string;
+  position?: string;
+  /** `yyyy-MM-dd`. */
+  joinDate?: string;
+  /** Email an invitation (the function's default is true). Without one the person is added as not invited. */
+  sendInvite?: boolean;
+}
+
+export type CreateCrewOutcome =
+  /** 201 with the honest body: added, and the invitation sent (or not asked for). */
+  | { kind: 'created'; profileId: string; invited: 'sent' | 'not_sent'; stored: boolean }
+  /**
+   * Added as not invited, but the invitation was not sent: the email failed
+   * (`emailError`) or the invitation path refused (`inviteCode`). Send it
+   * again from Users & Access; adding the person again is refused (409).
+   */
+  | { kind: 'created_invite_failed'; profileId: string | null; emailError: EmailErrorCode | null; inviteCode: string | null; assignmentFailed: boolean }
+  /** Added (and invited when asked), but the vessel assignment was not saved. */
+  | { kind: 'created_assignment_failed'; profileId: string | null; invited: 'sent' | 'not_sent' | null }
+  /** A 2xx without the honest body (an older deployed function, the visual harness's `{}`): STORM cannot say it worked (D-143). */
+  | { kind: 'unconfirmed' }
+  | { kind: 'failed'; failure: EdgeFailure };
+
+/** The request body: only the fields that have a value (the function trims and treats blanks as absent). */
+function createCrewBody(input: CreateCrewMemberInput): JsonObject {
+  const body: JsonObject = {};
+  const put = (key: keyof CreateCrewMemberInput, value: string | undefined) => {
+    const text = value?.trim();
+    if (text) body[key] = text;
+  };
+  put('email', input.email);
+  put('firstName', input.firstName);
+  put('lastName', input.lastName);
+  put('phone', input.phone);
+  put('nationality', input.nationality);
+  put('rank', input.rank);
+  put('role', input.role);
+  put('vesselId', input.vesselId);
+  put('position', input.position);
+  put('joinDate', input.joinDate);
+  if (typeof input.sendInvite === 'boolean') body.sendInvite = input.sendInvite;
+  return body;
+}
+
+/** The create-crew-member answer as an outcome. */
+export function createCrewOutcomeFrom(answer: EdgeAnswer): CreateCrewOutcome {
+  const ok = okBody(answer);
+  if (ok) {
+    const profileId = stringOrNull(ok.profileId);
+    const invitation = isObject(ok.invitation) ? ok.invitation : null;
+    if (profileId && invitation?.status === 'sent') return { kind: 'created', profileId, invited: 'sent', stored: invitation.stored === true };
+    if (profileId && invitation?.status === 'not_sent') return { kind: 'created', profileId, invited: 'not_sent', stored: true };
+    return { kind: 'unconfirmed' };
+  }
+  if (isSuccess(answer)) return { kind: 'unconfirmed' };
+  const failure = failureFrom(answer);
+  if (failure.code === 'partial_failure' && failure.details.profileCreated === true) {
+    const profileId = stringOrNull(failure.details.profileId);
+    const invite = failure.details.invitation;
+    if (invite === 'send_failed' || invite === 'refused') {
+      return {
+        kind: 'created_invite_failed',
+        profileId,
+        emailError: invite === 'send_failed' && isEmailCode(failure.details.email_error) ? failure.details.email_error : null,
+        inviteCode: invite === 'refused' ? stringOrNull(failure.details.invite_code) : null,
+        assignmentFailed: failure.details.assignmentCreated === false,
+      };
+    }
+    if (failure.details.assignmentCreated === false) {
+      const body = isObject(answer.body) ? answer.body : {};
+      const status = isObject(body.invitation) ? body.invitation.status : null;
+      return { kind: 'created_assignment_failed', profileId, invited: status === 'sent' || status === 'not_sent' ? status : null };
+    }
+  }
+  return { kind: 'failed', failure };
+}
+
+/** Add one crew member (`create-crew-member`): a profile without a login, invited by STORM's own email when asked. */
+export async function createCrewMember(input: CreateCrewMemberInput): Promise<CreateCrewOutcome> {
+  return createCrewOutcomeFrom(await invokeEdge('create-crew-member', createCrewBody(input)));
+}
+
+/** One CSV import row's result, from its create-crew-member outcome. */
+export type CrewImportRowStatus = 'invited' | 'added' | 'invite_failed' | 'assignment_failed' | 'unconfirmed' | 'failed';
+
+export interface CrewImportRowResult {
+  status: CrewImportRowStatus;
+  /** True when a profile now exists for the row (every status but `failed`; `unconfirmed` cannot say). */
+  created: boolean;
+  /** One sentence for the person. */
+  message: string;
+}
+
+export function crewImportRowResult(outcome: CreateCrewOutcome): CrewImportRowResult {
+  switch (outcome.kind) {
+    case 'created':
+      return outcome.invited === 'sent'
+        ? { status: 'invited', created: true, message: withNote('Added and invited.', outcome.stored ? null : NOT_STORED_NOTE) ?? 'Added and invited.' }
+        : { status: 'added', created: true, message: 'Added. No invitation was sent.' };
+    case 'created_invite_failed': {
+      const why = outcome.emailError ? `The invitation email could not be sent: ${emailErrorMessage(outcome.emailError)}` : 'The invitation was not sent.';
+      const vessel = outcome.assignmentFailed ? ' The vessel assignment was not saved either.' : '';
+      return { status: 'invite_failed', created: true, message: `Added, but not invited. ${why}${vessel} Send it from Users & Access.` };
+    }
+    case 'created_assignment_failed':
+      return {
+        status: 'assignment_failed',
+        created: true,
+        message: `${outcome.invited === 'sent' ? 'Added and invited' : 'Added'}, but the vessel assignment could not be saved. Assign the vessel from the crew list.`,
+      };
+    case 'unconfirmed':
+      return { status: 'unconfirmed', created: false, message: 'STORM could not confirm this row. Check the crew list before importing it again.' };
+    case 'failed':
+      return { status: 'failed', created: false, message: outcome.failure.message };
+  }
+}
+
+export interface CrewImportSummary {
+  /** Rows that now have a profile (invited, added, invite failed, assignment failed). */
+  created: number;
+  invited: number;
+  inviteFailed: number;
+  assignmentFailed: number;
+  unconfirmed: number;
+  failed: number;
+}
+
+/** Counts from the rows' own results, never assumed. */
+export function crewImportSummary(results: readonly CrewImportRowResult[]): CrewImportSummary {
+  const count = (status: CrewImportRowStatus) => results.filter((r) => r.status === status).length;
+  return {
+    created: results.filter((r) => r.created).length,
+    invited: count('invited'),
+    inviteFailed: count('invite_failed'),
+    assignmentFailed: count('assignment_failed'),
+    unconfirmed: count('unconfirmed'),
+    failed: count('failed'),
+  };
+}
+
 // ─── What to tell the person ───────────────────────────────────────────────
 
 export type NoticeTone = 'success' | 'warning' | 'error';
@@ -574,6 +744,46 @@ export function inviteNotice(outcome: InviteOutcome, recipient?: string | null):
       };
     case 'failed':
       return { tone: 'error', title: 'Could not send the invitation', description: outcome.failure.message, retry: failureIsRetryable(outcome.failure) };
+  }
+}
+
+/** The notice for adding one crew member (create-crew-member): "added" only after the honest 201, and the invitation said as it went. */
+export function createCrewNotice(outcome: CreateCrewOutcome, name?: string | null): OutcomeNotice {
+  const who = name?.trim() || 'The crew member';
+  switch (outcome.kind) {
+    case 'created':
+      return outcome.invited === 'sent'
+        ? {
+            tone: 'success',
+            title: 'Crew member added',
+            description: withNote(`${who} was added and STORM emailed them an invitation.`, outcome.stored ? null : NOT_STORED_NOTE),
+            retry: false,
+          }
+        : { tone: 'success', title: 'Crew member added', description: `${who} was added. Send their invitation from Users & Access when they are ready to join.`, retry: false };
+    case 'created_invite_failed': {
+      const why = outcome.emailError ? emailErrorMessage(outcome.emailError) : null;
+      const vessel = outcome.assignmentFailed ? 'The vessel assignment was not saved either.' : null;
+      return {
+        tone: 'error',
+        title: 'Crew member added, invitation not sent',
+        description: [`${who} was added, but ${outcome.emailError ? 'the invitation email could not be sent.' : 'the invitation was not sent.'}`, why, vessel, 'Send it from Users & Access.']
+          .filter(Boolean)
+          .join(' '),
+        // Adding them again is refused (the email is in use): the retry is the invitation, from Users & Access.
+        retry: false,
+      };
+    }
+    case 'created_assignment_failed':
+      return {
+        tone: 'error',
+        title: 'Crew member added, vessel not assigned',
+        description: `${who} was added${outcome.invited === 'sent' ? ' and invited' : ''}, but the vessel assignment could not be saved. Assign the vessel from the crew list.`,
+        retry: false,
+      };
+    case 'unconfirmed':
+      return { tone: 'warning', title: 'Crew member requested', description: 'STORM could not confirm that the crew member was added. Check the crew list before adding them again.', retry: false };
+    case 'failed':
+      return { tone: 'error', title: 'Could not add the crew member', description: outcome.failure.message, retry: failureIsRetryable(outcome.failure) };
   }
 }
 

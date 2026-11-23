@@ -17,6 +17,9 @@ vi.mock('@/integrations/supabase/client', async () => (await import('./inboxFake
 
 const h = vi.hoisted(() => ({
   accessReady: true,
+  /** The vessel list failed to load: VesselContext then serves no vessels. */
+  vesselsError: null as { message: string } | null,
+  retryVessels: (() => undefined) as () => void,
   center: {
     data: undefined as unknown,
     isPending: false,
@@ -35,15 +38,19 @@ vi.mock('@/modules/vessels/contexts/VesselContext', () => {
     { id: 'v-hyd', name: 'Hydra' },
   ];
   const codes: Record<string, string> = { 'v-dra': 'DRA', 'v-hyd': 'HYD' };
+  // A failed first load serves no vessels (VesselContext keeps the lists empty).
+  const served = () => (h.vesselsError ? [] : vessels);
   return {
     useVessel: () => ({
-      vessels,
-      getVesselCodeById: (id: string | null | undefined) => (id ? codes[id] ?? null : null),
-      findVesselByCode: (code: string | null | undefined) => vessels.find((v) => codes[v.id] === (code ?? '').trim().toUpperCase()),
+      vessels: served(),
+      getVesselCodeById: (id: string | null | undefined) => (id && !h.vesselsError ? codes[id] ?? null : null),
+      findVesselByCode: (code: string | null | undefined) => served().find((v) => codes[v.id] === (code ?? '').trim().toUpperCase()),
     }),
   };
 });
-vi.mock('@/app/router/useScopeAccess', () => ({ useScopeAccess: () => ({ ready: h.accessReady, fleetReach: false, vesselsError: null }) }));
+vi.mock('@/app/router/useScopeAccess', () => ({
+  useScopeAccess: () => ({ ready: h.accessReady, fleetReach: false, reachUnknown: false, vesselsError: h.vesselsError, retryVessels: h.retryVessels }),
+}));
 vi.mock('@/shared/components/layout/DashboardLayout', () => ({ default: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock('@/modules/notifications/hooks/useInboxLinks', async () => {
   const { resolveInboxLink } = await import('@/modules/notifications/lib/deepLink');
@@ -51,6 +58,7 @@ vi.mock('@/modules/notifications/hooks/useInboxLinks', async () => {
     useInboxLinks: () => ({
       ready: true,
       reachUnknown: false,
+      fleetReachUnknown: false,
       resolve: (row: Parameters<typeof resolveInboxLink>[0]) =>
         resolveInboxLink(row, { fleetReach: false, reachableVesselCodes: new Set(['DRA', 'HYD']), canOpenWorkspace: () => false }),
     }),
@@ -85,6 +93,8 @@ const CENTER_DATA = {
 beforeEach(() => {
   resetInboxFake();
   h.accessReady = true;
+  h.vesselsError = null;
+  h.retryVessels = () => undefined;
   h.center = { data: CENTER_DATA, isPending: false, isError: false, error: null };
   h.centerRefetch = () => undefined;
 });
@@ -265,6 +275,53 @@ describe('All and Archived lists', () => {
     expect(await screen.findByRole('heading', { name: 'Nothing archived' })).toBeInTheDocument();
   });
 
+  it.each([
+    ['the only row (the list unmounts before Undo)', 1],
+    ['one of two rows (the list stays)', 2],
+  ])('an Undo that fails says so: %s (gap/03 C9, no fake success)', async (_name, rows) => {
+    const a = inboxRow({ title: 'Alpha', minutesAgo: 1 });
+    const others = rows > 1 ? [inboxRow({ title: 'Bravo', minutesAgo: 2 })] : [];
+    inboxFake.tables.notification_inbox = [a, ...others];
+    const success = vi.spyOn(notify, 'success').mockImplementation(() => 'ok');
+    const error = vi.spyOn(notify, 'error').mockImplementation(() => 'x');
+    renderInbox('/inbox?tab=all');
+    fireEvent.click(await screen.findByRole('button', { name: 'Archive "Alpha"' }));
+    await waitFor(() => expect(success).toHaveBeenCalledWith('Archived', expect.anything()));
+    await waitFor(() => expect(screen.queryByText('Alpha')).toBeNull());
+    if (rows > 1) expect(screen.getByText('Bravo')).toBeInTheDocument();
+    else expect(await screen.findByRole('heading', { name: 'No notifications' })).toBeInTheDocument();
+
+    // The write path now fails (RLS, a dropped connection) and the user presses Undo.
+    inboxFake.writeFailures.notification_inbox = RLS_DENIED;
+    const undo = success.mock.calls[0][1]?.action?.onClick;
+    await act(async () => {
+      undo?.();
+    });
+    await waitFor(() =>
+      expect(error).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ title: 'Could not move the notification back' })),
+    );
+    expect(success).not.toHaveBeenCalledWith('Moved back to the inbox');
+    expect(a.archived_at).toEqual(expect.any(String));
+  });
+
+  it('an Undo that lands says so', async () => {
+    const a = inboxRow({ title: 'Alpha' });
+    inboxFake.tables.notification_inbox = [a];
+    const success = vi.spyOn(notify, 'success').mockImplementation(() => 'ok');
+    const error = vi.spyOn(notify, 'error').mockImplementation(() => 'x');
+    renderInbox('/inbox?tab=all');
+    fireEvent.click(await screen.findByRole('button', { name: 'Archive "Alpha"' }));
+    await waitFor(() => expect(success).toHaveBeenCalledWith('Archived', expect.anything()));
+    const undo = success.mock.calls[0][1]?.action?.onClick;
+    await act(async () => {
+      undo?.();
+    });
+    await waitFor(() => expect(success).toHaveBeenCalledWith('Moved back to the inbox'));
+    expect(a.archived_at).toBeNull();
+    expect(error).not.toHaveBeenCalled();
+    expect(await screen.findByText('Alpha')).toBeInTheDocument();
+  });
+
   it('an archive that fails, or changes nothing, says so (no fake success)', async () => {
     const a = inboxRow({ title: 'Alpha' });
     inboxFake.tables.notification_inbox = [a];
@@ -366,6 +423,30 @@ describe('filters', () => {
     expect(await screen.findByRole('heading', { name: 'That vessel is not one you can reach' })).toBeInTheDocument();
     expect(screen.queryByText('Should not show')).toBeNull();
     expect(listCalls()).toEqual([]);
+  });
+
+  it('a vessel filter while the vessel list is in error: the error with Retry, not "out of reach", and nothing read (D-119)', async () => {
+    h.vesselsError = { message: 'Your vessels could not load.' };
+    const retry = vi.fn();
+    h.retryVessels = retry;
+    inboxFake.tables.notification_inbox = [inboxRow({ title: 'Should not show' })];
+    renderInbox('/inbox?tab=all&vessel=dra');
+    expect(await screen.findByText('Your vessels could not load')).toBeInTheDocument();
+    expect(screen.getByText(/The vessel filter cannot be checked until your vessels load/)).toBeInTheDocument();
+    expect(screen.queryByText('That vessel is not one you can reach')).toBeNull();
+    expect(screen.queryByText('Should not show')).toBeNull();
+    // The page keeps its own heading and the filter bar, so the filters can be cleared.
+    expect(screen.getByRole('heading', { level: 1, name: 'Inbox' })).toBeInTheDocument();
+    expect(await screen.findByRole('group', { name: 'Filter notifications' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(retry).toHaveBeenCalledTimes(1);
+    await act(async () => {});
+    expect(listCalls()).toEqual([]);
+
+    const clear = screen.getAllByRole('button', { name: 'Clear filters' });
+    fireEvent.click(clear[0]);
+    await waitFor(() => expect(location()).toBe('/inbox?tab=all'));
+    expect(await screen.findByText('Should not show')).toBeInTheDocument();
   });
 
   it('a vessel filter waits for the vessel list before reading', async () => {

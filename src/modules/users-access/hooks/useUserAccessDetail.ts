@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { PermissionLevel } from '../lib/presets';
 import { accountStateOf, type AccountState } from '../lib/invitationStatus';
+import { highestPermissionByModule } from '../lib/permissionRank';
 
 export interface AccessDetail {
   profileId: string;
@@ -30,8 +31,15 @@ export function useUserAccessDetail(userId?: string) {
       if (error) throw error;
       if (!prof) return null;
 
-      const [{ data: assignment }, { data: overrides }, { data: rolesRows }] = await Promise.all([
-        supabase.from('crew_assignments').select('position').eq('user_id', userId!).eq('is_current', true).maybeSingle(),
+      const [assignmentRes, overridesRes, rolesRes] = await Promise.all([
+        // Several current rows are valid (one per vessel): the most recent join shows.
+        supabase
+          .from('crew_assignments')
+          .select('position')
+          .eq('user_id', userId!)
+          .eq('is_current', true)
+          .order('join_date', { ascending: false })
+          .limit(1),
         supabase
           .from('user_permission_overrides')
           .select('module_key, permission, is_granted')
@@ -39,13 +47,17 @@ export function useUserAccessDetail(userId?: string) {
           .eq('is_granted', true),
         supabase.rpc('get_user_roles_full', { p_user_id: userId! }),
       ]);
+      // A failed read is an error state, not "no access" (fail closed, D-04): the
+      // page shows PageError with Retry instead of a matrix of "None".
+      if (assignmentRes.error) throw assignmentRes.error;
+      if (overridesRes.error) throw overridesRes.error;
+      if (rolesRes.error) throw rolesRes.error;
+      const assignment = assignmentRes.data?.[0] ?? null;
 
-      const permissions: Record<string, PermissionLevel | null> = {};
-      (overrides ?? []).forEach((o) => {
-        permissions[o.module_key] = o.permission as PermissionLevel;
-      });
+      // Duplicate rows for a module: the highest one applies, so it is the one shown (as on the list).
+      const permissions: Record<string, PermissionLevel | null> = highestPermissionByModule(overridesRes.data ?? []);
 
-      const roleDisplayName = (rolesRows ?? [])[0]?.role_display_name ?? null;
+      const roleDisplayName = (rolesRes.data ?? [])[0]?.role_display_name ?? null;
 
       return {
         profileId: prof.id,
