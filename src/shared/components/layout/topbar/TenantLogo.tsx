@@ -8,6 +8,12 @@
  * While auth, the profile or the company row is loading it is a skeleton,
  * never the STORM wordmark in place of a tenant that has not loaded (D-04).
  * The link goes to the user's home (gap/01 landing rules).
+ *
+ * The accessible name follows the same rule as the visual (D-110): while
+ * loading it is the neutral "Go to my start page" with aria-busy, never
+ * "STORM"; once settled it names the display name, else (a logo with no
+ * display name) the company, and "STORM" only when there is nothing to
+ * name: no display name, no logo with a company name, or the read failed.
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
@@ -34,19 +40,22 @@ export interface TenantLogoProps {
 
 const TenantLogo: React.FC<TenantLogoProps> = ({ className, surface = 'topbar' }) => {
   const onSidebar = surface === 'sidebar';
-  const { clientLogoUrl, clientDisplayName, tenantBrandColor, isLoading } = useBrandingContext();
+  const { clientLogoUrl, clientDisplayName, companyName, tenantBrandColor, isLoading } = useBrandingContext();
   const access = useScopeAccess();
   const [logoFailed, setLogoFailed] = React.useState(false);
   React.useEffect(() => setLogoFailed(false), [clientLogoUrl]);
   const name = clientDisplayName?.trim() || null;
   const home = access.ready ? access.homePath : '/';
   const showLogo = Boolean(clientLogoUrl) && !logoFailed;
+  const labelName = name ?? (showLogo ? companyName?.trim() || null : null);
+  const label = isLoading ? 'Go to my start page' : `${labelName ?? 'STORM'}, go to my start page`;
 
   return (
     <Link
       to={home}
       data-testid={SHELL_TEST_IDS.tenantLogo}
-      aria-label={`${name ?? 'STORM'}, go to my start page`}
+      aria-label={label}
+      aria-busy={isLoading || undefined}
       className={cn(
         'min-h-11 shrink-0 items-center rounded-md px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
         onSidebar ? 'focus-visible:ring-sidebar-ring focus-visible:ring-offset-sidebar' : 'focus-visible:ring-ring focus-visible:ring-offset-background',

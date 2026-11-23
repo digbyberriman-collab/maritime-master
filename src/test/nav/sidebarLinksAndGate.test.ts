@@ -111,6 +111,17 @@ describe('the module-off route gate', () => {
     expect(vesselRouteDecision('crew/list', horLater)).toBe('ok');
   });
 
+  it('ignores case like the router (D-111): an upper-case rest needs the same keys and is gated the same', () => {
+    expect(moduleSettingsForVesselPath('Technical/Jobs/12')).toEqual(['technical', 'technical.jobs']);
+    expect(moduleSettingsForVesselPath('CREW/People/P1/Hours-Of-Rest')).toEqual(['crew', 'crew_hor']);
+    expect(vesselRouteDecision('CREW/list', off('crew'))).toEqual({ off: 'crew' });
+    expect(vesselRouteDecision('technical/JOBS', off('technical.jobs'))).toEqual({ off: 'technical.jobs' });
+    expect(vesselRouteDecision('TECHNICAL', loading)).toBe('loading');
+    expect(vesselRouteDecision('CREW/list', failed)).toBe('error');
+    // Still never gated.
+    expect(vesselRouteDecision('CALENDAR', off('crew'))).toBe('ok');
+  });
+
   it('names an off key the way the nav does, after the vessel’s override', () => {
     expect(moduleSettingLabel('technical', () => null)).toBe('Technical');
     expect(moduleSettingLabel('technical.jobs', () => null)).toBe('Jobs');

@@ -558,6 +558,13 @@ export const AppRoutes: React.FC = () => {
         <Route path="/help" element={<KeepSearchNavigate to="/help/how-to-guides" />} />
         <Route path="/help/how-to-guides" element={<HowToGuidesPage />} />
         <Route path="/help/support" element={<SupportPage />} />
+        {/* Any other /inbox or /help URL is the in-scope 404 (D-96), as in the
+            Fleet and vessel scopes, never a jump to the Fleet dashboard. The
+            static routes above outrank these splats. The planned gap/10 Help
+            URLs (/help/faqs/:id, /help/requests…) get sitemap placeholders
+            when those leaves are added. */}
+        <Route path={`${INBOX_PATH}/*`} element={<ScopeNotFound />} />
+        <Route path="/help/*" element={<ScopeNotFound />} />
       </Route>
 
       {/* Workspaces keep their URLs, guards and module shells (D-09). Their

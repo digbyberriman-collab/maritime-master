@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode, useCa
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { assignVesselCodes, resolveVesselByCode } from '@/modules/vessels/lib/vesselCode';
+import { normaliseError } from '@/shared/lib/notify';
 
 export interface Vessel {
   id: string;
@@ -59,7 +60,23 @@ interface VesselContextType {
    * at most PROFILE_WAIT_MS (an unreadable profile then means no vessels).
    */
   loadedForUserId: string | null;
+  /**
+   * The last load of the vessel lists failed, or null (D-04, gap/10 A.12):
+   * an error state with Retry, never a definitive "no vessels" or "not
+   * found". Set when a load fails and cleared only when one succeeds, so it
+   * stays up while a retry runs (the D-76 latch). A failed refresh keeps
+   * serving the previous lists of the same user. Served behind the same
+   * guard as the lists, so one user's error never shows for another (D-25,
+   * D-41). The company directory read alone failing is not a load error:
+   * that list only feeds the codes, and the reachable vessels loaded.
+   */
+  loadError: { message: string } | null;
+  /** Loads the vessel lists again (the Retry for `loadError`; same as `refreshVessels`). */
+  retryVessels: () => Promise<void>;
 }
+
+/** The sentence a failed vessel-list load falls back to when the error has none. */
+const LOAD_ERROR_FALLBACK = 'Your vessels could not load.';
 
 const VesselContext = createContext<VesselContextType | undefined>(undefined);
 
@@ -87,6 +104,9 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   // account changes the profile before the next load lands; until then the
   // previous user's lists must not be served (fail closed, D-04, D-25).
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  // The last load failed. Latched: only a load that succeeds clears it (or a
+  // user change), never the start of a retry (D-76).
+  const [loadError, setLoadError] = useState<{ message: string } | null>(null);
   // Each load takes a ticket; a load that a newer one (or a user change) has
   // superseded never writes, so A's slow load cannot land after B's.
   const loadSeq = useRef(0);
@@ -131,6 +151,8 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const current = () => seq === loadSeq.current;
     const owner = profile?.user_id ?? null;
     if (!profile?.company_id) {
+      // No company: a definitive "no vessels", so not an error.
+      setLoadError(null);
       setLoading(false);
       setLoadedFor(owner);
       return;
@@ -196,6 +218,7 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
 
       setVessels(vesselsData);
+      setLoadError(null);
 
       // Restore previous selection from localStorage
       const savedIsAllVessels = localStorage.getItem(STORAGE_KEY_ALL_VESSELS) === 'true';
@@ -226,7 +249,12 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setIsAllVessels(true);
       }
     } catch (error) {
-      if (current()) console.error('Error loading vessels:', error);
+      // The lists stay as they were: empty on a first load, the same user's
+      // previous lists on a refresh. Either way it is not "no vessels".
+      if (current()) {
+        console.error('Error loading vessels:', error);
+        setLoadError({ message: normaliseError(error, LOAD_ERROR_FALLBACK).message });
+      }
     } finally {
       if (current()) {
         setLoading(false);
@@ -246,6 +274,7 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     setCompanyVessels([]);
     setSelectedVesselState(null);
     setIsAllVessels(false);
+    setLoadError(null);
     if (!profileUserId) setLoadedFor(null);
   }, [profileUserId]);
 
@@ -339,16 +368,27 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     getVesselCodeById,
     findVesselByCode,
     loadedForUserId: loadedFor,
+    // Never another user's error, nor one served before their lists (D-25, D-41).
+    loadError: stale ? null : loadError,
+    retryVessels: refreshVessels,
   };
 
   return <VesselContext.Provider value={value}>{children}</VesselContext.Provider>;
 };
 
-// Custom hook to use vessel context
-export const useVessel = () => {
+/**
+ * The vessel context. Throws outside a VesselProvider, unless called with
+ * `{ optional: true }`, which returns null there instead: for shell chrome
+ * that only reports on the lists (VesselListNotice) and is also rendered on
+ * its own.
+ */
+export function useVessel(): VesselContextType;
+export function useVessel(options: { optional: true }): VesselContextType | null;
+export function useVessel(options?: { optional?: boolean }): VesselContextType | null {
   const context = useContext(VesselContext);
   if (context === undefined) {
+    if (options?.optional) return null;
     throw new Error('useVessel must be used within a VesselProvider');
   }
   return context;
-};
+}

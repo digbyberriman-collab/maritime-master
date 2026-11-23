@@ -445,6 +445,27 @@ describe('Help in the personal scope (gap/10 Target IA principle 1)', () => {
     expect(document.querySelector('[data-shell-scope]')).toHaveAttribute('data-shell-scope', 'personal');
   });
 
+  // The in-scope 404 (D-96), as in the Fleet and vessel scopes: never a jump
+  // to another scope's home.
+  it.each(['/help/zzz', '/help/faqs', '/help/requests/new', '/inbox/zzz'])(
+    '%s is Page not found inside the personal shell, the URL as written',
+    async (url) => {
+      renderApp(url);
+      expect(await screen.findByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument();
+      expect(location()).toBe(url);
+      expect(document.querySelector('[data-shell-scope]')).toHaveAttribute('data-shell-scope', 'personal');
+      expect(within(sidebar()).getByRole('link', { name: /^Inbox/ })).toHaveAttribute('href', '/inbox');
+      expect(h1s()).toHaveLength(1);
+    },
+  );
+
+  it('/HELP/zzz canonicalises to /help/zzz and is Page not found there (D-111)', async () => {
+    renderApp('/HELP/zzz?x=1');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Page not found' })).toBeInTheDocument();
+    await waitFor(() => expect(location()).toBe('/help/zzz?x=1'));
+    expect(document.querySelector('[data-shell-scope]')).toHaveAttribute('data-shell-scope', 'personal');
+  });
+
   it('/me/support seeds the Support page with the subject it carried', async () => {
     renderApp('/me/support?subject=hello%20there');
     const field = (await screen.findByLabelText('Subject')) as HTMLInputElement;

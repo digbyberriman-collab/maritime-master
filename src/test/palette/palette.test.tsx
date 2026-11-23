@@ -3,7 +3,7 @@
  * ⌘K / Ctrl+K from anywhere (fields too), Esc and focus return, accessible
  * dialog and listbox, fail-closed sources (Pages, Vessels, Recent), gated
  * actions, theme through useThemeChoice, the incident target (with the
- * current vessel), record
+ * current vessel, whose Safety module must be on: S4, W4), record
  * references that find nothing, and a lazy dialog chunk loaded once.
  */
 import React from 'react';
@@ -21,6 +21,7 @@ import { createPaletteLoader, type PaletteDialogModule } from '@/shared/componen
 import { paletteRecentKey, PALETTE_RECENT_LIMIT, recordPaletteRecent } from '@/shared/components/command-palette/recent';
 import { reportIncidentPath, resolveVesselPattern } from '@/shared/components/command-palette/sources';
 import type { Vessel } from '@/modules/vessels/contexts/VesselContext';
+import { TABLE_MISSING_STATE, type ModuleSettingsState, type VesselModuleSetting } from '@/modules/vessels/lib/moduleSettings';
 
 const h = vi.hoisted(() => ({
   nav: { ready: true, leaves: [] } as { ready: boolean; leaves: readonly unknown[] },
@@ -36,6 +37,8 @@ const h = vi.hoisted(() => ({
   signOut: vi.fn(async () => undefined),
   switchVessel: vi.fn(),
   feedbackOpen: vi.fn(),
+  moduleSettings: { status: 'loading' } as ModuleSettingsState,
+  settingsVesselIds: [] as (string | null | undefined)[],
 }));
 
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
@@ -50,6 +53,12 @@ vi.mock('@/modules/auth/contexts/AuthContext', () => ({
 }));
 vi.mock('@/modules/vessels/contexts/VesselContext', () => ({
   useVessel: () => ({ vessels: h.vessels, getVesselCodeById: (id: string | null | undefined) => (id ? h.codes.get(id) ?? null : null) }),
+}));
+vi.mock('@/modules/vessels/hooks/useVesselModuleSettings', () => ({
+  useVesselModuleSettings: (id: string | null | undefined) => {
+    h.settingsVesselIds.push(id);
+    return { state: id ? h.moduleSettings : { status: 'loading' }, fetching: false, retry: () => undefined };
+  },
 }));
 vi.mock('@/modules/feedback/store/feedbackStore', () => ({
   useFeedbackStore: (select: (s: { setPanelOpen: (open: boolean) => void }) => unknown) => select({ setPanelOpen: h.feedbackOpen }),
@@ -191,6 +200,8 @@ beforeEach(() => {
   h.signOut.mockClear();
   h.switchVessel.mockClear();
   h.feedbackOpen.mockClear();
+  h.moduleSettings = TABLE_MISSING_STATE;
+  h.settingsVesselIds = [];
   window.localStorage.clear();
   currentLocation = '';
 });
@@ -546,6 +557,93 @@ describe('Actions', () => {
     expect(recent).not.toBeNull();
     fireEvent.click(within(recent as HTMLElement).getByRole('option', { name: /Report an incident/ }));
     await waitFor(() => expect(currentLocation).toBe('/incidents?new=true'));
+  });
+
+  describe("Report an incident follows the scope vessel's Safety module (S4, W4)", () => {
+    const INCIDENT = /Report an incident/;
+    const safetyRow = (extra: Partial<VesselModuleSetting>): VesselModuleSetting => ({
+      moduleKey: 'safety',
+      enabled: true,
+      enabledFrom: null,
+      labelOverride: null,
+      ...extra,
+    });
+    const settingsOf = (...rows: VesselModuleSetting[]): ModuleSettingsState => ({
+      status: 'ready',
+      source: 'table',
+      settings: new Map(rows.map((row) => [row.moduleKey, row])),
+    });
+    const SAFETY_OFF = settingsOf(safetyRow({ enabled: false }));
+    const inDraak = () => {
+      const draak = h.vessels[0] as Vessel;
+      return { scope: { scope: 'vessel', vessel: draak, vesselCode: 'DRA' } as ScopeValue, draak };
+    };
+
+    beforeEach(() => {
+      h.caps = new Set(['vessel.safety.incidents.create']);
+    });
+
+    it.each<[string, ModuleSettingsState]>([
+      ['Safety switched off', SAFETY_OFF],
+      ['Safety on from a future date', settingsOf(safetyRow({ enabledFrom: '2999-01-01' }))],
+      ['the settings still loading', { status: 'loading' }],
+      ['the settings failed to load', { status: 'error', message: "This vessel's modules could not load." }],
+    ])('is not offered in a vessel with %s', async (_case, state) => {
+      h.moduleSettings = state;
+      renderPalette({ scope: inDraak().scope });
+      const dialog = await openPalette();
+      expect(within(dialog).queryByRole('option', { name: INCIDENT })).toBeNull();
+      typeQuery('incident');
+      await waitFor(() => expect(optionNames(dialog).some((n) => n.startsWith('Report an incident'))).toBe(false));
+      // The settings read are the scope vessel's.
+      expect(h.settingsVesselIds).toContain('v-dra');
+    });
+
+    it('is offered when the settings table does not exist yet (D-01), carrying the vessel', async () => {
+      h.moduleSettings = TABLE_MISSING_STATE;
+      const { scope, draak } = inDraak();
+      renderPalette({ scope });
+      const dialog = await openPalette();
+      fireEvent.click(within(dialog).getByRole('option', { name: INCIDENT }));
+      await waitFor(() => expect(currentLocation).toBe(`/incidents?new=true&vessel=${draak.id}`));
+    });
+
+    it('is offered when Safety is on, or on since a past date', async () => {
+      h.moduleSettings = settingsOf(safetyRow({ enabledFrom: '2000-01-01' }), { ...safetyRow({ enabled: false }), moduleKey: 'technical' });
+      renderPalette({ scope: inDraak().scope });
+      const dialog = await openPalette();
+      expect(within(dialog).getByRole('option', { name: INCIDENT })).toBeInTheDocument();
+    });
+
+    it('in the Fleet scope is unchanged: no vessel is read, whatever the last vessel had', async () => {
+      h.moduleSettings = SAFETY_OFF;
+      renderPalette();
+      const dialog = await openPalette();
+      fireEvent.click(within(dialog).getByRole('option', { name: INCIDENT }));
+      await waitFor(() => expect(currentLocation).toBe('/incidents?new=true'));
+      expect(h.settingsVesselIds.length).toBeGreaterThan(0);
+      expect(h.settingsVesselIds.every((id) => id === null)).toBe(true);
+    });
+
+    it('leaves Recent while Safety is off, after an earlier pick', async () => {
+      const { scope } = inDraak();
+      const before = renderPalette({ scope });
+      let dialog = await openPalette();
+      fireEvent.click(within(dialog).getByRole('option', { name: INCIDENT }));
+      await waitFor(() => expect(currentLocation).toBe('/incidents?new=true&vessel=v-dra'));
+      expect(JSON.parse(window.localStorage.getItem(paletteRecentKey('user-1')) ?? '[]')).toContain('action:report-incident');
+      before.unmount();
+
+      // A page picked since keeps Recent on screen, so its contents are checked.
+      recordPaletteRecent('user-1', 'page:/fleet/training');
+      h.moduleSettings = SAFETY_OFF;
+      renderPalette({ scope });
+      dialog = await openPalette();
+      const recent = groupByHeading(dialog, 'Recent') as HTMLElement;
+      expect(recent).not.toBeNull();
+      expect(within(recent).getAllByRole('option').map((o) => o.textContent)).toEqual(['TrainingFleet › People']);
+      expect(within(dialog).queryByRole('option', { name: INCIDENT })).toBeNull();
+    });
   });
 
   it('reportIncidentPath encodes the vessel id', () => {

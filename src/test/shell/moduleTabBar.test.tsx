@@ -148,6 +148,16 @@ describe('tabs', () => {
     expect(screen.getByTestId(`${SHELL_TEST_IDS.moduleTabPrefix}crew`)).not.toHaveAttribute('aria-current');
   });
 
+  it.each(['/v/dra/crew/list', '/v/dra/CREW/list', '/v/dra/Crew/List'])(
+    'marks the Crew tab current at %s (paths ignore case like the router, D-111)',
+    async (path) => {
+      renderTabs(path);
+      await waitFor(() => expect(tabIds()).toContain('crew'));
+      expect(screen.getByTestId(`${SHELL_TEST_IDS.moduleTabPrefix}crew`)).toHaveAttribute('aria-current', 'page');
+      expect(tabRow().querySelectorAll('[aria-current="page"]')).toHaveLength(1);
+    },
+  );
+
   it('hides a module switched off for the vessel (W4)', async () => {
     fakeDb.tables.vessel_module_settings = [{ vessel_id: HYDRA.id, module_key: 'technical', enabled: false, enabled_from: null, label_override: null }];
     renderTabs('/v/hyd/crew/list', { scope: vesselScope(HYDRA, 'HYD') });

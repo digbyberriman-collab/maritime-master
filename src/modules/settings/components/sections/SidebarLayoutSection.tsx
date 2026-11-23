@@ -1,6 +1,6 @@
 /**
  * Sidebar layout (/me/sidebar-layout; gap/10 IA5–IA7; D-112): the order of
- * the pages inside each sidebar section, on this device.
+ * the sections and pages inside each sidebar tree, on this device.
  *
  * Built on the shell's own pipeline, so every row is one the user's sidebar
  * draws and every control writes a key the shell reads (D-04: no control
@@ -25,6 +25,10 @@
  * until access, the personal tree, the vessel's settings and the workspace
  * gate are in (fail closed); then the stale '__root' and 'vessel' keys,
  * which nothing reads, are pruned.
+ *
+ * Every move and expand control names its row's place (WCAG 2.4.6): "Move
+ * Administration up (Fleet)" and "Move Administration up (Vessel › Logbooks)"
+ * are two controls, so their names differ.
  *
  * D-79: the section keeps its own visible h2; Settings renders the sr-only h1.
  */
@@ -95,6 +99,8 @@ interface TreeShared {
 interface RowProps {
   id: string;
   label: string;
+  /** Where the row sits ("Fleet", "Vessel › Logbooks", "Yard › Refit"): its controls' names carry it, so they are unique. */
+  path: string;
   icon: LucideIcon;
   index: number;
   total: number;
@@ -118,6 +124,7 @@ interface RowProps {
 const RowImpl: React.FC<RowProps> = ({
   id,
   label,
+  path,
   icon: Icon,
   index,
   total,
@@ -212,7 +219,7 @@ const RowImpl: React.FC<RowProps> = ({
           size="icon"
           tabIndex={-1}
           onClick={onToggleExpand}
-          aria-label={expanded ? `Collapse ${label}` : `Expand ${label}`}
+          aria-label={expanded ? `Collapse ${label} (${path})` : `Expand ${label} (${path})`}
           aria-expanded={expanded}
           className="shrink-0 text-muted-foreground hover:text-foreground"
         >
@@ -257,7 +264,7 @@ const RowImpl: React.FC<RowProps> = ({
             data-move="up"
             disabled={isFirst}
             onClick={() => onMove('up', 'up')}
-            aria-label={`Move ${label} up`}
+            aria-label={`Move ${label} up (${path})`}
           >
             <ArrowUp aria-hidden="true" />
           </Button>
@@ -268,7 +275,7 @@ const RowImpl: React.FC<RowProps> = ({
             data-move="down"
             disabled={isLast}
             onClick={() => onMove('down', 'down')}
-            aria-label={`Move ${label} down`}
+            aria-label={`Move ${label} down (${path})`}
           >
             <ArrowDown aria-hidden="true" />
           </Button>
@@ -295,11 +302,13 @@ interface OrderTreeProps {
   /** The key the top-level rows are ordered under ('fleet', 'hris', 'personal', 'vessel-crew'). */
   groupKey: string;
   label: string;
+  /** The tree's display name, the first part of every row's path ("Fleet", "Yard", "Vessel › Crew"). */
+  context: string;
   nodes: readonly FilteredNavNode[];
   shared: TreeShared;
 }
 
-const OrderTree: React.FC<OrderTreeProps> = ({ groupKey, label, nodes, shared }) => {
+const OrderTree: React.FC<OrderTreeProps> = ({ groupKey, label, context, nodes, shared }) => {
   const { readOnly, isExpanded, toggleExpanded, saveOrder, announce } = shared;
   const { toast } = useToast();
   const [drag, setDrag] = React.useState<{ group: string; id: string } | null>(null);
@@ -326,7 +335,8 @@ const OrderTree: React.FC<OrderTreeProps> = ({ groupKey, label, nodes, shared })
     setOverId(null);
   };
 
-  const renderBranch = (branch: readonly FilteredNavNode[], group: string, depth: number): React.ReactNode => {
+  /** `path`: where the branch sits, the tree's name then each parent's label. */
+  const renderBranch = (branch: readonly FilteredNavNode[], group: string, depth: number, path: string): React.ReactNode => {
     const ids = branch.map((n) => n.id);
     const total = branch.length;
     const dragHere = drag?.group === group;
@@ -366,6 +376,7 @@ const OrderTree: React.FC<OrderTreeProps> = ({ groupKey, label, nodes, shared })
           <Row
             id={node.id}
             label={node.label}
+            path={path}
             icon={node.icon}
             index={index}
             total={total}
@@ -389,7 +400,7 @@ const OrderTree: React.FC<OrderTreeProps> = ({ groupKey, label, nodes, shared })
           />
           {expanded && (
             <div role="group" className="space-y-1.5">
-              {renderBranch(children, node.id, depth + 1)}
+              {renderBranch(children, node.id, depth + 1, `${path} › ${node.label}`)}
             </div>
           )}
         </React.Fragment>
@@ -399,7 +410,7 @@ const OrderTree: React.FC<OrderTreeProps> = ({ groupKey, label, nodes, shared })
 
   return (
     <div ref={treeRef} role="tree" aria-label={label} className="space-y-1.5">
-      {renderBranch(nodes, groupKey, 0)}
+      {renderBranch(nodes, groupKey, 0, context)}
     </div>
   );
 };
@@ -434,7 +445,13 @@ const FleetBlock: React.FC<{ shared: TreeShared }> = ({ shared }) => {
   if (!FLEET_MODULE || decide(FLEET_MODULE) === 'hidden' || !nodes.length) return null;
   return (
     <Block id={FLEET_MODULE.id} title={FLEET_MODULE.label} icon={FLEET_MODULE.icon}>
-      <OrderTree groupKey={FLEET_MODULE.id} label={`${FLEET_MODULE.label} pages`} nodes={nodes} shared={shared} />
+      <OrderTree
+        groupKey={FLEET_MODULE.id}
+        label={`${FLEET_MODULE.label} pages`}
+        context={FLEET_MODULE.label}
+        nodes={nodes}
+        shared={shared}
+      />
     </Block>
   );
 };
@@ -447,7 +464,7 @@ const WorkspaceBlock: React.FC<{ tree: WorkspaceTree; shared: TreeShared }> = ({
   if (!module || !gate.canOpen(module.path) || !nodes.length) return null;
   return (
     <Block id={module.id} title={module.label} icon={module.icon}>
-      <OrderTree groupKey={module.id} label={`${module.label} pages`} nodes={nodes} shared={shared} />
+      <OrderTree groupKey={module.id} label={`${module.label} pages`} context={module.label} nodes={nodes} shared={shared} />
     </Block>
   );
 };
@@ -456,7 +473,13 @@ const PersonalBlock: React.FC<{ nodes: readonly FilteredNavNode[]; shared: TreeS
   if (!PERSONAL_MODULE || !nodes.length) return null;
   return (
     <Block id={PERSONAL_MODULE.id} title={PERSONAL_MODULE.label} icon={PERSONAL_MODULE.icon}>
-      <OrderTree groupKey={PERSONAL_TREE_ID} label={`${PERSONAL_MODULE.label} pages`} nodes={nodes} shared={shared} />
+      <OrderTree
+        groupKey={PERSONAL_TREE_ID}
+        label={`${PERSONAL_MODULE.label} pages`}
+        context={PERSONAL_MODULE.label}
+        nodes={nodes}
+        shared={shared}
+      />
     </Block>
   );
 };
@@ -481,7 +504,13 @@ const VesselBlock: React.FC<{ nav: VesselNavModel; shared: TreeShared }> = ({ na
                 <TabIcon className="h-3.5 w-3.5" aria-hidden="true" />
                 {tab.label}
               </h4>
-              <OrderTree groupKey={`vessel-${tab.id}`} label={`${tab.label} pages`} nodes={tab.children} shared={shared} />
+              <OrderTree
+                groupKey={`vessel-${tab.id}`}
+                label={`${tab.label} pages`}
+                context={`Vessel › ${tab.label}`}
+                nodes={tab.children}
+                shared={shared}
+              />
             </div>
           );
         })}
@@ -548,11 +577,12 @@ const SidebarLayoutSection: React.FC = () => {
         <div className="min-w-0 max-w-prose">
           <h2 className="type-display text-foreground">Sidebar layout</h2>
           <p className="type-body mt-1 text-muted-foreground">
-            Reorder the pages inside each sidebar section. Changes save on this device and apply to your sidebar and search.
+            Reorder the sections and pages inside each sidebar tree. Changes save on this device and apply to your sidebar and
+            search.
           </p>
           <p className="type-caption mt-2 text-muted-foreground">
-            Drag a row, use its arrows, or focus it and press Ctrl with the up or down arrow (⌘ on a Mac). Sections and vessel
-            tabs keep their fixed order.
+            Drag a row, use its arrows, or focus it and press Ctrl with the up or down arrow (⌘ on a Mac). The Fleet, workspace
+            and Personal trees and the vessel tabs stay where they are; everything inside them can be reordered.
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">

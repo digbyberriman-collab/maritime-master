@@ -264,6 +264,13 @@ describe('Vessel modules (gap/10 "Vessel view")', () => {
     expect(vesselModuleForPath('logbooks/engine-log?x=1')?.id).toBe('logbooks');
     expect(vesselModuleForPath('nothing-here')).toBeNull();
   });
+
+  it('vesselModuleForPath ignores case, like the router (D-111)', () => {
+    expect(vesselModuleForPath('CREW/list')?.id).toBe('crew');
+    expect(vesselModuleForPath('Technical')?.id).toBe('technical');
+    expect(vesselModuleForPath('/Safety/Risk-Assessments/New/')?.id).toBe('safety');
+    expect(vesselModuleForPath('NOTHING-HERE')).toBeNull();
+  });
 });
 
 describe("today's shell (NAVIGATION_ITEMS)", () => {

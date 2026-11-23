@@ -506,9 +506,13 @@ export function buildVesselNav(vesselCode: string, options: VesselNavOptions = {
  * The module a path inside the vessel scope belongs to, given the part after
  * `/v/<code>/` (`crew/list` → Crew). The home module answers only the bare
  * vessel root. Used by the tab row to light the active tab.
+ *
+ * Case-insensitive, like the router (D-111): `CREW/list` is Crew, so the
+ * route gate, tabs, sidebar and switch judge the page the router renders.
+ * Module roots are lower case; the caller's `rest` is never rewritten.
  */
 export function vesselModuleForPath(rest: string): VesselModule | null {
-  const path = rest.replace(/^\/+|\/+$/g, '').split(/[?#]/)[0];
+  const path = rest.replace(/^\/+|\/+$/g, '').split(/[?#]/)[0].toLowerCase();
   if (!path) return VESSEL_MODULES.find((m) => m.root === '') ?? null;
   let best: VesselModule | null = null;
   for (const m of VESSEL_MODULES) {

@@ -4,6 +4,7 @@ import { useAuth, ROLE_LABEL } from "@/modules/refit/lib/auth";
 import { useSession } from "@/modules/refit/lib/session";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { endSession } from "@/modules/auth/lib/endSession";
 
 export default function SessionDiagnosticsPage() {
   const { status: sessionStatus, session } = useSession();
@@ -182,7 +183,7 @@ export default function SessionDiagnosticsPage() {
                 Refresh session
               </button>
               <button
-                onClick={() => supabase.auth.signOut()}
+                onClick={() => void endSession()}
                 className="inline-flex items-center gap-2 rounded-sm border border-destructive/30 text-destructive px-4 py-2 text-xs font-medium hover:bg-destructive/5 transition"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

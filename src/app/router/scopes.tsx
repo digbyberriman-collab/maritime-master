@@ -47,11 +47,13 @@ import { useScopeAccess } from './useScopeAccess';
 import { legacyEntryFor, resolveLegacyTarget, targetKind, withSearch, type LegacyTargetKind } from './legacyResolve';
 import {
   FullPageLoading,
+  FullPageVesselListError,
   NoVesselState,
   ScopeAccessDenied,
   ScopeLoading,
   ScopePageNotFound,
   VesselArchivedState,
+  VesselListError,
   VesselNotFound,
 } from './ScopeStates';
 
@@ -362,11 +364,20 @@ const VesselScopeBody: React.FC = () => {
         replace
         state={location.state}
       />
+    ) : access.vesselsError ? (
+      // No vessel because the list failed, not because none is assigned.
+      <VesselListError error={access.vesselsError.message} onRetry={access.retryVessels} />
     ) : (
       <NoVesselState homePath={access.homePath} />
     );
   } else if (!vessel) {
-    if (unreachable && unreachable.status === 'Sold') {
+    if (access.vesselsError) {
+      // A code missing from a list that failed to load (or to refresh) is
+      // not known to be wrong: an error with Retry, never "not found", "no
+      // access" or "archived" (D-04, gap/10 A.12). A retry that lands finds
+      // the vessel, and the effects above select it.
+      body = <VesselListError error={access.vesselsError.message} onRetry={access.retryVessels} />;
+    } else if (unreachable && unreachable.status === 'Sold') {
       body = <VesselArchivedState name={unreachable.name} homePath={access.homePath} />;
     } else if (unreachable) {
       body = <ScopeAccessDenied homePath={access.homePath} />;
@@ -409,11 +420,14 @@ const VesselScopeBody: React.FC = () => {
  * `/v/:vesselCode/*`: one vessel. The code is matched without regard to case
  * against the vessels the user can reach (VesselContext). An unknown code
  * renders a 404, a vessel outside the user's reach renders "no access", and a
- * sold vessel renders "archived", all inside the shell.
+ * sold vessel renders "archived", all inside the shell. While the vessel
+ * list has failed to load, a code it does not hold renders the load error
+ * with Retry instead, since none of those is known then (D-04, gap/10 A.12).
  *
  * The literal param (`/v/:vesselCode/crew/list`, the form the static nav tree
  * links to) opens the same page on the current vessel: the selected one, else
- * the first reachable one. With no vessel at all it says so.
+ * the first reachable one. With no vessel at all it says so, or, when the
+ * list failed to load, shows that error with Retry.
  */
 export const VesselScopeRoute: React.FC = () => (
   <CanonicalScopePath canonical={canonicalVesselPathname}>
@@ -479,6 +493,12 @@ const HomeRedirectBody: React.FC = () => {
   const access = useScopeAccess();
   const location = useLocation();
   if (!access.ready) return <FullPageLoading />;
+  // Without fleet reach, home depends on the list: wait here with Retry
+  // rather than land a vessel user on `/me` (D-04). No navigation, so a
+  // retry that lands redirects from here.
+  if (access.vesselsError && !access.fleetReach && !access.lastVesselCode) {
+    return <FullPageVesselListError error={access.vesselsError.message} onRetry={access.retryVessels} />;
+  }
   return <Navigate to={withSearch(access.homePath, location.search, location.hash)} replace />;
 };
 
@@ -486,6 +506,9 @@ const HomeRedirectBody: React.FC = () => {
  * `/`, `/index` and `/dashboard`: send the user to their home (gap/01
  * landing rules). Fleet users land on `/fleet/dashboard`, vessel users on
  * `/v/<code>` (selected vessel, else the first), anyone with no vessel on `/me`.
+ * A failed vessel-list load is not "no vessel": without fleet reach (which
+ * comes from the role, not the list) the user stays here on the error with
+ * Retry, never on `/me` (D-04, gap/10 A.12).
  */
 export const HomeRedirect: React.FC = () => (
   <ProtectedRoute>
@@ -509,6 +532,8 @@ function withoutModuleParam(search: string): string {
  * own pattern; the target comes from `LEGACY_REDIRECTS`. When there is no
  * target for this user (no vessel to scope to, no fleet reach, or a fleet user
  * in "All vessels" mode for a vessel page), the old page renders where it is.
+ * A vessel target missed because the vessel list failed to load is not that
+ * case: the load error with Retry renders instead (D-04).
  */
 export const LegacyRoute: React.FC<{ from: string; children: React.ReactNode }> = ({ from, children }) => {
   const entry = legacyEntryFor(from);
@@ -532,6 +557,11 @@ export const LegacyRoute: React.FC<{ from: string; children: React.ReactNode }> 
   const kind = targetKind(entry.fleetTo && access.legacy.fleetReach ? entry.fleetTo : entry.to);
   const search = SCOPE_KINDS.has(kind) ? withoutModuleParam(location.search) : location.search;
   const target = resolveLegacyTarget(entry, params, search, location.hash, access.legacy);
+  // Only a vessel target hangs on the list; a fleet target missed for want
+  // of reach renders the old page as before.
+  if (!target && needsAccess && kind === 'vessel' && access.vesselsError) {
+    return <FullPageVesselListError error={access.vesselsError.message} onRetry={access.retryVessels} />;
+  }
   if (!target) return <>{children}</>;
   return <Navigate to={target} replace state={location.state} />;
 };

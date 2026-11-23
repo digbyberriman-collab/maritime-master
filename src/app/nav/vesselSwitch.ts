@@ -78,9 +78,12 @@ function matchedLength(rest: string, node: NavChild): number {
  * name (`crew/people/p1/hours-of-rest` → `crew`, `crew_hor`), so the route
  * gate and the vessel switch close them with it. Pages outside any module
  * need none.
+ *
+ * Case-insensitive, like the router (D-111): `CREW/list` needs `crew`. Only
+ * lengths come out of the match, so lower-casing a record id is harmless.
  */
 export function vesselSettingKeysForRest(vesselRest: string): string[] {
-  const rest = strip(vesselRest.split(/[?#]/)[0]);
+  const rest = strip(vesselRest.split(/[?#]/)[0]).toLowerCase();
   const tab = vesselModuleForPath(rest);
   if (!tab) return [];
   // The deepest node the page sits under (by the length of the part of the
@@ -132,6 +135,7 @@ export function vesselSwitchTarget({ currentPath, targetCode, isModuleOn, isVisi
     const rest = parsed.rest;
     const tail = `${query ? `?${query}` : ''}${hash ? `#${hash}` : ''}`;
     if (!rest) return `${home}${tail}`;
+    // The checks ignore case (D-111); the URL returned keeps `rest` as written.
     const tabRoot = vesselTabRootForRest(rest);
     // A page outside every module (no tab) keeps its place; its own guard decides.
     if (tabRoot === null) return `${vesselPath(targetCode, rest)}${tail}`;

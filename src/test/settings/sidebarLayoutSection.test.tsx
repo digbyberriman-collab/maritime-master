@@ -12,6 +12,9 @@
  *   'vessel' key, and only keys the shell reads.
  * - A move changes the order the shell's sidebar draws (useFilteredModuleTree),
  *   visibly, and a saved id that is hidden now keeps its place.
+ * - Every control's name is unique on the page (WCAG 2.4.6): move and expand
+ *   names carry the row's place ("Move Administration up (Fleet)"), and the
+ *   copy says what is fixed (the trees and the vessel tabs, D-112).
  */
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -119,6 +122,11 @@ const blockIds = () => Array.from(document.querySelectorAll<HTMLElement>('[data-
 const rowIds = (container: ParentNode = document) =>
   Array.from(container.querySelectorAll<HTMLElement>('[data-order-row]')).map((el) => el.dataset.orderRow);
 const block = (id: string) => document.querySelector<HTMLElement>(`[data-sidebar-layout-block="${id}"]`)!;
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** A button's accessible name: its aria-label, else its text. */
+const buttonName = (button: HTMLElement) => (button.getAttribute('aria-label') ?? button.textContent ?? '').trim();
+/** The names that more than one button carries. */
+const repeatedNames = (names: readonly string[]) => [...new Set(names.filter((name, i) => names.indexOf(name) !== i))];
 const ready = () => waitFor(() => expect(document.querySelector('[aria-label="Loading sidebar layout"]')).toBeNull(), { timeout: 4000 });
 
 /** Click every enabled move control the page renders (by element: labels repeat across trees). */
@@ -227,8 +235,9 @@ describe('every control writes a key the shell reads', () => {
       expect(heading.closest('[data-order-row]')).toBeNull();
       expect(heading.closest('[draggable="true"]')).toBeNull();
     }
-    expect(screen.queryByRole('button', { name: 'Move Fleet down' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Move Vessel down' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Move Fleet (up|down) \(/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Move Vessel (up|down) \(/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Move Crew (up|down) \(Vessel\)/ })).toBeNull();
     // The vessel tabs are headings inside the Vessel block, not rows.
     const crewTab = within(block('vessel')).getByRole('heading', { name: 'Crew' });
     expect(crewTab.closest('[data-order-row]')).toBeNull();
@@ -272,7 +281,7 @@ describe('a move is what the sidebar draws', () => {
     expect(probe().slice(0, 2)).toEqual([first.id, second.id]);
 
     act(() => {
-      fireEvent.click(screen.getByRole('button', { name: `Move ${first.label} down` }));
+      fireEvent.click(screen.getByRole('button', { name: `Move ${first.label} down (Fleet)` }));
     });
     expect(probe().slice(0, 2)).toEqual([second.id, first.id]);
     expect(rowIds(within(block('fleet')).getByRole('tree')).slice(0, 2)).toEqual([second.id, first.id]);
@@ -301,7 +310,7 @@ describe('a move is what the sidebar draws', () => {
     await ready();
     const second = FLEET_MODULE.children![1];
     act(() => {
-      fireEvent.click(screen.getByRole('button', { name: `Move ${second.label} up` }));
+      fireEvent.click(screen.getByRole('button', { name: `Move ${second.label} up (Fleet)` }));
     });
     expect(rowIds(within(block('fleet')).getByRole('tree')).slice(0, 2)).toEqual([ids[1], ids[0]]);
     expect(stored().fleet).toEqual([ids[1], 'fleet-retired-section', ids[0], ...ids.slice(2)]);
@@ -315,7 +324,7 @@ describe('a move is what the sidebar draws', () => {
     expect(before.length).toBeGreaterThan(1);
     const firstLabel = crew.querySelector<HTMLElement>('[data-order-row]')!.getAttribute('aria-label')!.split(',')[0];
     act(() => {
-      fireEvent.click(within(crew).getByRole('button', { name: `Move ${firstLabel} down` }));
+      fireEvent.click(within(crew).getByRole('button', { name: `Move ${firstLabel} down (Vessel › Crew)` }));
     });
     const after = rowIds(within(block('vessel')).getByRole('tree', { name: 'Crew pages' }));
     expect(after.slice(0, 2)).toEqual([before[1], before[0]]);
@@ -327,12 +336,77 @@ describe('a move is what the sidebar draws', () => {
     await ready();
     const [first, second] = FLEET_MODULE.children!;
     act(() => {
-      fireEvent.click(screen.getByRole('button', { name: `Move ${first.label} down` }));
+      fireEvent.click(screen.getByRole('button', { name: new RegExp(`^Move ${escapeRegExp(first.label)} down \\(`) }));
     });
     act(() => {
       fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
     });
     expect(screen.getByTestId('fleet-order').textContent!.split(',').slice(0, 2)).toEqual([first.id, second.id]);
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
+  });
+});
+
+describe('control names and copy', () => {
+  it.each([
+    ['a fleet manager', () => undefined, FLEET_ACCESS],
+    ['a vessel master', () => asVesselMaster(), VESSEL_ONLY_ACCESS],
+  ] as const)('for %s, every button has a name no other button has, collapsed and after Expand all', async (_who, persona, access) => {
+    persona();
+    renderShell(
+      <main>
+        <SidebarLayoutSection />
+      </main>,
+      { path: '/me/sidebar-layout', scope: PERSONAL, access },
+    );
+    await ready();
+    const names = () => within(screen.getByRole('main')).getAllByRole('button').map(buttonName);
+    expect(repeatedNames(names())).toEqual([]);
+
+    act(() => {
+      fireEvent.click(screen.getByRole('button', { name: 'Expand all' }));
+    });
+    const expanded = names();
+    expect(expanded.length).toBeGreaterThan(20);
+    expect(repeatedNames(expanded)).toEqual([]);
+    expect(new Set(expanded).size).toBe(expanded.length);
+    // The names carry the row's place: the tree, then each parent.
+    expect(expanded.filter((name) => /^(Move .+ (up|down)|Expand .+|Collapse .+) \(.+\)$/.test(name)).length).toBe(
+      expanded.filter((name) => /^(Move|Expand|Collapse) /.test(name) && name !== 'Expand all' && name !== 'Collapse all').length,
+    );
+    expect(expanded.some((name) => / \(Vessel › [^)]+\)$/.test(name))).toBe(true);
+    expect(expanded.some((name) => / \([^)]+ › [^)]+\)$/.test(name) && !name.includes('(Vessel'))).toBe(true);
+  }, 20_000);
+
+  it('a Fleet section and a vessel tab section with the same label get different names', async () => {
+    renderSection();
+    await ready();
+    const fleetTree = within(block('fleet')).getByRole('tree', { name: 'Fleet pages' });
+    const logbooks = within(block('vessel')).getByRole('tree', { name: 'Logbooks pages' });
+    // Both trees have an Administration section.
+    expect(within(fleetTree).getByRole('button', { name: 'Expand Administration (Fleet)' })).toBeInTheDocument();
+    expect(within(logbooks).getByRole('button', { name: 'Expand Administration (Vessel › Logbooks)' })).toBeInTheDocument();
+    expect(within(fleetTree).getAllByRole('button', { name: /^Move Administration (up|down) \(Fleet\)$/ })).toHaveLength(2);
+    expect(within(logbooks).getAllByRole('button', { name: /^Move Administration (up|down) \(Vessel › Logbooks\)$/ })).toHaveLength(2);
+    // A child's place is its tree, then its parent.
+    act(() => {
+      fireEvent.click(within(fleetTree).getByRole('button', { name: 'Expand Administration (Fleet)' }));
+    });
+    expect(within(fleetTree).getByRole('button', { name: 'Collapse Administration (Fleet)' })).toBeInTheDocument();
+    const children = within(fleetTree).getAllByRole('button', { name: /^Move .+ \(Fleet › Administration\)$/ });
+    expect(children.length).toBeGreaterThan(0);
+    const crew = within(block('vessel')).getByRole('tree', { name: 'Crew pages' });
+    for (const button of within(crew).getAllByRole('button', { name: /^Move / })) {
+      expect(buttonName(button)).toMatch(/ \(Vessel › Crew\)$/);
+    }
+  });
+
+  it('the instructions say what is fixed: the trees and the vessel tabs, not the sections', async () => {
+    renderSection();
+    await ready();
+    expect(screen.queryByText(/Sections and vessel\s+tabs keep their fixed order/)).toBeNull();
+    expect(screen.getByText(/^Reorder the sections and pages inside each sidebar tree\./)).toBeInTheDocument();
+    expect(
+      screen.getByText(/The Fleet, workspace\s+and Personal trees and the vessel tabs stay where they are; everything inside them can be reordered\.$/),
+    ).toBeInTheDocument();
   });
 });

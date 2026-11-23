@@ -114,6 +114,23 @@ describe('a module switched off for the vessel', () => {
     expect(screen.getByTestId('location').textContent).toBe('/v/dra/crew/list');
   });
 
+  // The router ignores case after the prefix too, so the gate does (D-111);
+  // the URL stays as written (record ids and slugs are the page's).
+  it.each([
+    ['/v/dra/CREW/list', 'crew', 'Crew is switched off for DRAAK', 'Crew list page'],
+    ['/v/dra/Crew/List', 'crew', 'Crew is switched off for DRAAK', 'Crew list page'],
+    ['/v/dra/technical/JOBS', 'technical.jobs', 'Jobs is switched off for DRAAK', 'Jobs page'],
+    ['/v/dra/TECHNICAL', 'technical', 'Technical is switched off for DRAAK', 'Technical overview'],
+  ])('gates an upper-case rest too: %s with %s off ends on ModuleOff, never the page (D-111)', async (path, key, off, page) => {
+    asFleetUser([DRAAK, HYDRA, XIPHIAS]);
+    fakeDb.tables.vessel_module_settings = [row(DRAAK.id, key, false)];
+    renderAt(path);
+    const heading = await screen.findByRole('heading', { level: 1, name: off });
+    expect(main()).toContainElement(heading);
+    expect(screen.queryByRole('heading', { name: page })).toBeNull();
+    expect(screen.getByTestId('location').textContent).toBe(path);
+  });
+
   it('applies to the vessel whose settings say so only', async () => {
     fakeDb.tables.vessel_module_settings = [row(DRAAK.id, 'technical', false)];
     renderAt('/v/hyd/technical');

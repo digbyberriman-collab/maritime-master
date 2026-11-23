@@ -6,6 +6,7 @@ import { resolveMedicalAccess } from '@/modules/auth/lib/medicalAccess';
 import { resolveWellnessAccess } from '@/modules/auth/lib/wellnessAccess';
 import { canEnterHealth } from '@/modules/auth/lib/healthAccess';
 import { resolveHrAccess } from '@/modules/auth/lib/hrAccess';
+import { endSession } from '@/modules/auth/lib/endSession';
 
 interface Profile {
   id: string;
@@ -496,8 +497,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Ends the session on this device even when the server cannot be reached
+  // (endSession: fails closed, D-04, and says so when only this device was
+  // signed out).
   const signOut = async () => {
-    await supabase.auth.signOut();
+    await endSession();
     sessionUserIdRef.current = null;
     profileResolvedForRef.current = null;
     setUser(null);

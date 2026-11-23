@@ -8,6 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 
 import { resolvePageNavigation } from '@/shared/lib/pageNavigation';
+import { resolveModuleForPath } from '@/shared/lib/moduleNavigation';
 import { toNavPathname } from '@/app/router/legacyResolve';
 
 const UUID = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
@@ -98,6 +99,46 @@ describe('scoped breadcrumbs', () => {
       links: ['/v/:vesselCode', '/v/:vesselCode/crew', null],
     });
     expect(nav('/V/DRA/crew/list', moduleId).title).toBe('Crew List');
+  });
+
+  // The router ignores case after the prefix too, so the trail and title do
+  // (D-111); a record id or slug still shows as written.
+  it.each([null, 'vessel'])('an upper-case vessel rest reads like the lower-case one (module %s)', (moduleId) => {
+    expect(resolvePageNavigation('/v/:vesselCode/CREW/list', '', moduleId)).toEqual(resolvePageNavigation('/v/:vesselCode/crew/list', '', moduleId));
+    expect(nav('/v/dra/Crew/List', moduleId)).toEqual({
+      crumbs: 'Vessel > Crew > Crew List',
+      title: 'Crew List',
+      links: ['/v/:vesselCode', '/v/:vesselCode/crew', null],
+    });
+    expect(nav('/v/dra/TECHNICAL/JOBS', moduleId)).toEqual(nav('/v/dra/technical/jobs', moduleId));
+    // A scoped title (one crew member's month) too.
+    expect(resolvePageNavigation('/v/:vesselCode/CREW/People/p1/Hours-Of-Rest', '', moduleId)).toEqual(
+      resolvePageNavigation('/v/:vesselCode/crew/people/p1/hours-of-rest', '', moduleId),
+    );
+    expect(nav('/v/dra/CREW/People/p1/Hours-Of-Rest', moduleId).crumbs).toBe('Vessel > Crew > Hours of Rest > Crew member hours');
+  });
+
+  it('a detail segment after an upper-case rest keeps its own case', () => {
+    const upper = nav('/v/dra/CREW/list/AbC-Def');
+    expect(upper).toEqual(nav('/v/dra/crew/list/AbC-Def'));
+    expect(upper.crumbs).toBe('Vessel > Crew > Crew List > AbC Def');
+    expect(nav('/v/dra/CREW/list/AbC-Def').crumbs).not.toBe(nav('/v/dra/crew/list/abc-def').crumbs);
+  });
+
+  it('an upper-case Fleet or personal path reads like the lower-case one', () => {
+    expect(nav('/FLEET/Dashboard')).toEqual(nav('/fleet/dashboard'));
+    expect(nav('/Fleet/Admin/Users/Crew').title).toBe('Vessel Crew');
+    expect(nav('/ME/Profile')).toEqual(nav('/me/profile'));
+    expect(resolvePageNavigation('/INDEX')).toEqual(resolvePageNavigation('/index'));
+  });
+
+  it('resolveModuleForPath ignores case', () => {
+    expect(resolveModuleForPath('/me/profile')).not.toBeNull();
+    expect(resolveModuleForPath('/ME/Profile')?.id).toBe(resolveModuleForPath('/me/profile')?.id);
+    expect(resolveModuleForPath('/Inbox')?.id).toBe(resolveModuleForPath('/inbox')?.id);
+    expect(resolveModuleForPath(toNavPathname('/v/dra/CREW/list'))?.id).toBe('vessel');
+    expect(resolveModuleForPath('/Fleet/Dashboard')?.id).toBe(resolveModuleForPath('/fleet/dashboard')?.id);
+    expect(resolveModuleForPath('/DASHBOARD')).toBeNull();
   });
 
   it('pages with a leaf of their own are unchanged', () => {

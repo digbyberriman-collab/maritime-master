@@ -71,7 +71,12 @@ const DEPTH_PADDING = ['pl-3', 'pl-2.5', 'pl-2.5', 'pl-2.5'];
 const badgeTone = (badge: NavBadge) =>
   badge.tone === 'critical' ? 'bg-critical text-critical-foreground' : 'bg-sidebar-primary text-sidebar-primary-foreground';
 
-const pathnameOf = (path: string) => toNavPathname(path.split(/[?#]/)[0]);
+/**
+ * A path as the sidebar compares it: the pathname on the vessel pattern, lower
+ * case, since paths ignore case like the router (D-111). Queries still match
+ * exactly (queryMatches).
+ */
+const pathnameOf = (path: string) => toNavPathname(path.split(/[?#]/)[0]).toLowerCase();
 
 /** The glowing bar on the current page's row. */
 const ActiveBar: React.FC<{ collapsed?: boolean }> = ({ collapsed }) => (
@@ -159,8 +164,9 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({
   const location = useLocation();
   const badgeFor = useNavBadges();
   // Vessel URLs are compared on the `/v/:vesselCode` pattern, so a tree built
-  // for one vessel and the legacy pattern tree both light up the same leaf.
-  const pathname = toNavPathname(location.pathname);
+  // for one vessel and the legacy pattern tree both light up the same leaf;
+  // `/v/dra/CREW/list` lights Crew list as `/v/dra/crew/list` does.
+  const pathname = pathnameOf(location.pathname);
   const rootPathname = rootPath ? pathnameOf(rootPath) : null;
 
   const queryMatches = useCallback(

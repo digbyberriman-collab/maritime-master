@@ -4,7 +4,7 @@
  * AuthContext, VesselContext and the RBAC store; the decisions themselves are
  * the pure functions in ./reach.ts and ./legacyResolve.ts.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
 import { useVessel, type Vessel } from '@/modules/vessels/contexts/VesselContext';
@@ -21,8 +21,23 @@ export interface ScopeAccess {
   fleetReach: boolean;
   /** The selected vessel's code, else the first reachable vessel's; null if none. */
   lastVesselCode: string | null;
-  /** Where this user's "home" is (gap/01 landing rules). */
+  /**
+   * Where this user's "home" is (gap/01 landing rules). A failed vessel-list
+   * load never makes it `/me`: without fleet reach or a vessel it is `/`,
+   * whose landing redirect shows the error with Retry (D-04).
+   */
   homePath: string;
+  /**
+   * The vessel lists failed to load, or null (D-04, gap/10 A.12). The lists
+   * then hold nothing (a first load) or the previous lists of the same user
+   * (a refresh), so a missing vessel is not known to be missing: callers
+   * show an error with Retry, never "not found" or "no vessels". `ready`
+   * still turns true, so the error shows instead of an endless spinner.
+   * Never another user's (VesselContext guards it like the lists).
+   */
+  vesselsError: { message: string } | null;
+  /** Loads the vessel lists again (the Retry for `vesselsError`). */
+  retryVessels: () => void;
   /** Input for the legacy redirect resolver. */
   legacy: LegacyRedirectContext;
 }
@@ -96,6 +111,13 @@ export function useScopeAccess(): ScopeAccess {
   const firstCode = vessels.length ? getVesselCodeById(vessels[0].id) : null;
   const lastVesselCode = selectedCode ?? firstCode;
 
+  // Not for a signed-in user with no readable profile: that is "no vessels".
+  const vesselsError = profile ? vessel.loadError ?? null : null;
+  const { refreshVessels } = vessel;
+  const retryVessels = useCallback(() => {
+    void refreshVessels();
+  }, [refreshVessels]);
+
   const legacy = useMemo<LegacyRedirectContext>(
     () => ({
       fleetReach,
@@ -116,7 +138,11 @@ export function useScopeAccess(): ScopeAccess {
     signedOut: !authLoading && !user,
     fleetReach,
     lastVesselCode,
-    homePath: landingPath({ fleetReach, lastVesselCode }),
+    // Fleet reach comes from the role, so a fleet user still lands on the
+    // fleet dashboard; anyone else waits on `/` for the list (never `/me`).
+    homePath: vesselsError && !fleetReach && !lastVesselCode ? '/' : landingPath({ fleetReach, lastVesselCode }),
     legacy,
+    vesselsError,
+    retryVessels,
   };
 }

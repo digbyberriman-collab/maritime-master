@@ -124,6 +124,16 @@ describe('the vessel scope', () => {
     expect(availability('/v/dra/crew/list', access(), checks({ moduleSettings: off('technical') }))).toBe('available');
   });
 
+  it('an upper-case path after the code is judged like the router judges it (D-111)', () => {
+    expect(availability('/v/dra/CREW/list', access(), checks({ moduleSettings: off('crew') }))).toBe('unavailable');
+    expect(availability('/v/dra/CREW/list', access(), checks({ moduleSettings: settings('loading') }))).toBe('waiting');
+    expect(availability('/v/dra/CREW/list', access(), checks({ moduleSettings: settings('error') }))).toBe('error');
+    expect(availability('/v/dra/technical/JOBS', access(), checks({ moduleSettings: off('technical.jobs') }))).toBe('unavailable');
+    expect(availability('/V/DRA/Technical', access(), checks({ moduleSettings: off('technical') }))).toBe('unavailable');
+    expect(availability('/v/dra/CREW/list', access(), checks({ moduleSettings: ALL_MODULES_ON }))).toBe('available');
+    expect(availability('/v/dra/CALENDAR', access(), checks({ moduleSettings: settings('loading') }))).toBe('available');
+  });
+
   it('paths no setting governs (the vessel home, Calendar) never wait for the settings', () => {
     expect(availability('/v/dra', access(), checks({ moduleSettings: settings('loading') }))).toBe('available');
     expect(availability('/v/dra/calendar', access(), checks({ moduleSettings: settings('error') }))).toBe('available');

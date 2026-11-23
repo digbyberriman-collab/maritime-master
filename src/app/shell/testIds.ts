@@ -34,6 +34,7 @@ export const SHELL_TEST_IDS = {
   impersonationBar: 'shell-impersonation-bar',
   rbacRetry: 'shell-rbac-retry',
   moduleSettingsRetry: 'shell-module-settings-retry',
+  vesselListRetry: 'shell-vessel-list-retry',
   moduleTabBar: 'shell-module-tabs',
   moduleTabMore: 'shell-module-tabs-more',
   backToFleet: 'shell-back-to-fleet',

@@ -51,6 +51,17 @@ describe('vesselSwitchTarget inside the vessel scope', () => {
     expect(vesselSwitchTarget({ currentPath: '/v/dra/crew/list', targetCode: 'hyd', isModuleOn: () => false })).toBe('/v/hyd');
   });
 
+  it('judges an upper-case rest like the router (D-111) and keeps it as written', () => {
+    expect(vesselSwitchTarget({ currentPath: '/v/dra/CREW/list', targetCode: 'hyd', isModuleOn: off('crew') })).toBe('/v/hyd');
+    expect(vesselSwitchTarget({ currentPath: '/v/dra/technical/JOBS', targetCode: 'hyd', isModuleOn: off('technical.jobs') })).toBe(
+      '/v/hyd/technical',
+    );
+    expect(vesselSwitchTarget({ currentPath: '/v/dra/CREW/list?x=1#y', targetCode: 'hyd', isModuleOn: allOn })).toBe('/v/hyd/CREW/list?x=1#y');
+    expect(
+      vesselSwitchTarget({ currentPath: '/v/dra/LOGBOOKS/review', targetCode: 'hyd', isModuleOn: allOn, isVisible: (rest) => rest !== 'logbooks' }),
+    ).toBe('/v/hyd');
+  });
+
   it('keeps a page outside every module (its own guard decides)', () => {
     expect(vesselSwitchTarget({ currentPath: '/v/dra/unknown/page', targetCode: 'hyd', isModuleOn: () => false })).toBe('/v/hyd/unknown/page');
   });
@@ -92,6 +103,10 @@ describe('module-setting keys of a vessel page', () => {
     ['calendar', []],
     ['', []],
     ['unknown', []],
+    // Case-insensitive, like the router (D-111).
+    ['CREW/List', ['crew']],
+    ['Technical/JOBS/7', ['technical', 'technical.jobs']],
+    ['crew/people/P1/HOURS-OF-REST', ['crew', 'crew_hor']],
   ])('%s needs %j', (rest, keys) => {
     expect(vesselSettingKeysForRest(rest)).toEqual(keys);
   });
@@ -100,6 +115,7 @@ describe('module-setting keys of a vessel page', () => {
     expect(vesselTabRootForRest('crew/list/7')).toBe('crew');
     expect(vesselTabRootForRest('')).toBe('');
     expect(vesselTabRootForRest('nowhere')).toBeNull();
+    expect(vesselTabRootForRest('CREW/list/7')).toBe('crew');
   });
 });
 
@@ -119,6 +135,7 @@ describe('vessel page visibility in the filtered vessel nav', () => {
     const visible = visibility(builtOnly);
     // Crew Medical and the whole Charter tab are planned.
     expect(visible('crew/medical')).toBe(false);
+    expect(visible('CREW/Medical')).toBe(false);
     expect(visible('charter')).toBe(false);
   });
 
@@ -127,6 +144,9 @@ describe('vessel page visibility in the filtered vessel nav', () => {
     expect(visible('technical')).toBe(false);
     expect(visible('technical/jobs')).toBe(false);
     expect(visible('crew/list')).toBe(true);
+    // An as-written rest is judged like the router (D-111).
+    expect(visible('Technical/JOBS')).toBe(false);
+    expect(visible('CREW/List')).toBe(true);
   });
 
   it('fails closed with a filter that shows nothing', () => {

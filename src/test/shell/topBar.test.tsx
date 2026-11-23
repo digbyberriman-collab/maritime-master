@@ -382,12 +382,34 @@ describe('tenant logo', () => {
     const logo = screen.getByTestId(SHELL_TEST_IDS.tenantLogo);
     expect(logo).not.toHaveTextContent('STORM');
     expect(logo.querySelector('span[aria-hidden="true"]')).not.toBeNull();
+    // The accessible name follows the visual (D-110): neutral and busy, never "STORM".
+    expect(logo).toHaveAccessibleName('Go to my start page');
+    expect(logo).not.toHaveAccessibleName(/STORM/);
+    expect(logo).toHaveAttribute('aria-busy', 'true');
   });
 
   it('falls back to the STORM wordmark', () => {
     shellState.branding = { ...shellState.branding, clientDisplayName: null };
     renderShell(<TenantLogo />);
-    expect(screen.getByTestId(SHELL_TEST_IDS.tenantLogo)).toHaveTextContent('STORM');
+    const logo = screen.getByTestId(SHELL_TEST_IDS.tenantLogo);
+    expect(logo).toHaveTextContent('STORM');
+    expect(logo).toHaveAccessibleName('STORM, go to my start page');
+    expect(logo).not.toHaveAttribute('aria-busy');
+  });
+
+  it('names the display name once settled', () => {
+    renderShell(<TenantLogo />);
+    const logo = screen.getByTestId(SHELL_TEST_IDS.tenantLogo);
+    expect(logo).toHaveAccessibleName('Demo Fleet, go to my start page');
+    expect(logo).not.toHaveAttribute('aria-busy');
+  });
+
+  it('a logo with no display name is named for the company, not STORM', () => {
+    shellState.branding = { ...shellState.branding, clientLogoUrl: 'https://example.invalid/logo.png', clientDisplayName: null, companyName: 'Tenant Co' };
+    renderShell(<TenantLogo />);
+    const logo = screen.getByTestId(SHELL_TEST_IDS.tenantLogo);
+    expect(logo.querySelector('img')).not.toBeNull();
+    expect(logo).toHaveAccessibleName('Tenant Co, go to my start page');
   });
 });
 

@@ -15,7 +15,8 @@
  *   incident" needs the capability and a vessel in reach (D-04); it opens the
  *   incidents page with its report form open (`/incidents?new=true`, D-27),
  *   and from a vessel it carries that vessel (`&vessel=<id>`), which the
- *   page preselects in the form and the list filter (D-81).
+ *   page preselects in the form and the list filter (D-81). From a vessel it
+ *   also needs that vessel's Safety module on (S4, W4).
  */
 import { useMemo } from 'react';
 import {
@@ -43,6 +44,8 @@ import { useShellActions } from '@/app/shell/shellActions';
 import { useThemeChoice } from '@/app/shell/themeChoice';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
+import { useVesselModuleSettings } from '@/modules/vessels/hooks/useVesselModuleSettings';
+import { localIsoDate, resolveModuleSettings } from '@/modules/vessels/lib/moduleSettings';
 import { VESSEL_SCOPE_PATTERN, vesselPath } from '@/modules/vessels/lib/vesselCode';
 import { useFeedbackStore } from '@/modules/feedback/store/feedbackStore';
 import { useCan } from '@/lib/permissions/useCan';
@@ -62,6 +65,8 @@ export function reportIncidentPath(vesselId?: string | null): string {
   return vesselId ? `${REPORT_INCIDENT_PATH}&vessel=${encodeURIComponent(vesselId)}` : REPORT_INCIDENT_PATH;
 }
 export const REPORT_INCIDENT_CAPABILITY = 'vessel.safety.incidents.create';
+/** The `vessel_module_settings` key the report belongs to (the Safety tab, sitemap.ts). */
+export const REPORT_INCIDENT_MODULE = 'safety';
 export const FLEET_OVERVIEW_PATH = '/fleet/dashboard';
 
 /**
@@ -189,13 +194,23 @@ export function usePaletteActions({ navigate }: PaletteActionDeps): PaletteSourc
   // From a resolved vessel, the report is for that vessel; elsewhere the form starts empty.
   const scope = useScope();
   const reportVesselId = scope.scope === 'vessel' ? scope.vessel?.id ?? null : null;
+  // S4, W4: a module switched off for a vessel disappears for everyone on it,
+  // so the report for that vessel needs its Safety module on. The settings are
+  // read for the scope's vessel only (never the shell's last vessel), from the
+  // same query cache as the tab row and the route gate, so all three agree.
+  // No vessel in scope: unchanged. A vessel in scope: loading and error are
+  // off (D-04, D-63); a missing table is on (D-01).
+  const { state: settingsState } = useVesselModuleSettings(reportVesselId);
+  const today = localIsoDate();
+  const safetyOn =
+    reportVesselId === null || resolveModuleSettings(settingsState, today).isModuleOn(REPORT_INCIDENT_MODULE);
   const { user, signOut } = useAuth();
   const setFeedbackOpen = useFeedbackStore((s) => s.setPanelOpen);
   const signedIn = Boolean(user);
 
   return useMemo<PaletteSource>(() => {
     const items: PaletteItem[] = [];
-    if (canReportIncident && vesselReach) {
+    if (canReportIncident && vesselReach && safetyOn) {
       items.push({
         id: 'action:report-incident',
         group: 'actions',
@@ -284,6 +299,7 @@ export function usePaletteActions({ navigate }: PaletteActionDeps): PaletteSourc
     canReportIncident,
     vesselReach,
     reportVesselId,
+    safetyOn,
     openNotifications,
     openKeyboardShortcuts,
     theme,

@@ -108,7 +108,8 @@ function underPath(path: string, prefix: string): boolean {
 export function vesselRestVisibilityFromTabs(tabs: readonly VesselTab[], code: string): (vesselRest: string) => boolean {
   const statics = buildVesselNav(code);
   return (vesselRest: string) => {
-    const rest = strip(vesselRest);
+    // Case-insensitive, like the router (D-111): nav paths are lower case.
+    const rest = strip(vesselRest).toLowerCase();
     if (!rest) return true;
     const module = vesselModuleForPath(rest);
     if (!module || !module.root) return true;

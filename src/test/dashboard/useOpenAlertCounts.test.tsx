@@ -7,9 +7,10 @@
  *   vessels" is off (no `vessel_id` filter, no `or`);
  * - anyone else counts the vessels in their reach plus the company-wide
  *   alerts (the same `or` filter the bell uses);
- * - nothing is read before access has loaded, and the state says `loading`
- *   meanwhile (D-04, no fake "all clear");
- * - once it has, an account with no company is `error` (`no-company`,
+ * - nothing is read before access and the profile read have answered, and
+ *   the state says `loading` meanwhile (D-04, no fake "all clear"), so a
+ *   slow profile read is never a transient "no company";
+ * - once they have, an account with no company is `error` (`no-company`,
  *   D-103), not zeros and not an endless skeleton, and still reads nothing;
  * - a failed read is `error` (`read`), not zero.
  *
@@ -34,7 +35,11 @@ const h = vi.hoisted(() => ({
   calls: [] as RecordedCall[],
   rows: [] as Array<{ severity_color: string | null; status: string }>,
   error: null as { message: string } | null,
-  auth: { user: { id: 'u1' }, profile: { id: 'p1', company_id: 'c1' } as { id: string; company_id: string | null } | null },
+  auth: {
+    user: { id: 'u1' },
+    profile: { id: 'p1', company_id: 'c1' } as { id: string; company_id: string | null } | null,
+    profileResolved: true,
+  },
   access: { ready: true, fleetReach: false },
   vessel: {
     vessels: [] as Vessel[],
@@ -107,7 +112,7 @@ beforeEach(() => {
   h.calls.length = 0;
   h.rows = [];
   h.error = null;
-  h.auth = { user: { id: 'u1' }, profile: { id: 'p1', company_id: 'c1' } };
+  h.auth = { user: { id: 'u1' }, profile: { id: 'p1', company_id: 'c1' }, profileResolved: true };
   h.access = { ready: true, fleetReach: false };
   h.vessel = { vessels: [], loading: false, canAccessAllVessels: false, selectedVesselId: null, isAllVessels: false };
 });
@@ -193,7 +198,7 @@ describe('useOpenAlertCounts', () => {
     ['no readable profile', null],
   ])('once access has loaded, %s is an error (no company), never an endless skeleton, and reads nothing', async (_name, profile) => {
     h.access = { ready: true, fleetReach: true };
-    h.auth = { user: { id: 'u1' }, profile };
+    h.auth = { user: { id: 'u1' }, profile, profileResolved: true };
     const { result, rerender } = renderCounts();
     expect(result.current).toMatchObject({ status: 'error', reason: 'no-company', counts: null });
     // A retry cannot help, and reads nothing either.
@@ -202,6 +207,31 @@ describe('useOpenAlertCounts', () => {
     rerender();
     expect(result.current).toMatchObject({ status: 'error', reason: 'no-company' });
     expect(h.calls).toEqual([]);
+  });
+
+  it('a profile read still in flight is loading, never "no company", and reads nothing (D-103)', async () => {
+    // Access and the vessel list have settled (VesselContext stops waiting for
+    // the profile after 5 s), but the profile read has not answered yet.
+    h.access = { ready: true, fleetReach: true };
+    h.vessel = { ...h.vessel, loading: false };
+    h.auth = { user: { id: 'u1' }, profile: null, profileResolved: false };
+    const { result, rerender } = renderCounts();
+    expect(result.current).toMatchObject({ status: 'loading', counts: null });
+    const tile = alertKpiTileProps(result.current);
+    expect(tile.state).toBe('loading');
+    expect(tile.errorMessage).toBeUndefined();
+    expect(JSON.stringify(tile)).not.toContain(NO_COMPANY_MESSAGE);
+    result.current.retry();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    rerender();
+    expect(result.current.status).toBe('loading');
+    expect(alertCalls()).toHaveLength(0);
+
+    // The read answers with a company: counting starts.
+    h.auth = { user: { id: 'u1' }, profile: { id: 'p1', company_id: 'c1' }, profileResolved: true };
+    rerender();
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(alertCalls()).toHaveLength(1);
   });
 
   it('a failed read is an error, not zero', async () => {

@@ -6,8 +6,12 @@
  * vessels in reach (D-71). The sidebar and tab badge counts
  * (`useSidebarBadgeCounts`) read this query, so they are scoped the same way.
  *
- * Fail closed (D-04): nothing is read until auth, roles and the vessel list
- * have loaded, and a null vessel selection never widens the scope.
+ * Fail closed (D-04): nothing is read until auth, roles, the vessel list and
+ * the profile read (AuthContext.profileResolved) have answered, and a null
+ * vessel selection never widens the scope. "No company" is known, never
+ * inferred from a profile still in flight (D-103): `profileResolved` is true
+ * once the read answers with a row (company_id set or null), with no row or
+ * with an error, and with no session.
  */
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -47,11 +51,13 @@ export interface NotificationCenterData {
 }
 
 export interface AlertScopeState {
-  /** Auth, roles and the vessel list have loaded and there is a company: reading may start. */
+  /** `settled`, and there is a company: reading may start. */
   ready: boolean;
   /**
-   * Auth, roles and the vessel list have loaded, with or without a company:
-   * the scope is final, so a missing company is known to be missing.
+   * Auth, roles and the vessel list have loaded and the profile read has
+   * answered (AuthContext.profileResolved), with or without a company: the
+   * scope is final, so a missing company is known to be missing. A slow
+   * profile read keeps this false, never a transient "no company".
    */
   settled: boolean;
   companyId: string | null;
@@ -64,12 +70,12 @@ export interface AlertScopeState {
 
 /** The viewer's alert scope (see the header). */
 export function useAlertScope(): AlertScopeState {
-  const { profile } = useAuth();
+  const { profile, profileResolved } = useAuth();
   const access = useScopeAccess();
   const { vessels, loading, canAccessAllVessels } = useVessel();
   const route = useScope();
   const companyId = profile?.company_id ?? null;
-  const settled = access.ready && !loading;
+  const settled = access.ready && !loading && profileResolved;
   const ready = settled && Boolean(companyId);
   const reachKey = vessels.map((v) => v.id).join(',');
   const routeVessel = route.scope === 'vessel' ? route.vessel ?? null : null;

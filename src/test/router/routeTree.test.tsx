@@ -63,6 +63,15 @@ describe('route tree', () => {
     const fallthrough = leaves.filter((l) => resolve(l.path).path === '*').map((l) => `${l.label} -> ${l.path}`);
     expect(fallthrough, `leaves that bounce to the dashboard:\n${fallthrough.join('\n')}`).toEqual([]);
   });
+
+  it('an unknown /help or /inbox URL is the personal in-scope 404, and the static pages still win', () => {
+    expect(resolve('/help/zzz').path).toBe('/help/*');
+    expect(resolve('/help/requests/new').path).toBe('/help/*');
+    expect(resolve('/inbox/zzz').path).toBe('/inbox/*');
+    expect(resolve('/inbox').path).toBe('/inbox');
+    expect(resolve('/help/support').path).toBe('/help/support');
+    expect(resolve('/help/how-to-guides').path).toBe('/help/how-to-guides');
+  });
 });
 
 describe('Refit routing', () => {

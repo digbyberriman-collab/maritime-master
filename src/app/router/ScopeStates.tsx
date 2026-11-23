@@ -1,8 +1,10 @@
 /**
  * The bodies a scope layout renders instead of its page: loading, vessel not
- * found, no access, vessel archived, page not found. They render no shell; the
- * scope layout puts them inside its DashboardLayout. Built on the shared page
- * states (`@/shared/components/states`, gap/00 D7, gap/10 §A.12).
+ * found, no access, vessel archived, page not found, the vessel list could
+ * not load. They render no shell; the scope layout puts them inside its
+ * DashboardLayout (the two `FullPage…` states are for the routes that decide
+ * before any shell renders). Built on the shared page states
+ * (`@/shared/components/states`, gap/00 D7, gap/10 §A.12).
  *
  * Each state that replaces a page names itself to the page header
  * (`usePageLocationOverride`, spec §7), so the document title and the
@@ -12,7 +14,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, SearchX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { AccessDenied, EmptyState, PageLoading, VesselArchived } from '@/shared/components/states';
+import { AccessDenied, EmptyState, PageError, PageLoading, VesselArchived } from '@/shared/components/states';
 import RbacRetryNotice from '@/shared/components/layout/topbar/RbacRetryNotice';
 import { usePageLocationOverride } from '@/shared/components/layout/pageLocationOverride';
 
@@ -40,6 +42,62 @@ export const FullPageLoading: React.FC = () => (
       <Loader2 className="h-8 w-8 text-primary motion-safe:animate-spin" aria-hidden="true" />
       <span className="sr-only">Loading…</span>
     </div>
+  </div>
+);
+
+/** The heading (and page title) of the failed vessel-list state. */
+export const VESSEL_LIST_ERROR_TITLE = 'Your vessels could not load';
+
+/**
+ * PageError's Try again is a small button; on touch it gets the 44 px target
+ * (D-35, gap/10 A.7) the strips' Retry has.
+ */
+const COARSE_RETRY_TARGET = '[@media(pointer:coarse)]:[&_button]:h-11';
+
+interface VesselListErrorProps {
+  /** What failed (a sentence, or the error itself). */
+  error?: unknown;
+  onRetry: () => void;
+}
+
+/**
+ * The vessel lists could not load (D-04, gap/10 A.12): an error with Retry,
+ * shown instead of "Vessel not found", "no access", "archived" or "No vessel
+ * to open", none of which is known while the list is missing. The table is
+ * live, so a missing-relation code is an error here, not "not switched on".
+ * Inside the shell; the shell's strip (VesselListNotice) says the same.
+ */
+export const VesselListError: React.FC<VesselListErrorProps> = ({ error, onRetry }) => {
+  usePageLocationOverride({ title: VESSEL_LIST_ERROR_TITLE, crumbs: 'none' });
+  return (
+    <PageError
+      title={VESSEL_LIST_ERROR_TITLE}
+      error={error}
+      onRetry={onRetry}
+      headingLevel={1}
+      treatMissingAsOff={false}
+      className={COARSE_RETRY_TARGET}
+    />
+  );
+};
+
+/**
+ * The same error for the routes with no shell (`/`, legacy redirects), in
+ * FullPageLoading's frame: the RBAC Retry notice on top, the error centred.
+ */
+export const FullPageVesselListError: React.FC<VesselListErrorProps> = ({ error, onRetry }) => (
+  <div className="flex min-h-dvh flex-col bg-background">
+    <RbacRetryNotice />
+    <main className="flex flex-1 items-center justify-center px-4">
+      <PageError
+        title={VESSEL_LIST_ERROR_TITLE}
+        error={error}
+        onRetry={onRetry}
+        headingLevel={1}
+        treatMissingAsOff={false}
+        className={COARSE_RETRY_TARGET}
+      />
+    </main>
   </div>
 );
 

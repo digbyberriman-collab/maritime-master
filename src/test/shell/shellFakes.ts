@@ -108,6 +108,7 @@ export const shellState = {
     clientLogoUrl: null as string | null,
     brandColor: '',
     tenantBrandColor: null as string | null,
+    companyName: null as string | null,
     isLoading: false,
   },
   feedback: { panelOpen: false, setPanelOpen: (open: boolean) => void (shellState.feedback.panelOpen = open) },
@@ -153,7 +154,7 @@ export function asLoading(): void {
 
 export function resetShellState(): void {
   shellState.auth.canAccessModule = () => true;
-  shellState.branding = { clientDisplayName: 'Demo Fleet', clientLogoUrl: null, brandColor: '', tenantBrandColor: null, isLoading: false };
+  shellState.branding = { clientDisplayName: 'Demo Fleet', clientLogoUrl: null, brandColor: '', tenantBrandColor: null, companyName: null, isLoading: false };
   shellState.feedback.panelOpen = false;
   shellState.theme.theme = 'dark';
   asFleetUser();

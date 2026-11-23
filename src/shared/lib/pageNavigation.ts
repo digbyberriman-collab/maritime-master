@@ -85,11 +85,17 @@ const SCOPED_TITLES: ReadonlyArray<readonly [pattern: string, title: ScopedTitle
   ['/v/:vesselCode/crew/planner/configuration', { label: 'Planner Configuration' }],
 ];
 
-/** Segment-wise match; a `:param` segment of the pattern takes any one segment. */
+/**
+ * Segment-wise match; a `:param` segment of the pattern takes any one
+ * segment. Case-insensitive, like the router (D-111).
+ */
 function matchesPattern(pattern: string, pathname: string): boolean {
   const want = pattern.split('/');
   const got = pathname.replace(/\/+$/, '').split('/');
-  return want.length === got.length && want.every((segment, i) => segment === got[i] || (segment.startsWith(':') && got[i] !== ''));
+  return (
+    want.length === got.length &&
+    want.every((segment, i) => segment.toLowerCase() === got[i].toLowerCase() || (segment.startsWith(':') && got[i] !== ''))
+  );
 }
 
 const scopedTitleFor = (pathname: string): ScopedTitle | null =>
@@ -148,6 +154,9 @@ function isForeignCrossLink(node: NavigationNode): boolean {
 
 function findBestMatch(pathname: string, search: string, activeModuleId?: string | null): Match | null {
   let best: Match | null = null;
+  // Paths compare case-insensitively, like the router (D-111): `/v/:vesselCode/CREW/list`
+  // is Crew list. Node paths hold `:vesselCode`, so both sides are lower-cased.
+  const key = pathname.toLowerCase();
   const modules = activeModuleId
     ? NAVIGATION_ITEMS.filter((item) => item.id === activeModuleId)
     : NAVIGATION_ITEMS;
@@ -163,8 +172,9 @@ function findBestMatch(pathname: string, search: string, activeModuleId?: string
   const visit = (node: NavigationNode, ancestors: NavigationNode[], depth: number, moduleRoot: string) => {
     if (isForeignCrossLink(node)) return;
     const nodePath = pathnameOf(node.path);
-    const exact = pathname === nodePath;
-    const descendant = nodePath !== '/' && (depth === 0 || nodePath !== moduleRoot) && pathname.startsWith(`${nodePath}/`);
+    const nodeKey = nodePath.toLowerCase();
+    const exact = key === nodeKey;
+    const descendant = nodePath !== '/' && (depth === 0 || nodeKey !== moduleRoot.toLowerCase()) && key.startsWith(`${nodeKey}/`);
     if (exact || descendant) {
       const queryBonus = exact && routeQueryMatches(node.path, search) ? 500 : 0;
       const leafBonus = node.children?.length ? 0 : 100;
@@ -196,7 +206,7 @@ export function resolvePageNavigation(
   search = '',
   activeModuleId?: string | null,
 ): PageNavigation {
-  const special = SPECIAL_PAGES[pathname];
+  const special = SPECIAL_PAGES[pathname] ?? SPECIAL_PAGES[pathname.toLowerCase()];
   if (special) return special;
 
   const match = findBestMatch(pathname, search, activeModuleId);
@@ -207,6 +217,8 @@ export function resolvePageNavigation(
       ...('moduleSetting' in item && item.moduleSetting ? { moduleSetting: item.moduleSetting } : {}),
       ...('kind' in item && item.kind === 'section' ? { section: true } : {}),
     }));
+    // The original pathname, so a record id or slug shows as written (the
+    // match ignores case only, so the prefix lengths are equal).
     const matchedPath = pathnameOf(match.node.path);
     const detail = detailCrumb(pathname, matchedPath, match.node.label);
     if (detail) {
