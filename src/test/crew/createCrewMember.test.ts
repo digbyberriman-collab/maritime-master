@@ -146,6 +146,160 @@ describe('createCrewMember: the outcome', () => {
   });
 });
 
+/**
+ * The vessel is said only as the function reported it (D-184, D-199,
+ * finding create-crew-member-pending-login-never-assigned): `created` when
+ * the invitation linked a login and the assignment was written,
+ * `pending_login` while no login is linked; an unknown value is ignored.
+ */
+describe('createCrewMember: the vessel assignment', () => {
+  const NAME = 'Demo Deckhand';
+
+  it('201 sent + created → "added to the vessel"', async () => {
+    ok({ ok: true, profileId: 'p-1', invitation: { status: 'sent', invitationId: 'inv-1', stored: true }, assignment: 'created' });
+    const outcome = await createCrewMember(INPUT);
+    expect(outcome).toEqual({ kind: 'created', profileId: 'p-1', invited: 'sent', stored: true, assignment: 'created' });
+    expect(createCrewNotice(outcome, NAME)).toEqual({
+      tone: 'success',
+      title: 'Crew member added',
+      description: 'Demo Deckhand was added to the vessel and STORM emailed them an invitation.',
+      retry: false,
+    });
+    expect(crewImportRowResult(outcome)).toEqual({ status: 'invited', created: true, message: 'Added and invited.' });
+  });
+
+  it('201 sent + created, not stored → the tracking note still follows', async () => {
+    ok({ ok: true, profileId: 'p-1', invitation: { status: 'sent', invitationId: null, stored: false }, assignment: 'created' });
+    const outcome = await createCrewMember(INPUT);
+    expect(createCrewNotice(outcome, NAME).description).toBe(`Demo Deckhand was added to the vessel and STORM emailed them an invitation. ${NOT_STORED_NOTE}`);
+    expect(crewImportRowResult(outcome).message).toBe(`Added and invited. ${NOT_STORED_NOTE}`);
+  });
+
+  it('201 sent + pending_login → invited, and the vessel waits for the login', async () => {
+    ok({ ok: true, profileId: 'p-1', invitation: { status: 'sent', invitationId: 'inv-1', stored: true }, assignment: 'pending_login' });
+    const outcome = await createCrewMember(INPUT);
+    expect(outcome).toEqual({ kind: 'created', profileId: 'p-1', invited: 'sent', stored: true, assignment: 'pending_login' });
+    const notice = createCrewNotice(outcome, NAME);
+    expect(notice).toMatchObject({ tone: 'success', title: 'Crew member added', retry: false });
+    expect(notice.description).toBe('Demo Deckhand was added and STORM emailed them an invitation. They are assigned to the vessel once their login is linked.');
+    expect(notice.description).not.toMatch(/added to the vessel/);
+    expect(crewImportRowResult(outcome)).toEqual({ status: 'invited', created: true, message: 'Added and invited. The vessel is assigned once their login is linked.' });
+  });
+
+  it('201 not_sent + pending_login → added, the vessel waits for the invitation and the login', async () => {
+    ok({ ok: true, profileId: 'p-1', invitation: { status: 'not_sent' }, assignment: 'pending_login' });
+    const outcome = await createCrewMember({ ...INPUT, sendInvite: false });
+    expect(outcome).toEqual({ kind: 'created', profileId: 'p-1', invited: 'not_sent', stored: true, assignment: 'pending_login' });
+    expect(createCrewNotice(outcome, NAME)).toEqual({
+      tone: 'success',
+      title: 'Crew member added',
+      description:
+        'Demo Deckhand was added. They are assigned to the vessel once they are invited and their login is linked. Send their invitation from Users & Access when they are ready to join.',
+      retry: false,
+    });
+    expect(crewImportRowResult(outcome)).toEqual({
+      status: 'added',
+      created: true,
+      message: 'Added. No invitation was sent. The vessel is assigned once they are invited and their login is linked.',
+    });
+  });
+
+  it('201 not_sent + created (a login was already linked) → "added to the vessel"', async () => {
+    ok({ ok: true, profileId: 'p-1', invitation: { status: 'not_sent' }, assignment: 'created' });
+    const outcome = await createCrewMember({ ...INPUT, sendInvite: false });
+    expect(outcome).toMatchObject({ kind: 'created', invited: 'not_sent', assignment: 'created' });
+    expect(createCrewNotice(outcome, NAME).description).toBe('Demo Deckhand was added to the vessel. Send their invitation from Users & Access when they are ready to join.');
+    expect(crewImportRowResult(outcome)).toEqual({ status: 'added', created: true, message: 'Added. No invitation was sent.' });
+  });
+
+  it('no vessel (no assignment in the answer) keeps the copy without a vessel', async () => {
+    ok({ ok: true, profileId: 'p-1', invitation: { status: 'sent', invitationId: 'inv-1', stored: true } });
+    const sent = await createCrewMember({ ...INPUT, vesselId: undefined });
+    expect(sent).not.toHaveProperty('assignment');
+    expect(createCrewNotice(sent, NAME).description).toBe('Demo Deckhand was added and STORM emailed them an invitation.');
+    ok({ ok: true, profileId: 'p-1', invitation: { status: 'not_sent' } });
+    const notSent = await createCrewMember({ ...INPUT, vesselId: undefined, sendInvite: false });
+    expect(createCrewNotice(notSent, NAME).description).toBe('Demo Deckhand was added. Send their invitation from Users & Access when they are ready to join.');
+    expect(crewImportRowResult(notSent).message).toBe('Added. No invitation was sent.');
+  });
+
+  it.each([['maybe'], ['failed'], [true], [{ status: 'created' }]])('an unknown 201 assignment value (%o) is ignored, never guessed', async (value) => {
+    ok({ ok: true, profileId: 'p-1', invitation: { status: 'not_sent' }, assignment: value });
+    const outcome = await createCrewMember({ ...INPUT, sendInvite: false });
+    expect(outcome).toEqual({ kind: 'created', profileId: 'p-1', invited: 'not_sent', stored: true });
+    expect(outcome).not.toHaveProperty('assignment');
+    expect(createCrewNotice(outcome, NAME).description).toBe('Demo Deckhand was added. Send their invitation from Users & Access when they are ready to join.');
+    expect(crewImportRowResult(outcome).message).toBe('Added. No invitation was sent.');
+  });
+
+  it('502 send_failed + pending_login → the vessel waits for the invitation and the login', async () => {
+    httpError(502, edgeError('partial_failure', 'x', { profileCreated: true, profileId: 'p-1', invitation: 'send_failed', email_error: 'provider_unavailable', assignment: 'pending_login' }));
+    const outcome = await createCrewMember(INPUT);
+    expect(outcome).toEqual({ kind: 'created_invite_failed', profileId: 'p-1', emailError: 'provider_unavailable', inviteCode: null, assignmentFailed: false, assignment: 'pending_login' });
+    const notice = createCrewNotice(outcome, NAME);
+    expect(notice).toMatchObject({ tone: 'error', title: 'Crew member added, invitation not sent', retry: false });
+    expect(notice.description).toBe(
+      'Demo Deckhand was added, but the invitation email could not be sent. The email service did not answer. Try again in a few minutes. Send it from Users & Access. They are assigned to the vessel once they are invited and their login is linked.',
+    );
+    expect(crewImportRowResult(outcome)).toEqual({
+      status: 'invite_failed',
+      created: true,
+      message:
+        'Added, but not invited. The invitation email could not be sent: The email service did not answer. Try again in a few minutes. Send it from Users & Access. The vessel is assigned once they are invited and their login is linked.',
+    });
+  });
+
+  it('502 refused + pending_login → the same vessel sentence', async () => {
+    httpError(502, edgeError('partial_failure', 'x', { profileCreated: true, profileId: 'p-1', invitation: 'refused', invite_code: 'status_unavailable', assignment: 'pending_login' }));
+    const outcome = await createCrewMember(INPUT);
+    expect(outcome).toEqual({ kind: 'created_invite_failed', profileId: 'p-1', emailError: null, inviteCode: 'status_unavailable', assignmentFailed: false, assignment: 'pending_login' });
+    expect(createCrewNotice(outcome, NAME).description).toBe(
+      'Demo Deckhand was added, but the invitation was not sent. Send it from Users & Access. They are assigned to the vessel once they are invited and their login is linked.',
+    );
+    expect(crewImportRowResult(outcome).message).toBe('Added, but not invited. The invitation was not sent. Send it from Users & Access. The vessel is assigned once they are invited and their login is linked.');
+  });
+
+  it('502 send_failed + created (the failed send still linked the login) → no vessel caveat', async () => {
+    httpError(502, edgeError('partial_failure', 'x', { profileCreated: true, profileId: 'p-1', invitation: 'send_failed', email_error: 'provider_rejected', assignment: 'created' }));
+    const outcome = await createCrewMember(INPUT);
+    expect(outcome).toEqual({ kind: 'created_invite_failed', profileId: 'p-1', emailError: 'provider_rejected', inviteCode: null, assignmentFailed: false, assignment: 'created' });
+    const description = createCrewNotice(outcome, NAME).description ?? '';
+    expect(description).not.toMatch(/once they are invited|not saved/);
+    expect(crewImportRowResult(outcome).message).not.toMatch(/once they are invited|not saved/);
+  });
+
+  it('502 send_failed + assignment failed → assignmentFailed, said once, and no "once they are invited"', async () => {
+    httpError(502, edgeError('partial_failure', 'x', { profileCreated: true, profileId: 'p-1', invitation: 'send_failed', email_error: 'provider_rejected', assignment: 'failed', assignmentCreated: false }));
+    const outcome = await createCrewMember(INPUT);
+    expect(outcome).toEqual({ kind: 'created_invite_failed', profileId: 'p-1', emailError: 'provider_rejected', inviteCode: null, assignmentFailed: true, assignment: 'failed' });
+    expect(createCrewNotice(outcome, NAME).description).toMatch(/vessel assignment was not saved either/);
+    expect(createCrewNotice(outcome, NAME).description).not.toMatch(/once they are invited/);
+    expect(crewImportRowResult(outcome).message).toMatch(/vessel assignment was not saved either/);
+  });
+
+  it('502 details.assignment failed alone also sets assignmentFailed', async () => {
+    httpError(502, edgeError('partial_failure', 'x', { profileCreated: true, profileId: 'p-1', invitation: 'send_failed', email_error: 'link_failed', assignment: 'failed' }));
+    await expect(createCrewMember(INPUT)).resolves.toMatchObject({ kind: 'created_invite_failed', assignmentFailed: true, assignment: 'failed' });
+  });
+
+  it('502 with an unknown details.assignment is ignored', async () => {
+    httpError(502, edgeError('partial_failure', 'x', { profileCreated: true, profileId: 'p-1', invitation: 'refused', invite_code: 'forbidden', assignment: 'later' }));
+    const outcome = await createCrewMember(INPUT);
+    expect(outcome).toEqual({ kind: 'created_invite_failed', profileId: 'p-1', emailError: null, inviteCode: 'forbidden', assignmentFailed: false });
+    expect(createCrewNotice(outcome, NAME).description).not.toMatch(/vessel/);
+  });
+
+  it('the assignment-failed 502 (invited, assignment failed) is unchanged', async () => {
+    httpError(502, {
+      ...edgeError('partial_failure', 'x', { profileCreated: true, profileId: 'p-1', assignmentCreated: false, assignment: 'failed' }),
+      invitation: { status: 'sent', invitationId: 'inv-1', stored: true },
+    });
+    const outcome = await createCrewMember(INPUT);
+    expect(outcome).toEqual({ kind: 'created_assignment_failed', profileId: 'p-1', invited: 'sent' });
+    expect(crewImportRowResult(outcome).status).toBe('assignment_failed');
+  });
+});
+
 describe('CSV import rows', () => {
   const outcomes: CreateCrewOutcome[] = [
     { kind: 'created', profileId: 'p-1', invited: 'sent', stored: true },

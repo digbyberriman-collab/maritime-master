@@ -14,6 +14,10 @@
  * - `partial_failure` names the part that failed (status stored, sign-in
  *   blocked, assignment created, previous assignment closed);
  * - `not_supported` is said as such (ending sessions by user id);
+ * - a vessel assignment is said only as the function reported it (D-199):
+ *   `create-crew-member` answers `assignment: 'created' | 'pending_login'`
+ *   (and `'failed'` in a 502), the invite answers `'created' | 'failed'`
+ *   when an imported vessel was being assigned; an unknown value is ignored;
  * - a 2xx without the expected body (an older deployed function, or the
  *   visual harness's `{}`) is `unconfirmed`: STORM cannot say it worked;
  * - anything else is `failed` with an `EdgeFailure`: the HTTP status, the
@@ -288,9 +292,19 @@ export const okBody = (answer: EdgeAnswer): JsonObject | null => (isSuccess(answ
 
 // ─── Invitations ───────────────────────────────────────────────────────────
 
+/** An invite answer's `assignment` (D-199): the imported vessel was written to `crew_assignments` once the login was linked, or not. */
+export type InviteAssignment = 'created' | 'failed';
+const inviteAssignmentOf = (value: unknown): InviteAssignment | null => (value === 'created' || value === 'failed' ? value : null);
+/** `assignmentFailed` only when the function reported the assignment step (`created` → false, `failed` → true). */
+const assignmentFailedField = (value: unknown): { assignmentFailed?: boolean } => {
+  const assignment = inviteAssignmentOf(value);
+  return assignment ? { assignmentFailed: assignment === 'failed' } : {};
+};
+
 export type InviteOutcome =
-  | { kind: 'sent'; stored: boolean; invitationId: string | null }
-  | { kind: 'send_failed'; stored: boolean; invitationId: string | null; emailError: EmailErrorCode | null }
+  /** `assignmentFailed`: an imported vessel was being assigned when the login was linked, and that was not saved (absent when no vessel was being assigned). */
+  | { kind: 'sent'; stored: boolean; invitationId: string | null; assignmentFailed?: boolean }
+  | { kind: 'send_failed'; stored: boolean; invitationId: string | null; emailError: EmailErrorCode | null; assignmentFailed?: boolean }
   /** A 2xx without the honest body (an older deployed function): delivery cannot be confirmed. */
   | { kind: 'unconfirmed' }
   | { kind: 'failed'; failure: EdgeFailure };
@@ -302,7 +316,7 @@ export function inviteOutcomeFrom(answer: EdgeAnswer): InviteOutcome {
   const ok = okBody(answer);
   if (ok) {
     if (invitation?.status === 'sent') {
-      return { kind: 'sent', stored: invitation.stored === true, invitationId: stringOrNull(invitation.id) };
+      return { kind: 'sent', stored: invitation.stored === true, invitationId: stringOrNull(invitation.id), ...assignmentFailedField(ok.assignment) };
     }
     return { kind: 'unconfirmed' };
   }
@@ -315,6 +329,7 @@ export function inviteOutcomeFrom(answer: EdgeAnswer): InviteOutcome {
       stored: invitation.stored === true,
       invitationId: stringOrNull(invitation.id),
       emailError: isEmailCode(details.email_error) ? details.email_error : null,
+      ...assignmentFailedField(body.assignment),
     };
   }
   return { kind: 'failed', failure: failureFrom(answer) };
@@ -338,6 +353,8 @@ export interface BulkInviteRow {
   reason: string | null;
   /** A failed send that may work when tried again (`emailErrorIsRetryable`: a busy or duplicate send, a failed link). */
   retryable: boolean;
+  /** The imported vessel's assignment when the login was linked (D-199); absent when no vessel was being assigned. */
+  assignment?: InviteAssignment;
 }
 
 export type BulkInviteOutcome =
@@ -352,6 +369,7 @@ function bulkRowFrom(value: unknown): BulkInviteRow | null {
   const status = value.status;
   if (!profileId || (status !== 'sent' && status !== 'send_failed' && status !== 'refused')) return null;
   const emailError = isEmailCode(value.emailError) ? value.emailError : null;
+  const assignment = inviteAssignmentOf(value.assignment);
   return {
     profileId,
     status,
@@ -361,6 +379,7 @@ function bulkRowFrom(value: unknown): BulkInviteRow | null {
     emailError,
     reason: stringOrNull(value.reason),
     retryable: status === 'send_failed' && emailErrorIsRetryable(emailError),
+    ...(assignment ? { assignment } : {}),
   };
 }
 
@@ -570,15 +589,28 @@ export interface CreateCrewMemberInput {
   sendInvite?: boolean;
 }
 
+/**
+ * Where the new crew member's vessel stands (`create-crew-member`'s
+ * `assignment`, D-184/D-199; only when a vessel was given): `created` (the
+ * invitation linked a login and the `crew_assignments` row was written),
+ * `pending_login` (no login is linked yet: the row is written once they are
+ * invited and their login is linked), `failed` (502 only: not saved).
+ */
+export type CrewAssignmentStatus = 'created' | 'pending_login' | 'failed';
+const crewAssignmentOf = (value: unknown): CrewAssignmentStatus | null =>
+  value === 'created' || value === 'pending_login' || value === 'failed' ? value : null;
+
 export type CreateCrewOutcome =
-  /** 201 with the honest body: added, and the invitation sent (or not asked for). */
-  | { kind: 'created'; profileId: string; invited: 'sent' | 'not_sent'; stored: boolean }
+  /** 201 with the honest body: added, and the invitation sent (or not asked for). `assignment` only when a vessel was given (an unknown value is left out). */
+  | { kind: 'created'; profileId: string; invited: 'sent' | 'not_sent'; stored: boolean; assignment?: Exclude<CrewAssignmentStatus, 'failed'> }
   /**
    * Added as not invited, but the invitation was not sent: the email failed
    * (`emailError`) or the invitation path refused (`inviteCode`). Send it
    * again from Users & Access; adding the person again is refused (409).
+   * `assignment` when a vessel was given; `assignmentFailed` is true when it
+   * is `failed` (or the function said `assignmentCreated: false`).
    */
-  | { kind: 'created_invite_failed'; profileId: string | null; emailError: EmailErrorCode | null; inviteCode: string | null; assignmentFailed: boolean }
+  | { kind: 'created_invite_failed'; profileId: string | null; emailError: EmailErrorCode | null; inviteCode: string | null; assignmentFailed: boolean; assignment?: CrewAssignmentStatus }
   /** Added (and invited when asked), but the vessel assignment was not saved. */
   | { kind: 'created_assignment_failed'; profileId: string | null; invited: 'sent' | 'not_sent' | null }
   /** A 2xx without the honest body (an older deployed function, the visual harness's `{}`): STORM cannot say it worked (D-143). */
@@ -612,8 +644,11 @@ export function createCrewOutcomeFrom(answer: EdgeAnswer): CreateCrewOutcome {
   if (ok) {
     const profileId = stringOrNull(ok.profileId);
     const invitation = isObject(ok.invitation) ? ok.invitation : null;
-    if (profileId && invitation?.status === 'sent') return { kind: 'created', profileId, invited: 'sent', stored: invitation.stored === true };
-    if (profileId && invitation?.status === 'not_sent') return { kind: 'created', profileId, invited: 'not_sent', stored: true };
+    // A 201 reports `created` or `pending_login`; anything else (`failed` belongs in a 502) is left out, never guessed.
+    const reported = crewAssignmentOf(ok.assignment);
+    const assignment = reported && reported !== 'failed' ? { assignment: reported } : {};
+    if (profileId && invitation?.status === 'sent') return { kind: 'created', profileId, invited: 'sent', stored: invitation.stored === true, ...assignment };
+    if (profileId && invitation?.status === 'not_sent') return { kind: 'created', profileId, invited: 'not_sent', stored: true, ...assignment };
     return { kind: 'unconfirmed' };
   }
   if (isSuccess(answer)) return { kind: 'unconfirmed' };
@@ -621,16 +656,19 @@ export function createCrewOutcomeFrom(answer: EdgeAnswer): CreateCrewOutcome {
   if (failure.code === 'partial_failure' && failure.details.profileCreated === true) {
     const profileId = stringOrNull(failure.details.profileId);
     const invite = failure.details.invitation;
+    const assignment = crewAssignmentOf(failure.details.assignment);
+    const assignmentFailed = failure.details.assignmentCreated === false || assignment === 'failed';
     if (invite === 'send_failed' || invite === 'refused') {
       return {
         kind: 'created_invite_failed',
         profileId,
         emailError: invite === 'send_failed' && isEmailCode(failure.details.email_error) ? failure.details.email_error : null,
         inviteCode: invite === 'refused' ? stringOrNull(failure.details.invite_code) : null,
-        assignmentFailed: failure.details.assignmentCreated === false,
+        assignmentFailed,
+        ...(assignment ? { assignment } : {}),
       };
     }
-    if (failure.details.assignmentCreated === false) {
+    if (assignmentFailed) {
       const body = isObject(answer.body) ? answer.body : {};
       const status = isObject(body.invitation) ? body.invitation.status : null;
       return { kind: 'created_assignment_failed', profileId, invited: status === 'sent' || status === 'not_sent' ? status : null };
@@ -655,16 +693,24 @@ export interface CrewImportRowResult {
   message: string;
 }
 
+/** The row's vessel sentence while no login is linked yet (D-199). */
+const ROW_PENDING_LOGIN_NOT_INVITED = 'The vessel is assigned once they are invited and their login is linked.';
+
 export function crewImportRowResult(outcome: CreateCrewOutcome): CrewImportRowResult {
   switch (outcome.kind) {
-    case 'created':
-      return outcome.invited === 'sent'
-        ? { status: 'invited', created: true, message: withNote('Added and invited.', outcome.stored ? null : NOT_STORED_NOTE) ?? 'Added and invited.' }
-        : { status: 'added', created: true, message: 'Added. No invitation was sent.' };
+    case 'created': {
+      const pending = outcome.assignment === 'pending_login';
+      if (outcome.invited === 'sent') {
+        const text = pending ? 'Added and invited. The vessel is assigned once their login is linked.' : 'Added and invited.';
+        return { status: 'invited', created: true, message: withNote(text, outcome.stored ? null : NOT_STORED_NOTE) ?? text };
+      }
+      return { status: 'added', created: true, message: pending ? `Added. No invitation was sent. ${ROW_PENDING_LOGIN_NOT_INVITED}` : 'Added. No invitation was sent.' };
+    }
     case 'created_invite_failed': {
       const why = outcome.emailError ? `The invitation email could not be sent: ${emailErrorMessage(outcome.emailError)}` : 'The invitation was not sent.';
       const vessel = outcome.assignmentFailed ? ' The vessel assignment was not saved either.' : '';
-      return { status: 'invite_failed', created: true, message: `Added, but not invited. ${why}${vessel} Send it from Users & Access.` };
+      const pending = outcome.assignment === 'pending_login' && !outcome.assignmentFailed ? ` ${ROW_PENDING_LOGIN_NOT_INVITED}` : '';
+      return { status: 'invite_failed', created: true, message: `Added, but not invited. ${why}${vessel} Send it from Users & Access.${pending}` };
     }
     case 'created_assignment_failed':
       return {
@@ -718,21 +764,29 @@ export const NOT_STORED_NOTE = 'Delivery tracking is not set up yet.';
 
 const withNote = (text: string | undefined, note: string | null) => [text, note].filter(Boolean).join(' ') || undefined;
 
+/** Said when an invitation linked a login but the imported vessel's assignment was not saved (D-199). */
+export const ASSIGNMENT_NOT_SAVED_NOTE = 'The vessel assignment could not be saved. Assign the vessel from the crew list.';
+
 /** The notice for an invitation outcome (single invite or resend). */
 export function inviteNotice(outcome: InviteOutcome, recipient?: string | null): OutcomeNotice {
   switch (outcome.kind) {
-    case 'sent':
+    case 'sent': {
+      const assignmentNote = outcome.assignmentFailed ? ASSIGNMENT_NOT_SAVED_NOTE : null;
       return {
-        tone: 'success',
+        tone: assignmentNote ? 'warning' : 'success',
         title: 'Invitation sent',
-        description: withNote(recipient ? `STORM emailed an invitation to ${recipient}.` : 'STORM emailed the invitation.', outcome.stored ? null : NOT_STORED_NOTE),
+        description: withNote(
+          withNote(recipient ? `STORM emailed an invitation to ${recipient}.` : 'STORM emailed the invitation.', outcome.stored ? null : NOT_STORED_NOTE),
+          assignmentNote,
+        ),
         retry: false,
       };
+    }
     case 'send_failed':
       return {
         tone: 'error',
         title: 'The invitation email could not be sent',
-        description: withNote(emailErrorMessage(outcome.emailError), outcome.stored ? null : NOT_STORED_NOTE),
+        description: withNote(withNote(emailErrorMessage(outcome.emailError), outcome.stored ? null : NOT_STORED_NOTE), outcome.assignmentFailed ? ASSIGNMENT_NOT_SAVED_NOTE : null),
         retry: emailErrorIsRetryable(outcome.emailError),
       };
     case 'unconfirmed':
@@ -748,25 +802,39 @@ export function inviteNotice(outcome: InviteOutcome, recipient?: string | null):
 }
 
 /** The notice for adding one crew member (create-crew-member): "added" only after the honest 201, and the invitation said as it went. */
+/** The notice's vessel sentence while no login is linked yet and none is on its way (D-199). */
+const PENDING_LOGIN_NOT_INVITED = 'They are assigned to the vessel once they are invited and their login is linked.';
+
 export function createCrewNotice(outcome: CreateCrewOutcome, name?: string | null): OutcomeNotice {
   const who = name?.trim() || 'The crew member';
   switch (outcome.kind) {
-    case 'created':
-      return outcome.invited === 'sent'
-        ? {
-            tone: 'success',
-            title: 'Crew member added',
-            description: withNote(`${who} was added and STORM emailed them an invitation.`, outcome.stored ? null : NOT_STORED_NOTE),
-            retry: false,
-          }
-        : { tone: 'success', title: 'Crew member added', description: `${who} was added. Send their invitation from Users & Access when they are ready to join.`, retry: false };
+    case 'created': {
+      if (outcome.invited === 'sent') {
+        // The vessel is named only as the function reported it: written (`created`), or waiting for the login (`pending_login`).
+        const text =
+          outcome.assignment === 'created'
+            ? `${who} was added to the vessel and STORM emailed them an invitation.`
+            : outcome.assignment === 'pending_login'
+              ? `${who} was added and STORM emailed them an invitation. They are assigned to the vessel once their login is linked.`
+              : `${who} was added and STORM emailed them an invitation.`;
+        return { tone: 'success', title: 'Crew member added', description: withNote(text, outcome.stored ? null : NOT_STORED_NOTE), retry: false };
+      }
+      const added =
+        outcome.assignment === 'created'
+          ? `${who} was added to the vessel.`
+          : outcome.assignment === 'pending_login'
+            ? `${who} was added. ${PENDING_LOGIN_NOT_INVITED}`
+            : `${who} was added.`;
+      return { tone: 'success', title: 'Crew member added', description: `${added} Send their invitation from Users & Access when they are ready to join.`, retry: false };
+    }
     case 'created_invite_failed': {
       const why = outcome.emailError ? emailErrorMessage(outcome.emailError) : null;
       const vessel = outcome.assignmentFailed ? 'The vessel assignment was not saved either.' : null;
+      const pending = outcome.assignment === 'pending_login' && !outcome.assignmentFailed ? PENDING_LOGIN_NOT_INVITED : null;
       return {
         tone: 'error',
         title: 'Crew member added, invitation not sent',
-        description: [`${who} was added, but ${outcome.emailError ? 'the invitation email could not be sent.' : 'the invitation was not sent.'}`, why, vessel, 'Send it from Users & Access.']
+        description: [`${who} was added, but ${outcome.emailError ? 'the invitation email could not be sent.' : 'the invitation was not sent.'}`, why, vessel, 'Send it from Users & Access.', pending]
           .filter(Boolean)
           .join(' '),
         // Adding them again is refused (the email is in use): the retry is the invitation, from Users & Access.
@@ -787,6 +855,9 @@ export function createCrewNotice(outcome: CreateCrewOutcome, name?: string | nul
   }
 }
 
+/** Said when some bulk rows linked a login but their imported vessel's assignment was not saved (D-199). */
+export const BULK_ASSIGNMENT_NOT_SAVED_NOTE = 'Some vessel assignments could not be saved. Assign them from the crew list.';
+
 /** The notice for a bulk invite: "Sent n · Failed m" from the rows the function returned. */
 export function bulkInviteNotice(outcome: BulkInviteOutcome): OutcomeNotice {
   const parts = [`Sent ${outcome.sent}`, `Failed ${outcome.failed}`];
@@ -796,13 +867,21 @@ export function bulkInviteNotice(outcome: BulkInviteOutcome): OutcomeNotice {
   if (outcome.failed > 0) notes.push('Some invitation emails could not be sent. Retry them from the list.');
   if (outcome.refused > 0) notes.push('Some people could not be invited; their status says why.');
   if (outcome.notStored > 0) notes.push(NOT_STORED_NOTE);
+  // Rows whose invitation linked a login but whose imported vessel was not written (D-199).
+  const assignmentNote = outcome.results.some((r) => r.assignment === 'failed') ? BULK_ASSIGNMENT_NOT_SAVED_NOTE : null;
+  if (assignmentNote) notes.push(assignmentNote);
   if (outcome.kind === 'failed') {
     return { tone: 'error', title: outcome.results.length ? title : 'Could not send the invitations', description: [outcome.failure.message, ...notes].join(' '), retry: failureIsRetryable(outcome.failure) };
   }
   if (outcome.kind === 'unconfirmed') {
-    return { tone: 'warning', title: outcome.results.length ? title : 'Invitations requested', description: 'STORM could not confirm every result. Check the invitation status before sending again.', retry: false };
+    return {
+      tone: 'warning',
+      title: outcome.results.length ? title : 'Invitations requested',
+      description: withNote('STORM could not confirm every result. Check the invitation status before sending again.', assignmentNote),
+      retry: false,
+    };
   }
-  const tone: NoticeTone = outcome.failed + outcome.refused === 0 ? 'success' : outcome.sent === 0 ? 'error' : 'warning';
+  const tone: NoticeTone = outcome.failed + outcome.refused === 0 ? (assignmentNote ? 'warning' : 'success') : outcome.sent === 0 ? 'error' : 'warning';
   return { tone, title, description: notes.join(' ') || undefined, retry: false };
 }
 

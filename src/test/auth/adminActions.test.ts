@@ -16,6 +16,8 @@ vi.mock('@/integrations/supabase/client', () => ({ supabase: { functions: { invo
 
 import {
   accessNotice,
+  ASSIGNMENT_NOT_SAVED_NOTE,
+  BULK_ASSIGNMENT_NOT_SAVED_NOTE,
   EMAIL_ERROR_CODES,
   EMAIL_ERROR_COPY,
   emailErrorIsRetryable,
@@ -243,6 +245,142 @@ describe('bulkInvite', () => {
     ok({ ok: true, results: [row('p-1', 'send_failed', { code: 'status_unavailable' })] });
     const outcome = await bulkInvite(['p-1']);
     expect(bulkInviteNotice(outcome)).toMatchObject({ tone: 'error', title: 'Sent 0 · Failed 1' });
+  });
+});
+
+/**
+ * An invitation that links a login also writes the imported vessel's
+ * assignment (D-199); the answer's top-level `assignment` says whether that
+ * worked, and the copy never claims a vessel assignment it was not told about.
+ */
+describe('invite answers with an imported vessel assignment', () => {
+  it('200 sent + assignment failed → sent, warning tone, and the vessel sentence', async () => {
+    ok({ ok: true, invitation: { status: 'sent', stored: true, id: 'inv-1' }, assignment: 'failed' });
+    const outcome = await sendInvitation('p-1');
+    expect(outcome).toEqual({ kind: 'sent', stored: true, invitationId: 'inv-1', assignmentFailed: true });
+    expect(inviteNotice(outcome, 'bosun@demo-fleet.example')).toEqual({
+      tone: 'warning',
+      title: 'Invitation sent',
+      description: `STORM emailed an invitation to bosun@demo-fleet.example. ${ASSIGNMENT_NOT_SAVED_NOTE}`,
+      retry: false,
+    });
+    expect(ASSIGNMENT_NOT_SAVED_NOTE).toBe('The vessel assignment could not be saved. Assign the vessel from the crew list.');
+  });
+
+  it('200 sent + assignment failed, not stored → both notes', async () => {
+    ok({ ok: true, invitation: { status: 'sent', stored: false, id: null }, assignment: 'failed' });
+    const notice = inviteNotice(await sendInvitation('p-1'));
+    expect(notice.tone).toBe('warning');
+    expect(notice.description).toContain(NOT_STORED_NOTE);
+    expect(notice.description).toContain(ASSIGNMENT_NOT_SAVED_NOTE);
+  });
+
+  it('200 sent + assignment created → sent, success, no vessel sentence', async () => {
+    ok({ ok: true, invitation: { status: 'sent', stored: true, id: 'inv-1' }, assignment: 'created' });
+    const outcome = await sendInvitation('p-1');
+    expect(outcome).toEqual({ kind: 'sent', stored: true, invitationId: 'inv-1', assignmentFailed: false });
+    expect(inviteNotice(outcome)).toEqual({ tone: 'success', title: 'Invitation sent', description: 'STORM emailed the invitation.', retry: false });
+  });
+
+  it.each([['pending_login'], ['maybe'], [false]])('an unknown assignment value (%o) is ignored', async (value) => {
+    ok({ ok: true, invitation: { status: 'sent', stored: true, id: 'inv-1' }, assignment: value });
+    const outcome = await sendInvitation('p-1');
+    expect(outcome).toEqual({ kind: 'sent', stored: true, invitationId: 'inv-1' });
+    expect(outcome).not.toHaveProperty('assignmentFailed');
+    expect(inviteNotice(outcome).tone).toBe('success');
+  });
+
+  it('502 send_failed + assignment failed → the email error, then the vessel sentence', async () => {
+    httpError(502, {
+      ...edgeError('send_failed', 'The invitation email could not be sent.', { email_error: 'provider_unavailable' }),
+      invitation: { status: 'send_failed', stored: true, id: 'inv-2' },
+      assignment: 'failed',
+    });
+    const outcome = await sendInvitation('p-1');
+    expect(outcome).toEqual({ kind: 'send_failed', stored: true, invitationId: 'inv-2', emailError: 'provider_unavailable', assignmentFailed: true });
+    expect(inviteNotice(outcome)).toEqual({
+      tone: 'error',
+      title: 'The invitation email could not be sent',
+      description: `The email service did not answer. Try again in a few minutes. ${ASSIGNMENT_NOT_SAVED_NOTE}`,
+      retry: true,
+    });
+  });
+
+  it('502 send_failed + assignment created → no vessel sentence', async () => {
+    httpError(502, {
+      ...edgeError('send_failed', 'x', { email_error: 'provider_rejected' }),
+      invitation: { status: 'send_failed', stored: true, id: 'inv-2' },
+      assignment: 'created',
+    });
+    const outcome = await sendInvitation('p-1');
+    expect(outcome).toMatchObject({ kind: 'send_failed', assignmentFailed: false });
+    expect(inviteNotice(outcome).description).not.toContain(ASSIGNMENT_NOT_SAVED_NOTE);
+  });
+
+  it('resend (admin-actions) reads the same assignment field, 200 and 502', async () => {
+    ok({ ok: true, invitation: { status: 'sent', stored: true, id: 'inv-3' }, assignment: 'failed' });
+    const sent = await resendInvitation({ profileId: 'p-9' });
+    expect(sent).toEqual({ kind: 'sent', stored: true, invitationId: 'inv-3', assignmentFailed: true });
+    expect(inviteNotice(sent)).toMatchObject({ tone: 'warning', title: 'Invitation sent' });
+    expect(inviteNotice(sent).description).toContain(ASSIGNMENT_NOT_SAVED_NOTE);
+
+    ok({ ok: true, invitation: { status: 'sent', stored: true, id: 'inv-3' }, assignment: 'created' });
+    await expect(resendInvitation({ userId: 'u-1' })).resolves.toEqual({ kind: 'sent', stored: true, invitationId: 'inv-3', assignmentFailed: false });
+
+    httpError(502, { ...edgeError('send_failed', 'x', { email_error: 'link_failed' }), invitation: { status: 'send_failed', stored: true, id: 'inv-3' }, assignment: 'failed' });
+    const failed = await resendInvitation({ profileId: 'p-9' });
+    expect(failed).toMatchObject({ kind: 'send_failed', emailError: 'link_failed', assignmentFailed: true });
+    expect(inviteNotice(failed).description).toContain(ASSIGNMENT_NOT_SAVED_NOTE);
+  });
+
+  it('bulk rows keep their assignment; a failed one adds the note and turns an all-sent run into a warning', async () => {
+    ok({
+      ok: true,
+      results: [
+        { profileId: 'p-1', status: 'sent', stored: true, invitationId: 'i-1', assignment: 'created' },
+        { profileId: 'p-2', status: 'sent', stored: true, invitationId: 'i-2', assignment: 'failed' },
+        { profileId: 'p-3', status: 'sent', stored: true, invitationId: 'i-3' },
+        { profileId: 'p-4', status: 'sent', stored: true, invitationId: 'i-4', assignment: 'pending_login' },
+      ],
+    });
+    const outcome = await bulkInvite(['p-1', 'p-2', 'p-3', 'p-4']);
+    expect(outcome.results.map((r) => r.assignment)).toEqual(['created', 'failed', undefined, undefined]);
+    expect(outcome.results[2]).not.toHaveProperty('assignment');
+    expect(bulkInviteNotice(outcome)).toEqual({ tone: 'warning', title: 'Sent 4 · Failed 0', description: BULK_ASSIGNMENT_NOT_SAVED_NOTE, retry: false });
+    expect(BULK_ASSIGNMENT_NOT_SAVED_NOTE).toBe('Some vessel assignments could not be saved. Assign them from the crew list.');
+  });
+
+  it('bulk: assignments all created → success, no note; a failed send row that failed its assignment adds the note', async () => {
+    ok({ ok: true, results: [{ profileId: 'p-1', status: 'sent', stored: true, invitationId: 'i-1', assignment: 'created' }] });
+    expect(bulkInviteNotice(await bulkInvite(['p-1']))).toEqual({ tone: 'success', title: 'Sent 1 · Failed 0', description: undefined, retry: false });
+
+    ok({
+      ok: true,
+      results: [
+        { profileId: 'p-1', status: 'sent', stored: true, invitationId: 'i-1' },
+        { profileId: 'p-2', status: 'send_failed', stored: true, invitationId: null, code: 'send_failed', emailError: 'provider_rejected', assignment: 'failed' },
+      ],
+    });
+    const notice = bulkInviteNotice(await bulkInvite(['p-1', 'p-2']));
+    expect(notice.tone).toBe('warning');
+    expect(notice.description).toContain('Some invitation emails could not be sent.');
+    expect(notice.description).toContain(BULK_ASSIGNMENT_NOT_SAVED_NOTE);
+  });
+
+  it('bulk: rows that answered before a batch failed or was unconfirmed still carry the note', async () => {
+    const ids = Array.from({ length: 51 }, (_, i) => `p-${i}`);
+    ok({ ok: true, results: ids.slice(0, 50).map((id, i) => ({ profileId: id, status: 'sent', stored: true, invitationId: null, ...(i === 0 ? { assignment: 'failed' } : {}) })) });
+    httpError(429, edgeError('rate_limited', 'Too many requests.'));
+    const failed = bulkInviteNotice(await bulkInvite(ids));
+    expect(failed.tone).toBe('error');
+    expect(failed.description).toContain(BULK_ASSIGNMENT_NOT_SAVED_NOTE);
+
+    ok({ ok: true, results: ids.slice(0, 50).map((id, i) => ({ profileId: id, status: 'sent', stored: true, invitationId: null, ...(i === 0 ? { assignment: 'failed' } : {}) })) });
+    ok({});
+    const unconfirmed = bulkInviteNotice(await bulkInvite(ids));
+    expect(unconfirmed.tone).toBe('warning');
+    expect(unconfirmed.description).toContain('STORM could not confirm every result.');
+    expect(unconfirmed.description).toContain(BULK_ASSIGNMENT_NOT_SAVED_NOTE);
   });
 });
 
