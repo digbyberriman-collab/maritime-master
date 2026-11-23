@@ -21,6 +21,14 @@
  * scoped URLs themselves (BUILD-PLAN B7), so nothing maps a target back to
  * its old URL any more.
  *
+ * Handled by their own route element, not this table:
+ * - `/notifications/center` opens the inbox's Attention tab
+ *   (`/inbox?tab=attention`, D-62) through
+ *   src/modules/notifications/components/NotificationCenterRedirect.tsx: its
+ *   old `?tab=compliance|messages|tasks` becomes `?view=`, a rename this
+ *   table cannot express (it only copies the query). `/alerts` goes straight
+ *   to `/inbox?tab=attention`.
+ *
  * Not redirected yet, on purpose:
  * - `/admin/feedback` stays. R3 sends it to `/fleet/admin/support?source=quick`,
  *   but that page is not built (gap/03), so the inbox stays where it works.

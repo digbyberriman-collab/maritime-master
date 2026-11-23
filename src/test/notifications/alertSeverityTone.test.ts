@@ -14,8 +14,10 @@ import { ALERT_SEVERITY_TONE } from '@/modules/notifications/lib/alertSeverityTo
 
 const ROOT = process.cwd();
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
-const BELL = 'src/shared/components/layout/NotificationBell.tsx';
-const CENTER = 'src/modules/notifications/pages/NotificationCenterPage.tsx';
+// The alerts bell (the top-bar bell's fallback while notification_inbox is missing, D-01)
+// and the inbox's Attention tab (today's Notification Center, D-62).
+const BELL = 'src/modules/notifications/components/AlertsBell.tsx';
+const CENTER = 'src/modules/notifications/components/AttentionPanel.tsx';
 const IMPORT = '@/modules/notifications/lib/alertSeverityTone';
 
 describe('ALERT_SEVERITY_TONE', () => {
@@ -65,7 +67,7 @@ describe('alert surfaces share the tone map (gap/10 DS12 / C5)', () => {
     expect(src).not.toMatch(/overdue:\s*'text-/);
   });
 
-  it('the Notification Center keeps no local severity style table', () => {
+  it('the Attention tab (the Notification Center) keeps no local severity style table', () => {
     const src = read(CENTER);
     expect(src).not.toMatch(/\bseverityStyle\b/);
     expect(src).toContain('ALERT_SEVERITY_TONE[alert.severity_color].badge');

@@ -35,6 +35,12 @@ import { SHELL_TEST_IDS } from '@/app/shell/testIds';
 import { fakeDb, resetFakeDb } from './fakeSupabase';
 import { COMPANY_ID, DRAAK, FLEET_ACCESS, renderShell, resetShellState } from './shellFakes';
 
+/**
+ * notification_inbox is not applied (D-01): the bell falls back to the alerts
+ * bell, which is what these tests cover. src/test/notifications covers the inbox bell.
+ */
+const INBOX_MISSING = { code: '42P01', message: 'relation "public.notification_inbox" does not exist' };
+
 beforeAll(() => {
   Element.prototype.scrollIntoView = () => undefined;
   Element.prototype.hasPointerCapture = () => false;
@@ -44,6 +50,7 @@ beforeAll(() => {
 beforeEach(() => {
   localStorage.clear();
   resetFakeDb();
+  fakeDb.failures.notification_inbox = INBOX_MISSING;
   resetShellState();
 });
 

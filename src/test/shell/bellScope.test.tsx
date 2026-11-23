@@ -56,6 +56,12 @@ import { SHELL_TEST_IDS } from '@/app/shell/testIds';
 import { fakeDb, resetFakeDb } from './fakeSupabase';
 import { COMPANY_ID, DRAAK, HYDRA, asFleetUser, asVesselMaster, renderShell, resetShellState, shellState } from './shellFakes';
 
+/**
+ * notification_inbox is not applied (D-01): the bell falls back to the alerts
+ * bell, which is what these tests cover. src/test/notifications covers the inbox bell.
+ */
+const INBOX_MISSING = { code: '42P01', message: 'relation "public.notification_inbox" does not exist' };
+
 beforeAll(() => {
   Element.prototype.scrollIntoView = () => undefined;
   Element.prototype.hasPointerCapture = () => false;
@@ -66,6 +72,7 @@ beforeEach(() => {
   localStorage.clear();
   localStorage.setItem('storm_alert_helper_shown', 'true');
   resetFakeDb();
+  fakeDb.failures.notification_inbox = INBOX_MISSING;
   resetShellState();
   countFailure.on = false;
 });
@@ -221,7 +228,7 @@ describe('badge', () => {
     const { queryClient } = renderBell();
     await settled(queryClient, countsKey('company'));
     await settled(queryClient, listKey('company'));
-    expect(trigger()).toHaveAccessibleName('Notifications, 1 unread');
+    expect(trigger()).toHaveAccessibleName('Notifications, 1 unacknowledged alert');
     const badge = trigger().querySelector('[data-tone]') as HTMLElement;
     expect(badge).toHaveTextContent('1');
     expect(badge).toHaveAttribute('data-tone', 'primary');
@@ -239,7 +246,7 @@ describe('badge', () => {
     ];
     const { queryClient } = renderBell();
     await settled(queryClient, countsKey('company'));
-    expect(trigger()).toHaveAccessibleName('Notifications, 121 unread, including critical');
+    expect(trigger()).toHaveAccessibleName('Notifications, 121 unacknowledged alerts, including critical');
     const badge = trigger().querySelector('[data-tone]') as HTMLElement;
     expect(badge).toHaveTextContent('99+');
     expect(badge).toHaveAttribute('data-tone', 'critical');
@@ -253,13 +260,13 @@ describe('badge', () => {
     expect(trigger().querySelector('[data-tone]')).toBeNull();
     expect(trigger()).toHaveAccessibleName('Notifications');
     await settled(queryClient, countsKey('company'));
-    expect(trigger()).toHaveAccessibleName('Notifications, 1 unread, including critical');
+    expect(trigger()).toHaveAccessibleName('Notifications, 1 unacknowledged alert, including critical');
   });
 });
 
 describe('badge when only the counts fail (D-91, D-04)', () => {
   const panel = () => screen.getByTestId(SHELL_TEST_IDS.notificationsPanel);
-  const openChip = () => within(panel()).queryByText(/^\d+\+? open$/);
+  const openChip = () => within(panel()).queryByText(/^\d+\+? unacknowledged$/);
 
   async function renderWithFailedCounts() {
     countFailure.on = true;
@@ -287,11 +294,11 @@ describe('badge when only the counts fail (D-91, D-04)', () => {
       alertRow('o2', DRAAK.id, 'YELLOW', 'OPEN'),
     ];
     await renderWithFailedCounts();
-    expect(trigger()).toHaveAccessibleName('Notifications, 2+ unread');
+    expect(trigger()).toHaveAccessibleName('Notifications, 2+ unacknowledged alerts');
     const badge = trigger().querySelector('[data-tone]') as HTMLElement;
     expect(badge).toHaveTextContent(/^2\+$/);
     expect(badge).toHaveAttribute('data-tone', 'primary');
-    expect(openChip()).toHaveTextContent(/^2\+ open$/);
+    expect(openChip()).toHaveTextContent(/^2\+ unacknowledged$/);
     expect(panel()).not.toHaveTextContent('20+');
   });
 
@@ -303,11 +310,11 @@ describe('badge when only the counts fail (D-91, D-04)', () => {
       alertRow('o3', HYDRA.id, 'RED', 'OPEN'),
     ];
     await renderWithFailedCounts();
-    expect(trigger()).toHaveAccessibleName('Notifications, 3 unread, including critical');
+    expect(trigger()).toHaveAccessibleName('Notifications, 3 unacknowledged alerts, including critical');
     const badge = trigger().querySelector('[data-tone]') as HTMLElement;
     expect(badge).toHaveTextContent(/^3$/);
     expect(badge).toHaveAttribute('data-tone', 'critical');
-    expect(openChip()).toHaveTextContent(/^3 open$/);
+    expect(openChip()).toHaveTextContent(/^3 unacknowledged$/);
   });
 
   it('a list that is not full with no OPEN row: no badge (zero is exact, and zero is not drawn)', async () => {

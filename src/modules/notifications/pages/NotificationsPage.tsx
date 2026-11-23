@@ -1,5 +1,7 @@
 import React, { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -50,9 +52,13 @@ const NotificationsPage: React.FC = () => {
           </TabsList>
 
           <TabsContent value="inbox" className="mt-4">
+            {/* The inbox has its own page; this tab used to say "empty" without reading anything. */}
             <Card>
-              <CardContent className="p-8 text-center text-sm text-muted-foreground">
-                Your inbox is empty.
+              <CardContent className="flex flex-col items-center gap-3 p-8 text-center text-sm text-muted-foreground">
+                <p>Your notifications are in the Inbox.</p>
+                <Button variant="outline" asChild>
+                  <Link to="/inbox">Open inbox</Link>
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
@@ -90,7 +96,7 @@ const NotificationsPage: React.FC = () => {
                           onCheckedChange={(v) =>
                             toggle.mutate(
                               { typeKey: t.key, enabled: v },
-                              { onError: (e: any) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }) }
+                              { onError: (e: unknown) => toast({ title: 'Failed', description: e instanceof Error ? e.message : 'The preference was not saved.', variant: 'destructive' }) }
                             )
                           }
                         />

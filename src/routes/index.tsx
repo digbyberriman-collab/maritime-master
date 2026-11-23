@@ -9,6 +9,7 @@ import { PersonalIndexRedirect, SettingsSectionRedirect } from '@/app/router/per
 import { INBOX_PATH, PERSONAL_HOME, PERSONAL_SETTINGS_ROUTES } from '@/config/personalNav';
 import ModuleRoute from '@/shared/components/ModuleRoute';
 import KeepSearchNavigate from '@/app/router/KeepSearchNavigate';
+import NotificationCenterRedirect from '@/modules/notifications/components/NotificationCenterRedirect';
 import { lazyPage, type LazyPageOptions, type PageLoader } from '@/app/router/lazyPage';
 import {
   FleetScope,
@@ -159,7 +160,7 @@ const UsersAccessListPage = protectedPage(() => import('@/modules/users-access/p
 const UsersAccessDetailPage = protectedPage(() => import('@/modules/users-access/pages/UsersAccessDetailPage'));
 const NotificationManagementPage = protectedPage(() => import('@/modules/notifications-admin/pages/NotificationManagementPage'));
 const NotificationsPage = protectedPage(() => import('@/modules/notifications/pages/NotificationsPage'));
-const NotificationCenterPage = protectedPage(() => import('@/modules/notifications/pages/NotificationCenterPage'));
+const InboxPage = protectedPage(() => import('@/modules/notifications/pages/InboxPage'));
 // Honest "not built yet" page for admin areas whose previous pages showed sample data.
 const ComingSoonPage = protectedPage(() => import('@/shared/pages/Placeholder'));
 const APIIntegrations = protectedPage(() => import('@/modules/settings/pages/APIIntegrations'));
@@ -387,7 +388,7 @@ export const AppRoutes: React.FC = () => {
 
       {/* Alerts */}
       {/* The sample-data alerts page is gone; the notification centre reads the real alerts table. */}
-      <Route path="/alerts" element={<Navigate to="/notifications/center" replace />} />
+      <Route path="/alerts" element={<Navigate to="/inbox?tab=attention" replace />} />
 
       {/* Settings */}
       <Route path="/settings" element={legacy('/settings', <Settings />)} />
@@ -406,7 +407,8 @@ export const AppRoutes: React.FC = () => {
       <Route path="/users-access/:userId" element={legacy('/users-access/:userId', <UsersAccessDetailPage />)} />
       <Route path="/settings/notifications" element={legacy('/settings/notifications', <NotificationManagementPage />)} />
       <Route path="/notifications" element={legacy('/notifications', <NotificationsPage />)} />
-      <Route path="/notifications/center" element={<NotificationCenterPage />} />
+      {/* The old Notification Center is the inbox's Attention tab (D-62); its ?tab= becomes ?view=, the rest is kept. */}
+      <Route path="/notifications/center" element={<NotificationCenterRedirect />} />
       <Route path="/admin/roles" element={legacy('/admin/roles', <RolesPermissionsPage />)} />
       <Route path="/admin/fleet-groups" element={<ComingSoonPage title="Fleet Groups" description="Grouping vessels into fleets is not built yet." />} />
       <Route path="/admin/alerts" element={<ComingSoonPage title="Alert Configuration" description="Alert rules and escalation settings are not built yet." />} />
@@ -548,8 +550,9 @@ export const AppRoutes: React.FC = () => {
           <Route path="support" element={<KeepSearchNavigate to="/help/support" />} />
           <Route path="*" element={<KeepSearchNavigate to={PERSONAL_HOME} />} />
         </Route>
-        {/* The inbox the bell opens (gap/10 /inbox); /notifications/center keeps working (D-27). */}
-        <Route path={INBOX_PATH} element={<NotificationCenterPage />} />
+        {/* The inbox the bell opens (gap/10 /inbox, P5): All / Attention / Archived;
+            /notifications/center redirects to its Attention tab (D-62). */}
+        <Route path={INBOX_PATH} element={<InboxPage />} />
         {/* Help (gap/10 Target IA principle 1: Personal = /me, /inbox, /help).
             The URLs are the ones the Help menu, the footer and the Coming
             Soon pages link; /help/support is the one Support page (/me/support

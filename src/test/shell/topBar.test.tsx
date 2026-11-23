@@ -59,6 +59,12 @@ import type { QueryClient } from '@tanstack/react-query';
 import { fakeDb, resetFakeDb } from './fakeSupabase';
 import { COMPANY_ID, DRAAK, FLEET_ACCESS, USER_ID, VESSEL_ONLY_ACCESS, asVesselMaster, renderShell, resetShellState, shellState } from './shellFakes';
 
+/**
+ * notification_inbox is not applied (D-01): the bell falls back to the alerts
+ * bell, which is what these tests cover. src/test/notifications covers the inbox bell.
+ */
+const INBOX_MISSING = { code: '42P01', message: 'relation "public.notification_inbox" does not exist' };
+
 beforeAll(() => {
   Element.prototype.scrollIntoView = () => undefined;
   Element.prototype.hasPointerCapture = () => false;
@@ -80,6 +86,7 @@ const wide = () => {
 beforeEach(() => {
   localStorage.clear();
   resetFakeDb();
+  fakeDb.failures.notification_inbox = INBOX_MISSING;
   resetShellState();
   spies.preload.mockClear();
 });
@@ -598,7 +605,7 @@ describe('notification bell', () => {
     fakeDb.tables.alerts = [row('a', 'RED'), row('b', 'YELLOW')];
     renderShell(<TopBar {...topBarProps} />, { path: '/fleet/dashboard', scope: { scope: 'fleet' } });
     const trigger = within(screen.getByTestId(SHELL_TEST_IDS.topBar)).getByTestId(SHELL_TEST_IDS.notificationsTrigger);
-    await waitFor(() => expect(trigger).toHaveAccessibleName('Notifications, 2 unread, including critical'));
+    await waitFor(() => expect(trigger).toHaveAccessibleName('Notifications, 2 unacknowledged alerts, including critical'));
     const badge = trigger.querySelector('[data-tone]') as HTMLElement;
     expect(badge).toHaveAttribute('data-tone', 'critical');
     expect(badge).toHaveClass('bg-critical', 'text-critical-foreground', 'motion-safe:animate-pulse');

@@ -14,7 +14,7 @@
  * - A company settings section is gated by the role: a crew member is told
  *   and sent to the profile; an admin whose profile arrives late waits on a
  *   loading state and then gets the section (no false denial).
- * - `/inbox` is the notification centre in the personal scope; planned
+ * - `/inbox` is the inbox page in the personal scope; planned
  *   personal leaves open Coming Soon inside it.
  * - Help (`/help/*`) is in the personal scope too: `/help` opens the
  *   guides, `/help/support` is the one Support page (seeded from
@@ -157,7 +157,7 @@ vi.mock('@/modules/settings/components/sections', async () => {
     SidebarLayoutSection: section('Sidebar layout'),
   };
 });
-vi.mock('@/modules/notifications/pages/NotificationCenterPage', () => h.page('Notification centre'));
+vi.mock('@/modules/notifications/pages/InboxPage', () => h.page('Inbox'));
 vi.mock('@/modules/notifications/pages/NotificationsPage', () => h.page('Notification preferences'));
 vi.mock('@/modules/development/pages/MyDevelopment', () => h.page('My Development'));
 vi.mock('@/modules/work-rest/pages/MyWorkRestMonth', () => h.page('My hours of rest'));
@@ -370,9 +370,9 @@ describe('company settings sections', () => {
 });
 
 describe('the inbox and planned personal leaves', () => {
-  it('/inbox is the notification centre in the personal scope', async () => {
+  it('/inbox is the inbox page in the personal scope', async () => {
     renderApp('/inbox');
-    expect(await screen.findByRole('heading', { name: 'Notification centre' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Inbox' })).toBeInTheDocument();
     expect(document.querySelector('[data-shell-scope]')).toHaveAttribute('data-shell-scope', 'personal');
     expect(within(sidebar()).getByRole('link', { name: /^Inbox, current page/ })).toHaveAttribute('aria-current', 'page');
   });
@@ -397,7 +397,7 @@ describe('the inbox and planned personal leaves', () => {
     act(() => {
       fireEvent.click(within(sidebar()).getByRole('link', { name: /^Inbox/ }));
     });
-    expect(await screen.findByRole('heading', { name: 'Notification centre' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Inbox' })).toBeInTheDocument();
     expect(document.querySelector('[data-shell-scope]')).toBe(root);
   });
 });

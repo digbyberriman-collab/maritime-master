@@ -1,9 +1,10 @@
 /**
  * One tone per alert severity, shared by every surface that shows an alert
- * (the header NotificationBell and the Notification Center).
+ * (the alerts bell, ../components/AlertsBell.tsx, and the inbox's Attention
+ * tab, ../components/AttentionPanel.tsx: today's Notification Center).
  *
  * - gap/10 DS12 / C5: the same severity gets the same tone on every surface,
- *   so the bell and the Notification Center import this map and cannot drift.
+ *   so the alerts bell and the Attention tab import this map and cannot drift.
  * - D-34: `--accent` is the neutral hover surface and is never a colour cue,
  *   so no severity uses an accent class.
  * - D-52: text on a tint uses `text-<tone>`, never `<tone>-foreground`.
