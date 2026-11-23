@@ -139,3 +139,101 @@ test('the repo: only the four documented followups rely on the gateway flag alon
   assert.ok(!summary.remote.some((r) => r.name === 'create-crew-member'));
 });
 
+/**
+ * The run command of the named step in a GitHub Actions workflow text. Reads
+ * `run: <command>` on one line, or a `run: |` / `run: >` block (its indented
+ * lines joined with spaces). Returns null when the step or its run is missing.
+ */
+function workflowStepRun(yaml, stepName) {
+  const lines = yaml.split(/\r?\n/);
+  const nameRe = /^(\s*)-\s+name:\s*(.+?)\s*$/;
+  for (let i = 0; i < lines.length; i++) {
+    const m = nameRe.exec(lines[i]);
+    if (!m || m[2].replace(/^['"]|['"]$/g, '') !== stepName) continue;
+    const stepIndent = m[1].length;
+    for (let j = i + 1; j < lines.length; j++) {
+      const line = lines[j];
+      if (!line.trim()) continue;
+      const indent = line.length - line.trimStart().length;
+      if (indent <= stepIndent) return null;
+      const run = /^\s*run:\s*(.*)$/.exec(line);
+      if (!run) continue;
+      const value = run[1].trim();
+      if (value && !/^[|>][-+]?$/.test(value)) return value;
+      const block = [];
+      for (let k = j + 1; k < lines.length; k++) {
+        const next = lines[k];
+        if (next.trim() && next.length - next.trimStart().length <= indent) break;
+        if (next.trim()) block.push(next.trim());
+      }
+      return block.join(' ');
+    }
+    return null;
+  }
+  return null;
+}
+
+test('workflowStepRun reads a one-line and a block run of the named step only', () => {
+  const yaml = [
+    'jobs:',
+    '  edge:',
+    '    steps:',
+    '      - name: other',
+    '        run: echo other',
+    "      - name: 'deno lint (migrated functions)'",
+    '        run: deno lint a b',
+    '      - name: block',
+    '        run: |',
+    '          deno lint c',
+    '          d',
+    '      - name: no run',
+    '        uses: actions/checkout@v4',
+    '      - name: after',
+    '        run: echo after',
+  ].join('\n');
+  assert.equal(workflowStepRun(yaml, 'deno lint (migrated functions)'), 'deno lint a b');
+  assert.equal(workflowStepRun(yaml, 'block'), 'deno lint c d');
+  assert.equal(workflowStepRun(yaml, 'no run'), null);
+  assert.equal(workflowStepRun(yaml, 'missing'), null);
+});
+
+test('CI lints _shared and every checkable (migrated) function', async () => {
+  const { fileURLToPath } = await import('node:url');
+  const { main } = await import('./check.mjs');
+  const root = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
+  const run = workflowStepRun(readFileSync(join(root, '.github', 'workflows', 'ci.yml'), 'utf8'), 'deno lint (migrated functions)');
+  assert.ok(run, "ci.yml has a 'deno lint (migrated functions)' step with a run line");
+  const words = new Set(run.split(/\s+/).map((w) => w.replace(/\/+$/, '')));
+  assert.ok(words.has('lint'), 'the step runs deno lint');
+  assert.ok(words.has('supabase/functions/_shared'), 'the step lints supabase/functions/_shared');
+
+  const lines = [];
+  const original = console.log;
+  console.log = (line) => lines.push(String(line));
+  let code;
+  try {
+    code = main(['--list', '--json']);
+  } finally {
+    console.log = original;
+  }
+  assert.equal(code, 0);
+  const { checkable } = JSON.parse(lines.join('\n'));
+  for (const name of ['accept-invitation', 'admin-actions', 'bulk-invite', 'create-crew-member', 'send-email', 'send-invitation']) {
+    assert.ok(checkable.includes(name), `${name} stays checkable (npm:/jsr:/relative imports only)`);
+  }
+  const missing = checkable.filter((name) => !words.has(`supabase/functions/${name}`));
+  assert.deepEqual(missing, [], `every checkable function is in the CI lint step (missing: ${missing.join(', ')})`);
+});
+
+test('every function the build plan tells the owner to delete live (D-191) has neither a source folder nor a config entry', async () => {
+  const { fileURLToPath } = await import('node:url');
+  const root = join(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
+  const plan = readFileSync(join(root, 'docs', 'blueprint', 'BUILD-PLAN.md'), 'utf8');
+  const retired = [...new Set([...plan.matchAll(/`supabase functions delete ([a-z0-9_-]+)`/g)].map((m) => m[1]))];
+  assert.ok(retired.length >= 2, 'BUILD-PLAN names the retired functions as owner delete actions');
+  const map = configFunctions(readFileSync(join(root, 'supabase', 'config.toml'), 'utf8'));
+  for (const name of retired) {
+    assert.equal(existsSync(join(root, 'supabase', 'functions', name)), false, `${name} source is removed`);
+    assert.equal(map.has(name), false, `${name} has no [functions.${name}] entry`);
+  }
+});

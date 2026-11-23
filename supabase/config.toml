@@ -102,10 +102,6 @@ verify_jwt = false
 [functions.notify-shipping-master]
 verify_jwt = true
 
-# Signed-in admins; own getUser check in code.
-[functions.parse-crew-csv]
-verify_jwt = true
-
 # Signed-in users; own getUser check in code. (Entry added: it had none, so the
 # gateway default applied silently.)
 [functions.pt-exercise-import]
@@ -131,10 +127,6 @@ verify_jwt = true
 
 # Dead: no client call (gap/08 says delete). Followup: remove the source and undeploy.
 [functions.submit-form]
-verify_jwt = true
-
-# Signed-in admins; own getUser check in code.
-[functions.update-crew-assignment]
 verify_jwt = true
 
 # Signed-in users; own getUser check in code.

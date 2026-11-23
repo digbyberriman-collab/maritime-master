@@ -16,7 +16,7 @@ Paste this after `MASTER-PROMPT.md`.
 **Four overlapping role and permission systems.** PMS unifies them; retire the legacy ones only after the migration diff (§9) is signed off.
 
 1. **`profiles.role`**: legacy text values (`dpa`, `shore_management`, `master` …). Still read by these edge functions:
-   - `update-crew-assignment` (lines ~65, 144)
+   - ~~`update-crew-assignment`~~: retired, not migrated (DECISIONS D-191). Its `reassign` action is covered by `admin-actions` `reallocate_vessel` (capability-checked); the `transfer_crew` RPC is planned in gap/04 C58. `parse-crew-csv` is retired too: the browser CSV import calls `create-crew-member` once per row.
    - `bulk-invite` (~56)
    - `send-invitation` (~58)
 2. **`user_roles` + enum `app_role`** (`supabase/migrations/20260127170354_*.sql`):
