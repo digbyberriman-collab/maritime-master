@@ -6,6 +6,11 @@
  *
  * - Sections are non-interactive eyebrow headings that label their leaves;
  *   collapsed to icons they become separators.
+ * - Collapsed to icons, each row (leaf, group, locked add-on) names itself
+ *   in a tooltip to its right, with its status, on hover and keyboard focus
+ *   (never on touch): the top bar's icon tooltip (IconTooltip, D-92),
+ *   portalled so the scroll container cannot clip it. The rows keep their
+ *   aria-labels; the tooltip only describes them.
  * - The current page's leaf is lit (`bg-sidebar-accent`, Signal text and a
  *   2 px glowing bar). Exact match wins; otherwise the longest leaf the URL
  *   sits under. A leaf on the tree's own root counts only on an exact match.
@@ -31,6 +36,7 @@ import { useNavBadges, type NavBadge } from '@/app/nav/badges';
 import { sidebarHref } from '@/app/nav/sidebarLinks';
 import { toNavPathname } from '@/app/router/legacyResolve';
 import AddOnLock from './AddOnLock';
+import IconTooltip from './IconTooltip';
 
 export interface SidebarNavigationProps {
   nodes: readonly FilteredNavNode[];
@@ -43,7 +49,10 @@ export interface SidebarNavigationProps {
   /** Still deciding what to show: skeleton rows, never unfiltered nodes. */
   loading?: boolean;
   onNavigate?: () => void;
-  /** Icon-only (visuals only) rendering; labels become tooltips. */
+  /**
+   * Icon-only rendering: each row's label and status become a tooltip to its
+   * right (hover and keyboard focus); accessible names are unchanged.
+   */
   collapsed?: boolean;
   /** Called when a collapsed group icon is clicked so the layout can expand. */
   onExpand?: () => void;
@@ -95,6 +104,38 @@ const StatusChip: React.FC<{ status: FilteredNavNode['status'] }> = ({ status })
 };
 
 const statusSuffix = (node: FilteredNavNode) => (node.status === 'planned' ? ', planned' : node.status === 'beta' ? ', beta' : '');
+
+/** A row's status as the collapsed tooltip shows it, after the label. */
+const statusText = (node: FilteredNavNode): string | null =>
+  node.status === 'planned' ? 'Planned' : node.status === 'beta' ? 'Beta' : null;
+
+/** Clears the 64 px rail: the 44 px row sits 10 px in from its edge. */
+const RAIL_TOOLTIP_OFFSET = 14;
+
+/**
+ * A locked add-on in the collapsed rail: the add-on explanation outside the
+ * tooltip (AddOnLock > IconTooltip > button), and no tooltip while the
+ * explanation is open.
+ */
+const CollapsedLockedRow: React.FC<{ node: FilteredNavNode; ariaLabel: string }> = ({ node, ariaLabel }) => {
+  const [explaining, setExplaining] = useState(false);
+  const Icon = node.icon;
+  const hint = [statusText(node), 'Add-on'].filter(Boolean).join(' · ');
+  return (
+    <AddOnLock label={node.label} open={explaining} onOpenChange={setExplaining}>
+      <IconTooltip side="right" sideOffset={RAIL_TOOLTIP_OFFSET} label={node.label} hint={hint} suppressed={explaining}>
+        <button
+          type="button"
+          aria-label={ariaLabel}
+          className={cn('relative flex h-11 w-11 items-center justify-center rounded-lg text-sidebar-muted-foreground hover:bg-sidebar-accent', focusRing)}
+        >
+          <Icon className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
+          <Lock className="absolute bottom-1.5 right-1.5 h-3 w-3" strokeWidth={2} aria-hidden="true" />
+        </button>
+      </IconTooltip>
+    </AddOnLock>
+  );
+};
 
 const SkeletonRows: React.FC<{ rows?: number; label: string }> = ({ rows = 5, label }) => (
   <div role="status" aria-busy="true" className="space-y-1 px-1">
@@ -279,17 +320,7 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({
         if (depth > 0) return null;
         return (
           <div key={node.id} className="relative flex w-full justify-center">
-            <AddOnLock label={node.label}>
-              <button
-                type="button"
-                aria-label={label}
-                title={`${node.label} (add-on)`}
-                className={cn('relative flex h-11 w-11 items-center justify-center rounded-lg text-sidebar-muted-foreground hover:bg-sidebar-accent', focusRing)}
-              >
-                <Icon className="h-[18px] w-[18px]" strokeWidth={1.75} aria-hidden="true" />
-                <Lock className="absolute bottom-1.5 right-1.5 h-3 w-3" strokeWidth={2} aria-hidden="true" />
-              </button>
-            </AddOnLock>
+            <CollapsedLockedRow node={node} ariaLabel={label} />
           </div>
         );
       }
@@ -324,31 +355,31 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({
       return (
         <div key={node.id} className="relative flex w-full justify-center">
           {active && <ActiveBar collapsed />}
-          {hasChildren ? (
-            <button
-              type="button"
-              onClick={() => onExpand?.()}
-              aria-label={`${node.label} section${descendantActive ? ', contains current page' : ''}${badgeSuffix}. Expand sidebar to view`}
-              title={node.label}
-              className={iconClass}
-            >
-              <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} aria-hidden="true" />
-              {descendantActive && (
-                <span aria-hidden="true" className="absolute right-1 top-1 h-2 w-2 rounded-full border border-sidebar bg-sidebar-primary" />
-              )}
-            </button>
-          ) : (
-            <Link
-              to={hrefFor(node.path)}
-              onClick={onNavigate}
-              aria-current={active ? 'page' : undefined}
-              aria-label={`${node.label}${statusSuffix(node)}${active ? ', current page' : ''}${badgeSuffix}`}
-              title={node.label}
-              className={iconClass}
-            >
-              <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} aria-hidden="true" />
-            </Link>
-          )}
+          <IconTooltip side="right" sideOffset={RAIL_TOOLTIP_OFFSET} label={node.label} hint={statusText(node)}>
+            {hasChildren ? (
+              <button
+                type="button"
+                onClick={() => onExpand?.()}
+                aria-label={`${node.label} section${descendantActive ? ', contains current page' : ''}${badgeSuffix}. Expand sidebar to view`}
+                className={iconClass}
+              >
+                <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} aria-hidden="true" />
+                {descendantActive && (
+                  <span aria-hidden="true" className="absolute right-1 top-1 h-2 w-2 rounded-full border border-sidebar bg-sidebar-primary" />
+                )}
+              </button>
+            ) : (
+              <Link
+                to={hrefFor(node.path)}
+                onClick={onNavigate}
+                aria-current={active ? 'page' : undefined}
+                aria-label={`${node.label}${statusSuffix(node)}${active ? ', current page' : ''}${badgeSuffix}`}
+                className={iconClass}
+              >
+                <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} aria-hidden="true" />
+              </Link>
+            )}
+          </IconTooltip>
           {badge && renderBadge(badge, true)}
         </div>
       );

@@ -17,6 +17,7 @@
   { "path": "/settings", "expectRedirect": "/me/profile", "note": "Legacy URL (B6): personal scope, via /me to the first section (D-59)" },
   { "path": "/hris", "expectRedirect": true, "note": "Section path; redirects to the HRIS landing page" },
   { "path": "/health", "expectRedirect": true, "note": "Section path; redirects to its first leaf" },
+  { "path": "/health/medical/dashboard", "note": "Workspace scope (Health): the workspace chip from 640 px; at phone widths (try --widths 390,360,320) the top-bar collision check (D-70)" },
   { "path": "/departments/legal", "expectRedirect": "/departments/legal/dashboard" },
   { "path": "/fleet/dashboard", "note": "Fleet scope: dashboard" },
   { "path": "/fleet/tracker", "note": "Fleet scope: vessel tracker" },

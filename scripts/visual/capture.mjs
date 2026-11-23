@@ -361,7 +361,16 @@ function printSummary(results) {
   console.log(widths.map((w) => '-'.repeat(w)).join('  '));
   rows.forEach((row) => console.log(line(row)));
   const count = (s) => results.filter((r) => r.status === s).length;
+  // The top-bar check (inspectPage's topbarCollisions) in full; the NOTES column cuts it short.
+  const checked = results.filter((r) => Array.isArray(r.page?.topbarCollisions));
+  const collided = checked.filter((r) => r.page.topbarCollisions.length);
   console.log('');
+  if (collided.length) {
+    console.log(`Top-bar collisions in ${collided.length} of ${checked.length} capture(s) with a top bar:`);
+    for (const r of collided) console.log(`  ${r.theme}-${r.width}-${r.slug}${r.persona ? ` (persona ${r.persona})` : ''}: ${r.page.topbarCollisions.join('; ')}`);
+  } else {
+    console.log(`Top-bar collisions: none in ${checked.length} capture(s) with a top bar`);
+  }
   console.log(`${results.length} capture(s): ${count('ok')} ok, ${count('warn')} warn, ${count('fail')} fail`);
 }
 

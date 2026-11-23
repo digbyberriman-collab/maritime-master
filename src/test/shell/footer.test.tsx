@@ -41,6 +41,11 @@ describe('InkfishFooter', () => {
     }
   });
 
+  it('does not print: a printout carries the page only (DS23, D-36)', () => {
+    renderFooter();
+    expect(screen.getByTestId(SHELL_TEST_IDS.footer)).toHaveClass('print:hidden');
+  });
+
   it('uses theme tokens only (no raw palette, hex or dark: variants)', () => {
     const source = readRepoFile('src/shared/components/layout/InkfishFooter.tsx');
     expect(source).not.toMatch(/\b(text|bg|border)-(gray|slate|zinc|neutral|white|black)\b/);

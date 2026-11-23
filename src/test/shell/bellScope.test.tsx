@@ -11,7 +11,32 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, screen, waitFor, within } from '@testing-library/react';
 import type { QueryClient, QueryKey } from '@tanstack/react-query';
 
-vi.mock('@/integrations/supabase/client', async () => (await import('./fakeSupabase')).fakeSupabaseModule);
+/** While `on`, every head count request fails (the counts fail; the list read goes through). */
+const countFailure = vi.hoisted(() => ({ on: false }));
+vi.mock('@/integrations/supabase/client', async () => {
+  const { fakeSupabase } = await import('./fakeSupabase');
+  return {
+    supabase: {
+      ...fakeSupabase,
+      from: (table: string) => {
+        // The builder's methods return the same object, so the patched methods stick.
+        const api = fakeSupabase.from(table);
+        const select = api.select;
+        const then = api.then;
+        let head = false;
+        api.select = (columns, options) => {
+          if (options?.head) head = true;
+          return select(columns, options);
+        };
+        api.then = (resolve, reject) =>
+          countFailure.on && head
+            ? Promise.resolve({ data: null, count: null, error: { message: 'count failed' } }).then(resolve, reject)
+            : then(resolve, reject);
+        return api;
+      },
+    },
+  };
+});
 vi.mock('@/modules/auth/contexts/AuthContext', async () => {
   const { shellState } = await import('./shellFakes');
   return { useAuth: () => shellState.auth };
@@ -42,6 +67,7 @@ beforeEach(() => {
   localStorage.setItem('storm_alert_helper_shown', 'true');
   resetFakeDb();
   resetShellState();
+  countFailure.on = false;
 });
 
 const alertRow = (id: string, vesselId: string | null, severity = 'RED', status = 'OPEN') => ({
@@ -228,5 +254,82 @@ describe('badge', () => {
     expect(trigger()).toHaveAccessibleName('Notifications');
     await settled(queryClient, countsKey('company'));
     expect(trigger()).toHaveAccessibleName('Notifications, 1 unread, including critical');
+  });
+});
+
+describe('badge when only the counts fail (D-91, D-04)', () => {
+  const panel = () => screen.getByTestId(SHELL_TEST_IDS.notificationsPanel);
+  const openChip = () => within(panel()).queryByText(/^\d+\+? open$/);
+
+  async function renderWithFailedCounts() {
+    countFailure.on = true;
+    const { queryClient } = renderBell();
+    await settled(queryClient, listKey('company'));
+    await settled(queryClient, countsKey('company'));
+    expect(queryClient.getQueryState(countsKey('company'))?.status).toBe('error');
+    expect(queryClient.getQueryState(listKey('company'))?.status).toBe('success');
+  }
+
+  it('a full list with no OPEN row: the count is unknown, so no badge and no "open" chip', async () => {
+    fakeDb.tables.alerts = Array.from({ length: 20 }, (_, i) => alertRow(`ack-${i}`, DRAAK.id, 'YELLOW', 'ACKNOWLEDGED'));
+    await renderWithFailedCounts();
+    expect(trigger()).toHaveAccessibleName('Notifications');
+    expect(trigger().querySelector('[data-tone]')).toBeNull();
+    expect(openChip()).toBeNull();
+    // The rows still show; only the number is withheld.
+    expect(within(panel()).getByText('Alert ack-0')).toBeInTheDocument();
+  });
+
+  it('a full list with 2 OPEN rows: "2+" (a floor), never "20+"', async () => {
+    fakeDb.tables.alerts = [
+      ...Array.from({ length: 18 }, (_, i) => alertRow(`ack-${i}`, DRAAK.id, 'YELLOW', 'ACKNOWLEDGED')),
+      alertRow('o1', DRAAK.id, 'YELLOW', 'OPEN'),
+      alertRow('o2', DRAAK.id, 'YELLOW', 'OPEN'),
+    ];
+    await renderWithFailedCounts();
+    expect(trigger()).toHaveAccessibleName('Notifications, 2+ unread');
+    const badge = trigger().querySelector('[data-tone]') as HTMLElement;
+    expect(badge).toHaveTextContent(/^2\+$/);
+    expect(badge).toHaveAttribute('data-tone', 'primary');
+    expect(openChip()).toHaveTextContent(/^2\+ open$/);
+    expect(panel()).not.toHaveTextContent('20+');
+  });
+
+  it('a list that is not full holds every open-status alert: the exact OPEN count, critical from its RED rows', async () => {
+    fakeDb.tables.alerts = [
+      ...Array.from({ length: 5 }, (_, i) => alertRow(`ack-${i}`, DRAAK.id, 'YELLOW', 'ACKNOWLEDGED')),
+      alertRow('o1', DRAAK.id, 'YELLOW', 'OPEN'),
+      alertRow('o2', DRAAK.id, 'ORANGE', 'OPEN'),
+      alertRow('o3', HYDRA.id, 'RED', 'OPEN'),
+    ];
+    await renderWithFailedCounts();
+    expect(trigger()).toHaveAccessibleName('Notifications, 3 unread, including critical');
+    const badge = trigger().querySelector('[data-tone]') as HTMLElement;
+    expect(badge).toHaveTextContent(/^3$/);
+    expect(badge).toHaveAttribute('data-tone', 'critical');
+    expect(openChip()).toHaveTextContent(/^3 open$/);
+  });
+
+  it('a list that is not full with no OPEN row: no badge (zero is exact, and zero is not drawn)', async () => {
+    fakeDb.tables.alerts = Array.from({ length: 19 }, (_, i) => alertRow(`ack-${i}`, DRAAK.id, 'YELLOW', 'ACKNOWLEDGED'));
+    await renderWithFailedCounts();
+    expect(trigger()).toHaveAccessibleName('Notifications');
+    expect(trigger().querySelector('[data-tone]')).toBeNull();
+  });
+});
+
+describe('panel layout on a short viewport (IA19)', () => {
+  it('the panel is capped at the room below the trigger, and only the list shrinks', async () => {
+    fakeDb.tables.alerts = [alertRow('a', DRAAK.id, 'YELLOW')];
+    const { queryClient } = renderBell();
+    await settled(queryClient, listKey('company'));
+    const panel = screen.getByTestId(SHELL_TEST_IDS.notificationsPanel);
+    expect(panel).toHaveClass('flex', 'flex-col', 'max-h-[var(--radix-popover-content-available-height)]');
+    const scroller = within(panel).getByText('Alert a').closest('.overflow-y-auto') as HTMLElement;
+    // Up to 400 px and shrinkable; never flex-1 (that would grow the desktop list).
+    expect(scroller).toHaveClass('min-h-0', 'max-h-[400px]', 'shrink');
+    expect(scroller).not.toHaveClass('flex-1');
+    const inbox = within(panel).getByRole('button', { name: /open inbox/i });
+    expect(inbox.parentElement).toHaveClass('shrink-0');
   });
 });

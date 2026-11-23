@@ -230,14 +230,13 @@ export const AppRoutes: React.FC = () => {
 
       {/* Dashboard */}
       <Route path="/dashboard" element={<HomeRedirect />} />
-      <Route path="/dpa-dashboard" element={<DPADashboard />} />
+      {/* Fleet reach goes to /fleet/dashboard; anyone else keeps the old page (D-27). */}
+      <Route path="/dpa-dashboard" element={legacy('/dpa-dashboard', <DPADashboard />)} />
 
       {/* Fleet Map */}
       <Route path="/fleet-map" element={legacy('/fleet-map', <FleetMap />)} />
 
-      {/* Help & Legal */}
-      <Route path="/help/how-to-guides" element={<HowToGuidesPage />} />
-      <Route path="/help/support" element={<SupportPage />} />
+      {/* Legal (Help lives in the personal scope, below). */}
       <Route path="/legal/privacy-policy" element={<PrivacyPolicyPage />} />
       <Route path="/legal/terms-of-service" element={<TermsOfServicePage />} />
 
@@ -526,9 +525,9 @@ export const AppRoutes: React.FC = () => {
         <Route path="*" element={<ScopeNotFound />} />
       </Route>
 
-      {/* Personal area (spec §8): one shell (scope personal) around /me/* and
-          /inbox. Every settings section has its own URL; /me and the old
-          ?tab= form redirect (src/app/router/personalRoutes.tsx). */}
+      {/* Personal area (spec §8): one shell (scope personal) around /me/*,
+          /inbox and /help/*. Every settings section has its own URL; /me and
+          the old ?tab= form redirect (src/app/router/personalRoutes.tsx). */}
       <Route element={<PersonalScope />}>
         <Route path="/me">
           <Route index element={<PersonalIndexRedirect />} />
@@ -544,10 +543,21 @@ export const AppRoutes: React.FC = () => {
           {personalManifestRoutes}
           {/* Planned personal leaves: Coming Soon inside the scope (sitemap, D-06). */}
           {personalNavRoutes}
+          {/* Support is the Help page (/help/support); the old section URL and
+              ?tab=support land there with the query kept. */}
+          <Route path="support" element={<KeepSearchNavigate to="/help/support" />} />
           <Route path="*" element={<KeepSearchNavigate to={PERSONAL_HOME} />} />
         </Route>
         {/* The inbox the bell opens (gap/10 /inbox); /notifications/center keeps working (D-27). */}
         <Route path={INBOX_PATH} element={<NotificationCenterPage />} />
+        {/* Help (gap/10 Target IA principle 1: Personal = /me, /inbox, /help).
+            The URLs are the ones the Help menu, the footer and the Coming
+            Soon pages link; /help/support is the one Support page (/me/support
+            redirects to it) and takes ?subject= (D-87), which the redirects
+            keep (D-43). */}
+        <Route path="/help" element={<KeepSearchNavigate to="/help/how-to-guides" />} />
+        <Route path="/help/how-to-guides" element={<HowToGuidesPage />} />
+        <Route path="/help/support" element={<SupportPage />} />
       </Route>
 
       {/* Workspaces keep their URLs, guards and module shells (D-09). Their

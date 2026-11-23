@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { format, subDays } from "date-fns";
 import DashboardLayout from "@/shared/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
@@ -51,8 +52,18 @@ import {
   TrendingUp,
 } from "lucide-react";
 
+/** `?new=true` opens the report form (the palette's "Report an incident", Quick actions, pinned shortcuts). */
+const NEW_INCIDENT_PARAM = "new";
+/** `?vessel=<id>` preselects that vessel in the list filter and the report form, if it is one of the user's. */
+const INCIDENT_VESSEL_PARAM = "vessel";
+
 export default function Incidents() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [showReportModal, setShowReportModal] = useState(false);
+  // The URL's vessel, once it is known to be one of the user's vessels.
+  const [urlVesselId, setUrlVesselId] = useState<string | null>(null);
+  // The `vessel` value already decided on, so the filter is seeded once and the user's own choice stands.
+  const decidedVesselParam = useRef<string | null>(null);
   const [viewingIncident, setViewingIncident] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
@@ -65,7 +76,31 @@ export default function Incidents() {
   });
   const [searchQuery, setSearchQuery] = useState("");
 
-  const { vessels } = useVessels();
+  const { vessels, isLoading: vesselsLoading } = useVessels();
+
+  // `?new=true` opens the report form once; the flag leaves the URL so Back
+  // or a refresh does not open it again. Other params (`vessel`) stay.
+  useEffect(() => {
+    if (searchParams.get(NEW_INCIDENT_PARAM) !== "true") return;
+    setShowReportModal(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete(NEW_INCIDENT_PARAM);
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
+  // `?vessel=<id>` seeds the filter (and the form's default) once the user's
+  // vessels are in, and only for one of them: an unknown id is ignored, never
+  // preselected (D-04).
+  const vesselParam = searchParams.get(INCIDENT_VESSEL_PARAM);
+  useEffect(() => {
+    if (!vesselParam || decidedVesselParam.current === vesselParam) return;
+    if (vesselsLoading || vessels.length === 0) return;
+    decidedVesselParam.current = vesselParam;
+    if (!vessels.some((vessel) => vessel.id === vesselParam)) return;
+    setUrlVesselId(vesselParam);
+    setFilters((prev) => ({ ...prev, vesselId: vesselParam }));
+  }, [vesselParam, vessels, vesselsLoading]);
+
   const { data: incidents, isLoading } = useIncidents({
     vesselId: filters.vesselId || undefined,
     status: filters.status || undefined,
@@ -436,6 +471,7 @@ export default function Incidents() {
         <ReportIncidentModal
           open={showReportModal}
           onOpenChange={setShowReportModal}
+          defaultVesselId={urlVesselId ?? undefined}
         />
 
         {viewingIncident && (

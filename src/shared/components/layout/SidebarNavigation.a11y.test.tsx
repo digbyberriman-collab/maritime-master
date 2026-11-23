@@ -7,7 +7,7 @@ import { NavAccessContext, type NavAccess } from '@/app/nav/navAccess';
 import { useFilteredModuleTree } from '@/app/nav/useFilteredTree';
 import { NAVIGATION_ITEMS } from '@/config/sitemap';
 import type { FilteredNavNode } from '@/app/nav/navTree';
-import { CheckSquare, FolderOpen, Layers, Navigation } from 'lucide-react';
+import { CheckSquare, FolderOpen, Layers, Navigation, Stethoscope, Utensils } from 'lucide-react';
 
 const mocks = vi.hoisted(() => ({
   order: { map: {} },
@@ -165,5 +165,77 @@ describe('SidebarNavigation accessibility regressions', () => {
     expect(planned.querySelector('[data-nav-status="planned"]')).toHaveAttribute('aria-hidden', 'true');
     expect(within(navigation).getByRole('button', { name: 'Deck Plans and General Arrangement, planned, add-on, locked' })).toBeInTheDocument();
     expect(within(navigation).queryByText('Planned')).toBeNull();
+  });
+  describe('icon-only rows name themselves in a tooltip (D-92)', () => {
+    const COLLAPSED_NODES: FilteredNavNode[] = [
+      { id: 'medical', label: 'Medical', path: '/health/medical', icon: Stethoscope, kind: 'group', children: [
+        { id: 'records', label: 'Records', path: '/health/medical/records', icon: FolderOpen, kind: 'leaf', status: 'live' },
+      ] },
+      { id: 'nutrition', label: 'Nutrition', path: '/health/nutrition', icon: Utensils, kind: 'leaf', status: 'beta' },
+      { id: 'deck', label: 'Deck Plans', path: '/health/deck-plans', icon: Layers, kind: 'leaf', status: 'planned', locked: true },
+    ];
+    const tooltipText = () => screen.queryByRole('tooltip')?.textContent ?? null;
+
+    function renderCollapsed() {
+      return render(
+        <NavAccessContext.Provider value={OPEN_ACCESS}>
+          <MemoryRouter initialEntries={['/health/medical/records']}>
+            <SidebarNavigation nodes={COLLAPSED_NODES} heading={null} collapsed onExpand={vi.fn()} />
+          </MemoryRouter>
+        </NavAccessContext.Provider>,
+      );
+    }
+
+    it('a focused leaf and a focused group show their label (and status) in a tooltip; no native title', async () => {
+      renderCollapsed();
+      const navigation = screen.getByRole('navigation', { name: 'Navigation' });
+      const leaf = within(navigation).getByRole('link', { name: 'Nutrition, beta' });
+      const group = within(navigation).getByRole('button', { name: 'Medical section, contains current page. Expand sidebar to view' });
+      for (const row of [leaf, group]) expect(row).not.toHaveAttribute('title');
+      expect(screen.queryByRole('tooltip')).toBeNull();
+
+      act(() => leaf.focus());
+      await waitFor(() => expect(tooltipText()).toBe('NutritionBeta'));
+      // The tooltip describes the row; its name is unchanged.
+      expect(leaf).toHaveAttribute('aria-describedby');
+      expect(leaf).toHaveAccessibleName('Nutrition, beta');
+      expect(screen.getAllByRole('tooltip')).toHaveLength(1);
+
+      act(() => group.focus());
+      await waitFor(() => expect(tooltipText()).toBe('Medical'));
+      expect(group).toHaveAccessibleName('Medical section, contains current page. Expand sidebar to view');
+      expect(screen.getAllByRole('tooltip')).toHaveLength(1);
+    });
+
+    // Placement (to the right of the rail, not clipped) needs a real layout:
+    // jsdom has a zero-size viewport, so floating-ui flips the side. The
+    // browser probe checks it; here, the portal and the reduced-motion class.
+    it('the tooltip is portalled out of the scroll container, its animation off under reduced motion', async () => {
+      renderCollapsed();
+      const navigation = screen.getByRole('navigation', { name: 'Navigation' });
+      const leaf = within(navigation).getByRole('link', { name: 'Nutrition, beta' });
+      act(() => leaf.focus());
+      const tooltip = await screen.findByRole('tooltip');
+      expect(navigation.contains(tooltip)).toBe(false);
+      const surface = document.querySelector('[data-side]');
+      expect(navigation.contains(surface)).toBe(false);
+      expect(surface?.className).toContain('motion-reduce:animate-none');
+      expect(surface?.className).toContain('bg-popover');
+    });
+
+    it('a locked add-on: tooltip on focus, none while its explanation is open', async () => {
+      renderCollapsed();
+      const navigation = screen.getByRole('navigation', { name: 'Navigation' });
+      const lock = within(navigation).getByRole('button', { name: 'Deck Plans, planned, add-on, locked' });
+      expect(lock).not.toHaveAttribute('title');
+      act(() => lock.focus());
+      await waitFor(() => expect(tooltipText()).toBe('Deck PlansPlanned · Add-on'));
+      fireEvent.click(lock);
+      expect(await screen.findByText('Deck Plans is an add-on')).toBeInTheDocument();
+      expect(lock).toHaveAttribute('data-state', 'open');
+      expect(screen.queryByRole('tooltip')).toBeNull();
+      act(() => lock.focus());
+      expect(screen.queryByRole('tooltip')).toBeNull();
+    });
   });
 });

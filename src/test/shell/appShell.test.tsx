@@ -4,7 +4,8 @@
  * wrap the command palette (so the palette's Actions group sees them), one
  * palette per shell however many DashboardLayouts nest, the vessel of a
  * vessel-scope visit goes to the recent list, and the shell offers each
- * action only when its surface is there.
+ * action only when its surface is there. A printout carries the page only
+ * (DS23, D-36): the chrome is print:hidden and main drops its scroll box.
  */
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -212,5 +213,35 @@ describe('impersonation', () => {
   it('shows no bar in Phase 1 (no impersonation runtime)', () => {
     renderShell(<AppShell>page</AppShell>, { path: '/fleet/dashboard', scope: { scope: 'fleet' } });
     expect(screen.queryByTestId(SHELL_TEST_IDS.impersonationBar)).toBeNull();
+  });
+});
+
+describe('print (DS23, D-36)', () => {
+  it('hides the chrome (header with the tab row, sidebar, notices) and lets main flow on paper', () => {
+    // A desktop window, so the sidebar is the static column.
+    window.matchMedia = ((query: string) => ({ ...realMatchMedia(query), matches: /min-width:\s*(768|1024)px/.test(query) })) as typeof window.matchMedia;
+    renderShell(<AppShell>page</AppShell>, { path: '/fleet/dashboard', scope: { scope: 'fleet' } });
+    const header = document.querySelector('[data-shell-header]') as HTMLElement;
+    expect(header).toHaveClass('print:hidden');
+    expect(header).toContainElement(screen.getByTestId(SHELL_TEST_IDS.topBar));
+    const sidebar = screen.getByTestId(SHELL_TEST_IDS.sidebar);
+    expect(sidebar.tagName).toBe('ASIDE');
+    expect(sidebar).toHaveClass('print:hidden');
+    expect(screen.getByTestId(SHELL_TEST_IDS.shellNotices)).toHaveClass('print:hidden');
+    const main = screen.getByTestId(SHELL_TEST_IDS.main);
+    expect(main).toHaveClass('print:overflow-visible', 'print:p-0');
+    expect(main).not.toHaveClass('print:hidden');
+    // No 100dvh minimums on paper (no blank space after a short page).
+    const root = screen.getByTestId('watermark').parentElement as HTMLElement;
+    expect(root).toHaveClass('print:min-h-0');
+    expect(sidebar.parentElement).toHaveClass('print:min-h-0');
+  });
+
+  it('hides the footer', async () => {
+    const { default: RealFooter } = await vi.importActual<typeof import('@/shared/components/layout/InkfishFooter')>(
+      '@/shared/components/layout/InkfishFooter',
+    );
+    renderShell(<RealFooter />);
+    expect(screen.getByTestId(SHELL_TEST_IDS.footer)).toHaveClass('print:hidden');
   });
 });

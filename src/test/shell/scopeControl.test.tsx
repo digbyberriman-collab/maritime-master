@@ -139,48 +139,43 @@ describe('the five states (fail closed)', () => {
 
 describe('workspace chip', () => {
   const healthScope = { scope: 'workspace' as const, workspace: 'health' };
-  /** The chip's parts: the short label (below 640 px), the screen-reader name, the full label (from 640 px). */
-  const chipParts = (chip: HTMLElement) => {
-    const [short, srName, full] = Array.from(chip.children) as HTMLElement[];
-    return { short, srName, full };
-  };
 
   it('names the workspace and lights neither segment', async () => {
     renderShell(<ScopeControl />, { path: '/hris/people', scope: { scope: 'workspace', workspace: 'hris' }, access: FLEET_ACCESS });
     const chip = await screen.findByTestId(SHELL_TEST_IDS.scopeWorkspaceChip);
-    expect(chipParts(chip).full).toHaveTextContent(/^HRIS$/);
+    expect(chip).toHaveTextContent(/^HRIS$/);
     expect(chip).toHaveAttribute('title', 'HRIS');
     expect(screen.getByTestId(SHELL_TEST_IDS.scopeFleet)).not.toHaveAttribute('aria-current');
     expect(screen.getByTestId(SHELL_TEST_IDS.scopeVessel)).not.toHaveAttribute('aria-current');
   });
 
-  it('shows below 640 px too: a short label, the full name for assistive technology (D-70)', async () => {
+  it('shows from 640 px only, with its full name (D-70 as amended)', async () => {
     renderShell(<ScopeControl />, { path: '/health/medical/dashboard', scope: healthScope, access: FLEET_ACCESS });
     const chip = await screen.findByTestId(SHELL_TEST_IDS.scopeWorkspaceChip);
-    // Never hidden at any width: no `hidden` on the chip itself.
-    expect(chip).toHaveClass('inline-flex');
-    expect(chip).not.toHaveClass('hidden');
-    const { short, srName, full } = chipParts(chip);
-    expect(short).toHaveTextContent(/^Health$/);
-    expect(short).toHaveAttribute('aria-hidden', 'true');
-    expect(short).toHaveClass('sm:hidden', 'truncate');
-    expect(srName).toHaveTextContent(/^Health & Wellness$/);
-    expect(srName).toHaveClass('sr-only', 'sm:hidden');
-    expect(full).toHaveTextContent(/^Health & Wellness$/);
-    expect(full).toHaveClass('hidden', 'sm:block', 'truncate');
+    // Below 640 px the breadcrumb and the page header name the workspace; the row has no room.
+    expect(chip).toHaveClass('hidden', 'sm:inline-flex');
+    expect(chip).not.toHaveClass('inline-flex');
+    // One label, no short form below 640 px any more.
+    expect(chip.children).toHaveLength(1);
+    expect(chip.firstElementChild).toHaveTextContent(/^Health & Wellness$/);
+    expect(chip.firstElementChild).toHaveClass('truncate');
+    expect(chip.querySelector('.sm\\:hidden, .sr-only')).toBeNull();
     expect(chip).toHaveAttribute('title', 'Health & Wellness');
   });
 
-  it('is the part that gives way below 1024 px, never the vessel segment', async () => {
+  it('is the part that gives way from 640 to 1024 px; below 640 px the control may shrink', async () => {
     renderShell(<ScopeControl />, { path: '/health/medical/dashboard', scope: healthScope, access: FLEET_ACCESS });
     const chip = await screen.findByTestId(SHELL_TEST_IDS.scopeWorkspaceChip);
     expect(chip).toHaveClass('min-w-0', 'shrink', 'lg:shrink-0');
     expect(chip).not.toHaveClass('shrink-0');
     const segment = screen.getByTestId(SHELL_TEST_IDS.scopeVessel);
-    expect(segment).toHaveClass('shrink-0', 'lg:shrink');
-    // The segmented control (the switcher's anchor) keeps its width too.
+    expect(segment).toHaveClass('min-w-0', 'sm:shrink-0', 'lg:shrink');
+    // `compact` only acts from 640 px: no unconditional shrink-0 below it.
+    expect(segment).not.toHaveClass('shrink-0');
+    // The segmented control (the switcher's anchor) keeps its width from 640 px too.
     const control = screen.getByTestId(SHELL_TEST_IDS.vesselSwitcherTrigger).parentElement;
-    expect(control).toHaveClass('shrink-0', 'lg:shrink');
+    expect(control).toHaveClass('min-w-0', 'sm:shrink-0', 'lg:shrink');
+    expect(control).not.toHaveClass('shrink-0');
   });
 
   it('next to a chip the vessel shows its code up to 1024 px, then its name', async () => {
@@ -378,5 +373,111 @@ describe('compliance dot (D-57)', () => {
     const segment = await screen.findByTestId(SHELL_TEST_IDS.scopeVessel);
     expect(await within(segment).findByText('Alert summary incomplete')).toHaveClass('sr-only');
     expect(segment.querySelector('[data-compliance]')).toBeNull();
+  });
+});
+
+describe('fitting a phone top bar (D-70 as amended, D-35)', () => {
+  const marksOf = (segment: HTMLElement) => segment.querySelector<HTMLElement>('[data-scope-marks]');
+  /** The outermost element ScopeControl returned (TopBar's flex slot). */
+  const rootOf = (el: HTMLElement) => {
+    let node: HTMLElement = el;
+    while (node.parentElement && node.parentElement.id !== 'scope-root') node = node.parentElement;
+    return node;
+  };
+  const inSlot = (ui: React.ReactElement) => <div id="scope-root">{ui}</div>;
+
+  it('the AIS mark and compliance dot sit in one wrapper that is left out below 400 px', async () => {
+    fakeDb.tables.ais_snapshots = [fix(DRAAK.id, '5')];
+    fakeDb.tables.alerts = [alert(DRAAK.id, 'RED')];
+    renderShell(<ScopeControl />, { path: '/v/dra', scope: vesselScope, access: FLEET_ACCESS });
+    const segment = await screen.findByTestId(SHELL_TEST_IDS.scopeVessel);
+    await waitFor(() => expect(segment.querySelector('[data-ais]')).not.toBeNull());
+    await waitFor(() => expect(segment.querySelector('[data-compliance]')).not.toBeNull());
+    const marks = marksOf(segment);
+    expect(marks).toHaveClass('inline-flex', 'items-center', 'gap-1.5', 'max-[399px]:hidden');
+    expect(marks).toContainElement(segment.querySelector<HTMLElement>('[data-ais]'));
+    expect(marks).toContainElement(segment.querySelector<HTMLElement>('[data-compliance]'));
+  });
+
+  it('the one-vessel label hides its marks below 400 px too, and its focus ring is inset', async () => {
+    asVesselMaster([DRAAK]);
+    renderShell(<ScopeControl />, { path: '/fleet/dashboard', scope: { scope: 'personal' }, access: VESSEL_ONLY_ACCESS });
+    const label = await screen.findByTestId(SHELL_TEST_IDS.scopeVessel);
+    expect(marksOf(label)).toHaveClass('max-[399px]:hidden');
+    expect(label).toHaveClass('focus-visible:ring-inset');
+  });
+
+  it('in the vessel scope, below 360 px with the chevron, Fleet gives way to the lit vessel', async () => {
+    renderShell(<ScopeControl />, { path: '/v/dra/crew/list', scope: vesselScope, access: FLEET_ACCESS });
+    const fleet = await screen.findByTestId(SHELL_TEST_IDS.scopeFleet);
+    expect(fleet).toHaveClass('max-[359px]:hidden');
+    expect(screen.getByTestId(SHELL_TEST_IDS.scopeVessel)).not.toHaveClass('max-[359px]:hidden');
+    expect(screen.getByTestId(SHELL_TEST_IDS.vesselSwitcherTrigger)).toBeInTheDocument();
+  });
+
+  it.each([
+    ['the fleet scope', '/fleet/dashboard', { scope: 'fleet' as const }],
+    ['a workspace', '/health/medical/dashboard', { scope: 'workspace' as const, workspace: 'health' }],
+    ['the personal scope', '/me/profile', { scope: 'personal' as const }],
+  ])('in %s, below 360 px with the chevron, the vessel gives way to Fleet', async (_name, path, scope) => {
+    renderShell(<ScopeControl />, { path, scope, access: FLEET_ACCESS });
+    const vessel = await screen.findByTestId(SHELL_TEST_IDS.scopeVessel);
+    expect(vessel).toHaveClass('max-[359px]:hidden');
+    expect(screen.getByTestId(SHELL_TEST_IDS.scopeFleet)).not.toHaveClass('max-[359px]:hidden');
+  });
+
+  it('without a chevron (one vessel, fleet reach) both segments stay below 360 px', async () => {
+    asFleetUser([DRAAK]);
+    renderShell(<ScopeControl />, { path: '/v/dra', scope: vesselScope, access: FLEET_ACCESS });
+    const fleet = await screen.findByTestId(SHELL_TEST_IDS.scopeFleet);
+    expect(screen.queryByTestId(SHELL_TEST_IDS.vesselSwitcherTrigger)).toBeNull();
+    expect(fleet).not.toHaveClass('max-[359px]:hidden');
+    expect(screen.getByTestId(SHELL_TEST_IDS.scopeVessel)).not.toHaveClass('max-[359px]:hidden');
+  });
+
+  it('without fleet reach the vessel segment is never hidden (it is the only one)', async () => {
+    asVesselMaster([DRAAK, HYDRA]);
+    renderShell(<ScopeControl />, { path: '/fleet/dashboard', scope: { scope: 'personal' }, access: VESSEL_ONLY_ACCESS });
+    const vessel = await screen.findByTestId(SHELL_TEST_IDS.scopeVessel);
+    expect(vessel).not.toHaveClass('max-[359px]:hidden');
+  });
+
+  it.each([
+    ['segments with the chevron', () => renderShell(inSlot(<ScopeControl />), { path: '/v/dra', scope: vesselScope, access: FLEET_ACCESS })],
+    [
+      'segments without the chevron',
+      () => {
+        asFleetUser([DRAAK]);
+        return renderShell(inSlot(<ScopeControl />), { path: '/v/dra', scope: vesselScope, access: FLEET_ACCESS });
+      },
+    ],
+    [
+      'the one-vessel label',
+      () => {
+        asVesselMaster([DRAAK]);
+        return renderShell(inSlot(<ScopeControl />), { path: '/v/dra', scope: vesselScope, access: VESSEL_ONLY_ACCESS });
+      },
+    ],
+  ])('%s clip inside their own box, so nothing paints over Search', async (_name, render) => {
+    render();
+    const vessel = await screen.findByTestId(SHELL_TEST_IDS.scopeVessel);
+    expect(rootOf(vessel)).toHaveClass('overflow-hidden', 'min-w-0');
+  });
+
+  it('the chip-only variant clips inside its box too', async () => {
+    asVesselMaster([]);
+    renderShell(inSlot(<ScopeControl />), {
+      path: '/health/medical/dashboard',
+      scope: { scope: 'workspace', workspace: 'health' },
+      access: { ...VESSEL_ONLY_ACCESS, vesselReach: false },
+    });
+    const chip = await screen.findByTestId(SHELL_TEST_IDS.scopeWorkspaceChip);
+    expect(rootOf(chip)).toHaveClass('overflow-hidden');
+  });
+
+  it('the loading skeleton clips inside its box', () => {
+    asLoading();
+    renderShell(<ScopeControl />, { path: '/v/dra', scope: vesselScope, access: FAIL_CLOSED_NAV_ACCESS });
+    expect(screen.getByTestId(SHELL_TEST_IDS.scopeControl)).toHaveClass('overflow-hidden');
   });
 });

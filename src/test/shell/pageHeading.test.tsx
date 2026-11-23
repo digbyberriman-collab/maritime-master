@@ -164,6 +164,19 @@ describe('page heading contract', () => {
     expect(document.title).toBe('Dashboard | STORM');
   });
 
+  it('the breadcrumb row does not print; the shell title does (it is the page title on paper; DS23)', async () => {
+    renderShell(
+      <Main>
+        <p>Review queue</p>
+      </Main>,
+      { path: '/fleet/dashboard', scope: FLEET },
+    );
+    await waitFor(() => expect(screen.getByTestId(SHELL_TEST_IDS.fallbackHeading)).toBeInTheDocument());
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveClass('print:hidden');
+    expect(screen.getByTestId(SHELL_TEST_IDS.fallbackHeading)).not.toHaveClass('print:hidden');
+    expect(screen.getByTestId(SHELL_TEST_IDS.pageHeader)).not.toHaveClass('print:hidden');
+  });
+
   it.each([
     ['the route Suspense fallback', <LazyLoader key="l" />],
     ['ScopeLoading', <ScopeLoading key="s" />],

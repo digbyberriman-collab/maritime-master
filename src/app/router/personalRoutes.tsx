@@ -7,6 +7,8 @@
  *   /me?tab=security          → /me/security        (`?section=` alike)
  *   /settings/security        → /me/security
  *   /settings/<unknown>       → /me/profile
+ *   /me?tab=support           → /me/support → /help/support (the one Support
+ *                               page, in the personal scope; routes/index.tsx)
  *
  * The rest of the query string and the hash are kept (D-43), as
  * KeepSearchNavigate does for every router redirect.

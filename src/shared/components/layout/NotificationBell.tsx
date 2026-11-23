@@ -13,7 +13,9 @@
  * from the 20-row list: critical tone when any open alert is RED (critical =
  * destructive, D-57), else Signal; only the critical badge pulses, and not
  * under reduced motion. No badge until the counts are in; if the counts fail
- * but the list loaded, the list's open count (`20+` when the list is full).
+ * but the list loaded, the list's OPEN row count (`<n>+` when the list is
+ * full, and no badge when a full list holds no OPEN row: the count is then
+ * unknown, D-04).
  * While the list loads or after an error the panel says so; it never reads a
  * failed load as "no alerts". A failed Acknowledge says so.
  *
@@ -304,10 +306,16 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange,
       return { count: openCount, label: openCount > 99 ? '99+' : String(openCount), spoken: String(openCount), critical: critical > 0 };
     }
     if (counts.isError && list.data) {
+      // The list holds every open-status alert (OPEN, ACKNOWLEDGED, SNOOZED,
+      // ESCALATED) up to its 20-row cap. A list that is not full holds them all,
+      // so its OPEN count is exact. A full list can hide more OPEN alerts, so its
+      // count is a floor (`<n>+`); with no OPEN row in a full list the count is
+      // unknown, and the bell shows no badge rather than invent one (D-04).
       const openRows = list.data.filter((a) => a.status === 'OPEN');
       const full = list.data.length >= MAX_DROPDOWN_ALERTS;
-      const count = full ? Math.max(openRows.length, MAX_DROPDOWN_ALERTS) : openRows.length;
-      const label = full ? `${MAX_DROPDOWN_ALERTS}+` : String(count);
+      if (full && openRows.length === 0) return null;
+      const count = openRows.length;
+      const label = full ? `${count > 99 ? 99 : count}+` : count > 99 ? '99+' : String(count);
       return { count, label, spoken: label, critical: openRows.some((a) => a.severity_color === 'RED') };
     }
     return null;
@@ -537,8 +545,12 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange,
         ref={panelRef}
         tabIndex={-1}
         align="end"
-        className="w-[min(24rem,calc(100vw-2rem))] p-0 bg-popover"
+        // A flex column capped at the room Radix measures below the trigger: on a
+        // short viewport (a landscape phone) the list shrinks, and the header,
+        // hint and footer ("Open inbox") stay on screen.
+        className="w-[min(24rem,calc(100vw-2rem))] p-0 bg-popover flex flex-col max-h-[var(--radix-popover-content-available-height)]"
         sideOffset={8}
+        collisionPadding={8}
         data-testid={SHELL_TEST_IDS.notificationsPanel}
         aria-label="Notifications"
         onOpenAutoFocus={(event) => {
@@ -548,7 +560,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange,
         }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <div className="flex shrink-0 items-center justify-between px-4 py-3 border-b border-border">
           <div className="flex min-w-0 items-center gap-2">
             <Bell className="w-4 h-4 shrink-0 text-primary" strokeWidth={1.75} aria-hidden="true" />
             <span className="type-subtitle truncate text-foreground">
@@ -570,7 +582,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange,
 
         {/* Helper text for first-time users */}
         {showHelper && hasAlerts && (
-          <div className="px-4 py-2 bg-muted border-b border-border flex items-start gap-2">
+          <div className="shrink-0 px-4 py-2 bg-muted border-b border-border flex items-start gap-2">
             <Info className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" aria-hidden="true" />
             <div className="flex-1">
               <p className="text-xs text-muted-foreground">
@@ -590,12 +602,12 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange,
 
         {/* Alert sections */}
         {isLoading && !hasAlerts ? (
-          <div role="status" className="flex items-center justify-center gap-2 p-8 text-sm text-muted-foreground">
+          <div role="status" className="flex shrink-0 items-center justify-center gap-2 p-8 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-hidden="true" />
             Loading alerts…
           </div>
         ) : loadFailed && !hasAlerts ? (
-          <div role="alert" className="p-6 text-center">
+          <div role="alert" className="shrink-0 p-6 text-center">
             <p className="text-sm font-medium text-foreground">Alerts could not load</p>
             <p className="text-xs text-muted-foreground mt-1">Check your connection and try again.</p>
             <Button
@@ -610,8 +622,9 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange,
           </div>
         ) : hasAlerts ? (
           // A plain scroller: the ScrollArea viewport lays rows out at their
-          // natural width, so long titles would not truncate.
-          <div className="max-h-[min(400px,60dvh)] overflow-y-auto overflow-x-hidden overscroll-contain">
+          // natural width, so long titles would not truncate. Up to 400 px, and
+          // it shrinks (never grows) when the panel is capped by the viewport.
+          <div className="min-h-0 max-h-[400px] shrink overflow-y-auto overflow-x-hidden overscroll-contain">
             <div className="divide-y divide-border">
               {renderSection('Urgent', categorizedAlerts.urgent, 'urgent')}
               {renderSection('Overdue', categorizedAlerts.overdue, 'overdue')}
@@ -620,7 +633,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange,
             </div>
           </div>
         ) : (
-          <div className="p-8 text-center">
+          <div className="shrink-0 p-8 text-center">
             <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
               <Bell className="w-6 h-6 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />
             </div>
@@ -632,7 +645,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange,
         )}
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-border">
+        <div className="shrink-0 px-4 py-3 border-t border-border">
           <Button
             variant="outline"
             size="sm"

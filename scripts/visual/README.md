@@ -86,16 +86,25 @@ Each capture gets a status:
 
 | Status | When |
 |---|---|
-| `fail` | The ErrorBoundary rendered ("This part of the page failed to render"), the page was blank, the stale-chunk recovery panel showed, an uncaught page error fired, navigation failed, or a signed-in route ended on `/auth` |
+| `fail` | The ErrorBoundary rendered ("This part of the page failed to render"), the page was blank, the stale-chunk recovery panel showed, an uncaught page error fired, navigation failed, a signed-in route ended on `/auth`, or two top-bar controls collide (see "Top-bar collisions") |
 | `warn` | Console errors, "Something went wrong" text outside the boundary, an AccessDenied card, a spinner or skeleton (`aria-busy`) that never cleared, a wait that gave up (network never idle, `waitFor` selector not found, screenshot failed), more than 500 mock requests in one capture ("runaway fetching"), horizontal overflow of `main` or the page at a width under 768 px, or an unexpected redirect |
 | `ok` | None of the above |
 
 React development warnings (`Warning: …`) are listed separately under `reactWarnings` and do not change the status. The exception is "Maximum update depth exceeded", which counts as a console error.
 
+### Top-bar collisions
+
+On every page with the shell's top bar (`[data-testid="shell-topbar"]`), `inspectPage` takes each visible top-bar control by its `SHELL_TEST_IDS` value: the menu button, the tenant logo, the Fleet and vessel segments, the switcher chevron, the workspace chip, Apps, Search, the favourite star and menu, Help, the bell and the account button. It records in `page.topbarCollisions`:
+
+- each pair whose boxes intersect horizontally by more than 0.5 px (`shell-vessel-switcher-trigger overlaps shell-search-trigger by 43.9px`);
+- each control whose centre point, by `document.elementFromPoint`, lands outside it (`shell-search-trigger centre hits shell-vessel-switcher-trigger`): a neighbour painted over it, or its own middle clipped away, so a tap there reaches the wrong control. This part is skipped while a modal layer is open (a dialog, a menu or the drawer covers the bar on purpose); the overlap part still runs.
+
+A non-empty list grades the capture `fail` at any width, and the terminal summary lists every capture that has one in full after the table (or says there were none). The list is `null` on a page without a top bar, such as `/auth`. Phone widths (under 768 px) run with a touch context, so the coarse-pointer 44 px targets (D-35) are the ones measured; check the top bar on narrow phones with, for example, `--widths 414,390,375,360,320`.
+
 Per capture, `report.json` holds:
 
 - `finalPath`
-- `page`: title, first `h1`, theme class, text sample and the detection flags
+- `page`: title, first `h1`, theme class, text sample and the detection flags, including `overflowX` and `topbarCollisions`
 - `consoleErrors`, `reactWarnings`, `pageErrors`, `failedRequests`
 - `externalHosts`: external hosts that were stubbed
 - `mock.tablesRead`, `mock.restWithoutFixture`, `mock.rpcWithoutFixture`: what to add to the fixtures to make a page less empty
@@ -297,8 +306,8 @@ The tests cover:
 - the fixture loader, tokens and shipped fixtures
 - options and routes
 - scripted actions (validation, order, a failing step as a warning) and personas (`actions.test.mjs`, no browser)
-- report grading
+- report grading, including top-bar collisions
 - the auth, storage and functions mock
-- `inspectPage` in a real browser (skipped if Playwright is missing)
+- `inspectPage` in a real browser, including the top-bar collision check on synthetic bars (skipped if Playwright is missing)
 
 They use `node:test` because `vitest.config.ts` only collects `src/**`.

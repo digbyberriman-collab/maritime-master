@@ -118,3 +118,55 @@ test('a main pane that scrolls sideways at 390 is flagged, and not at 1440', asy
   assert.equal(desktop.result.overflowX.main, 0);
   assert.equal(gradeAt(desktop).status, 'ok');
 });
+
+/** A synthetic top bar: a flex row of absolutely placed controls (left, width), like the shell's. */
+const topBar = (controls, extra = '') =>
+  `<div id="root"><header data-testid="shell-topbar" style="position:relative;height:52px;width:320px">${controls
+    .map(([id, left, width, z = 0]) => `<button data-testid="${id}" style="position:absolute;top:4px;left:${left}px;width:${width}px;height:44px;z-index:${z};overflow:hidden" aria-label="${id}"></button>`)
+    .join('')}</header>${extra}<main><h1>Health</h1><p>Medical dashboard with enough text to count as a page.</p></main></div>`;
+
+test('top-bar controls that are apart and hit at their centres report nothing', async (t) => {
+  if (skipReason) return t.skip(skipReason);
+  const { result, width } = await inspectAt(320, topBar([
+    ['shell-mobile-nav-trigger', 8, 44],
+    ['shell-scope-fleet', 60, 44],
+    ['shell-vessel-switcher-trigger', 106, 44],
+    ['shell-search-trigger', 180, 44],
+    ['shell-notifications-trigger', 226, 44],
+    ['shell-account-trigger', 270, 44],
+  ]));
+  assert.deepEqual(result.topbarCollisions, []);
+  assert.equal(gradeAt({ result, width }).status, 'ok');
+});
+
+test('a top-bar control painted over another fails: the overlap and the stolen centre', async (t) => {
+  if (skipReason) return t.skip(skipReason);
+  // The 320 px workspace case from the review: the chevron sits on top of Search.
+  const { result, width } = await inspectAt(320, topBar([
+    ['shell-scope-fleet', 60, 44],
+    ['shell-vessel-switcher-trigger', 150, 44, 2],
+    ['shell-search-trigger', 170, 44, 1],
+    ['shell-account-trigger', 270, 44],
+  ]));
+  assert.ok(result.topbarCollisions.includes('shell-vessel-switcher-trigger overlaps shell-search-trigger by 24.0px'), result.topbarCollisions.join(' | '));
+  assert.ok(result.topbarCollisions.includes('shell-search-trigger centre hits shell-vessel-switcher-trigger'), result.topbarCollisions.join(' | '));
+  const graded = gradeAt({ result, width });
+  assert.equal(graded.status, 'fail');
+  assert.match(graded.problems.join(), /top bar collision/);
+});
+
+test('hidden top-bar controls are ignored, and an open modal skips only the centre test', async (t) => {
+  if (skipReason) return t.skip(skipReason);
+  const hidden = await inspectAt(320, topBar([['shell-search-trigger', 180, 44], ['shell-account-trigger', 270, 44]]).replace(
+    '</header>',
+    '<span data-testid="shell-scope-workspace" style="display:none">Health &amp; Wellness</span></header>',
+  ));
+  assert.deepEqual(hidden.result.topbarCollisions, []);
+  // A dialog overlay covers the bar on purpose: centres are not tested, overlaps still are.
+  const overlay = '<div aria-modal="true" role="dialog" style="position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.5)">Search</div>';
+  const modal = await inspectAt(320, topBar([['shell-search-trigger', 180, 44], ['shell-notifications-trigger', 210, 44], ['shell-account-trigger', 270, 44]], overlay));
+  assert.deepEqual(modal.result.topbarCollisions, ['shell-search-trigger overlaps shell-notifications-trigger by 14.0px']);
+  // No top bar at all (the sign-in page): not checked.
+  const signIn = await inspectAt(320, '<div id="root"><main><h1>Sign in</h1><p>Welcome back to STORM, sign in to continue.</p></main></div>');
+  assert.equal(signIn.result.topbarCollisions, null);
+});

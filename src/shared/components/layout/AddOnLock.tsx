@@ -3,6 +3,10 @@
  * add-on that fails only its entitlement stays visible with a lock; spec
  * §4.1 step 6, §5.4; DECISIONS G4). Opening a locked sidebar leaf or vessel
  * tab shows this popover; it never navigates to the add-on's pages.
+ *
+ * The popover keeps its own open state unless the caller controls it with
+ * `open` / `onOpenChange` (the collapsed sidebar does, to keep its icon
+ * tooltip closed while the explanation is open).
  */
 import React from 'react';
 import { Lock } from 'lucide-react';
@@ -14,10 +18,13 @@ export interface AddOnLockProps {
   /** The trigger: a button that shows the locked node. */
   children: React.ReactElement;
   side?: 'right' | 'bottom';
+  /** Controlled open state; leave both out for an uncontrolled popover. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-const AddOnLock: React.FC<AddOnLockProps> = ({ label, children, side = 'right' }) => (
-  <Popover>
+const AddOnLock: React.FC<AddOnLockProps> = ({ label, children, side = 'right', open, onOpenChange }) => (
+  <Popover open={open} onOpenChange={onOpenChange}>
     <PopoverTrigger asChild>{children}</PopoverTrigger>
     <PopoverContent side={side} align="start" className="w-[min(18rem,calc(100vw-2rem))] p-3">
       <div className="flex items-start gap-2.5">

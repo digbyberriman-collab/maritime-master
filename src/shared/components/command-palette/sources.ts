@@ -11,8 +11,11 @@
  *   `useVesselSwitch()`, which keeps the user's place (IA23).
  * - Actions: theme (`useThemeChoice`, mirrored to the profile, gap/10 W1),
  *   density (device only, D-19), shell surfaces that the shell says are
- *   available, report a problem, report an incident (capability + a vessel
- *   in reach; `/incidents?new=true`, D-27), sign out.
+ *   available, report a problem, report an incident, sign out. "Report an
+ *   incident" needs the capability and a vessel in reach (D-04); it opens the
+ *   incidents page with its report form open (`/incidents?new=true`, D-27),
+ *   and from a vessel it carries that vessel (`&vessel=<id>`), which the
+ *   page preselects in the form and the list filter (D-81).
  */
 import { useMemo } from 'react';
 import {
@@ -47,8 +50,17 @@ import { useDensity } from '@/components/ui/use-density';
 import type { Density, ThemePreference } from '@/components/ui/theme-config';
 import { LOADING_SOURCE, type PaletteItem, type PaletteSource } from './model';
 
-/** Where "Report an incident" goes (D-27: the incidents URLs stay until their stream rebuilds them). */
+/**
+ * Where "Report an incident" goes: the incidents page, which opens its report
+ * form for `new=true` (D-27: the incidents URLs stay until their stream
+ * rebuilds them).
+ */
 export const REPORT_INCIDENT_PATH = '/incidents?new=true';
+
+/** The report form's URL, for the given vessel when there is one (the page ignores an id that is not the user's). */
+export function reportIncidentPath(vesselId?: string | null): string {
+  return vesselId ? `${REPORT_INCIDENT_PATH}&vessel=${encodeURIComponent(vesselId)}` : REPORT_INCIDENT_PATH;
+}
 export const REPORT_INCIDENT_CAPABILITY = 'vessel.safety.incidents.create';
 export const FLEET_OVERVIEW_PATH = '/fleet/dashboard';
 
@@ -174,6 +186,9 @@ export function usePaletteActions({ navigate }: PaletteActionDeps): PaletteSourc
   const { openNotifications, openKeyboardShortcuts } = useShellActions();
   const { vesselReach } = useNavAccess();
   const canReportIncident = useCan(REPORT_INCIDENT_CAPABILITY);
+  // From a resolved vessel, the report is for that vessel; elsewhere the form starts empty.
+  const scope = useScope();
+  const reportVesselId = scope.scope === 'vessel' ? scope.vessel?.id ?? null : null;
   const { user, signOut } = useAuth();
   const setFeedbackOpen = useFeedbackStore((s) => s.setPanelOpen);
   const signedIn = Boolean(user);
@@ -188,7 +203,7 @@ export function usePaletteActions({ navigate }: PaletteActionDeps): PaletteSourc
         keywords: ['Report an incident', 'new incident', 'accident', 'near miss', 'safety'],
         icon: Siren,
         recordable: true,
-        perform: { kind: 'navigate', to: REPORT_INCIDENT_PATH },
+        perform: { kind: 'navigate', to: reportIncidentPath(reportVesselId) },
       });
     }
     if (openNotifications) {
@@ -268,6 +283,7 @@ export function usePaletteActions({ navigate }: PaletteActionDeps): PaletteSourc
   }, [
     canReportIncident,
     vesselReach,
+    reportVesselId,
     openNotifications,
     openKeyboardShortcuts,
     theme,

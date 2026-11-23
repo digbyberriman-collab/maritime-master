@@ -48,7 +48,7 @@ import {
   AlertCircle, AlertTriangle, ClipboardList,
   BookOpen, FileCheck, Layers, Package, HardHat, Umbrella,
   Briefcase, Compass, Anchor,
-  Heart, Utensils, Stethoscope, Hammer, Building,
+  Heart, Flower2, Utensils, Stethoscope, Hammer, Building,
   Calendar, ListChecks, Network, Receipt, Banknote, Globe,
   Sparkles, Beaker, Waves, LifeBuoy, BookMarked, Headphones, Cpu,
   Camera, ScrollText, Truck, ClipboardCheck,
@@ -401,7 +401,7 @@ const vDepartments: NavChild[] = [
   G('Interior',    DEPT, standardDept6(`${DEPT}/interior`),    { icon: Sparkles,  slug: 'interior' }),
   G('Galley',      DEPT, galleyChildren,                       { icon: Utensils,  slug: 'galley' }),
   // Spa and Medical are Health & Wellness pages (cross-links).
-  L('Spa', DEPT, { existing: '/health/spa', icon: Heart, crossLink: true, scope: 'workspace', moduleKey: 'wellness' }),
+  L('Spa', DEPT, { existing: '/health/spa', icon: Flower2, crossLink: true, scope: 'workspace', moduleKey: 'wellness' }),
   G('Media',       DEPT, standardDept6(`${DEPT}/media`),       { icon: Camera,    slug: 'media' }),
   G('IT',          DEPT, standardDept6(`${DEPT}/it`),          { icon: Cpu,       slug: 'it' }),
   L('Medical', DEPT, { existing: '/health/medical', icon: Stethoscope, crossLink: true, scope: 'workspace', moduleKey: 'medical' }),

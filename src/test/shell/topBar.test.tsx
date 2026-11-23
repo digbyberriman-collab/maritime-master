@@ -56,7 +56,7 @@ import { notify } from '@/shared/lib/notify';
 import type { ScopeValue } from '@/app/router/scopeContext';
 import type { QueryClient } from '@tanstack/react-query';
 import { fakeDb, resetFakeDb } from './fakeSupabase';
-import { COMPANY_ID, DRAAK, FLEET_ACCESS, USER_ID, renderShell, resetShellState, shellState } from './shellFakes';
+import { COMPANY_ID, DRAAK, FLEET_ACCESS, USER_ID, VESSEL_ONLY_ACCESS, asVesselMaster, renderShell, resetShellState, shellState } from './shellFakes';
 
 beforeAll(() => {
   Element.prototype.scrollIntoView = () => undefined;
@@ -130,6 +130,44 @@ describe('per scope', () => {
     const { queryClient } = renderShell(<TopBar {...topBarProps} />, { path: '/fleet/dashboard', scope: { scope: 'fleet' } });
     expect(screen.getByTestId(SHELL_TEST_IDS.topBar)).toHaveClass('h-[52px]', 'lg:h-14', 'bg-topbar/[0.88]', 'backdrop-blur-md', 'border-b', 'border-border');
     await bellSettled(queryClient);
+  });
+
+  it('keeps search, bell and account at the right edge and above the scope control (ml-auto, relative z-10)', async () => {
+    const { queryClient } = renderShell(<TopBar {...topBarProps} />, { path: '/fleet/dashboard', scope: { scope: 'fleet' }, access: FLEET_ACCESS });
+    const bar = screen.getByTestId(SHELL_TEST_IDS.topBar);
+    await within(bar).findByTestId(SHELL_TEST_IDS.scopeFleet);
+    const group = within(bar).getByTestId(SHELL_TEST_IDS.searchTrigger).closest('header > div');
+    expect(group).not.toBeNull();
+    for (const id of [SHELL_TEST_IDS.notificationsTrigger, SHELL_TEST_IDS.accountTrigger]) {
+      expect(group).toContainElement(within(bar).getByTestId(id));
+    }
+    // Pinned right when the scope control renders nothing; above the segments' touch hit areas.
+    expect(group).toHaveClass('relative', 'z-10', 'ml-auto', 'shrink-0');
+    // The scope control's slot clips inside itself, so it can never paint over Search.
+    const scopeRoot = within(bar).getByTestId(SHELL_TEST_IDS.scopeFleet).closest('header > div');
+    expect(scopeRoot).not.toBe(group);
+    expect(scopeRoot).toHaveClass('overflow-hidden', 'min-w-0', 'flex-1');
+    await bellSettled(queryClient);
+  });
+
+  it('with no scope control at all the right-hand group still carries ml-auto', async () => {
+    // asVesselMaster gives the profile a job title that resetShellState keeps; put it back after.
+    const profile = shellState.auth.profile;
+    try {
+      asVesselMaster([]);
+      const { queryClient } = renderShell(<TopBar {...topBarProps} />, {
+        path: '/me/profile',
+        scope: { scope: 'personal' },
+        access: { ...VESSEL_ONLY_ACCESS, vesselReach: false },
+      });
+      const bar = screen.getByTestId(SHELL_TEST_IDS.topBar);
+      await waitFor(() => expect(within(bar).queryByTestId(SHELL_TEST_IDS.scopeControl)).toBeNull());
+      const group = within(bar).getByTestId(SHELL_TEST_IDS.accountTrigger).closest('header > div');
+      expect(group).toHaveClass('ml-auto', 'relative', 'z-10');
+      await bellSettled(queryClient);
+    } finally {
+      shellState.auth.profile = profile;
+    }
   });
 
   it('turns warning-muted while impersonating', async () => {

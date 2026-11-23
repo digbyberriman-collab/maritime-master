@@ -175,6 +175,20 @@ describe('old sitemap paths still resolve', () => {
     expect(landOn('/documents', ctx()).pattern).toBe('/documents');
   });
 
+  it('/dpa-dashboard opens the fleet dashboard for fleet reach, and keeps its page for anyone else (D-27)', () => {
+    const fleet = landOn('/dpa-dashboard', ctx({ fleetReach: true }));
+    expect(fleet.pattern).toBe('/fleet/dashboard');
+    expect(isRealPage(fleet)).toBe(true);
+    expect(landOn('/dpa-dashboard', ctx({ fleetReach: true, allVesselsMode: true, lastVesselCode: null })).pattern).toBe('/fleet/dashboard');
+    const other = landOn('/dpa-dashboard', ctx());
+    expect(other.pattern).toBe('/dpa-dashboard');
+    expect(isLazyPage(other.element)).toBe(true);
+    const entry = legacyEntryFor('/dpa-dashboard');
+    if (!entry) throw new Error('no entry for /dpa-dashboard');
+    expect(resolveLegacyTarget(entry, {}, '?x=1', '#k', ctx({ fleetReach: true }))).toBe('/fleet/dashboard?x=1#k');
+    expect(resolveLegacyTarget(entry, {}, '', '', ctx())).toBeNull();
+  });
+
   it('/crew/work-rest goes to /me/hours-of-rest (R8)', () => {
     expect(landOn('/crew/work-rest', ctx()).pattern).toBe('/me/hours-of-rest');
     expect(landOn('/crew/hours-of-rest', ctx()).pattern).toBe('/me/hours-of-rest');

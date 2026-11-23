@@ -7,12 +7,20 @@ import { Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Dialog, DialogDescription, DialogOverlay, DialogPortal, DialogTitle } from "@/components/ui/dialog";
 
+/*
+ * cmdk's vim bindings (Ctrl+J/K/N/P move the selection) are off by default
+ * here: cmdk claims Ctrl+K for "previous item" and calls preventDefault, so
+ * the command palette's Ctrl+K would never reach it from inside a menu
+ * (D-61: Cmd+K / Ctrl+K opens the palette from anywhere). A caller can still
+ * opt in with `vimBindings`.
+ */
 const Command = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive>,
   React.ComponentPropsWithoutRef<typeof CommandPrimitive>
->(({ className, ...props }, ref) => (
+>(({ className, vimBindings = false, ...props }, ref) => (
   <CommandPrimitive
     ref={ref}
+    vimBindings={vimBindings}
     className={cn(
       "flex h-full w-full flex-col overflow-hidden rounded-md bg-popover text-popover-foreground",
       className,
@@ -37,7 +45,7 @@ interface CommandDialogProps extends DialogProps {
   description?: string;
   /** Props for the dialog panel: `data-testid`, `className`, `onCloseAutoFocus`, … */
   contentProps?: CommandDialogContentProps;
-  /** Props for the inner `Command`: `label`, `filter`, `loop`, `vimBindings`, … */
+  /** Props for the inner `Command`: `label`, `filter`, `loop`, `vimBindings` (off unless set), … */
   commandProps?: Omit<React.ComponentPropsWithoutRef<typeof CommandPrimitive>, "children">;
   /**
    * The corner close button. On by default; a caller that renders its own

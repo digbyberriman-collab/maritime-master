@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
 import { resolveMedicalAccess } from '@/modules/auth/lib/medicalAccess';
 import { resolveWellnessAccess } from '@/modules/auth/lib/wellnessAccess';
+import { canEnterHealth } from '@/modules/auth/lib/healthAccess';
 import { resolveHrAccess } from '@/modules/auth/lib/hrAccess';
 
 interface Profile {
@@ -264,8 +265,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         medical,
       });
       // Crew may enter to see their own records; clinical pages add a
-      // medicalLevel gate of their own.
-      return wellness.level !== 'none' || medical.level !== 'none';
+      // medicalLevel gate of their own. The workspace's nav entry uses the
+      // same rule (moduleKey `health`).
+      return canEnterHealth(medical, wellness);
     }
 
     // Fails closed while RBAC is still loading: ModuleRoute already blanks the

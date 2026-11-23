@@ -13,11 +13,14 @@
  * - `page`: the page's own crumbs (the page exists; only the title changes);
  * - `none`: the title alone (no scope to name, e.g. "Vessel not found").
  *
- * AppShell provides the channel around `<main>` (PageLocationOverrideProvider.tsx;
- * a separate file, so this one exports no component). The override is set in a
- * layout effect, so the header never paints the URL's title first, and is
- * cleared on unmount only while it is still the caller's own. Without a
- * provider (a state rendered outside the shell) the hook does nothing.
+ * AppShell provides the channel around the shell root
+ * (PageLocationOverrideProvider.tsx; a separate file, so this one exports no
+ * component), so the breadcrumb row in `<main>` and the top bar read the same
+ * override: the favourites star hides on a state that is not a page (any
+ * crumbs but `page`). The override is set in a layout effect, so the header
+ * never paints the URL's title first, and is cleared on unmount only while it
+ * is still the caller's own. Without a provider (a state rendered outside the
+ * shell) the hook does nothing, and the reader gets null.
  */
 import React from 'react';
 

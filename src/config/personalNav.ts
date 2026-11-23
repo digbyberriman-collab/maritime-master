@@ -2,14 +2,20 @@
  * The personal area's nav tree (gap/10 "Personal and global"; gap/01
  * "Personal area"; spec §8): the user's own account, notifications, work and
  * help, then the company settings their role may open. Every page has a URL
- * under `/me` (plus the inbox at `/inbox`), so a section is a link, a
- * bookmark and a breadcrumb like any other page.
+ * under `/me`, plus the inbox at `/inbox` and Help at `/help/*` (gap/10
+ * Target IA principle 1), so a section is a link, a bookmark and a
+ * breadcrumb like any other page.
  *
  *   ACCOUNT            Profile · Security · Signature (planned) · Appearance · Favourites · Sidebar layout
  *   NOTIFICATIONS      In-app · Channels & alerts
  *   MY WORK            Hours of rest · Training · Inbox · Documents (planned) · Leave (planned)
- *   DATA & HELP        Data & exports · Support
+ *   DATA & HELP        Data & exports · How-to guides · Support
  *   COMPANY SETTINGS   the admin sections `canAccessSection` allows (placeholders planned)
+ *
+ * Inbox, How-to guides and Support link pages outside `/me` (`existing`), as
+ * the inbox always has. `/help/support` is the one Support page: the Help
+ * menu, the footer and the Coming Soon pages link it with `?subject=`, and
+ * the old `/me/support` section URL redirects to it.
  *
  * `buildPersonalNav(canAccessSection)` takes the section gate (the settings
  * permissions for the user's role), so the sidebar shows only what the user
@@ -20,8 +26,8 @@
  * `/fleet/admin`.
  */
 import {
-  Bell, BellRing, Clock, Database, Download, Eye, FileCheck, FileText, FileWarning, GraduationCap, HelpCircle, Inbox,
-  LayoutList, Lock, Mail, Palette, PenLine, Plane, Plug, CreditCard, ScrollText, Shield, Ship, Star, User, UserX,
+  Bell, BellRing, BookOpen, Clock, Database, Download, Eye, FileCheck, FileText, FileWarning, GraduationCap, Inbox,
+  LayoutList, LifeBuoy, Lock, Mail, Palette, PenLine, Plane, Plug, CreditCard, ScrollText, Shield, Ship, Star, User, UserX,
   type LucideIcon,
 } from 'lucide-react';
 import { SETTINGS_SECTION_IDS, settingsSectionPath } from '@/shared/utils/settingsPermissions';
@@ -100,7 +106,8 @@ export function buildPersonalNav(canAccessSection: (id: string) => boolean): Nav
     ]),
     S('Data & help', me, [
       L('Data & exports', me, { slug: 'data-exports', icon: Download, ...LIVE }),
-      L('Support', me, { icon: HelpCircle, ...LIVE }),
+      L('How-to guides', me, { existing: '/help/how-to-guides', icon: BookOpen }),
+      L('Support', me, { existing: '/help/support', icon: LifeBuoy }),
     ]),
     ...(company.length ? [S('Company settings', me, company)] : []),
   ];
@@ -116,13 +123,20 @@ export interface PersonalSettingsRoute {
 const PLANNED_SECTIONS: ReadonlySet<string> = new Set(COMPANY_SETTINGS.filter((s) => s.planned).map((s) => s.id));
 
 /**
- * Every settings section with a real page, as a route under `/me`
+ * Settings sections whose page is elsewhere: `support` is `/help/support`,
+ * and `/me/support` (with `?tab=support` and `/settings/support`, which land
+ * on it) redirects there, keeping the query.
+ */
+const SECTIONS_ELSEWHERE: ReadonlySet<string> = new Set(['support']);
+
+/**
+ * Every settings section with a real page under `/me`, as a route
  * (`profile`, `security`, …, `notifications/channels` for the notification
  * channels). The planned company settings open Coming Soon instead
- * (PERSONAL_PLACEHOLDER_LEAVES in the sitemap).
+ * (PERSONAL_PLACEHOLDER_LEAVES in the sitemap); Support is the Help page.
  */
 export const PERSONAL_SETTINGS_ROUTES: readonly PersonalSettingsRoute[] = Object.freeze(
-  SETTINGS_SECTION_IDS.filter((id) => !PLANNED_SECTIONS.has(id)).map((id) => ({
+  SETTINGS_SECTION_IDS.filter((id) => !PLANNED_SECTIONS.has(id) && !SECTIONS_ELSEWHERE.has(id)).map((id) => ({
     path: settingsSectionPath(id).slice(PERSONAL_BASE.length + 1),
     section: id,
   })),

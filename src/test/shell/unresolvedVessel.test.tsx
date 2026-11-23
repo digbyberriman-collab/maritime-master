@@ -11,8 +11,10 @@
  *   the vessel scope only, spec §5.3; the top bar's scope control keeps it,
  *   D-64, and is not drawn here);
  * - `useVesselNav()` names no vessel and no active tab;
- * - while access loads, the row stays (its skeletons), so the header does
- *   not jump once the vessel resolves.
+ * - while access loads, the vessel is not yet known: the row stays (its
+ *   skeletons) and so does the static tab's sidebar column (skeleton rows,
+ *   no links), so neither the header nor the page jumps once the vessel
+ *   resolves (D-96, IA19).
  *
  * src/test/router/scopes.test.tsx stubs the tab row, which is why it never
  * saw this.
@@ -145,13 +147,19 @@ describe('an unresolved vessel URL, access ready', () => {
 });
 
 describe('while access loads', () => {
-  it('keeps the tab row as skeletons, with no tab to follow', () => {
+  it('keeps the tab row and the static tab’s sidebar as skeletons, with nothing to follow', () => {
     asLoading();
     renderAt('/v/zzz/crew/list', UNRESOLVED, FAIL_CLOSED_NAV_ACCESS);
     const row = screen.getByTestId(SHELL_TEST_IDS.moduleTabBar);
     expect(within(row).getByRole('status')).toHaveAttribute('aria-busy', 'true');
     expect(within(row).queryAllByRole('link')).toEqual([]);
-    expect(screen.queryByTestId(SHELL_TEST_IDS.sidebar)).toBeNull();
+    // The column holds its place (no jump once the vessel resolves), but draws no vessel's tree.
+    const sidebar = screen.getByTestId(SHELL_TEST_IDS.sidebar);
+    const nav = within(sidebar).getByRole('navigation', { name: 'Crew folders' });
+    expect(nav).toHaveAttribute('aria-busy', 'true');
+    expect(within(nav).getByText('Loading Crew').closest('[role="status"]')).toHaveAttribute('aria-busy', 'true');
+    expect(within(sidebar).queryAllByRole('link')).toEqual([]);
+    expect(vesselLinks()).toEqual([]);
   });
 });
 

@@ -20,11 +20,11 @@ export interface PageNavigation {
 
 type NavigationNode = NavItem | NavChild;
 
+// Help's pages (/help/*) are leaves of the personal tree (My account › Data &
+// help), so their crumbs and titles come from it like any other page.
 const SPECIAL_PAGES: Record<string, PageNavigation> = {
   '/': { crumbs: [{ label: 'Fleet', path: '/dashboard' }, { label: 'Fleet Dashboard' }], title: 'Fleet Dashboard' },
   '/index': { crumbs: [{ label: 'Fleet', path: '/dashboard' }, { label: 'Fleet Dashboard' }], title: 'Fleet Dashboard' },
-  '/help/how-to-guides': { crumbs: [{ label: 'Help' }, { label: 'How-to Guides' }], title: 'How-to Guides' },
-  '/help/support': { crumbs: [{ label: 'Help' }, { label: 'Support' }], title: 'Support' },
   '/notifications/center': { crumbs: [{ label: 'Fleet', path: '/dashboard' }, { label: 'Notification Center' }], title: 'Notification Center' },
   '/legal/privacy-policy': { crumbs: [{ label: 'Legal' }, { label: 'Privacy Policy' }], title: 'Privacy Policy' },
   '/legal/terms-of-service': { crumbs: [{ label: 'Legal' }, { label: 'Terms of Service' }], title: 'Terms of Service' },

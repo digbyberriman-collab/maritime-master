@@ -22,6 +22,8 @@
  *   archived, a module switched off) names itself through
  *   `usePageLocationOverride` (./pageLocationOverride.ts): the document
  *   title and the current crumb are the state's, never the URL's nav title.
+ * - Print (DS23): the breadcrumb row is shell chrome and does not print; the
+ *   fallback h1, when the shell adds one, does (it is the page's title).
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
@@ -136,8 +138,8 @@ const PageLocationHeader: React.FC = () => {
   const showFallback = settled && !hasPageHeading;
 
   return (
-    <div ref={rootRef} data-testid={SHELL_TEST_IDS.pageHeader} className={cn('min-w-0', showFallback ? 'mb-3' : 'mb-2')}>
-      <nav aria-label="Breadcrumb" className="min-w-0">
+    <div ref={rootRef} data-testid={SHELL_TEST_IDS.pageHeader} className={cn('min-w-0', showFallback ? 'mb-3' : 'mb-2 print:mb-0')}>
+      <nav aria-label="Breadcrumb" className="min-w-0 print:hidden">
         <ol className="type-caption flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-muted-foreground">
           {crumbs.map((crumb, index) => {
             const current = index === crumbs.length - 1;

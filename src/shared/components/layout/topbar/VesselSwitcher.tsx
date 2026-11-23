@@ -5,7 +5,8 @@
  * cmdk) is a lazy chunk: it is warmed when the pointer enters, focuses or
  * presses the chevron and whenever the switcher opens, and while it loads
  * the popover shows a small loading row. If the chunk cannot load, the
- * popover says so with Retry, never an empty list.
+ * popover says so with Retry, never an empty list, and the page is not
+ * reloaded for it (an optional UI chunk, src/app/optionalChunks.ts).
  *
  * Choosing a vessel goes through `useVesselSwitch()`, which keeps the user's
  * place when it can. The row shows a spinner until the navigation lands; the
@@ -24,6 +25,7 @@ import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import { cancelPendingVesselSwitch, useVesselSwitch } from '@/app/nav/useVesselSwitch';
 import { SHELL_TEST_IDS } from '@/app/shell/testIds';
 import { useShellSurface } from '@/app/shell/shellUi';
+import { createOptionalChunkLoader } from '@/app/optionalChunks';
 import { FLEET_HOME } from './useFleetTarget';
 import type { VesselAlertSummary } from './useVesselAlertSummary';
 import { ALL_VESSELS, type SwitcherTarget, type SwitcherVessel } from './vesselSwitcherModel';
@@ -42,39 +44,12 @@ export interface VesselSwitcherProps {
 type PanelModule = typeof import('./VesselSwitcherPanel');
 
 /**
- * One import of the panel chunk at a time, shared by the preloads and the
- * lazy component; a failed import is forgotten so the next try loads again.
- * (The same contract as the palette's `createPaletteLoader`, which is typed
- * to the palette dialog's module.)
+ * The panel is an optional UI chunk (src/app/optionalChunks.ts): one import
+ * at a time, shared by the preloads and the lazy component, and a failed
+ * import is forgotten so the next try loads again. It never reloads the page;
+ * a failure shows PanelLoadBoundary's "could not load" state with Retry.
  */
-function createChunkLoader<M>(importer: () => Promise<M>): { load: () => Promise<M>; preload: () => void } {
-  let pending: Promise<M> | null = null;
-  const load = () => {
-    if (!pending) {
-      let attempt: Promise<M>;
-      try {
-        attempt = importer();
-      } catch (error) {
-        attempt = Promise.reject(error);
-      }
-      pending = attempt.catch((error: unknown) => {
-        pending = null;
-        throw error;
-      });
-    }
-    return pending;
-  };
-  const preload = () => {
-    try {
-      load().catch(() => undefined);
-    } catch {
-      // A preload is only a hint.
-    }
-  };
-  return { load, preload };
-}
-
-const panelLoader = createChunkLoader<PanelModule>(() => import('./VesselSwitcherPanel'));
+const panelLoader = createOptionalChunkLoader<PanelModule>(() => import('./VesselSwitcherPanel'));
 
 const newAttempt = (attempt: number) => ({ attempt, Panel: React.lazy(panelLoader.load) });
 

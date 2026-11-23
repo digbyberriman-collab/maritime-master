@@ -5,10 +5,11 @@
  * home or Calendar, a workspace's own tree. Deferred item 2 with D-45: the
  * HRIS tree opens `/me/training` without `?module=`, but keeps `?module=hris`
  * on its legacy Leave Planner URL; `?module=` on a Fleet, vessel or personal
- * URL never changes the sidebar.
+ * URL never changes the sidebar. While access loads, a vessel URL keeps the
+ * static tab's column as skeleton rows (D-96, IA19: no layout jump).
  */
 import React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 
 const badges = vi.hoisted(() => ({ data: { pendingCompliance: 0, unreadMessages: 4, overdueTasks: 0 } as Record<string, number> | undefined }));
@@ -27,14 +28,28 @@ vi.mock('@/modules/auth/store/permissionsStore', async () => {
   return { usePermissionsStore: (selector: (s: object) => unknown) => selector(shellState.perm) };
 });
 vi.mock('@/shared/hooks/useSidebarBadgeCounts', () => ({ useSidebarBadgeCounts: () => badges }));
+// The frame around the sidebar, for the cases that render the whole shell (the static column).
+vi.mock('@/shared/contexts/BrandingContext', async () => {
+  const { shellState } = await import('./shellFakes');
+  return { useBrandingContext: () => shellState.branding };
+});
+vi.mock('@/shared/components/InkfishWatermark', () => ({ default: () => null }));
+vi.mock('@/shared/components/layout/InkfishFooter', () => ({ default: () => null }));
+vi.mock('@/shared/components/layout/topbar/TopBar', () => ({ default: () => <header data-testid="shell-topbar" /> }));
+vi.mock('@/shared/components/layout/topbar/KeyboardShortcutsDialog', () => ({ default: () => null }));
+vi.mock('@/shared/components/layout/topbar/ShellShortcuts', () => ({ default: () => null }));
+vi.mock('@/modules/feedback/components/FeedbackPanel', () => ({ default: () => null }));
+vi.mock('@/modules/feedback/components/FeedbackResolvedToast', () => ({ default: () => null }));
 
+import AppShell from '@/shared/components/layout/AppShell';
 import ShellSidebar from '@/shared/components/layout/ShellSidebar';
 import { useShellSidebar } from '@/shared/components/layout/useShellSidebar';
 import type { ShellScope } from '@/shared/components/layout/AppShell';
 import { SHOW_ROADMAP_KEY } from '@/app/nav/roadmap';
 import type { ScopeValue } from '@/app/router/scopeContext';
 import { fakeDb, resetFakeDb } from './fakeSupabase';
-import { DRAAK, renderShell, resetShellState, shellState } from './shellFakes';
+import { SHELL_TEST_IDS } from '@/app/shell/testIds';
+import { DRAAK, FAIL_CLOSED_NAV_ACCESS, asLoading, renderShell, resetShellState, shellState } from './shellFakes';
 
 const Harness: React.FC<{ scope: ShellScope }> = ({ scope }) => {
   const model = useShellSidebar(scope);
@@ -150,6 +165,34 @@ describe('the vessel sidebar', () => {
     fakeDb.tables.vessel_module_settings = [{ vessel_id: DRAAK.id, module_key: 'crew', enabled: false, enabled_from: null, label_override: null }];
     renderSidebar('/v/dra/crew/list', VESSEL);
     expect(await screen.findByText('No sidebar')).toBeInTheDocument();
+  });
+
+  describe('while access loads (the vessel is not yet known)', () => {
+    const realMatchMedia = window.matchMedia;
+    beforeEach(() => {
+      // A desktop window, where the sidebar is the static column.
+      window.matchMedia = ((query: string) => ({ ...realMatchMedia(query), matches: /min-width:\s*(768|1024)px/.test(query) })) as typeof window.matchMedia;
+    });
+    afterEach(() => {
+      window.matchMedia = realMatchMedia;
+    });
+
+    it('keeps the static tab’s column as skeleton rows, headed Crew, with no leaf links', () => {
+      asLoading();
+      // What VesselScopeBody publishes until access is in: the vessel scope, no vessel yet.
+      renderShell(
+        <AppShell>
+          <p>Page</p>
+        </AppShell>,
+        { path: '/v/dra/crew/list', scope: { scope: 'vessel', vessel: undefined, vesselCode: undefined }, access: FAIL_CLOSED_NAV_ACCESS },
+      );
+      const column = screen.getByTestId(SHELL_TEST_IDS.sidebar);
+      const nav = within(column).getByRole('navigation', { name: 'Crew folders' });
+      expect(nav).toHaveAttribute('aria-busy', 'true');
+      expect(within(nav).getByText('Crew')).toBeInTheDocument();
+      expect(within(nav).getByText('Loading Crew').closest('[role="status"]')).toHaveAttribute('aria-busy', 'true');
+      expect(within(column).queryAllByRole('link')).toEqual([]);
+    });
   });
 });
 

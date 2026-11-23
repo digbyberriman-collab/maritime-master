@@ -4,49 +4,25 @@
  * `focus`, the provider on the first ⌘K / Ctrl+K. Safe to call any number of
  * times and outside a provider.
  *
- * The chunk is imported once and shared with the `React.lazy` that renders
- * it. A failed import is forgotten, so the next preload or open tries again
- * (the open path shows its own "could not load" state); a preload never
+ * The chunk is an optional UI chunk (src/app/optionalChunks.ts): it is
+ * imported once and shared with the `React.lazy` that renders it. A failed
+ * import, or one that resolves to something other than the module, is
+ * forgotten, so the next preload or open tries again. It never reloads the
+ * page (main.tsx leaves it out of the stale-chunk reload, D-39); the open path
+ * shows "Search could not load" with Try again instead (D-81). A preload never
  * throws and never rejects unhandled.
  */
 import type { ComponentType } from 'react';
+import { createOptionalChunkLoader, type OptionalChunkLoader } from '@/app/optionalChunks';
 import type { PaletteDialogProps } from './paletteDialogProps';
 
 export type PaletteDialogModule = { default: ComponentType<PaletteDialogProps> };
 
-export interface PaletteLoader {
-  /** The dialog module; one import in flight or settled at a time. */
-  load: () => Promise<PaletteDialogModule>;
-  /** `load()` for warming the cache: never throws, never rejects. */
-  preload: () => void;
-}
+export type PaletteLoader = OptionalChunkLoader<PaletteDialogModule>;
 
 /** A loader around `importer` (exported for tests; the app uses `paletteLoader`). */
 export function createPaletteLoader(importer: () => Promise<PaletteDialogModule>): PaletteLoader {
-  let pending: Promise<PaletteDialogModule> | null = null;
-  const load = () => {
-    if (!pending) {
-      let attempt: Promise<PaletteDialogModule>;
-      try {
-        attempt = importer();
-      } catch (error) {
-        attempt = Promise.reject(error);
-      }
-      pending = attempt.catch((error: unknown) => {
-        pending = null;
-        throw error;
-      });
-    }
-    return pending;
-  };
-  const preload = () => {
-    try {
-      load().catch(() => undefined);
-    } catch {
-      // A preload is only a hint.
-    }
-  };
-  return { load, preload };
+  return createOptionalChunkLoader(importer);
 }
 
 export const paletteLoader = createPaletteLoader(() => import('./PaletteDialog'));

@@ -2,7 +2,8 @@
  * Command palette behaviour (gap/10 IA12, BUILD-PLAN S5; spec §11.1, §12):
  * ⌘K / Ctrl+K from anywhere (fields too), Esc and focus return, accessible
  * dialog and listbox, fail-closed sources (Pages, Vessels, Recent), gated
- * actions, theme through useThemeChoice, the incident target, record
+ * actions, theme through useThemeChoice, the incident target (with the
+ * current vessel), record
  * references that find nothing, and a lazy dialog chunk loaded once.
  */
 import React from 'react';
@@ -18,7 +19,7 @@ import { PALETTE_TEST_IDS } from '@/app/shell/testIds';
 import { CommandPaletteProvider, preloadCommandPalette, useCommandPalette } from '@/shared/components/command-palette';
 import { createPaletteLoader, type PaletteDialogModule } from '@/shared/components/command-palette/preload';
 import { paletteRecentKey, PALETTE_RECENT_LIMIT, recordPaletteRecent } from '@/shared/components/command-palette/recent';
-import { resolveVesselPattern } from '@/shared/components/command-palette/sources';
+import { reportIncidentPath, resolveVesselPattern } from '@/shared/components/command-palette/sources';
 import type { Vessel } from '@/modules/vessels/contexts/VesselContext';
 
 const h = vi.hoisted(() => ({
@@ -509,7 +510,7 @@ describe('Actions', () => {
     await waitFor(() => expect(h.feedbackOpen).toHaveBeenCalledWith(true));
   });
 
-  it('Report an incident needs the capability and a vessel in reach, and opens /incidents?new=true', async () => {
+  it('Report an incident needs the capability and a vessel in reach, and opens the report form (/incidents?new=true)', async () => {
     const first = renderPalette();
     let dialog = await openPalette();
     expect(within(dialog).queryByRole('option', { name: /Report an incident/ })).toBeNull();
@@ -521,10 +522,35 @@ describe('Actions', () => {
     expect(within(dialog).queryByRole('option', { name: /Report an incident/ })).toBeNull();
     second.unmount();
 
+    // Fleet scope: no vessel to carry, the form starts empty.
     renderPalette();
     dialog = await openPalette();
     fireEvent.click(within(dialog).getByRole('option', { name: /Report an incident/ }));
     await waitFor(() => expect(currentLocation).toBe('/incidents?new=true'));
+  });
+
+  it('from a vessel, Report an incident carries that vessel (/incidents?new=true&vessel=<id>)', async () => {
+    h.caps = new Set(['vessel.safety.incidents.create']);
+    const draak = h.vessels[0] as Vessel;
+    const inVessel = renderPalette({ scope: { scope: 'vessel', vessel: draak, vesselCode: 'DRA' } });
+    let dialog = await openPalette();
+    fireEvent.click(within(dialog).getByRole('option', { name: /Report an incident/ }));
+    await waitFor(() => expect(currentLocation).toBe(`/incidents?new=true&vessel=${draak.id}`));
+    inVessel.unmount();
+
+    // An unresolved vessel URL names no vessel: nothing is carried, not even
+    // through Recent (it stores the id and offers the current scope's item).
+    renderPalette({ scope: { scope: 'vessel', vessel: undefined, vesselCode: undefined } });
+    dialog = await openPalette();
+    const recent = groupByHeading(dialog, 'Recent');
+    expect(recent).not.toBeNull();
+    fireEvent.click(within(recent as HTMLElement).getByRole('option', { name: /Report an incident/ }));
+    await waitFor(() => expect(currentLocation).toBe('/incidents?new=true'));
+  });
+
+  it('reportIncidentPath encodes the vessel id', () => {
+    expect(reportIncidentPath(null)).toBe('/incidents?new=true');
+    expect(reportIncidentPath('a b&c')).toBe('/incidents?new=true&vessel=a%20b%26c');
   });
 
   it('theme actions go through useThemeChoice and mark the theme in use', async () => {

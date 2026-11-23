@@ -14,11 +14,30 @@
  * the vessel in scope, else the last one opened (useShellVessel); inside the vessel scope it goes to
  * that vessel's home, elsewhere it opens the vessel through the vessel switch
  * (so a switched-off module is never the landing page). In a workspace a chip
- * names the workspace and neither segment is lit. The chip shows at every
- * width (a short label below 640 px) and is the part that gives way: below
- * 1024 px the control beside it takes its compact form (the Fleet globe
- * without its word, the vessel's code) and never shrinks, so its marks and
- * the switcher's chevron are never clipped (D-70).
+ * names the workspace and neither segment is lit.
+ *
+ * Fitting the row (D-70 as amended; every width from 320 px, coarse pointers
+ * keeping their 44 px targets, D-35):
+ *
+ *   < 360 px   with the switcher's chevron, only the lit segment shows: the
+ *              vessel in the vessel scope, Fleet everywhere else. The other
+ *              one is a tap away in the switcher ("All vessels — Fleet
+ *              overview" exists exactly when Fleet does). Without a chevron
+ *              (one vessel and fleet reach) both segments stay.
+ *   < 400 px   the vessel's AIS mark and compliance dot are left out (the
+ *              switcher rows and the vessel tab row still carry them).
+ *   < 640 px   no workspace chip (the breadcrumb and the page header name the
+ *              workspace); the vessel shows its three-letter code.
+ *   640–1023   the chip shows and is the part that gives way: the control
+ *              beside it keeps its compact form (the Fleet globe without its
+ *              word, the vessel's code) and does not shrink, so its marks and
+ *              the chevron are never cut.
+ *
+ * Every variant clips inside its own box (`overflow-hidden`), so if its
+ * contents ever outgrow the slot they are cut there instead of painting over
+ * Search and taking its taps. Focus rings stay inside that box: the segments'
+ * rings fit in the segmented control's padding and border, the one-vessel
+ * label's ring is inset.
  */
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -33,7 +52,7 @@ import { useScope } from '@/app/router/scopeContext';
 import { useNavAccess } from '@/app/nav/navAccess';
 import { useVesselSwitch } from '@/app/nav/useVesselSwitch';
 import { SHELL_TEST_IDS } from '@/app/shell/testIds';
-import { WORKSPACE_SCOPE_LABELS, WORKSPACE_SCOPE_SHORT_LABELS } from '@/app/shell/apps';
+import { WORKSPACE_SCOPE_LABELS } from '@/app/shell/apps';
 import AisMark from './AisMark';
 import ComplianceDot from './ComplianceDot';
 import VesselSwitcher from './VesselSwitcher';
@@ -111,26 +130,21 @@ const ScopeControl: React.FC<{ className?: string }> = ({ className }) => {
   const positionStatus = positions.isError ? 'error' : positions.data ? 'ready' : 'loading';
 
   const workspaceLabel = scope.scope === 'workspace' && scope.workspace ? WORKSPACE_SCOPE_LABELS[scope.workspace] ?? null : null;
-  const workspaceShort = scope.workspace ? WORKSPACE_SCOPE_SHORT_LABELS[scope.workspace] ?? workspaceLabel : workspaceLabel;
-  // Shown at every width; below 1024 px it is the part of the row that truncates.
+  // From 640 px; up to 1024 px it is the part of the row that truncates.
   const chip = workspaceLabel ? (
     <span
       data-testid={SHELL_TEST_IDS.scopeWorkspaceChip}
       title={workspaceLabel}
-      className="type-caption inline-flex min-w-0 max-w-[5.5rem] shrink items-center rounded-sm bg-muted px-1.5 py-1 text-foreground sm:max-w-[9rem] sm:px-2 lg:max-w-none lg:shrink-0"
+      className="type-caption hidden min-w-0 max-w-[9rem] shrink items-center rounded-sm bg-muted px-2 py-1 text-foreground sm:inline-flex lg:max-w-none lg:shrink-0"
     >
-      <span aria-hidden="true" className="truncate sm:hidden">
-        {workspaceShort}
-      </span>
-      <span className="sr-only sm:hidden">{workspaceLabel}</span>
-      <span className="hidden truncate sm:block">{workspaceLabel}</span>
+      <span className="truncate">{workspaceLabel}</span>
     </span>
   ) : null;
   const compact = Boolean(chip);
 
   if (!ready) {
     return (
-      <div data-testid={SHELL_TEST_IDS.scopeControl} aria-busy="true" className={cn('flex min-w-0 items-center', className)}>
+      <div data-testid={SHELL_TEST_IDS.scopeControl} aria-busy="true" className={cn('flex min-w-0 items-center overflow-hidden', className)}>
         <Skeleton className="h-9 w-36 rounded-md sm:w-48" />
         <span className="sr-only">Loading your vessels</span>
       </div>
@@ -140,15 +154,16 @@ const ScopeControl: React.FC<{ className?: string }> = ({ className }) => {
   const showFleet = fleetReach;
   const showVessel = vesselReach && Boolean(vessel && vesselCode);
   if (!showFleet && !showVessel) {
-    return chip ? <div className={cn('flex min-w-0 items-center gap-2', className)}>{chip}</div> : null;
+    return chip ? <div className={cn('flex min-w-0 items-center gap-2 overflow-hidden', className)}>{chip}</div> : null;
   }
 
+  // Left out below 400 px, where the code and the chevron need the room.
   const marks =
     vessel ? (
-      <>
+      <span data-scope-marks="" className="inline-flex items-center gap-1.5 empty:hidden max-[399px]:hidden">
         <AisMark status={positionStatus} position={positions.data?.get(vessel.id) ?? null} />
         <ComplianceDot summary={alerts} vesselId={vessel.id} />
-      </>
+      </span>
     ) : null;
 
   // One vessel and no fleet reach: a plain label, no control chrome.
@@ -161,7 +176,7 @@ const ScopeControl: React.FC<{ className?: string }> = ({ className }) => {
       </>
     );
     return (
-      <div data-testid={SHELL_TEST_IDS.scopeControl} className={cn('flex min-w-0 items-center gap-2', className)}>
+      <div data-testid={SHELL_TEST_IDS.scopeControl} className={cn('flex min-w-0 items-center gap-2 overflow-hidden', className)}>
         {inVesselScope ? (
           <span data-testid={SHELL_TEST_IDS.scopeVessel} className="flex min-w-0 items-center gap-1.5 px-1">
             {label}
@@ -170,7 +185,7 @@ const ScopeControl: React.FC<{ className?: string }> = ({ className }) => {
           <Link
             to={vesselPath(vesselCode)}
             data-testid={SHELL_TEST_IDS.scopeVessel}
-            className="flex min-h-11 min-w-0 items-center gap-1.5 rounded-md px-1 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex min-h-11 min-w-0 items-center gap-1.5 rounded-md px-1 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           >
             {label}
           </Link>
@@ -181,6 +196,10 @@ const ScopeControl: React.FC<{ className?: string }> = ({ className }) => {
   }
 
   const fleetActive = scope.scope === 'fleet';
+  const withSwitcher = switcherAvailable && showVessel;
+  // Below 360 px, with the chevron, only the lit segment shows (the vessel in
+  // the vessel scope, Fleet elsewhere); the switcher reaches the other one.
+  const litOnly = withSwitcher && showFleet;
   const segments = (
     <>
       {showFleet && (
@@ -188,7 +207,7 @@ const ScopeControl: React.FC<{ className?: string }> = ({ className }) => {
           to={fleetTarget}
           data-testid={SHELL_TEST_IDS.scopeFleet}
           aria-current={fleetActive ? 'true' : undefined}
-          className={cn(segment(fleetActive), 'shrink-0')}
+          className={cn(segment(fleetActive), 'shrink-0', litOnly && inVesselScope && 'max-[359px]:hidden')}
         >
           <Globe className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
           {/* Beside a chip the word waits for 1024 px too, leaving the chip room to be read (D-70). */}
@@ -203,7 +222,11 @@ const ScopeControl: React.FC<{ className?: string }> = ({ className }) => {
           aria-current={inVesselScope ? 'true' : undefined}
           onClick={() => (inVesselScope ? navigate(vesselPath(vesselCode)) : switchTo({ id: vessel.id, code: vesselCode }))}
           title={inVesselScope ? `${vessel.name} home` : `Open ${vessel.name}`}
-          className={cn(segment(inVesselScope), compact ? 'shrink-0 lg:shrink' : 'min-w-0')}
+          className={cn(
+            segment(inVesselScope),
+            compact ? 'min-w-0 sm:shrink-0 lg:shrink' : 'min-w-0',
+            litOnly && !inVesselScope && 'max-[359px]:hidden',
+          )}
         >
           <Ship className="hidden h-4 w-4 shrink-0 sm:block" strokeWidth={1.75} aria-hidden="true" />
           <VesselName
@@ -218,11 +241,11 @@ const ScopeControl: React.FC<{ className?: string }> = ({ className }) => {
     </>
   );
 
-  // Beside a chip, below 1024 px, the control keeps its full width (the chip gives way).
-  const segmentedClass = cn(segmented, compact && 'shrink-0 lg:shrink');
+  // Beside a chip (640–1023 px) the control keeps its full width; the chip gives way.
+  const segmentedClass = cn(segmented, compact && 'sm:shrink-0 lg:shrink');
   return (
-    <div className={cn('flex min-w-0 items-center gap-2', className)}>
-      {switcherAvailable && showVessel ? (
+    <div className={cn('flex min-w-0 items-center gap-2 overflow-hidden', className)}>
+      {withSwitcher ? (
         <VesselSwitcher
           currentVesselId={vessel?.id ?? null}
           alerts={alerts}

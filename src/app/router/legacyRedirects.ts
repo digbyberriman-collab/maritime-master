@@ -47,6 +47,9 @@ export interface LegacyRedirectEntry {
 
 export const LEGACY_REDIRECTS: readonly LegacyRedirectEntry[] = [
   // ─── Fleet (gap/01, gap/02, gap/03) ──────────────────────────────────────
+  // The DPA view is the fleet dashboard (D-90: its alert tiles count the
+  // viewer's alert scope, never the vessel selection).
+  { from: '/dpa-dashboard', to: '/fleet/dashboard' },
   { from: '/fleet-map', to: '/fleet/tracker' },
   { from: '/itinerary/timeline', to: '/fleet/calendar' },
   { from: '/documents', to: '/fleet/documents' },

@@ -10,7 +10,8 @@ import RbacRetryNotice from './RbacRetryNotice';
 import ModuleSettingsNotice from './ModuleSettingsNotice';
 
 const ShellNotices: React.FC = () => (
-  <div data-testid={SHELL_TEST_IDS.shellNotices} className="min-w-0">
+  // Shell chrome: never printed (DS23, D-36).
+  <div data-testid={SHELL_TEST_IDS.shellNotices} className="min-w-0 print:hidden">
     <RbacRetryNotice />
     <ModuleSettingsNotice />
   </div>

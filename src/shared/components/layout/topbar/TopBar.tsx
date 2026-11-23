@@ -3,14 +3,24 @@
  * 1024 px, 56 px from 1024 px; Abyss (Daylight: white) at 88 % behind an 8 px
  * blur, with a 1 px bottom border. Warning-muted while impersonating.
  *
- *   < 640     ☰ · scope control (fills, truncates) · search · bell · avatar
- *   640–767   + tenant logo
+ *   < 640     ☰ · scope control (fills the middle) · search · bell · avatar,
+ *             the avatar at the right edge even when there is no scope
+ *             control; no workspace chip, the vessel as its code
+ *   < 400     the vessel's AIS mark and compliance dot are left out
+ *   < 360     with the switcher's chevron, only the lit scope segment shows
+ *   640–767   + tenant logo, the workspace chip
  *   768–1023  + Apps, favourites, Help; the sidebar is still the drawer
  *   ≥ 1024    56 px, static sidebar (the menu button goes)
- *
- * Every control is 44 × 44 on a coarse pointer (`--control-h`, D-35); the
- * row never overflows: the scope control is the one part that shrinks.
  *   ≥ 1280    search as a 280 px field with its shortcut
+ *
+ * Every control is 44 × 44 on a coarse pointer (`--control-h`, D-35), and no
+ * two controls overlap at any width from 320 px (the visual harness checks
+ * this as `topbarCollisions`). The row never overflows: the scope control is
+ * the one part that shrinks, and it clips inside its own box, so it can never
+ * paint over Search. The right-hand group sits above it (`relative z-10`), so
+ * Search, the bell and the account button also win hit-testing over the
+ * segments' enlarged touch areas, and `ml-auto` keeps it at the right edge
+ * when the scope control renders nothing.
  *
  * The top bar stays mounted for the whole shell, so it also abandons a
  * vessel switch still in flight whenever the location changes
@@ -81,7 +91,7 @@ const TopBar: React.FC<TopBarProps> = ({
       <ScopeControl className="min-w-0 flex-1 sm:flex-initial" />
       <AppsMenu className="hidden md:inline-flex" />
       <div className="hidden min-w-0 flex-1 sm:block" />
-      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+      <div className="relative z-10 ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1">
         <SearchTrigger />
         <FavouritesControl className="hidden md:flex" />
         <HelpMenu className="hidden md:inline-flex" />

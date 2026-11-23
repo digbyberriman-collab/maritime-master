@@ -33,7 +33,8 @@ const ICON = 'h-3.5 w-3.5';
 const MENU_ICON = 'mr-2 h-4 w-4';
 
 const InkfishFooter: React.FC = () => (
-  <footer data-testid={SHELL_TEST_IDS.footer} className="border-t border-border">
+  // Shell chrome: a printout carries the page only (DS23, D-36).
+  <footer data-testid={SHELL_TEST_IDS.footer} className="border-t border-border print:hidden">
     <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 px-3 py-1.5 lg:px-4">
       <div className="flex select-none items-center gap-2">
         <img src={inkfishLogo} alt="Inkfish" className="h-4 object-contain" draggable={false} />

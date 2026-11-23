@@ -5,7 +5,9 @@
  *   fleet      the Fleet tree (six section headings)
  *   vessel     the active tab's sidebar only, for that vessel (none for Home,
  *              Calendar, Reports: the page takes the full width; none when
- *              the URL resolved to no vessel)
+ *              the URL resolved to no vessel). While access loads the URL's
+ *              vessel is not yet known, so the column keeps the static tab's
+ *              skeleton (its heading, no links) and never jumps in later
  *   workspace  that workspace's tree, only when the user may open the
  *              workspace (the Apps gate, src/app/nav/workspaceAccess.ts; a
  *              skeleton while access loads), also when a legacy page names
@@ -30,6 +32,7 @@ import type { FilteredNavNode } from '@/app/nav/navTree';
 import { useVesselNav } from '@/app/nav/useVesselNav';
 import { PERSONAL_TREE_ID, usePersonalNav } from '@/app/nav/usePersonalNav';
 import { useWorkspaceRootGate } from '@/app/nav/workspaceAccess';
+import { useScopeAccess } from '@/app/router/useScopeAccess';
 import type { ShellScope } from './AppShell';
 import { useActiveNavModule } from './useActiveNavModule';
 
@@ -81,6 +84,8 @@ export function useShellSidebar(scope: ShellScope): ShellSidebarModel {
   const personal = usePersonalNav();
   // A workspace tree shows only when Apps would offer the workspace (D-09; spec §6.3).
   const workspaceGate = useWorkspaceRootGate();
+  // Whether the URL's vessel can be known yet (the tab row reads the same, AppShell).
+  const accessReady = useScopeAccess().ready;
 
   // The vessel tab the URL is on, known from the static tree before the
   // vessel's settings load (so the column does not jump in once they do).
@@ -102,12 +107,20 @@ export function useShellSidebar(scope: ShellScope): ShellSidebarModel {
       };
     }
     if (scope === 'vessel') {
-      // An unresolved vessel (unknown code, out of reach, sold): no sidebar, not even a skeleton.
-      if (!vesselNav.vessel) return NONE;
       if (!staticTab || !staticTab.children.length) return NONE;
-      if (vesselNav.status === 'loading') {
-        return { ...NONE, available: true, loading: true, heading: { label: staticTab.label, icon: staticTab.icon }, roadmapApplies: true };
-      }
+      const skeleton: ShellSidebarModel = {
+        ...NONE,
+        available: true,
+        loading: true,
+        heading: { label: staticTab.label, icon: staticTab.icon },
+        roadmapApplies: true,
+      };
+      // The URL's vessel is unknown until access loads: keep the column as the
+      // static tab's skeleton rows (static heading, no links), never another
+      // vessel's tree. Once access is in, an unresolved vessel (unknown code,
+      // out of reach, sold) has no sidebar, not even a skeleton.
+      if (!vesselNav.vessel) return accessReady ? NONE : skeleton;
+      if (vesselNav.status === 'loading') return skeleton;
       const tab = vesselNav.tabs.find((t) => t.id === staticTab.id);
       if (!tab || tab.locked || (!tab.children.length && !tab.childrenPending)) return NONE;
       return {
@@ -138,5 +151,17 @@ export function useShellSidebar(scope: ShellScope): ShellSidebarModel {
       rootPath: treeModule.path,
       roadmapApplies: true,
     };
-  }, [scope, staticTab, vesselNav.vessel, vesselNav.status, vesselNav.tabs, treeModule, nodes, personalTree, personal.nodes, workspaceGate]);
+  }, [
+    scope,
+    staticTab,
+    accessReady,
+    vesselNav.vessel,
+    vesselNav.status,
+    vesselNav.tabs,
+    treeModule,
+    nodes,
+    personalTree,
+    personal.nodes,
+    workspaceGate,
+  ]);
 }

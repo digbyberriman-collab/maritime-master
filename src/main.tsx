@@ -1,5 +1,6 @@
 import { createRoot, type Root } from "react-dom/client";
 import App from "./App.tsx";
+import { isOptionalChunkError } from "./app/optionalChunks";
 import "./index.css";
 
 // --- Stale-chunk recovery, with a loop guard -------------------------------
@@ -103,17 +104,33 @@ const recoverFromStaleChunk = () => {
 const isStaleChunkMessage = (msg: string) =>
   msg.includes("Unable to preload CSS") || msg.includes("Failed to fetch dynamically imported module");
 
+// Route chunks reload (D-39). Optional UI chunks (the palette dialog, the
+// vessel switcher's list; src/app/optionalChunks.ts) are left alone: no
+// preventDefault, so Vite rethrows, the chunk's loader forgets the attempt and
+// its boundary shows "could not load" with a retry (D-81). Matching is by the
+// chunk's URL in the error message. Safari's import error ("Importing a module
+// script failed.") carries no URL, so there an optional chunk still takes the
+// reload path.
 window.addEventListener("vite:preloadError", (e) => {
+  const payload = (e as Event & { payload?: unknown }).payload;
+  const msg = payload instanceof Error ? payload.message : String(payload ?? "");
+  if (isOptionalChunkError(msg)) return;
   e.preventDefault();
   recoverFromStaleChunk();
 });
 
+// React's development build replays an error its boundary caught as a window
+// error, so an optional chunk's failure surfaces here too: skip it.
 window.addEventListener("error", (e) => {
-  if (isStaleChunkMessage(e?.message || "")) recoverFromStaleChunk();
+  const msg = e?.message || "";
+  const errorMsg = e?.error instanceof Error ? e.error.message : "";
+  if (isOptionalChunkError(msg) || isOptionalChunkError(errorMsg)) return;
+  if (isStaleChunkMessage(msg)) recoverFromStaleChunk();
 });
 
 window.addEventListener("unhandledrejection", (e) => {
   const msg = (e?.reason && (e.reason.message || String(e.reason))) || "";
+  if (isOptionalChunkError(msg)) return;
   if (isStaleChunkMessage(msg)) recoverFromStaleChunk();
 });
 

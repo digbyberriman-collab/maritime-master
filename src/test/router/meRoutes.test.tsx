@@ -16,6 +16,10 @@
  *   loading state and then gets the section (no false denial).
  * - `/inbox` is the notification centre in the personal scope; planned
  *   personal leaves open Coming Soon inside it.
+ * - Help (`/help/*`) is in the personal scope too: `/help` opens the
+ *   guides, `/help/support` is the one Support page (seeded from
+ *   `?subject=`), and `/me/support` and `?tab=support` redirect to it with
+ *   the query kept.
  * - HRIS › Training & Development opens `/me/training` with the personal
  *   sidebar, not HRIS's (deferred item 2).
  */
@@ -242,7 +246,6 @@ describe('/me sections', () => {
     ['/me/shortcuts', 'Quick Action Shortcuts'],
     ['/me/sidebar-layout', 'Sidebar layout'],
     ['/me/data-exports', 'Data & Exports'],
-    ['/me/support', 'Support'],
     ['/me/notifications/channels', 'Notification channels'],
   ])('%s renders its section', async (url, heading) => {
     renderApp(url);
@@ -387,6 +390,57 @@ describe('the inbox and planned personal leaves', () => {
     });
     expect(await screen.findByRole('heading', { name: 'Notification centre' })).toBeInTheDocument();
     expect(document.querySelector('[data-shell-scope]')).toBe(root);
+  });
+});
+
+describe('Help in the personal scope (gap/10 Target IA principle 1)', () => {
+  it('/help/support?subject=… is the one Support page, inside the personal shell, with the subject seeded', async () => {
+    renderApp('/help/support?subject=Request%3A%20Vessel%20Details');
+    const field = (await screen.findByLabelText('Subject')) as HTMLInputElement;
+    expect(field.value).toBe('Request: Vessel Details');
+    expect(location()).toBe('/help/support?subject=Request%3A%20Vessel%20Details');
+    expect(document.querySelector('[data-shell-scope]')).toHaveAttribute('data-shell-scope', 'personal');
+    const nav = within(sidebar());
+    expect(nav.getByRole('link', { name: /^Support, current page/ })).toHaveAttribute('aria-current', 'page');
+    expect(nav.getByRole('link', { name: /^Support, current page/ })).toHaveAttribute('href', '/help/support');
+    expect(nav.getByRole('link', { name: /^How-to guides$/ })).toHaveAttribute('href', '/help/how-to-guides');
+    expect(nav.getByText('Data & help')).toBeInTheDocument();
+    // The crumbs sit under the personal root; one h1, the page's.
+    const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });
+    expect(crumbs).toHaveTextContent(/My account/);
+    expect(crumbs).toHaveTextContent(/Support/);
+    expect(crumbs).not.toHaveTextContent(/^Help/);
+    await waitFor(() => expect(h1s()).toHaveLength(1));
+  });
+
+  it('/help/how-to-guides renders in the personal shell, How-to guides current', async () => {
+    renderApp('/help/how-to-guides');
+    expect(await screen.findByRole('heading', { level: 1, name: 'How-to Guides' })).toBeInTheDocument();
+    expect(document.querySelector('[data-shell-scope]')).toHaveAttribute('data-shell-scope', 'personal');
+    expect(within(sidebar()).getByRole('link', { name: /^How-to guides, current page/ })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent(/My account/);
+    await waitFor(() => expect(h1s()).toHaveLength(1));
+  });
+
+  it.each([
+    ['/help', '/help/how-to-guides'],
+    ['/help?x=1#top', '/help/how-to-guides?x=1#top'],
+    ['/me/support', '/help/support'],
+    // The redirect re-encodes the query (a space as `+`); the value is the same.
+    ['/me/support?subject=Request%3A%20Billing', '/help/support?subject=Request%3A+Billing'],
+    ['/me?tab=support&subject=hello', '/help/support?subject=hello'],
+    ['/settings/support?subject=hello', '/help/support?subject=hello'],
+  ])('%s → %s', async (from, to) => {
+    renderApp(from);
+    await waitFor(() => expect(location()).toBe(to));
+    expect(document.querySelector('[data-shell-scope]')).toHaveAttribute('data-shell-scope', 'personal');
+  });
+
+  it('/me/support seeds the Support page with the subject it carried', async () => {
+    renderApp('/me/support?subject=hello%20there');
+    const field = (await screen.findByLabelText('Subject')) as HTMLInputElement;
+    expect(field.value).toBe('hello there');
+    expect(location()).toBe('/help/support?subject=hello+there');
   });
 });
 

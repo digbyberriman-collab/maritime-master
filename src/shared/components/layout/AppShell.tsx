@@ -15,10 +15,17 @@
  *   │       same sidebar, never collapsed (IA19; spec §9)
  *   └─ feedback panel, keyboard shortcuts dialog
  *
+ * Print (DS23, D-36): the chrome (sticky header with the tab row, sidebar,
+ * notices, footer) is `print:hidden`, and `<main>` drops its scroll box and
+ * padding, so a printout carries the page only.
+ *
  * Providers, outermost first: ShellContext (nested layouts ask for the wide
  * mode), ShellActionsContext (what the palette and shortcuts may open),
  * ShellUiContext (the open state behind those actions), the command palette
- * (once per shell), and inside `<main>` the page location override (spec §7).
+ * (once per shell), and around the shell root the page location override
+ * (spec §7): a shell-owned state in `<main>` names itself to the breadcrumb
+ * row and, through the same channel, to the top bar (no favourites star on a
+ * state that is not a page).
  *
  * Render it through DashboardLayout, which keeps it idempotent (D-13).
  */
@@ -222,65 +229,66 @@ const AppShell: React.FC<AppShellProps> = ({ children, scope: scopeProp, collaps
         <ShellUiContext.Provider value={ui}>
           {/* One command palette per shell (BUILD-PLAN S5); the top bar's search trigger opens it. */}
           <CommandPaletteProvider>
-            <div data-shell-scope={scope} className="relative isolate min-h-dvh bg-background" style={rootStyle}>
-              {/* Behind all content: the root is its own stacking context. */}
-              <InkfishWatermark />
-              <SkipLink />
+            {/* Around the root, so the top bar (favourites) and the breadcrumb row in <main> read one override. */}
+            <PageLocationOverrideProvider>
+              <div data-shell-scope={scope} className="relative isolate min-h-dvh bg-background print:min-h-0" style={rootStyle}>
+                {/* Behind all content: the root is its own stacking context. */}
+                <InkfishWatermark />
+                <SkipLink />
 
-              <div ref={headerRef} data-shell-header="" className="sticky top-0 z-40">
-                {impersonation && <ImpersonationBar targetLabel={impersonation.targetLabel} onEnd={impersonation.end} />}
-                <TopBar
-                  mobileNavAvailable={drawerAvailable}
-                  mobileNavAtAllWidths={wide}
-                  mobileNavOpen={drawerOpen}
-                  onOpenMobileNav={() => setDrawerOpen(true)}
-                  mobileNavTriggerRef={drawerTriggerRef}
-                  impersonating={Boolean(impersonation)}
-                />
-                {/* The vessel's module tabs (IA5), on the top bar's surface. */}
-                {scope === 'vessel' && <VesselTabRow />}
-              </div>
+                <div ref={headerRef} data-shell-header="" className="sticky top-0 z-40 print:hidden">
+                  {impersonation && <ImpersonationBar targetLabel={impersonation.targetLabel} onEnd={impersonation.end} />}
+                  <TopBar
+                    mobileNavAvailable={drawerAvailable}
+                    mobileNavAtAllWidths={wide}
+                    mobileNavOpen={drawerOpen}
+                    onOpenMobileNav={() => setDrawerOpen(true)}
+                    mobileNavTriggerRef={drawerTriggerRef}
+                    impersonating={Boolean(impersonation)}
+                  />
+                  {/* The vessel's module tabs (IA5), on the top bar's surface. */}
+                  {scope === 'vessel' && <VesselTabRow />}
+                </div>
 
-              {/* At least the viewport below the header, so the footer sits at the bottom of a short page. */}
-              <div className="flex min-h-[calc(100dvh-var(--shell-header-h,56px))] min-w-0">
-                {staticSidebar && (
-                  <aside
-                    data-testid={SHELL_TEST_IDS.sidebar}
-                    aria-label="Main navigation"
-                    className={cn(
-                      'sticky top-[var(--shell-header-h,56px)] z-30 flex h-[calc(100dvh-var(--shell-header-h,56px))] shrink-0 flex-col self-start bg-sidebar',
-                      'transition-[width] duration-panel ease-tide motion-reduce:transition-none',
-                      sidebarCollapsed ? 'w-16' : 'w-[248px]',
-                    )}
-                  >
-                    <ShellSidebar
-                      model={sidebar}
-                      collapsed={collapsedIcons}
-                      onToggleCollapsed={toggleSidebarCollapsed}
-                      onExpand={toggleSidebarCollapsed}
-                    />
-                  </aside>
-                )}
+                {/* At least the viewport below the header, so the footer sits at the bottom of a short page. */}
+                <div className="flex min-h-[calc(100dvh-var(--shell-header-h,56px))] min-w-0 print:min-h-0">
+                  {staticSidebar && (
+                    <aside
+                      data-testid={SHELL_TEST_IDS.sidebar}
+                      aria-label="Main navigation"
+                      className={cn(
+                        'sticky top-[var(--shell-header-h,56px)] z-30 flex h-[calc(100dvh-var(--shell-header-h,56px))] shrink-0 flex-col self-start bg-sidebar print:hidden',
+                        'transition-[width] duration-panel ease-tide motion-reduce:transition-none',
+                        sidebarCollapsed ? 'w-16' : 'w-[248px]',
+                      )}
+                    >
+                      <ShellSidebar
+                        model={sidebar}
+                        collapsed={collapsedIcons}
+                        onToggleCollapsed={toggleSidebarCollapsed}
+                        onExpand={toggleSidebarCollapsed}
+                      />
+                    </aside>
+                  )}
 
-                <div className="flex min-w-0 flex-1 flex-col pb-[env(safe-area-inset-bottom)]">
-                  {/* Non-blocking strips (RBAC Retry, the vessel's module settings). In the content column, so the sticky sidebar keeps its full height. */}
-                  <ShellNotices />
-                  <main
-                    id="main-content"
-                    data-testid={SHELL_TEST_IDS.main}
-                    tabIndex={-1}
-                    className="storm-compact min-w-0 flex-1 overflow-auto p-3 focus:outline-none lg:p-4"
-                  >
-                    <PageLocationOverrideProvider>
+                  <div className="flex min-w-0 flex-1 flex-col pb-[env(safe-area-inset-bottom)]">
+                    {/* Non-blocking strips (RBAC Retry, the vessel's module settings). In the content column, so the sticky sidebar keeps its full height. */}
+                    <ShellNotices />
+                    <main
+                      id="main-content"
+                      data-testid={SHELL_TEST_IDS.main}
+                      tabIndex={-1}
+                      className="storm-compact min-w-0 flex-1 overflow-auto p-3 focus:outline-none lg:p-4 print:overflow-visible print:p-0"
+                    >
                       <PageLocationHeader />
                       {children}
-                    </PageLocationOverrideProvider>
-                  </main>
-                  {/* Inkfish ownership footer: persistent, unaffected by client branding. */}
-                  <InkfishFooter />
+                    </main>
+                    {/* Inkfish ownership footer: persistent, unaffected by client branding. */}
+                    <InkfishFooter />
+                  </div>
                 </div>
               </div>
-            </div>
+            </PageLocationOverrideProvider>
 
             {drawerAvailable && (
               <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>

@@ -1,6 +1,8 @@
 /**
  * The channel for a shell-owned state's own title (spec §7; see
- * `pageLocationOverride.ts`). AppShell renders it around `<main>`.
+ * `pageLocationOverride.ts`). AppShell renders it around the whole shell
+ * root, so the breadcrumb row in `<main>` and the top bar (the favourites
+ * star) read one override.
  */
 import React from 'react';
 import {

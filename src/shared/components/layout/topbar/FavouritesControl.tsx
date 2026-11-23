@@ -8,13 +8,21 @@
  * Fail closed: the star waits (aria-disabled) while the pins load, while a
  * change is being saved (a second click cannot add a duplicate), and after a
  * load error (with the reason in its tooltip and a Retry in the menu). It
- * shows the saved state only, never an unsaved success. On a vessel page
- * whose vessel has not resolved (unknown, out of reach, sold, or still
- * loading) there is no page to pin, so the star is not shown.
+ * shows the saved state only, never an unsaved success. There is no star
+ * where there is no page to pin: on a vessel page whose vessel has not
+ * resolved (unknown, out of reach, sold, or still loading), and on every
+ * shell-owned state other than ModuleOff (the in-scope 404, "Vessel not
+ * found", access denied, archived, no vessel, the module-settings error),
+ * which name themselves through the page location override. ModuleOff keeps
+ * the star: its page exists, only switched off.
  *
  * Only in-app paths become links (`isInAppPath`): a stored target such as
  * `javascript:…`, `https://…` or `//host` is listed as "Not a page in STORM"
- * with Remove, and never navigates.
+ * with Remove, and never navigates. Each in-app pin is then resolved by scope
+ * (`usePinAvailability`: fleet reach, vessel reach, that vessel's module
+ * settings, the workspace's Apps entry): a pin the viewer can no longer open
+ * is listed as "No longer available" with Remove, and a pin waits (no link)
+ * while access loads.
  */
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -28,19 +36,72 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { isInAppPath, usePinnedShortcuts } from '@/shared/hooks/usePinnedShortcuts';
+import { isInAppPath, usePinnedShortcuts, type PinnedShortcut } from '@/shared/hooks/usePinnedShortcuts';
 import { SHELL_TEST_IDS } from '@/app/shell/testIds';
 import { topBarIconButton } from './styles';
 import { useCurrentFavourite } from './useCurrentFavourite';
+import { usePinAvailability } from './pinAvailability';
 import TopBarTooltip from './TopBarTooltip';
 
 const MANAGE_FAVOURITES_PATH = '/me/shortcuts';
+
+/** A pin that is not a link: selecting it removes the pin, and the menu stays open. */
+const RemovablePin: React.FC<{ pin: PinnedShortcut; reason: string; onRemove: (target: string) => void }> = ({ pin, reason, onRemove }) => (
+  <DropdownMenuItem
+    aria-label={`Remove ${pin.shortcut_label}, ${reason.charAt(0).toLowerCase()}${reason.slice(1)}`}
+    className="gap-2 text-muted-foreground"
+    onSelect={(event) => {
+      event.preventDefault();
+      onRemove(pin.shortcut_target);
+    }}
+  >
+    <Star className="h-[18px] w-[18px] shrink-0 opacity-60" strokeWidth={1.75} aria-hidden="true" />
+    <span className="min-w-0 flex-1">
+      <span className="block truncate">{pin.shortcut_label}</span>
+      <span className="type-caption block">{reason}</span>
+    </span>
+    <span className="type-caption shrink-0 font-medium text-primary">Remove</span>
+  </DropdownMenuItem>
+);
+
+/**
+ * One in-app pin, resolved by scope while the menu is open (D-93, D-04): a
+ * link when the viewer can open it, "No longer available" with Remove when
+ * they cannot, and a muted row with no link while access loads.
+ */
+const PinItem: React.FC<{ pin: PinnedShortcut; current: boolean; onRemove: (target: string) => void }> = ({ pin, current, onRemove }) => {
+  const availability = usePinAvailability(pin.shortcut_target);
+  if (availability === 'unavailable') return <RemovablePin pin={pin} reason="No longer available" onRemove={onRemove} />;
+  if (availability === 'waiting') {
+    return (
+      // Disabled: aria-disabled, skipped by the arrow keys, never a link until access is in.
+      <DropdownMenuItem disabled data-pin-state="waiting" className="gap-2 text-muted-foreground">
+        <Star className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} aria-hidden="true" />
+        <span className="min-w-0 flex-1 truncate">{pin.shortcut_label}</span>
+      </DropdownMenuItem>
+    );
+  }
+  return (
+    <DropdownMenuItem asChild>
+      <Link to={pin.shortcut_target} aria-current={current ? 'page' : undefined} className="gap-2">
+        <Star
+          className={cn('h-[18px] w-[18px] shrink-0', current ? 'fill-primary text-primary' : 'text-muted-foreground')}
+          strokeWidth={1.75}
+          aria-hidden="true"
+        />
+        <span className="min-w-0 flex-1 truncate">{pin.shortcut_label}</span>
+        {current && <span className="type-caption shrink-0 text-muted-foreground">This page</span>}
+      </Link>
+    </DropdownMenuItem>
+  );
+};
 
 /** The favourites list as dropdown items: the top-bar menu and the account menu's More group share it. */
 export const FavouritesMenuItems: React.FC = () => {
   const { pins, status, retry, removePin } = usePinnedShortcuts();
   const { pathname, search } = useLocation();
   const here = `${pathname}${search}`;
+  const remove = React.useCallback((target: string) => void removePin(target), [removePin]);
 
   return (
     <>
@@ -71,43 +132,14 @@ export const FavouritesMenuItems: React.FC = () => {
         <p className="type-body-sm max-w-[16rem] px-2 py-2 text-muted-foreground">Star a page to keep it here.</p>
       )}
       {status === 'ready' &&
-        pins.map((pin) => {
-          if (!isInAppPath(pin.shortcut_target)) {
+        pins.map((pin) =>
+          isInAppPath(pin.shortcut_target) ? (
+            <PinItem key={pin.id} pin={pin} current={pin.shortcut_target === here} onRemove={remove} />
+          ) : (
             // Not a page of this app: never a link. Selecting it removes the pin.
-            return (
-              <DropdownMenuItem
-                key={pin.id}
-                aria-label={`Remove ${pin.shortcut_label}, not a page in STORM`}
-                className="gap-2 text-muted-foreground"
-                onSelect={(event) => {
-                  event.preventDefault();
-                  void removePin(pin.shortcut_target);
-                }}
-              >
-                <Star className="h-[18px] w-[18px] shrink-0 opacity-60" strokeWidth={1.75} aria-hidden="true" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate">{pin.shortcut_label}</span>
-                  <span className="type-caption block">Not a page in STORM</span>
-                </span>
-                <span className="type-caption shrink-0 font-medium text-primary">Remove</span>
-              </DropdownMenuItem>
-            );
-          }
-          const current = pin.shortcut_target === here;
-          return (
-            <DropdownMenuItem key={pin.id} asChild>
-              <Link to={pin.shortcut_target} aria-current={current ? 'page' : undefined} className="gap-2">
-                <Star
-                  className={cn('h-[18px] w-[18px] shrink-0', current ? 'fill-primary text-primary' : 'text-muted-foreground')}
-                  strokeWidth={1.75}
-                  aria-hidden="true"
-                />
-                <span className="min-w-0 flex-1 truncate">{pin.shortcut_label}</span>
-                {current && <span className="type-caption shrink-0 text-muted-foreground">This page</span>}
-              </Link>
-            </DropdownMenuItem>
-          );
-        })}
+            <RemovablePin key={pin.id} pin={pin} reason="Not a page in STORM" onRemove={remove} />
+          ),
+        )}
       <DropdownMenuSeparator />
       <DropdownMenuItem asChild>
         <Link to={MANAGE_FAVOURITES_PATH} className="gap-2">

@@ -33,6 +33,59 @@ export function inspectPage() {
     main: main ? main.scrollWidth - main.clientWidth : 0,
     document: doc ? doc.scrollWidth - doc.clientWidth : 0,
   };
+  // Top-bar controls that overlap or cannot be hit (D-35, the TopBar contract):
+  // every visible pair whose boxes intersect horizontally by more than 0.5 px,
+  // and every control whose centre point hits something outside it (a
+  // neighbour painted over it, or its own part clipped away). The ids are
+  // SHELL_TEST_IDS values (src/app/shell/testIds.ts), inlined because this
+  // function runs in the page. null when the page has no top bar (sign-in).
+  const topBar = document.querySelector('[data-testid="shell-topbar"]');
+  const topbarCollisions = topBar ? [] : null;
+  if (topBar) {
+    const ids = [
+      'shell-mobile-nav-trigger',
+      'shell-tenant-logo',
+      'shell-scope-fleet',
+      'shell-scope-vessel',
+      'shell-vessel-switcher-trigger',
+      'shell-scope-workspace',
+      'shell-apps-trigger',
+      'shell-search-trigger',
+      'shell-favourite-toggle',
+      'shell-favourites-trigger',
+      'shell-help-trigger',
+      'shell-notifications-trigger',
+      'shell-account-trigger',
+    ];
+    const controls = [];
+    for (const id of ids) {
+      const el = topBar.querySelector(`[data-testid="${id}"]`);
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      const style = getComputedStyle(el);
+      if (r.width < 1 || r.height < 1 || style.visibility === 'hidden') continue;
+      controls.push({ id, el, r });
+    }
+    for (let a = 0; a < controls.length; a += 1) {
+      for (let b = a + 1; b < controls.length; b += 1) {
+        const x = controls[a].r;
+        const y = controls[b].r;
+        const overlap = Math.min(x.right, y.right) - Math.max(x.left, y.left);
+        if (overlap > 0.5) topbarCollisions.push(`${controls[a].id} overlaps ${controls[b].id} by ${overlap.toFixed(1)}px`);
+      }
+    }
+    // An open modal layer (dialog, menu, drawer) covers the bar on purpose; skip the hit test then.
+    const modalOpen = (document.body && document.body.style.pointerEvents === 'none') || !!document.querySelector('[aria-modal="true"]');
+    if (!modalOpen) {
+      for (const { id, el, r } of controls) {
+        const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+        if (hit && el.contains(hit)) continue;
+        const owner = hit ? hit.closest('[data-testid]') : null;
+        const what = owner ? owner.getAttribute('data-testid') : hit ? hit.tagName.toLowerCase() : 'nothing (off screen)';
+        topbarCollisions.push(`${id} centre hits ${what}`);
+      }
+    }
+  }
   return {
     title: document.title,
     h1: h1 ? squash(h1.textContent).slice(0, 120) : null,
@@ -49,6 +102,7 @@ export function inspectPage() {
     loadingOnly: rootText.length < 40 && (/Loading/i.test(rootText) || !!(root && root.querySelector('.animate-spin'))),
     busy,
     overflowX,
+    topbarCollisions,
     signInForm: !!document.querySelector('input[type="password"]'),
   };
 }
@@ -105,6 +159,10 @@ export function classify(c) {
     // A skeleton inside the shell has plenty of text around it, so busy wins over length.
     if (i.busy) warnings.push('still loading (skeleton)');
     else if (i.loadingOnly) warnings.push('still loading');
+    // Overlapping or unreachable top-bar controls are a defect at any width (a tap lands on the wrong control).
+    if (Array.isArray(i.topbarCollisions) && i.topbarCollisions.length) {
+      problems.push(`top bar collision: ${i.topbarCollisions.join('; ')}`);
+    }
     if (typeof c.viewportWidth === 'number' && c.viewportWidth < PHONE_MAX_WIDTH && i.overflowX) {
       const worst = Math.max(i.overflowX.main ?? 0, i.overflowX.document ?? 0);
       if (worst > 1) warnings.push(`horizontal overflow: ${worst}px at ${c.viewportWidth}px wide`);

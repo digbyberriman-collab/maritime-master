@@ -175,6 +175,23 @@ test('classify: sideways scroll warns at phone width only', () => {
   assert.equal(classify({ ...base, inspection: wide }).status, 'ok');
 });
 
+test('classify: top-bar collisions fail the capture at any width; none, or no top bar, is fine', () => {
+  const overlap = ['shell-vessel-switcher-trigger overlaps shell-search-trigger by 43.9px', 'shell-search-trigger centre hits shell-vessel-switcher-trigger'];
+  for (const viewportWidth of [320, 390, 768, 1440, undefined]) {
+    const graded = classify({ ...base, inspection: page({ topbarCollisions: overlap }), viewportWidth });
+    assert.equal(graded.status, 'fail');
+    assert.deepEqual(graded.problems, [`top bar collision: ${overlap.join('; ')}`]);
+  }
+  assert.equal(classify({ ...base, inspection: page({ topbarCollisions: [] }), viewportWidth: 320 }).status, 'ok');
+  // No top bar on the page (sign-in), or an inspection from before the check existed.
+  assert.equal(classify({ ...base, inspection: page({ topbarCollisions: null }), viewportWidth: 320 }).status, 'ok');
+  assert.equal(classify({ ...base, inspection: page(), viewportWidth: 320 }).status, 'ok');
+  // It sits beside the other findings rather than replacing them.
+  const both = classify({ ...base, inspection: page({ topbarCollisions: overlap.slice(0, 1), overflowX: { main: 40, document: 0 } }), viewportWidth: 390 });
+  assert.equal(both.status, 'fail');
+  assert.match(both.warnings.join(), /horizontal overflow: 40px/);
+});
+
 test('captureWarnings: waits that gave up and runaway fetching are warnings, not notes', () => {
   assert.deepEqual(
     captureWarnings({

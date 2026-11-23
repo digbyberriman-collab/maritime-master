@@ -9,7 +9,7 @@
  *   in the Fleet sidebar's WORKSPACES section.
  */
 import {
-  Activity, BookOpen, Calendar, ClipboardCheck, ClipboardList, Dumbbell, FileText, GraduationCap, Heart, Layers,
+  Activity, BookOpen, Calendar, ClipboardCheck, ClipboardList, Dumbbell, FileText, Flower2, GraduationCap, Heart, Layers,
   LayoutGrid, LifeBuoy, ListChecks, MessageSquare, Package, Settings, Stethoscope, Users, Utensils, Wrench,
 } from 'lucide-react';
 import type { ModuleManifest } from '@/app/registry/types';
@@ -122,7 +122,7 @@ const healthPT: NavChild[] = [
 
 const healthTree: NavChild[] = [
   G('Medical', H, healthMedical, { icon: Stethoscope, slug: 'medical', ...MED_SELF }),
-  G('Spa', H, healthSpa, { icon: Heart, slug: 'spa', ...WELL_SELF }),
+  G('Spa', H, healthSpa, { icon: Flower2, slug: 'spa', ...WELL_SELF }),
   G('Nutrition', H, healthNutrition, { icon: Utensils, slug: 'nutrition', ...WELL_SELF }),
   G('Physio', H, healthPhysio, { icon: Activity, slug: 'physio', ...WELL }),
   G('Personal Training', H, healthPT, { icon: Dumbbell, slug: 'personal-training', ...WELL_SELF }),
@@ -139,7 +139,7 @@ const manifest: ModuleManifest = {
       slot: 'fleet.workspaces',
       order: 20,
       node: L('Health & Wellness', '/fleet', {
-        existing: H, icon: Heart, crossLink: true, scope: 'workspace', moduleKey: 'wellness', selfServe: true,
+        existing: H, icon: Heart, crossLink: true, scope: 'workspace', moduleKey: 'health', selfServe: true,
       }),
     },
   ],

@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 import { format } from "date-fns";
 import {
@@ -44,6 +44,11 @@ import {
 interface ReportIncidentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * The vessel to preselect (the one the user reported from). Used only when
+   * it is in the vessel list; an unknown id leaves the field empty (D-04).
+   */
+  defaultVesselId?: string;
 }
 
 const STEPS = [
@@ -55,7 +60,7 @@ const STEPS = [
   "Review & Submit",
 ];
 
-export function ReportIncidentModal({ open, onOpenChange }: ReportIncidentModalProps) {
+export function ReportIncidentModal({ open, onOpenChange, defaultVesselId }: ReportIncidentModalProps) {
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<IncidentFormData>({
     vessel_id: "",
@@ -78,6 +83,16 @@ export function ReportIncidentModal({ open, onOpenChange }: ReportIncidentModalP
   const { crew } = useCrew();
   const createIncident = useCreateIncident();
   const uploadAttachment = useUploadIncidentAttachment();
+
+  // The preselected vessel, only once it is known to be in the list.
+  const knownDefaultVesselId =
+    defaultVesselId && vessels?.some((vessel) => vessel.id === defaultVesselId) ? defaultVesselId : undefined;
+
+  // Opening with an empty vessel field: fill in the default (the user can still change it).
+  useEffect(() => {
+    if (!open || !knownDefaultVesselId) return;
+    setFormData((prev) => (prev.vessel_id ? prev : { ...prev, vessel_id: knownDefaultVesselId }));
+  }, [open, knownDefaultVesselId]);
 
   const handleNext = () => {
     if (currentStep < STEPS.length - 1) {
@@ -115,7 +130,7 @@ export function ReportIncidentModal({ open, onOpenChange }: ReportIncidentModalP
   const resetForm = () => {
     setCurrentStep(0);
     setFormData({
-      vessel_id: "",
+      vessel_id: knownDefaultVesselId ?? "",
       incident_date: new Date().toISOString(),
       incident_type: "",
       location: "",

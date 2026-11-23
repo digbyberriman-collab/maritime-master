@@ -70,10 +70,20 @@ export function useNavNodeFilter(options: NavNodeFilterOptions = {}): NavNodeFil
   // Step 5: the legacy moduleKey gates. HR uses the dedicated resolver so
   // legacy-role users are handled the way the database handles them; crew
   // keep the medical and wellness leaves that show their own record.
+  // `health` is the Health & Wellness workspace entry (Apps, Fleet ›
+  // Workspaces): medical or wellness access opens it, as
+  // `canAccessModule('health')` does (`canEnterHealth`), so a medical-only
+  // user gets the workspace and the tree's own gates keep them to Medical.
+  // It never reaches `hasPermission`: there is no RBAC module `health`.
   const passesModuleKey = useCallback(
     (item: NavChild): boolean => {
       if (!item.moduleKey) return true;
       const required = item.minPermission ?? 'view';
+      // Once loaded: self-only access opens only the self-service nodes.
+      const passesMedical = () =>
+        medicalAccess.selfOnly ? Boolean(item.selfServe) : medicalAccessSatisfies(medicalAccess, required);
+      const passesWellness = () =>
+        wellnessAccess.selfOnly ? Boolean(item.selfServe) : wellnessAccessSatisfies(wellnessAccess, required);
       if (item.moduleKey === 'hr') {
         if (hrAccess.loading) return false;
         return hrAccessSatisfies(hrAccess, required);
@@ -84,13 +94,15 @@ export function useNavNodeFilter(options: NavNodeFilterOptions = {}): NavNodeFil
       }
       if (item.moduleKey === 'medical') {
         if (medicalAccess.loading) return false;
-        if (medicalAccess.selfOnly) return Boolean(item.selfServe);
-        return medicalAccessSatisfies(medicalAccess, required);
+        return passesMedical();
       }
       if (item.moduleKey === 'wellness') {
         if (wellnessAccess.loading) return false;
-        if (wellnessAccess.selfOnly) return Boolean(item.selfServe);
-        return wellnessAccessSatisfies(wellnessAccess, required);
+        return passesWellness();
+      }
+      if (item.moduleKey === 'health') {
+        if (medicalAccess.loading || wellnessAccess.loading) return false;
+        return passesMedical() || passesWellness();
       }
       // Fail closed while RBAC loads (gap/00 C2), as canAccessModule does.
       if (!rbacInitialized) return false;
