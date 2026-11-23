@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "description": "Replay governance for the DB harness (Phase 2 spec §D.4, proposed D-131). Every legacy migration (version < 20261123000000) replays in version order, each in its own transaction; files not listed here are 'apply'. 'driftBefore' runs drift patches (supabase/tests/harness/drift/, live schema state only) before the file. 'expect_failure' needs reason, evidence and errorMatch, and fails the run if the file applies. 'skip' needs supersededBy or a reason. 'fidelityExceptions' explains types.ts objects the replay cannot reproduce. Legacy files are never edited.",
+  "files": {
+    "20260228120000_create_feedback_submissions.sql": {
+      "action": "skip",
+      "reason": "Not applied live: MIGRATIONS-LEDGER.md row 1 is 'written, not applied' (feedback_submissions is absent from types.ts) and the Apply queue holds it until X6 decides (R3). The replay reproduces live after the Apply queue, so the held file is left out."
+    },
+    "20260428170829_00553f3f-cc1f-4c05-8442-a3a3cf7fce9c.sql": {
+      "action": "apply",
+      "driftBefore": [
+        "drift/legacy_seed_company.sql"
+      ],
+      "reason": "Its vessels seed needs company 11111111-1111-1111-1111-111111111111, which existed live (Lovable ran this file) but no migration creates."
+    },
+    "20260917113000_hris_phase1_followups.sql": {
+      "action": "expect_failure",
+      "reason": "Hand-written HRIS phase 1 follow-ups; it never ran live as written. Lovable applied a corrected copy, 20260917175431_780bf2a9-cf3e-40be-a9b2-f37c8fff5950.sql (ledger row 7: 95 %, 30 of its 33 new statements), which replays here and carries the rest.",
+      "evidence": "Its audit_logs SELECT policy compares 'ca.id::text = audit_logs.entity_id' with audit_logs.entity_id uuid (20260127120753_96ffc917-b51e-4b1a-8dd1-263dc4c70d3e.sql creates it as 'entity_id UUID NOT NULL'; no migration changes its type). The Lovable copy writes the same policy as 'audit_logs.entity_id::text' (lines 46, 54, 62): the statement as written failed live with this error. types.ts cannot tell (entity_id: string for uuid and text alike), and the Lovable copies of rows 7 and 11 insert uuid values (20260917181151 line 69 'p_profile_id' where the hand-written row 11 had 'p_profile_id::text'), so the live column is uuid and a type drift patch would make the replay differ from live. docs/HEALTH.md (line 129) records the same: both files fail to replay on this policy, 'where both columns are uuid', and the live project is unaffected because the Lovable copies create a working version.",
+      "errorMatch": "operator does not exist: text = uuid"
+    },
+    "20260917140000_hris_phase4_recruitment_onboarding_rtw.sql": {
+      "action": "apply",
+      "driftBefore": [
+        "drift/profiles_visa_expiry.sql"
+      ],
+      "reason": "Its hr_expiry_items view reads profiles.visa_expiry, which the failed hand-written row 7 adds; live, the phase 4 copy ran after the row 7 copy had added the column."
+    },
+    "20260917150000_hris_phase5_retention.sql": {
+      "action": "expect_failure",
+      "reason": "Hand-written HRIS phase 5 retention; it never ran live as written. Lovable applied a corrected copy, 20260917181151_83a5b472-ef4b-4d26-9f66-4412934a9d32.sql (ledger row 11: 97 %, 101 of its 105 new statements), which replays here and carries the rest.",
+      "evidence": "Line 238 is the audit_logs SELECT policy with 'ca.id::text = audit_logs.entity_id' against the uuid column (see the row 7 entry). The Lovable copy writes it as 'audit_logs.entity_id::text' (lines 191, 197, 201) and inserts 'p_profile_id' (uuid) where this file has 'p_profile_id::text' (copy lines 68-69 vs line 84): the copy is the corrected text that ran live. docs/HEALTH.md (line 129) records the same failure and that live runs the Lovable copy.",
+      "errorMatch": "operator does not exist: text = uuid"
+    }
+  },
+  "fidelityExceptions": {
+    "tables": {
+      "dev_todos": "Exists live (types.ts) but no migration in the repo creates it and nothing reads it (only types.ts names it under src/). Only its column names and TS types are known; its SQL types, defaults, RLS and policies are recorded nowhere in the repo, so a drift patch would be a guess. No migration, policy, function or app path depends on it."
+    },
+    "views": {},
+    "columns": {},
+    "functions": {}
+  }
+}

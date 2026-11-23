@@ -126,7 +126,7 @@ The same harness was used to prove the access fixes from the security review, wi
 Two pre-existing HRIS issues surfaced during that replay and are **not** fixed here, because they belong to that module:
 
 - `hr_generate_alerts` compared a uuid column against text and therefore never raised an HR alert. This one **is** fixed, in `20260919150000_fix_hr_generate_alerts_uuid.sql`, because the health generator was built from it and shares the `alerts` table.
-- `20260917113000_hris_phase1_followups.sql` and `20260917150000_hris_phase5_retention.sql` both fail to replay from scratch on the same uuid-against-text mistake in the `audit_logs` policy (`m.record_id::text = audit_logs.entity_id`, where both columns are uuid). The live project is unaffected, because the Lovable copies applied later create a working version of that policy, but a clean rebuild of the database would stop there. Worth correcting when HRIS is next touched.
+- `20260917113000_hris_phase1_followups.sql` and `20260917150000_hris_phase5_retention.sql` both fail to replay from scratch on the same uuid-against-text mistake in the `audit_logs` policy (`m.record_id::text = audit_logs.entity_id`, where both columns are uuid). The live project is unaffected, because the Lovable copies applied later create a working version of that policy, but a clean rebuild of the database would stop there. Worth correcting when HRIS is next touched. A fresh replay now succeeds under the database harness (`node scripts/db/harness.mjs`, `supabase/tests/harness/replay.json`): these two files are recorded as expected failures there, with the evidence, because their Lovable copies carry the statements that ran live (DECISIONS D-131).
 
 ## Go-live checklist
 

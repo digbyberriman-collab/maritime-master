@@ -1,0 +1,88 @@
+{
+  "version": 1,
+  "description": "The pending-type contract of Phase 2 (spec §B.1, §D.7): which TypeScript files and type names mirror the build-out schema, and the objects each must declare. scripts/db/check-pending-contract.mjs reads this map with a TypeScript Program + TypeChecker ('@/' -> src/) and compares it with the harness export of scripts/db/schema-export.mjs. Lane 1 owns this file; the TS files belong to Lane 2 and are never edited by the checker.",
+  "files": [
+    {
+      "file": "src/modules/vessels/types/db.pending.ts",
+      "mirrors": "spec §A.1, §A.5",
+      "tables": { "type": "VesselsPendingTables", "expect": ["vessel_module_settings", "company_module_settings"] },
+      "columns": { "type": "VesselsPendingColumns", "expect": ["vessels"] }
+    },
+    {
+      "file": "src/modules/auth/types/db.pending.ts",
+      "mirrors": "spec §A.3, §A.4, §A.8, §A.9",
+      "tables": { "type": "AuthPendingTables", "expect": ["account_memberships", "account_membership_vessels", "user_invitations"] },
+      "columns": { "type": "AuthPendingColumns", "expect": ["user_permission_overrides", "permission_audit_log"] },
+      "functions": {
+        "type": "AuthPendingFunctions",
+        "expect": ["user_is_active", "my_account_status", "record_session_start", "user_vessel_reach", "user_can_reach_vessel", "user_has_fleet_reach", "has_capability", "is_company_actor", "revoke_invitation"]
+      }
+    },
+    {
+      "file": "src/modules/settings/types/db.pending.ts",
+      "mirrors": "spec §A.2",
+      "columns": { "type": "SettingsPendingColumns", "expect": ["user_preferences"] }
+    },
+    {
+      "file": "src/lib/records/services/db.pending.ts",
+      "mirrors": "spec §A.10-§A.14",
+      "tables": {
+        "type": "RecordsPendingTables",
+        "expect": [
+          "record_kinds", "record_envelopes", "record_events", "record_snapshots", "record_signature_slots", "record_signatures",
+          "record_threads", "record_thread_entries", "file_objects", "record_attachments", "record_links", "export_jobs"
+        ]
+      },
+      "views": { "type": "RecordsPendingViews", "expect": ["record_signature_slot_states"] },
+      "functions": {
+        "type": "RecordsPendingFunctions",
+        "expect": [
+          "record_open_envelope", "record_transition_decide", "record_transition", "record_sign_slot", "record_pass_slot", "record_cancel_pass",
+          "record_remove_signature", "record_resign_slot", "record_post_thread_entry", "record_resolve_thread_request",
+          "register_file_object", "attach_record_file", "remove_record_attachment", "link_records", "unlink_records",
+          "request_export", "log_client_export", "cancel_export_job"
+        ]
+      }
+    },
+    {
+      "file": "src/modules/notifications/types/db.pending.ts",
+      "mirrors": "spec §A.15",
+      "tables": { "type": "NotificationsPendingTables", "expect": ["notification_inbox"] },
+      "functions": { "type": "NotificationsPendingFunctions", "expect": ["notification_inbox_mark_all_read"] }
+    }
+  ],
+  "notMirrored": {
+    "tables": {
+      "notification_outbox": "service role only: the browser never reads it (spec §A.15, §B.1)"
+    },
+    "views": {},
+    "columns": {},
+    "functions": {
+      "export_module_key": "pure helper of the export engine (a source key's module); no browser caller",
+      "format_reference_text": "pure formatter; the client has its TS original (src/lib/records/reference.ts)",
+      "format_voyage_reference_text": "pure formatter; the client has its TS original (src/lib/records/reference.ts)",
+      "module_enabled": "server-side check for Phase 3 calendars, notifications and reports; the client resolves module settings itself (spec §A.5, D-63)",
+      "normalise_code_text": "pure helper of the vessel-code derivation (D-03); the client has its TS original",
+      "vessel_code_candidates": "pure helper of the vessel-code derivation (D-03); the client has its TS original",
+      "vessel_code_letters": "pure helper of the vessel-code derivation (D-03); the client has its TS original",
+      "vessel_code_stored": "pure helper of the vessel-code derivation (D-03); the client has its TS original",
+      "vessel_codes_assign": "pure helper of the vessel-code derivation (D-03); the client has its TS original",
+      "vessel_in_reachable_state": "pure helper of the reach rules; the client has its TS original (membershipReach.ts)",
+      "permission_override_write_allowed": "RLS predicate (rule 11): policies call it, the browser does not",
+      "rbac_user_roles_write_allowed": "RLS predicate (rule 11): policies call it, the browser does not",
+      "user_roles_write_allowed": "RLS predicate (rule 11): policies call it, the browser does not",
+      "user_company_for_admin": "RLS predicate of rbac_user_roles (spec §A.4, §A.8): policies call it",
+      "record_readable": "RLS predicate of every record table (spec §A.10): policies call it",
+      "storage_path_allowed": "RLS predicate of the records bucket (spec §A.13): storage policies call it",
+      "record_digest_of": "pure helper of the record engine (parity with the TS engines)",
+      "record_js_trim": "pure helper of the record engine (parity with the TS engines)",
+      "record_json_truthy": "pure helper of the record engine (parity with the TS engines)",
+      "record_normalise_office": "pure helper of the record engine (parity with the TS engines)",
+      "record_refusal": "pure helper of the record engine (builds a refusal result)",
+      "record_slot_template_valid": "pure helper backing the record_kinds slot-template CHECK",
+      "record_text_blank": "pure helper of the record engine (parity with the TS engines)",
+      "record_vessel_signatures_locked": "pure mirror of vesselSignaturesLocked() (D-51); the client has its TS original"
+    }
+  },
+  "knownMismatches": []
+}
