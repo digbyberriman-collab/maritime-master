@@ -28,25 +28,33 @@
  *    used by any profile, in any company → 409 `conflict` (generic copy).
  * 8. With the service client: the profile, `account_status 'not_invited'`,
  *    no auth user (`is_imported`, the vessel on `imported_vessel_id`, the
- *    pre-login link the crew list reads).
+ *    pre-login link the crew list reads; `position`, `rank` and
+ *    `joining_date` from `joinDate`, which the assignment takes later).
  * 9. `sendInvite`: the one invitation path (`inviteProfile`: generateLink,
  *    our email, `record_invitation_send`; `invited` only after a send that
  *    worked). `createUser` / `inviteUserByEmail` are gone.
- * 10. With a vessel and a login (the invitation links one), the current
- *    `crew_assignments` row (it needs a login: `user_id` is NOT NULL). Without
- *    a login the vessel stays on `imported_vessel_id` until they are invited.
+ * 10. The vessel assignment belongs to the invitation path (D-199): once an
+ *    invitation links a login, `fulfil_imported_assignment()` (D-01: the
+ *    service insert in `_shared/invitations.ts`) writes the current
+ *    `crew_assignments` row from the stored position (else rank, else Crew)
+ *    and `joining_date`, and clears the import flags. This function writes
+ *    no assignment itself. Without a linked login (`sendInvite: false`, a
+ *    refused invitation, or a failed send that linked none) the vessel stays
+ *    on `imported_vessel_id` (`pending_login`), and a later invitation from
+ *    Users & Access or the crew list assigns it.
  *
  * Responses:
  * - 201 `{ ok: true, profileId, invitation: { status: 'sent', invitationId, stored }, assignment? }`
  * - 201 `{ ok: true, profileId, invitation: { status: 'not_sent' }, assignment? }` (`sendInvite: false`)
- * - 502 `partial_failure` `details: { profileCreated: true, profileId, invitation: 'send_failed', email_error }`
+ * - 502 `partial_failure` `details: { profileCreated: true, profileId, invitation: 'send_failed', email_error, assignment? }`
  *   (the email failed; the person exists as not invited; Send again from Users & Access)
- * - 502 `partial_failure` `details: { profileCreated: true, profileId, invitation: 'refused', invite_code }`
+ * - 502 `partial_failure` `details: { profileCreated: true, profileId, invitation: 'refused', invite_code, assignment? }`
  *   (the invitation path refused after the profile was saved, e.g. 503)
- * - 502 `partial_failure` `details: { profileCreated: true, profileId, assignmentCreated: false }` + `invitation`
+ * - 502 `partial_failure` `details: { profileCreated: true, profileId, assignmentCreated: false, assignment: 'failed' }` + `invitation`
  *   (invited, but the vessel assignment could not be saved)
  * - 400 / 403 / 404 / 409 (`conflict`: email in use, `reason: vessel_archived`) / 429 / 500 / 503 as above.
- * `assignment` (when a vessel was given): `created` or `pending_login`.
+ * `assignment` (only when a vessel was given): `created` (the invitation linked a login and wrote the row),
+ * `pending_login` (no login linked yet) or, in a 502 only, `failed` (then also `assignmentCreated: false`).
  */
 import { getAuthContext } from '../_shared/auth.ts';
 import { assertCapability } from '../_shared/capability.ts';
@@ -63,6 +71,7 @@ import { objectBody, optionalBoolean, optionalDate, optionalString, optionalUuid
 export interface CreateCrewMemberDeps extends EdgeDeps {
   invite: Partial<InviteDeps>;
   limiter: RateLimiter;
+  /** The clock; also the invitation path's, unless `invite.now` is given. */
   now: () => Date;
 }
 
@@ -128,12 +137,13 @@ const DUPLICATE_SCAN = 25;
 
 export function createHandler(patch: Partial<CreateCrewMemberDeps> = {}): Handler {
   const base = edgeDeps(patch);
+  const now = patch.now ?? (() => new Date());
   const deps: CreateCrewMemberDeps = {
     ...base,
-    invite: patch.invite ?? {},
+    invite: { now, ...(patch.invite ?? {}) },
     // A CSV import calls this once per row: generous per caller, still bounded.
     limiter: patch.limiter ?? new RateLimiter({ limit: 120, windowMs: 60_000 }),
-    now: patch.now ?? (() => new Date()),
+    now,
   };
   const fakeEmail = deps.invite.isFakeEmail ?? isFakeEmail;
 
@@ -188,6 +198,7 @@ export function createHandler(patch: Partial<CreateCrewMemberDeps> = {}): Handle
           account_status: 'not_invited',
           is_imported: true,
           imported_vessel_id: body.vesselId,
+          joining_date: body.joinDate,
           user_id: null,
         })
         .select('id')
@@ -200,10 +211,14 @@ export function createHandler(patch: Partial<CreateCrewMemberDeps> = {}): Handle
       const profileId = text(asRow(insert.data), 'id');
       if (!profileId) throw new HttpError(500, 'internal_error', 'The crew member could not be added. Try again.');
 
+      // The vessel waits on imported_vessel_id until an invitation links a login; the invitation path then writes
+      // the assignment (step 10) and says so. No invitation, or a refused one: still waiting.
+      let assignment: 'created' | 'pending_login' | 'failed' | null = body.vesselId ? 'pending_login' : null;
       let invitation: Record<string, JsonValue> = { status: 'not_sent' };
       let inviteFailure: HttpError | null = null;
       if (body.sendInvite) {
         const outcome = await inviteProfile(ctx, profileId, deps.invite);
+        if (body.vesselId && outcome.status !== 'refused') assignment = outcome.assignment ?? 'pending_login';
         if (outcome.status === 'sent') {
           invitation = { status: 'sent', invitationId: outcome.invitationId, stored: outcome.stored };
         } else if (outcome.status === 'send_failed') {
@@ -222,32 +237,14 @@ export function createHandler(patch: Partial<CreateCrewMemberDeps> = {}): Handle
           });
         }
       }
-
-      // The assignment needs a login; the invitation links one (also after a failed send when the database records it).
-      let assignment: 'created' | 'pending_login' | 'failed' | null = null;
-      if (body.vesselId) {
-        assignment = 'pending_login';
-        const linked = await service.from('profiles').select('user_id').eq('id', profileId).maybeSingle();
-        const userId = linked.error ? null : text(asRow(linked.data), 'user_id');
-        if (linked.error) {
-          assignment = 'failed';
-        } else if (userId) {
-          const ins = await service.from('crew_assignments').insert({
-            user_id: userId,
-            vessel_id: body.vesselId,
-            position: body.position ?? body.rank ?? 'Crew',
-            join_date: body.joinDate ?? deps.now().toISOString().slice(0, 10),
-            is_current: true,
-            created_by: ctx.user.id,
-          });
-          assignment = ins.error ? 'failed' : 'created';
-          if (ins.error) log('warn', 'crew_assignment_failed', { profile_id: profileId, code: errorCode(ins.error) || 'none' });
-        }
-      }
       log('info', 'crew_member_created', { profile_id: profileId, invitation: inviteFailure ? 'failed' : String(invitation.status), assignment });
 
       if (inviteFailure) {
-        const details = { ...(inviteFailure.details ?? {}), ...(assignment === 'failed' ? { assignmentCreated: false } : {}) };
+        const details = {
+          ...(inviteFailure.details ?? {}),
+          ...(assignment ? { assignment } : {}),
+          ...(assignment === 'failed' ? { assignmentCreated: false } : {}),
+        };
         const err = new HttpError(502, 'partial_failure', inviteFailure.publicMessage, details);
         return json(errorBody(err), { status: 502 });
       }
@@ -256,6 +253,7 @@ export function createHandler(patch: Partial<CreateCrewMemberDeps> = {}): Handle
           profileCreated: true,
           profileId,
           assignmentCreated: false,
+          assignment: 'failed',
         });
         return json({ ...errorBody(err), invitation }, { status: 502 });
       }

@@ -6,7 +6,10 @@
  * same checks, cooldown and honest outcome as `send-invitation`.
  * `redirectTo` from the client is ignored.
  *
- * 200 `{ ok: true, results: [{ profileId, status: 'sent' | 'send_failed' | 'refused', stored, invitationId, code?, emailError?, reason? }], sent, failed, refused }`
+ * 200 `{ ok: true, results: [{ profileId, status: 'sent' | 'send_failed' | 'refused', stored, invitationId, code?, emailError?, reason?, assignment? }], sent, failed, refused }`
+ * - `assignment: 'created' | 'failed'` on a `sent` or `send_failed` row only
+ *   when that row linked a login for an imported profile still waiting for
+ *   its vessel (D-199); absent otherwise;
  * - `sent`: the email was accepted by the provider;
  * - `send_failed`: the email (or its link) failed, or the server could not
  *   finish that row (`code` says which: `send_failed`, `status_unavailable`, …);

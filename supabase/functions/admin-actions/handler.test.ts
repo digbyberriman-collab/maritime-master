@@ -361,6 +361,46 @@ Deno.test('toggle_access: SQL refusals as snake_case codes map to copy with deta
   }
 });
 
+Deno.test('toggle_access: a withdrawn invitation (invitation_withdrawn / membership_removed) → 403 with its copy; no ban change', async () => {
+  const cases: Array<[boolean, string, string]> = [
+    [true, 'invitation_withdrawn', 'Their invitation was withdrawn. Send a new invitation instead.'],
+    [false, 'membership_removed', "This person's access was already withdrawn with their invitation, so there is nothing to turn off. Send a new invitation if they need access again."],
+  ];
+  for (const [enableAccess, message, copy] of cases) {
+    const h = setup();
+    // The revoke banned the invitee's login; a refused toggle must leave that ban alone.
+    const login = h.world.authUsers.find((u) => u.id === P.invitedA.userId);
+    assert(login);
+    login.banned_until = '2126-01-01T00:00:00Z';
+    h.world.rpcs.set_membership_status = () => fail('42501', message);
+    const res = await call(h, P.adminA.token, { action: 'toggle_access', targetUserId: P.invitedA.userId, enableAccess, reason: enableAccess ? undefined : 'Left' });
+    assertEquals(res.status, 403, message);
+    const error = await errorOf(res);
+    assertEquals([error.code, error.message], ['forbidden', copy]);
+    assertEquals((error.details as Record<string, unknown> | undefined)?.reason, message);
+    assertEquals(callsOf(h.world, 'admin').filter((c) => c.method === 'updateUserById').length, 0, `${message}: no updateUserById`);
+    assertEquals(login.banned_until, '2126-01-01T00:00:00Z', 'the revoke ban stays');
+  }
+});
+
+Deno.test('resend_invitation: an imported person\'s vessel is assigned when the invitation links the login (top-level assignment)', async () => {
+  for (const p3 of [true, false]) {
+    const h = setup({ p3 });
+    const res = await call(h, P.adminA.token, { action: 'reset_account', targetProfileId: P.importedA.profileId, resetType: 'resend_invitation' });
+    assertEquals(res.status, 200, `p3=${p3}`);
+    const answer = await bodyOf(res);
+    assertEquals(answer.assignment, 'created', `p3=${p3}`);
+    const userId = profileRow(h.world, P.importedA.profileId).user_id;
+    assertEquals((h.world.tables.crew_assignments ?? []).filter((a) => a.user_id === userId && a.is_current).map((a) => a.vessel_id), [V_A1]);
+    const [audit] = auditRows(h.world, 'RESET_ACCOUNT');
+    assertEquals((audit.after_json as Record<string, unknown>).assignment, 'created');
+  }
+  // Someone already on a vessel: no assignment field.
+  const h = setup();
+  const res = await call(h, P.adminA.token, { action: 'reset_account', targetUserId: P.invitedA.userId, resetType: 'resend_invitation' });
+  assertFalse('assignment' in (await bodyOf(res)));
+});
+
 // ---- password_reset window and keys -----------------------------------------------------------
 
 const RESET = { action: 'reset_account', resetType: 'password_reset', targetUserId: P.crewA.userId };

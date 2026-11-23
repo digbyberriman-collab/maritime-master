@@ -24,11 +24,13 @@
  *    the cooldown under that lock (5 minutes from the last successful send,
  *    30 seconds from a failed attempt, so Retry after a failed send works
  *    almost at once) and returns the attempt number → 429 `cooldown` (with
- *    `Retry-After`), 404 `not_found`, 409 `conflict` (disabled). Two
- *    concurrent requests: one reserves, the other gets 429 and makes no
- *    link. D-01 (RPC or table missing): the same cooldown computed here from
- *    the live row (when the table exists) and the profile's `last_invited_at`,
- *    and the attempt from `max(send_attempts, invitation_count) + 1`.
+ *    `Retry-After`), 404 `not_found`, 409 `conflict` (disabled; `reason:
+ *    counter_exhausted` when the attempt number would pass the integer
+ *    range). Two concurrent requests: one reserves, the other gets 429 and
+ *    makes no link. D-01 (RPC or table missing): the same cooldown computed
+ *    here from the live row (when the table exists) and the profile's
+ *    `last_invited_at`, and the attempt from `max(send_attempts,
+ *    invitation_count) + 1` (past 2147483647 → the same 409).
  * 7. A revoked invitee's login was banned (admin-actions `revoke_invitation`):
  *    for a `not_invited` / `invited` profile whose login is banned, the ban is
  *    lifted first. If that fails, the attempt is an honest `link_failed`
@@ -47,10 +49,24 @@
  *    and links `user_id`; when the RPC is missing (D-01) the legacy profile
  *    columns are updated **only after a successful send** and the answer
  *    says `stored: false`.
+ * 11. The vessel of an imported profile (D-199): when the profile has
+ *    `is_imported` and `imported_vessel_id`, step 2 found no current
+ *    assignment, and a login is now linked to the profile (its own, or the
+ *    one step 10 linked), the service-role `fulfil_imported_assignment()`
+ *    writes the current `crew_assignments` row (`created` / `exists` →
+ *    `created`; `none` → the row is looked up, since `record_invitation_send`
+ *    may already have written it; `not_eligible` → `failed`). D-01 (RPC
+ *    missing): the login's current assignments are looked up (service
+ *    client); one on another vessel → `failed`; else the vessel must be the
+ *    target company's and not Sold, and the edge inserts it with the service client
+ *    (position, else rank, else Crew; `joining_date`, else today), then clears
+ *    `is_imported` / `imported_vessel_id`. This runs only after step 3
+ *    passed. The answer carries `assignment: 'created' | 'failed'` only in
+ *    that case; a D-01 send that failed links no login, so it has none.
  */
 import type { AuthContext } from './auth.ts';
 import { assertCapability } from './capability.ts';
-import { asRow, errorCode, errorMessage, int, isMissingFunction, isMissingTable, rowsOf, text, timeOf, type Row } from './db.ts';
+import { asRow, bool, errorCode, errorMessage, int, isMissingFunction, isMissingTable, rowsOf, text, timeOf, type Row } from './db.ts';
 import { type EmailErrorCode, type EmailMessage, type EmailResult, isValidRecipient, payloadTag, sendEmail } from './email.ts';
 import { type EdgeEnv, linkLanding } from './env.ts';
 import { errorBody, HttpError, json, type JsonValue } from './http.ts';
@@ -64,9 +80,12 @@ export const BULK_INVITE_MAX = 50;
 /** Why an invitation email was not sent: the email error, or the auth link could not be made. */
 export type InviteFailureCode = EmailErrorCode | 'link_failed';
 
+/** What step 11 did with an imported profile's vessel once a login was linked (D-199). */
+export type AssignmentResult = 'created' | 'failed';
+
 export type InviteOutcome =
-  | { status: 'sent'; profileId: string; invitationId: string | null; stored: boolean }
-  | { status: 'send_failed'; profileId: string; invitationId: string | null; stored: boolean; emailError: InviteFailureCode }
+  | { status: 'sent'; profileId: string; invitationId: string | null; stored: boolean; assignment?: AssignmentResult }
+  | { status: 'send_failed'; profileId: string; invitationId: string | null; stored: boolean; emailError: InviteFailureCode; assignment?: AssignmentResult }
   | { status: 'refused'; profileId: string; error: HttpError };
 
 export interface InviteDeps {
@@ -112,6 +131,10 @@ const REINVITABLE = new Set(['not_invited', 'invited']);
 const UNAVAILABLE = (): HttpError => new HttpError(503, 'status_unavailable', 'The invitation could not be checked. Try again.');
 const ACCESS_DISABLED = (): HttpError =>
   new HttpError(409, 'conflict', "This person's access is disabled. Turn access on before sending an invitation.", { reason: 'access_disabled' });
+/** The largest attempt number the database stores (`integer`). */
+export const MAX_INVITE_ATTEMPT = 2147483647;
+const COUNTER_EXHAUSTED = (): HttpError =>
+  new HttpError(409, 'conflict', 'STORM cannot send this person another invitation. Contact STORM support.', { reason: 'counter_exhausted' });
 
 function cooldownError(seconds: number): HttpError {
   const wait = Math.max(1, Math.ceil(seconds));
@@ -151,13 +174,20 @@ interface Target {
   companyId: string | null;
   email: string | null;
   status: string;
+  /** The capability scope: the current assignment's vessel, else `imported_vessel_id`. */
   vesselId: string | null;
+  /** True when the linked login has a current assignment (step 11 never runs then). */
+  assigned: boolean;
+  /** `imported_vessel_id` of an imported profile (`is_imported`): the vessel waiting for a login. */
+  pendingVesselId: string | null;
 }
 
 async function readTarget(ctx: AuthContext, profileId: string): Promise<Target> {
   const res = await ctx.userClient
     .from('profiles')
-    .select('id, user_id, email, first_name, company_id, account_status, role, last_invited_at, invitation_count, invited_at, imported_vessel_id')
+    .select(
+      'id, user_id, email, first_name, company_id, account_status, role, last_invited_at, invitation_count, invited_at, imported_vessel_id, is_imported, position, rank, joining_date',
+    )
     .eq('id', profileId)
     .maybeSingle();
   if (res.error) throw UNAVAILABLE();
@@ -176,6 +206,7 @@ async function readTarget(ctx: AuthContext, profileId: string): Promise<Target> 
     if (a.error) throw UNAVAILABLE();
     vesselId = text(rowsOf(a.data)[0] ?? null, 'vessel_id');
   }
+  const importedVesselId = text(row, 'imported_vessel_id');
   return {
     row,
     profileId,
@@ -183,7 +214,9 @@ async function readTarget(ctx: AuthContext, profileId: string): Promise<Target> 
     companyId: text(row, 'company_id'),
     email: text(row, 'email')?.trim() ?? null,
     status: (text(row, 'account_status') ?? '').toLowerCase(),
-    vesselId: vesselId ?? text(row, 'imported_vessel_id'),
+    vesselId: vesselId ?? importedVesselId,
+    assigned: vesselId !== null,
+    pendingVesselId: bool(row, 'is_imported') === true ? importedVesselId : null,
   };
 }
 
@@ -251,8 +284,12 @@ async function bestEffortName(ctx: AuthContext, table: 'companies' | 'vessels', 
   }
 }
 
-/** Legacy profile columns, only after a successful send (D-01 branch, or when the record RPC failed). */
-async function stampLegacyProfile(ctx: AuthContext, target: Target, linkUserId: string | null, now: Date): Promise<void> {
+/**
+ * Legacy profile columns, only after a successful send (D-01 branch, or when
+ * the record RPC failed). True when the update was stored (so `user_id` is
+ * linked when it was missing).
+ */
+async function stampLegacyProfile(ctx: AuthContext, target: Target, linkUserId: string | null, now: Date): Promise<boolean> {
   const at = now.toISOString();
   const patch: Record<string, string | number> = {
     last_invited_at: at,
@@ -264,6 +301,7 @@ async function stampLegacyProfile(ctx: AuthContext, target: Target, linkUserId: 
   if (!target.userId && linkUserId) patch.user_id = linkUserId;
   const res = await ctx.serviceClient().from('profiles').update(patch).eq('id', target.profileId);
   if (res.error) log('warn', 'invite_legacy_stamp_failed', { profile_id: target.profileId, code: errorCode(res.error) || 'none' });
+  return !res.error;
 }
 
 function bannedNow(user: Row | null, now: Date): boolean {
@@ -300,6 +338,8 @@ async function reserveAttempt(ctx: AuthContext, target: Target, kind: string, no
         throw new HttpError(404, 'not_found', 'That person was not found.');
       case 'disabled':
         throw ACCESS_DISABLED();
+      case 'counter_exhausted':
+        throw COUNTER_EXHAUSTED();
       default:
         throw UNAVAILABLE();
     }
@@ -330,7 +370,88 @@ async function reserveAttempt(ctx: AuthContext, target: Target, kind: string, no
   if (until > now.getTime()) throw cooldownError((until - now.getTime()) / 1000);
   // The attempt does not move after a failed send here; the payload tag in the key keeps it unique per link.
   const attempt = Math.max(int(liveRow, 'send_attempts') ?? 0, int(target.row, 'invitation_count') ?? 0) + 1;
+  if (attempt > MAX_INVITE_ATTEMPT) throw COUNTER_EXHAUSTED();
   return { attempt, invitationId: text(liveRow, 'id'), reserved: false };
+}
+
+/**
+ * The vessels of `userId`'s current assignments (service client: the caller's
+ * RLS view in step 2 may not see all of them), or null when they could not
+ * be read.
+ */
+async function currentVessels(ctx: AuthContext, userId: string): Promise<string[] | null> {
+  const res = await ctx.serviceClient().from('crew_assignments').select('vessel_id').eq('user_id', userId).eq('is_current', true).limit(50);
+  if (res.error) return null;
+  return rowsOf(res.data).map((r) => text(r, 'vessel_id')).filter((v): v is string => v !== null);
+}
+
+/** A text column with something in it (trimmed), else null: a blank position counts as missing, as in SQL. */
+function filled(row: Row | null, key: string): string | null {
+  const value = text(row, key)?.trim();
+  return value ? value : null;
+}
+
+function assignmentFailed(profileId: string, code: string): AssignmentResult {
+  log('warn', 'invite_assignment_failed', { profile_id: profileId, code });
+  return 'failed';
+}
+
+/**
+ * Step 11 (D-199). The caller passed `assertCapability` for this target in
+ * step 3; `userId` is the login now linked to the profile.
+ */
+async function fulfilAssignment(ctx: AuthContext, target: Target, vesselId: string, userId: string, now: Date): Promise<AssignmentResult> {
+  const service = ctx.serviceClient();
+  const rpc = await service.rpc('fulfil_imported_assignment', { p_profile_id: target.profileId, p_actor: ctx.user.id });
+  if (!rpc.error) {
+    switch (rpc.data) {
+      case 'created':
+      case 'exists':
+        return 'created';
+      case 'none': {
+        // Nothing left to do: record_invitation_send (or the link trigger) may already have written it.
+        const vessels = await currentVessels(ctx, userId);
+        if (vessels === null) return assignmentFailed(target.profileId, 'verify_failed');
+        return vessels.includes(vesselId) ? 'created' : assignmentFailed(target.profileId, 'none');
+      }
+      case 'not_eligible':
+        return assignmentFailed(target.profileId, 'not_eligible');
+      default:
+        return assignmentFailed(target.profileId, 'unexpected_answer');
+    }
+  }
+  if (!isMissingFunction(rpc.error)) return assignmentFailed(target.profileId, errorCode(rpc.error) || 'none');
+
+  // D-01: the function is not in the database yet. The same rule, with the service client: never for
+  // someone already on another vessel, and only for a vessel of the target's company that is not Sold.
+  const vessels = await currentVessels(ctx, userId);
+  if (vessels === null) return assignmentFailed(target.profileId, 'verify_failed');
+  if (!vessels.includes(vesselId)) {
+    if (vessels.length > 0) return assignmentFailed(target.profileId, 'already_assigned');
+    const vessel = await service.from('vessels').select('id, company_id, status').eq('id', vesselId).maybeSingle();
+    if (vessel.error) return assignmentFailed(target.profileId, errorCode(vessel.error) || 'none');
+    const row = asRow(vessel.data);
+    if (!row || !target.companyId || text(row, 'company_id') !== target.companyId || text(row, 'status') === 'Sold') {
+      return assignmentFailed(target.profileId, 'not_eligible');
+    }
+    const insert = await service.from('crew_assignments').insert({
+      user_id: userId,
+      vessel_id: vesselId,
+      position: filled(target.row, 'position') ?? filled(target.row, 'rank') ?? 'Crew',
+      join_date: text(target.row, 'joining_date') ?? now.toISOString().slice(0, 10),
+      is_current: true,
+      created_by: ctx.user.id,
+    });
+    if (insert.error) return assignmentFailed(target.profileId, errorCode(insert.error) || 'none');
+  }
+  // The vessel is on crew_assignments now: the profile is no longer waiting for a login.
+  const clear = await service
+    .from('profiles')
+    .update({ is_imported: false, imported_vessel_id: null })
+    .eq('id', target.profileId)
+    .eq('imported_vessel_id', vesselId);
+  if (clear.error) log('warn', 'invite_import_flags_failed', { profile_id: target.profileId, code: errorCode(clear.error) || 'none' });
+  return 'created';
 }
 
 async function runInvite(ctx: AuthContext, profileId: string, deps: InviteDeps): Promise<InviteOutcome> {
@@ -415,19 +536,37 @@ async function runInvite(ctx: AuthContext, profileId: string, deps: InviteDeps):
   });
   let stored = false;
   let invitationId: string | null = reservation.invitationId;
+  /** The profile now carries `linkUserId` (the record RPC links it; the legacy stamp only after a successful send). */
+  let linkStored = false;
   if (record.error) {
     if (!isMissingFunction(record.error)) {
       log('warn', 'invite_record_failed', { profile_id: profileId, outcome, code: errorCode(record.error) || 'none' });
     }
-    if (result.ok) await stampLegacyProfile(ctx, target, linkUserId, now);
+    if (result.ok) linkStored = await stampLegacyProfile(ctx, target, linkUserId, now);
   } else {
     stored = true;
+    linkStored = true;
     invitationId = text(asRow(record.data), 'id') ?? invitationId;
   }
 
-  log('info', 'invite_attempt', { profile_id: profileId, outcome, stored, reserved: reservation.reserved, code: result.ok ? null : result.errorCode });
-  if (result.ok) return { status: 'sent', profileId, invitationId, stored };
-  return { status: 'send_failed', profileId, invitationId, stored, emailError: result.errorCode };
+  // Step 11: the imported vessel becomes an assignment once a login is linked (capability checked in step 3).
+  const linked = target.userId ?? (linkStored ? linkUserId : null);
+  let assignment: AssignmentResult | undefined;
+  if (target.pendingVesselId && !target.assigned && linked) {
+    assignment = await fulfilAssignment(ctx, target, target.pendingVesselId, linked, now);
+  }
+
+  log('info', 'invite_attempt', {
+    profile_id: profileId,
+    outcome,
+    stored,
+    reserved: reservation.reserved,
+    code: result.ok ? null : result.errorCode,
+    assignment: assignment ?? null,
+  });
+  const extra = assignment ? { assignment } : {};
+  if (result.ok) return { status: 'sent', profileId, invitationId, stored, ...extra };
+  return { status: 'send_failed', profileId, invitationId, stored, emailError: result.errorCode, ...extra };
 }
 
 /**
@@ -445,15 +584,21 @@ export async function inviteProfile(ctx: AuthContext, profileId: string, deps: P
   }
 }
 
-/** The single-invite response (spec §C.3): 200 sent, 502 send_failed (with the invitation), or the refusal. */
+/**
+ * The single-invite response (spec §C.3): 200 sent, 502 send_failed (with the
+ * invitation), or the refusal. Both 200 and 502 carry a top-level
+ * `assignment: 'created' | 'failed'` when step 11 ran.
+ */
 export function invitationResponse(outcome: InviteOutcome): Response {
   if (outcome.status === 'sent') {
-    return json({ ok: true, invitation: { status: 'sent', stored: outcome.stored, id: outcome.invitationId } });
+    const extra = outcome.assignment ? { assignment: outcome.assignment } : {};
+    return json({ ok: true, invitation: { status: 'sent', stored: outcome.stored, id: outcome.invitationId }, ...extra });
   }
   if (outcome.status === 'send_failed') {
     const err = new HttpError(502, 'send_failed', 'The invitation email could not be sent.', { email_error: outcome.emailError });
+    const extra = outcome.assignment ? { assignment: outcome.assignment } : {};
     return json(
-      { ...errorBody(err), invitation: { status: 'send_failed', stored: outcome.stored, id: outcome.invitationId } },
+      { ...errorBody(err), invitation: { status: 'send_failed', stored: outcome.stored, id: outcome.invitationId }, ...extra },
       { status: 502 },
     );
   }
@@ -468,6 +613,8 @@ export type BulkInviteRow = {
   code?: string;
   emailError?: InviteFailureCode;
   reason?: string;
+  /** Step 11's result, when it ran (`sent` and `send_failed` rows only). */
+  assignment?: AssignmentResult;
 };
 
 /**
@@ -477,9 +624,13 @@ export type BulkInviteRow = {
  * address).
  */
 export function bulkRow(outcome: InviteOutcome): BulkInviteRow {
-  if (outcome.status === 'sent') return { profileId: outcome.profileId, status: 'sent', stored: outcome.stored, invitationId: outcome.invitationId };
+  if (outcome.status === 'sent') {
+    const row: BulkInviteRow = { profileId: outcome.profileId, status: 'sent', stored: outcome.stored, invitationId: outcome.invitationId };
+    if (outcome.assignment) row.assignment = outcome.assignment;
+    return row;
+  }
   if (outcome.status === 'send_failed') {
-    return {
+    const row: BulkInviteRow = {
       profileId: outcome.profileId,
       status: 'send_failed',
       code: 'send_failed',
@@ -487,6 +638,8 @@ export function bulkRow(outcome: InviteOutcome): BulkInviteRow {
       stored: outcome.stored,
       invitationId: outcome.invitationId,
     };
+    if (outcome.assignment) row.assignment = outcome.assignment;
+    return row;
   }
   const reason = outcome.error.details?.reason;
   const row: BulkInviteRow = {
@@ -513,6 +666,9 @@ export function bulkSummary(rows: BulkInviteRow[]): { ok: true; results: BulkInv
 /** For callers that need the outcome as JSON details (e.g. admin-actions logging). */
 export function outcomeDetails(outcome: InviteOutcome): Record<string, JsonValue> {
   if (outcome.status === 'refused') return { outcome: 'refused', code: outcome.error.code };
-  if (outcome.status === 'send_failed') return { outcome: 'send_failed', code: outcome.emailError, stored: outcome.stored };
-  return { outcome: 'sent', stored: outcome.stored };
+  const details: Record<string, JsonValue> = outcome.status === 'send_failed'
+    ? { outcome: 'send_failed', code: outcome.emailError, stored: outcome.stored }
+    : { outcome: 'sent', stored: outcome.stored };
+  if (outcome.assignment) details.assignment = outcome.assignment;
+  return details;
 }

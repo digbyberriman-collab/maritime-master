@@ -13,9 +13,9 @@
  * | `set_pin` | `pin` (6 digits) | 200 `{ ok: true }` | 400 |
  * | `verify_pin` | `pin` | 200 `{ ok: true, confirmedUntil }` | 400 `reason: pin_format / pin_not_set`, 403 `reason: pin_invalid` (+ `attempts_remaining`) / `pin_locked` (+ `retry_after_seconds`), 429 |
  * | `reset_account` + `resetType: 'password_reset'` | `targetUserId`, `reason?` | 200 `{ ok: true, reset: { status: 'sent' } }` | 502 `send_failed` `details.email_error`; 409 `conflict` (access disabled); 429 `cooldown` (`retry_after_seconds`, `Retry-After`: a reset for this person in the last 60 s, no link made); 503 (the cooldown could not be checked) |
- * | `reset_account` + `resetType: 'resend_invitation'` | `targetUserId` or `targetProfileId` | as send-invitation (200 / 502 / 409 / 429 …) | |
+ * | `reset_account` + `resetType: 'resend_invitation'` | `targetUserId` or `targetProfileId` | as send-invitation (200 / 502 / 409 / 429 …; top-level `assignment: 'created' \| 'failed'` when the invitation linked a login for an imported vessel, D-199) | |
  * | `reset_account` + `resetType: 'invalidate_sessions'` | `targetUserId` | — | 501 `not_supported` (no supported revoke by user id; never faked) |
- * | `toggle_access` | `targetUserId`, `enableAccess`, `reason` (required to disable) | 200 `{ ok: true, statusStored: true, banApplied: true, accountStatus }` | 502 `partial_failure` `details: { statusStored, banApplied }`; 403 refusal (self, owner, admin without manages-admins, last manager); 400 |
+ * | `toggle_access` | `targetUserId`, `enableAccess`, `reason` (required to disable) | 200 `{ ok: true, statusStored: true, banApplied: true, accountStatus }` | 502 `partial_failure` `details: { statusStored, banApplied }`; 403 refusal (self, owner, admin without manages-admins, last manager; `reason: invitation_withdrawn` / `membership_removed` for a withdrawn invitation, nothing changed and no ban lifted); 400 |
  * | `reallocate_vessel` | `targetUserId`, `vesselId`, `reason`, `position?`, `effectiveDate?`, `endDate?` | 200 `{ ok: true, assignment }` | 502 `partial_failure` `details: { assignmentCreated, previousEnded }`; 404 vessel; 409 |
  * | `revoke_invitation` | `invitationId`, `reason?` | 200 `{ ok: true, invitation: { id, status: 'revoked', profileId, revokedAt }, loginBlocked, loginNote }`: `loginNote` `banned` (a login that never signed in is banned, so the emailed link and "Forgot password" stop working; `loginBlocked: true`), `no_login` (`loginBlocked: true`), `signed_in_before` (not banned; `loginBlocked: false`: turn access off to stop them) | 404 `not_found` (not visible, not live); 403 `forbidden` (capability, own / owner login); 501 `not_supported` `details.reason: invitations_not_live`; 502 `partial_failure` `details: { revoked: true, loginBlocked: false }` + `invitation`; 503 |
  *
@@ -421,7 +421,16 @@ function refusal(error: unknown, status: 400 | 403): HttpError {
   return new HttpError(status, code, status === 403 ? 'You do not have permission to change this access.' : 'The request has a wrong value.');
 }
 
+/**
+ * First match wins. The two invitation codes come first: `set_membership_status`
+ * refuses turning access on for a withdrawn invitation (`invitation_withdrawn`)
+ * and turning it off when the withdrawal already removed it
+ * (`membership_removed`); a refusal changes nothing, so the revoke's sign-in
+ * block stays.
+ */
 const REFUSAL_COPY: ReadonlyArray<readonly [RegExp, string]> = [
+  [/invitation_withdrawn/, 'Their invitation was withdrawn. Send a new invitation instead.'],
+  [/membership_removed/, "This person's access was already withdrawn with their invitation, so there is nothing to turn off. Send a new invitation if they need access again."],
   [/reason/, 'Give a reason for turning access off.'],
   [/owner/, "The account owner's access cannot be changed here."],
   [/last/, 'This is the last administrator who manages administrators. Give someone else that role first.'],

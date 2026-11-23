@@ -3,10 +3,10 @@ import { getAuthContext } from './auth.ts';
 import { type EmailMessage, type EmailResult, payloadTag, sendEmail } from './email.ts';
 import type { EdgeEnv } from './env.ts';
 import { HttpError } from './http.ts';
-import { bulkRow, bulkSummary, type InviteDeps, inviteProfile, invitationResponse, isFakeEmail } from './invitations.ts';
+import { bulkRow, bulkSummary, type InviteDeps, inviteProfile, invitationResponse, isFakeEmail, MAX_INVITE_ATTEMPT } from './invitations.ts';
 import { idempotentProvider } from './testing/fakeFetch.ts';
 import { callsOf, fail, fakeClientFactory, type FakeWorld, ok } from './testing/fakeSupabase.ts';
-import { buildWorld, CO_A, envWith, P, type Persona, profileRow, request, TEST_ENV, V_A1, V_A2 } from './testing/world.ts';
+import { buildWorld, CO_A, envWith, P, type Persona, profileRow, request, TEST_ENV, V_A1, V_A2, V_A_SOLD, V_B1 } from './testing/world.ts';
 
 const NOW = new Date('2026-11-23T10:00:00Z');
 
@@ -74,7 +74,8 @@ Deno.test('invite (P3 live): sent, recorded by record_invitation_send, profile s
 
   const res = invitationResponse(outcome);
   assertEquals(res.status, 200);
-  assertEquals(await res.json(), { ok: true, invitation: { status: 'sent', stored: true, id: outcome.invitationId } });
+  // importedA waits on Aurora: the linked login got the assignment (D-199).
+  assertEquals(await res.json(), { ok: true, invitation: { status: 'sent', stored: true, id: outcome.invitationId }, assignment: 'created' });
 });
 
 Deno.test('invite (P3 live): a failed email is recorded as send_failed and the profile is NOT stamped invited', async () => {
@@ -118,7 +119,8 @@ Deno.test('invite (legacy, RPCs missing): stored:false, profile columns stamped 
   assertEquals(profile.invitation_count, 1);
   assertEquals(profile.last_invited_at, NOW.toISOString());
   assert(profile.user_id);
-  assertEquals(await invitationResponse(second).json(), { ok: true, invitation: { status: 'sent', stored: false, id: null } });
+  assertEquals(await invitationResponse(second).json(), { ok: true, invitation: { status: 'sent', stored: false, id: null }, assignment: 'created' });
+  assert(first.status === 'send_failed' && first.assignment === undefined, 'a D-01 send that failed linked no login: no assignment step');
 });
 
 Deno.test('invite: 5-minute cooldown from the live invitation (429) and from the legacy stamp', async () => {
@@ -413,3 +415,178 @@ Deno.test('invite: a provider_duplicate answer is a failed attempt for the calle
   assertEquals((world.tables.user_invitations ?? [])[0].status, 'sent');
 });
 
+
+// ---- step 11: the imported vessel becomes an assignment once a login is linked (D-199) ----------
+
+const assignmentsOf = (world: FakeWorld, userId: unknown) => (world.tables.crew_assignments ?? []).filter((a) => a.user_id === userId && a.is_current === true);
+const fulfilCalls = (world: FakeWorld) => callsOf(world, 'rpc').filter((c) => c.fn === 'fulfil_imported_assignment');
+const assignmentReads = (world: FakeWorld) =>
+  callsOf(world, 'query').filter((q) => q.table === 'crew_assignments' && q.op === 'select' && q.caller.role === 'service');
+const assignmentInserts = (world: FakeWorld) => callsOf(world, 'query').filter((q) => q.table === 'crew_assignments' && q.op === 'insert');
+
+Deno.test('assignment (P3): the RPC answers created → assignment created, no lookup and no edge insert', async () => {
+  const world = buildWorld({ p3: true });
+  world.hooks.rpc = (r) => (r.fn === 'fulfil_imported_assignment' ? ok('created') : undefined);
+  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, mailer().deps);
+  assert(outcome.status === 'sent');
+  assertEquals(outcome.assignment, 'created');
+  const [call] = fulfilCalls(world);
+  assert(call, 'the edge asked the database');
+  assertEquals(call.caller.role, 'service');
+  assertEquals(call.args, { p_profile_id: P.importedA.profileId, p_actor: P.adminA.userId });
+  const record = callsOf(world, 'rpc').find((c) => c.fn === 'record_invitation_send');
+  assert(record && world.calls.indexOf(record) < world.calls.indexOf(call), 'after the send is recorded');
+  assertEquals(assignmentReads(world).length, 0);
+  assertEquals(assignmentInserts(world).length, 0);
+  assertEquals(await invitationResponse(outcome).json(), { ok: true, invitation: { status: 'sent', stored: true, id: outcome.invitationId }, assignment: 'created' });
+});
+
+Deno.test('assignment (P3): none (record_invitation_send already wrote it) + the row → created; none and no row → failed', async () => {
+  const world = buildWorld({ p3: true });
+  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, mailer().deps);
+  assert(outcome.status === 'sent' && outcome.assignment === 'created');
+  const profile = profileRow(world, P.importedA.profileId);
+  const rows = assignmentsOf(world, profile.user_id);
+  assertEquals(rows.map((a) => [a.vessel_id, a.position, a.join_date]), [[V_A1, 'Crew', '2026-11-23']]);
+  assertEquals([profile.is_imported, profile.imported_vessel_id], [false, null]);
+  assertEquals(assignmentReads(world).length, 1, 'the edge looked the row up');
+  assertEquals(assignmentInserts(world).length, 0, 'and wrote nothing itself');
+
+  const missing = buildWorld({ p3: true });
+  missing.rpcs.fulfil_imported_assignment = () => ok('none');
+  const failed = await inviteProfile(await ctxFor(missing, P.adminA), P.importedA.profileId, mailer().deps);
+  assert(failed.status === 'sent');
+  assertEquals(failed.assignment, 'failed');
+  assertEquals(assignmentsOf(missing, profileRow(missing, P.importedA.profileId).user_id).length, 0);
+});
+
+Deno.test('assignment (P3): not_eligible, or any other RPC error → failed (no edge insert)', async () => {
+  const notEligible = buildWorld({ p3: true });
+  notEligible.rpcs.fulfil_imported_assignment = () => ok('not_eligible');
+  const a = await inviteProfile(await ctxFor(notEligible, P.adminA), P.importedA.profileId, mailer().deps);
+  assert(a.status === 'sent' && a.assignment === 'failed');
+  assertEquals(assignmentInserts(notEligible).length, 0);
+  const body = await invitationResponse(a).json();
+  assertEquals(body.assignment, 'failed');
+
+  const broken = buildWorld({ p3: true });
+  broken.hooks.rpc = (r) => (r.fn === 'fulfil_imported_assignment' ? fail('XX000', 'lock timeout') : undefined);
+  const b = await inviteProfile(await ctxFor(broken, P.adminA), P.importedA.profileId, mailer().deps);
+  assert(b.status === 'sent' && b.assignment === 'failed');
+  assertEquals(assignmentInserts(broken).length, 0);
+});
+
+Deno.test('assignment (D-01, RPC missing): exactly one row from the profile, the import flags cleared', async () => {
+  for (const p3 of [false, true]) {
+    let t = NOW.getTime();
+    const clock = () => new Date(t);
+    const world = buildWorld({ p3, now: clock });
+    if (p3) delete world.rpcs.fulfil_imported_assignment; // record_invitation_send applied, the new function not yet
+    const profile = profileRow(world, P.importedA.profileId);
+    Object.assign(profile, { position: 'Bosun', rank: 'AB', joining_date: '2026-12-01' });
+    const m = mailer();
+    m.deps.now = clock;
+    const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, m.deps);
+    assert(outcome.status === 'sent', `p3=${p3}`);
+    assertEquals(outcome.assignment, 'created', `p3=${p3}`);
+    const rows = assignmentsOf(world, profile.user_id);
+    assertEquals(rows.length, 1, `p3=${p3}`);
+    assertEquals([rows[0].vessel_id, rows[0].position, rows[0].join_date, rows[0].created_by], [V_A1, 'Bosun', '2026-12-01', P.adminA.userId]);
+    const [insert] = assignmentInserts(world);
+    assert(insert && insert.caller.role === 'service');
+    assertEquals([profile.is_imported, profile.imported_vessel_id], [false, null]);
+
+    // Inviting again after the cooldown: the vessel is no longer pending, so nothing more is written.
+    t += 10 * 60_000;
+    const again = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, m.deps);
+    assert(again.status === 'sent' && again.assignment === undefined, `p3=${p3}`);
+    assertEquals(assignmentsOf(world, profile.user_id).length, 1);
+  }
+  // Without a position (blank counts as missing) or a joining date: rank, else Crew; today.
+  const plain = buildWorld({ p3: false });
+  Object.assign(profileRow(plain, P.importedA.profileId), { position: '  ', rank: 'AB' });
+  await inviteProfile(await ctxFor(plain, P.adminA), P.importedA.profileId, mailer().deps);
+  const [row] = assignmentsOf(plain, profileRow(plain, P.importedA.profileId).user_id);
+  assertEquals([row.position, row.join_date], ['AB', '2026-11-23']);
+});
+
+Deno.test('assignment: a Sold or another company\'s vessel → failed, no row, the vessel stays pending', async () => {
+  // P3: the database refuses (not_eligible). D-01: the edge checks the vessel itself.
+  for (const [p3, vessel] of [[true, V_A_SOLD], [false, V_A_SOLD], [false, V_B1]] as const) {
+    const world = buildWorld({ p3 });
+    profileRow(world, P.importedA.profileId).imported_vessel_id = vessel;
+    const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, mailer().deps);
+    assert(outcome.status === 'sent', `p3=${p3} ${vessel}`);
+    assertEquals(outcome.assignment, 'failed', `p3=${p3} ${vessel}`);
+    const profile = profileRow(world, P.importedA.profileId);
+    assertEquals(assignmentsOf(world, profile.user_id).length, 0);
+    assertEquals(assignmentInserts(world).length, 0);
+    assertEquals([profile.is_imported, profile.imported_vessel_id], [true, vessel]);
+  }
+});
+
+Deno.test('assignment (D-01): a login already on a vessel the caller cannot see gets no second assignment', async () => {
+  const world = buildWorld({ p3: false });
+  // importedA has a login with a current assignment in another company (invisible to the fleet manager's RLS view).
+  const login = { id: '00000000-0000-4000-8000-00000000a1b6', email: P.importedA.email, email_confirmed_at: null };
+  world.authUsers.push(login);
+  profileRow(world, P.importedA.profileId).user_id = login.id;
+  (world.tables.crew_assignments ??= []).push({ id: 'elsewhere', user_id: login.id, vessel_id: V_B1, is_current: true, position: 'Deckhand', join_date: '2026-01-01' });
+  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, mailer().deps);
+  assert(outcome.status === 'sent');
+  assertEquals(outcome.assignment, 'failed');
+  assertEquals(assignmentInserts(world).length, 0);
+  assertEquals(assignmentsOf(world, login.id).map((a) => a.vessel_id), [V_B1]);
+  assertEquals(profileRow(world, P.importedA.profileId).imported_vessel_id, V_A1, 'still pending: the admin sees the vessel was not assigned');
+});
+
+Deno.test('assignment: a target with a current assignment gets no fulfilment and no field', async () => {
+  for (const p3 of [true, false]) {
+    const world = buildWorld({ p3 });
+    // invitedA is on Aurora already; a stale import link must not add a second vessel.
+    Object.assign(profileRow(world, P.invitedA.profileId), { is_imported: true, imported_vessel_id: V_A2 });
+    const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.invitedA.profileId, mailer().deps);
+    assert(outcome.status === 'sent', `p3=${p3}`);
+    assertEquals(outcome.assignment, undefined);
+    assertEquals(fulfilCalls(world).length, 0);
+    assertEquals(assignmentInserts(world).length, 0);
+    assertEquals(assignmentsOf(world, P.invitedA.userId).map((a) => a.vessel_id), [V_A1]);
+    assertFalse('assignment' in (await invitationResponse(outcome).json()));
+  }
+});
+
+Deno.test('assignment (P3): a failed send that linked the login still assigns; the 502 and the bulk row carry it', async () => {
+  const world = buildWorld({ p3: true });
+  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, mailer([{ ok: false, errorCode: 'provider_unavailable' }]).deps);
+  assert(outcome.status === 'send_failed');
+  assertEquals(outcome.assignment, 'created');
+  const res = invitationResponse(outcome);
+  assertEquals(res.status, 502);
+  assertEquals((await res.json()).assignment, 'created');
+  assertEquals(bulkRow(outcome).assignment, 'created');
+});
+
+// ---- the attempt counter ------------------------------------------------------------------------
+
+Deno.test('invite: an exhausted attempt counter → 409 counter_exhausted, no link, nothing sent', async () => {
+  const world = buildWorld({ p3: true });
+  world.hooks.rpc = (r) => (r.fn === 'reserve_invitation_attempt' ? ok({ ok: false, code: 'counter_exhausted' }) : undefined);
+  const m = mailer();
+  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, m.deps);
+  assert(outcome.status === 'refused');
+  assertEquals([outcome.error.status, outcome.error.code, outcome.error.details?.reason], [409, 'conflict', 'counter_exhausted']);
+  assertEquals(outcome.error.publicMessage, 'STORM cannot send this person another invitation. Contact STORM support.');
+  assertEquals(linkCalls(world).length, 0);
+  assertEquals(m.sent.length, 0);
+
+  // D-01: the same answer when the computed attempt would pass the integer range.
+  const legacy = buildWorld({ p3: false });
+  profileRow(legacy, P.importedA.profileId).invitation_count = MAX_INVITE_ATTEMPT;
+  const l = mailer();
+  const refused = await inviteProfile(await ctxFor(legacy, P.adminA), P.importedA.profileId, l.deps);
+  assert(refused.status === 'refused');
+  assertEquals([refused.error.status, refused.error.details?.reason], [409, 'counter_exhausted']);
+  assertEquals(linkCalls(legacy).length, 0);
+  assertEquals(l.sent.length, 0);
+  assertEquals(bulkRow(refused).reason, 'counter_exhausted');
+});

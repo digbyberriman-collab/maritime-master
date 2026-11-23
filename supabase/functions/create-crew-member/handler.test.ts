@@ -1,8 +1,10 @@
 import { assert, assertEquals, assertFalse } from 'jsr:@std/assert@1.0.13';
 import type { EmailMessage, EmailResult } from '../_shared/email.ts';
 import type { EdgeEnv } from '../_shared/env.ts';
-import { callsOf, fail, fakeClientFactory, type FakeWorld } from '../_shared/testing/fakeSupabase.ts';
+import { callsOf, fail, fakeClientFactory, type FakeWorld, ok } from '../_shared/testing/fakeSupabase.ts';
 import { bodyOf, buildWorld, CO_A, CO_B, envWith, obj, P, profileRow, request, TEST_ENV, V_A1, V_A_SOLD, V_B1 } from '../_shared/testing/world.ts';
+import { createHandler as bulkInvite } from '../bulk-invite/handler.ts';
+import { createHandler as sendInvitation } from '../send-invitation/handler.ts';
 import { createHandler } from './handler.ts';
 
 const NOW = new Date('2026-11-23T10:00:00Z');
@@ -37,6 +39,8 @@ async function errorOf(res: Response): Promise<Record<string, unknown>> {
 }
 
 const created = (world: FakeWorld) => (world.tables.profiles ?? []).filter((p) => p.email === NEW_EMAIL);
+const assignmentsOf = (world: FakeWorld, userId: unknown) =>
+  (world.tables.crew_assignments ?? []).filter((a) => typeof userId === 'string' && a.user_id === userId && a.is_current === true);
 const writes = (world: FakeWorld) => callsOf(world, 'query').filter((q) => q.op !== 'select');
 
 Deno.test('create-crew-member: 201, the profile starts not_invited with no login, then the invitation makes it invited', async () => {
@@ -58,7 +62,10 @@ Deno.test('create-crew-member: 201, the profile starts not_invited with no login
     assert(insert);
     assertEquals(insert.caller.role, 'service');
     const values = insert.values as Record<string, unknown>;
-    assertEquals([values.account_status, values.user_id, values.role, values.company_id, values.imported_vessel_id], ['not_invited', null, 'crew', CO_A, V_A1]);
+    assertEquals(
+      [values.account_status, values.user_id, values.role, values.company_id, values.imported_vessel_id, values.joining_date],
+      ['not_invited', null, 'crew', CO_A, V_A1, '2026-12-01'],
+    );
 
     assertEquals(profile.account_status, 'invited', 'invited only after the send worked');
     assert(typeof profile.user_id === 'string', 'the invitation linked the login');
@@ -83,8 +90,10 @@ Deno.test('create-crew-member: sendInvite false → 201 not_sent; the vessel wai
   assertEquals(answer.assignment, 'pending_login');
   const [profile] = created(h.world);
   assertEquals([profile.account_status, profile.user_id, profile.imported_vessel_id, profile.is_imported], ['not_invited', null, V_A1, true]);
+  assertEquals(profile.joining_date, null, 'no joinDate given');
   assertEquals(callsOf(h.world, 'admin').length, 0);
   assertEquals(h.sent.length, 0);
+  assertEquals(callsOf(h.world, 'query').filter((q) => q.table === 'crew_assignments').length, 0, 'no assignment read or write here');
 });
 
 Deno.test('create-crew-member: a failed email → 502 partial_failure { profileCreated, profileId, invitation: send_failed, email_error }', async () => {
@@ -98,17 +107,126 @@ Deno.test('create-crew-member: a failed email → 502 partial_failure { profileC
   assertEquals(profile.account_status, 'not_invited', 'never stamped invited after a failed send');
 });
 
-Deno.test('create-crew-member: the assignment fails → 502 partial_failure { profileCreated, profileId, assignmentCreated: false } + invitation', async () => {
-  const h = setup();
-  h.world.hooks.query = (q) => (q.table === 'crew_assignments' && q.op === 'insert' ? fail('XX000', 'boom') : undefined);
-  const res = await create(h, P.adminA.token, body({ vesselId: V_A1 }));
-  assertEquals(res.status, 502);
+Deno.test('create-crew-member: the assignment fails → 502 partial_failure { profileCreated, profileId, assignmentCreated: false, assignment: failed } + invitation', async () => {
+  for (const p3 of [true, false]) {
+    const h = setup({ p3 });
+    // P3: the database refuses the vessel; D-01: the edge insert fails.
+    if (p3) h.world.rpcs.fulfil_imported_assignment = () => ok('not_eligible');
+    else h.world.hooks.query = (q) => (q.table === 'crew_assignments' && q.op === 'insert' ? fail('XX000', 'boom') : undefined);
+    const res = await create(h, P.adminA.token, body({ vesselId: V_A1 }));
+    assertEquals(res.status, 502, `p3=${p3}`);
+    const answer = await bodyOf(res);
+    const error = obj(answer, 'error');
+    const [profile] = created(h.world);
+    assertEquals(error.code, 'partial_failure');
+    assertEquals(error.details, { profileCreated: true, profileId: profile.id, assignmentCreated: false, assignment: 'failed' });
+    assertEquals(obj(answer, 'invitation').status, 'sent');
+    assertEquals(assignmentsOf(h.world, profile.user_id).length, 0);
+  }
+});
+
+Deno.test('create-crew-member: an invitation failure reports the assignment in the 502 details', async () => {
+  // P3: the failed send still linked the login, so the vessel was assigned.
+  const linked = setup({ results: [{ ok: false, errorCode: 'provider_unavailable' }] });
+  const r1 = await create(linked, P.adminA.token, body({ vesselId: V_A1 }));
+  assertEquals(r1.status, 502);
+  const [p1] = created(linked.world);
+  assertEquals((await errorOf(r1)).details, {
+    profileCreated: true, profileId: p1.id, invitation: 'send_failed', email_error: 'provider_unavailable', assignment: 'created',
+  });
+  assertEquals(assignmentsOf(linked.world, p1.user_id).length, 1);
+
+  // D-01: a failed send links no login: the vessel waits.
+  const legacy = setup({ p3: false, results: [{ ok: false, errorCode: 'provider_unavailable' }] });
+  const r2 = await create(legacy, P.adminA.token, body({ vesselId: V_A1 }));
+  const [p2] = created(legacy.world);
+  assertEquals(((await errorOf(r2)).details as Record<string, unknown>).assignment, 'pending_login');
+  assertEquals([p2.user_id, p2.imported_vessel_id, p2.is_imported], [null, V_A1, true]);
+
+  // A refused invitation (here 503 from the reservation): the vessel waits.
+  const refused = setup();
+  refused.world.hooks.rpc = (r) => (r.fn === 'reserve_invitation_attempt' ? fail('XX000', 'lock timeout') : undefined);
+  const r3 = await create(refused, P.adminA.token, body({ vesselId: V_A1 }));
+  const details = (await errorOf(r3)).details as Record<string, unknown>;
+  assertEquals([details.invitation, details.invite_code, details.assignment], ['refused', 'status_unavailable', 'pending_login']);
+  assertFalse('assignmentCreated' in details);
+
+  // The fulfilment failed after a failed send: failed, and assignmentCreated: false.
+  const both = setup({ results: [{ ok: false, errorCode: 'provider_unavailable' }] });
+  both.world.rpcs.fulfil_imported_assignment = () => ok('not_eligible');
+  const r4 = await create(both, P.adminA.token, body({ vesselId: V_A1 }));
+  const d4 = (await errorOf(r4)).details as Record<string, unknown>;
+  assertEquals([d4.invitation, d4.assignment, d4.assignmentCreated], ['send_failed', 'failed', false]);
+
+  // No vessel: no assignment field at all.
+  const none = setup({ results: [{ ok: false, errorCode: 'provider_unavailable' }] });
+  const r5 = await create(none, P.adminA.token, body());
+  assertFalse('assignment' in ((await errorOf(r5)).details as Record<string, unknown>));
+});
+
+// ---- the pending-login vessel is assigned when a later invitation links the login (D-199) -------
+
+const SCENARIO = { vesselId: V_A1, position: 'Deckhand', joinDate: '2026-12-01' };
+
+async function addWithoutInvite(h: ReturnType<typeof setup>): Promise<string> {
+  const res = await create(h, P.adminA.token, body({ ...SCENARIO, sendInvite: false }));
+  assertEquals(res.status, 201);
   const answer = await bodyOf(res);
-  const error = obj(answer, 'error');
+  assertEquals(answer.assignment, 'pending_login');
+  assertEquals(obj(answer, 'invitation'), { status: 'not_sent' });
   const [profile] = created(h.world);
-  assertEquals(error.code, 'partial_failure');
-  assertEquals(error.details, { profileCreated: true, profileId: profile.id, assignmentCreated: false });
-  assertEquals(obj(answer, 'invitation').status, 'sent');
+  assertEquals([profile.joining_date, profile.position, profile.imported_vessel_id, profile.is_imported, profile.user_id], ['2026-12-01', 'Deckhand', V_A1, true, null]);
+  assertEquals((h.world.tables.crew_assignments ?? []).filter((a) => a.vessel_id === V_A1 && !a.user_id).length, 0);
+  return String(answer.profileId);
+}
+
+function assertAssignedOnce(h: ReturnType<typeof setup>, profileId: string, label: string): void {
+  const profile = profileRow(h.world, profileId);
+  assert(typeof profile.user_id === 'string', `${label}: login linked`);
+  const rows = assignmentsOf(h.world, profile.user_id);
+  assertEquals(rows.map((a) => [a.vessel_id, a.position, a.join_date]), [[V_A1, 'Deckhand', '2026-12-01']], label);
+  assertEquals([profile.is_imported, profile.imported_vessel_id], [false, null], label);
+}
+
+Deno.test('create-crew-member: sendInvite false → pending_login; a later send-invitation assigns the vessel once', async () => {
+  for (const p3 of [true, false]) {
+    const h = setup({ p3 });
+    const profileId = await addWithoutInvite(h);
+    const send = sendInvitation({ env: () => TEST_ENV, createClient: fakeClientFactory(h.world), invite: { now: () => NOW, isFakeEmail: () => false, sendEmail: () => Promise.resolve({ ok: true, providerMessageId: 'msg-2' }) } });
+    const res = await send(request(P.adminA.token, { profileId }));
+    assertEquals(res.status, 200, `p3=${p3}`);
+    const answer = await bodyOf(res);
+    assertEquals(obj(answer, 'invitation').status, 'sent');
+    assertEquals(answer.assignment, 'created', `p3=${p3}`);
+    assertAssignedOnce(h, profileId, `send-invitation p3=${p3}`);
+  }
+});
+
+Deno.test('create-crew-member: sendInvite false → pending_login; a later bulk-invite assigns the vessel once', async () => {
+  for (const p3 of [true, false]) {
+    const h = setup({ p3 });
+    const profileId = await addWithoutInvite(h);
+    const bulk = bulkInvite({ env: () => TEST_ENV, createClient: fakeClientFactory(h.world), pauseMs: 0, invite: { now: () => NOW, isFakeEmail: () => false, sendEmail: () => Promise.resolve({ ok: true, providerMessageId: 'msg-2' }) } });
+    const res = await bulk(request(P.adminA.token, { profileIds: [profileId] }));
+    assertEquals(res.status, 200, `p3=${p3}`);
+    const answer = await bodyOf(res);
+    assertEquals(answer.sent, 1);
+    const [row] = answer.results as Array<Record<string, unknown>>;
+    assertEquals([row.status, row.assignment], ['sent', 'created'], `p3=${p3}`);
+    assertAssignedOnce(h, profileId, `bulk-invite p3=${p3}`);
+  }
+});
+
+Deno.test('create-crew-member: sendInvite true → 201 created with exactly one assignment (control)', async () => {
+  for (const p3 of [true, false]) {
+    const h = setup({ p3 });
+    const res = await create(h, P.adminA.token, body(SCENARIO));
+    assertEquals(res.status, 201, `p3=${p3}`);
+    const answer = await bodyOf(res);
+    assertEquals(answer.assignment, 'created');
+    assertAssignedOnce(h, String(answer.profileId), `create p3=${p3}`);
+    assertEquals(callsOf(h.world, 'query').filter((q) => q.table === 'crew_assignments' && q.op === 'insert').length, p3 ? 0 : 1, 'the D-01 insert is the edge\'s');
+  }
 });
 
 Deno.test('create-crew-member: a disabled caller → 403 account_disabled, nothing written', async () => {

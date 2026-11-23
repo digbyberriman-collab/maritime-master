@@ -6,8 +6,13 @@
  * links land on `${STORM_SITE_URL}/reset-password?flow=invite`.
  *
  * Responses (every error is `{ error: { code, message, details? } }`):
- * - 200 `{ ok: true, invitation: { status: 'sent', stored, id } }`
- * - 502 `{ error: { code: 'send_failed', message, details: { email_error } }, invitation: { status: 'send_failed', stored, id } }`
+ * - 200 `{ ok: true, invitation: { status: 'sent', stored, id }, assignment? }`
+ * - 502 `{ error: { code: 'send_failed', message, details: { email_error } }, invitation: { status: 'send_failed', stored, id }, assignment? }`
+ * - `assignment: 'created' | 'failed'` (top level) only when the invitation
+ *   linked a login for an imported profile still waiting for its vessel and
+ *   the assignment step ran (D-199); absent otherwise
+ * - 409 `conflict` with `details.reason: counter_exhausted` when the attempt
+ *   counter is at its ceiling (nothing linked or sent, D-196)
  * - 400 `invalid_request` (no id; `details.reason` `missing_email` / `placeholder_email`)
  * - 401 `unauthorized`, 403 `account_disabled` / `forbidden` / `cross_company`
  * - 404 `not_found` (not visible to the caller), 409 `already_active` / `conflict`

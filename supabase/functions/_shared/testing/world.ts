@@ -4,8 +4,9 @@
  *
  * `p3: true` = the Phase 2 P2/P3 migrations are applied: `my_account_status`,
  * `has_capability`, `reserve_invitation_attempt`, `record_invitation_send`,
- * `revoke_invitation`, `auth_user_id_for_email` and `set_membership_status`
- * answer, `user_invitations` exists, and a disabled user reads no rows at all
+ * `revoke_invitation`, `auth_user_id_for_email`, `set_membership_status`,
+ * `fulfil_imported_assignment` and `invitation_withdrawn_for` answer,
+ * `user_invitations` exists, and a disabled user reads no rows at all
  * (file 7). `p3: false` = today's live database: those RPCs answer PGRST202
  * and `user_invitations` PGRST205 (D-01), so every function takes its
  * documented legacy branch.
@@ -15,10 +16,15 @@
  * failed send) cooldown, and increments `send_attempts` (monotonic across a
  * revoke: a new live row starts from the profile's highest count);
  * `record_invitation_send` records the outcome without incrementing, never
- * downgrades a `sent` row on `provider_duplicate`, and a `sent` outcome
- * restores a removed membership; `revoke_invitation` (users-access admin)
- * also resets a never-signed-in `invited` profile to `not_invited` and
- * removes the never-accepted membership.
+ * downgrades a `sent` row on `provider_duplicate`, a `sent` outcome
+ * restores a removed membership, and once the profile has a login it calls
+ * `fulfil_imported_assignment` (D-199: through `world.rpcs`, so a test that
+ * replaces or deletes that function changes both); `revoke_invitation`
+ * (users-access admin) also resets a never-signed-in `invited` profile to
+ * `not_invited` and removes the never-accepted membership;
+ * `invitation_withdrawn_for` answers true for a profile that is neither
+ * invited nor active whose newest invitation is revoked or expired and was
+ * never accepted.
  */
 import type { EdgeEnv } from '../env.ts';
 import { createWorld, fail, type Caller, type FakeAuthUser, type FakeResult, type FakeRow, type FakeWorld, ok } from './fakeSupabase.ts';
@@ -254,6 +260,41 @@ function invitationRows(wd: FakeWorld): FakeRow[] {
   return (wd.tables.user_invitations ??= []);
 }
 
+export type FulfilAnswer = 'created' | 'exists' | 'none' | 'not_eligible';
+
+/**
+ * `fulfil_imported_assignment` as the SQL (D-199) defines it: a linked,
+ * imported profile with `imported_vessel_id` and no current assignment at
+ * all gets one current `crew_assignments` row on that vessel (its company's,
+ * not Sold: else `not_eligible`, profile untouched), from its position (else
+ * rank, else Crew; blank counts as missing) and `joining_date` (else today),
+ * and the import flags are cleared. Anything else (not imported, no login,
+ * already a current crew member) is `none` and changes nothing, so a second
+ * call adds nothing.
+ */
+export function fakeFulfil(wd: FakeWorld, profile: FakeRow, actor: unknown): FulfilAnswer {
+  const userId = profile.user_id;
+  const vesselId = profile.imported_vessel_id;
+  if (typeof userId !== 'string' || !userId || profile.is_imported !== true || !vesselId) return 'none';
+  const rows = (wd.tables.crew_assignments ??= []);
+  if (rows.some((a) => a.user_id === userId && a.is_current === true)) return 'none';
+  const vessel = (wd.tables.vessels ?? []).find((v) => v.id === vesselId);
+  if (!vessel || vessel.company_id !== profile.company_id || vessel.status === 'Sold') return 'not_eligible';
+  const filled = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  rows.push({
+    id: crypto.randomUUID(),
+    user_id: userId,
+    vessel_id: vesselId,
+    position: filled(profile.position) ?? filled(profile.rank) ?? 'Crew',
+    join_date: profile.joining_date ?? wd.now().toISOString().slice(0, 10),
+    is_current: true,
+    created_by: actor ?? null,
+  });
+  profile.is_imported = false;
+  profile.imported_vessel_id = null;
+  return 'created';
+}
+
 function installP3Rpcs(world: FakeWorld): void {
   world.rpcs.my_account_status = (_args, caller, wd) => {
     const me = profileOf(wd, caller.userId);
@@ -359,6 +400,9 @@ function installP3Rpcs(world: FakeWorld): void {
       user_id: args.p_user_id ?? live.user_id ?? null,
     });
     if (args.p_user_id && !profile.user_id) profile.user_id = args.p_user_id;
+    // D-199: a linked login gets its imported vessel (a send that failed but still linked it too).
+    const fulfil = wd.rpcs.fulfil_imported_assignment;
+    if (profile.user_id && fulfil) fulfil({ p_profile_id: profile.id, p_actor: args.p_invited_by ?? null }, { role: 'service', userId: null }, wd);
     if (outcome === 'sent') {
       if (!['active', 'disabled'].includes(String(profile.account_status))) profile.account_status = 'invited';
       profile.last_invited_at = at;
@@ -372,6 +416,22 @@ function installP3Rpcs(world: FakeWorld): void {
       }
     }
     return ok({ ...live });
+  };
+
+  world.rpcs.fulfil_imported_assignment = (args, caller, wd) => {
+    const denied = SERVICE_ONLY(caller);
+    if (denied) return denied;
+    const profile = (wd.tables.profiles ?? []).find((p) => p.id === args.p_profile_id);
+    return ok(profile ? fakeFulfil(wd, profile, args.p_actor) : 'none');
+  };
+
+  world.rpcs.invitation_withdrawn_for = (args, caller, wd) => {
+    const denied = SERVICE_ONLY(caller);
+    if (denied) return denied;
+    const profile = profileOf(wd, typeof args._user_id === 'string' ? args._user_id : null);
+    if (!profile || ['invited', 'active'].includes(String(profile.account_status ?? '').toLowerCase())) return ok(false);
+    const newest = invitationRows(wd).filter((r) => r.profile_id === profile.id || r.user_id === profile.user_id).at(-1);
+    return ok(!!newest && ['revoked', 'expired'].includes(String(newest.status)) && !newest.accepted_at);
   };
 
   world.rpcs.set_membership_status = (args, caller, wd) => {

@@ -43,6 +43,8 @@ Deno.test('bulk-invite: per-row results with sent / failed / refused counts', as
   ]);
   assertEquals(results[1].emailError, 'provider_unavailable');
   assertEquals(results[0].stored, true);
+  // importedA waited on Aurora: its row says the vessel was assigned; people already on a vessel and refusals carry no field.
+  assertEquals(results.map((r) => r.assignment ?? null), ['created', null, null, null, null]);
   assertEquals(h.sent.length, 2);
   assertEquals(profileRow(h.world, P.invitedA.profileId).account_status, 'invited', 'unchanged by a failed send');
   assertEquals(profileRow(h.world, P.importedA.profileId).account_status, 'invited');
@@ -68,6 +70,8 @@ Deno.test('bulk-invite: a master gets per-row refusals for people outside their 
   assertEquals(results.map((r) => r.status), ['sent', 'refused']);
   assertEquals(results[1].code, 'forbidden');
   assertEquals(results[0].stored, false, 'legacy database: not stored');
+  assertEquals(results[0].assignment, 'created', 'D-01: the edge assigned the vessel the master may invite for');
+  assertEquals(results[1].assignment, undefined);
 });
 
 Deno.test('bulk-invite: STORM_SITE_URL missing → 500 before any row', async () => {

@@ -2,7 +2,7 @@ import { assert, assertEquals, assertFalse } from 'jsr:@std/assert@1.0.13';
 import type { EmailMessage, EmailResult } from '../_shared/email.ts';
 import type { EdgeEnv } from '../_shared/env.ts';
 import { callsOf, fakeClientFactory, type FakeWorld } from '../_shared/testing/fakeSupabase.ts';
-import { bodyOf, buildWorld, CO_A, envWith, obj, P, profileRow, request, TEST_ENV } from '../_shared/testing/world.ts';
+import { bodyOf, buildWorld, CO_A, envWith, obj, P, profileRow, request, TEST_ENV, V_A1 } from '../_shared/testing/world.ts';
 import { createHandler } from './handler.ts';
 
 const NOW = new Date('2026-11-23T10:00:00Z');
@@ -42,6 +42,10 @@ Deno.test('send-invitation: 200 sent with the stored invitation id', async () =>
   assertEquals(invitation.status, 'sent');
   assertEquals(invitation.stored, true);
   assert(typeof invitation.id === 'string');
+  // importedA waits on Aurora: the invitation linked a login, so the vessel is assigned (D-199).
+  assertEquals(body.assignment, 'created');
+  const userId = profileRow(h.world, P.importedA.profileId).user_id;
+  assertEquals((h.world.tables.crew_assignments ?? []).filter((a) => a.user_id === userId && a.is_current).map((a) => a.vessel_id), [V_A1]);
   // The client redirectTo is ignored: the link lands on STORM_SITE_URL.
   const link = callsOf(h.world, 'admin').find((c) => c.method === 'generateLink');
   const options = link?.args.options as { redirectTo?: string } | undefined;
@@ -58,6 +62,7 @@ Deno.test('send-invitation: 502 send_failed with details.email_error; never "sen
   assertEquals(obj(obj(body, 'error'), 'details'), { email_error: 'provider_rejected' });
   assertEquals(obj(body, 'invitation').status, 'send_failed');
   assertEquals(obj(body, 'invitation').stored, true);
+  assertEquals(body.assignment, 'created', 'the recorded failure still linked the login (D-199)');
   assertFalse(JSON.stringify(body).includes('"sent"'));
   assertEquals(profileRow(h.world, P.importedA.profileId).account_status, 'not_invited');
 });
@@ -66,13 +71,17 @@ Deno.test('send-invitation: RPCs missing (D-01) → stored:false; legacy columns
   const h = setup({ p3: false });
   const res = await invite(h, P.adminA.token, { profileId: P.importedA.profileId });
   assertEquals(res.status, 200);
-  assertEquals(obj(await bodyOf(res), 'invitation'), { status: 'sent', stored: false, id: null });
+  const answer = await bodyOf(res);
+  assertEquals(obj(answer, 'invitation'), { status: 'sent', stored: false, id: null });
+  assertEquals(answer.assignment, 'created', 'D-01: the edge wrote the assignment');
   assertEquals(profileRow(h.world, P.importedA.profileId).account_status, 'invited');
 
   const failing = setup({ p3: false, results: [{ ok: false, errorCode: 'not_configured' }] });
   const r2 = await invite(failing, P.adminA.token, { profileId: P.importedA.profileId });
   assertEquals(r2.status, 502);
-  assertEquals(obj(await bodyOf(r2), 'invitation'), { status: 'send_failed', stored: false, id: null });
+  const failed = await bodyOf(r2);
+  assertEquals(obj(failed, 'invitation'), { status: 'send_failed', stored: false, id: null });
+  assertFalse('assignment' in failed, 'a D-01 failure links no login, so nothing was assigned or claimed');
   assertEquals(profileRow(failing.world, P.importedA.profileId).account_status, 'not_invited');
 });
 
@@ -144,6 +153,7 @@ Deno.test('send-invitation: legacy userId is resolved through the caller\'s RLS 
   const res = await invite(h, P.adminA.token, { userId: P.invitedA.userId });
   assertEquals(res.status, 200);
   assertEquals(h.sent[0].to, P.invitedA.email);
+  assertFalse('assignment' in (await bodyOf(res)), 'already on a vessel: no assignment step');
   const other = await invite(h, P.adminB.token, { userId: P.invitedA.userId });
   assertEquals(other.status, 404);
 });
