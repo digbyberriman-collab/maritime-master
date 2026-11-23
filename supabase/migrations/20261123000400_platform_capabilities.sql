@@ -6,7 +6,8 @@
 --   their company's memberships)
 -- Helpers: legacy_user_admin(), role_rank(), user_role_rank(),
 --   has_capability(), has_capability_for(), user_company_for_admin(),
---   is_company_actor()
+--   is_company_actor(), admin_scope_all(), admin_may_act_on_user()
+--   (service role; definers), admin_may_view_user() (RLS predicate)
 -- TS mirror: src/modules/auth/types/db.pending.ts (AuthPendingFunctions
 --   has_capability / is_company_actor); the interim client adaptor useCan
 --   and the edge fallback supabase/functions/_shared/capability.ts
@@ -41,6 +42,17 @@
 -- own company or no company (CC-5: a row naming another company never
 -- makes anyone an admin anywhere).
 --
+-- Acting on a user (review round 2, D-120; gap/01 F23): admin_scope_all()
+-- is a full admin or a non-legacy admin over all vessels of the company;
+-- anyone else acts on a user only when every vessel of the target's
+-- structural vessel set (membership vessel rows, current crew assignments,
+-- else the profile's imported vessel, D-125; Sold and archived vessels
+-- excluded; read whatever the target's active state) is in their own
+-- reach, and never on a target with an empty set, vessel_scope all, fleet
+-- access or legacy fleet reach (admin_may_act_on_user(), for definers;
+-- admin_may_view_user(), the caller-scoped read predicate of the admin
+-- read policies here and in files 8 and 9).
+--
 -- Idempotent (D-12).
 
 -- ---------------------------------------------------------------- prerequisites (rule 14)
@@ -49,8 +61,14 @@ BEGIN
   IF to_regclass('public.account_memberships') IS NULL
      OR to_regprocedure('public.user_is_active(uuid)') IS NULL
      OR to_regprocedure('public.reach_vessel_for(uuid,uuid)') IS NULL
-     OR to_regprocedure('public.fleet_reach_for(uuid,uuid)') IS NULL THEN
-    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123000400_platform_capabilities needs account_memberships, user_is_active(), reach_vessel_for() and fleet_reach_for(): apply 20261123000300_platform_account_memberships.sql first';
+     OR to_regprocedure('public.reach_vessels_for(uuid)') IS NULL
+     OR to_regprocedure('public.fleet_reach_for(uuid,uuid)') IS NULL
+     OR to_regprocedure('public.legacy_fleet_reach(uuid)') IS NULL
+     OR to_regprocedure('public.vessel_in_reachable_state(text,text)') IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123000400_platform_capabilities needs account_memberships, user_is_active(), the reach helpers and legacy_fleet_reach(): apply 20261123000300_platform_account_memberships.sql first';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'imported_vessel_id') THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123000400_platform_capabilities needs the live profiles.imported_vessel_id';
   END IF;
   IF to_regclass('public.user_roles') IS NULL OR to_regprocedure('public.user_has_permission(uuid,text,public.permission_level,uuid)') IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123000400_platform_capabilities needs public.user_roles and user_has_permission(uuid,text,permission_level,uuid)';
@@ -315,17 +333,177 @@ BEGIN
 END;
 $$;
 
+-- ---------------------------------------------------------------- acting on a user (gap/01 F23; review round 2)
+
+-- Whether the actor administers every vessel of the company: an active
+-- user whose profile is in _company and who is a full legacy admin
+-- (legacy_user_admin), or holds a non-legacy owner membership, or a
+-- non-legacy admin membership with vessel_scope all (active, in its
+-- window) there. NULL / unknown / inactive -> false. Internal (service
+-- role; definers).
+CREATE OR REPLACE FUNCTION public.admin_scope_all(_actor uuid, _company uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT _actor IS NOT NULL
+     AND _company IS NOT NULL
+     AND public.user_is_active(_actor)
+     AND EXISTS (SELECT 1 FROM public.profiles AS p WHERE p.user_id = _actor AND p.company_id = _company)
+     AND (
+       public.legacy_user_admin(_actor)
+       OR EXISTS (
+         SELECT 1
+         FROM public.account_memberships AS m
+         WHERE m.user_id = _actor
+           AND m.company_id = _company
+           AND NOT m.legacy_managed
+           AND m.status = 'active'
+           AND (m.valid_from IS NULL OR m.valid_from <= now())
+           AND (m.valid_until IS NULL OR m.valid_until > now())
+           AND (m.kind = 'owner' OR (m.kind = 'admin' AND m.vessel_scope = 'all')))
+     )
+$$;
+
+-- Whether the actor may act on the target user (or the target profile,
+-- which may have no login yet) in _company, vessel by vessel: true with
+-- admin_scope_all(); otherwise only when the target's structural vessel
+-- set is non-empty and every vessel in it is in reach_vessels_for(_actor).
+-- The set is read whatever the target's active state (reach_vessels_for()
+-- of a disabled user is empty, which would make the rule vacuous): the
+-- target membership's account_membership_vessels rows (any window) plus
+-- the target's current crew assignments, else the profile's
+-- imported_vessel_id (D-125); Sold and archived vessels excluded. A target
+-- with an empty set, a membership with vessel_scope all or fleet access,
+-- or legacy fleet reach (a dpa / shore_management profile, an RBAC fleet
+-- role) needs admin_scope_all(). The target is resolved from the user, or
+-- from the profile when there is no user; it must belong to _company (its
+-- profile there, or a membership there). Unknown ids, an inactive actor or
+-- an actor outside _company -> false. Internal (service role; definers).
+CREATE OR REPLACE FUNCTION public.admin_may_act_on_user(_actor uuid, _target_user uuid, _company uuid, _target_profile uuid DEFAULT NULL)
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_profile public.profiles;
+  v_membership public.account_memberships;
+  v_user uuid;
+  v_vessels uuid[];
+BEGIN
+  IF _actor IS NULL OR _company IS NULL OR (_target_user IS NULL AND _target_profile IS NULL) THEN
+    RETURN false;
+  END IF;
+  IF NOT public.user_is_active(_actor)
+     OR NOT EXISTS (SELECT 1 FROM public.profiles AS a WHERE a.user_id = _actor AND a.company_id = _company) THEN
+    RETURN false;
+  END IF;
+
+  IF _target_user IS NOT NULL THEN
+    SELECT * INTO v_profile FROM public.profiles WHERE user_id = _target_user;
+  END IF;
+  IF v_profile.id IS NULL AND _target_profile IS NOT NULL THEN
+    SELECT * INTO v_profile FROM public.profiles WHERE id = _target_profile;
+  END IF;
+  v_user := coalesce(_target_user, v_profile.user_id);
+  SELECT * INTO v_membership
+  FROM public.account_memberships AS m
+  WHERE m.company_id = _company
+    AND ((v_user IS NOT NULL AND m.user_id = v_user) OR (v_profile.id IS NOT NULL AND m.profile_id = v_profile.id))
+  ORDER BY (m.user_id IS NOT DISTINCT FROM v_user) DESC, m.created_at
+  LIMIT 1;
+  IF v_profile.id IS NULL AND v_membership.id IS NULL THEN
+    RETURN false;  -- unknown target (fail closed)
+  END IF;
+  IF v_profile.company_id IS DISTINCT FROM _company AND v_membership.id IS NULL THEN
+    RETURN false;  -- not a member of this company
+  END IF;
+
+  IF public.admin_scope_all(_actor, _company) THEN
+    RETURN true;
+  END IF;
+
+  -- Everything below needs a current member of the company.
+  IF v_profile.id IS NULL OR v_profile.company_id IS DISTINCT FROM _company THEN
+    RETURN false;
+  END IF;
+  -- Fleet-wide targets need admin_scope_all().
+  IF v_profile.role::text IN ('dpa', 'shore_management')
+     OR (v_user IS NOT NULL AND public.legacy_fleet_reach(v_user))
+     OR (v_membership.id IS NOT NULL AND NOT v_membership.legacy_managed
+         AND (v_membership.vessel_scope = 'all' OR v_membership.fleet_access)) THEN
+    RETURN false;
+  END IF;
+
+  v_vessels := ARRAY(
+    SELECT v.id
+    FROM public.vessels AS v
+    WHERE v.company_id = _company
+      AND public.vessel_in_reachable_state(v.lifecycle_status, v.status)
+      AND (
+        (v_membership.id IS NOT NULL AND EXISTS (
+           SELECT 1 FROM public.account_membership_vessels AS mv
+           WHERE mv.membership_id = v_membership.id AND mv.vessel_id = v.id))
+        OR (v_user IS NOT NULL AND EXISTS (
+           SELECT 1 FROM public.crew_assignments AS ca
+           WHERE ca.user_id = v_user AND ca.vessel_id = v.id AND ca.is_current))
+      )
+  );
+  IF cardinality(v_vessels) = 0 AND v_profile.imported_vessel_id IS NOT NULL THEN
+    v_vessels := ARRAY(
+      SELECT v.id FROM public.vessels AS v
+      WHERE v.id = v_profile.imported_vessel_id
+        AND v.company_id = _company
+        AND public.vessel_in_reachable_state(v.lifecycle_status, v.status)
+    );
+  END IF;
+  IF cardinality(v_vessels) = 0 THEN
+    RETURN false;
+  END IF;
+  RETURN NOT EXISTS (
+    SELECT 1 FROM unnest(v_vessels) AS t(vessel_id)
+    WHERE t.vessel_id NOT IN (SELECT r FROM public.reach_vessels_for(_actor) AS r)
+  );
+END;
+$$;
+
+-- RLS predicate of the admin read policies (rule 11): the caller (active,
+-- with admin.access.users_access.view in _company) may see this user's
+-- access rows: admin_may_act_on_user(auth.uid(), ...). False without a
+-- caller.
+CREATE OR REPLACE FUNCTION public.admin_may_view_user(_target_user uuid, _company uuid, _target_profile uuid DEFAULT NULL)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT auth.uid() IS NOT NULL
+     AND public.has_capability('admin.access.users_access.view', _company)
+     AND public.admin_may_act_on_user(auth.uid(), _target_user, _company, _target_profile)
+$$;
+
 -- ---------------------------------------------------------------- admin read policies (file 3 has the own-row ones)
 
+-- Users-access viewers of the company, for the users they may act on
+-- (a vessel-scoped admin reads only the users of the vessels they reach).
 DROP POLICY IF EXISTS account_memberships_select_admin ON public.account_memberships;
 CREATE POLICY account_memberships_select_admin ON public.account_memberships
   FOR SELECT TO authenticated
-  USING (public.has_capability('admin.access.users_access.view', company_id));
+  USING (public.admin_may_view_user(user_id, company_id, profile_id));
 
 DROP POLICY IF EXISTS account_membership_vessels_select_admin ON public.account_membership_vessels;
 CREATE POLICY account_membership_vessels_select_admin ON public.account_membership_vessels
   FOR SELECT TO authenticated
-  USING (public.has_capability('admin.access.users_access.view', company_id));
+  USING (EXISTS (
+    SELECT 1 FROM public.account_memberships AS m
+    WHERE m.id = account_membership_vessels.membership_id
+      AND public.admin_may_view_user(m.user_id, m.company_id, m.profile_id)
+  ));
 
 -- ---------------------------------------------------------------- privileges (rule 5)
 
@@ -336,6 +514,9 @@ REVOKE ALL ON FUNCTION public.has_capability_for(uuid, text, uuid, uuid) FROM PU
 REVOKE ALL ON FUNCTION public.has_capability(text, uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.user_company_for_admin(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.is_company_actor(uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.admin_scope_all(uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.admin_may_act_on_user(uuid, uuid, uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.admin_may_view_user(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
 
 GRANT EXECUTE ON FUNCTION public.legacy_user_admin(uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.role_rank(text) TO service_role;
@@ -344,6 +525,9 @@ GRANT EXECUTE ON FUNCTION public.has_capability_for(uuid, text, uuid, uuid) TO s
 GRANT EXECUTE ON FUNCTION public.has_capability(text, uuid, uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.user_company_for_admin(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.is_company_actor(uuid, uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.admin_scope_all(uuid, uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.admin_may_act_on_user(uuid, uuid, uuid, uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.admin_may_view_user(uuid, uuid, uuid) TO authenticated, service_role;
 
 -- ---------------------------------------------------------------- comments
 
@@ -354,3 +538,6 @@ COMMENT ON FUNCTION public.has_capability_for(uuid, text, uuid, uuid) IS 'The se
 COMMENT ON FUNCTION public.has_capability(text, uuid, uuid) IS 'has_capability_for(auth.uid(), ...): the caller''s capability; false without a caller. Policies and RPCs use it.';
 COMMENT ON FUNCTION public.user_company_for_admin(uuid) IS 'The target user''s company when the active caller is in it (service role: always); ignores the target''s own active state. Used by RBAC policies.';
 COMMENT ON FUNCTION public.is_company_actor(uuid, uuid) IS 'gap/01 W10 interim: whether the user acts as the company for a vessel (or, with no vessel, a fleet record): full admin, or a non-legacy admin membership reaching the vessel. Never shore staff or crew.';
+COMMENT ON FUNCTION public.admin_scope_all(uuid, uuid) IS 'gap/01 F23: the active actor (profile in the company) is a full legacy admin, or holds a non-legacy owner membership or a non-legacy admin membership with vessel_scope all there. Internal (service role; definers).';
+COMMENT ON FUNCTION public.admin_may_act_on_user(uuid, uuid, uuid, uuid) IS 'gap/01 F23: whether the actor may act on the target user / profile of the company: admin_scope_all(), or every vessel of the target''s structural set (membership vessel rows, current crew assignments, else imported_vessel_id per D-125; Sold / archived excluded; whatever the target''s active state) is in the actor''s reach. Empty set, vessel_scope all, fleet access or legacy fleet reach need admin_scope_all(). Unknown ids, an inactive actor or another company: false. Internal (service role; definers).';
+COMMENT ON FUNCTION public.admin_may_view_user(uuid, uuid, uuid) IS 'RLS predicate (rule 11) of the admin read policies on memberships, membership vessels, user_roles, rbac_user_roles, overrides and invitations: the caller has admin.access.users_access.view in the company and admin_may_act_on_user(auth.uid(), ...). False without a caller.';

@@ -23,7 +23,7 @@ SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET vessel_id 
                          '42501', 'self_assignment_refused', 'nor move their own assignment to another vessel');
 SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET is_current = true, leave_date = NULL WHERE id = %L$q$, tests.id('assignment:A.master_dra@A.gam')),
                          '42501', 'self_assignment_refused', 'nor revive an ended assignment of their own');
-SELECT tests.lives($q$UPDATE public.crew_assignments SET position = 'Captain' WHERE user_id = auth.uid() AND is_current$q$, 'an own-row edit that grants no reach is still allowed');
+SELECT tests.lives($q$UPDATE public.crew_assignments SET notes = 'Watch schedule agreed' WHERE user_id = auth.uid() AND is_current$q$, 'an own-row edit that grants no reach and changes no office is still allowed');
 -- b. placing someone else needs reach of the vessel
 SELECT tests.throws_like(format($q$INSERT INTO public.crew_assignments (vessel_id, user_id, position, join_date, is_current) VALUES (%L, %L, 'Deckhand', current_date, true)$q$, tests.vessel_id('A.hyd'), tests.user_id('A.deckhand')),
                          '42501', 'assignment_vessel_out_of_reach', 'a Master cannot place someone on a vessel they do not reach');
@@ -64,10 +64,42 @@ SELECT tests.lives(format($q$INSERT INTO public.crew_assignments (id, vessel_id,
 SELECT tests.lives(format($q$UPDATE public.crew_assignments SET vessel_id = %L WHERE id = %L$q$, tests.vessel_id('A.gam'), tests.id('ca:deckhand')), 'the admin moves an assignment between company vessels');
 SELECT tests.reset_role();
 
+-- Offices (review round 2, crew-assignment-office-self-promotion): the
+-- signature offices read crew_assignments.position / rank (D-132 interim),
+-- so an HR editor never retitles their own row, and only a users-access
+-- admin of the vessel appoints, removes or moves a Master.
+SELECT tests.seed_user('A', 'A.purser_dra', 'crew');
+SELECT tests.seed_rbac_role('A.purser_dra', 'purser', 'A.dra');
+SELECT tests.seed_assignment('A.purser_dra', 'A.dra', true, 'Purser');
+SELECT tests.seed_user('A', 'A.deck_dra', 'crew');
+SELECT tests.seed_assignment('A.deck_dra', 'A.dra', true, 'Deckhand');
+SELECT tests.seed_user('A', 'A.deck2_dra', 'crew');
+SELECT tests.as_user(tests.user_id('A.purser_dra'));
+SELECT tests.ok(public.hr_can_edit(auth.uid()) AND NOT public.has_capability('admin.access.users_access.admin', tests.company_id('A'), tests.vessel_id('A.dra')),
+                'the purser is an HR editor, not a users-access admin');
+SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET %s WHERE user_id = auth.uid() AND is_current$q$, v.set_clause), '42501', 'self_office_change_refused', 'the purser cannot set their own ' || v.what)
+FROM (VALUES ($s$position = 'Master'$s$, 'position Master'), ($s$rank = 'Captain'$s$, 'rank Captain'), ($s$position = 'Chief Engineer'$s$, 'position Chief Engineer')) AS v(set_clause, what);
+SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET rank = 'Captain' WHERE id = %L$q$, tests.id('assignment:A.deck_dra@A.dra')), '42501', 'master_office_change_refused',
+                         'nor set rank Captain on a deckhand');
+SELECT tests.throws_like(format($q$INSERT INTO public.crew_assignments (vessel_id, user_id, position, join_date, is_current) VALUES (%L, %L, 'Master', current_date, true)$q$, tests.vessel_id('A.dra'), tests.user_id('A.deck2_dra')),
+                         '42501', 'master_office_change_refused', 'nor place a colleague as Master');
+SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET position = 'Deckhand' WHERE id = %L$q$, tests.id('assignment:A.master_dra@A.dra')), '42501', 'master_office_change_refused',
+                         'nor remove the real Master');
+SELECT tests.lives(format($q$UPDATE public.crew_assignments SET position = 'Bosun' WHERE id = %L$q$, tests.id('assignment:A.deck_dra@A.dra')), 'an HR editor still retitles a deckhand (no office of their own, not Master)');
+SELECT tests.reset_role();
+SELECT tests.ok(NOT public.record_is_master(tests.user_id('A.purser_dra'), tests.vessel_id('A.dra')) AND NOT public.record_is_master(tests.user_id('A.deck_dra'), tests.vessel_id('A.dra')),
+                'nobody new is Master of DRAAK');
+-- A users-access admin of the vessel may.
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.lives(format($q$UPDATE public.crew_assignments SET position = 'Master' WHERE id = %L$q$, tests.id('ca:fm')), 'a users-access admin changes their own office');
+SELECT tests.lives(format($q$UPDATE public.crew_assignments SET rank = 'Captain' WHERE id = %L$q$, tests.id('assignment:A.deck_dra@A.dra')), 'and appoints a Captain');
+SELECT tests.reset_role();
+
 -- The service role (admin-actions, create-crew-member) is not limited.
 SELECT tests.as_service();
 SELECT tests.lives(format($q$INSERT INTO public.crew_assignments (vessel_id, user_id, position, join_date, is_current) VALUES (%L, %L, 'Master', current_date, true)$q$, tests.vessel_id('A.hyd'), tests.user_id('A.master_dra')),
                    'the service role writes any assignment');
+SELECT tests.lives(format($q$UPDATE public.crew_assignments SET rank = 'Master' WHERE id = %L$q$, tests.id('assignment:A.purser_dra@A.dra')), 'and any office');
 SELECT tests.reset_role();
 SELECT tests.ok(public.reach_vessel_for(tests.user_id('A.master_dra'), tests.vessel_id('A.hyd')), 'and that one grants reach');
 

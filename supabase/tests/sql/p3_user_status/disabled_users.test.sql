@@ -168,6 +168,44 @@ SELECT tests.ok(public.hr_can_edit(auth.uid()), 'the Master is an HR editor');
 SELECT tests.throws_like(format($q$UPDATE public.profiles SET role = 'dpa' WHERE user_id = %L$q$, tests.user_id('A.crew_hyd')), '42501', 'profile_access_columns_locked', 'an HR editor cannot set anyone''s role to dpa');
 SELECT tests.throws_like(format($q$UPDATE public.profiles SET account_status = 'disabled' WHERE user_id = %L$q$, tests.user_id('A.crew_hyd')), '42501', 'profile_access_columns_locked', 'an HR editor cannot change an account status');
 
+-- The invitation and sign-in bookkeeping is the engine's (review round 2,
+-- profile-invite-bookkeeping-writable; D-174, D-176, D-183): the HR editor
+-- writes none of it, on another profile or on their own.
+SELECT tests.ok(NOT public.has_capability('admin.access.users_access.admin', tests.company_id('A')), 'the Master is not a users-access admin');
+SELECT tests.throws_like(format($q$UPDATE public.profiles SET %s WHERE user_id = %L$q$, c.set_clause, tests.user_id(c.target)), '42501', 'profile_access_columns_locked',
+                         format('an HR editor cannot write %s on %s', c.col, c.whose))
+FROM (VALUES
+  ('invitation_token', $s$invitation_token = 'attackerChosenToken_0123456789'$s$),
+  ('invitation_token_expires', $s$invitation_token_expires = now() + interval '1 day'$s$),
+  ('invitation_count', $s$invitation_count = 2147483647$s$),
+  ('last_invited_at', $s$last_invited_at = now() + interval '50 years'$s$),
+  ('invited_at', $s$invited_at = now()$s$),
+  ('last_login_at', $s$last_login_at = now()$s$)
+) AS v(col, set_clause)
+CROSS JOIN (VALUES ('A.crew_hyd', 'another profile'), ('A.master_dra', 'their own row')) AS t(target, whose)
+CROSS JOIN LATERAL (SELECT v.col, v.set_clause, t.target, t.whose) AS c
+ORDER BY c.whose, c.col;
+SELECT tests.reset_role();
+SELECT tests.ok((SELECT invitation_token IS NULL AND coalesce(invitation_count, 0) = 0 AND last_login_at IS NULL FROM public.profiles WHERE user_id = tests.user_id('A.crew_hyd')),
+                'the bookkeeping of the other profile is unchanged');
+-- A signed-in INSERT starts with no token, no sign-in and count 0.
+SELECT tests._set_claims(jsonb_build_object('sub', tests.user_id('A.master_dra'), 'role', 'authenticated'));
+SELECT tests.throws_like(format($q$INSERT INTO public.profiles (id, email, first_name, last_name, company_id, role, invitation_token, invitation_token_expires) VALUES (%L, 'token-crew@example.test', 'Crew', 'token', %L, 'crew', 'chosenToken_0123456789abcdef', now() + interval '1 day')$q$,
+                                tests.id('profile:token_crew'), tests.company_id('A')), '42501', 'profile_access_columns_locked', 'a signed-in INSERT with an invitation token is refused');
+SELECT tests.throws_like(format($q$INSERT INTO public.profiles (id, email, first_name, last_name, company_id, role, last_login_at) VALUES (%L, 'login-crew@example.test', 'Crew', 'login', %L, 'crew', now())$q$,
+                                tests.id('profile:login_crew'), tests.company_id('A')), '42501', 'profile_access_columns_locked', 'and with a sign-in stamp');
+SELECT tests.throws_like(format($q$INSERT INTO public.profiles (id, email, first_name, last_name, company_id, role, invitation_count) VALUES (%L, 'count-crew@example.test', 'Crew', 'count', %L, 'crew', 5)$q$,
+                                tests.id('profile:count_crew'), tests.company_id('A')), '42501', 'profile_access_columns_locked', 'and with an invitation count');
+SELECT tests.reset_role();
+-- The service role (no JWT) and the engine writers still write it.
+SELECT tests.as_service();
+SELECT tests.lives(format($q$UPDATE public.profiles SET invitation_count = 3, last_invited_at = now() WHERE user_id = %L$q$, tests.user_id('A.colleague')), 'the service role writes the bookkeeping');
+SELECT tests.reset_role();
+SELECT tests.as_user(tests.user_id('A.colleague'));
+SELECT tests.is(public.record_session_start(), 'active', 'record_session_start (engine) still stamps the sign-in');
+SELECT tests.reset_role();
+SELECT tests.ok((SELECT last_login_at IS NOT NULL FROM public.profiles WHERE user_id = tests.user_id('A.colleague')), 'and last_login_at is set');
+
 -- A users-access admin changes another user's role in their company, never their own.
 SELECT tests.as_user(tests.user_id('A.fleet_manager'));
 SELECT tests.lives(format($q$UPDATE public.profiles SET role = 'chief_officer' WHERE user_id = %L$q$, tests.user_id('A.crew_hyd')), 'a users-access admin changes a colleague''s role');
@@ -263,6 +301,45 @@ SELECT tests.throws_like(format($q$SELECT public.set_membership_status(%L, 'disa
 SELECT tests.lives(format($q$SELECT public.set_membership_status(%L, 'disabled', %L, 'Role ended')$q$, tests.user_id('A.ua_admin'), tests.user_id('A.fleet_manager')), 'the DPA can');
 SELECT tests.reset_role();
 SELECT tests.is((SELECT status FROM public.account_memberships WHERE user_id = tests.user_id('A.ua_admin')), 'disabled', 'non-legacy membership disabled');
+
+-- A withdrawn invitee is re-invited, not enabled (review round 2,
+-- enable-after-revoke-inconsistent-status): after a sent invitation is
+-- revoked, or expires, set_membership_status('active') is refused and
+-- changes nothing.
+SELECT tests.seed_auth_user('A.withdrawn_rv');
+SELECT tests.seed_profile('A', 'A.withdrawn_rv', 'crew', 'not_invited', 'A.withdrawn_rv');
+SELECT tests.seed_auth_user('A.withdrawn_ex');
+SELECT tests.seed_profile('A', 'A.withdrawn_ex', 'crew', 'not_invited', 'A.withdrawn_ex');
+SELECT tests.as_service();
+SELECT public.record_invitation_send(tests.profile_id(k), 'sent', NULL, 'msg-w', tests.user_id('A.fleet_manager')) FROM unnest(ARRAY['A.withdrawn_rv', 'A.withdrawn_ex']) AS k;
+SELECT tests.reset_role();
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT public.revoke_invitation(ui.id) FROM public.user_invitations AS ui WHERE ui.profile_id = tests.profile_id('A.withdrawn_rv');
+SELECT tests.reset_role();
+UPDATE public.user_invitations SET expires_at = now() - interval '1 minute' WHERE profile_id = tests.profile_id('A.withdrawn_ex');
+SELECT tests.as_service();
+SELECT tests.ok(public.expire_invitations() >= 1, 'the second invitee''s invitation expires');
+SELECT tests.throws_like(format($q$SELECT public.set_membership_status(%L, 'active', %L)$q$, tests.user_id(k), tests.user_id('A.fleet_manager')), '42501', 'invitation_withdrawn',
+                         k || ': enabling a withdrawn invitee is refused (re-invite instead)')
+FROM unnest(ARRAY['A.withdrawn_rv', 'A.withdrawn_ex']) AS k;
+SELECT tests.reset_role();
+SELECT tests.results_eq(
+  format($q$SELECT p.account_status, m.status, public.user_is_active(p.user_id) FROM public.profiles AS p JOIN public.account_memberships AS m ON m.user_id = p.user_id WHERE p.id IN (%L, %L)$q$,
+         tests.profile_id('A.withdrawn_rv'), tests.profile_id('A.withdrawn_ex')),
+  $q$VALUES ('not_invited'::text, 'removed'::text, false), ('not_invited'::text, 'removed'::text, false)$q$,
+  'both stay not_invited with the membership removed and inactive');
+SELECT tests.is((SELECT count(*) FROM public.admin_action_log WHERE action_type = 'TOGGLE_ACCESS' AND target_user_id IN (tests.user_id('A.withdrawn_rv'), tests.user_id('A.withdrawn_ex'))), 0::bigint,
+                'and no TOGGLE_ACCESS row was written');
+
+-- The W7 last-manager checks are serialised per company (review round 2,
+-- last-manager-guard-race; scripts/db/test/last-manager-race.test.mjs
+-- races two sessions): every path that can remove a manager of admins
+-- takes lock_company_admin_managers() first.
+SELECT tests.ok(position('lock_company_admin_managers(' IN pg_get_functiondef(f::regprocedure)) > 0, f || ' takes lock_company_admin_managers()')
+FROM unnest(ARRAY['public.set_membership_status(uuid,text,uuid,text)', 'public.profiles_guard_access_columns()', 'public.hr_anonymize_profile(uuid,text)']) AS f;
+SELECT tests.ok(position('pg_advisory_xact_lock' IN pg_get_functiondef('public.lock_company_admin_managers(uuid)'::regprocedure)) > 0, 'lock_company_admin_managers is a transaction-level advisory lock');
+SELECT tests.ok(NOT has_function_privilege(r, 'public.lock_company_admin_managers(uuid)', 'EXECUTE'), 'lock_company_admin_managers is not executable by ' || r)
+FROM unnest(ARRAY['anon', 'authenticated', 'service_role']) AS r;
 
 -- ------------------------------------------------------------ W7 through a direct profiles UPDATE (no bypass of set_membership_status)
 

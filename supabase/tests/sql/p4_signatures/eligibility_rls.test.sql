@@ -113,6 +113,23 @@ SELECT tests.throws_like(format($q$UPDATE public.record_signatures SET signer_na
 SELECT set_config('storm.record_engine', '', true);
 SELECT tests.is(public.record_instantiate_slots(:'env', 1), 0, 'record_instantiate_slots is idempotent per cycle');
 
+-- ------------------------------------------------------------ an HR editor cannot make themselves the Master (review round 2)
+
+-- crew-assignment-office-self-promotion: the purser (RBAC purser on DRAAK,
+-- an HR editor) cannot retitle their own assignment as Master, so the
+-- Master office and its slot stay out of reach (20261123010300).
+SELECT tests.seed_user('A', 'A.purser_dra', 'crew');
+SELECT tests.seed_rbac_role('A.purser_dra', 'purser', 'A.dra');
+SELECT tests.seed_assignment('A.purser_dra', 'A.dra', true, 'Purser');
+SELECT tests.as_user(tests.user_id('A.purser_dra'));
+SELECT tests.throws(format($q$UPDATE public.crew_assignments SET position = 'Master' WHERE user_id = auth.uid() AND vessel_id = %L$q$, tests.vessel_id('A.dra')), '42501',
+                    'the purser''s own position Master is refused');
+SELECT tests.throws(format($q$UPDATE public.crew_assignments SET rank = 'Captain' WHERE user_id = auth.uid() AND vessel_id = %L$q$, tests.vessel_id('A.dra')), '42501',
+                    'and so is their own rank Captain');
+SELECT tests.reset_role();
+SELECT tests.ok(NOT public.record_is_master(tests.user_id('A.purser_dra'), tests.vessel_id('A.dra')), 'record_is_master stays false for the purser');
+SELECT tests.ok(NOT public.record_slot_eligible(tests.slot(:'env', 'master'), tests.profile_id('A.purser_dra')), 'and record_slot_eligible for the Master slot stays false');
+
 -- ------------------------------------------------------------ ACLs (rule 5)
 
 SELECT tests.ok(has_function_privilege('authenticated', f, 'EXECUTE') AND NOT has_function_privilege('anon', f, 'EXECUTE') AND NOT has_function_privilege('service_role', f, 'EXECUTE'), f || ': authenticated only')

@@ -262,6 +262,75 @@ SELECT tests.as_user(tests.user_id('B.admin'));
 SELECT tests.is_empty('SELECT 1 FROM public.user_permission_overrides', 'company B''s admin reads none of A''s overrides');
 SELECT tests.reset_role();
 
+-- ------------------------------------------------------------ overrides involving an administrator need a manager of admins (W7)
+
+-- w7-manages-admins-missing-overrides-revoke: A.shore (a full legacy admin,
+-- users-access admin, not a manager of admins) cannot mint a full admin
+-- (settings:admin) nor touch a DPA's access; ordinary module overrides are
+-- still theirs; the DPA does both.
+SELECT tests.as_user(tests.user_id('A.shore'));
+SELECT tests.ok(NOT public.permission_override_write_allowed(tests.user_id('A.crew_hyd'), tests.company_id('A'), 'settings', 'admin'), 'A.shore: settings:admin on crew is refused');
+SELECT tests.throws_like(format($q$INSERT INTO public.user_permission_overrides (user_id, module_key, permission, is_granted, reason, created_by) VALUES (%L, 'settings', 'admin', true, 'mint', auth.uid())$q$, tests.user_id('A.crew_hyd')),
+                         '42501', 'new row violates row-level security%', 'and the INSERT is refused');
+SELECT tests.ok(NOT public.permission_override_write_allowed(tests.user_id('A.fleet_manager'), tests.company_id('A'), m, 'view'), 'A.shore: no ' || m || ' override on the DPA')
+FROM unnest(ARRAY['hr', 'crew_roster', 'settings']) AS m;
+SELECT tests.throws_like(format($q$INSERT INTO public.user_permission_overrides (user_id, module_key, permission, is_granted, reason, created_by) VALUES (%L, 'hr', 'view', false, 'deny', auth.uid())$q$, tests.user_id('A.fleet_manager')),
+                         '42501', 'new row violates row-level security%', 'not even a deny');
+SELECT tests.ok(public.permission_override_write_allowed(tests.user_id('A.crew_hyd'), tests.company_id('A'), 'crew_roster', 'view'), 'A.shore still writes crew_roster:view on crew');
+SELECT tests.lives(format($q$INSERT INTO public.user_permission_overrides (id, user_id, module_key, permission, is_granted, reason, created_by) VALUES (%L, %L, 'crew_roster', 'view', true, 'Crew list', auth.uid())$q$, tests.id('upo:shore'), tests.user_id('A.crew_hyd')),
+                   'and inserts it');
+SELECT tests.reset_role();
+SELECT tests.ok(NOT public.legacy_user_admin(tests.user_id('A.crew_hyd')), 'crew_hyd is still no full admin');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.ok(public.permission_override_write_allowed(tests.user_id('A.crew_hyd'), tests.company_id('A'), 'settings', 'admin'), 'the DPA may write settings:admin on crew');
+SELECT tests.ok(public.permission_override_write_allowed(tests.user_id('A.shore'), tests.company_id('A'), 'hr', 'view'), 'and an override on an administrator');
+SELECT tests.reset_role();
+DELETE FROM public.user_permission_overrides WHERE id = tests.id('upo:shore');
+-- The same rule on RBAC roles: a non-manager cannot touch a DPA's roles.
+SELECT tests.seed_role('watch_keeper_test', 'vessel');
+SELECT tests.seed_rbac_role('A.fleet_manager', 'watch_keeper_test', 'A.dra');
+SELECT tests.as_user(tests.user_id('A.shore'));
+SELECT tests.ok(NOT public.rbac_user_roles_write_allowed(tests.user_id('A.fleet_manager'), (SELECT id FROM public.roles WHERE name = 'watch_keeper_test'), tests.vessel_id('A.dra')),
+                'A.shore: no RBAC change on the DPA, even a rank-0 role');
+SELECT tests.denied(format($q$DELETE FROM public.rbac_user_roles WHERE id = %L RETURNING id$q$, tests.id('rbac:A.fleet_manager:watch_keeper_test:A.dra')), 'nor deletes the DPA''s lower-ranked role');
+SELECT tests.ok(public.rbac_user_roles_write_allowed(tests.user_id('A.crew_hyd'), (SELECT id FROM public.roles WHERE name = 'watch_keeper_test'), tests.vessel_id('A.hyd')),
+                'A.shore still assigns it to crew');
+SELECT tests.reset_role();
+
+-- ------------------------------------------------------------ fleet-conferring and module roles are not rank-0 loopholes (review round 2)
+
+-- rbac-fleet-role-rank-too-low: legal_counsel (rank 0, default scope
+-- fleet, legal:edit) and employer_api (rank 20, fleet, hr:view) confer
+-- fleet reach and module rights; they need an all-vessels admin with fleet
+-- reach, and a non-legacy admin holds every right of the role it grants.
+SELECT tests.seed_user('A', 'A.ua_write_hyd', 'crew');                -- non-legacy admin, write, HYDRA only, rank 10
+UPDATE public.account_memberships SET legacy_managed = false, source = 'admin', kind = 'admin', users_access_level = 'write' WHERE user_id = tests.user_id('A.ua_write_hyd');
+INSERT INTO public.account_membership_vessels (membership_id, company_id, vessel_id)
+SELECT id, company_id, tests.vessel_id('A.hyd') FROM public.account_memberships WHERE user_id = tests.user_id('A.ua_write_hyd');
+SELECT tests.seed_user('A', 'A.ua_master_all', 'master');             -- non-legacy admin, write, all vessels, no fleet access, rank 60
+UPDATE public.account_memberships SET legacy_managed = false, source = 'admin', kind = 'admin', users_access_level = 'write', vessel_scope = 'all', fleet_access = false
+WHERE user_id = tests.user_id('A.ua_master_all');
+SELECT tests.ok(NOT public.fleet_reach_for(tests.user_id('A.crew_hyd'), tests.company_id('A')), 'setup: crew_hyd has no fleet reach');
+SELECT tests.as_user(tests.user_id('A.ua_write_hyd'));
+SELECT tests.throws_like(format($q$INSERT INTO public.rbac_user_roles (user_id, role_id, vessel_id) VALUES (%L, (SELECT id FROM public.roles WHERE name = %L), NULL)$q$, tests.user_id('A.crew_hyd'), r),
+                         '42501', 'new row violates row-level security%', 'the HYDRA admin cannot grant ' || r || ' company-wide')
+FROM unnest(ARRAY['legal_counsel', 'employer_api']) AS r;
+SELECT tests.throws_like(format($q$INSERT INTO public.rbac_user_roles (user_id, role_id, vessel_id) VALUES (%L, (SELECT id FROM public.roles WHERE name = 'legal_counsel'), %L)$q$, tests.user_id('A.crew_hyd'), tests.vessel_id('A.hyd')),
+                         '42501', 'new row violates row-level security%', 'nor legal_counsel on their own vessel without legal:edit');
+SELECT tests.as_user(tests.user_id('A.ua_master_all'));
+SELECT tests.ok(public.has_capability('admin.access.users_access.admin', tests.company_id('A')) AND NOT public.user_has_fleet_reach(auth.uid(), tests.company_id('A')),
+                'setup: A.ua_master_all is a users-access admin over all vessels without fleet reach');
+SELECT tests.throws_like(format($q$INSERT INTO public.rbac_user_roles (user_id, role_id, vessel_id) VALUES (%L, (SELECT id FROM public.roles WHERE name = 'employer_api'), NULL)$q$, tests.user_id('A.crew_hyd')),
+                         '42501', 'new row violates row-level security%', 'a rank-60 all-vessels admin without fleet access cannot grant employer_api');
+SELECT tests.reset_role();
+SELECT tests.ok(NOT public.fleet_reach_for(tests.user_id('A.crew_hyd'), tests.company_id('A')), 'after the refused attempts crew_hyd still has no fleet reach');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.lives(format($q$INSERT INTO public.rbac_user_roles (id, user_id, role_id, vessel_id) VALUES (%L, %L, (SELECT id FROM public.roles WHERE name = %L), NULL)$q$, tests.id('rbac:fleet:' || r), tests.user_id('A.crew_hyd'), r),
+                   'the DPA (fleet reach) grants ' || r)
+FROM unnest(ARRAY['legal_counsel', 'employer_api']) AS r;
+SELECT tests.reset_role();
+DELETE FROM public.rbac_user_roles WHERE id IN (tests.id('rbac:fleet:legal_counsel'), tests.id('rbac:fleet:employer_api'));
+
 -- ------------------------------------------------------------ policies call only authenticated-executable functions (rule 11)
 
 SELECT tests.ok(bool_and(has_function_privilege('authenticated', p.oid, 'EXECUTE')),

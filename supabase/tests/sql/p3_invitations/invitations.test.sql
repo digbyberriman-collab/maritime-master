@@ -223,7 +223,8 @@ SELECT tests.ok((SELECT count(*) FROM public.vessels) = 1, 'and the invitee read
 SELECT tests.reset_role();
 SELECT tests.is((SELECT status FROM public.account_memberships WHERE user_id = tests.user_id('A.revokee')), 'active', 'the membership is active');
 SELECT tests.is((SELECT count(*) FROM public.user_invitations WHERE profile_id = tests.profile_id('A.revokee') AND status = 'accepted'), 1::bigint, 'the new invitation is accepted');
--- set_membership_status (admin-actions) can also enable a removed membership.
+-- set_membership_status (admin-actions) does not enable a withdrawn
+-- invitee: they are re-invited, not enabled (invitation_withdrawn).
 SELECT tests.seed_auth_user('A.revokee2');
 SELECT tests.seed_profile('A', 'A.revokee2', 'crew', 'not_invited', 'A.revokee2');
 SELECT tests.as_service();
@@ -234,9 +235,10 @@ SELECT tests.as_user(tests.user_id('A.fleet_manager'));
 SELECT public.revoke_invitation(:'revokee2_invitation');
 SELECT tests.as_service();
 SELECT tests.throws_like(format($q$SELECT public.set_membership_status(%L, 'disabled', %L, 'x')$q$, tests.user_id('A.revokee2'), tests.user_id('A.fleet_manager')), '42501', 'membership_removed', 'a removed membership cannot be disabled');
-SELECT tests.is((public.set_membership_status(tests.user_id('A.revokee2'), 'active', tests.user_id('A.fleet_manager'))).status, 'active', 'an admin enabling it restores a removed membership');
+SELECT tests.throws_like(format($q$SELECT public.set_membership_status(%L, 'active', %L)$q$, tests.user_id('A.revokee2'), tests.user_id('A.fleet_manager')), '42501', 'invitation_withdrawn',
+                         'an admin cannot enable a withdrawn invitee (re-invite instead)');
 SELECT tests.reset_role();
-SELECT tests.ok(public.user_is_active(tests.user_id('A.revokee2')), 'the user is active again');
+SELECT tests.ok(NOT public.user_is_active(tests.user_id('A.revokee2')), 'the withdrawn invitee stays inactive');
 
 -- ------------------------------------------------------------ expire_invitations
 
@@ -303,6 +305,86 @@ SELECT tests.is(public.record_session_start(), 'disabled', 'a disabled invitee i
 SELECT tests.reset_role();
 SELECT tests.is((SELECT status FROM public.user_invitations WHERE id = tests.id('invitation:disabled')), 'sent', 'and accepts nothing');
 
+-- ------------------------------------------------------------ a signed-in legacy user keeps their access (review round 2)
+
+-- invitation-withdraw-removes-signed-in-membership: a legacy invited /
+-- not_invited profile whose login has signed in (auth last_sign_in_at 30
+-- days ago) and whose membership was never stamped accepted is resent an
+-- invitation; revoking or expiring that resend withdraws nothing.
+SELECT tests.seed_auth_user(k, jsonb_build_object('last_sign_in_at', now() - interval '30 days'))
+FROM unnest(ARRAY['A.legacy_inv_rv', 'A.legacy_ni_rv', 'A.legacy_inv_ex', 'A.legacy_ni_ex']) AS k;
+SELECT tests.seed_profile('A', k, 'crew', CASE WHEN k LIKE '%inv%' THEN 'invited' ELSE 'not_invited' END, k)
+FROM unnest(ARRAY['A.legacy_inv_rv', 'A.legacy_ni_rv', 'A.legacy_inv_ex', 'A.legacy_ni_ex']) AS k;
+SELECT tests.is((SELECT count(*) FROM public.account_memberships WHERE user_id IN (tests.user_id('A.legacy_inv_rv'), tests.user_id('A.legacy_ni_rv'), tests.user_id('A.legacy_inv_ex'), tests.user_id('A.legacy_ni_ex'))
+                 AND status = 'active' AND accepted_at IS NULL), 4::bigint, 'setup: four legacy memberships, active, accepted_at NULL');
+SELECT tests.as_service();
+SELECT tests.is(public.reserve_invitation_attempt(tests.profile_id(k), tests.user_id('A.fleet_manager')) ->> 'ok', 'true', k || ': the resend is reserved')
+FROM unnest(ARRAY['A.legacy_inv_rv', 'A.legacy_ni_rv', 'A.legacy_inv_ex', 'A.legacy_ni_ex']) AS k;
+SELECT tests.is((public.record_invitation_send(tests.profile_id(k), 'sent', NULL, 'msg-legacy', tests.user_id('A.fleet_manager'))).status, 'sent', k || ': and sent')
+FROM unnest(ARRAY['A.legacy_inv_rv', 'A.legacy_ni_rv', 'A.legacy_inv_ex', 'A.legacy_ni_ex']) AS k;
+SELECT tests.reset_role();
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.lives(format('SELECT public.revoke_invitation(%L)', ui.id), 'the resend of ' || k || ' is revoked')
+FROM unnest(ARRAY['A.legacy_inv_rv', 'A.legacy_ni_rv']) AS k
+JOIN public.user_invitations AS ui ON ui.profile_id = tests.profile_id(k) AND ui.status = 'sent';
+SELECT tests.reset_role();
+UPDATE public.user_invitations SET expires_at = now() - interval '1 minute'
+WHERE profile_id IN (tests.profile_id('A.legacy_inv_ex'), tests.profile_id('A.legacy_ni_ex')) AND status = 'sent';
+SELECT tests.as_service();
+SELECT tests.ok(public.expire_invitations() >= 2, 'the other two resends expire');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT status FROM public.account_memberships WHERE user_id = tests.user_id(k)), 'active', k || ': the membership stays active')
+FROM unnest(ARRAY['A.legacy_inv_rv', 'A.legacy_ni_rv', 'A.legacy_inv_ex', 'A.legacy_ni_ex']) AS k;
+SELECT tests.ok(public.user_is_active(tests.user_id(k)), k || ': user_is_active stays true')
+FROM unnest(ARRAY['A.legacy_inv_rv', 'A.legacy_ni_rv', 'A.legacy_inv_ex', 'A.legacy_ni_ex']) AS k;
+DO $$
+DECLARE k text;
+BEGIN
+  FOREACH k IN ARRAY ARRAY['A.legacy_inv_rv', 'A.legacy_ni_rv', 'A.legacy_inv_ex', 'A.legacy_ni_ex'] LOOP
+    PERFORM tests.as_user(tests.user_id(k));
+    PERFORM tests.is(public.my_account_status(), 'active', k || ': my_account_status() stays active');
+  END LOOP;
+  PERFORM tests.reset_role();
+END
+$$;
+
+-- ------------------------------------------------------------ revoking an administrator's invitation needs a manager of admins (W7)
+
+SELECT tests.seed_user('A', 'A.shore', 'shore_management');
+SELECT tests.seed_profile('A', 'A.admin_kind', 'crew', 'not_invited');
+SELECT tests.seed_profile('A', 'A.dpa_invitee', 'dpa', 'not_invited');
+SELECT tests.as_service();
+SELECT public.record_invitation_send(tests.profile_id('A.admin_kind'), 'sent', NULL, 'msg-ak', tests.user_id('A.fleet_manager'), 'admin');
+SELECT public.record_invitation_send(tests.profile_id('A.dpa_invitee'), 'sent', NULL, 'msg-dpa', tests.user_id('A.fleet_manager'), 'crew');
+SELECT tests.reset_role();
+SELECT tests.ok(public.has_capability_for(tests.user_id('A.shore'), 'admin.access.users_access.admin', tests.company_id('A'))
+            AND NOT public.user_manages_admins_for(tests.user_id('A.shore'), tests.company_id('A')), 'A.shore: users-access admin, not a manager of admins');
+SELECT tests.as_user(tests.user_id('A.shore'));
+SELECT tests.throws_like(format('SELECT public.revoke_invitation(%L)', ui.id), '42501', 'manages_admins_required', 'shore management cannot revoke ' || k)
+FROM (VALUES ('A.admin_kind', 'an admin-kind invitation'), ('A.dpa_invitee', 'a dpa profile''s invitation')) AS v(p, k)
+JOIN public.user_invitations AS ui ON ui.profile_id = tests.profile_id(v.p) AND ui.status = 'sent';
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.lives(format('SELECT public.revoke_invitation(%L)', ui.id), 'the DPA revokes ' || v.p)
+FROM (VALUES ('A.admin_kind'), ('A.dpa_invitee')) AS v(p)
+JOIN public.user_invitations AS ui ON ui.profile_id = tests.profile_id(v.p) AND ui.status = 'sent';
+SELECT tests.reset_role();
+SELECT tests.is((SELECT count(*) FROM public.user_invitations WHERE profile_id IN (tests.profile_id('A.admin_kind'), tests.profile_id('A.dpa_invitee')) AND status = 'revoked'), 2::bigint,
+                'both are revoked by the manager of admins');
+
+-- ------------------------------------------------------------ the attempt counter cannot be made to raise (review round 2)
+
+SELECT tests.seed_profile('A', 'A.counter_max', 'crew', 'not_invited');
+SELECT tests.as_service();
+UPDATE public.profiles SET invitation_count = 2147483647 WHERE id = tests.profile_id('A.counter_max');
+SELECT tests.is(public.reserve_invitation_attempt(tests.profile_id('A.counter_max')), '{"ok": false, "code": "counter_exhausted"}'::jsonb,
+                'a counter at the integer ceiling answers counter_exhausted (no error)');
+SELECT tests.lives(format($q$SELECT public.record_invitation_send(%L, 'sent')$q$, tests.profile_id('A.counter_max')), 'record_invitation_send never raises on it either');
+SELECT tests.reset_role();
+SELECT tests.results_eq(
+  format($q$SELECT p.invitation_count, ui.send_attempts FROM public.profiles AS p JOIN public.user_invitations AS ui ON ui.profile_id = p.id WHERE p.id = %L$q$, tests.profile_id('A.counter_max')),
+  $q$VALUES (2147483647, 2147483647)$q$,
+  'both numbers are clamped at the ceiling');
+
 -- ------------------------------------------------------------ ACLs (rule 5)
 
 SELECT tests.ok(NOT has_function_privilege(r, 'public.record_invitation_send(uuid,text,text,text,uuid,text,timestamptz,uuid)', 'EXECUTE'), r || ' cannot execute record_invitation_send')
@@ -320,7 +402,7 @@ SELECT tests.is((SELECT count(*) FROM public.user_invitations WHERE profile_id =
 -- ------------------------------------------------------------ backfill (re-run the file on legacy rows)
 
 SELECT tests.seed_profile('A', 'A.legacy_pending', 'crew', 'invited', NULL, jsonb_build_object('last_invited_at', now() - interval '2 days', 'invitation_count', 3));
-SELECT tests.seed_profile('A', 'A.legacy_token', 'dpa', 'invited', NULL, jsonb_build_object('last_invited_at', now() - interval '1 day', 'invitation_token_expires', now() + interval '30 days'));
+SELECT tests.seed_profile('A', 'A.legacy_token', 'dpa', 'invited', NULL, jsonb_build_object('last_invited_at', now() - interval '1 day', 'invitation_token', 'legacyToken_0123456789abcdef', 'invitation_token_expires', now() + interval '30 days'));
 SELECT tests.seed_user('A', 'A.legacy_signed_in', 'crew', 'invited', jsonb_build_object('last_login_at', now() - interval '3 hours', 'last_invited_at', now() - interval '4 days'));
 -- The real legacy shape: accepted through the auth link (auth last_sign_in_at
 -- yesterday), profile still 'invited', last_login_at never written.
@@ -366,3 +448,13 @@ SELECT tests.results_eq(
   $q$VALUES ('not_invited'::text, 'removed'::text)$q$,
   'and its access is withdrawn');
 SELECT tests.is((SELECT count(*) FROM public.user_invitations WHERE profile_id = tests.profile_id('A.newbie')), 2::bigint, 'profiles that already have rows are left alone');
+-- Revoking the backfilled legacy invitation also ends its legacy token
+-- (revoke-leaves-legacy-token-live): accept-invitation can never claim it.
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.lives(format('SELECT public.revoke_invitation(%L)', ui.id), 'the DPA revokes the legacy token invitation')
+FROM public.user_invitations AS ui WHERE ui.profile_id = tests.profile_id('A.legacy_token') AND ui.status = 'pending';
+SELECT tests.reset_role();
+SELECT tests.results_eq(
+  format($q$SELECT invitation_token IS NULL, invitation_token_expires IS NULL, account_status FROM public.profiles WHERE id = %L$q$, tests.profile_id('A.legacy_token')),
+  $q$VALUES (true, true, 'not_invited'::text)$q$,
+  'the revoke nulls invitation_token and invitation_token_expires');

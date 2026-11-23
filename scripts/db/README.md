@@ -27,9 +27,9 @@ flock /tmp/storm-db.lock node scripts/db/harness.mjs --keep
 # CI without PostgreSQL: exit 0 with a SKIP line instead of 2
 node scripts/db/harness.mjs --allow-skip
 
-# Tests of the harness itself. All but harness-lifecycle.test.mjs are unit tests (no cluster);
-# that file starts throwaway clusters, each through the lock itself, so never run this under the lock
-# (it is skipped without PostgreSQL binaries or flock)
+# Tests of the harness itself. All but harness-lifecycle.test.mjs and last-manager-race.test.mjs are
+# unit tests (no cluster); those two start throwaway clusters, each through the lock itself, so never
+# run this under the lock (they are skipped without PostgreSQL binaries or flock)
 node --test scripts/db/test/*.test.mjs
 ```
 
@@ -321,7 +321,8 @@ The kept database holds the replay, the build-out and the test library (each tes
 | `scripts/db/lib/migrations.mjs` | version order, `replay.json` validation and verdicts |
 | `scripts/db/lib/sql.mjs` | statement splitter, one-definition scanner |
 | `scripts/db/lib/tests.mjs` | test discovery, globs, wrapper, TAP parsing |
-| `scripts/db/test/*.test.mjs` | `node --test` unit tests (no cluster), plus `harness-lifecycle.test.mjs`: a failing build-out, a `SIGTERM`, an `initdb` failure and a late usage error each leave no cluster and no schema snapshot, and a report whose `exitCode` is the exit code (real throwaway clusters, each run through the lock; skipped without PostgreSQL or `flock`) |
+| `scripts/db/test/*.test.mjs` | `node --test` unit tests (no cluster), plus `harness-lifecycle.test.mjs`: a failing build-out, a `SIGTERM`, an `initdb` failure and a late usage error each leave no cluster and no schema snapshot, and a report whose `exitCode` is the exit code (real throwaway clusters, each run through the lock; skipped without PostgreSQL or `flock`), and `last-manager-race.test.mjs` (see below) |
+| `scripts/db/test/last-manager-race.test.mjs` | the one concurrency test (the SQL runner is single-session): it starts a kept cluster through the lock (`flock -w 900 /tmp/storm-db.lock node scripts/db/harness.mjs --keep --no-fidelity --no-contract --tests '00_harness/**'`), reads the printed `connect` and `stop` lines, seeds company RC with two dpa users (the only managers of admins), and races two psql sessions as `service_role` that disable each other with `set_membership_status`, the first holding its transaction open for 4 s. It asserts that the first commits, the second is refused (`not_permitted` or `last_manager_of_admins`: `lock_company_admin_managers()` makes it wait and then see its actor disabled) and at least one active manager of admins remains; the cluster is stopped in `finally`. Skipped without PostgreSQL or `flock`; never run it under the lock |
 | `supabase/tests/harness/supabase-stub.sql` | the Supabase stub |
 | `supabase/tests/harness/testlib.sql` | the `tests` schema |
 | `supabase/tests/harness/replay.json`, `drift/*.sql` | replay governance and drift patches |

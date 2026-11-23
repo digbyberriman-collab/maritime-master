@@ -30,9 +30,14 @@
 -- company-scoped through the target user: users-access admin of the
 -- target's company, never on yourself, never superadmin, never your own
 -- rank or above (an equal rank only for a manager of admins), never above
--- your own module level. Legacy app roles (user_roles) have no browser
--- write path at all (CC-5 closes the live "Superadmin and DPA can manage
--- roles" hole): about 40 legacy policies honour a user_roles row without
+-- your own module level; a vessel-scoped admin acts only on users of the
+-- vessels they reach and never grants company-wide or fleet-conferring
+-- roles; an administrator target needs a manager of admins (review round
+-- 2, gap/01 F23, W7). The admin reads (rbac_user_roles, overrides,
+-- user_roles) use admin_may_view_user() the same way. Legacy app roles
+-- (user_roles) have no browser write path at all (CC-5 closes the live
+-- "Superadmin and DPA can manage roles" hole): about 40 legacy policies
+-- honoured a user_roles row without
 -- asking which company it names, so a tenant admin who could write one
 -- would reach every tenant; the service role writes them, and
 -- 20261123010500_platform_role_scoped_policies.sql scopes those policies.
@@ -63,8 +68,15 @@ BEGIN
      OR to_regprocedure('public.legacy_user_admin(uuid)') IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010100_platform_access_rls needs has_capability(), user_company_for_admin(), role_rank(), user_role_rank() and legacy_user_admin(): apply 20261123000400_platform_capabilities.sql first';
   END IF;
-  IF to_regprocedure('public.user_manages_admins_for(uuid,uuid)') IS NULL THEN
-    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010100_platform_access_rls needs user_manages_admins_for(): apply 20261123010000_platform_user_status.sql first';
+  IF to_regprocedure('public.user_manages_admins_for(uuid,uuid)') IS NULL
+     OR to_regprocedure('public.user_is_admin_target(uuid,uuid)') IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010100_platform_access_rls needs user_manages_admins_for() and user_is_admin_target(): apply 20261123010000_platform_user_status.sql first';
+  END IF;
+  IF to_regprocedure('public.admin_scope_all(uuid,uuid)') IS NULL
+     OR to_regprocedure('public.admin_may_act_on_user(uuid,uuid,uuid,uuid)') IS NULL
+     OR to_regprocedure('public.admin_may_view_user(uuid,uuid,uuid)') IS NULL
+     OR to_regprocedure('public.fleet_reach_for(uuid,uuid)') IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010100_platform_access_rls needs admin_scope_all(), admin_may_act_on_user(), admin_may_view_user() (20261123000400) and fleet_reach_for() (20261123000300)';
   END IF;
   IF to_regprocedure('public.user_can_reach_vessel(uuid,uuid)') IS NULL OR to_regprocedure('public.user_has_fleet_reach(uuid,uuid)') IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010100_platform_access_rls needs the reach helpers: apply 20261123000300_platform_account_memberships.sql first';
@@ -135,11 +147,25 @@ REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON TABLE public.role_permissions FROM an
 -- May the caller assign / change / remove this RBAC role for that user?
 -- Not on yourself; users-access admin in the target's company (and over the
 -- vessel when one is given); the vessel belongs to that company; the role
--- exists, is not superadmin and ranks strictly below the caller, or equal
--- to the caller when the caller manages admins in that company (so a DPA
--- can appoint a DPA, shore management cannot mint its own rank). Role ranks
--- of 0 (role_rank's unknown and auditor-style names) are below every
--- signed-in admin.
+-- exists and is not superadmin. Then (review round 2, gap/01 F23, W7, F23
+-- no self-escalation):
+--   scope        a grant with no vessel needs an all-vessels admin
+--                (admin_scope_all); a vessel grant also needs that the caller
+--                may act on the target (admin_may_act_on_user: every vessel
+--                of the target in the caller's reach)
+--   fleet        a fleet-conferring role ((no vessel and default scope
+--                fleet) or dpa / fleet_master) needs the caller's own fleet
+--                reach and an all-vessels admin
+--   W7           an administrator target (user_is_admin_target) needs a
+--                manager of admins
+--   modules      unless a full legacy admin, the caller holds every
+--                role_permissions right of the role (rbac_company_permission)
+--   rank         ranks strictly below the caller, or equal to the caller
+--                when the caller manages admins in that company (so a DPA
+--                can appoint a DPA, shore management cannot mint its own
+--                rank). role_rank 0 (unknown names) is harmless only for a
+--                role with no fleet scope and no module rights: the checks
+--                above, not the rank, stop a low-ranked fleet or module role.
 CREATE OR REPLACE FUNCTION public.rbac_user_roles_write_allowed(_user_id uuid, _role_id uuid, _vessel_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -151,6 +177,7 @@ DECLARE
   v_caller uuid := auth.uid();
   v_company uuid;
   v_role_name text;
+  v_role_scope text;
   v_rank integer;
   v_caller_rank integer;
 BEGIN
@@ -167,8 +194,34 @@ BEGIN
   IF NOT public.has_capability_for(v_caller, 'admin.access.users_access.admin', v_company, _vessel_id) THEN
     RETURN false;
   END IF;
-  SELECT r.name INTO v_role_name FROM public.roles AS r WHERE r.id = _role_id;
+  SELECT r.name, r.default_scope::text INTO v_role_name, v_role_scope FROM public.roles AS r WHERE r.id = _role_id;
   IF v_role_name IS NULL OR v_role_name = 'superadmin' THEN
+    RETURN false;
+  END IF;
+  -- Scope: company-wide grants need an all-vessels admin; vessel grants a
+  -- caller who may act on the target.
+  IF _vessel_id IS NULL THEN
+    IF NOT public.admin_scope_all(v_caller, v_company) THEN
+      RETURN false;
+    END IF;
+  ELSIF NOT public.admin_may_act_on_user(v_caller, _user_id, v_company) THEN
+    RETURN false;
+  END IF;
+  -- Fleet-conferring roles.
+  IF ((_vessel_id IS NULL AND v_role_scope = 'fleet') OR v_role_name IN ('dpa', 'fleet_master'))
+     AND NOT (public.fleet_reach_for(v_caller, v_company) AND public.admin_scope_all(v_caller, v_company)) THEN
+    RETURN false;
+  END IF;
+  -- W7: an administrator target needs a manager of admins.
+  IF public.user_is_admin_target(_user_id, v_company) AND NOT public.user_manages_admins_for(v_caller, v_company) THEN
+    RETURN false;
+  END IF;
+  -- Module containment: no granting another module's rights you lack.
+  IF NOT public.legacy_user_admin(v_caller) AND EXISTS (
+    SELECT 1 FROM public.role_permissions AS rp
+    WHERE rp.role_id = _role_id
+      AND NOT coalesce(public.rbac_company_permission(v_caller, rp.module_key, rp.permission), false)
+  ) THEN
     RETURN false;
   END IF;
   v_rank := public.role_rank(v_role_name);
@@ -180,8 +233,12 @@ $$;
 
 -- May the caller write this permission override? Not on yourself; the
 -- company is the target's (as the stamp trigger sets it); users-access
--- admin there; and the caller holds that module level themselves (a full
--- legacy admin, or rbac_company_permission): no granting what you lack.
+-- admin there who may act on the target (vessel reach, gap/01 F23); a
+-- manager of admins when the override is on the settings module (a
+-- settings:admin grant makes a full admin, a deny can take one away) or
+-- the target is an administrator (user_is_admin_target; W7); and the
+-- caller holds that module level themselves (a full legacy admin, or
+-- rbac_company_permission): no granting what you lack.
 CREATE OR REPLACE FUNCTION public.permission_override_write_allowed(_user_id uuid, _company_id uuid, _module_key text, _permission public.permission_level)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -202,6 +259,13 @@ BEGIN
   IF NOT public.has_capability_for(v_caller, 'admin.access.users_access.admin', _company_id) THEN
     RETURN false;
   END IF;
+  IF NOT public.admin_may_act_on_user(v_caller, _user_id, _company_id) THEN
+    RETURN false;
+  END IF;
+  IF (_module_key = 'settings' OR public.user_is_admin_target(_user_id, _company_id))
+     AND NOT public.user_manages_admins_for(v_caller, _company_id) THEN
+    RETURN false;
+  END IF;
   RETURN public.legacy_user_admin(v_caller) OR coalesce(public.rbac_company_permission(v_caller, _module_key, _permission), false);
 END;
 $$;
@@ -218,7 +282,7 @@ CREATE POLICY rbac_user_roles_select ON public.rbac_user_roles
   FOR SELECT TO authenticated
   USING (
     (user_id = auth.uid() AND public.user_is_active(auth.uid()))
-    OR public.has_capability('admin.access.users_access.view', public.user_company_for_admin(user_id))
+    OR public.admin_may_view_user(user_id, public.user_company_for_admin(user_id))
   );
 
 DROP POLICY IF EXISTS rbac_user_roles_insert ON public.rbac_user_roles;
@@ -309,7 +373,7 @@ CREATE POLICY user_permission_overrides_select ON public.user_permission_overrid
   FOR SELECT TO authenticated
   USING (
     (user_id = auth.uid() AND public.user_is_active(auth.uid()))
-    OR public.has_capability('admin.access.users_access.view', company_id)
+    OR public.admin_may_view_user(user_id, company_id)
   );
 
 DROP POLICY IF EXISTS user_permission_overrides_insert ON public.user_permission_overrides;
@@ -342,7 +406,7 @@ DROP POLICY IF EXISTS "Admins can view all roles in company" ON public.user_role
 DROP POLICY IF EXISTS user_roles_select_admin ON public.user_roles;
 CREATE POLICY user_roles_select_admin ON public.user_roles
   FOR SELECT TO authenticated
-  USING (company_id IS NOT NULL AND public.has_capability('admin.access.users_access.view', company_id));
+  USING (company_id IS NOT NULL AND public.admin_may_view_user(user_id, company_id));
 
 DROP POLICY IF EXISTS user_roles_insert ON public.user_roles;
 DROP POLICY IF EXISTS user_roles_update ON public.user_roles;
@@ -578,8 +642,8 @@ GRANT EXECUTE ON FUNCTION public.log_permission_change(uuid, text, public.audit_
 
 -- ---------------------------------------------------------------- comments
 
-COMMENT ON FUNCTION public.rbac_user_roles_write_allowed(uuid, uuid, uuid) IS 'Policy predicate (rule 11) for rbac_user_roles writes, for auth.uid() only: not on yourself, users-access admin of the target''s company (and vessel), vessel of that company, role not superadmin and ranked strictly below the caller (equal only for a manager of admins of that company).';
-COMMENT ON FUNCTION public.permission_override_write_allowed(uuid, uuid, text, public.permission_level) IS 'Policy predicate (rule 11) for user_permission_overrides writes, for auth.uid() only: not on yourself, the target''s company, users-access admin there, and the caller holds the module level (full admin or rbac_company_permission).';
+COMMENT ON FUNCTION public.rbac_user_roles_write_allowed(uuid, uuid, uuid) IS 'Policy predicate (rule 11) for rbac_user_roles writes, for auth.uid() only: not on yourself, users-access admin of the target''s company (and vessel), vessel of that company, role not superadmin; no vessel: an all-vessels admin, a vessel: a caller who may act on the target (gap/01 F23); a fleet-conferring role (no vessel and default scope fleet, or dpa / fleet_master) needs the caller''s fleet reach and an all-vessels admin; an administrator target needs a manager of admins (W7); unless a full legacy admin, the caller holds every module right of the role; ranked strictly below the caller (equal only for a manager of admins of that company). Rank 0 is harmless only for roles with no fleet scope and no module rights.';
+COMMENT ON FUNCTION public.permission_override_write_allowed(uuid, uuid, text, public.permission_level) IS 'Policy predicate (rule 11) for user_permission_overrides writes, for auth.uid() only: not on yourself, the target''s company, users-access admin there who may act on the target (gap/01 F23), a manager of admins for a settings override or an administrator target (W7), and the caller holds the module level (full admin or rbac_company_permission).';
 COMMENT ON FUNCTION public.user_permission_overrides_stamp() IS 'Trigger: company_id = the target''s profile company (client value overwritten), created_by = the signed-in caller on insert (kept on update), vessel of that company only.';
 COMMENT ON FUNCTION public.access_change_audit() IS 'Trigger (gap/01 F53): one permission_audit_log row per change of rbac_user_roles, user_permission_overrides or user_roles, actor = auth.uid(), ids / keys / levels only. Skipped without a JWT (service-role maintenance).';
 COMMENT ON FUNCTION public.log_permission_change(uuid, text, public.audit_action_type, uuid, uuid, text, jsonb, jsonb, text, uuid, inet, text) IS 'CC-4: the live signature, one overload. With a JWT the actor, role and company are the caller''s (users-access admin required; target and vessel of that company); without, the parameters are used. Service role only.';

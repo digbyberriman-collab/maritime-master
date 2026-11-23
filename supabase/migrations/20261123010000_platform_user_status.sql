@@ -7,7 +7,8 @@
 --   get_user_company_id(), my_profile_id(), current_user_company_id(),
 --   has_role(), has_any_role(), legacy_profile_role()
 -- New: profiles_guard_access_columns() + trg_profiles_guard_access_columns,
---   set_membership_status(), auth_user_id_for_email() (service role)
+--   set_membership_status(), auth_user_id_for_email(), user_is_admin_target()
+--   (service role), lock_company_admin_managers() (no grant)
 -- Redefined (live, same signature): hr_anonymize_profile() (the W7 guards
 --   and the audit row around its account_status write)
 -- TS mirror: src/modules/auth/services/accountStatus.ts (a disabled user
@@ -30,6 +31,11 @@
 -- user reads no profile row at all, not even their own. The client and the
 -- edge helper learn the status from my_account_status() /
 -- record_session_start() instead (file 3).
+--
+-- has_role() / has_any_role() count a user_roles row only in the holder's
+-- own company (CC-5, D-181; review round 2): a row naming another company
+-- never counts anywhere, so the legacy policies and definers built on them
+-- stop honouring foreign rows.
 --
 -- Privileged profile columns (CC-6, W7): from a signed-in session,
 -- company_id, user_id and account_status never change directly (access is
@@ -55,8 +61,13 @@ BEGIN
   IF to_regprocedure('public.user_is_active(uuid)') IS NULL OR to_regclass('public.account_memberships') IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010000_platform_user_status needs user_is_active(uuid) and account_memberships: apply 20261123000300_platform_account_memberships.sql first';
   END IF;
-  IF to_regprocedure('public.has_capability_for(uuid,text,uuid,uuid)') IS NULL THEN
-    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010000_platform_user_status needs has_capability_for(uuid,text,uuid,uuid): apply 20261123000400_platform_capabilities.sql first';
+  IF to_regprocedure('public.has_capability_for(uuid,text,uuid,uuid)') IS NULL
+     OR to_regprocedure('public.admin_scope_all(uuid,uuid)') IS NULL
+     OR to_regprocedure('public.admin_may_act_on_user(uuid,uuid,uuid,uuid)') IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010000_platform_user_status needs has_capability_for(), admin_scope_all() and admin_may_act_on_user(): apply 20261123000400_platform_capabilities.sql first';
+  END IF;
+  IF to_regprocedure('public.invitation_withdrawn_for(uuid)') IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010000_platform_user_status needs invitation_withdrawn_for(): apply 20261123000300_platform_account_memberships.sql first';
   END IF;
   IF to_regclass('public.admin_action_log') IS NULL OR to_regclass('public.user_roles') IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010000_platform_user_status needs public.admin_action_log and public.user_roles';
@@ -110,7 +121,10 @@ AS $$
   SELECT id FROM public.profiles WHERE user_id = auth.uid() AND public.user_is_active(auth.uid()) LIMIT 1
 $$;
 
--- 20260501203014_9658bc16-…: the user_roles-based company, only while active.
+-- 20260501203014_9658bc16-…: the user_roles-based company, only while
+-- active, and only from a row that names the caller's own profile company
+-- (CC-5, D-181: a row naming another company gives nothing anywhere; the
+-- frp_* and storage policies compare it with the row's company).
 CREATE OR REPLACE FUNCTION public.current_user_company_id()
 RETURNS uuid
 LANGUAGE sql
@@ -118,15 +132,19 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT company_id
-  FROM public.user_roles
-  WHERE user_id = auth.uid()
-    AND is_active = true
+  SELECT ur.company_id
+  FROM public.user_roles AS ur
+  JOIN public.profiles AS p ON p.user_id = ur.user_id
+  WHERE ur.user_id = auth.uid()
+    AND ur.is_active = true
+    AND ur.company_id IS NOT NULL
+    AND ur.company_id = p.company_id
     AND public.user_is_active(auth.uid())
   LIMIT 1
 $$;
 
--- 20260127170354_8cbfc11b-…: the user_roles check, plus the active check.
+-- 20260127170354_8cbfc11b-…: the user_roles check (own company, CC-5 /
+-- D-181), plus the active check: has_any_role with one role.
 CREATE OR REPLACE FUNCTION public.has_role(_user_id uuid, _role public.app_role)
 RETURNS boolean
 LANGUAGE sql
@@ -134,17 +152,21 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT EXISTS (
-    SELECT 1
-    FROM public.user_roles
-    WHERE user_id = _user_id
-      AND role = _role
-      AND is_active = true
-      AND (expires_at IS NULL OR expires_at > now())
-  ) AND public.user_is_active(_user_id)
+  SELECT public.has_any_role(_user_id, ARRAY[_role]::public.app_role[])
 $$;
 
 -- 20260127170354_8cbfc11b-…: the user_roles check, plus the active check.
+-- Only a row that counts in the holder's own company (CC-5, D-181): an
+-- active, unexpired row with one of the roles that names the holder's
+-- profile company, or a company-less row (a superadmin row counts
+-- anywhere; any other company-less row counts for the holder's own
+-- profile company only, which is what 20261123010500 then writes into it).
+-- A row naming another company never counts, so the ~190 legacy call sites
+-- (policies AND-ed with user_belongs_to_company, and the company-blind
+-- hr_*, payroll_*, wellness_*, legal_*, medical, logbook, frp_* and form
+-- definers) answer for the holder's own company only. No caller probe
+-- guard: hr_can_admin(_user_id), payroll_can_*(_user_id) and others pass
+-- arbitrary ids.
 CREATE OR REPLACE FUNCTION public.has_any_role(_user_id uuid, _roles public.app_role[])
 RETURNS boolean
 LANGUAGE sql
@@ -152,14 +174,22 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT EXISTS (
-    SELECT 1
-    FROM public.user_roles
-    WHERE user_id = _user_id
-      AND role = ANY(_roles)
-      AND is_active = true
-      AND (expires_at IS NULL OR expires_at > now())
-  ) AND public.user_is_active(_user_id)
+  SELECT _user_id IS NOT NULL
+     AND _roles IS NOT NULL
+     AND EXISTS (
+       SELECT 1
+       FROM public.user_roles AS ur
+       JOIN public.profiles AS p ON p.user_id = ur.user_id
+       WHERE ur.user_id = _user_id
+         AND ur.role = ANY (_roles)
+         AND ur.is_active = true
+         AND (ur.expires_at IS NULL OR ur.expires_at > now())
+         AND (
+           (ur.company_id IS NOT NULL AND p.company_id IS NOT NULL AND ur.company_id = p.company_id)
+           OR (ur.company_id IS NULL AND (ur.role = 'superadmin' OR p.company_id IS NOT NULL))
+         )
+     )
+     AND public.user_is_active(_user_id)
 $$;
 
 -- 20260917174601_92aaeda7-…: the legacy profile role, NULL for an inactive
@@ -198,8 +228,19 @@ CREATE POLICY "Users can update their own profile" ON public.profiles
 --   account_status never changes                profile_access_columns_locked
 --                                               (DETAIL: use admin-actions /
 --                                               set_membership_status)
+--   the invitation and sign-in bookkeeping      profile_access_columns_locked
+--     (invitation_token, invitation_token_expires, invitation_count,
+--     last_invited_at, invited_at, last_login_at) never changes, your own
+--     row included: the engine writes it (record_session_start,
+--     record_invitation_send, invitation_withdraw_access; D-174, D-176,
+--     D-183); a new profile starts with no token, no sign-in and count 0
 --   role: never on your own row, and otherwise
 --     users-access admin of the row's company   profile_access_columns_locked
+--     an actor who may act on the target (every
+--     vessel of the target in the actor's reach,
+--     or an all-vessels admin; a dpa /
+--     shore_management role, which is fleet-wide,
+--     needs an all-vessels admin; gap/01 F23)   profile_access_columns_locked
 --     a manager of admins there when the old or
 --     new role is dpa / shore_management or the
 --     target's membership is admin / owner      manages_admins_required
@@ -209,10 +250,11 @@ CREATE POLICY "Users can update their own profile" ON public.profiles
 --     caller's user_role_rank()                 rank_exceeded
 --     never dpa away from the last active
 --     manager of admins of the company          last_manager_of_admins
+--       (serialised per company by lock_company_admin_managers())
 --   and every allowed role change writes one permission_audit_log row
 --   (actor = the caller, the target, old and new role, the company);
---   a new dpa / shore_management profile needs users-access admin, a
---   manager of admins and the rank check in its company.
+--   a new dpa / shore_management profile needs users-access admin over all
+--   vessels, a manager of admins and the rank check in its company.
 -- No JWT (SQL editor, cron, the service-role client) or the engine flag:
 -- allowed. The legacy guard (row 12) still applies on top.
 CREATE OR REPLACE FUNCTION public.profiles_guard_access_columns()
@@ -242,10 +284,19 @@ BEGIN
   END;
 
   IF TG_OP = 'INSERT' THEN
+    IF NEW.invitation_token IS NOT NULL OR NEW.invitation_token_expires IS NOT NULL OR NEW.last_login_at IS NOT NULL
+       OR coalesce(NEW.invitation_count, 0) <> 0 THEN
+      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'profile_access_columns_locked',
+        DETAIL = 'Invitation and sign-in bookkeeping is written by the access engine only.';
+    END IF;
     IF NEW.role::text IN ('dpa', 'shore_management') THEN
       IF NOT public.has_capability_for(v_uid, 'admin.access.users_access.admin', NEW.company_id) THEN
         RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'profile_access_columns_locked',
           DETAIL = 'Only a users-access administrator of the company can create an administrator profile.';
+      END IF;
+      IF NOT public.admin_scope_all(v_uid, NEW.company_id) THEN
+        RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'profile_access_columns_locked',
+          DETAIL = 'Only an administrator of every vessel can create a fleet-wide administrator profile.';
       END IF;
       IF NOT public.user_manages_admins_for(v_uid, NEW.company_id) THEN
         RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'manages_admins_required',
@@ -269,14 +320,34 @@ BEGIN
       DETAIL = 'use admin-actions / set_membership_status';
   END IF;
 
+  IF NEW.invitation_token IS DISTINCT FROM OLD.invitation_token
+     OR NEW.invitation_token_expires IS DISTINCT FROM OLD.invitation_token_expires
+     OR NEW.invitation_count IS DISTINCT FROM OLD.invitation_count
+     OR NEW.last_invited_at IS DISTINCT FROM OLD.last_invited_at
+     OR NEW.invited_at IS DISTINCT FROM OLD.invited_at
+     OR NEW.last_login_at IS DISTINCT FROM OLD.last_login_at THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'profile_access_columns_locked',
+      DETAIL = 'Invitation and sign-in bookkeeping is written by the access engine only.';
+  END IF;
+
   IF NEW.role IS DISTINCT FROM OLD.role THEN
     IF OLD.user_id IS NOT DISTINCT FROM v_uid THEN
       RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'profile_access_columns_locked',
         DETAIL = 'You cannot change your own role.';
     END IF;
+    -- W7 checks run one at a time per company (last-manager race).
+    PERFORM public.lock_company_admin_managers(OLD.company_id);
     IF NOT public.has_capability_for(v_uid, 'admin.access.users_access.admin', OLD.company_id) THEN
       RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'profile_access_columns_locked',
         DETAIL = 'Only a users-access administrator of the company can change a role.';
+    END IF;
+    IF NOT public.admin_may_act_on_user(v_uid, OLD.user_id, OLD.company_id, OLD.id) THEN
+      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'profile_access_columns_locked',
+        DETAIL = 'You can only change the role of people on the vessels you administer.';
+    END IF;
+    IF NEW.role::text IN ('dpa', 'shore_management') AND NOT public.admin_scope_all(v_uid, OLD.company_id) THEN
+      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'profile_access_columns_locked',
+        DETAIL = 'Only an administrator of every vessel can give a fleet-wide administrator role.';
     END IF;
     IF OLD.user_id IS NOT NULL THEN
       SELECT m.kind INTO v_kind FROM public.account_memberships AS m WHERE m.user_id = OLD.user_id AND m.company_id = OLD.company_id;
@@ -368,21 +439,82 @@ AS $$
      )
 $$;
 
+-- Whether the user is, or is about to be, an administrator of the company
+-- (the W7 "an administrator is involved" test for overrides, RBAC roles and
+-- invitations), whatever their active state, so a disabled administrator
+-- still counts: a dpa / shore_management profile there; an admin / owner
+-- membership there; a user_roles dpa / superadmin row naming it or no
+-- company; an rbac_user_roles superadmin / dpa row; a granted settings:admin
+-- override (rows counted whatever their own active / expiry state: being
+-- an administrator target only ever asks for more). NULL -> false.
+-- Internal (service role; definers).
+CREATE OR REPLACE FUNCTION public.user_is_admin_target(_user_id uuid, _company_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT _user_id IS NOT NULL AND _company_id IS NOT NULL AND (
+    EXISTS (SELECT 1 FROM public.profiles AS p
+            WHERE p.user_id = _user_id AND p.company_id = _company_id AND p.role::text IN ('dpa', 'shore_management'))
+    OR EXISTS (SELECT 1 FROM public.account_memberships AS m
+               WHERE m.user_id = _user_id AND m.company_id = _company_id AND m.kind IN ('admin', 'owner'))
+    OR EXISTS (SELECT 1 FROM public.user_roles AS ur
+               WHERE ur.user_id = _user_id AND ur.role::text IN ('dpa', 'superadmin')
+                 AND (ur.company_id IS NULL OR ur.company_id = _company_id))
+    OR EXISTS (SELECT 1 FROM public.rbac_user_roles AS r JOIN public.roles AS ro ON ro.id = r.role_id
+               WHERE r.user_id = _user_id AND ro.name IN ('superadmin', 'dpa'))
+    OR EXISTS (SELECT 1 FROM public.user_permission_overrides AS o
+               WHERE o.user_id = _user_id AND o.module_key = 'settings' AND o.permission = 'admin'::public.permission_level AND o.is_granted)
+  )
+$$;
+
+-- Serialises the W7 "never the last manager of admins" checks of one
+-- company: set_membership_status, a profile role change
+-- (profiles_guard_access_columns) and hr_anonymize_profile take this
+-- transaction-level advisory lock before their actor and last-manager
+-- checks, so two concurrent disables of the company's last two managers
+-- run one after the other and the second sees the first. It relies on
+-- READ COMMITTED (PostgREST's default): every later statement of the
+-- caller reads a snapshot taken after the lock. user_roles and the
+-- membership's manages_admins / kind have no browser write path (file 8,
+-- file 3), so those are the only paths. NULL company: no lock.
+CREATE OR REPLACE FUNCTION public.lock_company_admin_managers(_company uuid)
+RETURNS void
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF _company IS NOT NULL THEN
+    PERFORM pg_advisory_xact_lock(hashtextextended('admin_managers:' || _company::text, 0));
+  END IF;
+END;
+$$;
+
 -- Turns a user's access off or on (the edge function admin-actions calls it
 -- with the service client after assertCapability, then applies the auth
 -- ban). Refusals (stable codes in MESSAGE): 22023 status_invalid,
 -- actor_required, user_required, reason_required; 42501 self_change_refused,
--- not_permitted (no users-access admin in the target's company, or an
--- unknown target), owner_membership_locked, membership_removed,
--- manages_admins_required, last_manager_of_admins; P0002
--- membership_not_found. Enabling a removed membership (a revoked or
--- expired invitation removed it, 20261123010200) makes it active again;
--- disabling one is refused (membership_removed). Under
--- storm.access_engine it sets the membership status and disabled_at / by /
--- reason (cleared on enable), mirrors the
--- legacy profiles.account_status ('disabled'; 'active' again only from
--- disabled / deactivated, so an invited user stays invited) and writes one
--- admin_action_log row (TOGGLE_ACCESS, no email). Returns the membership.
+-- not_permitted (no users-access admin in the target's company, an
+-- unknown target, or a target on a vessel outside a vessel-scoped actor's
+-- reach, gap/01 F23), owner_membership_locked, membership_removed,
+-- invitation_withdrawn, manages_admins_required, last_manager_of_admins;
+-- P0002 membership_not_found. The W7 checks run under
+-- lock_company_admin_managers() of the target's company. Enabling a
+-- removed membership makes it active again, except for an invitee whose
+-- invitation was withdrawn (a revoked or expired invitation removed it,
+-- 20261123010200; the profile is invited / not_invited or
+-- invitation_withdrawn_for() holds): that invitee is re-invited, not
+-- enabled (invitation_withdrawn). Disabling a removed membership is
+-- refused (membership_removed). Under storm.access_engine it sets the
+-- membership status and disabled_at / by / reason (cleared on enable),
+-- mirrors the legacy profiles.account_status ('disabled'; 'active' again
+-- only from disabled / deactivated, so an invited user stays invited) and
+-- writes one admin_action_log row (TOGGLE_ACCESS, no email). Returns the
+-- membership.
 CREATE OR REPLACE FUNCTION public.set_membership_status(p_user_id uuid, p_status text, p_actor uuid, p_reason text DEFAULT NULL)
 RETURNS public.account_memberships
 LANGUAGE plpgsql
@@ -424,9 +556,17 @@ BEGIN
   IF NOT FOUND OR v_profile.company_id IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'not_permitted';
   END IF;
+  -- One W7 change per company at a time (the last-manager race): the actor
+  -- checks below then see a concurrent disable of the actor, and the
+  -- last-manager check reads a snapshot taken after the lock.
+  PERFORM public.lock_company_admin_managers(v_profile.company_id);
   -- The actor must be a users-access admin of the target's company (this is
   -- also the same-company rule); an unknown target answers the same.
   IF NOT public.has_capability_for(p_actor, 'admin.access.users_access.admin', v_profile.company_id) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'not_permitted';
+  END IF;
+  -- A vessel-scoped admin acts only on users of the vessels they reach.
+  IF NOT public.admin_may_act_on_user(p_actor, p_user_id, v_profile.company_id, v_profile.id) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'not_permitted';
   END IF;
 
@@ -438,6 +578,12 @@ BEGIN
   END IF;
   IF v_membership.kind = 'owner' THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'owner_membership_locked';
+  END IF;
+  -- An invitee whose invitation was withdrawn is re-invited, not enabled.
+  IF NOT v_disable AND v_membership.status = 'removed'
+     AND (lower(coalesce(v_profile.account_status, 'active')) IN ('invited', 'not_invited')
+          OR public.invitation_withdrawn_for(p_user_id)) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'invitation_withdrawn';
   END IF;
   IF v_membership.status = 'removed' AND v_disable THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'membership_removed';
@@ -505,8 +651,14 @@ $$;
 -- ---------------------------------------------------------------- hr_anonymize_profile (live, redefined once here, D-120)
 
 -- The live body of 20260917190000_hris_review_fixes.sql (the definition the
--- replay ends with), verbatim, plus before its profile UPDATE the W7 guards
--- of set_membership_status (reason from p_reason, never yourself, never the
+-- replay ends with), verbatim except the first refusal now carries SQLSTATE
+-- 42501, plus: once the profile is loaded and before any write, the caller
+-- must be a users-access admin of the profile's company
+-- (has_capability('admin.access.users_access.admin'), so a user_roles row
+-- naming another company never opens it, CC-5 / D-181) who may act on that
+-- person (admin_may_act_on_user, gap/01 F23), both 42501 not_permitted;
+-- then, under lock_company_admin_managers(), the W7 guards of
+-- set_membership_status (reason from p_reason, never yourself, never the
 -- owner, a manager of admins for an administrator target, never the last
 -- manager of admins); the account_status write runs under
 -- storm.access_engine (the access guard refuses it from a session
@@ -522,10 +674,18 @@ DECLARE
   v_kind text;
   v_engine text;
 BEGIN
-  IF NOT public.hr_can_admin(auth.uid()) THEN RAISE EXCEPTION 'Only HR admins can anonymise records'; END IF;
+  IF NOT public.hr_can_admin(auth.uid()) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'Only HR admins can anonymise records';
+  END IF;
   SELECT * INTO p FROM public.profiles WHERE id = p_profile_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'Profile not found'; END IF;
   IF p.company_id IS DISTINCT FROM public.get_user_company_id(auth.uid()) THEN RAISE EXCEPTION 'Profile not found'; END IF;
+  -- Own-company users-access admin who may act on this person (CC-5,
+  -- D-181; gap/01 F23), before any write.
+  IF NOT public.has_capability('admin.access.users_access.admin', p.company_id)
+     OR NOT public.admin_may_act_on_user(auth.uid(), p.user_id, p.company_id, p.id) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'not_permitted';
+  END IF;
   IF p.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM public.crew_assignments ca WHERE ca.user_id = p.user_id AND ca.is_current) THEN
     RAISE EXCEPTION 'Crew member still has a current assignment';
   END IF;
@@ -543,7 +703,8 @@ BEGIN
 
   -- W7 guards (set_membership_status): a reason, never yourself, never the
   -- owner, a manager of admins for an administrator, never the last
-  -- manager of admins (20261123010000).
+  -- manager of admins (20261123010000), one per company at a time.
+  PERFORM public.lock_company_admin_managers(p.company_id);
   v_reason := nullif(btrim(coalesce(p_reason, '')), '');
   IF v_reason IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'reason_required';
@@ -662,6 +823,8 @@ REVOKE ALL ON FUNCTION public.user_manages_admins_for(uuid, uuid) FROM PUBLIC, a
 REVOKE ALL ON FUNCTION public.set_membership_status(uuid, text, uuid, text) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.auth_user_id_for_email(text) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.hr_anonymize_profile(uuid, text) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.user_is_admin_target(uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.lock_company_admin_managers(uuid) FROM PUBLIC, anon, authenticated, service_role;
 
 GRANT EXECUTE ON FUNCTION public.user_belongs_to_company(uuid, uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.get_user_company_id(uuid) TO authenticated, service_role;
@@ -674,18 +837,22 @@ GRANT EXECUTE ON FUNCTION public.user_manages_admins_for(uuid, uuid) TO service_
 GRANT EXECUTE ON FUNCTION public.set_membership_status(uuid, text, uuid, text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.auth_user_id_for_email(text) TO service_role;
 GRANT EXECUTE ON FUNCTION public.hr_anonymize_profile(uuid, text) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.user_is_admin_target(uuid, uuid) TO service_role;
+-- lock_company_admin_managers: no grant (only this file's definers call it).
 
 -- ---------------------------------------------------------------- comments
 
 COMMENT ON FUNCTION public.user_belongs_to_company(uuid, uuid) IS 'The user has a profile in the company and is active (D-122: disabled / deactivated profile, disabled / removed membership or auth ban -> false). Live helper redefined by 20261123010000_platform_user_status.';
 COMMENT ON FUNCTION public.get_user_company_id(uuid) IS 'The profile''s company for an active user, else NULL (D-122).';
 COMMENT ON FUNCTION public.my_profile_id() IS 'The caller''s profile id while active, else NULL (D-122).';
-COMMENT ON FUNCTION public.current_user_company_id() IS 'The company of the caller''s active user_roles row, only while the caller is active (D-122).';
-COMMENT ON FUNCTION public.has_role(uuid, public.app_role) IS 'An active, unexpired user_roles row with that role, for an active user only (D-122).';
-COMMENT ON FUNCTION public.has_any_role(uuid, public.app_role[]) IS 'An active, unexpired user_roles row with one of the roles, for an active user only (D-122).';
+COMMENT ON FUNCTION public.current_user_company_id() IS 'The company of the caller''s active user_roles row that names their own profile company (CC-5, D-181), only while the caller is active (D-122).';
+COMMENT ON FUNCTION public.has_role(uuid, public.app_role) IS 'has_any_role(_user_id, ARRAY[_role]): an active, unexpired user_roles row with that role that counts in the holder''s own company (CC-5, D-181), for an active user only (D-122).';
+COMMENT ON FUNCTION public.has_any_role(uuid, public.app_role[]) IS 'An active, unexpired user_roles row with one of the roles, for an active user only (D-122), that names the holder''s profile company or no company (CC-5, D-181): a company-less superadmin row counts anywhere, another company-less row for the holder''s own company only, a row naming another company never. No caller probe guard (definers pass arbitrary ids).';
 COMMENT ON FUNCTION public.legacy_profile_role(uuid) IS 'The legacy profiles.role for an active user, else NULL, so the HR / legal / health helpers built on it deny a disabled user (D-122).';
-COMMENT ON FUNCTION public.profiles_guard_access_columns() IS 'Trigger (CC-6, W7): from a signed-in session without storm.access_engine, company_id / user_id / account_status never change (42501 profile_access_columns_locked: use admin-actions / set_membership_status); role never on your own row and otherwise needs users-access admin (profile_access_columns_locked), a manager of admins when an administrator is involved (manages_admins_required), at most the caller''s rank (rank_exceeded), never dpa away from the last manager of admins (last_manager_of_admins), and is audited in permission_audit_log; a new dpa / shore_management profile needs users-access admin, a manager of admins and the rank check.';
+COMMENT ON FUNCTION public.profiles_guard_access_columns() IS 'Trigger (CC-6, W7; D-174): from a signed-in session without storm.access_engine, company_id / user_id / account_status never change (42501 profile_access_columns_locked: use admin-actions / set_membership_status), nor the invitation and sign-in bookkeeping (invitation_token, invitation_token_expires, invitation_count, last_invited_at, invited_at, last_login_at; your own row included) and a new profile starts with none of it; role never on your own row and otherwise needs users-access admin and an actor who may act on the target (vessel reach; an all-vessels admin for a dpa / shore_management role) (profile_access_columns_locked), a manager of admins when an administrator is involved (manages_admins_required), at most the caller''s rank (rank_exceeded), never dpa away from the last manager of admins (last_manager_of_admins, under lock_company_admin_managers), and is audited in permission_audit_log; a new dpa / shore_management profile needs an all-vessels users-access admin, a manager of admins and the rank check.';
 COMMENT ON FUNCTION public.user_manages_admins_for(uuid, uuid) IS 'Whether the user manages admins in the company (non-legacy owner / manages_admins membership, legacy dpa, or a user_roles dpa / superadmin row of the company). Internal to set_membership_status (service role).';
-COMMENT ON FUNCTION public.set_membership_status(uuid, text, uuid, text) IS 'gap/01 W7: turns a user''s access off / on for an actor who is a users-access admin of their company; no self, never the owner, manages-admins to change an admin, never the last manager of admins, reason to disable; enabling restores a removed membership. Mirrors profiles.account_status and logs TOGGLE_ACCESS. Service role only (admin-actions).';
-COMMENT ON FUNCTION public.hr_anonymize_profile(uuid, text) IS 'HRIS GDPR erasure (live body of 20260917190000) with the W7 guards of set_membership_status before the account is disabled (reason, no self, no owner, manages-admins for an administrator, never the last manager of admins); the disable runs under storm.access_engine and is logged as TOGGLE_ACCESS.';
+COMMENT ON FUNCTION public.set_membership_status(uuid, text, uuid, text) IS 'gap/01 W7, F23: turns a user''s access off / on for an actor who is a users-access admin of their company and may act on the user (vessel reach, admin_may_act_on_user); no self, never the owner, manages-admins to change an admin, never the last manager of admins (serialised by lock_company_admin_managers), reason to disable; enabling restores a removed membership, except a withdrawn invitee, who is re-invited, not enabled (42501 invitation_withdrawn). Mirrors profiles.account_status and logs TOGGLE_ACCESS. Service role only (admin-actions).';
+COMMENT ON FUNCTION public.hr_anonymize_profile(uuid, text) IS 'HRIS GDPR erasure (live body of 20260917190000) for an own-company users-access admin who may act on the person (42501 not_permitted; a user_roles row naming another company never opens it, CC-5 / D-181), with the W7 guards of set_membership_status under lock_company_admin_managers before the account is disabled (reason, no self, no owner, manages-admins for an administrator, never the last manager of admins); the disable runs under storm.access_engine and is logged as TOGGLE_ACCESS.';
+COMMENT ON FUNCTION public.user_is_admin_target(uuid, uuid) IS 'W7: whether the user is an administrator of the company whatever their active state (dpa / shore_management profile, admin / owner membership, user_roles dpa / superadmin of the company or none, RBAC superadmin / dpa, a granted settings:admin override). Internal (service role; definers).';
+COMMENT ON FUNCTION public.lock_company_admin_managers(uuid) IS 'W7 last-manager race: pg_advisory_xact_lock on admin_managers:<company>, taken by set_membership_status, the profile role-change guard and hr_anonymize_profile before their actor and last-manager checks. Relies on READ COMMITTED (PostgREST''s default); user_roles and the membership manages_admins / kind have no browser write path. No grant: definers only.';
 COMMENT ON FUNCTION public.auth_user_id_for_email(text) IS 'The auth user id for an email address (case-insensitive), or NULL. Service role only (the invite path).';

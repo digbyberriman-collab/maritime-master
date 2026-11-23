@@ -2,8 +2,9 @@
 -- PLATFORM P3 follow-up: legacy app-role policies scoped to the row's
 -- company (gap/01 F6, CC-5; Phase 2 security rules; proposed D-124)
 -- Tables: none new. Columns: none.
--- Helper: has_role_in_company() (authenticated; RLS predicate, rule 11);
---   the live single-role overload redefined on the same rule
+-- Helpers: has_role_in_company() (authenticated; RLS predicate, rule 11);
+--   the live single-role overload redefined on the same rule;
+--   vessel_company_of(), profile_company_of() (authenticated; RLS helpers)
 -- Policies (legacy names, recreated with the same command and roles):
 --   crew_change_dates_insert / _update; crew_import_write_privileged /
 --   _update_privileged (service role); crew_tasks "Officers can create
@@ -38,11 +39,14 @@
 --   as not mirrored)
 -- =================================================================
 --
--- has_role() / has_any_role() answer "does the user hold this app role in
--- any user_roles row", whatever company that row names. About forty legacy
--- policies used them as their only gate, so a user_roles row of company A
--- opened company B's medical reports, flight bookings, rest records and
--- planner (the cross-tenant finding of the Phase 2 review). The write path
+-- The live has_role() / has_any_role() answered "does the user hold this
+-- app role in any user_roles row", whatever company that row names
+-- (20261123010000 now counts a row only in its holder's own company, CC-5 /
+-- D-181). About forty legacy policies used them as their only gate, so a
+-- user_roles row of company A opened company B's medical reports, flight
+-- bookings, rest records and planner (the cross-tenant finding of the
+-- Phase 2 review): a holder's own-company role still reached every tenant's
+-- rows through them. The write path
 -- that let a tenant admin mint such rows is closed in
 -- 20261123010100_platform_access_rls.sql; this file closes the read side
 -- for rows that already exist: every policy whose only role gate was
@@ -50,18 +54,28 @@
 -- it) now asks has_role_in_company() about the row's company:
 --
 --   company_id column          -> company_id
---   vessel_id column           -> the vessel's company (subquery on vessels,
---                                 under the caller's RLS)
+--   vessel_id column           -> vessel_company_of(vessel_id): the vessel's
+--                                 real company, read without the caller's
+--                                 RLS, so an unseen vessel never falls back
+--                                 to the crew member's company
 --   crew / recipient column    -> user_company_for_admin(<column>): the
 --                                 person's company when the caller is in it
 --   parent record              -> the parent's company (flight_bookings via
 --                                 flight_requests; work-rest notes and
 --                                 signatures via their submission's vessel)
 --
--- Own-row branches (crew_id = auth.uid(), author_id = auth.uid(), …) stay
--- as they were. Global catalogs without a company (modules,
--- training_courses) and the company-less crew_import staging table are
--- written by the service role only; their read policies are unchanged.
+-- Own-row branches (crew_id = auth.uid(), author_id = auth.uid(), …) also
+-- ask user_is_active(auth.uid()) (a disabled user gets nothing, D-122),
+-- and on writes are pinned to the caller's tenancy (review round 2, D-172,
+-- CC-5): a flight request in the caller's own company; a vessel row on a
+-- vessel the caller reaches (or none); destinations, trip suggestions and
+-- support tickets in the caller's company. Every crew + vessel WITH CHECK
+-- also pins the vessel to the crew member's own company
+-- (vessel_company_of(vessel_id) = profile_company_of(crew_id)), so no branch
+-- pairs a crew member with a foreign vessel or re-points a row to one.
+-- Global catalogs without a company (modules, training_courses) and the
+-- company-less crew_import staging table are written by the service role
+-- only; their read policies are unchanged.
 --
 -- A legacy user_roles row with no company counts only for a superadmin
 -- (platform staff). Rows of other roles without a company are given their
@@ -74,8 +88,9 @@
 -- ---------------------------------------------------------------- prerequisites (rule 14)
 DO $$
 BEGIN
-  IF to_regprocedure('public.user_is_active(uuid)') IS NULL OR to_regprocedure('public.user_company_for_admin(uuid)') IS NULL THEN
-    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010500_platform_role_scoped_policies needs user_is_active() and user_company_for_admin(): apply 20261123000300 and 20261123000400 first';
+  IF to_regprocedure('public.user_is_active(uuid)') IS NULL OR to_regprocedure('public.user_company_for_admin(uuid)') IS NULL
+     OR to_regprocedure('public.user_can_reach_vessel(uuid,uuid)') IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010500_platform_role_scoped_policies needs user_is_active(), user_can_reach_vessel() and user_company_for_admin(): apply 20261123000300 and 20261123000400 first';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'user_roles' AND policyname = 'user_roles_select_admin') THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010500_platform_role_scoped_policies needs the closed user_roles write path: apply 20261123010100_platform_access_rls.sql first';
@@ -165,6 +180,47 @@ GRANT EXECUTE ON FUNCTION public.has_role_in_company(uuid, public.app_role, uuid
 COMMENT ON FUNCTION public.has_role_in_company(uuid, public.app_role, uuid) IS 'Live single-role overload: has_role_in_company(_user_id, ARRAY[_role], _company_id).';
 COMMENT ON FUNCTION public.has_role_in_company(uuid, public.app_role[], uuid) IS 'RLS predicate (rule 11, CC-5): an active, unexpired user_roles row with one of the roles naming that company (the user''s own profile company), or a company-less superadmin row; active users only. False for a NULL company and for a signed-in caller asking about someone else. Replaces the unscoped has_role / has_any_role gates of the legacy policies.';
 
+-- ---------------------------------------------------------------- company resolution (no RLS in the way)
+
+-- The company that owns a vessel, read without the caller's RLS: an inline
+-- "(SELECT company_id FROM vessels ...)" in a policy runs under the
+-- caller's vessel RLS, so a vessel the caller cannot see resolves to NULL
+-- and a coalesce with the crew member's company would then let a caller
+-- plant a row on another tenant's vessel (review round 2). Answers only
+-- the owning company's id for a known vessel id (no names); NULL for an
+-- unknown or NULL id. Policies of this file call it.
+CREATE OR REPLACE FUNCTION public.vessel_company_of(_vessel_id uuid)
+RETURNS uuid
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT v.company_id FROM public.vessels AS v WHERE v.id = _vessel_id
+$$;
+
+-- A person's profile company, read without the caller's RLS (rule 15: no
+-- inline profiles subquery in a build-out policy). Used to pin a crew +
+-- vessel row's vessel to the crew member's own company. NULL for an
+-- unknown or NULL id.
+CREATE OR REPLACE FUNCTION public.profile_company_of(_user_id uuid)
+RETURNS uuid
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT p.company_id FROM public.profiles AS p WHERE p.user_id = _user_id
+$$;
+
+REVOKE ALL ON FUNCTION public.vessel_company_of(uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.profile_company_of(uuid) FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.vessel_company_of(uuid) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.profile_company_of(uuid) TO authenticated, service_role;
+
+COMMENT ON FUNCTION public.vessel_company_of(uuid) IS 'RLS helper (rule 11): the owning company id of a vessel, read without the caller''s vessel RLS, so the role-scoped policies resolve a vessel the caller cannot see to its real company and fail closed. NULL for an unknown id.';
+COMMENT ON FUNCTION public.profile_company_of(uuid) IS 'RLS helper (rule 11, rule 15): a person''s profile company id, read without the caller''s RLS; pins a crew + vessel row''s vessel to the crew member''s company. NULL for an unknown id.';
+
 -- ---------------------------------------------------------------- crew_change_dates (vessel)
 
 DROP POLICY IF EXISTS crew_change_dates_insert ON public.crew_change_dates;
@@ -173,7 +229,7 @@ CREATE POLICY crew_change_dates_insert ON public.crew_change_dates
   WITH CHECK (
     auth.uid() IS NOT NULL
     AND public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'fleet_master', 'captain']::public.app_role[],
-          (SELECT v.company_id FROM public.vessels AS v WHERE v.id = crew_change_dates.vessel_id))
+          public.vessel_company_of(crew_change_dates.vessel_id))
   );
 
 DROP POLICY IF EXISTS crew_change_dates_update ON public.crew_change_dates;
@@ -182,12 +238,12 @@ CREATE POLICY crew_change_dates_update ON public.crew_change_dates
   USING (
     auth.uid() IS NOT NULL
     AND public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'fleet_master', 'captain']::public.app_role[],
-          (SELECT v.company_id FROM public.vessels AS v WHERE v.id = crew_change_dates.vessel_id))
+          public.vessel_company_of(crew_change_dates.vessel_id))
   )
   WITH CHECK (
     auth.uid() IS NOT NULL
     AND public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'fleet_master', 'captain']::public.app_role[],
-          (SELECT v.company_id FROM public.vessels AS v WHERE v.id = crew_change_dates.vessel_id))
+          public.vessel_company_of(crew_change_dates.vessel_id))
   );
 
 -- ---------------------------------------------------------------- crew_import (no company: service role writes)
@@ -210,6 +266,7 @@ CREATE POLICY "Officers can create tasks" ON public.crew_tasks
   FOR INSERT TO authenticated
   WITH CHECK (
     assigned_by = auth.uid()
+    AND public.user_is_active(auth.uid())
     AND public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'fleet_master', 'captain', 'chief_officer', 'chief_engineer']::public.app_role[], company_id)
   );
 
@@ -218,8 +275,10 @@ CREATE POLICY "Officers can create tasks" ON public.crew_tasks
 DROP POLICY IF EXISTS destinations_update ON public.destinations;
 CREATE POLICY destinations_update ON public.destinations
   FOR UPDATE TO authenticated
-  USING (public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'fleet_master']::public.app_role[], company_id) OR created_by = auth.uid())
-  WITH CHECK (public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'fleet_master']::public.app_role[], company_id) OR created_by = auth.uid());
+  USING (public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'fleet_master']::public.app_role[], company_id)
+         OR (created_by = auth.uid() AND public.user_is_active(auth.uid()) AND public.user_belongs_to_company(auth.uid(), company_id)))
+  WITH CHECK (public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'fleet_master']::public.app_role[], company_id)
+              OR (created_by = auth.uid() AND public.user_is_active(auth.uid()) AND public.user_belongs_to_company(auth.uid(), company_id)));
 
 -- ---------------------------------------------------------------- fleet_groups (company)
 
@@ -234,13 +293,16 @@ CREATE POLICY "DPA and Superadmin can manage fleet groups" ON public.fleet_group
 DROP POLICY IF EXISTS "Authorized users can manage flight requests" ON public.flight_requests;
 CREATE POLICY "Authorized users can manage flight requests" ON public.flight_requests
   FOR ALL
-  USING (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser']::public.app_role[], company_id))
-  WITH CHECK (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser']::public.app_role[], company_id));
+  USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND public.user_belongs_to_company(auth.uid(), company_id))
+         OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser']::public.app_role[], company_id))
+  WITH CHECK (((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND public.user_belongs_to_company(auth.uid(), company_id))
+               OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser']::public.app_role[], company_id))
+              AND (vessel_id IS NULL OR public.vessel_company_of(vessel_id) = company_id));
 
 DROP POLICY IF EXISTS "Users can view own flight requests" ON public.flight_requests;
 CREATE POLICY "Users can view own flight requests" ON public.flight_requests
   FOR SELECT
-  USING (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'travel_agent']::public.app_role[], company_id));
+  USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'travel_agent']::public.app_role[], company_id));
 
 DROP POLICY IF EXISTS "Flight bookings viewable by request owner and staff" ON public.flight_bookings;
 CREATE POLICY "Flight bookings viewable by request owner and staff" ON public.flight_bookings
@@ -249,7 +311,7 @@ CREATE POLICY "Flight bookings viewable by request owner and staff" ON public.fl
     EXISTS (
       SELECT 1 FROM public.flight_requests AS fr
       WHERE fr.id = flight_bookings.flight_request_id
-        AND (fr.crew_id = auth.uid()
+        AND ((fr.crew_id = auth.uid() AND public.user_is_active(auth.uid()))
              OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'travel_agent']::public.app_role[], fr.company_id))
     )
   );
@@ -267,32 +329,34 @@ CREATE POLICY "Travel agents and DPA can manage bookings" ON public.flight_booki
 DROP POLICY IF EXISTS "Users can manage own rest records" ON public.hours_of_rest_records;
 CREATE POLICY "Users can manage own rest records" ON public.hours_of_rest_records
   FOR ALL
-  USING (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain']::public.app_role[],
-           coalesce((SELECT v.company_id FROM public.vessels AS v WHERE v.id = hours_of_rest_records.vessel_id), public.user_company_for_admin(hours_of_rest_records.crew_id))))
-  WITH CHECK (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain']::public.app_role[],
-           coalesce((SELECT v.company_id FROM public.vessels AS v WHERE v.id = hours_of_rest_records.vessel_id), public.user_company_for_admin(hours_of_rest_records.crew_id))));
+  USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND (vessel_id IS NULL OR public.user_can_reach_vessel(auth.uid(), vessel_id))) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain']::public.app_role[],
+           coalesce(public.vessel_company_of(hours_of_rest_records.vessel_id), public.user_company_for_admin(hours_of_rest_records.crew_id))))
+  WITH CHECK (((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND (vessel_id IS NULL OR public.user_can_reach_vessel(auth.uid(), vessel_id))) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain']::public.app_role[],
+                coalesce(public.vessel_company_of(hours_of_rest_records.vessel_id), public.user_company_for_admin(hours_of_rest_records.crew_id))))
+              AND (hours_of_rest_records.vessel_id IS NULL OR public.vessel_company_of(hours_of_rest_records.vessel_id) = public.profile_company_of(hours_of_rest_records.crew_id)));
 
 DROP POLICY IF EXISTS "Users can view own rest records" ON public.hours_of_rest_records;
 CREATE POLICY "Users can view own rest records" ON public.hours_of_rest_records
   FOR SELECT
-  USING (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser']::public.app_role[],
-           coalesce((SELECT v.company_id FROM public.vessels AS v WHERE v.id = hours_of_rest_records.vessel_id), public.user_company_for_admin(hours_of_rest_records.crew_id))));
+  USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser']::public.app_role[],
+           coalesce(public.vessel_company_of(hours_of_rest_records.vessel_id), public.user_company_for_admin(hours_of_rest_records.crew_id))));
 
 -- ---------------------------------------------------------------- leave_requests (vessel, else crew)
 
 DROP POLICY IF EXISTS "Authorized users can manage leave requests" ON public.leave_requests;
 CREATE POLICY "Authorized users can manage leave requests" ON public.leave_requests
   FOR UPDATE
-  USING (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser']::public.app_role[],
-           coalesce((SELECT v.company_id FROM public.vessels AS v WHERE v.id = leave_requests.vessel_id), public.user_company_for_admin(leave_requests.crew_id))))
-  WITH CHECK (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser']::public.app_role[],
-           coalesce((SELECT v.company_id FROM public.vessels AS v WHERE v.id = leave_requests.vessel_id), public.user_company_for_admin(leave_requests.crew_id))));
+  USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND (vessel_id IS NULL OR public.user_can_reach_vessel(auth.uid(), vessel_id))) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser']::public.app_role[],
+           coalesce(public.vessel_company_of(leave_requests.vessel_id), public.user_company_for_admin(leave_requests.crew_id))))
+  WITH CHECK (((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND (vessel_id IS NULL OR public.user_can_reach_vessel(auth.uid(), vessel_id))) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser']::public.app_role[],
+                coalesce(public.vessel_company_of(leave_requests.vessel_id), public.user_company_for_admin(leave_requests.crew_id))))
+              AND (leave_requests.vessel_id IS NULL OR public.vessel_company_of(leave_requests.vessel_id) = public.profile_company_of(leave_requests.crew_id)));
 
 DROP POLICY IF EXISTS "Users can view own leave requests" ON public.leave_requests;
 CREATE POLICY "Users can view own leave requests" ON public.leave_requests
   FOR SELECT
-  USING (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser']::public.app_role[],
-           coalesce((SELECT v.company_id FROM public.vessels AS v WHERE v.id = leave_requests.vessel_id), public.user_company_for_admin(leave_requests.crew_id))));
+  USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser']::public.app_role[],
+           coalesce(public.vessel_company_of(leave_requests.vessel_id), public.user_company_for_admin(leave_requests.crew_id))));
 
 -- ---------------------------------------------------------------- medical_reports (vessel, else crew)
 
@@ -300,17 +364,18 @@ DROP POLICY IF EXISTS "DPA and Captain can manage medical reports" ON public.med
 CREATE POLICY "DPA and Captain can manage medical reports" ON public.medical_reports
   FOR ALL
   USING (public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain']::public.app_role[],
-           coalesce((SELECT v.company_id FROM public.vessels AS v WHERE v.id = medical_reports.vessel_id), public.user_company_for_admin(medical_reports.crew_id))))
+           coalesce(public.vessel_company_of(medical_reports.vessel_id), public.user_company_for_admin(medical_reports.crew_id))))
   WITH CHECK (public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain']::public.app_role[],
-           coalesce((SELECT v.company_id FROM public.vessels AS v WHERE v.id = medical_reports.vessel_id), public.user_company_for_admin(medical_reports.crew_id))));
+                coalesce(public.vessel_company_of(medical_reports.vessel_id), public.user_company_for_admin(medical_reports.crew_id)))
+              AND (medical_reports.vessel_id IS NULL OR medical_reports.crew_id IS NULL OR public.vessel_company_of(medical_reports.vessel_id) = public.profile_company_of(medical_reports.crew_id)));
 
 DROP POLICY IF EXISTS "Medical reports visible to authorized users" ON public.medical_reports;
 CREATE POLICY "Medical reports visible to authorized users" ON public.medical_reports
   FOR SELECT
   USING (
     public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain']::public.app_role[],
-      coalesce((SELECT v.company_id FROM public.vessels AS v WHERE v.id = medical_reports.vessel_id), public.user_company_for_admin(medical_reports.crew_id)))
-    OR crew_id = auth.uid()
+      coalesce(public.vessel_company_of(medical_reports.vessel_id), public.user_company_for_admin(medical_reports.crew_id)))
+    OR (crew_id = auth.uid() AND public.user_is_active(auth.uid()))
   );
 
 -- ---------------------------------------------------------------- modules (global catalog: service role writes)
@@ -326,7 +391,7 @@ CREATE POLICY "Only admins can modify modules" ON public.modules
 DROP POLICY IF EXISTS "Users can view own notifications" ON public.notification_logs;
 CREATE POLICY "Users can view own notifications" ON public.notification_logs
   FOR SELECT
-  USING (recipient_user_id = auth.uid()
+  USING ((recipient_user_id = auth.uid() AND public.user_is_active(auth.uid()))
          OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa']::public.app_role[], public.user_company_for_admin(notification_logs.recipient_user_id)));
 
 -- ---------------------------------------------------------------- planner_periods (vessel)
@@ -335,16 +400,17 @@ DROP POLICY IF EXISTS "DPA and Captain can manage planner periods" ON public.pla
 CREATE POLICY "DPA and Captain can manage planner periods" ON public.planner_periods
   FOR ALL
   USING (public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain']::public.app_role[],
-           (SELECT v.company_id FROM public.vessels AS v WHERE v.id = planner_periods.vessel_id)))
+           public.vessel_company_of(planner_periods.vessel_id)))
   WITH CHECK (public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain']::public.app_role[],
-           (SELECT v.company_id FROM public.vessels AS v WHERE v.id = planner_periods.vessel_id)));
+           public.vessel_company_of(planner_periods.vessel_id)));
 
 -- ---------------------------------------------------------------- support_tickets (company)
 
 DROP POLICY IF EXISTS "Users can view their own support tickets" ON public.support_tickets;
 CREATE POLICY "Users can view their own support tickets" ON public.support_tickets
   FOR SELECT TO authenticated
-  USING (reporter_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['dpa', 'superadmin']::public.app_role[], company_id));
+  USING ((reporter_id = auth.uid() AND public.user_is_active(auth.uid()) AND public.user_belongs_to_company(auth.uid(), company_id))
+         OR public.has_role_in_company(auth.uid(), ARRAY['dpa', 'superadmin']::public.app_role[], company_id));
 
 -- ---------------------------------------------------------------- training_courses (global catalog: service role writes)
 
@@ -374,8 +440,10 @@ CREATE POLICY suggestions_delete ON public.trip_suggestions
 DROP POLICY IF EXISTS suggestions_update ON public.trip_suggestions;
 CREATE POLICY suggestions_update ON public.trip_suggestions
   FOR UPDATE TO authenticated
-  USING (submitted_by = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'fleet_master']::public.app_role[], company_id))
-  WITH CHECK (submitted_by = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'fleet_master']::public.app_role[], company_id));
+  USING ((submitted_by = auth.uid() AND public.user_is_active(auth.uid()) AND public.user_belongs_to_company(auth.uid(), company_id))
+         OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'fleet_master']::public.app_role[], company_id))
+  WITH CHECK ((submitted_by = auth.uid() AND public.user_is_active(auth.uid()) AND public.user_belongs_to_company(auth.uid(), company_id))
+              OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'fleet_master']::public.app_role[], company_id));
 
 -- ---------------------------------------------------------------- work / rest (vessel, crew or the parent submission)
 
@@ -383,111 +451,114 @@ DROP POLICY IF EXISTS "Admins manage vessel work/rest settings" ON public.vessel
 CREATE POLICY "Admins manage vessel work/rest settings" ON public.vessel_work_rest_settings
   FOR ALL
   USING (public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain']::public.app_role[],
-           (SELECT v.company_id FROM public.vessels AS v WHERE v.id = vessel_work_rest_settings.vessel_id)))
+           public.vessel_company_of(vessel_work_rest_settings.vessel_id)))
   WITH CHECK (public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain']::public.app_role[],
-           (SELECT v.company_id FROM public.vessels AS v WHERE v.id = vessel_work_rest_settings.vessel_id)));
+           public.vessel_company_of(vessel_work_rest_settings.vessel_id)));
 
 DROP POLICY IF EXISTS "Admins manage rule sets" ON public.work_rest_rule_sets;
 CREATE POLICY "Admins manage rule sets" ON public.work_rest_rule_sets
   FOR ALL
   USING (public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain']::public.app_role[],
-           coalesce(company_id, (SELECT v.company_id FROM public.vessels AS v WHERE v.id = work_rest_rule_sets.vessel_id))))
+           coalesce(company_id, public.vessel_company_of(work_rest_rule_sets.vessel_id))))
   WITH CHECK (public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain']::public.app_role[],
-           coalesce(company_id, (SELECT v.company_id FROM public.vessels AS v WHERE v.id = work_rest_rule_sets.vessel_id))));
+           coalesce(company_id, public.vessel_company_of(work_rest_rule_sets.vessel_id))));
 
 DROP POLICY IF EXISTS "Authorized update of submission" ON public.work_rest_monthly_submissions;
 CREATE POLICY "Authorized update of submission" ON public.work_rest_monthly_submissions
   FOR UPDATE
-  USING (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[],
-           coalesce((SELECT v.company_id FROM public.vessels AS v WHERE v.id = work_rest_monthly_submissions.vessel_id), public.user_company_for_admin(work_rest_monthly_submissions.crew_id))))
-  WITH CHECK (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[],
-           coalesce((SELECT v.company_id FROM public.vessels AS v WHERE v.id = work_rest_monthly_submissions.vessel_id), public.user_company_for_admin(work_rest_monthly_submissions.crew_id))));
+  USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND (vessel_id IS NULL OR public.user_can_reach_vessel(auth.uid(), vessel_id))) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[],
+           coalesce(public.vessel_company_of(work_rest_monthly_submissions.vessel_id), public.user_company_for_admin(work_rest_monthly_submissions.crew_id))))
+  WITH CHECK (((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND (vessel_id IS NULL OR public.user_can_reach_vessel(auth.uid(), vessel_id))) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[],
+                coalesce(public.vessel_company_of(work_rest_monthly_submissions.vessel_id), public.user_company_for_admin(work_rest_monthly_submissions.crew_id))))
+              AND (work_rest_monthly_submissions.vessel_id IS NULL OR public.vessel_company_of(work_rest_monthly_submissions.vessel_id) = public.profile_company_of(work_rest_monthly_submissions.crew_id)));
 
 DROP POLICY IF EXISTS "Crew create own submission" ON public.work_rest_monthly_submissions;
 CREATE POLICY "Crew create own submission" ON public.work_rest_monthly_submissions
   FOR INSERT
-  WITH CHECK (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[],
-           coalesce((SELECT v.company_id FROM public.vessels AS v WHERE v.id = work_rest_monthly_submissions.vessel_id), public.user_company_for_admin(work_rest_monthly_submissions.crew_id))));
+  WITH CHECK (((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND (vessel_id IS NULL OR public.user_can_reach_vessel(auth.uid(), vessel_id))) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[],
+                coalesce(public.vessel_company_of(work_rest_monthly_submissions.vessel_id), public.user_company_for_admin(work_rest_monthly_submissions.crew_id))))
+              AND (work_rest_monthly_submissions.vessel_id IS NULL OR public.vessel_company_of(work_rest_monthly_submissions.vessel_id) = public.profile_company_of(work_rest_monthly_submissions.crew_id)));
 
 DROP POLICY IF EXISTS "Crew view own submission" ON public.work_rest_monthly_submissions;
 CREATE POLICY "Crew view own submission" ON public.work_rest_monthly_submissions
   FOR SELECT
-  USING (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(),
+  USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(),
            ARRAY['superadmin', 'dpa', 'fleet_master', 'captain', 'purser', 'hod', 'chief_officer', 'chief_engineer', 'auditor_flag', 'auditor_class']::public.app_role[],
-           coalesce((SELECT v.company_id FROM public.vessels AS v WHERE v.id = work_rest_monthly_submissions.vessel_id), public.user_company_for_admin(work_rest_monthly_submissions.crew_id))));
+           coalesce(public.vessel_company_of(work_rest_monthly_submissions.vessel_id), public.user_company_for_admin(work_rest_monthly_submissions.crew_id))));
 
 DROP POLICY IF EXISTS "Crew manage own records" ON public.work_rest_records;
 CREATE POLICY "Crew manage own records" ON public.work_rest_records
   FOR ALL
-  USING (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[],
-           coalesce((SELECT v.company_id FROM public.vessels AS v WHERE v.id = work_rest_records.vessel_id), public.user_company_for_admin(work_rest_records.crew_id))))
-  WITH CHECK (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[],
-           coalesce((SELECT v.company_id FROM public.vessels AS v WHERE v.id = work_rest_records.vessel_id), public.user_company_for_admin(work_rest_records.crew_id))));
+  USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND (vessel_id IS NULL OR public.user_can_reach_vessel(auth.uid(), vessel_id))) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[],
+           coalesce(public.vessel_company_of(work_rest_records.vessel_id), public.user_company_for_admin(work_rest_records.crew_id))))
+  WITH CHECK (((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND (vessel_id IS NULL OR public.user_can_reach_vessel(auth.uid(), vessel_id))) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[],
+                coalesce(public.vessel_company_of(work_rest_records.vessel_id), public.user_company_for_admin(work_rest_records.crew_id))))
+              AND (work_rest_records.vessel_id IS NULL OR public.vessel_company_of(work_rest_records.vessel_id) = public.profile_company_of(work_rest_records.crew_id)));
 
 DROP POLICY IF EXISTS "Crew view own records" ON public.work_rest_records;
 CREATE POLICY "Crew view own records" ON public.work_rest_records
   FOR SELECT
-  USING (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(),
+  USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(),
            ARRAY['superadmin', 'dpa', 'fleet_master', 'captain', 'purser', 'hod', 'chief_officer', 'chief_engineer', 'auditor_flag', 'auditor_class']::public.app_role[],
-           coalesce((SELECT v.company_id FROM public.vessels AS v WHERE v.id = work_rest_records.vessel_id), public.user_company_for_admin(work_rest_records.crew_id))));
+           coalesce(public.vessel_company_of(work_rest_records.vessel_id), public.user_company_for_admin(work_rest_records.crew_id))));
 
 DROP POLICY IF EXISTS "Manage blocks via record" ON public.work_rest_blocks;
 CREATE POLICY "Manage blocks via record" ON public.work_rest_blocks
   FOR ALL
-  USING (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_blocks.crew_id)))
-  WITH CHECK (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_blocks.crew_id)));
+  USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_blocks.crew_id)))
+  WITH CHECK ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_blocks.crew_id)));
 
 DROP POLICY IF EXISTS "View blocks via record visibility" ON public.work_rest_blocks;
 CREATE POLICY "View blocks via record visibility" ON public.work_rest_blocks
   FOR SELECT
-  USING (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(),
+  USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(),
            ARRAY['superadmin', 'dpa', 'fleet_master', 'captain', 'purser', 'hod', 'chief_officer', 'chief_engineer', 'auditor_flag', 'auditor_class']::public.app_role[],
            public.user_company_for_admin(work_rest_blocks.crew_id)));
 
 DROP POLICY IF EXISTS "System manages compliance checks" ON public.work_rest_compliance_checks;
 CREATE POLICY "System manages compliance checks" ON public.work_rest_compliance_checks
   FOR ALL
-  USING (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_compliance_checks.crew_id)))
-  WITH CHECK (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_compliance_checks.crew_id)));
+  USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_compliance_checks.crew_id)))
+  WITH CHECK ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_compliance_checks.crew_id)));
 
 DROP POLICY IF EXISTS "View own compliance checks" ON public.work_rest_compliance_checks;
 CREATE POLICY "View own compliance checks" ON public.work_rest_compliance_checks
   FOR SELECT
-  USING (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(),
+  USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(),
            ARRAY['superadmin', 'dpa', 'fleet_master', 'captain', 'purser', 'hod', 'chief_officer', 'chief_engineer', 'auditor_flag', 'auditor_class']::public.app_role[],
            public.user_company_for_admin(work_rest_compliance_checks.crew_id)));
 
 DROP POLICY IF EXISTS "Manage NCs" ON public.work_rest_non_conformities;
 CREATE POLICY "Manage NCs" ON public.work_rest_non_conformities
   FOR ALL
-  USING (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_non_conformities.crew_id)))
-  WITH CHECK (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_non_conformities.crew_id)));
+  USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_non_conformities.crew_id)))
+  WITH CHECK ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_non_conformities.crew_id)));
 
 DROP POLICY IF EXISTS "View own NCs" ON public.work_rest_non_conformities;
 CREATE POLICY "View own NCs" ON public.work_rest_non_conformities
   FOR SELECT
-  USING (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(),
+  USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(),
            ARRAY['superadmin', 'dpa', 'fleet_master', 'captain', 'purser', 'hod', 'chief_officer', 'chief_engineer', 'auditor_flag', 'auditor_class']::public.app_role[],
            public.user_company_for_admin(work_rest_non_conformities.crew_id)));
 
 DROP POLICY IF EXISTS "View audit log" ON public.work_rest_audit_log;
 CREATE POLICY "View audit log" ON public.work_rest_audit_log
   FOR SELECT
-  USING (crew_id = auth.uid() OR public.has_role_in_company(auth.uid(),
+  USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(),
            ARRAY['superadmin', 'dpa', 'captain', 'hod', 'auditor_flag', 'auditor_class']::public.app_role[],
            coalesce(public.user_company_for_admin(work_rest_audit_log.crew_id),
-                    (SELECT v.company_id FROM public.work_rest_monthly_submissions AS s JOIN public.vessels AS v ON v.id = s.vessel_id
+                    (SELECT public.vessel_company_of(s.vessel_id) FROM public.work_rest_monthly_submissions AS s
                       WHERE s.id = work_rest_audit_log.submission_id))));
 
 DROP POLICY IF EXISTS "Manage own notes" ON public.work_rest_notes;
 CREATE POLICY "Manage own notes" ON public.work_rest_notes
   FOR ALL
-  USING (author_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[],
-           coalesce((SELECT v.company_id FROM public.work_rest_monthly_submissions AS s JOIN public.vessels AS v ON v.id = s.vessel_id WHERE s.id = work_rest_notes.submission_id),
-                    (SELECT v.company_id FROM public.work_rest_records AS r JOIN public.vessels AS v ON v.id = r.vessel_id WHERE r.id = work_rest_notes.record_id))))
-  WITH CHECK (author_id = auth.uid() OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[],
-           coalesce((SELECT v.company_id FROM public.work_rest_monthly_submissions AS s JOIN public.vessels AS v ON v.id = s.vessel_id WHERE s.id = work_rest_notes.submission_id),
-                    (SELECT v.company_id FROM public.work_rest_records AS r JOIN public.vessels AS v ON v.id = r.vessel_id WHERE r.id = work_rest_notes.record_id))));
+  USING ((author_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[],
+           coalesce((SELECT public.vessel_company_of(s.vessel_id) FROM public.work_rest_monthly_submissions AS s WHERE s.id = work_rest_notes.submission_id),
+                    (SELECT public.vessel_company_of(r.vessel_id) FROM public.work_rest_records AS r WHERE r.id = work_rest_notes.record_id))))
+  WITH CHECK ((author_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[],
+           coalesce((SELECT public.vessel_company_of(s.vessel_id) FROM public.work_rest_monthly_submissions AS s WHERE s.id = work_rest_notes.submission_id),
+                    (SELECT public.vessel_company_of(r.vessel_id) FROM public.work_rest_records AS r WHERE r.id = work_rest_notes.record_id))));
 
 DROP POLICY IF EXISTS "View notes" ON public.work_rest_notes;
 CREATE POLICY "View notes" ON public.work_rest_notes
@@ -496,10 +567,10 @@ CREATE POLICY "View notes" ON public.work_rest_notes
     EXISTS (
       SELECT 1 FROM public.work_rest_monthly_submissions AS s
       WHERE s.id = work_rest_notes.submission_id
-        AND (s.crew_id = auth.uid()
+        AND ((s.crew_id = auth.uid() AND public.user_is_active(auth.uid()))
              OR public.has_role_in_company(auth.uid(),
                   ARRAY['superadmin', 'dpa', 'fleet_master', 'captain', 'purser', 'hod', 'chief_officer', 'chief_engineer', 'auditor_flag', 'auditor_class']::public.app_role[],
-                  (SELECT v.company_id FROM public.vessels AS v WHERE v.id = s.vessel_id)))
+                  public.vessel_company_of(s.vessel_id)))
     )
   );
 
@@ -510,9 +581,9 @@ CREATE POLICY "View signatures" ON public.work_rest_signatures
     EXISTS (
       SELECT 1 FROM public.work_rest_monthly_submissions AS s
       WHERE s.id = work_rest_signatures.submission_id
-        AND (s.crew_id = auth.uid()
+        AND ((s.crew_id = auth.uid() AND public.user_is_active(auth.uid()))
              OR public.has_role_in_company(auth.uid(),
                   ARRAY['superadmin', 'dpa', 'fleet_master', 'captain', 'purser', 'hod', 'chief_officer', 'chief_engineer', 'auditor_flag', 'auditor_class']::public.app_role[],
-                  (SELECT v.company_id FROM public.vessels AS v WHERE v.id = s.vessel_id)))
+                  public.vessel_company_of(s.vessel_id)))
     )
   );

@@ -689,6 +689,7 @@ $$;
 -- computes them. Profiles without a login (imported crew) get no membership
 -- in Phase 2: they cannot sign in (X6's invite flow creates 'invited' rows).
 -- user_roles superadmin is not migrated to platform staff here (gap/01 F3).
+-- Then accepted_at from the sign-in evidence (review round 2, D-120).
 INSERT INTO public.account_memberships
   (company_id, user_id, profile_id, kind, status, legacy_managed, fleet_access, vessel_scope, is_dpa, manages_admins, disabled_at, source)
 SELECT p.company_id, p.user_id, p.id,
@@ -706,6 +707,23 @@ WHERE p.user_id IS NOT NULL
   AND p.company_id IS NOT NULL
   AND NOT EXISTS (SELECT 1 FROM public.account_memberships AS m WHERE m.company_id = p.company_id AND m.profile_id = p.id)
 ON CONFLICT (company_id, user_id) WHERE user_id IS NOT NULL DO NOTHING;
+
+-- Sign-in evidence before the apply (coalesce(profiles.last_login_at, auth
+-- last_sign_in_at): nothing wrote last_login_at before Phase 2, auth records
+-- every sign-in) makes a legacy-managed membership accepted, so
+-- membership.accepted_at is honest for pre-apply sign-ins and a later
+-- revoke or expiry of a re-invite never withdraws a signed-in user's
+-- access (20261123010200 invitation_withdraw_access). Only rows still
+-- without accepted_at (idempotent, D-12).
+UPDATE public.account_memberships AS m
+SET accepted_at = coalesce(p.last_login_at, u.last_sign_in_at)
+FROM public.profiles AS p
+LEFT JOIN auth.users AS u ON u.id = p.user_id
+WHERE m.legacy_managed
+  AND m.accepted_at IS NULL
+  AND p.user_id = m.user_id
+  AND p.company_id = m.company_id
+  AND coalesce(p.last_login_at, u.last_sign_in_at) IS NOT NULL;
 
 DROP TRIGGER IF EXISTS trg_profiles_sync_membership ON public.profiles;
 CREATE TRIGGER trg_profiles_sync_membership
