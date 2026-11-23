@@ -1,4 +1,5 @@
 import { NAVIGATION_ITEMS, type NavChild, type NavItem } from '@/config/navigation';
+import { WORKSPACE_ROOTS, isScopedPath } from '@/app/nav/sidebarLinks';
 
 export interface PageCrumb {
   label: string;
@@ -129,6 +130,22 @@ interface Match {
   score: number;
 }
 
+const underRoot = (path: string, root: string): boolean => path === root || path.startsWith(`${root}/`);
+
+/**
+ * A cross-link into a page that a tree of its own names (a workspace root or
+ * page, a Fleet, vessel or personal URL) never roots that page's trail, as in
+ * resolveModuleForPath: Fleet › Workspaces › Legal is a link, the Legal
+ * pages' crumbs are Legal's. A cross-link to a legacy URL still names it, so
+ * a legacy page opened from a workspace keeps that workspace's trail (D-45:
+ * `/crew/leave?module=hris` reads HRIS › Leave & Rotation › Leave Planner).
+ */
+function isForeignCrossLink(node: NavigationNode): boolean {
+  if (!('crossLink' in node) || !node.crossLink) return false;
+  const path = pathnameOf(node.path);
+  return isScopedPath(path) || WORKSPACE_ROOTS.some((root) => underRoot(path, root));
+}
+
 function findBestMatch(pathname: string, search: string, activeModuleId?: string | null): Match | null {
   let best: Match | null = null;
   const modules = activeModuleId
@@ -144,6 +161,7 @@ function findBestMatch(pathname: string, search: string, activeModuleId?: string
   // sidebar (SidebarNavigation activeLeafPath); otherwise a page with no
   // leaf of its own would land under Home or Overview.
   const visit = (node: NavigationNode, ancestors: NavigationNode[], depth: number, moduleRoot: string) => {
+    if (isForeignCrossLink(node)) return;
     const nodePath = pathnameOf(node.path);
     const exact = pathname === nodePath;
     const descendant = nodePath !== '/' && (depth === 0 || nodePath !== moduleRoot) && pathname.startsWith(`${nodePath}/`);

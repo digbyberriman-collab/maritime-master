@@ -11,11 +11,16 @@
  * Every control is 44 × 44 on a coarse pointer (`--control-h`, D-35); the
  * row never overflows: the scope control is the one part that shrinks.
  *   ≥ 1280    search as a 280 px field with its shortcut
+ *
+ * The top bar stays mounted for the whole shell, so it also abandons a
+ * vessel switch still in flight whenever the location changes
+ * (`useInvalidateVesselSwitchOnNavigate`).
  */
 import React from 'react';
 import { Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SHELL_TEST_IDS } from '@/app/shell/testIds';
+import { useInvalidateVesselSwitchOnNavigate } from '@/app/nav/useVesselSwitch';
 import TenantLogo from './TenantLogo';
 import ScopeControl from './ScopeControl';
 import AppsMenu from './AppsMenu';
@@ -45,43 +50,46 @@ const TopBar: React.FC<TopBarProps> = ({
   onOpenMobileNav,
   mobileNavTriggerRef,
   impersonating = false,
-}) => (
-  <header
-    data-testid={SHELL_TEST_IDS.topBar}
-    data-impersonating={impersonating || undefined}
-    className={cn(
-      'flex h-[52px] min-w-0 items-center gap-1 border-b px-2 backdrop-blur-md sm:gap-2 sm:px-3 lg:h-14 lg:px-4',
-      impersonating ? 'border-warning/25 bg-warning-muted' : 'border-border bg-topbar/[0.88]',
-    )}
-  >
-    {mobileNavAvailable && (
-      <button
-        ref={mobileNavTriggerRef}
-        type="button"
-        data-testid={SHELL_TEST_IDS.mobileNavTrigger}
-        onClick={onOpenMobileNav}
-        aria-label="Open navigation drawer"
-        aria-haspopup="dialog"
-        aria-controls="mobile-navigation-drawer"
-        aria-expanded={mobileNavOpen}
-        className={cn(topBarIconButton, 'text-foreground', !mobileNavAtAllWidths && 'lg:hidden')}
-      >
-        <Menu strokeWidth={1.75} aria-hidden="true" />
-      </button>
-    )}
-    <TenantLogo className="hidden sm:flex" />
-    <span aria-hidden="true" className="hidden h-6 w-px shrink-0 bg-border sm:block" />
-    <ScopeControl className="min-w-0 flex-1 sm:flex-initial" />
-    <AppsMenu className="hidden md:inline-flex" />
-    <div className="hidden min-w-0 flex-1 sm:block" />
-    <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
-      <SearchTrigger />
-      <FavouritesControl className="hidden md:flex" />
-      <HelpMenu className="hidden md:inline-flex" />
-      <NotificationBell />
-      <AccountMenu className="ml-0.5" />
-    </div>
-  </header>
-);
+}) => {
+  useInvalidateVesselSwitchOnNavigate();
+  return (
+    <header
+      data-testid={SHELL_TEST_IDS.topBar}
+      data-impersonating={impersonating || undefined}
+      className={cn(
+        'flex h-[52px] min-w-0 items-center gap-1 border-b px-2 backdrop-blur-md sm:gap-2 sm:px-3 lg:h-14 lg:px-4',
+        impersonating ? 'border-warning/25 bg-warning-muted' : 'border-border bg-topbar/[0.88]',
+      )}
+    >
+      {mobileNavAvailable && (
+        <button
+          ref={mobileNavTriggerRef}
+          type="button"
+          data-testid={SHELL_TEST_IDS.mobileNavTrigger}
+          onClick={onOpenMobileNav}
+          aria-label="Open navigation drawer"
+          aria-haspopup="dialog"
+          aria-controls="mobile-navigation-drawer"
+          aria-expanded={mobileNavOpen}
+          className={cn(topBarIconButton, 'text-foreground', !mobileNavAtAllWidths && 'lg:hidden')}
+        >
+          <Menu strokeWidth={1.75} aria-hidden="true" />
+        </button>
+      )}
+      <TenantLogo className="hidden sm:flex" />
+      <span aria-hidden="true" className="hidden h-6 w-px shrink-0 bg-border sm:block" />
+      <ScopeControl className="min-w-0 flex-1 sm:flex-initial" />
+      <AppsMenu className="hidden md:inline-flex" />
+      <div className="hidden min-w-0 flex-1 sm:block" />
+      <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
+        <SearchTrigger />
+        <FavouritesControl className="hidden md:flex" />
+        <HelpMenu className="hidden md:inline-flex" />
+        <NotificationBell />
+        <AccountMenu className="ml-0.5" />
+      </div>
+    </header>
+  );
+};
 
 export default TopBar;

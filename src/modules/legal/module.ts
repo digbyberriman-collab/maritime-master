@@ -4,14 +4,25 @@
  * the public policy pages.
  *
  * - routes: ./routes.tsx (page loaders), mounted in the Legal workspace.
- * - nav: the Legal entry in the Fleet sidebar's WORKSPACES section. Legal has
- *   no sidebar tree: its tabs live in the Legal shell (./paths LEGAL_TABS).
+ * - nav:
+ *   - `workspace.legal`: the Legal sidebar tree, its four tabs
+ *     (./paths LEGAL_TABS; gap/10 Workspaces table, D-83). The Legal shell
+ *     keeps the same tabs in-page below 1024 px, where the sidebar is a drawer.
+ *   - `fleet.workspaces`: the Legal entry in the Fleet sidebar's WORKSPACES
+ *     section, a cross-link into this workspace (it never claims its pages).
  */
-import { Scale } from 'lucide-react';
+import { CheckSquare, FileText, Inbox, LayoutDashboard, Scale, type LucideIcon } from 'lucide-react';
 import type { ModuleManifest } from '@/app/registry/types';
-import { L } from '@/config/navBuilders';
-import { LEGAL_ROOT } from './paths';
+import { L, LIVE, inSlot } from '@/config/navBuilders';
+import { LEGAL_ROOT, LEGAL_TABS, type LegalTabId } from './paths';
 import { LEGAL_ROUTES } from './routes';
+
+const TAB_ICONS: Record<LegalTabId, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  requests: Inbox,
+  documents: FileText,
+  forms: CheckSquare,
+};
 
 const manifest: ModuleManifest = {
   id: 'legal',
@@ -19,6 +30,10 @@ const manifest: ModuleManifest = {
   scopes: ['workspace'],
   routes: LEGAL_ROUTES,
   nav: [
+    ...inSlot(
+      'workspace.legal',
+      LEGAL_TABS.map((tab) => L(tab.label, LEGAL_ROOT, { existing: tab.path, slug: tab.id, icon: TAB_ICONS[tab.id], ...LIVE })),
+    ),
     {
       slot: 'fleet.workspaces',
       order: 40,

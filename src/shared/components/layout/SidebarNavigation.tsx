@@ -10,6 +10,10 @@
  *   2 px glowing bar). Exact match wins; otherwise the longest leaf the URL
  *   sits under. A leaf on the tree's own root counts only on an exact match.
  * - Locked add-ons show a lock and open the add-on explanation.
+ * - Planned leaves (shown with Show roadmap on) carry a small dashed-circle
+ *   mark rather than a text chip, so the label keeps its width; the row's
+ *   accessible name says ", planned". A label that still truncates has its
+ *   full text as a tooltip.
  * - Badges come from the registry (./../../../app/nav/badges.ts); none for an
  *   unknown key or a count of 0.
  * - Links follow the `?module=` rule (src/app/nav/sidebarLinks.ts).
@@ -17,7 +21,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ChevronDown, ChevronRight, Lock, type LucideIcon } from 'lucide-react';
+import { ChevronDown, ChevronRight, CircleDashed, Lock, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { FilteredNavNode } from '@/app/nav/navTree';
@@ -73,9 +77,10 @@ const ActiveBar: React.FC<{ collapsed?: boolean }> = ({ collapsed }) => (
 
 const StatusChip: React.FC<{ status: FilteredNavNode['status'] }> = ({ status }) => {
   if (status === 'planned') {
+    // Visual only: the row's aria-label ends in ", planned" (statusSuffix).
     return (
-      <span className="type-eyebrow shrink-0 rounded-sm px-1.5 py-0.5 text-[0.625rem] leading-none text-sidebar-muted-foreground ring-1 ring-inset ring-sidebar-border">
-        Planned
+      <span aria-hidden="true" data-nav-status="planned" title="Planned" className="inline-flex shrink-0 items-center text-sidebar-muted-foreground">
+        <CircleDashed className="h-3 w-3" strokeWidth={2} />
       </span>
     );
   }
@@ -297,7 +302,9 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({
               className={cn(rowBase, 'type-body font-medium text-sidebar-muted-foreground hover:bg-sidebar-accent', DEPTH_PADDING[Math.min(depth, 3)])}
             >
               <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate">{node.label}</span>
+              <span className="min-w-0 flex-1 truncate" title={node.label}>
+                {node.label}
+              </span>
               <StatusChip status={node.status} />
               <Lock className="h-3.5 w-3.5 shrink-0" strokeWidth={1.75} aria-hidden="true" />
             </button>
@@ -366,7 +373,9 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({
           >
             {active && <ActiveBar />}
             <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-            <span className="min-w-0 flex-1 truncate">{node.label}</span>
+            <span className="min-w-0 flex-1 truncate" title={node.label}>
+              {node.label}
+            </span>
             <StatusChip status={node.status} />
           </Link>
           {badge && renderBadge(badge)}
@@ -392,7 +401,9 @@ const SidebarNavigation: React.FC<SidebarNavigationProps> = ({
               )}
             >
               <Icon className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-              <span className="min-w-0 flex-1 truncate">{node.label}</span>
+              <span className="min-w-0 flex-1 truncate" title={node.label}>
+                {node.label}
+              </span>
               <StatusChip status={node.status} />
               {isOpen ? (
                 <ChevronDown className="h-4 w-4 shrink-0 text-sidebar-muted-foreground" strokeWidth={1.75} aria-hidden="true" />

@@ -2,18 +2,17 @@
  * The signed-in user's favourites (`user_pinned_shortcuts`, live table;
  * gap/10 IA13). Read through React Query (`['pinned-shortcuts', userId]`) so
  * the top-bar star, its menu and /me/shortcuts share one cache and agree.
+ * Real pins only: no default set, no suggestions.
  *
- * Writes never fake success: a failed insert, delete or reorder shows a
- * notice and the list is re-read (a reorder's optimistic order is rolled
- * back). `togglePin` resolves to whether the write went through, and
- * `toggling` is true while it runs, so the star can wait instead of letting
- * a second click create a duplicate.
+ * Writes never fake success: a failed insert or delete shows a notice and
+ * the list is re-read. `togglePin` resolves to whether the write went
+ * through, and `toggling` is true while it runs, so the star can wait
+ * instead of letting a second click create a duplicate.
  *
- * `effectiveShortcuts` (pins, or a default set when there are none) and
- * `suggestions` (session activity) remain for older callers; the top bar
- * shows real pins only.
+ * Only in-app paths are pinned (`isInAppPath`): a target such as
+ * `javascript:…`, `https://…` or `//host` is refused without a write.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
@@ -56,8 +55,12 @@ export const ALL_AVAILABLE_SHORTCUTS: AvailableShortcut[] = [
   { target: '/risk-assessments', label: 'Risk Assessments', icon: 'shield' },
 ];
 
-/** Default shortcuts for new users (no pins yet); legacy callers only. */
-const DEFAULT_TARGETS = ['/dashboard', '/crew', '/certificates', '/compliance', '/maintenance'];
+/**
+ * True for a path inside this app (`/fleet/dashboard`): one leading slash,
+ * not followed by another slash or a backslash. Rejects `javascript:`,
+ * `data:`, `http(s):` and protocol-relative `//host` or `/\host` targets.
+ */
+export const isInAppPath = (target: string): boolean => /^\/(?![/\\])/.test(target);
 
 export const pinnedShortcutsKeys = {
   all: ['pinned-shortcuts'] as const,
@@ -95,36 +98,9 @@ export function usePinnedShortcuts() {
 
   const refresh = useCallback(() => queryClient.invalidateQueries({ queryKey: key }), [queryClient, key]);
 
-  // Suggestions from this session's activity that are not pinned yet.
-  const [suggestions, setSuggestions] = useState<AvailableShortcut[]>([]);
-  useEffect(() => {
-    try {
-      const raw = sessionStorage.getItem('storm_activity_log');
-      const log: Record<string, { label: string; icon: string; count: number }> = raw ? JSON.parse(raw) : {};
-      const pinnedTargets = new Set(pins.map((p) => p.shortcut_target));
-      setSuggestions(
-        Object.entries(log)
-          .filter(([target]) => !pinnedTargets.has(target))
-          .sort((a, b) => b[1].count - a[1].count)
-          .slice(0, 4)
-          .map(([target, data]) => ({ target, label: data.label, icon: data.icon })),
-      );
-    } catch {
-      setSuggestions([]);
-    }
-  }, [pins]);
-
-  const effectiveShortcuts: AvailableShortcut[] = useMemo(
-    () =>
-      pins.length > 0
-        ? pins.map((p) => ({ target: p.shortcut_target, label: p.shortcut_label, icon: p.shortcut_icon }))
-        : ALL_AVAILABLE_SHORTCUTS.filter((s) => DEFAULT_TARGETS.includes(s.target)),
-    [pins],
-  );
-
   const insertPin = useCallback(
     async (shortcut: AvailableShortcut): Promise<boolean> => {
-      if (!userId) return false;
+      if (!userId || !isInAppPath(shortcut.target)) return false;
       const current = queryClient.getQueryData<PinnedShortcut[]>(key) ?? pins;
       if (current.some((p) => p.shortcut_target === shortcut.target)) return true;
       const maxOrder = current.length > 0 ? Math.max(...current.map((p) => p.sort_order)) + 1 : 0;
@@ -177,56 +153,18 @@ export function usePinnedShortcuts() {
   /** Pin or unpin a page; resolves to whether the change was saved. */
   const togglePin = useCallback((shortcut: AvailableShortcut) => toggle.mutateAsync(shortcut), [toggle]);
 
-  const reorderPins = useCallback(
-    async (orderedTargets: string[]) => {
-      if (!userId) return;
-      const previous = queryClient.getQueryData<PinnedShortcut[]>(key) ?? pins;
-      const next = orderedTargets
-        .map((target, idx) => {
-          const existing = previous.find((p) => p.shortcut_target === target);
-          return existing ? { ...existing, sort_order: idx } : null;
-        })
-        .filter((p): p is PinnedShortcut => p !== null);
-      queryClient.setQueryData(key, next);
-      const results = await Promise.all(
-        orderedTargets.map((target, idx) =>
-          supabase.from('user_pinned_shortcuts').update({ sort_order: idx }).eq('user_id', userId).eq('shortcut_target', target),
-        ),
-      );
-      const failed = results.find((r) => r.error);
-      if (failed?.error) {
-        queryClient.setQueryData(key, previous);
-        notify.error(failed.error, { title: 'Could not save the new order' });
-        await refresh();
-      }
-    },
-    [userId, queryClient, key, pins, refresh],
-  );
-
   const isPinned = useCallback((target: string) => pins.some((p) => p.shortcut_target === target), [pins]);
-
-  const clearAllPins = useCallback(async () => {
-    if (!userId) return;
-    const { error } = await supabase.from('user_pinned_shortcuts').delete().eq('user_id', userId);
-    await refresh();
-    if (error) notify.error(error, { title: 'Could not clear your favourites' });
-  }, [userId, refresh]);
 
   return {
     pins,
     status,
     error: query.error,
     retry: refresh,
-    effectiveShortcuts,
-    suggestions,
     loading: status === 'loading',
     addPin,
     removePin,
     togglePin,
     toggling: toggle.isPending,
-    reorderPins,
     isPinned,
-    hasPins: pins.length > 0,
-    clearAllPins,
   };
 }

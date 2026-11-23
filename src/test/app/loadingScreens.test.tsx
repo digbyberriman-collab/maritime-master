@@ -2,11 +2,18 @@
  * Route loading, Coming Soon and the standalone 404 on tokens (BUILD-PLAN S6,
  * gap/10 §C.2 item 10). LazyLoader keeps the page-heading contract markers.
  */
-import { describe, expect, it } from 'vitest';
+import React from 'react';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+
+vi.mock('@/shared/components/layout/DashboardLayout', () => ({
+  default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+}));
+
 import { LazyLoader } from '@/shared/components/common/LazyLoader';
 import { PlaceholderPage } from '@/shared/components/common/PlaceholderPage';
+import PlaceholderWrapper from '@/app/router/PlaceholderWrapper';
 import NotFound from '@/shared/pages/NotFound';
 import { readRepoFile } from '../design/cssTokens';
 
@@ -32,7 +39,7 @@ describe('PlaceholderPage', () => {
   it('brings one h1 and says Coming soon', () => {
     render(
       <MemoryRouter>
-        <PlaceholderPage title="Fleet groups" features={['Group vessels by owner']} expectedRelease="Phase 2" />
+        <PlaceholderPage title="Fleet groups" features={['Group vessels by owner']} />
       </MemoryRouter>,
     );
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
@@ -40,6 +47,43 @@ describe('PlaceholderPage', () => {
     expect(screen.getByText('Coming soon')).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Planned features');
     expect(screen.getByRole('button', { name: 'Go back' })).toBeInTheDocument();
+  });
+
+  it('offers "Tell us what you need", to Support with the subject filled in (gap/10 W3)', () => {
+    render(
+      <MemoryRouter>
+        <PlaceholderPage title="Vessel Details" />
+      </MemoryRouter>,
+    );
+    const link = screen.getByRole('link', { name: 'Tell us what you need' });
+    expect(link).toHaveAttribute('href', '/help/support?subject=Request%3A%20Vessel%20Details');
+    // Both actions wrap together at 390 px.
+    expect(link.parentElement?.className).toMatch(/\bflex-wrap\b/);
+    expect(link.parentElement).toContainElement(screen.getByRole('button', { name: 'Go back' }));
+  });
+
+  it('takes another Support href when given one', () => {
+    render(
+      <MemoryRouter>
+        <PlaceholderPage title="Fleet groups" supportHref="/help/support" />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: 'Tell us what you need' })).toHaveAttribute('href', '/help/support');
+  });
+
+  it('a planned route (PlaceholderWrapper) names no internal phase', () => {
+    render(
+      <MemoryRouter>
+        <PlaceholderWrapper title="Vessel Details" />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Vessel Details');
+    expect(screen.queryByText(/Phase/)).toBeNull();
+    expect(screen.queryByText(/Expected:/)).toBeNull();
+    expect(screen.getByRole('link', { name: 'Tell us what you need' })).toHaveAttribute(
+      'href',
+      `/help/support?subject=${encodeURIComponent('Request: Vessel Details')}`,
+    );
   });
 });
 

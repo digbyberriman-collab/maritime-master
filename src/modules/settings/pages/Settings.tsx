@@ -19,7 +19,7 @@ import { Navigate, useParams } from 'react-router-dom';
 import { CreditCard, FileCheck, Mail, ScrollText } from 'lucide-react';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { canAccessSection, isAdminSection, isSettingsSection } from '@/shared/utils/settingsPermissions';
-import { PROFILE_GRACE_MS } from '@/app/router/useScopeAccess';
+import { useRolePending } from '@/shared/hooks/useRolePending';
 import { PERSONAL_HOME } from '@/config/personalNav';
 import { PageLoading } from '@/shared/components/states';
 import { notify } from '@/shared/lib/notify';
@@ -99,25 +99,6 @@ function renderSection(section: string): React.ReactNode {
     default:
       return null;
   }
-}
-
-/**
- * True while the role is not known yet: auth loading, or a signed-in user
- * whose profile has not arrived (for at most PROFILE_GRACE_MS).
- */
-function useRolePending(): boolean {
-  const { user, profile, loading } = useAuth();
-  const waitingForProfile = !!user && !profile && !loading;
-  const [gaveUp, setGaveUp] = React.useState(false);
-  React.useEffect(() => {
-    if (!waitingForProfile) {
-      setGaveUp(false);
-      return undefined;
-    }
-    const timer = window.setTimeout(() => setGaveUp(true), PROFILE_GRACE_MS);
-    return () => window.clearTimeout(timer);
-  }, [waitingForProfile]);
-  return loading || (waitingForProfile && !gaveUp);
 }
 
 /** Says why, then opens the profile. */

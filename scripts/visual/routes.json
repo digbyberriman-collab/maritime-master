@@ -47,7 +47,7 @@
   { "path": "/me/notifications", "note": "Personal scope: in-app notification preferences" },
   { "path": "/me/hours-of-rest", "note": "Personal scope: own hours of rest (D-47)" },
   { "path": "/me/training", "note": "Personal scope: own training, no ?module= (deferred item 2, D-75)" },
-  { "path": "/inbox", "note": "Personal scope: inbox (today's Notification Center, D-62); shell fallback h1" },
+  { "path": "/inbox", "note": "Personal scope: inbox (today's Notification Center, D-62); PageHeader" },
   { "path": "/me?tab=security", "slug": "me-tab-security", "expectRedirect": "/me/security", "note": "Legacy ?tab= on /me redirects to the section (D-59)" },
   { "path": "/settings/security", "expectRedirect": "/me/security", "note": "Legacy /settings/<section> redirects to /me/<section> (D-59)" },
   { "path": "/fleet/dashboard", "slug": "fleet-dashboard-collapsed", "widths": [1440, 1024], "localStorage": { "storm-sidebar-collapsed": "true" }, "note": "Fleet sidebar collapsed to icons (IA20)" },

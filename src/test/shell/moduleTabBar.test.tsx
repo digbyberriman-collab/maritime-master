@@ -6,12 +6,28 @@
  * the capability and a visible Vessel Settings leaf, "More ▾" from 768 px
  * with the active state, a locked add-on that explains itself, skeletons
  * while loading, and the fail-closed error state with its Retry strip.
+ * The underline and the fit re-measure when a tab widens after the first
+ * layout (badge counts arriving, a font swap); More carries a dot for the
+ * badges folded into it; the row gives each tab a full 44 px.
  */
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 
-const h = vi.hoisted(() => ({ lockTab: null as string | null }));
+const h = vi.hoisted(() => {
+  type Counts = { pendingCompliance: number; unreadMessages: number; overdueTasks: number };
+  const listeners = new Set<() => void>();
+  return {
+    lockTab: null as string | null,
+    /** The badge counts the tabs read; `undefined` = not loaded yet. Change them with `setCounts`. */
+    counts: { pendingCompliance: 3, unreadMessages: 0, overdueTasks: 0 } as Counts | undefined,
+    listeners,
+    setCounts(next: Counts | undefined) {
+      this.counts = next;
+      listeners.forEach((listener) => listener());
+    },
+  };
+});
 
 vi.mock('@/integrations/supabase/client', async () => (await import('./fakeSupabase')).fakeSupabaseModule);
 vi.mock('@/modules/auth/contexts/AuthContext', async () => {
@@ -26,9 +42,14 @@ vi.mock('@/modules/auth/store/permissionsStore', async () => {
   const { shellState } = await import('./shellFakes');
   return { usePermissionsStore: (selector: (s: object) => unknown) => selector(shellState.perm) };
 });
-vi.mock('@/shared/hooks/useSidebarBadgeCounts', () => ({
-  useSidebarBadgeCounts: () => ({ data: { pendingCompliance: 3, unreadMessages: 0, overdueTasks: 0 } }),
-}));
+vi.mock('@/shared/hooks/useSidebarBadgeCounts', async () => {
+  const { useSyncExternalStore } = await import('react');
+  const subscribe = (listener: () => void) => {
+    h.listeners.add(listener);
+    return () => h.listeners.delete(listener);
+  };
+  return { useSidebarBadgeCounts: () => ({ data: useSyncExternalStore(subscribe, () => h.counts) }) };
+});
 // One test turns a tab into a locked add-on (no vessel module has an entitlement yet).
 vi.mock('@/app/nav/useVesselNav', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/app/nav/useVesselNav')>();
@@ -103,6 +124,8 @@ beforeEach(() => {
   resetFakeDb();
   resetShellState();
   h.lockTab = null;
+  h.counts = { pendingCompliance: 3, unreadMessages: 0, overdueTasks: 0 };
+  h.listeners.clear();
   viewport();
 });
 afterEach(() => {
@@ -288,5 +311,246 @@ describe('overflow', () => {
     expect(screen.queryByTestId(SHELL_TEST_IDS.moduleTabMore)).toBeNull();
     const rail = screen.getByTestId(`${SHELL_TEST_IDS.moduleTabPrefix}home`).parentElement as HTMLElement;
     expect(rail).toHaveClass('overflow-x-auto', 'snap-x');
+  });
+});
+
+describe('the row is a full 44 px target (D-35)', () => {
+  it('draws its divider as a layout-free inset shadow, so h-full tabs get the whole 44 px', async () => {
+    renderTabs('/v/dra/crew/list');
+    await waitFor(() => expect(tabIds().length).toBeGreaterThan(0));
+    expect(tabRow()).toHaveClass('h-11', 'shadow-[inset_0_-1px_0_hsl(var(--border))]');
+    expect(tabRow().className).not.toMatch(/(^|\s)border-b(\s|$)/);
+    for (const id of tabIds()) {
+      expect(screen.getByTestId(`${SHELL_TEST_IDS.moduleTabPrefix}${id}`)).toHaveClass('h-full');
+    }
+  });
+});
+
+describe('the More dot (IA21, D-78)', () => {
+  const more = () => screen.getByTestId(SHELL_TEST_IDS.moduleTabMore);
+  const dot = () => more().querySelector('[data-more-badge]');
+
+  async function renderFolded() {
+    viewport({ md: true });
+    // home, crew, safety fit; certificates, technical, vessel, logbooks and calendar fold into More.
+    layout(600);
+    renderTabs('/v/dra/logbooks/review');
+    await screen.findByTestId(SHELL_TEST_IDS.moduleTabMore);
+    expect(tabIds()).toEqual(['home', 'crew', 'safety']);
+  }
+
+  it('a critical badge on a folded tab puts a critical dot on More and names it', async () => {
+    h.counts = { pendingCompliance: 3, unreadMessages: 4, overdueTasks: 2 };
+    await renderFolded();
+    expect(dot()).toHaveAttribute('data-more-badge', 'critical');
+    expect(dot()).toHaveClass('bg-critical');
+    expect(dot()).toHaveAttribute('aria-hidden', 'true');
+    expect(more()).toHaveAccessibleName(
+      'More modules, current: Logbooks, Technical: 2 overdue operational tasks; Vessel: 4 unread messages',
+    );
+  });
+
+  it('only primary badges folded: a Signal dot', async () => {
+    h.counts = { pendingCompliance: 3, unreadMessages: 1, overdueTasks: 0 };
+    await renderFolded();
+    expect(dot()).toHaveAttribute('data-more-badge', 'primary');
+    expect(dot()).toHaveClass('bg-primary');
+    expect(more()).toHaveAccessibleName('More modules, current: Logbooks, Vessel: 1 unread message');
+  });
+
+  it.each([
+    ['a badge only on a shown tab', { pendingCompliance: 3, unreadMessages: 0, overdueTasks: 0 }],
+    ['zero counts', { pendingCompliance: 0, unreadMessages: 0, overdueTasks: 0 }],
+    ['counts not loaded', undefined],
+  ])('no dot with %s (fail closed)', async (_label, counts) => {
+    h.counts = counts;
+    await renderFolded();
+    expect(dot()).toBeNull();
+    expect(more()).toHaveAccessibleName('More modules, current: Logbooks');
+  });
+
+  it('reserves the dot in the measured copy of More, so the fit never grows past it', async () => {
+    h.counts = undefined;
+    await renderFolded();
+    const measuredMore = tabRow().querySelector('[data-measure-more]');
+    expect(measuredMore?.querySelector('span.rounded-full.h-2.w-2')).not.toBeNull();
+  });
+});
+
+describe('re-measuring when a tab widens after the first layout', () => {
+  const BASE = 100;
+  const DOT = 24;
+  const MORE = 100;
+  const SUFFIX = 60;
+  const GAP = 2;
+  const extra: Record<string, number> = {};
+  let available = 0;
+  const realOffsetWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetWidth');
+  const realOffsetLeft = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetLeft');
+  const realResizeObserver = globalThis.ResizeObserver;
+
+  const isBox = (el: Element) =>
+    el.parentElement?.getAttribute('data-testid') === SHELL_TEST_IDS.moduleTabBar && el === el.parentElement.firstElementChild;
+  const hasDot = (el: Element) => el.querySelector('[data-count-dot]') !== null;
+  const tabWidth = (id: string, el: Element) => BASE + (hasDot(el) ? DOT : 0) + (extra[id] ?? 0);
+
+  /** A tab is 100 px, 24 px more with a count, plus any `extra`; More 100 px, 60 more with "· Logbooks". */
+  function widthOf(el: Element): number {
+    const measured = el.getAttribute('data-measure-tab');
+    if (measured) return tabWidth(measured, el);
+    if (el.hasAttribute('data-measure-more')) return MORE;
+    if (el.hasAttribute('data-measure-more-suffix')) return SUFFIX;
+    const testId = el.getAttribute('data-testid') ?? '';
+    if (testId === SHELL_TEST_IDS.moduleTabMore) return MORE + (el.getAttribute('data-tab-active') === 'true' ? SUFFIX : 0);
+    if (testId.startsWith(SHELL_TEST_IDS.moduleTabPrefix)) return tabWidth(testId.slice(SHELL_TEST_IDS.moduleTabPrefix.length), el);
+    if (isBox(el)) return available;
+    return 0;
+  }
+  const isRailItem = (el: Element) => (el.getAttribute('data-testid') ?? '').startsWith('shell-module-tab');
+
+  /** Like the browser: an observer hears only about the elements it observes whose size changed. */
+  class FakeResizeObserver {
+    static all: FakeResizeObserver[] = [];
+    readonly sizes = new Map<Element, number>();
+    connected = true;
+    constructor(readonly callback: ResizeObserverCallback) {
+      FakeResizeObserver.all.push(this);
+    }
+    observe(el: Element) {
+      this.sizes.set(el, widthOf(el));
+    }
+    unobserve(el: Element) {
+      this.sizes.delete(el);
+    }
+    disconnect() {
+      this.connected = false;
+      this.sizes.clear();
+    }
+  }
+  const observed = () => new Set(FakeResizeObserver.all.filter((o) => o.connected).flatMap((o) => [...o.sizes.keys()]));
+
+  function flushResizes() {
+    for (let round = 0; round < 5; round += 1) {
+      let fired = false;
+      for (const ro of [...FakeResizeObserver.all]) {
+        if (!ro.connected) continue;
+        const changed = [...ro.sizes].filter(([el, size]) => widthOf(el) !== size).map(([el]) => el);
+        if (changed.length === 0) continue;
+        for (const el of changed) ro.sizes.set(el, widthOf(el));
+        fired = true;
+        act(() => {
+          ro.callback(changed.map((target) => ({ target }) as ResizeObserverEntry), ro as unknown as ResizeObserver);
+        });
+      }
+      if (!fired) return;
+    }
+  }
+
+  beforeEach(() => {
+    for (const key of Object.keys(extra)) delete extra[key];
+    FakeResizeObserver.all = [];
+    globalThis.ResizeObserver = FakeResizeObserver as unknown as typeof ResizeObserver;
+    Element.prototype.getBoundingClientRect = function rect(this: Element) {
+      const width = widthOf(this);
+      return { width, height: 44, top: 0, left: 0, right: width, bottom: 44, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
+    };
+    Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
+      configurable: true,
+      get(this: HTMLElement) {
+        return isRailItem(this) ? widthOf(this) : 0;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, 'offsetLeft', {
+      configurable: true,
+      get(this: HTMLElement) {
+        if (!isRailItem(this)) return 0;
+        let left = 0;
+        for (let prev = this.previousElementSibling; prev; prev = prev.previousElementSibling) {
+          if (isRailItem(prev)) left += widthOf(prev) + GAP;
+        }
+        return left;
+      },
+    });
+    viewport({ md: true });
+  });
+  afterEach(() => {
+    globalThis.ResizeObserver = realResizeObserver;
+    if (realOffsetWidth) Object.defineProperty(HTMLElement.prototype, 'offsetWidth', realOffsetWidth);
+    if (realOffsetLeft) Object.defineProperty(HTMLElement.prototype, 'offsetLeft', realOffsetLeft);
+  });
+
+  const indicator = () => tabRow().querySelector<HTMLElement>('[data-sliding-indicator]');
+  const activeTab = () => tabRow().querySelector<HTMLElement>('[data-tab-active="true"]');
+  const rail = () => (indicator()?.parentElement ?? null) as HTMLElement | null;
+  const measurer = () => tabRow().querySelector('[data-measure-more]')?.parentElement ?? null;
+
+  it('the underline follows the active tab when counts arrive and widen an earlier tab', async () => {
+    available = 2000;
+    h.counts = undefined;
+    renderTabs('/v/dra/logbooks/review');
+    await waitFor(() => expect(tabIds()).toHaveLength(8));
+    expect(activeTab()).toHaveAttribute('data-testid', `${SHELL_TEST_IDS.moduleTabPrefix}logbooks`);
+    expect(indicator()?.style.transform).toBe(`translateX(${6 * (BASE + GAP)}px)`);
+
+    // Safety (before Logbooks) gets its count: 24 px wider, so Logbooks moves right.
+    act(() => h.setCounts({ pendingCompliance: 3, unreadMessages: 0, overdueTasks: 0 }));
+    flushResizes();
+    const active = activeTab() as HTMLElement;
+    expect(active.offsetLeft).toBe(6 * (BASE + GAP) + DOT);
+    expect(indicator()?.style.transform).toBe(`translateX(${active.offsetLeft}px)`);
+    expect(indicator()?.style.width).toBe(`${active.offsetWidth}px`);
+  });
+
+  it('re-fits the row when counts arrive and the tabs no longer fit', async () => {
+    // 8 × 100 + 7 × 2 = 814 px fit 820; with Safety's count (838 px) they do not.
+    available = 820;
+    h.counts = undefined;
+    renderTabs('/v/dra/logbooks/review');
+    await waitFor(() => expect(tabIds()).toHaveLength(8));
+    expect(screen.queryByTestId(SHELL_TEST_IDS.moduleTabMore)).toBeNull();
+
+    act(() => h.setCounts({ pendingCompliance: 3, unreadMessages: 0, overdueTasks: 0 }));
+    flushResizes();
+    const more = await screen.findByTestId(SHELL_TEST_IDS.moduleTabMore);
+    expect(tabIds()).toEqual(['home', 'crew', 'safety', 'certificates', 'technical', 'vessel']);
+    expect(more).toHaveAttribute('data-tab-active', 'true');
+    expect(indicator()?.style.transform).toBe(`translateX(${more.offsetLeft}px)`);
+  });
+
+  it('observes every rail child and every measured copy, so any width change re-measures', async () => {
+    available = 840;
+    renderTabs('/v/dra/logbooks/review');
+    await waitFor(() => expect(tabIds()).toHaveLength(8));
+    const watched = observed();
+    const railChildren = Array.from(rail()?.children ?? []).filter((el) => !el.hasAttribute('data-sliding-indicator'));
+    expect(railChildren.length).toBe(8);
+    for (const el of railChildren) expect(watched.has(el)).toBe(true);
+    // The indicator's own width transition is not watched.
+    expect(watched.has(indicator() as Element)).toBe(false);
+    const copies = Array.from(measurer()?.querySelectorAll('[data-measure-tab],[data-measure-more],[data-measure-more-suffix]') ?? []);
+    expect(copies.length).toBe(8 + 1 + 8);
+    for (const el of copies) expect(watched.has(el)).toBe(true);
+  });
+
+  it('a tab that widens with no re-render (a font swap) moves the underline and re-fits the row', async () => {
+    // With Safety's count the 8 tabs take 838 px of 840.
+    available = 840;
+    renderTabs('/v/dra/logbooks/review');
+    await waitFor(() => expect(tabIds()).toHaveLength(8));
+    expect(indicator()?.style.transform).toBe(`translateX(${6 * (BASE + GAP) + DOT}px)`);
+
+    // Home grows 1 px: the underline must follow at once…
+    extra.home = 1;
+    flushResizes();
+    expect(screen.queryByTestId(SHELL_TEST_IDS.moduleTabMore)).toBeNull();
+    expect(indicator()?.style.transform).toBe(`translateX(${(activeTab() as HTMLElement).offsetLeft}px)`);
+    expect((activeTab() as HTMLElement).offsetLeft).toBe(6 * (BASE + GAP) + DOT + 1);
+
+    // …and Crew growing 40 px more no longer fits: More takes the rest.
+    extra.crew = 40;
+    flushResizes();
+    const more = await screen.findByTestId(SHELL_TEST_IDS.moduleTabMore);
+    expect(tabIds().length).toBeLessThan(8);
+    expect(indicator()?.style.transform).toBe(`translateX(${more.offsetLeft}px)`);
   });
 });

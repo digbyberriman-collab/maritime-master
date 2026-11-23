@@ -81,6 +81,17 @@ export interface NavChild {
    * `/crew/leave` lands in HRIS even though Vessel also links to it.
    */
   crossLink?: boolean;
+  /**
+   * Pages outside this node's own path that its `moduleSetting` governs too,
+   * as patterns relative to the vessel root like node paths (`*` is exactly
+   * one segment): Hours of Rest covers one crew member's month,
+   * `crew/people/:crewId/hours-of-rest`, written with `*` for the id
+   * segment. A page under a pattern needs this node's keys on
+   * (src/app/nav/vesselSwitch.ts `vesselSettingKeysForRest`, shared by the
+   * route gate and the vessel switch). Only that rule reads it: the sidebar,
+   * the visibility pipeline, active-leaf matching and breadcrumbs ignore it.
+   */
+  alsoCovers?: readonly string[];
 }
 
 export interface NavItem {

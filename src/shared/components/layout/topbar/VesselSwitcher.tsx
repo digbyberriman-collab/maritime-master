@@ -1,41 +1,33 @@
 /**
  * The vessel switcher (gap/10 top bar element 3, IA4, IA23; spec §6.2): a
  * popover anchored to the scope control, opened by its chevron, `g v` or
- * `ShellActions.openVesselSwitcher`. A searchable list (name, code, IMO):
- * "All vessels — Fleet overview" for fleet users, Recent, the fleet groups,
- * Other vessels. Each row shows the code chip, the open-alert pill and the
- * AIS mark; the current vessel is ticked.
+ * `ShellActions.openVesselSwitcher`. The list itself (./VesselSwitcherPanel,
+ * cmdk) is a lazy chunk: it is warmed when the pointer enters, focuses or
+ * presses the chevron and whenever the switcher opens, and while it loads
+ * the popover shows a small loading row. If the chunk cannot load, the
+ * popover says so with Retry, never an empty list.
  *
  * Choosing a vessel goes through `useVesselSwitch()`, which keeps the user's
  * place when it can. The row shows a spinner until the navigation lands; the
- * popover then closes and focus goes back to the chevron. Only shown with at
- * least two vessels in reach (the caller checks `useVesselSwitcherAvailable`).
+ * popover then closes and focus goes back to the chevron. Closing the
+ * switcher before then (Esc, a click outside) abandons the switch. Only
+ * shown with at least two vessels in reach (the caller checks
+ * `useVesselSwitcherAvailable`).
  */
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Check, ChevronDown, Globe, Loader2 } from 'lucide-react';
+import { AlertTriangle, ChevronDown, Loader2, RotateCw } from 'lucide-react';
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@/components/ui/command';
-import { StatusPill } from '@/shared/components/status';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
-import { useLatestVesselPositions } from '@/modules/dashboard/hooks/useLatestVesselPositions';
-import { useNavAccess } from '@/app/nav/navAccess';
-import { useVesselSwitch } from '@/app/nav/useVesselSwitch';
-import { useRecentVessels } from '@/app/nav/recentVessels';
+import { cancelPendingVesselSwitch, useVesselSwitch } from '@/app/nav/useVesselSwitch';
 import { SHELL_TEST_IDS } from '@/app/shell/testIds';
 import { useShellSurface } from '@/app/shell/shellUi';
-import AisMark from './AisMark';
 import { FLEET_HOME } from './useFleetTarget';
-import { useFleetGroups } from './useFleetGroups';
 import type { VesselAlertSummary } from './useVesselAlertSummary';
-import {
-  alertSummaryLabel,
-  buildSwitcherGroups,
-  severityTone,
-  switcherFilter,
-  type SwitcherVessel,
-} from './vesselSwitcherModel';
+import { ALL_VESSELS, type SwitcherTarget, type SwitcherVessel } from './vesselSwitcherModel';
+import TopBarTooltip from './TopBarTooltip';
 
 export interface VesselSwitcherProps {
   /** The vessel the scope control shows (in scope, else the last one). */
@@ -47,102 +39,75 @@ export interface VesselSwitcherProps {
   className?: string;
 }
 
-const ALL_VESSELS = 'all-vessels';
+type PanelModule = typeof import('./VesselSwitcherPanel');
 
-const SwitcherPanel: React.FC<{
-  vessels: readonly SwitcherVessel[];
-  currentVesselId: string | null;
-  pendingId: string | null;
-  alerts: VesselAlertSummary;
-  onSelect: (target: SwitcherVessel | typeof ALL_VESSELS) => void;
-}> = ({ vessels, currentVesselId, pendingId, alerts, onSelect }) => {
-  const { fleetReach } = useNavAccess();
-  const recentIds = useRecentVessels();
-  const groupsState = useFleetGroups();
-  const ids = React.useMemo(() => vessels.map((v) => v.id), [vessels]);
-  // Positions for every vessel only while the list is open (D-38: one request each).
-  const positions = useLatestVesselPositions(ids);
-  const positionStatus = positions.isError ? 'error' : positions.data ? 'ready' : 'loading';
-  const groups = React.useMemo(
-    () => buildSwitcherGroups({ vessels, recentIds, groups: groupsState.status === 'ready' ? groupsState.groups : [] }),
-    [vessels, recentIds, groupsState],
-  );
+/**
+ * One import of the panel chunk at a time, shared by the preloads and the
+ * lazy component; a failed import is forgotten so the next try loads again.
+ * (The same contract as the palette's `createPaletteLoader`, which is typed
+ * to the palette dialog's module.)
+ */
+function createChunkLoader<M>(importer: () => Promise<M>): { load: () => Promise<M>; preload: () => void } {
+  let pending: Promise<M> | null = null;
+  const load = () => {
+    if (!pending) {
+      let attempt: Promise<M>;
+      try {
+        attempt = importer();
+      } catch (error) {
+        attempt = Promise.reject(error);
+      }
+      pending = attempt.catch((error: unknown) => {
+        pending = null;
+        throw error;
+      });
+    }
+    return pending;
+  };
+  const preload = () => {
+    try {
+      load().catch(() => undefined);
+    } catch {
+      // A preload is only a hint.
+    }
+  };
+  return { load, preload };
+}
 
-  return (
-    <Command label="Switch vessel" filter={switcherFilter} className="bg-transparent">
-      <CommandInput placeholder="Search by name, code or IMO" aria-label="Search vessels by name, code or IMO" />
-      <CommandList className="max-h-[min(24rem,60dvh)] p-1">
-        <CommandEmpty>No vessel matches.</CommandEmpty>
-        {fleetReach && (
-          <>
-            <CommandGroup>
-              <CommandItem
-                value={ALL_VESSELS}
-                keywords={['All vessels', 'Fleet overview', 'fleet']}
-                onSelect={() => onSelect(ALL_VESSELS)}
-                className="min-h-10 gap-2.5 [@media(pointer:coarse)]:min-h-11"
-              >
-                <Globe className="h-[18px] w-[18px] shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />
-                <span className="min-w-0 flex-1 truncate">
-                  All vessels <span className="text-muted-foreground">— Fleet overview</span>
-                </span>
-                {pendingId === ALL_VESSELS && <Loader2 className="h-4 w-4 shrink-0 motion-safe:animate-spin" aria-label="Opening" />}
-              </CommandItem>
-            </CommandGroup>
-            <CommandSeparator />
-          </>
-        )}
-        {groups.map((group) => (
-          <CommandGroup
-            key={group.id}
-            heading={group.heading}
-            className="[&_[cmdk-group-heading]]:type-eyebrow [&_[cmdk-group-heading]]:text-muted-foreground"
-          >
-            {group.vessels.map((vessel) => {
-              const count = alerts.status === 'ready' ? alerts.byVessel.get(vessel.id) : undefined;
-              const current = vessel.id === currentVesselId;
-              const pending = pendingId === vessel.id;
-              return (
-                <CommandItem
-                  key={`${group.id}:${vessel.id}`}
-                  value={`${group.id}:${vessel.id}`}
-                  keywords={[vessel.name, vessel.code, vessel.imo ?? '']}
-                  onSelect={() => onSelect(vessel)}
-                  aria-current={current ? 'true' : undefined}
-                  className="min-h-10 gap-2.5 [@media(pointer:coarse)]:min-h-11"
-                >
-                  <span className="flex min-w-0 flex-1 items-center gap-2">
-                    <span className="truncate font-display text-[0.9375rem] font-semibold">{vessel.name}</span>
-                    <span className="type-mono shrink-0 rounded-sm border border-input px-1 uppercase leading-4 text-muted-foreground">
-                      {vessel.code}
-                    </span>
-                  </span>
-                  {count && count.open > 0 && (
-                    <StatusPill
-                      tone={severityTone(count.worst)}
-                      icon={null}
-                      aria-label={alertSummaryLabel(count.open, count.worst, alerts.truncated)}
-                    >
-                      {alerts.truncated ? `${count.open}+` : count.open}
-                    </StatusPill>
-                  )}
-                  <AisMark status={positionStatus} position={positions.data?.get(vessel.id) ?? null} tooltip={false} />
-                  <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                    {pending ? (
-                      <Loader2 className="h-4 w-4 motion-safe:animate-spin" aria-label="Opening" />
-                    ) : current ? (
-                      <Check className="h-4 w-4 text-primary" strokeWidth={2} aria-label="Current vessel" />
-                    ) : null}
-                  </span>
-                </CommandItem>
-              );
-            })}
-          </CommandGroup>
-        ))}
-      </CommandList>
-    </Command>
-  );
-};
+const panelLoader = createChunkLoader<PanelModule>(() => import('./VesselSwitcherPanel'));
+
+const newAttempt = (attempt: number) => ({ attempt, Panel: React.lazy(panelLoader.load) });
+
+class PanelLoadBoundary extends React.Component<{ onRetry: () => void; children: React.ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+
+  static getDerivedStateFromError(): { failed: boolean } {
+    return { failed: true };
+  }
+
+  render() {
+    if (!this.state.failed) return this.props.children;
+    return (
+      <div role="alert" className="flex flex-col items-start gap-2 p-3">
+        <p className="type-body-sm flex items-center gap-2 text-foreground">
+          <AlertTriangle className="h-4 w-4 shrink-0 text-warning" strokeWidth={1.75} aria-hidden="true" />
+          The vessel list could not load
+        </p>
+        <Button variant="outline" size="sm" className="gap-1.5 [@media(pointer:coarse)]:h-11" onClick={this.props.onRetry}>
+          <RotateCw className="h-4 w-4" aria-hidden="true" />
+          Retry
+        </Button>
+      </div>
+    );
+  }
+}
+
+const PanelLoading: React.FC = () => (
+  <div role="status" className="type-body-sm flex items-center gap-2 px-3 py-3 text-muted-foreground">
+    <Loader2 className="h-4 w-4 shrink-0 motion-safe:animate-spin" aria-hidden="true" />
+    Loading vessels…
+  </div>
+);
 
 const VesselSwitcher: React.FC<VesselSwitcherProps> = ({ currentVesselId, alerts, children, className }) => {
   const [open, setOpen] = useShellSurface('vesselSwitcher');
@@ -152,6 +117,7 @@ const VesselSwitcher: React.FC<VesselSwitcherProps> = ({ currentVesselId, alerts
   const location = useLocation();
   const [pendingId, setPendingId] = React.useState<string | null>(null);
   const pendingRef = React.useRef<string | null>(null);
+  const [load, setLoad] = React.useState(() => newAttempt(0));
 
   const rows = React.useMemo<SwitcherVessel[]>(
     () =>
@@ -165,6 +131,11 @@ const VesselSwitcher: React.FC<VesselSwitcherProps> = ({ currentVesselId, alerts
     [vessels, getVesselCodeById],
   );
 
+  // Opened by any means (chevron, `g v`, the palette): make sure the list is on its way.
+  React.useEffect(() => {
+    if (open) panelLoader.preload();
+  }, [open]);
+
   // A selection lands as a navigation: then close, which returns focus to the chevron.
   React.useEffect(() => {
     if (!pendingRef.current) return;
@@ -175,13 +146,15 @@ const VesselSwitcher: React.FC<VesselSwitcherProps> = ({ currentVesselId, alerts
 
   const onOpenChange = (next: boolean) => {
     if (!next) {
+      // Closed before the switch landed (Esc, a click outside): abandon it.
+      if (pendingRef.current) cancelPendingVesselSwitch();
       pendingRef.current = null;
       setPendingId(null);
     }
     setOpen(next);
   };
 
-  const onSelect = (target: SwitcherVessel | typeof ALL_VESSELS) => {
+  const onSelect = (target: SwitcherTarget) => {
     if (target === ALL_VESSELS) {
       if (location.pathname === FLEET_HOME) return onOpenChange(false);
       pendingRef.current = ALL_VESSELS;
@@ -196,32 +169,39 @@ const VesselSwitcher: React.FC<VesselSwitcherProps> = ({ currentVesselId, alerts
     switchTo({ id: target.id, code: target.code });
   };
 
+  const { Panel, attempt } = load;
+
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverAnchor asChild>
         <div className={className}>
           {children}
           <PopoverTrigger asChild>
-            <button
-              type="button"
-              data-testid={SHELL_TEST_IDS.vesselSwitcherTrigger}
-              aria-label="Switch vessel"
-              aria-haspopup="dialog"
-              title="Switch vessel (G then V)"
-              className={cn(
-                'inline-flex w-7 shrink-0 items-center justify-center rounded-[calc(var(--radius)-4px)] text-muted-foreground transition-colors duration-quick ease-tide',
-                'hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground [@media(pointer:coarse)]:w-11',
-                // Touch: the hit area reaches the scope control's full 44 px height (D-35).
-                "relative [@media(pointer:coarse)]:after:absolute [@media(pointer:coarse)]:after:inset-x-0 [@media(pointer:coarse)]:after:-inset-y-[3px] [@media(pointer:coarse)]:after:content-['']",
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background',
-              )}
-            >
-              <ChevronDown
-                className="h-4 w-4 transition-transform duration-quick ease-tide motion-reduce:transition-none [[data-state=open]>&]:rotate-180"
-                strokeWidth={1.75}
-                aria-hidden="true"
-              />
-            </button>
+            <TopBarTooltip label="Switch vessel" shortcut="G V" suppressed={open}>
+              <button
+                type="button"
+                data-testid={SHELL_TEST_IDS.vesselSwitcherTrigger}
+                aria-label="Switch vessel"
+                aria-haspopup="dialog"
+                aria-keyshortcuts="G V"
+                onPointerEnter={panelLoader.preload}
+                onPointerDown={panelLoader.preload}
+                onFocus={panelLoader.preload}
+                className={cn(
+                  'inline-flex w-7 shrink-0 items-center justify-center rounded-[calc(var(--radius)-4px)] text-muted-foreground transition-colors duration-quick ease-tide',
+                  'hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground [@media(pointer:coarse)]:w-11',
+                  // Touch: the hit area reaches the scope control's full 44 px height (D-35).
+                  "relative [@media(pointer:coarse)]:after:absolute [@media(pointer:coarse)]:after:inset-x-0 [@media(pointer:coarse)]:after:-inset-y-[3px] [@media(pointer:coarse)]:after:content-['']",
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background',
+                )}
+              >
+                <ChevronDown
+                  className="h-4 w-4 transition-transform duration-quick ease-tide motion-reduce:transition-none [[data-state=open]>&]:rotate-180"
+                  strokeWidth={1.75}
+                  aria-hidden="true"
+                />
+              </button>
+            </TopBarTooltip>
           </PopoverTrigger>
         </div>
       </PopoverAnchor>
@@ -232,7 +212,11 @@ const VesselSwitcher: React.FC<VesselSwitcherProps> = ({ currentVesselId, alerts
         aria-label="Switch vessel"
         className="w-[min(22rem,calc(100vw-2rem))] overflow-hidden p-0"
       >
-        <SwitcherPanel vessels={rows} currentVesselId={currentVesselId} pendingId={pendingId} alerts={alerts} onSelect={onSelect} />
+        <PanelLoadBoundary key={attempt} onRetry={() => setLoad(newAttempt(attempt + 1))}>
+          <React.Suspense fallback={<PanelLoading />}>
+            <Panel vessels={rows} currentVesselId={currentVesselId} pendingId={pendingId} alerts={alerts} onSelect={onSelect} />
+          </React.Suspense>
+        </PanelLoadBoundary>
       </PopoverContent>
     </Popover>
   );

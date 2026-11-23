@@ -8,7 +8,6 @@ import {
   buildSwitcherGroups,
   severityTone,
   switcherFilter,
-  switcherSearchValue,
   type SwitcherVessel,
 } from '@/shared/components/layout/topbar/vesselSwitcherModel';
 
@@ -64,8 +63,6 @@ describe('buildSwitcherGroups', () => {
 
 describe('search', () => {
   it('matches on name, code and IMO', () => {
-    expect(switcherSearchValue(DRA)).toBe('DRAAK DRA 9416202');
-    expect(switcherSearchValue(XIP)).toBe('XIPHIAS XIP');
     const keywords = [DRA.name, DRA.code, DRA.imo ?? ''];
     expect(switcherFilter('x', 'draak', keywords)).toBe(1);
     expect(switcherFilter('x', 'dra', keywords)).toBe(1);

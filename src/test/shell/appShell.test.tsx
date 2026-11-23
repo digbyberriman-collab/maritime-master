@@ -34,9 +34,6 @@ vi.mock('@/modules/feedback/store/feedbackStore', async () => {
   const { shellState } = await import('./shellFakes');
   return { useFeedbackStore: (selector?: (s: object) => unknown) => (selector ? selector(shellState.feedback) : shellState.feedback) };
 });
-vi.mock('@/modules/dashboard/contexts/DashboardFilterContext', () => ({
-  DashboardFilterProvider: ({ children }: { children: React.ReactNode }) => children,
-}));
 vi.mock('@/shared/components/InkfishWatermark', () => ({ default: () => <div data-testid="watermark" /> }));
 vi.mock('@/shared/components/layout/topbar/TopBar', () => ({
   default: ({ impersonating }: { impersonating?: boolean }) => <header data-testid="shell-topbar" data-impersonating={impersonating || undefined} />,
@@ -103,6 +100,15 @@ describe('the shell root', () => {
       expect(node.className).not.toMatch(/(^|\s)bg-(background|card|popover|muted)(\s|$)/);
       node = node.parentElement;
     }
+  });
+
+  it('keeps the skip link a padded chip when it takes focus (focus:not-sr-only resets padding to 0)', () => {
+    renderShell(<AppShell>page</AppShell>, { path: '/fleet/dashboard', scope: { scope: 'fleet' } });
+    const skip = screen.getByTestId(SHELL_TEST_IDS.skipLink);
+    expect(skip).toHaveAttribute('href', '#main-content');
+    // Tailwind emits these focus utilities after focus:not-sr-only, so they win; 44 px on touch (D-35).
+    expect(skip).toHaveClass('sr-only', 'focus:not-sr-only', 'focus:px-3', 'focus:py-2', 'focus:min-h-[var(--control-h)]', 'focus:inline-flex', 'focus:items-center');
+    expect(skip).toHaveClass('bg-primary', 'text-primary-foreground', 'focus-visible:ring-2', 'focus-visible:ring-ring');
   });
 
   it('keeps the header sticky and publishes its height for the sidebar', () => {

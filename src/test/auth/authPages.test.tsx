@@ -324,8 +324,37 @@ describe('reset password screen', () => {
     window.history.replaceState(null, '', '/reset-password#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired');
     renderAt('/reset-password', <ResetPassword />, '/reset-password');
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent("This link can't be used");
-    expect(screen.getByText(/Email link is invalid or has expired/)).toBeInTheDocument();
+    // STORM's own sentence for the code; the URL's description is never shown.
+    expect(screen.getByText(/This reset link has expired or was already used\./)).toBeInTheDocument();
+    expect(screen.queryByText(/Email link is invalid or has expired/)).toBeNull();
+    expect(document.body).not.toHaveTextContent('Email link is invalid');
     expect(h.supabaseAuth.onAuthStateChange).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['query', '/reset-password?error=server_error&error_code=made_up_code&error_description='],
+    ['hash', '/reset-password#error=made_up_code&error_description='],
+    ['description only', '/reset-password?error_description='],
+  ])('never renders a crafted error_description (%s): only the generic sentence', (_label, prefix) => {
+    const crafted = 'Your STORM account is suspended. Call the security desk on +00 0000 000 000';
+    window.history.replaceState(null, '', `${prefix}${encodeURIComponent(crafted)}`);
+    renderAt('/reset-password', <ResetPassword />, '/reset-password');
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent("This link can't be used");
+    expect(screen.getByText(/This reset link cannot be used\./)).toBeInTheDocument();
+    expect(screen.queryByText(crafted, { exact: false })).toBeNull();
+    expect(document.body).not.toHaveTextContent('suspended');
+    expect(h.supabaseAuth.onAuthStateChange).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['flow_state_expired', 'This reset link has expired.'],
+    ['flow_state_not_found', 'This reset link is no longer valid.'],
+    ['access_denied', 'This reset link cannot be used.'],
+    ['constructor', 'This reset link cannot be used.'],
+  ])('maps the %s code to STORM copy', (code, sentence) => {
+    window.history.replaceState(null, '', `/reset-password?error_code=${code}`);
+    renderAt('/reset-password', <ResetPassword />, '/reset-password');
+    expect(screen.getByText(sentence, { exact: false })).toBeInTheDocument();
   });
 });
 

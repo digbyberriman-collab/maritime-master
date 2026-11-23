@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { NAVIGATION_ITEMS, PLACEHOLDER_LEAVES } from '@/config/sitemap';
+import { NAVIGATION_ITEMS, PLACEHOLDER_LEAVES, SECTION_REDIRECTS } from '@/config/sitemap';
 import type { NavChild } from '@/config/navigation-types';
 import { LEGAL_PATHS, LEGAL_TABS } from '@/modules/legal/paths';
 import { LEGAL_ROUTES } from '@/modules/legal/routes';
@@ -60,7 +60,7 @@ const leavesOf = (items: NavChild[], acc: NavChild[] = []): NavChild[] => {
 
 describe('Legal wiring', () => {
   // Legal is a workspace (D-09, R4): the Fleet sidebar reaches it from the
-  // WORKSPACES section (BUILD-PLAN B7).
+  // WORKSPACES section (BUILD-PLAN B7), and its own tree is its tabs (D-83).
   const fleet = NAVIGATION_ITEMS.find((m) => m.id === 'fleet');
   const legalLeaf = leavesOf(fleet?.children ?? []).find((l) => l.label === 'Legal');
   const routePaths = new Set(LEGAL_ROUTES.map((r) => r.path));
@@ -72,6 +72,17 @@ describe('Legal wiring', () => {
   it('sidebar Legal leaf points at the module and is no longer a placeholder', () => {
     expect(legalLeaf?.path).toBe(LEGAL_PATHS.root);
     expect(PLACEHOLDER_LEAVES.some((p) => p.path === LEGAL_PATHS.root || p.path === LEGAL_PATHS.legacyPlaceholder)).toBe(false);
+  });
+
+  it('has a sidebar tree of its own: the four tabs, live, at their tab paths (D-83)', () => {
+    const tree = NAVIGATION_ITEMS.find((m) => m.id === 'legal');
+    expect(tree?.path).toBe(LEGAL_PATHS.root);
+    expect(tree?.scope).toBe('workspace');
+    expect((tree?.children ?? []).map((l) => [l.label, l.path, l.status, l.crossLink ?? false])).toEqual(
+      LEGAL_TABS.map((tab) => [tab.label, tab.path, 'live', false]),
+    );
+    // The manifest's own root redirect serves /departments/legal: the site map adds none.
+    expect(SECTION_REDIRECTS.filter((r) => r.from === LEGAL_PATHS.root || r.from.startsWith(`${LEGAL_PATHS.root}/`))).toEqual([]);
   });
 
   it('every tab and static path has a route, and the legacy path redirects', () => {

@@ -14,6 +14,7 @@ import React, { useMemo, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation, useRoutes } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { assignVesselCodes, resolveVesselByCode } from '@/modules/vessels/lib/vesselCode';
 import type { Vessel } from '@/modules/vessels/contexts/VesselContext';
 
@@ -99,9 +100,6 @@ vi.mock('@/modules/vessels/contexts/VesselContext', async () => {
 // The shell's heavy children, as in scopes.test.tsx.
 vi.mock('@/shared/contexts/BrandingContext', () => ({
   useBrandingContext: () => ({ clientDisplayName: 'TEST', clientLogoUrl: null }),
-}));
-vi.mock('@/modules/dashboard/contexts/DashboardFilterContext', () => ({
-  DashboardFilterProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 vi.mock('@/shared/components/layout/InkfishFooter', async () => {
   const react = await import('react');
@@ -279,13 +277,17 @@ const LocationProbe: React.FC = () => {
 };
 
 function renderApp(url: string) {
+  // The app's query client sits above the routes (the vessel scope's vessel switch reads it).
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <FakeVesselProvider>
-      <MemoryRouter initialEntries={[url]}>
-        <AppTree />
-        <LocationProbe />
-      </MemoryRouter>
-    </FakeVesselProvider>,
+    <QueryClientProvider client={queryClient}>
+      <FakeVesselProvider>
+        <MemoryRouter initialEntries={[url]}>
+          <AppTree />
+          <LocationProbe />
+        </MemoryRouter>
+      </FakeVesselProvider>
+    </QueryClientProvider>,
   );
 }
 

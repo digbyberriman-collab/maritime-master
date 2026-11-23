@@ -21,15 +21,11 @@ import ProtectedRoute from '@/shared/components/ProtectedRoute';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
-import {
-  isVesselCodeParam,
-  normaliseVesselCode,
-  parseVesselPath,
-  switchVesselInPath,
-  vesselPath,
-} from '@/modules/vessels/lib/vesselCode';
+import { isVesselCodeParam, normaliseVesselCode, parseVesselPath, vesselPath } from '@/modules/vessels/lib/vesselCode';
 import { ModuleOff, PageError } from '@/shared/components/states';
+import { usePageLocationOverride, type PageLocationOverride } from '@/shared/components/layout/pageLocationOverride';
 import { useVesselNav, type VesselNavModel } from '@/app/nav/useVesselNav';
+import { cancelPendingVesselSwitch, useVesselSwitch } from '@/app/nav/useVesselSwitch';
 import { moduleSettingLabel, vesselRouteDecision } from '@/app/nav/vesselRouteGate';
 import { useVesselSettingsAccess, vesselSettingsHref } from '@/app/nav/vesselSettingsLink';
 import { RouteErrorBoundary, RouteSuspense } from './RouteBoundary';
@@ -123,10 +119,20 @@ export const FleetScope: React.FC = () => (
 // ─── Vessel ───────────────────────────────────────────────────────────────
 
 /**
+ * Names the gate's state to the page header (spec §7); the shared states in
+ * `@/shared/components/states` do not know about the shell, so the gate does.
+ */
+const GateLocation: React.FC<PageLocationOverride> = ({ title, crumbs }) => {
+  usePageLocationOverride({ title, crumbs });
+  return null;
+};
+
+/**
  * Pages of a module switched off for this vessel do not open (BUILD-PLAN S4;
  * gap/10 W4; spec §5.5): ModuleOff inside the shell, for everyone, admins
  * included (the cog and this state's button lead to Vessel Settings). Paths
  * no setting governs (the vessel home, Calendar) never wait for the settings.
+ * The page exists, so ModuleOff keeps its crumbs; only the title changes.
  */
 const VesselRouteGate: React.FC<{ nav: VesselNavModel; rest: string; vesselName: string; code: string }> = ({
   nav,
@@ -139,25 +145,48 @@ const VesselRouteGate: React.FC<{ nav: VesselNavModel; rest: string; vesselName:
   if (decision === 'ok') return <ScopeOutlet />;
   if (decision === 'loading') return <ScopeLoading label={`Opening ${vesselName}…`} />;
   if (decision === 'error') {
+    const title = "This vessel's modules could not load";
     return (
-      <PageError
-        title="This vessel's modules could not load"
-        error={nav.errorMessage ?? undefined}
-        onRetry={nav.retry}
-        headingLevel={1}
-        treatMissingAsOff={false}
-      />
+      <>
+        <GateLocation title={title} />
+        <PageError title={title} error={nav.errorMessage ?? undefined} onRetry={nav.retry} headingLevel={1} treatMissingAsOff={false} />
+      </>
     );
   }
+  const moduleName = moduleSettingLabel(decision.off, nav.resolver.labelFor);
   return (
-    <ModuleOff
-      moduleName={moduleSettingLabel(decision.off, nav.resolver.labelFor)}
-      vesselName={vesselName}
-      canEnable={canEnable}
-      settingsHref={vesselSettingsHref(code)}
-      headingLevel={1}
-    />
+    <>
+      <GateLocation title={`${moduleName} is switched off`} crumbs="page" />
+      <ModuleOff
+        moduleName={moduleName}
+        vesselName={vesselName}
+        canEnable={canEnable}
+        settingsHref={vesselSettingsHref(code)}
+        headingLevel={1}
+      />
+    </>
   );
+};
+
+/**
+ * Opens the vessel an in-page picker selected (IA23, D-71) through the vessel
+ * switch, as the top bar does: the page is kept only where it is on and
+ * visible for that vessel, else its tab root, else its home, and a failed
+ * settings read opens its home (D-64, gap/10 W2; spec §6.1). Mounted only
+ * while the pick waits (so the scope needs no query client until a pick);
+ * unmounting (the switch landed, the user moved on, or picked the URL's
+ * vessel again) abandons a switch still in flight.
+ */
+const PickedVesselSwitch: React.FC<{ id: string; code: string }> = ({ id, code }) => {
+  const switchTo = useVesselSwitch();
+  // Once per pick: a new location or gate gives `switchTo` a new identity, never a second switch.
+  const latest = useRef(switchTo);
+  latest.current = switchTo;
+  useEffect(() => {
+    latest.current({ id, code });
+    return () => cancelPendingVesselSwitch();
+  }, [id, code]);
+  return null;
 };
 
 const VesselScopeBody: React.FC = () => {
@@ -168,6 +197,7 @@ const VesselScopeBody: React.FC = () => {
   const code = currentVesselLink ? '' : normaliseVesselCode(rawCode);
   const access = useScopeAccess();
   const {
+    vessels,
     selectedVesselId,
     isAllVessels,
     setSelectedVessel,
@@ -190,12 +220,20 @@ const VesselScopeBody: React.FC = () => {
   // - the URL changed: select its vessel in VesselContext, so the legacy
   //   pages that read the selection show this vessel;
   // - the selection changed while the URL did not (an in-page vessel picker,
-  //   the account menu): move to the same page on that vessel (IA23), or to
+  //   the account menu): open that vessel through the vessel switch (IA23,
+  //   D-71), which keeps the page only where it is on and visible for that
+  //   vessel, else its tab root, else its home (D-64, gap/10 W2), or go to
   //   the fleet dashboard when "All vessels" was picked.
   const syncedCode = useRef<string | null>(null);
   // Our own pending selection: `from` is the selection we asked to replace.
   // Once the selection moves off `from`, the request has landed.
   const pending = useRef<{ from: string | null } | null>(null);
+  // The in-page pick the vessel switch is opening (PickedVesselSwitch), and
+  // where the user was when it was made. A new URL vessel starts afresh.
+  const requested = useRef<{ id: string; locationKey: string } | null>(null);
+  useEffect(() => {
+    requested.current = null;
+  }, [code]);
   useEffect(() => {
     if (!vessel) return;
     if (pending.current && selectedVesselId !== pending.current.from) pending.current = null;
@@ -214,22 +252,24 @@ const VesselScopeBody: React.FC = () => {
       return;
     }
     if (selectedVesselId && selectedVesselId !== vessel.id) {
-      const next = getVesselCodeById(selectedVesselId);
-      if (next) navigate(switchVesselInPath(`${location.pathname}${location.search}${location.hash}`, next));
+      // An in-page pick: PickedVesselSwitch (in the body) opens it.
+      const known = requested.current?.id === selectedVesselId;
+      if (getVesselCodeById(selectedVesselId) && !known) {
+        requested.current = { id: selectedVesselId, locationKey: location.key };
+      } else if (!known || location.key !== requested.current?.locationKey) {
+        // The pick names no vessel we can open, or the user went elsewhere
+        // before the switch landed (the switch is abandoned): the URL wins,
+        // so the selection goes back to its vessel. While a pick waits the
+        // body is ScopeLoading, so only the shell (tabs, sidebar, top bar)
+        // can have moved the user.
+        requested.current = null;
+        pending.current = { from: selectedVesselId };
+        setSelectedVessel(vessel);
+      }
+    } else {
+      requested.current = null;
     }
-  }, [
-    vessel,
-    code,
-    selectedVesselId,
-    isAllVessels,
-    setSelectedVessel,
-    getVesselCodeById,
-    navigate,
-    location.pathname,
-    location.search,
-    location.hash,
-    access.fleetReach,
-  ]);
+  }, [vessel, code, selectedVesselId, isAllVessels, setSelectedVessel, getVesselCodeById, navigate, location.key, access.fleetReach]);
 
   // Client permissions follow the vessel in scope (gap/00 C4).
   const vesselId = vessel?.id ?? null;
@@ -272,8 +312,18 @@ const VesselScopeBody: React.FC = () => {
     }
   } else if (selectedVesselId !== vessel.id) {
     // One render while VesselContext catches up with the URL, so a page never
-    // runs its queries against the previous vessel.
-    body = <ScopeLoading label={`Opening ${vessel.name}…`} />;
+    // runs its queries against the previous vessel; or, after an in-page pick
+    // (the selection moved while the URL did not), until the vessel switch
+    // opens the picked vessel, named here.
+    const pickedId = syncedCode.current === code && !pending.current ? selectedVesselId : null;
+    const pickedCode = pickedId ? getVesselCodeById(pickedId) : null;
+    const picked = pickedId ? vessels.find((v) => v.id === pickedId) : undefined;
+    body = (
+      <>
+        {pickedId && pickedCode && <PickedVesselSwitch id={pickedId} code={pickedCode} />}
+        <ScopeLoading label={`Opening ${(picked ?? vessel).name}…`} />
+      </>
+    );
   } else {
     body = (
       <VesselRouteGate nav={nav} rest={parseVesselPath(location.pathname)?.rest ?? ''} vesselName={vessel.name} code={code} />

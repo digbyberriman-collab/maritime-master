@@ -16,10 +16,11 @@
  *   each with the sidebar shown under it. Paths are relative to
  *   `/v/:vesselCode`; `buildVesselNav(code)` resolves them for one vessel.
  *   Finance and Departments are planned slots, hidden by default (G1, G5).
- * - **Workspaces** (HRIS, Health & Wellness, Yard, Shoreside): the STORM
- *   modules, unchanged (D-09). Their trees come from the HRIS, Health,
- *   Refit and New Build manifests; Shoreside is still the platform's.
- *   Legal stays at `/departments/legal` (R4) and is linked from WORKSPACES.
+ * - **Workspaces** (HRIS, Health & Wellness, Yard, Shoreside, Legal): the
+ *   STORM modules, unchanged (D-09). Their trees come from the HRIS, Health,
+ *   Refit, New Build and Legal manifests; Shoreside is still the platform's.
+ *   Legal stays at `/departments/legal` (R4); its tree is its four tabs
+ *   (D-83), and Fleet's WORKSPACES links to it.
  *
  * `NAVIGATION_ITEMS` feeds today's shell (top module rail + sidebar) until
  * Phase 1 replaces it: its Fleet module is the Fleet tree, and its Vessel
@@ -74,6 +75,9 @@ const fill = (slot: NavSlotId, base: (NavChild | SlotEntry)[] = []): NavChild[] 
 
 /** Whether a registered module route serves an absolute path. */
 const isRouted = (path: string): boolean => MODULE_REGISTRY.hasPage(path);
+
+/** Paths a module manifest declares a route for itself, page or redirect (`/departments/legal` → its dashboard). */
+const manifestRoutePaths = new Set(MODULE_REGISTRY.routes.map((r) => r.fullPath));
 
 /** Absolute path of a vessel-tree path under `base` (a cross-link stays absolute). */
 const underVessel = (base: string, rel: string): string => {
@@ -188,7 +192,10 @@ const vCrew: NavChild[] = [
   // Label "Leave" on vessels that rename it (vessel_module_settings).
   L('Planner', 'crew', { icon: Network, moduleSetting: 'planner', ...LIVE }),
   L('Crew Compliance', 'crew', { slug: 'compliance', icon: ShieldCheck, ...LIVE }),
-  L('Hours of Rest', 'crew', { icon: Clock, moduleSetting: 'crew_hor', ...LIVE }),
+  // One crew member's month (`crew/people/:crewId/hours-of-rest`, the target
+  // of the legacy /crew/work-rest/:crewId) is an Hours of Rest page too: the
+  // crew_hor setting closes it with the overview (gap/10 W4, D-63).
+  { ...L('Hours of Rest', 'crew', { icon: Clock, moduleSetting: 'crew_hor', ...LIVE }), alsoCovers: ['crew/people/*/hours-of-rest'] },
   L('Crew Medical', 'crew', { slug: 'medical', icon: Stethoscope }),
   L('Crew Training', 'crew', { slug: 'training', icon: GraduationCap, moduleSetting: 'crew_training', ...LIVE }),
   L('Familiarisation', 'crew', { icon: FileCheck, ...LIVE }),
@@ -541,8 +548,8 @@ const WORKSPACE_BASE: Readonly<Record<string, NavChild[]>> = { shoreside: shores
 
 /**
  * The workspaces with a sidebar tree, after Fleet and Vessel (navSlots.ts
- * WORKSPACE_TREES). Health & Wellness, Yard (Refit, New Build) and HRIS fill
- * their slots from their module manifests.
+ * WORKSPACE_TREES). Health & Wellness, Yard (Refit, New Build), HRIS and
+ * Legal fill their slots from their module manifests.
  */
 const workspaceItems: NavItem[] = WORKSPACE_TREES.map((w) => ({
   id: w.id,
@@ -556,7 +563,7 @@ const workspaceItems: NavItem[] = WORKSPACE_TREES.map((w) => ({
 
 export const NAVIGATION_ITEMS: NavItem[] = [
   {
-    id: 'fleet', label: 'Fleet', icon: Ship, path: FLEET_BASE, permissions: ['all'], defaultOpen: true, scope: 'fleet',
+    id: 'fleet', label: 'Fleet', icon: Globe, path: FLEET_BASE, permissions: ['all'], defaultOpen: true, scope: 'fleet',
     children: withScope(fleetTree, 'fleet'),
   },
   {
@@ -765,7 +772,9 @@ export const VESSEL_ROOT_REDIRECTS: SectionRedirect[] = (() => {
 // redirects to its first real (non-cross-link) leaf so bookmarks and typed
 // URLs land somewhere useful instead of bouncing to the dashboard. Fleet
 // headings share the `/fleet` path, which the Fleet scope already sends to
-// its dashboard; vessel roots are VESSEL_ROOT_REDIRECTS.
+// its dashboard; vessel roots are VESSEL_ROOT_REDIRECTS. A path a module
+// manifest already routes itself (Legal's root redirects to its dashboard)
+// gets none, so no path is declared twice.
 export const SECTION_REDIRECTS: SectionRedirect[] = (() => {
   const out: SectionRedirect[] = [];
   const seen = new Set<string>();
@@ -773,7 +782,7 @@ export const SECTION_REDIRECTS: SectionRedirect[] = (() => {
     for (const item of items ?? []) {
       if (!item.children?.length) continue;
       const target = firstLeaf(item.children);
-      if (target && WORKSPACE_PREFIXES.some((p) => item.path.startsWith(p)) && !seen.has(item.path)) {
+      if (target && WORKSPACE_PREFIXES.some((p) => item.path.startsWith(p)) && !seen.has(item.path) && !manifestRoutePaths.has(item.path)) {
         seen.add(item.path);
         out.push({ from: item.path, to: withModule(target, moduleId) });
       }
@@ -782,7 +791,7 @@ export const SECTION_REDIRECTS: SectionRedirect[] = (() => {
   };
   for (const module of workspaceModules) {
     const target = firstLeaf(module.children);
-    if (target && !seen.has(module.path) && !_placeholderPaths.has(module.path)) {
+    if (target && !seen.has(module.path) && !_placeholderPaths.has(module.path) && !manifestRoutePaths.has(module.path)) {
       seen.add(module.path);
       out.push({ from: module.path, to: withModule(target, module.id) });
     }

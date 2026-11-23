@@ -43,3 +43,36 @@ export function isMissingRelation(error: unknown): boolean {
   const message = text(e.message);
   return message !== undefined && MISSING_RELATION_MESSAGE.test(message);
 }
+
+/**
+ * The narrower "the table itself is not there" codes: Postgres undefined
+ * table and PostgREST's table schema-cache miss. A missing column (42703,
+ * PGRST204) or function is schema drift on a table that exists, not a
+ * missing table.
+ */
+export const MISSING_TABLE_CODES: readonly string[] = ['42P01', 'PGRST205'];
+
+/** For uncoded errors: "relation … does not exist" / "could not find the table". */
+const MISSING_TABLE_MESSAGE = /relation .* does not exist|could not find the table/i;
+/** `column "x" of relation "y" does not exist` names a relation but is a missing column. */
+const COLUMN_MESSAGE = /\bcolumn\b/i;
+
+const missingTableMessage = (message: string): boolean => MISSING_TABLE_MESSAGE.test(message) && !COLUMN_MESSAGE.test(message);
+
+/**
+ * True only for a "table / view not live yet" error, for callers where a
+ * missing table means "nothing stored" but any other failure must fail
+ * closed (vessel module settings, D-63 / D-04). Same shape as
+ * `isMissingRelation`: a coded error is judged by its code alone, an
+ * uncoded one (or a bare string) by its message. Never throws.
+ */
+export function isMissingTable(error: unknown): boolean {
+  if (error === null || error === undefined) return false;
+  if (typeof error === 'string') return missingTableMessage(error);
+  if (typeof error !== 'object') return false;
+  const e = error as { code?: unknown; message?: unknown };
+  const code = text(e.code);
+  if (code) return MISSING_TABLE_CODES.includes(code);
+  const message = text(e.message);
+  return message !== undefined && missingTableMessage(message);
+}

@@ -37,7 +37,7 @@
 import type { PostgrestError, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 import { supabase } from './client';
-import { isMissingRelation as classifyMissingRelation } from './missingRelation';
+import { isMissingRelation as classifyMissingRelation, isMissingTable as classifyMissingTable } from './missingRelation';
 
 /** One pending table, in the generated types' shape. */
 export interface PendingTableShape {
@@ -116,4 +116,14 @@ export const pendingClient = <T extends PendingTables, V extends PendingViews = 
  */
 export function isMissingRelation(error: Pick<PostgrestError, 'code' | 'message'> | null | undefined): boolean {
   return classifyMissingRelation(error);
+}
+
+/**
+ * True only when the table or view itself is missing (42P01, PGRST205, or
+ * the matching message), not a missing column or function. For callers that
+ * read "no table" as "nothing stored" and must treat every other error,
+ * column drift included, as an error (vessel module settings, D-63).
+ */
+export function isMissingTable(error: Pick<PostgrestError, 'code' | 'message'> | null | undefined): boolean {
+  return classifyMissingTable(error);
 }

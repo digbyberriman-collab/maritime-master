@@ -17,8 +17,14 @@
  * Keyboard: ↑ ↓ Home End move, Enter opens, Esc closes (cmdk + Radix).
  * Selecting closes the palette first; focus goes back to the element that
  * opened it, except when the action opens another surface.
+ *
+ * The highlighted option is held here (cmdk's controlled `value`): cmdk
+ * selects the first row to mount, which on a first open is a vessel while
+ * Pages still loads, and keeps it when Pages arrive above. So each open
+ * starts with nothing chosen, and with an empty query the top row is chosen
+ * once the sources settle, without undoing a row the user moved to.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Check, FileSearch, SearchX, X } from 'lucide-react';
 import {
@@ -166,9 +172,11 @@ interface ContentProps {
   onClose: () => void;
   /** Close, skip the focus return, then call `open` on the next frame. */
   onCloseThen: (open: () => void) => void;
+  /** Choose the highlighted option (cmdk's controlled value). */
+  setSelected: (value: string) => void;
 }
 
-const PaletteContent: React.FC<ContentProps> = ({ initialQuery, onClose, onCloseThen }) => {
+const PaletteContent: React.FC<ContentProps> = ({ initialQuery, onClose, onCloseThen, setSelected }) => {
   const navigate = useNavigate();
   const switchVessel = useVesselSwitch();
   const { user } = useAuth();
@@ -191,6 +199,19 @@ const PaletteContent: React.FC<ContentProps> = ({ initialQuery, onClose, onClose
   const anyLoading = !sourcesReady;
   // Ranked here (not by cmdk's filter): the best match is the first option, whatever its group.
   const groups = useMemo(() => paletteGroups(trimmed, { pages, vessels, actions }, scope), [trimmed, pages, vessels, actions, scope]);
+
+  // With an empty query, the top row is chosen whenever the rows above it
+  // settle (Pages and Vessels loaded, Recent shown), not on every render, so
+  // an arrow-key choice stays. A typed query needs nothing: cmdk chooses the
+  // first match whenever the search changes.
+  const firstValue = showRecent
+    ? `${RECENT_VALUE_PREFIX}${recentItems[0].id}`
+    : groups.find((g) => g.status === 'ready' && g.items.length > 0)?.items[0]?.id ?? '';
+  const top = useRef({ firstValue, trimmed });
+  top.current = { firstValue, trimmed };
+  useLayoutEffect(() => {
+    if (!top.current.trimmed && top.current.firstValue) setSelected(top.current.firstValue);
+  }, [sourcesReady, showRecent, setSelected]);
 
   const pick = useCallback(
     (item: PaletteItem) => {
@@ -297,6 +318,15 @@ const PaletteDialog: React.FC<PaletteDialogProps> = ({ open, onOpenChange, initi
     if (open) skipFocusReturn.current = false;
   }, [open]);
 
+  // The highlighted option, cleared as the palette opens (before its rows
+  // mount, so the first open and every later one start the same way).
+  const [selected, setSelected] = useState('');
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) setSelected('');
+  }
+
   const close = useCallback(() => onOpenChange(false), [onOpenChange]);
   const closeThen = useCallback(
     (next: () => void) => {
@@ -330,9 +360,9 @@ const PaletteDialog: React.FC<PaletteDialogProps> = ({ open, onOpenChange, initi
       description="Search pages, vessels and actions. Use the arrow keys to move through the results and Enter to open one."
       showCloseButton={false}
       contentProps={{ 'data-testid': PALETTE_TEST_IDS.dialog, onCloseAutoFocus }}
-      commandProps={{ label: 'Search STORM', shouldFilter: false, loop: true, vimBindings: false }}
+      commandProps={{ label: 'Search STORM', shouldFilter: false, loop: true, vimBindings: false, value: selected, onValueChange: setSelected }}
     >
-      <PaletteContent initialQuery={initialQuery} onClose={close} onCloseThen={closeThen} />
+      <PaletteContent initialQuery={initialQuery} onClose={close} onCloseThen={closeThen} setSelected={setSelected} />
     </CommandDialog>
   );
 };

@@ -29,6 +29,9 @@ const LEVEL_LABEL: Record<string, string> = {
  * Department shell for /departments/legal: module header with the user's
  * access level, the Dashboard / Requests / Documents / Forms tabs, and the
  * page content.
+ *
+ * D-83: from 1024 px the static Legal sidebar lists the same four entries, so
+ * the tab strip shows only below 1024 px, where the sidebar is a drawer.
  */
 export const LegalShell: React.FC<LegalShellProps> = ({ title, description, actions, backTo, children }) => {
   const access = useLegalAccess();
@@ -61,7 +64,11 @@ export const LegalShell: React.FC<LegalShellProps> = ({ title, description, acti
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
         </div>
 
-        <Tabs value={active} onValueChange={(v) => navigate(LEGAL_TABS.find((t) => t.id === v)?.path ?? LEGAL_TABS[0].path)}>
+        <Tabs
+          className="lg:hidden"
+          value={active}
+          onValueChange={(v) => navigate(LEGAL_TABS.find((t) => t.id === v)?.path ?? LEGAL_TABS[0].path)}
+        >
           <TabsList className="w-full justify-start overflow-x-auto sm:w-auto">
             {LEGAL_TABS.map((tab) => (
               <TabsTrigger key={tab.id} value={tab.id}>

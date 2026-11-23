@@ -96,6 +96,30 @@ describe('scoped breadcrumbs', () => {
     expect(nav('/v/dra/logbooks/deck').title).toBe('Deck & Bridge Logbook');
   });
 
+  // IA1: a workspace page's trail starts at its workspace, never at a Fleet
+  // cross-link (Fleet › Workspaces › …), whichever module the shell names.
+  it.each([null, 'legal'])('Legal pages read Legal › Dashboard, not Fleet › Workspaces (module %s)', (moduleId) => {
+    expect(nav('/departments/legal/dashboard', moduleId)).toMatchObject({ crumbs: 'Legal > Dashboard', title: 'Dashboard' });
+    expect(nav('/departments/legal/dashboard', moduleId).links[0]).toBe('/departments/legal');
+  });
+
+  it.each([null, 'fleet'])('a Fleet WORKSPACES cross-link never roots a workspace page (module %s)', (moduleId) => {
+    expect(nav('/departments/legal/requests', moduleId).crumbs).not.toMatch(/^Fleet/);
+    expect(nav('/hris/compensation/payroll', moduleId).crumbs).not.toMatch(/^Fleet/);
+  });
+
+  it('the first crumb of a workspace page is its workspace', () => {
+    expect(nav('/hris/compensation/payroll', 'hris').crumbs.split(' > ')[0]).toBe('HRIS');
+    expect(nav('/hris/compensation/payroll').crumbs.split(' > ')[0]).toBe('HRIS');
+    expect(nav('/health/medical', 'health').crumbs.split(' > ')[0]).toBe('Health & Wellness');
+    expect(nav('/health/medical').crumbs.split(' > ')[0]).toBe('Health & Wellness');
+    expect(nav('/departments/legal/forms').crumbs.split(' > ')[0]).toBe('Legal');
+  });
+
+  it('a legacy page opened from a workspace keeps that workspace’s trail (D-45)', () => {
+    expect(nav('/crew/leave?module=hris', 'hris').crumbs).toMatch(/^HRIS > .+ > Leave Planner$/);
+  });
+
   it('a malformed escape in the URL does not throw', () => {
     expect(() => nav('/hris/%zz')).not.toThrow();
     expect(() => nav('/v/%E0%A4%A/crew/list')).not.toThrow();

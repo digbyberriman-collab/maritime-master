@@ -112,9 +112,6 @@ vi.mock('@/modules/vessels/contexts/VesselContext', async () => {
 
 // The shell's heavy children.
 vi.mock('@/shared/contexts/BrandingContext', () => ({ useBrandingContext: () => ({ clientDisplayName: 'TEST', clientLogoUrl: null }) }));
-vi.mock('@/modules/dashboard/contexts/DashboardFilterContext', () => ({
-  DashboardFilterProvider: ({ children }: { children: React.ReactNode }) => children,
-}));
 vi.mock('@/shared/components/InkfishWatermark', () => ({ default: () => null }));
 vi.mock('@/shared/components/layout/topbar/TopBar', () => ({ default: () => null }));
 vi.mock('@/shared/components/layout/topbar/KeyboardShortcutsDialog', () => ({ default: () => null }));

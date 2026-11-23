@@ -1,19 +1,33 @@
 /**
  * The notification bell in the top bar (gap/10 top bar element 8, IA15; spec
- * §2.1): the latest 20 alerts in reach and "Open inbox". The badge counts open
- * alerts and takes the critical tone when any open alert is RED (critical =
+ * §2.1): the latest 20 alerts in the viewer's alert scope and "Open inbox".
+ *
+ * Scope (`useAlertScope`, shared with /inbox; D-71): the route's vessel inside
+ * `/v/:code` (named in the panel header), else the whole company for fleet
+ * reach, else the vessels in reach. Nothing is read until access and the
+ * vessel list have loaded, and a null selection never widens the scope
+ * (D-04). Every read is keyed by the scope, so a response for an earlier
+ * scope never shows.
+ *
+ * The badge comes from two head counts (open alerts, open RED alerts), not
+ * from the 20-row list: critical tone when any open alert is RED (critical =
  * destructive, D-57), else Signal; only the critical badge pulses, and not
- * under reduced motion. While the list loads or after an error the panel says
- * so; it never reads a failed load as "no alerts".
+ * under reduced motion. No badge until the counts are in; if the counts fail
+ * but the list loaded, the list's open count (`20+` when the list is full).
+ * While the list loads or after an error the panel says so; it never reads a
+ * failed load as "no alerts". A failed Acknowledge says so.
  *
  * The open state is the shell's (`ShellActions.openNotifications` opens it
  * from the command palette); outside a shell it keeps its own.
  */
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
-import { useVessel } from '@/modules/vessels/contexts/VesselContext';
+import { useAlertScope } from '@/modules/notifications/hooks/useNotificationCenter';
+import { alertOrFilter } from '@/modules/notifications/lib/alertScope';
+import { notify } from '@/shared/lib/notify';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -43,6 +57,7 @@ import { ALERT_SEVERITY_TONE } from '@/modules/notifications/lib/alertSeverityTo
 import { SHELL_TEST_IDS } from '@/app/shell/testIds';
 import { useShellSurface } from '@/app/shell/shellUi';
 import { topBarIconButton } from '@/shared/components/layout/topbar/styles';
+import TopBarTooltip from '@/shared/components/layout/topbar/TopBarTooltip';
 
 interface AlertItem {
   id: string;
@@ -65,6 +80,15 @@ const MAX_DROPDOWN_ALERTS = 20;
 /** The personal inbox (all notifications for the signed-in user). */
 const INBOX_PATH = '/inbox';
 const REFRESH_INTERVAL_MS = 30000; // 30 seconds
+const OPEN_STATUSES: readonly AlertStatus[] = ['OPEN', 'ACKNOWLEDGED', 'SNOOZED', 'ESCALATED'];
+
+/** Every bell read starts with this key; the realtime channel invalidates it. */
+const BELL_QUERY_KEY = ['shell', 'bell'] as const;
+
+interface BellCounts {
+  open: number;
+  critical: number;
+}
 
 const getSeverityConfig = (severity: AlertSeverity) => {
   switch (severity) {
@@ -151,17 +175,17 @@ export interface NotificationBellProps {
 
 const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange, className }) => {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { profile } = useAuth();
-  const { selectedVesselId, isAllVessels } = useVessel();
+  const { ready, companyId, scope, scopeKey, vesselName } = useAlertScope();
   const [shellOpen, setShellOpen] = useShellSurface('notifications');
   const isOpen = open ?? shellOpen;
   const setIsOpen = useCallback((next: boolean) => (onOpenChange ?? setShellOpen)(next), [onOpenChange, setShellOpen]);
-  const [alerts, setAlerts] = useState<AlertItem[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [criticalUnread, setCriticalUnread] = useState(false);
   const [showHelper, setShowHelper] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadFailed, setLoadFailed] = useState(false);
+  const [acknowledging, setAcknowledging] = useState<ReadonlySet<string>>(() => new Set());
+  const acknowledgingRef = useRef(new Set<string>());
+  const panelRef = useRef<HTMLDivElement>(null);
+  const orFilter = alertOrFilter(scope);
 
   // Check if helper has been shown before
   useEffect(() => {
@@ -172,20 +196,30 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange,
     }
   }, []);
 
+  /** The first alert row, else the panel itself (never the hint, never the page body). */
+  const focusPanelStart = useCallback(() => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    const row = panel.querySelector<HTMLElement>('[data-alert-row]');
+    (row ?? panel).focus();
+  }, []);
+
   const dismissHelper = () => {
     try {
       window.localStorage.setItem(HELPER_STORAGE_KEY, 'true');
     } catch {
       /* storage unavailable: the hint comes back next time */
     }
+    // Move focus before the button goes, so it stays in the panel.
+    focusPanelStart();
     setShowHelper(false);
   };
 
-  const companyId = profile?.company_id ?? null;
-  const loadAlerts = useCallback(async () => {
-    if (!companyId) return;
-
-    try {
+  const list = useQuery({
+    queryKey: [...BELL_QUERY_KEY, 'list', companyId, scopeKey],
+    enabled: ready,
+    refetchInterval: REFRESH_INTERVAL_MS,
+    queryFn: async (): Promise<AlertItem[]> => {
       let query = supabase
         .from('alerts')
         .select(`
@@ -203,44 +237,43 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange,
           source_module,
           vessel:vessels(name)
         `)
-        .eq('company_id', companyId)
-        .in('status', ['OPEN', 'ACKNOWLEDGED', 'SNOOZED', 'ESCALATED'])
+        .eq('company_id', companyId as string)
+        .in('status', OPEN_STATUSES)
         .order('severity_color', { ascending: true }) // RED first
         .order('due_at', { ascending: true, nullsFirst: false })
         .order('created_at', { ascending: false })
         .limit(MAX_DROPDOWN_ALERTS);
-
-      // Apply vessel filter if not in "All Vessels" mode
-      if (!isAllVessels && selectedVesselId) {
-        query = query.or(`vessel_id.eq.${selectedVesselId},vessel_id.is.null`);
-      }
-
+      if (orFilter) query = query.or(orFilter);
       const { data, error } = await query;
       if (error) throw error;
+      return (data as AlertItem[] | null) ?? [];
+    },
+  });
 
-      const rows = (data as AlertItem[]) || [];
-      setAlerts(rows);
-      // Unread = OPEN. Critical tone when any unread alert is RED.
-      const open = rows.filter((a) => a.status === 'OPEN');
-      setUnreadCount(open.length);
-      setCriticalUnread(open.some((a) => a.severity_color === 'RED'));
-      setLoadFailed(false);
-    } catch (error) {
-      console.error('Failed to load alerts:', error);
-      setLoadFailed(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [companyId, isAllVessels, selectedVesselId]);
+  const counts = useQuery({
+    queryKey: [...BELL_QUERY_KEY, 'counts', companyId, scopeKey],
+    enabled: ready,
+    refetchInterval: REFRESH_INTERVAL_MS,
+    queryFn: async (): Promise<BellCounts> => {
+      const openAlerts = () => {
+        const query = supabase
+          .from('alerts')
+          .select('id', { count: 'exact', head: true })
+          .eq('company_id', companyId as string)
+          .eq('status', 'OPEN');
+        return orFilter ? query.or(orFilter) : query;
+      };
+      const [all, red] = await Promise.all([openAlerts(), openAlerts().eq('severity_color', 'RED')]);
+      if (all.error) throw all.error;
+      if (red.error) throw red.error;
+      if (typeof all.count !== 'number' || typeof red.count !== 'number') throw new Error('The alert count was not returned.');
+      return { open: all.count, critical: red.count };
+    },
+  });
 
-  // Initial load and polling
+  // Realtime: any change to alerts refreshes every bell read.
   useEffect(() => {
-    loadAlerts();
-
-    // Set up polling interval
-    const interval = setInterval(loadAlerts, REFRESH_INTERVAL_MS);
-
-    // Set up realtime subscription for immediate updates
+    if (!ready) return undefined;
     const subscription = supabase
       .channel('alerts-bell')
       .on(
@@ -251,16 +284,38 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange,
           table: 'alerts',
         },
         () => {
-          loadAlerts();
+          void queryClient.invalidateQueries({ queryKey: BELL_QUERY_KEY });
         }
       )
       .subscribe();
-
     return () => {
-      clearInterval(interval);
       subscription.unsubscribe();
     };
-  }, [loadAlerts]);
+  }, [ready, queryClient]);
+
+  const alerts = useMemo(() => list.data ?? [], [list.data]);
+
+  // The badge: the counts when they are in; the list's open rows if only the counts failed.
+  // `label` is drawn (99+ above 99), `spoken` goes into the trigger's name.
+  const badge = useMemo((): { count: number; label: string; spoken: string; critical: boolean } | null => {
+    if (!ready) return null;
+    if (counts.data) {
+      const { open: openCount, critical } = counts.data;
+      return { count: openCount, label: openCount > 99 ? '99+' : String(openCount), spoken: String(openCount), critical: critical > 0 };
+    }
+    if (counts.isError && list.data) {
+      const openRows = list.data.filter((a) => a.status === 'OPEN');
+      const full = list.data.length >= MAX_DROPDOWN_ALERTS;
+      const count = full ? Math.max(openRows.length, MAX_DROPDOWN_ALERTS) : openRows.length;
+      const label = full ? `${MAX_DROPDOWN_ALERTS}+` : String(count);
+      return { count, label, spoken: label, critical: openRows.some((a) => a.severity_color === 'RED') };
+    }
+    return null;
+  }, [ready, counts.data, counts.isError, list.data]);
+  const unreadCount = badge?.count ?? 0;
+  const criticalUnread = badge?.critical ?? false;
+  const isLoading = !ready || list.isPending;
+  const loadFailed = list.isError;
 
   // Categorize alerts
   const categorizedAlerts = useMemo(() => {
@@ -314,22 +369,34 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange,
 
   const handleAcknowledge = async (e: React.MouseEvent, alertId: string) => {
     e.stopPropagation();
-    if (!profile?.user_id) return;
+    if (!profile?.user_id || acknowledgingRef.current.has(alertId)) return;
+    // One write per alert at a time: a second click waits for the first.
+    acknowledgingRef.current.add(alertId);
+    setAcknowledging(new Set(acknowledgingRef.current));
+    const failed = (error: unknown) =>
+      notify.error(error, {
+        title: 'Could not acknowledge the alert',
+        fallback: "That alert wasn't acknowledged. You may not have access to it.",
+      });
 
     try {
-      await supabase
+      const { data, error } = await supabase
         .from('alerts')
         .update({
           status: 'ACKNOWLEDGED' as AlertStatus,
           acknowledged_at: new Date().toISOString(),
           acknowledged_by: profile.user_id,
         })
-        .eq('id', alertId);
-
-      // Refresh alerts
-      loadAlerts();
+        .eq('id', alertId)
+        .select('id');
+      // No row back: RLS hid it, or it is gone. Either way it was not acknowledged.
+      if (error || !data?.length) failed(error ?? new Error('not acknowledged'));
     } catch (error) {
-      console.error('Failed to acknowledge alert:', error);
+      failed(error);
+    } finally {
+      acknowledgingRef.current.delete(alertId);
+      setAcknowledging(new Set(acknowledgingRef.current));
+      void queryClient.invalidateQueries({ queryKey: BELL_QUERY_KEY });
     }
   };
 
@@ -339,10 +406,12 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange,
     const vesselName = alert.vessel?.name || (alert.vessel_id ? 'Unknown Vessel' : 'Fleet');
     const timeAgo = formatDistanceToNow(parseISO(alert.created_at), { addSuffix: true });
     const isAcknowledged = alert.status === 'ACKNOWLEDGED';
+    const pending = acknowledging.has(alert.id);
 
     return (
       <div
         key={alert.id}
+        data-alert-row=""
         role="link"
         tabIndex={0}
         onClick={() => handleAlertClick(alert)}
@@ -384,12 +453,15 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange,
             <Button
               variant="ghost"
               size="icon"
-              className="h-7 w-7 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11"
-              onClick={(e) => handleAcknowledge(e, alert.id)}
+              className="h-7 w-7 aria-disabled:cursor-wait aria-disabled:opacity-50 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11"
+              onClick={(e) => void handleAcknowledge(e, alert.id)}
+              // aria-disabled, not disabled: the button keeps focus while the write runs.
+              aria-disabled={pending || undefined}
+              aria-busy={pending || undefined}
               aria-label={`Acknowledge ${alert.title}`}
               title="Acknowledge"
             >
-              <Check className="w-4 h-4" />
+              {pending ? <Loader2 className="w-4 h-4 motion-safe:animate-spin" aria-hidden="true" /> : <Check className="w-4 h-4" aria-hidden="true" />}
             </Button>
           )}
           <ChevronRight className="w-4 h-4 text-muted-foreground" />
@@ -429,52 +501,69 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange,
   const totalAlerts = alerts.length;
   const hasAlerts = totalAlerts > 0;
 
-  const badgeLabel = unreadCount > 99 ? '99+' : String(unreadCount);
+  const badgeLabel = badge?.label ?? '';
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          data-testid={SHELL_TEST_IDS.notificationsTrigger}
-          className={cn(topBarIconButton, 'relative', className)}
-          aria-label={
-            unreadCount > 0
-              ? `Notifications, ${unreadCount} unread${criticalUnread ? ', including critical' : ''}`
-              : 'Notifications'
-          }
-        >
-          <Bell strokeWidth={1.75} aria-hidden="true" />
-          {unreadCount > 0 && (
-            <span
-              aria-hidden="true"
-              data-tone={criticalUnread ? 'critical' : 'primary'}
-              className={cn(
-                'absolute right-0.5 top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none ring-2 ring-background',
-                criticalUnread ? 'bg-critical text-critical-foreground motion-safe:animate-pulse' : 'bg-primary text-primary-foreground',
-              )}
-            >
-              {badgeLabel}
-            </span>
-          )}
-        </button>
+        <TopBarTooltip label="Notifications" suppressed={isOpen}>
+          <button
+            type="button"
+            data-testid={SHELL_TEST_IDS.notificationsTrigger}
+            className={cn(topBarIconButton, 'relative', className)}
+            aria-label={
+              unreadCount > 0
+                ? `Notifications, ${badge?.spoken ?? badgeLabel} unread${criticalUnread ? ', including critical' : ''}`
+                : 'Notifications'
+            }
+          >
+            <Bell strokeWidth={1.75} aria-hidden="true" />
+            {unreadCount > 0 && (
+              <span
+                aria-hidden="true"
+                data-tone={criticalUnread ? 'critical' : 'primary'}
+                className={cn(
+                  'absolute right-0.5 top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none ring-2 ring-background',
+                  criticalUnread ? 'bg-critical text-critical-foreground motion-safe:animate-pulse' : 'bg-primary text-primary-foreground',
+                )}
+              >
+                {badgeLabel}
+              </span>
+            )}
+          </button>
+        </TopBarTooltip>
       </PopoverTrigger>
       <PopoverContent
+        ref={panelRef}
+        tabIndex={-1}
         align="end"
         className="w-[min(24rem,calc(100vw-2rem))] p-0 bg-popover"
         sideOffset={8}
         data-testid={SHELL_TEST_IDS.notificationsPanel}
         aria-label="Notifications"
+        onOpenAutoFocus={(event) => {
+          // Start at the first alert, else the panel; never on the first-run hint.
+          event.preventDefault();
+          focusPanelStart();
+        }}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <div className="flex items-center gap-2">
-            <Bell className="w-4 h-4 text-primary" strokeWidth={1.75} aria-hidden="true" />
-            <span className="type-subtitle text-foreground">Alerts</span>
+          <div className="flex min-w-0 items-center gap-2">
+            <Bell className="w-4 h-4 shrink-0 text-primary" strokeWidth={1.75} aria-hidden="true" />
+            <span className="type-subtitle truncate text-foreground">
+              Alerts
+              {vesselName && (
+                <>
+                  <span className="text-muted-foreground"> · </span>
+                  <span className="font-display">{vesselName}</span>
+                </>
+              )}
+            </span>
           </div>
-          {!isLoading && !loadFailed && totalAlerts > 0 && (
-            <Badge variant="outline" className="text-xs">
-              {unreadCount} open
+          {!isLoading && !loadFailed && totalAlerts > 0 && badge && (
+            <Badge variant="outline" className="shrink-0 text-xs">
+              {badgeLabel} open
             </Badge>
           )}
         </div>
@@ -490,7 +579,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange,
               <Button
                 variant="link"
                 size="sm"
-                className="p-0 h-auto text-xs text-primary"
+                className="h-auto md:h-auto p-0 text-xs text-primary [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11 [@media(pointer:coarse)]:justify-start"
                 onClick={dismissHelper}
               >
                 Got it
@@ -509,7 +598,12 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ open, onOpenChange,
           <div role="alert" className="p-6 text-center">
             <p className="text-sm font-medium text-foreground">Alerts could not load</p>
             <p className="text-xs text-muted-foreground mt-1">Check your connection and try again.</p>
-            <Button variant="outline" size="sm" className="mt-3 gap-1.5" onClick={() => void loadAlerts()}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3 gap-1.5"
+              onClick={() => void queryClient.invalidateQueries({ queryKey: BELL_QUERY_KEY })}
+            >
               <RotateCw className="h-4 w-4" aria-hidden="true" />
               Try again
             </Button>

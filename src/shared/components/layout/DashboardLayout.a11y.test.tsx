@@ -8,7 +8,6 @@ vi.mock('@/modules/auth/contexts/AuthContext', () => ({ useAuth: () => ({ user: 
 vi.mock('@/shared/contexts/BrandingContext', () => ({
   useBrandingContext: () => ({ clientDisplayName: 'INKFISH', clientLogoUrl: null }),
 }));
-vi.mock('@/modules/dashboard/contexts/DashboardFilterContext', () => ({ DashboardFilterProvider: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock('@/shared/components/layout/InkfishFooter', () => ({ default: () => null }));
 vi.mock('@/shared/components/InkfishWatermark', () => ({ default: () => null }));
 vi.mock('@/shared/components/layout/PageLocationHeader', () => ({ default: () => null }));

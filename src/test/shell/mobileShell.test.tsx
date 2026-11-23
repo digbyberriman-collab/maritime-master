@@ -32,7 +32,6 @@ vi.mock('@/modules/auth/store/permissionsStore', () => ({
 vi.mock('@/shared/contexts/BrandingContext', () => ({
   useBrandingContext: () => ({ clientDisplayName: 'Demo Fleet', clientLogoUrl: null, brandColor: '', isLoading: false }),
 }));
-vi.mock('@/modules/dashboard/contexts/DashboardFilterContext', () => ({ DashboardFilterProvider: ({ children }: { children: React.ReactNode }) => children }));
 vi.mock('@/shared/components/layout/InkfishFooter', () => ({ default: () => null }));
 vi.mock('@/shared/components/InkfishWatermark', () => ({ default: () => null }));
 vi.mock('@/shared/components/layout/PageLocationHeader', () => ({ default: () => null }));

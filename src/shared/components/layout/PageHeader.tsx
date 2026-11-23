@@ -20,7 +20,11 @@ export interface PageHeaderProps {
   eyebrow?: React.ReactNode;
   /** Record reference shown as a mono chip after the title (`PTW-DRA-2026-061`). */
   reference?: string;
-  /** Buttons on the right; they wrap under the title on narrow screens. */
+  /**
+   * Buttons on the right. The title block keeps at least 18rem (or the full
+   * width when narrower) before the actions may sit beside it, so on narrow
+   * screens they wrap under the title instead of crushing it.
+   */
   actions?: React.ReactNode;
   className?: string;
   children?: React.ReactNode;
@@ -28,7 +32,12 @@ export interface PageHeaderProps {
 
 const PageHeader: React.FC<PageHeaderProps> = ({ title, description, eyebrow, reference, actions, className, children }) => (
   <header data-page-heading="" className={cn('mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-3', className)}>
-    <div className="min-w-0 flex-1">
+    {/*
+      A zero basis alone never makes the actions wrap; a min-width of 18rem (or
+      the full width when narrower) does. A min-width rather than a basis, so a
+      caller's column layout (`max-sm:flex-col`) does not turn it into a height.
+    */}
+    <div className="min-w-[min(18rem,100%)] flex-1">
       {eyebrow ? <p className="type-eyebrow mb-1 text-muted-foreground">{eyebrow}</p> : null}
       <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
         <h1 className="type-display min-w-0 break-words text-foreground">{title}</h1>

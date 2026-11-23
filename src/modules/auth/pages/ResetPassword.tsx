@@ -31,14 +31,29 @@ const IDS = {
 } as const;
 const errorIdFor = (field: Field) => `${IDS[field]}-error`;
 
-/** Supabase puts `error` / `error_description` in the hash (or query) when a link is expired or used. */
+/**
+ * STORM's own sentence for each known link-error code Supabase puts in the
+ * hash (or query) when a link is expired or used. The URL's
+ * `error_description` is never shown: it is attacker-controlled text on an
+ * auth page, so an unknown code (or only a description) gets the generic
+ * sentence instead.
+ */
+const LINK_ERROR_COPY: Readonly<Record<string, string>> = Object.freeze({
+  otp_expired: 'This reset link has expired or was already used.',
+  flow_state_expired: 'This reset link has expired.',
+  flow_state_not_found: 'This reset link is no longer valid.',
+  access_denied: 'This reset link cannot be used.',
+});
+const GENERIC_LINK_ERROR = 'This reset link cannot be used.';
+
 function linkErrorFromUrl(): string | null {
   const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''));
   const query = new URLSearchParams(window.location.search);
-  const description = hash.get('error_description') ?? query.get('error_description');
-  const code = hash.get('error') ?? query.get('error') ?? hash.get('error_code') ?? query.get('error_code');
-  if (description) return description;
-  return code ? 'This reset link cannot be used.' : null;
+  const code = hash.get('error_code') ?? query.get('error_code') ?? hash.get('error') ?? query.get('error');
+  const hasError = code !== null || hash.has('error_description') || query.has('error_description');
+  if (!hasError) return null;
+  if (code && Object.prototype.hasOwnProperty.call(LINK_ERROR_COPY, code)) return LINK_ERROR_COPY[code];
+  return GENERIC_LINK_ERROR;
 }
 
 const iconTile = (tone: 'critical' | 'success' | 'signal', icon: React.ReactNode) => (

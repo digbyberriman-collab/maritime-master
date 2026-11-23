@@ -4,7 +4,9 @@
  *
  * Built on the same pipeline as the sidebar and the tab row (spec §4.3):
  * - Fleet and workspace trees: `NAVIGATION_ITEMS` through
- *   `useNavNodeFilter().decide` + `filterNavTree` (empty groups dropped).
+ *   `useNavNodeFilter().decide` + `filterNavTree` (empty groups dropped). A
+ *   workspace the Apps menu would not offer (./workspaceAccess.ts) lists no
+ *   page at all, whatever its own nodes carry.
  * - Vessel: the current vessel's resolved nav (`useVesselNav`): real code in
  *   every path (`/v/dra/crew/list`), the vessel's label overrides applied,
  *   modules switched off dropped. With no vessel known, no vessel leaves.
@@ -19,6 +21,7 @@
 import { useMemo } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import { NAVIGATION_ITEMS } from '@/config/sitemap';
+import { WORKSPACE_TREES } from '@/config/navSlots';
 import type { NavChild, NavItem, NavScope } from '@/config/navigation-types';
 import { applySidebarOrder, useSidebarOrder } from '@/shared/hooks/useSidebarOrder';
 import { navKindOf } from './visibility';
@@ -27,6 +30,7 @@ import { filterNavTree, type FilteredNavNode } from './navTree';
 import { useVesselNav } from './useVesselNav';
 import { PERSONAL_TREE_ID, usePersonalNav } from './usePersonalNav';
 import type { VesselTab } from './vesselNavModel';
+import { canOpenWorkspaceRoot } from './workspaceAccess';
 
 export interface VisibleNavLeaf {
   /** The nav node id (stable across vessels). */
@@ -97,8 +101,11 @@ function tabAsNode(tab: VesselTab): FilteredNavNode {
 
 const notLocked = (item: NavChild): boolean => !(item as FilteredNavNode).locked;
 
+const WORKSPACE_TREE_IDS: ReadonlySet<string> = new Set(WORKSPACE_TREES.map((w) => w.id));
+
 export function useVisibleNavLeaves(): VisibleNav {
-  const { ready, decide } = useNavNodeFilter();
+  // `ready` is the workspace gate's readiness too (one filter decides both).
+  const { ready, decide, canShow } = useNavNodeFilter();
   const { map } = useSidebarOrder();
   const vesselNav = useVesselNav();
   const personal = usePersonalNav();
@@ -118,8 +125,10 @@ export function useVisibleNavLeaves(): VisibleNav {
         modules.push({ ...module, children: personal.nodes });
         continue;
       }
+      // A workspace the user may not open lists none of its pages (the Apps gate).
+      if (module.scope === 'workspace' && WORKSPACE_TREE_IDS.has(module.id) && !canOpenWorkspaceRoot(module.path, canShow)) continue;
       modules.push({ ...module, children: filterNavTree(module.children ?? [], decide, order, module.id) });
     }
     return { ready: true, leaves: collectVisibleLeaves(modules, notLocked) };
-  }, [ready, vesselReady, decide, map, vesselNav.tabs, personal.ready, personal.nodes]);
+  }, [ready, vesselReady, decide, canShow, map, vesselNav.tabs, personal.ready, personal.nodes]);
 }

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { format, formatDistanceToNowStrict, parseISO } from 'date-fns';
 import { AlertTriangle, Bell, CheckCircle2, ChevronRight, ClipboardCheck, MessageSquare, RefreshCw, Settings, Ship } from 'lucide-react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
+import PageHeader from '@/shared/components/layout/PageHeader';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,7 +37,7 @@ function EmptyState({ icon: Icon, title, description }: { icon: React.ElementTyp
 
 function LoadingList() {
   return (
-    <div className="space-y-2" aria-label="Loading notifications">
+    <div className="space-y-2" role="status" aria-busy="true" aria-label="Loading notifications">
       {[0, 1, 2].map((item) => <Skeleton key={item} className="h-24 w-full rounded-md" />)}
     </div>
   );
@@ -103,11 +104,25 @@ function TaskRow({ task }: { task: OverdueOperationalTask }) {
   );
 }
 
+/** A tab's count, only once the list has loaded: never a 0 while loading or after a failed read (D-04). */
+function TabCount({ count, loaded }: { count: number; loaded: boolean }) {
+  return loaded ? <Badge variant="secondary">{count}</Badge> : null;
+}
+
+/**
+ * The Inbox (/inbox, personal scope; the legacy /notifications/center shares
+ * it). `useNotificationCenter` scopes the lists: here, the vessels the viewer
+ * can reach (company-wide with fleet reach). The page heading is the shared
+ * PageHeader, so the shell adds no fallback h1 (D-58).
+ */
 export default function NotificationCenterPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
   const activeTab: CenterTab = TABS.includes(requestedTab as CenterTab) ? requestedTab as CenterTab : 'compliance';
-  const { data, isLoading, isFetching, isError, error, refetch, dataUpdatedAt } = useNotificationCenter();
+  // A query waiting for scope access and the vessel list is pending, not loading (React Query v5): show the
+  // loading list for both, so no empty state flashes before the read starts.
+  const { data, isPending, isFetching, isError, error, refetch, dataUpdatedAt } = useNotificationCenter();
+  const loaded = data !== undefined;
   const compliance = data?.pendingCompliance ?? [];
   const messages = data?.unreadMessages ?? [];
   const tasks = data?.overdueTasks ?? [];
@@ -120,25 +135,34 @@ export default function NotificationCenterPage() {
 
   return (
     <DashboardLayout>
-      <div className="mx-auto max-w-6xl space-y-5">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <p className="text-sm text-muted-foreground">Items requiring attention in the current vessel scope.</p>
-          <div className="flex flex-wrap gap-2 self-start sm:self-auto">
-            <Button variant="outline" asChild>
-              <Link to="/notifications">
-                <Settings className="h-4 w-4" aria-hidden="true" />
-                Preferences
-              </Link>
-            </Button>
-            <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
-              <RefreshCw className={cn('h-4 w-4', isFetching && 'motion-safe:animate-spin')} aria-hidden="true" />
-              Refresh
-            </Button>
-          </div>
-        </div>
+      <div className="max-w-6xl space-y-5">
+        <PageHeader
+          title="Inbox"
+          description="Items that need your attention across the vessels you can reach."
+          actions={
+            <>
+              <Button variant="outline" asChild>
+                <Link to="/notifications">
+                  <Settings className="h-4 w-4" aria-hidden="true" />
+                  Preferences
+                </Link>
+              </Button>
+              <Button variant="outline" onClick={() => refetch()} disabled={isFetching}>
+                <RefreshCw className={cn('h-4 w-4', isFetching && 'motion-safe:animate-spin')} aria-hidden="true" />
+                Refresh
+              </Button>
+            </>
+          }
+        />
 
         <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
-          {isFetching ? 'Refreshing notification center' : `Notification center updated. ${compliance.length} compliance items, ${messages.length} unread messages, ${tasks.length} overdue tasks.`}
+          {isFetching
+            ? 'Refreshing the inbox'
+            : loaded
+              ? `Inbox updated. ${compliance.length} compliance items, ${messages.length} unread messages, ${tasks.length} overdue tasks.`
+              : isPending
+                ? 'Loading the inbox'
+                : ''}
         </p>
 
         {isError && (
@@ -153,31 +177,31 @@ export default function NotificationCenterPage() {
           <TabsList className="grid h-auto w-full grid-cols-1 gap-1 sm:grid-cols-3" aria-label="Notification categories">
             <TabsTrigger value="compliance" className="min-h-11 gap-2 whitespace-normal px-3">
               <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-              Pending compliance <Badge variant="secondary">{compliance.length}</Badge>
+              Pending compliance <TabCount count={compliance.length} loaded={loaded} />
             </TabsTrigger>
             <TabsTrigger value="messages" className="min-h-11 gap-2 whitespace-normal px-3">
               <MessageSquare className="h-4 w-4" aria-hidden="true" />
-              Unread messages <Badge variant="secondary">{messages.length}</Badge>
+              Unread messages <TabCount count={messages.length} loaded={loaded} />
             </TabsTrigger>
             <TabsTrigger value="tasks" className="min-h-11 gap-2 whitespace-normal px-3">
               <ClipboardCheck className="h-4 w-4" aria-hidden="true" />
-              Overdue tasks <Badge variant="secondary">{tasks.length}</Badge>
+              Overdue tasks <TabCount count={tasks.length} loaded={loaded} />
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="compliance" className="mt-4 space-y-3">
             <div className="flex items-center justify-between gap-3"><h2 className="font-semibold">Pending compliance items</h2><Button variant="link" size="sm" asChild><Link to="/alerts?category=compliance">View all alerts</Link></Button></div>
-            {isLoading ? <LoadingList /> : compliance.length ? <ListShell>{compliance.map((item) => <AlertRow key={item.id} alert={item} />)}</ListShell> : <EmptyState icon={CheckCircle2} title="No pending compliance items" description="There are no active compliance alerts in this vessel scope." />}
+            {isPending ? <LoadingList /> : !loaded ? null : compliance.length ? <ListShell>{compliance.map((item) => <AlertRow key={item.id} alert={item} />)}</ListShell> : <EmptyState icon={CheckCircle2} title="No pending compliance items" description="There are no active compliance alerts for the vessels you can reach." />}
           </TabsContent>
 
           <TabsContent value="messages" className="mt-4 space-y-3">
             <div className="flex items-center justify-between gap-3"><h2 className="font-semibold">Unread messages</h2><Button variant="link" size="sm" asChild><Link to="/alerts?status=open">View all alerts</Link></Button></div>
-            {isLoading ? <LoadingList /> : messages.length ? <ListShell>{messages.map((item) => <AlertRow key={item.id} alert={item} />)}</ListShell> : <EmptyState icon={Bell} title="No unread messages" description="You are up to date with all open fleet notifications." />}
+            {isPending ? <LoadingList /> : !loaded ? null : messages.length ? <ListShell>{messages.map((item) => <AlertRow key={item.id} alert={item} />)}</ListShell> : <EmptyState icon={Bell} title="No unread messages" description="You are up to date with all open fleet notifications." />}
           </TabsContent>
 
           <TabsContent value="tasks" className="mt-4 space-y-3">
             <div className="flex items-center justify-between gap-3"><h2 className="font-semibold">Overdue operational tasks</h2><Button variant="link" size="sm" asChild><Link to="/maintenance?tab=schedule">View maintenance schedule</Link></Button></div>
-            {isLoading ? <LoadingList /> : tasks.length ? <ListShell>{tasks.map((item) => <TaskRow key={item.id} task={item} />)}</ListShell> : <EmptyState icon={CheckCircle2} title="No overdue operational tasks" description="No maintenance tasks are currently overdue in this vessel scope." />}
+            {isPending ? <LoadingList /> : !loaded ? null : tasks.length ? <ListShell>{tasks.map((item) => <TaskRow key={item.id} task={item} />)}</ListShell> : <EmptyState icon={CheckCircle2} title="No overdue operational tasks" description="No maintenance tasks are overdue for the vessels you can reach." />}
           </TabsContent>
         </Tabs>
 

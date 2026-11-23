@@ -267,8 +267,8 @@ describe('Vessel modules (gap/10 "Vessel view")', () => {
 });
 
 describe("today's shell (NAVIGATION_ITEMS)", () => {
-  it('keeps the six top modules, then the personal tree (titles and breadcrumbs for /me, spec §8)', () => {
-    expect(NAVIGATION_ITEMS.map((m) => m.id)).toEqual(['fleet', 'vessel', 'shoreside', 'health', 'yard', 'hris', 'personal']);
+  it('keeps the seven top modules (Legal’s tree last, D-83), then the personal tree (titles and breadcrumbs for /me, spec §8)', () => {
+    expect(NAVIGATION_ITEMS.map((m) => m.id)).toEqual(['fleet', 'vessel', 'shoreside', 'health', 'yard', 'hris', 'legal', 'personal']);
     const personal = module('personal');
     expect(personal.path).toBe('/me');
     expect(personal.scope).toBe('personal');
@@ -325,7 +325,8 @@ describe("today's shell (NAVIGATION_ITEMS)", () => {
       }
       return acc;
     };
-    for (const id of ['shoreside', 'health', 'yard', 'hris'] as const) {
+    // Legal's tree is its four tabs (D-83), held to the baseline like the others.
+    for (const id of ['shoreside', 'health', 'yard', 'hris', 'legal'] as const) {
       expect(flat(module(id).children ?? []), id).toEqual(workspaceBaseline[id]);
     }
   });

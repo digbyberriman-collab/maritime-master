@@ -1,6 +1,6 @@
 import React from 'react';
-import { Construction, ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Construction, ArrowLeft, MessageSquare } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
@@ -9,13 +9,21 @@ interface PlaceholderPageProps {
   description?: string;
   icon?: React.ReactNode;
   features?: string[];
+  /** A real, tenant-facing date for this leaf. Never an internal phase name; no default. */
   expectedRelease?: string;
   showBackButton?: boolean;
+  /** Where "Tell us what you need" leads; defaults to Support with the subject filled in. */
+  supportHref?: string;
 }
 
+/** Support, with the ticket subject seeded from the planned page's title. */
+const placeholderSupportHref = (title: string): string =>
+  `/help/support?subject=${encodeURIComponent(`Request: ${title}`)}`;
+
 /**
- * Coming Soon page for planned nav leaves (D-06). Brings its own h1 (the
- * shell's heading contract), on tokens in both themes.
+ * Coming Soon page for planned nav leaves (D-06; gap/10 W3). Brings its own
+ * h1 (the shell's heading contract), on tokens in both themes, and offers a
+ * "Tell us what you need" link to Support next to "Go back".
  */
 export const PlaceholderPage: React.FC<PlaceholderPageProps> = ({
   title,
@@ -24,6 +32,7 @@ export const PlaceholderPage: React.FC<PlaceholderPageProps> = ({
   features = [],
   expectedRelease,
   showBackButton = true,
+  supportHref,
 }) => {
   const navigate = useNavigate();
 
@@ -63,12 +72,20 @@ export const PlaceholderPage: React.FC<PlaceholderPageProps> = ({
           </p>
         )}
 
-        {showBackButton && (
-          <Button variant="ghost" onClick={() => navigate(-1)} className="mt-6">
-            <ArrowLeft aria-hidden="true" />
-            Go back
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
+          {showBackButton && (
+            <Button variant="ghost" onClick={() => navigate(-1)}>
+              <ArrowLeft aria-hidden="true" />
+              Go back
+            </Button>
+          )}
+          <Button asChild variant="outline">
+            <Link to={supportHref ?? placeholderSupportHref(title)}>
+              <MessageSquare aria-hidden="true" />
+              Tell us what you need
+            </Link>
           </Button>
-        )}
+        </div>
       </div>
     </div>
   );

@@ -100,7 +100,7 @@ interface Setup {
   nested?: boolean;
 }
 
-function renderPalette({ navAccess = {}, shell = {}, scope = { scope: 'fleet' }, nested = false }: Setup = {}) {
+function paletteTree({ navAccess = {}, shell = {}, scope = { scope: 'fleet' }, nested = false }: Setup = {}) {
   const access: NavAccess = {
     ...FAIL_CLOSED_NAV_ACCESS,
     ready: true,
@@ -117,7 +117,7 @@ function renderPalette({ navAccess = {}, shell = {}, scope = { scope: 'fleet' },
       <LocationProbe />
     </>
   );
-  return render(
+  return (
     <MemoryRouter initialEntries={['/fleet/dashboard']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <NavAccessContext.Provider value={access}>
         <ShellActionsContext.Provider value={shell}>
@@ -128,8 +128,14 @@ function renderPalette({ navAccess = {}, shell = {}, scope = { scope: 'fleet' },
           </ScopeContext.Provider>
         </ShellActionsContext.Provider>
       </NavAccessContext.Provider>
-    </MemoryRouter>,
+    </MemoryRouter>
   );
+}
+
+function renderPalette(setup: Setup = {}) {
+  const view = render(paletteTree(setup));
+  /** Render again with the same setup, so the sources' current values are read. */
+  return Object.assign(view, { refresh: () => view.rerender(paletteTree(setup)) });
 }
 
 const pressPaletteKey = (target: Element | Window = document.activeElement ?? document.body, init: KeyboardEventInit = { ctrlKey: true }) => {
@@ -224,7 +230,8 @@ describe('opening and closing', () => {
     const field = screen.getByRole('textbox', { name: 'Notes' });
     field.addEventListener('keydown', (e) => e.preventDefault(), { once: true });
     pressPaletteKey(field);
-    await new Promise((r) => setTimeout(r, 20));
+    // The key handler runs synchronously; flush whatever it scheduled, then check.
+    await act(async () => {});
     expect(screen.queryByRole('dialog')).toBeNull();
   });
 
@@ -250,6 +257,47 @@ describe('opening and closing', () => {
     renderPalette({ nested: true });
     await openPalette();
     expect(screen.getAllByRole('dialog')).toHaveLength(1);
+  });
+});
+
+describe('the highlighted row', () => {
+  const options = (dialog: HTMLElement) => within(dialog).getAllByRole('option');
+
+  it('first open: Pages arriving after Vessels takes the highlight to the top row', async () => {
+    h.nav = { ready: false, leaves: [] };
+    const view = renderPalette();
+    const dialog = await openPalette();
+    // Pages loading, Vessels ready: cmdk highlights the first row it has.
+    await waitFor(() => expect(options(dialog)[0]).toHaveAttribute('aria-selected', 'true'));
+    expect(options(dialog)[0]).toHaveTextContent('All vessels');
+    h.nav = { ready: true, leaves: LEAVES };
+    view.refresh();
+    await waitFor(() => expect(options(dialog)[0]).toHaveTextContent('Dashboard'));
+    await waitFor(() => expect(options(dialog)[0]).toHaveAttribute('aria-selected', 'true'));
+    expect(within(dialog).getAllByRole('option', { selected: true })).toHaveLength(1);
+  });
+
+  it('an arrow-key choice stays while the palette re-renders', async () => {
+    const view = renderPalette();
+    const dialog = await openPalette();
+    await waitFor(() => expect(options(dialog)[0]).toHaveAttribute('aria-selected', 'true'));
+    fireEvent.keyDown(within(dialog).getByTestId(PALETTE_TEST_IDS.input), { key: 'ArrowDown' });
+    await waitFor(() => expect(options(dialog)[1]).toHaveAttribute('aria-selected', 'true'));
+    view.refresh();
+    await act(async () => {});
+    expect(options(dialog)[1]).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('every open starts on the top row', async () => {
+    renderPalette();
+    let dialog = await openPalette();
+    await waitFor(() => expect(options(dialog)[0]).toHaveAttribute('aria-selected', 'true'));
+    fireEvent.keyDown(within(dialog).getByTestId(PALETTE_TEST_IDS.input), { key: 'ArrowDown' });
+    await waitFor(() => expect(options(dialog)[1]).toHaveAttribute('aria-selected', 'true'));
+    fireEvent.keyDown(within(dialog).getByTestId(PALETTE_TEST_IDS.input), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    dialog = await openPalette();
+    await waitFor(() => expect(options(dialog)[0]).toHaveAttribute('aria-selected', 'true'));
   });
 });
 

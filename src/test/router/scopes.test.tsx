@@ -10,6 +10,7 @@ import React, { useMemo, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Link, MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { assignVesselCodes, resolveVesselByCode } from '@/modules/vessels/lib/vesselCode';
 import type { Vessel } from '@/modules/vessels/contexts/VesselContext';
 
@@ -42,11 +43,19 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
-// The vessel's module settings: the table is not live (D-01), so every module is on.
+// The vessel's module settings: the table is not live (D-01), so every module is
+// on, for the scope's nav and for the vessel switch an in-page pick goes through.
 vi.mock('@/modules/vessels/hooks/useVesselModuleSettings', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/modules/vessels/hooks/useVesselModuleSettings')>();
   const { TABLE_MISSING_STATE } = await import('@/modules/vessels/lib/moduleSettings');
-  return { ...actual, useVesselModuleSettings: () => ({ state: TABLE_MISSING_STATE, fetching: false, retry: () => undefined }) };
+  return {
+    ...actual,
+    useVesselModuleSettings: () => ({ state: TABLE_MISSING_STATE, fetching: false, retry: () => undefined }),
+    vesselModuleSettingsQueryOptions: (vesselId: string) => ({
+      queryKey: actual.vesselModuleSettingsKeys.vessel(vesselId),
+      queryFn: async () => TABLE_MISSING_STATE,
+    }),
+  };
 });
 vi.mock('@/modules/auth/contexts/AuthContext', () => ({ useAuth: () => mocks.auth }));
 vi.mock('@/modules/auth/store/permissionsStore', () => ({
@@ -60,9 +69,6 @@ vi.mock('@/modules/vessels/contexts/VesselContext', async () => {
 });
 vi.mock('@/shared/contexts/BrandingContext', () => ({
   useBrandingContext: () => ({ clientDisplayName: 'TEST', clientLogoUrl: null }),
-}));
-vi.mock('@/modules/dashboard/contexts/DashboardFilterContext', () => ({
-  DashboardFilterProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
 vi.mock('@/shared/components/layout/InkfishFooter', async () => {
   const react = await import('react');
@@ -242,43 +248,46 @@ const FleetPage: React.FC<{ title: string }> = ({ title }) => {
 };
 
 function renderApp(url: string, vessels: Omit<FakeVesselProps, 'children'>) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <FakeVesselProvider {...vessels}>
-      <MemoryRouter initialEntries={[url]}>
-        <Routes>
-          <Route path="/" element={<HomeRedirect />} />
-          <Route path="/fleet" element={<FleetScope />}>
-            <Route path="dashboard" element={<FleetPage title="Fleet dashboard" />} />
-            <Route path="documents" element={<FleetPage title="Fleet documents" />} />
-          </Route>
-          <Route path="/v/:vesselCode" element={<VesselScopeRoute />}>
-            <Route index element={<h1>Vessel home</h1>} />
-            <Route path="a" element={<PageA />} />
-            <Route path="b" element={<PageB />} />
-            {/* Under a module with a sidebar (Crew), so there is a sidebar to keep off-canvas. */}
-            <Route path="crew/wide" element={<WidePage />} />
-            <Route path="crew/list" element={<h1>Scoped crew list</h1>} />
-            <Route path="*" element={<ScopeNotFound />} />
-          </Route>
-          <Route element={<PersonalScope />}>
-            <Route path="/me">
-              <Route index element={<h1>My profile</h1>} />
-              <Route path="hours-of-rest" element={<h1>My hours of rest</h1>} />
+    <QueryClientProvider client={queryClient}>
+      <FakeVesselProvider {...vessels}>
+        <MemoryRouter initialEntries={[url]}>
+          <Routes>
+            <Route path="/" element={<HomeRedirect />} />
+            <Route path="/fleet" element={<FleetScope />}>
+              <Route path="dashboard" element={<FleetPage title="Fleet dashboard" />} />
+              <Route path="documents" element={<FleetPage title="Fleet documents" />} />
             </Route>
-            <Route path="/inbox" element={<h1>Inbox</h1>} />
-          </Route>
-          <Route element={<WorkspaceScope workspace="hris" />}>
-            <Route path="/hris/one" element={<HrisOne />} />
-            <Route path="/hris/two" element={<HrisTwo />} />
-          </Route>
-          <Route path="/crew/list" element={<LegacyRoute from="/crew/list"><h1>Legacy crew list</h1></LegacyRoute>} />
-          <Route path="/documents" element={<LegacyRoute from="/documents"><h1>Legacy documents</h1></LegacyRoute>} />
-          <Route path="/settings" element={<LegacyRoute from="/settings"><h1>Legacy settings</h1></LegacyRoute>} />
-          <Route path="/auth" element={<h1>Sign in</h1>} />
-        </Routes>
-        <LocationProbe />
-      </MemoryRouter>
-    </FakeVesselProvider>,
+            <Route path="/v/:vesselCode" element={<VesselScopeRoute />}>
+              <Route index element={<h1>Vessel home</h1>} />
+              <Route path="a" element={<PageA />} />
+              <Route path="b" element={<PageB />} />
+              {/* Under a module with a sidebar (Crew), so there is a sidebar to keep off-canvas. */}
+              <Route path="crew/wide" element={<WidePage />} />
+              <Route path="crew/list" element={<h1>Scoped crew list</h1>} />
+              <Route path="*" element={<ScopeNotFound />} />
+            </Route>
+            <Route element={<PersonalScope />}>
+              <Route path="/me">
+                <Route index element={<h1>My profile</h1>} />
+                <Route path="hours-of-rest" element={<h1>My hours of rest</h1>} />
+              </Route>
+              <Route path="/inbox" element={<h1>Inbox</h1>} />
+            </Route>
+            <Route element={<WorkspaceScope workspace="hris" />}>
+              <Route path="/hris/one" element={<HrisOne />} />
+              <Route path="/hris/two" element={<HrisTwo />} />
+            </Route>
+            <Route path="/crew/list" element={<LegacyRoute from="/crew/list"><h1>Legacy crew list</h1></LegacyRoute>} />
+            <Route path="/documents" element={<LegacyRoute from="/documents"><h1>Legacy documents</h1></LegacyRoute>} />
+            <Route path="/settings" element={<LegacyRoute from="/settings"><h1>Legacy settings</h1></LegacyRoute>} />
+            <Route path="/auth" element={<h1>Sign in</h1>} />
+          </Routes>
+          <LocationProbe />
+        </MemoryRouter>
+      </FakeVesselProvider>
+    </QueryClientProvider>,
   );
 }
 

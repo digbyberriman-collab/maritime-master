@@ -34,3 +34,15 @@ export const WORKSPACE_SCOPE_LABELS: Readonly<Record<string, string>> = Object.f
   legal: 'Legal',
   shoreside: 'Shoreside',
 });
+
+/**
+ * The chip's short label below 640 px (D-70): it fits beside the vessel code
+ * on a phone. The full label stays for screen readers and as the tooltip.
+ */
+export const WORKSPACE_SCOPE_SHORT_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  hris: 'HRIS',
+  health: 'Health',
+  yard: 'Yard',
+  legal: 'Legal',
+  shoreside: 'Shore',
+});

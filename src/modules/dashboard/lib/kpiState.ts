@@ -1,4 +1,4 @@
-import type { KpiTileState } from '@/shared/components/data';
+import type { KpiTileState } from '@/shared/components/data/KpiTile';
 
 /** The part of a React Query result a KPI tile needs. */
 export interface KpiQueryLike {
@@ -15,12 +15,5 @@ export interface KpiQueryLike {
 export function kpiStateFor(query: KpiQueryLike): KpiTileState | undefined {
   if (query.isError) return 'error';
   if (query.isPending) return 'loading';
-  return undefined;
-}
-
-/** Combine several sources: any error wins, then any loading. */
-export function combineKpiStates(...queries: KpiQueryLike[]): KpiTileState | undefined {
-  if (queries.some((q) => q.isError)) return 'error';
-  if (queries.some((q) => q.isPending)) return 'loading';
   return undefined;
 }

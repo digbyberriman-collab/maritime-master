@@ -5,9 +5,14 @@
  * settings, status, capability, add-on lock; labels last).
  *
  * - Tabs are links with `aria-current="page"`; a Signal underline slides to
- *   the active tab (jumps under reduced motion).
+ *   the active tab (jumps under reduced motion). It and the fit re-measure
+ *   whenever any tab changes width (badge counts arriving, fonts, markers),
+ *   not only when the tab list changes.
  * - Below 768 px the row scrolls inside itself, the active tab kept in view;
- *   from 768 px the tabs that do not fit go into "More ▾".
+ *   from 768 px the tabs that do not fit go into "More ▾", which carries a
+ *   dot (critical or Signal) when a folded tab has a badge (IA21, D-78).
+ * - The row is 44 px with a layout-free divider, so each tab is a full 44 px
+ *   target on coarse pointers (D-35).
  * - "← Fleet" only with fleet reach (D-26), to the Fleet counterpart when the
  *   viewer can see it, else the fleet dashboard. The cog only for Vessel
  *   Settings access (D-33; src/app/nav/vesselSettingsLink.ts).
@@ -57,6 +62,7 @@ const PlannedMarker: React.FC = () => (
 const CountDot: React.FC<{ badge: NavBadge }> = ({ badge }) => (
   <span
     aria-hidden="true"
+    data-count-dot=""
     className={cn(
       'inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[0.625rem] font-semibold leading-none tabular-nums',
       badge.tone === 'critical' ? 'bg-critical text-critical-foreground' : 'bg-primary text-primary-foreground',
@@ -83,6 +89,17 @@ const TabContent: React.FC<{ tab: VesselTab; badge: NavBadge | null }> = ({ tab,
 const tabAccessibleName = (tab: VesselTab, badge: NavBadge | null) =>
   `${tab.label}${tab.status === 'planned' ? ', planned' : ''}${tab.locked ? ', add-on, locked' : ''}${badge ? `, ${badge.label}` : ''}`;
 
+type MoreTone = 'critical' | 'primary';
+
+/** The 8 px dot on "More" when a folded tab has a badge (static: nothing to reduce for motion). */
+const MoreDot: React.FC<{ tone: MoreTone | null }> = ({ tone }) => (
+  <span
+    aria-hidden="true"
+    data-more-badge={tone ?? undefined}
+    className={cn('h-2 w-2 shrink-0 rounded-full', tone === 'critical' ? 'bg-critical' : tone === 'primary' ? 'bg-primary' : undefined)}
+  />
+);
+
 const SkeletonTabs: React.FC = () => (
   <div role="status" aria-busy="true" className="flex h-full items-center gap-4 px-3">
     {[56, 64, 72, 88].map((w) => (
@@ -104,6 +121,8 @@ const ModuleTabBar: React.FC<{ className?: string }> = ({ className }) => {
   const tabs = nav.tabs;
   const activeId = nav.activeTabId;
   const tabKey = tabs.map((t) => `${t.id}:${t.label}:${t.status}:${t.locked ? 1 : 0}`).join('|');
+  // A badge widens its tab (and moves every tab after it): re-measure when the counts arrive or change.
+  const badgeSig = tabs.map((t) => badgeFor(t.badgeKey)?.text ?? '').join('|');
 
   // ≥ 768 px: how many tabs fit beside "More". Measured from a hidden copy of the row.
   const activeIndex = tabs.findIndex((t) => t.id === activeId);
@@ -144,13 +163,30 @@ const ModuleTabBar: React.FC<{ className?: string }> = ({ className }) => {
     if (typeof ResizeObserver === 'undefined') return undefined;
     const observer = new ResizeObserver(measure);
     observer.observe(box);
+    // The measurer is absolute and shrink-to-fit, clamped to the nav, so its own box never changes:
+    // watch each measured copy, so any tab growing (a count, a font, a marker) re-fits the row.
+    measurer
+      .querySelectorAll('[data-measure-tab],[data-measure-more],[data-measure-more-suffix]')
+      .forEach((el) => observer.observe(el));
     void document.fonts?.ready?.then(measure).catch(() => undefined);
     return () => observer.disconnect();
-  }, [wide, tabKey, activeId, activeIndex]);
+  }, [wide, tabKey, activeId, activeIndex, badgeSig]);
 
   const shown = wide && fit < tabs.length ? tabs.slice(0, fit) : tabs;
   const overflow = wide && fit < tabs.length ? tabs.slice(fit) : [];
   const activeInMore = overflow.find((t) => t.id === activeId) ?? null;
+  // Folded tabs keep their counts visible on More (IA21). Locked tabs count too: the menu shows their badges.
+  const overflowBadges = overflow
+    .map((t) => ({ tab: t, badge: badgeFor(t.badgeKey) }))
+    .filter((x): x is { tab: VesselTab; badge: NavBadge } => x.badge !== null);
+  const moreTone: MoreTone | null = overflowBadges.some((x) => x.badge.tone === 'critical')
+    ? 'critical'
+    : overflowBadges.length
+      ? 'primary'
+      : null;
+  const moreName = `More modules${activeInMore ? `, current: ${activeInMore.label}` : ''}${
+    overflowBadges.length ? `, ${overflowBadges.map((x) => `${x.tab.label}: ${x.badge.label}`).join('; ')}` : ''
+  }`;
 
   const railRef = React.useRef<HTMLDivElement>(null);
   const activeRef = React.useRef<HTMLElement | null>(null);
@@ -160,8 +196,8 @@ const ModuleTabBar: React.FC<{ className?: string }> = ({ className }) => {
   // The active tab, or "More" when the active tab is inside it (before the indicator measures).
   React.useLayoutEffect(() => {
     activeRef.current = railRef.current?.querySelector<HTMLElement>('[data-tab-active="true"]') ?? null;
-  }, [activeId, tabKey, shownCount, overflowCount, wide, status]);
-  const indicator = useSlidingIndicator(railRef, activeRef, [activeId, tabKey, shownCount, overflowCount, wide, status]);
+  }, [activeId, tabKey, shownCount, overflowCount, wide, status, badgeSig]);
+  const indicator = useSlidingIndicator(railRef, activeRef, [activeId, tabKey, shownCount, overflowCount, wide, status, badgeSig]);
 
   // Below 768 px keep the active tab in view inside the scrolling row.
   React.useEffect(() => {
@@ -203,11 +239,15 @@ const ModuleTabBar: React.FC<{ className?: string }> = ({ className }) => {
     );
   };
 
+  // The divider is an inset shadow, not a border, so the 44 px row gives each h-full tab a full 44 px (D-35).
   return (
     <nav
       aria-label="Vessel modules"
       data-testid={SHELL_TEST_IDS.moduleTabBar}
-      className={cn('relative flex h-11 min-w-0 items-stretch border-b border-border bg-topbar/[0.88] backdrop-blur-md', className)}
+      className={cn(
+        'relative flex h-11 min-w-0 items-stretch bg-topbar/[0.88] shadow-[inset_0_-1px_0_hsl(var(--border))] backdrop-blur-md',
+        className,
+      )}
     >
       <div ref={boxRef} className="relative flex min-w-0 flex-1">
         {nav.status === 'loading' ? (
@@ -228,7 +268,7 @@ const ModuleTabBar: React.FC<{ className?: string }> = ({ className }) => {
                     type="button"
                     data-testid={SHELL_TEST_IDS.moduleTabMore}
                     data-tab-active={activeInMore ? 'true' : undefined}
-                    aria-label={activeInMore ? `More modules, current: ${activeInMore.label}` : 'More modules'}
+                    aria-label={moreName}
                     className={tabClass(Boolean(activeInMore))}
                   >
                     <span className="flex min-w-0 items-baseline gap-1.5">
@@ -240,6 +280,7 @@ const ModuleTabBar: React.FC<{ className?: string }> = ({ className }) => {
                         </>
                       )}
                     </span>
+                    {moreTone && <MoreDot tone={moreTone} />}
                     <ChevronDown className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
                   </button>
                 </DropdownMenuTrigger>
@@ -278,6 +319,7 @@ const ModuleTabBar: React.FC<{ className?: string }> = ({ className }) => {
             )}
             <span
               aria-hidden="true"
+              data-sliding-indicator=""
               className={cn(
                 'pointer-events-none absolute bottom-0 left-0 h-0.5 rounded-full bg-primary shadow-glow-signal transition-[transform,width,opacity] duration-indicator ease-tide motion-reduce:transition-none',
                 indicator.visible ? 'opacity-100' : 'opacity-0',
@@ -325,12 +367,14 @@ const ModuleTabBar: React.FC<{ className?: string }> = ({ className }) => {
       {wide && nav.status !== 'loading' && (
         <div ref={measureRef} aria-hidden="true" className="pointer-events-none invisible absolute left-0 top-0 flex h-0 overflow-hidden">
           {tabs.map((tab) => (
-            <span key={tab.id} data-measure-tab="" className={tabClass(false)}>
+            <span key={tab.id} data-measure-tab={tab.id} className={tabClass(false)}>
               <TabContent tab={tab} badge={badgeFor(tab.badgeKey)} />
             </span>
           ))}
+          {/* Always with the dot, so the fit reserves its width before a folded badge shows. */}
           <span data-measure-more="" className={tabClass(false)}>
             <span>More</span>
+            <MoreDot tone={null} />
             <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />
           </span>
           {/* What "More" adds when the active tab is inside it ("· Logbooks"), per tab. */}

@@ -1,5 +1,12 @@
+/**
+ * Company branding (/settings/branding; D-59). Only DPA and shore management
+ * may manage it. The role decides once it is known: while the profile loads
+ * (useRolePending, at most PROFILE_GRACE_MS) the page frame shows a loading
+ * state and never denies, so a reload or deep link does not bounce an admin.
+ * Anyone else is told once and sent to their profile (fail closed, D-04).
+ */
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,13 +17,55 @@ import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useBranding, canManageBranding } from '@/shared/hooks/useBranding';
 import { Palette, Building2, Image, Loader2, Upload, Trash2, RotateCcw } from 'lucide-react';
 import { toast } from '@/shared/hooks/use-toast';
+import { useRolePending } from '@/shared/hooks/useRolePending';
+import { PageLoading } from '@/shared/components/states';
+import { notify } from '@/shared/lib/notify';
+import { PERSONAL_HOME } from '@/config/personalNav';
 
 const DEFAULT_COLOR = '#1e3a8a';
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 
+/** One toast however often the redirect mounts (StrictMode, a re-render). */
+export const BRANDING_DENIED_TOAST_ID = 'branding-settings-denied';
+
+const PageIntro: React.FC = () => (
+  <div>
+    <h1 className="text-2xl font-bold text-foreground">Branding Settings</h1>
+    <p className="text-muted-foreground">Customize your company branding for reports and emails</p>
+  </div>
+);
+
+/** Says why, then opens the profile (one hop, replacing the history entry). */
+const BrandingDeniedRedirect: React.FC = () => {
+  useEffect(() => {
+    notify.warning('You do not have access to branding settings', {
+      id: BRANDING_DENIED_TOAST_ID,
+      description: 'Only DPA and Shore Management can manage company branding.',
+    });
+  }, []);
+  return <Navigate to={PERSONAL_HOME} replace />;
+};
+
 const BrandingSettings: React.FC = () => {
   const { profile } = useAuth();
-  const navigate = useNavigate();
+  const rolePending = useRolePending();
+
+  if (rolePending) {
+    return (
+      <DashboardLayout>
+        <div className="max-w-2xl space-y-6">
+          <PageIntro />
+          <PageLoading variant="detail" label="Checking your access…" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+  if (!canManageBranding(profile?.role)) return <BrandingDeniedRedirect />;
+  return <BrandingSettingsForm />;
+};
+
+/** The form, for a viewer whose role may manage branding. */
+const BrandingSettingsForm: React.FC = () => {
   const { branding, isLoading, updateBranding, uploadLogo, deleteLogo } = useBranding();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -26,20 +75,6 @@ const BrandingSettings: React.FC = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null);
-
-  // Check permissions
-  const hasPermission = canManageBranding(profile?.role);
-
-  useEffect(() => {
-    if (!hasPermission && !isLoading) {
-      toast({
-        title: 'Access Denied',
-        description: 'Only DPA and Shore Management can access branding settings.',
-        variant: 'destructive',
-      });
-      navigate('/settings');
-    }
-  }, [hasPermission, isLoading, navigate]);
 
   // Initialize form from branding data
   useEffect(() => {
@@ -125,18 +160,10 @@ const BrandingSettings: React.FC = () => {
     setPendingLogoFile(null);
   };
 
-  if (!hasPermission) {
-    return null;
-  }
-
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-2xl animate-fade-in">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Branding Settings</h1>
-          <p className="text-muted-foreground">Customize your company branding for reports and emails</p>
-        </div>
+        <PageIntro />
 
         {isLoading ? (
           <div className="space-y-4">
@@ -185,7 +212,8 @@ const BrandingSettings: React.FC = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center gap-4">
+                {/* Wraps at 390 px, so the preview never pushes the page sideways. */}
+                <div className="flex flex-wrap items-center gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="brandColor">Color</Label>
                     <div className="flex items-center gap-3">
@@ -213,7 +241,7 @@ const BrandingSettings: React.FC = () => {
                   {/* Preview */}
                   <div className="flex-1 space-y-2">
                     <Label>Preview</Label>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Button
                         style={{ backgroundColor: brandColor, borderColor: brandColor }}
                         className="text-white"

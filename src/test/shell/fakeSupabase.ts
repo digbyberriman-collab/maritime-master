@@ -8,6 +8,12 @@
  * table fail; `fakeDb.calls` records each request (table, operation, filters,
  * payload) so a test can check what was asked. Writes resolve with no rows
  * and are recorded, not applied, unless `fakeDb.applyWrites` is on.
+ *
+ * Also recorded: `select(columns, options)` options (`selectOptions`) and the
+ * `or(filter)` strings (`or`; recorded only, never applied). A select with
+ * `{ count: 'exact' }` resolves `{ data, count, error }` (`data` null with
+ * `head: true`); an `update(...).select()` resolves the rows it matched,
+ * merged with the payload.
  */
 type Row = Record<string, unknown>;
 
@@ -19,6 +25,12 @@ export interface FakeCall {
   options?: unknown;
   limit?: number;
   order?: Array<[string, boolean]>;
+  /** The options of `select(columns, options)` on a read. */
+  selectOptions?: { count?: string; head?: boolean };
+  /** `select()` was chained after `update()` or `insert()` (return the written rows). */
+  returning?: boolean;
+  /** The `or(filter)` strings, in order (recorded, not applied). */
+  or?: string[];
 }
 
 export const fakeDb = {
@@ -69,10 +81,18 @@ function builder(table: string) {
           fakeDb.tables[table] = rows.filter((r) => !matches(r, call.filters));
         }
       }
+      if (call.op === 'update' && call.returning) {
+        const patch = (call.payload ?? {}) as Row;
+        const updated = (fakeDb.tables[table] ?? []).filter((r) => matches(r, call.filters)).map((r) => ({ ...r, ...patch }));
+        return { data: updated, error: null };
+      }
       return { data: null, error: null };
     }
-    let rows = (fakeDb.tables[table] ?? []).filter((r) => matches(r, call.filters));
-    if (call.limit !== undefined) rows = rows.slice(0, call.limit);
+    const matched = (fakeDb.tables[table] ?? []).filter((r) => matches(r, call.filters));
+    const rows = call.limit !== undefined ? matched.slice(0, call.limit) : matched;
+    if (call.selectOptions?.count === 'exact') {
+      return { data: call.selectOptions.head ? null : rows, count: matched.length, error: null };
+    }
     return { data: rows, error: null };
   };
   const set = (patch: Partial<FakeCall>) => {
@@ -80,7 +100,14 @@ function builder(table: string) {
     return api;
   };
   const api = {
-    select: () => api,
+    select: (_columns?: string, options?: { count?: string; head?: boolean }) => {
+      if (call.op === 'select') {
+        if (options) call.selectOptions = options;
+      } else if (call.op === 'update' || call.op === 'insert') {
+        call.returning = true;
+      }
+      return api;
+    },
     insert: (payload: unknown) => set({ op: 'insert', payload }),
     upsert: (payload: unknown, options?: unknown) => set({ op: 'upsert', payload, options }),
     update: (payload: unknown) => set({ op: 'update', payload }),
@@ -98,7 +125,10 @@ function builder(table: string) {
       return api;
     },
     not: () => api,
-    or: () => api,
+    or: (filter: string) => {
+      call.or = [...(call.or ?? []), filter];
+      return api;
+    },
     order: (column: string, options?: { ascending?: boolean }) => {
       call.order = [...(call.order ?? []), [column, options?.ascending !== false]];
       return api;

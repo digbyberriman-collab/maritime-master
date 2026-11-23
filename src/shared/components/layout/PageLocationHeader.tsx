@@ -18,6 +18,10 @@
  * - A crumb into a scope the user cannot reach (Fleet without fleet reach)
  *   is plain text, never a link they cannot open (deferred item 1). Section
  *   headings ("Overview") are labels in the trail, not links.
+ * - A shell-owned state (the in-scope 404, "Vessel not found", no access,
+ *   archived, a module switched off) names itself through
+ *   `usePageLocationOverride` (./pageLocationOverride.ts): the document
+ *   title and the current crumb are the state's, never the URL's nav title.
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
@@ -36,6 +40,7 @@ import { VESSEL_SCOPE_PATTERN, vesselPath } from '@/modules/vessels/lib/vesselCo
 import type { PageCrumb } from '@/shared/lib/pageNavigation';
 import { useCurrentPageNavigation } from './useActiveNavModule';
 import { usePageHeadingPresence } from './usePageHeadingPresence';
+import { useActivePageLocationOverride, type ResolvedPageLocationOverride } from './pageLocationOverride';
 
 /** A crumb as the row draws it: a link, or plain text. */
 interface ShownCrumb {
@@ -68,39 +73,62 @@ const crumbText = 'min-w-0 max-w-[14rem] truncate';
 const crumbLink = cn(
   'inline-flex min-w-0 items-center rounded-sm transition-colors duration-quick ease-tide hover:text-foreground',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-  '[@media(pointer:coarse)]:min-h-11',
+  // 44 px both ways on touch (D-35); emitted after min-w-0, so fine pointers still truncate.
+  '[@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11 [@media(pointer:coarse)]:justify-center',
 );
 
 const Separator: React.FC = () => (
   <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground/70" strokeWidth={1.75} aria-hidden="true" />
 );
 
+/**
+ * The trail a shell-owned state shows (see ./pageLocationOverride.ts):
+ * `page` keeps the page's crumbs, `none` is the title alone, `scope-root` the
+ * scope's root crumb (when there is one to name: the vessel scope needs a
+ * resolved vessel) and then the title.
+ */
+function overrideTrail(page: readonly PageCrumb[], override: ResolvedPageLocationOverride, vesselName: string | null): PageCrumb[] {
+  if (override.crumbs === 'page') return [...page];
+  const title: PageCrumb = { label: override.title };
+  if (override.crumbs === 'none') return [title];
+  const root = page.length > 1 ? page[0] : undefined;
+  if (!root || root.section || (root.path === VESSEL_SCOPE_PATTERN && !vesselName)) return [title];
+  return [root, title];
+}
+
 /** Rendered by AppShell as the first child of `<main>`, where it looks for the page's own h1. */
 const PageLocationHeader: React.FC = () => {
   const rootRef = React.useRef<HTMLDivElement>(null);
   const page = useCurrentPageNavigation();
+  const override = useActivePageLocationOverride();
   const scope = useScope();
   const { fleetReach } = useNavAccess();
   const { hasPageHeading, settled } = usePageHeadingPresence(rootRef);
 
   const vesselCode = scope.scope === 'vessel' ? scope.vesselCode ?? null : null;
   const vesselName = scope.scope === 'vessel' ? scope.vessel?.name ?? null : null;
+  const title = override?.title ?? page.title;
 
   React.useEffect(() => {
-    document.title = `${page.title} | STORM`;
-  }, [page.title]);
+    document.title = `${title} | STORM`;
+  }, [title]);
+
+  const trail = React.useMemo<PageCrumb[]>(
+    () => (override ? overrideTrail(page.crumbs, override, vesselName) : page.crumbs),
+    [page.crumbs, override, vesselName],
+  );
 
   const crumbs = React.useMemo<ShownCrumb[]>(
     () =>
-      page.crumbs.map((crumb: PageCrumb, index) => {
-        const current = index === page.crumbs.length - 1;
+      trail.map((crumb: PageCrumb, index) => {
+        const current = index === trail.length - 1;
         // The vessel scope's root crumb names the vessel.
         const label = index === 0 && vesselName && crumb.path === VESSEL_SCOPE_PATTERN ? vesselName : crumb.label;
         let href: string | null = !current && crumb.path && !crumb.section ? onVessel(crumb.path, vesselCode) : null;
         if (href && isFleetTarget(href) && !fleetReach) href = null;
         return { key: `${index}-${crumb.label}`, label, href };
       }),
-    [page.crumbs, vesselCode, vesselName, fleetReach],
+    [trail, vesselCode, vesselName, fleetReach],
   );
 
   const fold = crumbs.length >= FOLD_FROM;
@@ -171,7 +199,7 @@ const PageLocationHeader: React.FC = () => {
           data-shell-heading=""
           className="type-display mt-1 min-w-0 break-words text-foreground"
         >
-          {page.title}
+          {title}
         </h1>
       )}
     </div>

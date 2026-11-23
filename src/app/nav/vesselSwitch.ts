@@ -50,25 +50,50 @@ const strip = (path: string): string => path.replace(/^\/+|\/+$/g, '');
 const isUnder = (rest: string, prefix: string): boolean => prefix !== '' && (rest === prefix || rest.startsWith(`${prefix}/`));
 
 /**
+ * How much of `rest` an `alsoCovers` pattern matches (`*` = exactly one
+ * segment): the length of the matched prefix when `rest` is the pattern or
+ * continues it with `/`, else -1.
+ */
+function coveredLength(rest: string, pattern: string): number {
+  const want = strip(pattern).split('/');
+  const got = rest.split('/');
+  if (!want[0] || got.length < want.length) return -1;
+  const matches = want.every((segment, i) => (segment === '*' ? got[i] !== '' : segment === got[i]));
+  return matches ? got.slice(0, want.length).join('/').length : -1;
+}
+
+/** How much of `rest` a node governs: its own path, or the longest of its `alsoCovers` patterns; -1 for none. */
+function matchedLength(rest: string, node: NavChild): number {
+  const rel = strip(node.path);
+  let length = isUnder(rest, rel) ? rel.length : -1;
+  for (const pattern of node.alsoCovers ?? []) length = Math.max(length, coveredLength(rest, pattern));
+  return length;
+}
+
+/**
  * Every `vessel_module_settings` key that must be on for a vessel page: its
  * tab's key, then the key of each nav node on the way down to the most
  * specific node the path sits under (`technical/jobs/12` → `technical`,
- * `technical.jobs`). Pages outside any module need none.
+ * `technical.jobs`). A node also governs the pages its `alsoCovers` patterns
+ * name (`crew/people/p1/hours-of-rest` → `crew`, `crew_hor`), so the route
+ * gate and the vessel switch close them with it. Pages outside any module
+ * need none.
  */
 export function vesselSettingKeysForRest(vesselRest: string): string[] {
   const rest = strip(vesselRest.split(/[?#]/)[0]);
   const tab = vesselModuleForPath(rest);
   if (!tab) return [];
-  // The deepest node the page sits under, with the nodes above it. Cross-links
-  // (absolute paths into another tree) never match a vessel page.
+  // The deepest node the page sits under (by the length of the part of the
+  // path it matches), with the nodes above it. Cross-links (absolute paths
+  // into another tree) never match a vessel page.
   const found: { length: number; chain: readonly NavChild[] } = { length: -1, chain: [] };
   const visit = (nodes: readonly NavChild[], above: readonly NavChild[]) => {
     for (const node of nodes) {
       if (node.path.startsWith('/')) continue;
       const chain = [...above, node];
-      const rel = strip(node.path);
-      if (isUnder(rest, rel) && (rel.length > found.length || (rel.length === found.length && chain.length > found.chain.length))) {
-        found.length = rel.length;
+      const length = matchedLength(rest, node);
+      if (length >= 0 && (length > found.length || (length === found.length && chain.length > found.chain.length))) {
+        found.length = length;
         found.chain = chain;
       }
       if (node.children?.length) visit(node.children, chain);

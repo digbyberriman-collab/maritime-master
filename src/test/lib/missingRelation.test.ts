@@ -10,8 +10,8 @@ import { describe, expect, it, vi } from 'vitest';
 // The pending shim imports the app client, which needs the Supabase env.
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 
-import { MISSING_RELATION_CODES, isMissingRelation } from '@/integrations/supabase/missingRelation';
-import { isMissingRelation as pendingIsMissingRelation } from '@/integrations/supabase/pending';
+import { MISSING_RELATION_CODES, MISSING_TABLE_CODES, isMissingRelation, isMissingTable } from '@/integrations/supabase/missingRelation';
+import { isMissingRelation as pendingIsMissingRelation, isMissingTable as pendingIsMissingTable } from '@/integrations/supabase/pending';
 import { isMissingRelationError, normaliseError } from '@/shared/lib/notify';
 
 const MISSING: Array<[string, unknown]> = [
@@ -75,5 +75,53 @@ describe('every alias gives the same answer', () => {
 
   it('notify re-exports the classifier itself', () => {
     expect(isMissingRelationError).toBe(isMissingRelation);
+  });
+});
+
+describe('isMissingTable (the table itself, not a column or function)', () => {
+  const TABLE_MISSING: Array<[string, unknown]> = [
+    ['42P01 undefined table', { code: '42P01', message: 'relation "public.vessel_module_settings" does not exist' }],
+    ['PGRST205 table not in the schema cache', { code: 'PGRST205', message: "Could not find the table 'public.vessel_module_settings' in the schema cache" }],
+    ['no code, relation message', { message: 'relation "public.vessel_module_settings" does not exist' }],
+    ['empty code, relation message', { code: '', message: 'relation "rf_x" does not exist' }],
+    ['no code, schema-cache table message', { message: "Could not find the table 'public.rf_x' in the schema cache" }],
+    ['Error that lost its code', new Error('relation "rf_x" does not exist')],
+    ['a bare string', 'relation "rf_x" does not exist'],
+  ];
+  const NOT_TABLE_MISSING: Array<[string, unknown]> = [
+    ['42703 undefined column', { code: '42703', message: 'column vessel_module_settings.enabled_from does not exist' }],
+    ['42883 undefined function', { code: '42883', message: 'function public.f() does not exist' }],
+    ['PGRST200 embed', { code: 'PGRST200', message: "Could not find a relationship between 'a' and 'b' in the schema cache" }],
+    ['PGRST202 RPC', { code: 'PGRST202', message: 'Could not find the function public.f in the schema cache' }],
+    ['PGRST204 column', { code: 'PGRST204', message: "Could not find the 'enabled_from' column of 'vessel_module_settings' in the schema cache" }],
+    ['a coded error is judged by its code, not its text', { code: '42703', message: 'relation "x" does not exist' }],
+    ['no code, column message', { message: 'column vessel_module_settings.enabled_from does not exist' }],
+    ['no code, "column … of relation … does not exist"', { message: 'column "enabled_from" of relation "vessel_module_settings" does not exist' }],
+    ['Error that lost its code (column)', new Error('column "severity" does not exist')],
+    ['no code, schema-cache function message', { message: 'Could not find the function public.f in the schema cache' }],
+    ...NOT_MISSING,
+  ];
+
+  it('lists only the table codes', () => {
+    expect([...MISSING_TABLE_CODES].sort()).toEqual(['42P01', 'PGRST205']);
+    for (const code of MISSING_TABLE_CODES) expect(MISSING_RELATION_CODES).toContain(code);
+  });
+
+  it.each(TABLE_MISSING)('%s → table missing', (_label, error) => {
+    expect(isMissingTable(error)).toBe(true);
+    // Every missing table is also a missing relation.
+    expect(isMissingRelation(error)).toBe(true);
+  });
+
+  it.each(NOT_TABLE_MISSING)('%s → not a missing table', (_label, error) => {
+    expect(isMissingTable(error)).toBe(false);
+  });
+
+  it('the pending shim re-exports the same answer', () => {
+    for (const [, error] of [...TABLE_MISSING, ...NOT_TABLE_MISSING]) {
+      if (error === null || error === undefined || (typeof error === 'object' && !(error instanceof Error))) {
+        expect(pendingIsMissingTable(error as Parameters<typeof pendingIsMissingTable>[0])).toBe(isMissingTable(error));
+      }
+    }
   });
 });

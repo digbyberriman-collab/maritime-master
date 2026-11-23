@@ -14,7 +14,11 @@
  * the vessel in scope, else the last one opened (useShellVessel); inside the vessel scope it goes to
  * that vessel's home, elsewhere it opens the vessel through the vessel switch
  * (so a switched-off module is never the landing page). In a workspace a chip
- * names the workspace and neither segment is lit.
+ * names the workspace and neither segment is lit. The chip shows at every
+ * width (a short label below 640 px) and is the part that gives way: below
+ * 1024 px the control beside it takes its compact form (the Fleet globe
+ * without its word, the vessel's code) and never shrinks, so its marks and
+ * the switcher's chevron are never clipped (D-70).
  */
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -29,7 +33,7 @@ import { useScope } from '@/app/router/scopeContext';
 import { useNavAccess } from '@/app/nav/navAccess';
 import { useVesselSwitch } from '@/app/nav/useVesselSwitch';
 import { SHELL_TEST_IDS } from '@/app/shell/testIds';
-import { WORKSPACE_SCOPE_LABELS } from '@/app/shell/apps';
+import { WORKSPACE_SCOPE_LABELS, WORKSPACE_SCOPE_SHORT_LABELS } from '@/app/shell/apps';
 import AisMark from './AisMark';
 import ComplianceDot from './ComplianceDot';
 import VesselSwitcher from './VesselSwitcher';
@@ -56,15 +60,32 @@ const segment = (active: boolean) =>
 /**
  * The vessel's name in the display face, truncating; below 640 px its
  * three-letter code instead (D-03), so the control never pushes the account
- * button off a phone screen. Screen readers always get the full name.
+ * button off a phone screen. `compact` (a workspace chip shares the row)
+ * keeps the code up to 1024 px, where the touch controls and the chip leave
+ * too little room for a readable name (D-70). Screen readers always get the
+ * full name.
  */
-const VesselName: React.FC<{ name: string; code: string; className?: string }> = ({ name, code, className }) => (
+const VesselName: React.FC<{ name: string; code: string; compact?: boolean; className?: string }> = ({
+  name,
+  code,
+  compact = false,
+  className,
+}) => (
   <>
-    <span aria-hidden="true" className={cn('font-display text-[0.9375rem] font-semibold tracking-wide sm:hidden', className)}>
+    <span
+      aria-hidden="true"
+      className={cn('font-display text-[0.9375rem] font-semibold tracking-wide', compact ? 'lg:hidden' : 'sm:hidden', className)}
+    >
       {code}
     </span>
-    <span className="sr-only sm:hidden">{name}</span>
-    <span className={cn('hidden min-w-0 max-w-[14rem] truncate font-display text-[0.9375rem] font-semibold sm:inline', className)}>
+    <span className={cn('sr-only', compact ? 'lg:hidden' : 'sm:hidden')}>{name}</span>
+    <span
+      className={cn(
+        'hidden min-w-[3ch] max-w-[14rem] truncate font-display text-[0.9375rem] font-semibold',
+        compact ? 'lg:inline' : 'sm:inline',
+        className,
+      )}
+    >
       {name}
     </span>
   </>
@@ -90,14 +111,22 @@ const ScopeControl: React.FC<{ className?: string }> = ({ className }) => {
   const positionStatus = positions.isError ? 'error' : positions.data ? 'ready' : 'loading';
 
   const workspaceLabel = scope.scope === 'workspace' && scope.workspace ? WORKSPACE_SCOPE_LABELS[scope.workspace] ?? null : null;
+  const workspaceShort = scope.workspace ? WORKSPACE_SCOPE_SHORT_LABELS[scope.workspace] ?? workspaceLabel : workspaceLabel;
+  // Shown at every width; below 1024 px it is the part of the row that truncates.
   const chip = workspaceLabel ? (
     <span
       data-testid={SHELL_TEST_IDS.scopeWorkspaceChip}
-      className="type-caption hidden shrink-0 items-center rounded-sm bg-muted px-2 py-1 text-foreground sm:inline-flex"
+      title={workspaceLabel}
+      className="type-caption inline-flex min-w-0 max-w-[5.5rem] shrink items-center rounded-sm bg-muted px-1.5 py-1 text-foreground sm:max-w-[9rem] sm:px-2 lg:max-w-none lg:shrink-0"
     >
-      {workspaceLabel}
+      <span aria-hidden="true" className="truncate sm:hidden">
+        {workspaceShort}
+      </span>
+      <span className="sr-only sm:hidden">{workspaceLabel}</span>
+      <span className="hidden truncate sm:block">{workspaceLabel}</span>
     </span>
   ) : null;
+  const compact = Boolean(chip);
 
   if (!ready) {
     return (
@@ -127,7 +156,7 @@ const ScopeControl: React.FC<{ className?: string }> = ({ className }) => {
     const label = (
       <>
         <Ship className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.75} aria-hidden="true" />
-        <VesselName name={vessel.name} code={vesselCode} className="text-foreground" />
+        <VesselName name={vessel.name} code={vesselCode} compact={compact} className="text-foreground" />
         {marks}
       </>
     );
@@ -162,8 +191,9 @@ const ScopeControl: React.FC<{ className?: string }> = ({ className }) => {
           className={cn(segment(fleetActive), 'shrink-0')}
         >
           <Globe className="h-4 w-4 shrink-0" strokeWidth={1.75} aria-hidden="true" />
-          <span className="hidden sm:inline">Fleet</span>
-          <span className="sr-only sm:hidden">Fleet</span>
+          {/* Beside a chip the word waits for 1024 px too, leaving the chip room to be read (D-70). */}
+          <span className={compact ? 'hidden lg:inline' : 'hidden sm:inline'}>Fleet</span>
+          <span className={compact ? 'sr-only lg:hidden' : 'sr-only sm:hidden'}>Fleet</span>
         </Link>
       )}
       {showVessel && vessel && vesselCode && (
@@ -173,30 +203,37 @@ const ScopeControl: React.FC<{ className?: string }> = ({ className }) => {
           aria-current={inVesselScope ? 'true' : undefined}
           onClick={() => (inVesselScope ? navigate(vesselPath(vesselCode)) : switchTo({ id: vessel.id, code: vesselCode }))}
           title={inVesselScope ? `${vessel.name} home` : `Open ${vessel.name}`}
-          className={cn(segment(inVesselScope), 'min-w-0')}
+          className={cn(segment(inVesselScope), compact ? 'shrink-0 lg:shrink' : 'min-w-0')}
         >
           <Ship className="hidden h-4 w-4 shrink-0 sm:block" strokeWidth={1.75} aria-hidden="true" />
-          <VesselName name={vessel.name} code={vesselCode} className={inVesselScope ? 'text-primary' : 'text-foreground'} />
+          <VesselName
+            name={vessel.name}
+            code={vesselCode}
+            compact={compact}
+            className={inVesselScope ? 'text-primary' : 'text-foreground'}
+          />
           {marks}
         </button>
       )}
     </>
   );
 
+  // Beside a chip, below 1024 px, the control keeps its full width (the chip gives way).
+  const segmentedClass = cn(segmented, compact && 'shrink-0 lg:shrink');
   return (
     <div className={cn('flex min-w-0 items-center gap-2', className)}>
       {switcherAvailable && showVessel ? (
         <VesselSwitcher
           currentVesselId={vessel?.id ?? null}
           alerts={alerts}
-          className={segmented}
+          className={segmentedClass}
         >
           <div data-testid={SHELL_TEST_IDS.scopeControl} role="group" aria-label="Scope" className="flex min-w-0 items-stretch gap-0.5">
             {segments}
           </div>
         </VesselSwitcher>
       ) : (
-        <div data-testid={SHELL_TEST_IDS.scopeControl} role="group" aria-label="Scope" className={segmented}>
+        <div data-testid={SHELL_TEST_IDS.scopeControl} role="group" aria-label="Scope" className={segmentedClass}>
           {segments}
         </div>
       )}

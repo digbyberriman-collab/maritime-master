@@ -2,6 +2,10 @@
  * Help in the top bar (gap/10 top bar element 7, IA14; spec §6.5): guides,
  * support, "Report a problem" and the keyboard shortcuts. Shown from 768 px;
  * on phones the same items sit in the account menu's More group.
+ *
+ * Opening it starts keyboard users on the first row (How-to guides, the §6.5
+ * order), not on the first button: Radix's focus scope skips links. Its
+ * tooltip names it and, where the shortcuts dialog exists, says `?` opens it.
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
@@ -10,8 +14,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils';
 import { SHELL_TEST_IDS } from '@/app/shell/testIds';
 import { useShellSurface } from '@/app/shell/shellUi';
+import { useShellActions } from '@/app/shell/shellActions';
 import { topBarIconButton } from './styles';
 import { useHelpItems, type HelpItem } from './helpItems';
+import TopBarTooltip from './TopBarTooltip';
 
 export interface HelpMenuProps {
   className?: string;
@@ -25,6 +31,8 @@ const rowClass =
 const HelpMenu: React.FC<HelpMenuProps> = ({ className, badgeCount }) => {
   const [open, setOpen] = useShellSurface('help');
   const items = useHelpItems();
+  const { openKeyboardShortcuts } = useShellActions();
+  const listRef = React.useRef<HTMLUListElement>(null);
   const badge = typeof badgeCount === 'number' && badgeCount > 0;
 
   const select = (item: HelpItem) => {
@@ -46,16 +54,18 @@ const HelpMenu: React.FC<HelpMenuProps> = ({ className, badgeCount }) => {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          data-testid={SHELL_TEST_IDS.helpTrigger}
-          aria-label={badge ? `Help, ${badgeCount} new` : 'Help'}
-          title="Help"
-          className={cn(topBarIconButton, 'relative', className)}
-        >
-          <CircleHelp strokeWidth={1.75} aria-hidden="true" />
-          {badge && <span aria-hidden="true" className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />}
-        </button>
+        <TopBarTooltip label="Help" hint={openKeyboardShortcuts ? '? for keyboard shortcuts' : undefined} suppressed={open}>
+          <button
+            type="button"
+            data-testid={SHELL_TEST_IDS.helpTrigger}
+            aria-label={badge ? `Help, ${badgeCount} new` : 'Help'}
+            aria-keyshortcuts={openKeyboardShortcuts ? 'Shift+?' : undefined}
+            className={cn(topBarIconButton, 'relative', className)}
+          >
+            <CircleHelp strokeWidth={1.75} aria-hidden="true" />
+            {badge && <span aria-hidden="true" className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />}
+          </button>
+        </TopBarTooltip>
       </PopoverTrigger>
       <PopoverContent
         align="end"
@@ -63,9 +73,13 @@ const HelpMenu: React.FC<HelpMenuProps> = ({ className, badgeCount }) => {
         data-testid={SHELL_TEST_IDS.helpMenu}
         aria-label="Help"
         className="w-[min(20rem,calc(100vw-2rem))] p-1.5"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          listRef.current?.querySelector<HTMLElement>('a,button')?.focus();
+        }}
       >
         <p className="type-eyebrow px-2.5 pb-1 pt-1.5 text-muted-foreground">Help</p>
-        <ul className="space-y-0.5">
+        <ul ref={listRef} className="space-y-0.5">
           {items.map((item) => (
             <li key={item.id}>
               {item.to ? (

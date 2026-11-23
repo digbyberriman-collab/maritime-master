@@ -2,7 +2,7 @@ import React from 'react';
 import { AlertCircle, AlertTriangle, ClipboardCheck, Clock, Ship, Users } from 'lucide-react';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { KpiGrid, KpiTile } from '@/shared/components/data';
+import { KpiGrid, KpiTile } from '@/shared/components/data/KpiTile';
 import { useVesselCount } from '@/modules/vessels/hooks/useVessels';
 import { useCrewCount, useRecentCrewChanges } from '@/modules/crew/hooks/useCrew';
 import { useOverdueCAPAs } from '@/modules/analytics/hooks/useCAPAAnalytics';
@@ -50,7 +50,14 @@ const DPADashboard: React.FC = () => {
   const widgetContent: Record<string, React.ReactNode> = {
     'red-room': <RedRoomPanel />,
     'overdue-capas': capaCount > 0 ? <OverdueCapasBanner count={capaCount} /> : null,
-    'crew-changes': <RecentCrewChangesCard changes={recentChanges.data} isLoading={recentChanges.isPending} />,
+    'crew-changes': (
+      <RecentCrewChangesCard
+        changes={recentChanges.data}
+        isLoading={recentChanges.isPending}
+        isError={recentChanges.isError}
+        onRetry={() => void recentChanges.refetch()}
+      />
+    ),
   };
 
   return (

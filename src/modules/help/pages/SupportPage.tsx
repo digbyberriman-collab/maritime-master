@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, LifeBuoy, Mail, Phone, Send, Ticket } from 'lucide-react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
@@ -58,11 +58,21 @@ interface TicketRecord {
   created_at: string;
 }
 
+/** The longest subject a link may seed (`?subject=`); the field itself allows 150. */
+export const SEEDED_SUBJECT_MAX = 120;
+
+/** A `?subject=` value as the field's starting text: trimmed and capped. */
+function seededSubject(raw: string | null): string {
+  return (raw ?? '').trim().slice(0, SEEDED_SUBJECT_MAX).trim();
+}
+
 const SupportPage: React.FC = () => {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
 
-  const [subject, setSubject] = useState('');
+  // A planned page's "Tell us what you need" link names what was asked for (gap/10 W3); only the starting value.
+  const [subject, setSubject] = useState(() => seededSubject(searchParams.get('subject')));
   const [category, setCategory] = useState<string>('technical');
   const [priority, setPriority] = useState<string>('normal');
   const [description, setDescription] = useState('');

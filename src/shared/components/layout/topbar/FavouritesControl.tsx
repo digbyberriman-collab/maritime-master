@@ -8,7 +8,13 @@
  * Fail closed: the star waits (aria-disabled) while the pins load, while a
  * change is being saved (a second click cannot add a duplicate), and after a
  * load error (with the reason in its tooltip and a Retry in the menu). It
- * shows the saved state only, never an unsaved success.
+ * shows the saved state only, never an unsaved success. On a vessel page
+ * whose vessel has not resolved (unknown, out of reach, sold, or still
+ * loading) there is no page to pin, so the star is not shown.
+ *
+ * Only in-app paths become links (`isInAppPath`): a stored target such as
+ * `javascript:…`, `https://…` or `//host` is listed as "Not a page in STORM"
+ * with Remove, and never navigates.
  */
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -21,18 +27,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { usePinnedShortcuts } from '@/shared/hooks/usePinnedShortcuts';
+import { isInAppPath, usePinnedShortcuts } from '@/shared/hooks/usePinnedShortcuts';
 import { SHELL_TEST_IDS } from '@/app/shell/testIds';
 import { topBarIconButton } from './styles';
 import { useCurrentFavourite } from './useCurrentFavourite';
+import TopBarTooltip from './TopBarTooltip';
 
 const MANAGE_FAVOURITES_PATH = '/me/shortcuts';
 
 /** The favourites list as dropdown items: the top-bar menu and the account menu's More group share it. */
 export const FavouritesMenuItems: React.FC = () => {
-  const { pins, status, retry } = usePinnedShortcuts();
+  const { pins, status, retry, removePin } = usePinnedShortcuts();
   const { pathname, search } = useLocation();
   const here = `${pathname}${search}`;
 
@@ -66,6 +72,27 @@ export const FavouritesMenuItems: React.FC = () => {
       )}
       {status === 'ready' &&
         pins.map((pin) => {
+          if (!isInAppPath(pin.shortcut_target)) {
+            // Not a page of this app: never a link. Selecting it removes the pin.
+            return (
+              <DropdownMenuItem
+                key={pin.id}
+                aria-label={`Remove ${pin.shortcut_label}, not a page in STORM`}
+                className="gap-2 text-muted-foreground"
+                onSelect={(event) => {
+                  event.preventDefault();
+                  void removePin(pin.shortcut_target);
+                }}
+              >
+                <Star className="h-[18px] w-[18px] shrink-0 opacity-60" strokeWidth={1.75} aria-hidden="true" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{pin.shortcut_label}</span>
+                  <span className="type-caption block">Not a page in STORM</span>
+                </span>
+                <span className="type-caption shrink-0 font-medium text-primary">Remove</span>
+              </DropdownMenuItem>
+            );
+          }
           const current = pin.shortcut_target === here;
           return (
             <DropdownMenuItem key={pin.id} asChild>
@@ -95,52 +122,59 @@ export const FavouritesMenuItems: React.FC = () => {
 const FavouritesControl: React.FC<{ className?: string }> = ({ className }) => {
   const { status, isPinned, togglePin, toggling } = usePinnedShortcuts();
   const page = useCurrentFavourite();
-  const pinned = status === 'ready' && isPinned(page.target);
+  const [menuOpen, setMenuOpen] = React.useState(false);
+  const pinned = status === 'ready' && page !== null && isPinned(page.target);
   const waiting = status !== 'ready' || toggling;
-  const label = pinned ? `Remove ${page.label} from favourites` : `Add ${page.label} to favourites`;
+  const label = page ? (pinned ? `Remove ${page.label} from favourites` : `Add ${page.label} to favourites`) : '';
   const hint = status === 'error' ? 'Favourites could not load' : status === 'loading' ? 'Loading favourites…' : label;
 
   const onToggle = () => {
-    if (waiting) return;
+    if (waiting || !page) return;
     void togglePin(page);
   };
 
   return (
     <div className={cn('items-center', className)}>
-      <TooltipProvider delayDuration={300}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              data-testid={SHELL_TEST_IDS.favouriteToggle}
-              aria-pressed={pinned}
-              aria-disabled={waiting || undefined}
-              aria-label={status === 'error' ? `${label} (favourites could not load)` : label}
-              onClick={onToggle}
-              className={cn(topBarIconButton, 'rounded-r-none', waiting && 'cursor-not-allowed opacity-60 hover:bg-transparent')}
-            >
-              {toggling ? (
-                <Loader2 className="motion-safe:animate-spin" strokeWidth={1.75} aria-hidden="true" />
-              ) : (
-                <Star className={cn(pinned && 'fill-primary text-primary')} strokeWidth={1.75} aria-hidden="true" />
-              )}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom" className="type-caption">
-            {hint}
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
+      {page && (
+        <TopBarTooltip label={hint}>
           <button
             type="button"
-            data-testid={SHELL_TEST_IDS.favouritesTrigger}
-            aria-label="Favourites"
-            className={cn(topBarIconButton, 'w-6 rounded-l-none [@media(pointer:coarse)]:w-8 [&_svg]:h-4 [&_svg]:w-4')}
+            data-testid={SHELL_TEST_IDS.favouriteToggle}
+            aria-pressed={pinned}
+            aria-disabled={waiting || undefined}
+            aria-label={status === 'error' ? `${label} (favourites could not load)` : label}
+            onClick={onToggle}
+            className={cn(topBarIconButton, 'rounded-r-none', waiting && 'cursor-not-allowed opacity-60 hover:bg-transparent')}
           >
-            <ChevronDown strokeWidth={1.75} aria-hidden="true" />
+            {toggling ? (
+              <Loader2 className="motion-safe:animate-spin" strokeWidth={1.75} aria-hidden="true" />
+            ) : (
+              <Star className={cn(pinned && 'fill-primary text-primary')} strokeWidth={1.75} aria-hidden="true" />
+            )}
           </button>
+        </TopBarTooltip>
+      )}
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+        <DropdownMenuTrigger asChild>
+          <TopBarTooltip label="Favourites" suppressed={menuOpen}>
+            <button
+              type="button"
+              data-testid={SHELL_TEST_IDS.favouritesTrigger}
+              aria-label="Favourites"
+              className={cn(
+                topBarIconButton,
+                // 24 px beside the star on a fine pointer; 44 px on touch (D-35), like the vessel switcher's chevron.
+                'w-6 [@media(pointer:coarse)]:w-11 [&_svg]:h-4 [&_svg]:w-4',
+                page && 'rounded-l-none',
+              )}
+            >
+              <ChevronDown
+                className="transition-transform duration-quick ease-tide motion-reduce:transition-none [[data-state=open]>&]:rotate-180"
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
+            </button>
+          </TopBarTooltip>
         </DropdownMenuTrigger>
         <DropdownMenuContent
           align="end"

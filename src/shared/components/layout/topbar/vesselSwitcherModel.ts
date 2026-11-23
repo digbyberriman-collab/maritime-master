@@ -12,6 +12,12 @@ import type { Tone } from '@/components/ui/tones';
 import type { AlertSeverity } from '@/modules/alerts/constants';
 import type { FleetGroup } from './useFleetGroups';
 
+/** The "All vessels — Fleet overview" row's value. */
+export const ALL_VESSELS = 'all-vessels';
+
+/** What a row stands for: a vessel, or the Fleet overview. */
+export type SwitcherTarget = SwitcherVessel | typeof ALL_VESSELS;
+
 export interface SwitcherVessel {
   id: string;
   name: string;
@@ -61,11 +67,6 @@ export function buildSwitcherGroups({ vessels, recentIds, groups }: SwitcherGrou
   const rest = sorted.filter((v) => !placed.has(v.id));
   if (rest.length) out.push({ id: 'other', heading: 'Other vessels', vessels: rest });
   return out;
-}
-
-/** What a row is matched on: name, code and IMO (the search box's placeholder). */
-export function switcherSearchValue(vessel: Pick<SwitcherVessel, 'name' | 'code' | 'imo'>): string {
-  return [vessel.name, vessel.code, vessel.imo ?? ''].join(' ').trim();
 }
 
 const fold = (text: string) =>

@@ -4,6 +4,13 @@
  * a dead key (D-04): `g f` with fleet reach, `g v` when the vessel switcher
  * is offered, ⌘/Ctrl+B with a static sidebar, ⌘K when the palette is there.
  * Keys are shown for this platform (⌘ on Apple, Ctrl elsewhere).
+ *
+ * It opens from shell state, not from a trigger of its own (`?`, the Account
+ * menu, the Help menu, the palette), so it records what had focus when it
+ * opened and returns focus there on close (gap/10 A.5, spec §6.6; WCAG
+ * 2.4.3): the element itself, else the trigger of the menu or popover it sat
+ * in (a menu item is gone by then), else the account button, else the main
+ * content. Never the page body.
  */
 import React from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -21,14 +28,56 @@ const Key: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   </kbd>
 );
 
+interface FocusOrigin {
+  /** What had focus when the dialog opened. */
+  opener: HTMLElement | null;
+  /** The trigger of the menu, popover or dialog the opener sat in (`aria-controls` its content). */
+  trigger: HTMLElement | null;
+}
+
+const NO_ORIGIN: FocusOrigin = { opener: null, trigger: null };
+
+function focusOrigin(): FocusOrigin {
+  const el = typeof document === 'undefined' ? null : document.activeElement;
+  if (!(el instanceof HTMLElement) || el === document.body) return NO_ORIGIN;
+  const container = el.closest<HTMLElement>('[role="menu"][id], [role="dialog"][id], [role="alertdialog"][id], [role="listbox"][id]');
+  const id = container?.id;
+  const trigger = id ? document.querySelector<HTMLElement>(`[aria-controls="${id.replace(/["\\]/g, '\\$&')}"]`) : null;
+  return { opener: el, trigger };
+}
+
 const KeyboardShortcutsDialog: React.FC = () => {
   const [open, setOpen] = useShellSurface('keyboardShortcuts');
   const shortcuts = useLiveShortcuts();
   const apple = isApplePlatform();
 
+  // Recorded while rendering the open, before the dialog (or a closing menu)
+  // moves focus.
+  const origin = React.useRef<FocusOrigin>(NO_ORIGIN);
+  const wasOpen = React.useRef(false);
+  if (open && !wasOpen.current) origin.current = focusOrigin();
+  wasOpen.current = open;
+
+  const onCloseAutoFocus = React.useCallback((event: Event) => {
+    event.preventDefault();
+    const { opener, trigger } = origin.current;
+    origin.current = NO_ORIGIN;
+    const target = [
+      opener,
+      trigger,
+      document.querySelector<HTMLElement>(`[data-testid="${SHELL_TEST_IDS.accountTrigger}"]`),
+      document.getElementById('main-content'),
+    ].find((el): el is HTMLElement => Boolean(el && el.isConnected));
+    target?.focus();
+  }, []);
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent data-testid={SHELL_TEST_IDS.keyboardShortcuts} className="w-[min(28rem,calc(100vw-2rem))] gap-3">
+      <DialogContent
+        data-testid={SHELL_TEST_IDS.keyboardShortcuts}
+        onCloseAutoFocus={onCloseAutoFocus}
+        className="w-[min(28rem,calc(100vw-2rem))] gap-3"
+      >
         <DialogHeader>
           <DialogTitle className="type-title">Keyboard shortcuts</DialogTitle>
           <DialogDescription>Shortcuts work anywhere in STORM except while you are typing in a field.</DialogDescription>

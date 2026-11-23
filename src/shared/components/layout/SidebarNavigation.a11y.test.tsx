@@ -6,6 +6,8 @@ import SidebarNavigation from '@/shared/components/layout/SidebarNavigation';
 import { NavAccessContext, type NavAccess } from '@/app/nav/navAccess';
 import { useFilteredModuleTree } from '@/app/nav/useFilteredTree';
 import { NAVIGATION_ITEMS } from '@/config/sitemap';
+import type { FilteredNavNode } from '@/app/nav/navTree';
+import { CheckSquare, FolderOpen, Layers, Navigation } from 'lucide-react';
 
 const mocks = vi.hoisted(() => ({
   order: { map: {} },
@@ -136,5 +138,32 @@ describe('SidebarNavigation accessibility regressions', () => {
     expect(crewList).toHaveFocus();
     // A link into the vessel scope never carries a workspace's ?module= (deferred item 2).
     await waitFor(() => expect(screen.getByLabelText('Current route')).toHaveTextContent(/^\/v\/:vesselCode\/crew\/list$/));
+  });
+
+  it('long labels keep a tooltip in every expanded row, and a planned leaf is marked without a text chip', () => {
+    const LONG = 'Voyage Checklists and Passage Planning Records';
+    const nodes: FilteredNavNode[] = [
+      { id: 'ops', label: 'Operations Group With A Long Name', path: '/v/:vesselCode/vessel', icon: Navigation, kind: 'group', children: [
+        { id: 'voyage', label: LONG, path: '/v/:vesselCode/vessel/voyage-checklists', icon: CheckSquare, kind: 'leaf', status: 'planned' },
+      ] },
+      { id: 'docs', label: 'Documents & Plans for the Engine Room', path: '/v/:vesselCode/technical/documents', icon: FolderOpen, kind: 'leaf', status: 'live' },
+      { id: 'deck', label: 'Deck Plans and General Arrangement', path: '/v/:vesselCode/technical/deck-plans', icon: Layers, kind: 'leaf', status: 'planned', locked: true },
+    ];
+    render(
+      <NavAccessContext.Provider value={OPEN_ACCESS}>
+        <MemoryRouter initialEntries={['/v/dra/vessel/voyage-checklists']}>
+          <SidebarNavigation nodes={nodes} heading={null} />
+        </MemoryRouter>
+      </NavAccessContext.Provider>,
+    );
+    const navigation = screen.getByRole('navigation', { name: 'Navigation' });
+    // Group trigger, leaf link and locked button: the truncating label has the full text as its title.
+    for (const label of ['Operations Group With A Long Name', LONG, 'Documents & Plans for the Engine Room', 'Deck Plans and General Arrangement']) {
+      expect(within(navigation).getByText(label)).toHaveAttribute('title', label);
+    }
+    const planned = within(navigation).getByRole('link', { name: `${LONG}, planned, current page` });
+    expect(planned.querySelector('[data-nav-status="planned"]')).toHaveAttribute('aria-hidden', 'true');
+    expect(within(navigation).getByRole('button', { name: 'Deck Plans and General Arrangement, planned, add-on, locked' })).toBeInTheDocument();
+    expect(within(navigation).queryByText('Planned')).toBeNull();
   });
 });

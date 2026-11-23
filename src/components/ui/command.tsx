@@ -108,21 +108,75 @@ type CommandInputProps = React.ComponentPropsWithoutRef<typeof CommandPrimitive.
   trailing?: React.ReactNode;
 };
 
+/** The first selected option of this command root (not of a command nested in it). */
+function selectedOption(root: Element): HTMLElement | null {
+  for (const item of Array.from(root.querySelectorAll<HTMLElement>('[cmdk-item][aria-selected="true"]'))) {
+    if (item.closest("[cmdk-root]") === root) return item;
+  }
+  return null;
+}
+
+/*
+ * Keeps the input's `aria-activedescendant` on the option Enter will run
+ * (WAI-ARIA combobox; gap/10 IA4, IA12). cmdk writes the attribute itself,
+ * after the caller's props, and it lags the selection: missing until the
+ * first arrow key, stale after a query changes the first match. A
+ * MutationObserver on the command root (so lists that mount later are covered)
+ * follows `aria-selected` and corrects the input, writing only when the value
+ * differs, so its own writes end the loop and cmdk's stale ones are undone.
+ */
+function useActiveDescendantSync(inputRef: React.RefObject<HTMLInputElement>): void {
+  React.useLayoutEffect(() => {
+    const input = inputRef.current;
+    const root = input?.closest("[cmdk-root]");
+    if (!input || !root || typeof MutationObserver === "undefined") return undefined;
+    const sync = () => {
+      const id = selectedOption(root)?.id || null;
+      if (id) {
+        if (input.getAttribute("aria-activedescendant") !== id) input.setAttribute("aria-activedescendant", id);
+      } else if (input.hasAttribute("aria-activedescendant")) {
+        input.removeAttribute("aria-activedescendant");
+      }
+    };
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(root, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["aria-selected", "id", "aria-activedescendant"],
+    });
+    return () => observer.disconnect();
+  }, [inputRef]);
+}
+
 const CommandInput = React.forwardRef<React.ElementRef<typeof CommandPrimitive.Input>, CommandInputProps>(
-  ({ className, wrapperClassName, trailing, ...props }, ref) => (
-    <div className={cn("flex items-center gap-2 border-b border-border px-3", wrapperClassName)} cmdk-input-wrapper="">
-      <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-      <CommandPrimitive.Input
-        ref={ref}
-        className={cn(
-          "flex h-11 w-full min-w-0 rounded-md bg-transparent py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
-          className,
-        )}
-        {...props}
-      />
-      {trailing}
-    </div>
-  ),
+  ({ className, wrapperClassName, trailing, ...props }, ref) => {
+    const inputRef = React.useRef<HTMLInputElement | null>(null);
+    const setRefs = React.useCallback(
+      (node: HTMLInputElement | null) => {
+        inputRef.current = node;
+        if (typeof ref === "function") ref(node);
+        else if (ref) ref.current = node;
+      },
+      [ref],
+    );
+    useActiveDescendantSync(inputRef);
+    return (
+      <div className={cn("flex items-center gap-2 border-b border-border px-3", wrapperClassName)} cmdk-input-wrapper="">
+        <Search className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <CommandPrimitive.Input
+          ref={setRefs}
+          className={cn(
+            "flex h-11 w-full min-w-0 rounded-md bg-transparent py-3 text-sm text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50",
+            className,
+          )}
+          {...props}
+        />
+        {trailing}
+      </div>
+    );
+  },
 );
 
 CommandInput.displayName = CommandPrimitive.Input.displayName;

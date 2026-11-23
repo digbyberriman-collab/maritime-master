@@ -2,9 +2,10 @@
  * Dead shell code stays gone (gap/10 IA22; BUILD-PLAN S6/S7; spec §2.1 L1c).
  *
  * The top bar, the vessel tab row, the account menu and the URL-routed
- * personal area replaced these. Each was deleted only once nothing imported
- * it; this test keeps it that way: the files are gone, and no source file
- * imports them or names them again.
+ * personal area replaced these (and left the dashboard filter provider with
+ * no consumer). Each was deleted only once nothing imported it; this test
+ * keeps it that way: the files are gone, and no source file imports them or
+ * names them again.
  */
 import { describe, expect, it } from 'vitest';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -21,6 +22,8 @@ const DELETED_FILES = [
   'src/modules/settings/components/SettingsHeader.tsx',
   'src/modules/settings/components/SettingsSidebar.tsx',
   'src/modules/settings/components/SettingsMobileNav.tsx',
+  // No consumer left once the shell swap retired the header filter (doc 02 can bring a page filter back).
+  'src/modules/dashboard/contexts/DashboardFilterContext.tsx',
 ] as const;
 
 /** The names the deleted modules exported (default exports were imported under these). */
@@ -32,6 +35,8 @@ const DELETED_NAMES = [
   'SettingsHeader',
   'SettingsSidebar',
   'SettingsMobileNav',
+  'DashboardFilterContext',
+  'DashboardFilterProvider',
 ] as const;
 
 function sourceFiles(dir: string, acc: string[] = []): string[] {

@@ -25,8 +25,11 @@ export type VesselRouteDecision = 'ok' | 'loading' | 'error' | { off: string };
  * Every `vessel_module_settings` key a vessel page needs on: its tab's key,
  * then each key on the way down to the most specific nav node the path sits
  * under (`technical/jobs/123` → `['technical', 'technical.jobs']`;
- * `crew/hours-of-rest` → `['crew', 'crew_hor']`). `[]` for the vessel home
- * and for pages outside every module with a setting.
+ * `crew/hours-of-rest` → `['crew', 'crew_hor']`), including the pages a node
+ * lists in `alsoCovers` (one crew member's month,
+ * `crew/people/p1/hours-of-rest` → `['crew', 'crew_hor']`). `[]` for the
+ * vessel home and for pages outside every module with a setting. It is the
+ * vessel switch's rule (`vesselSettingKeysForRest`), so the two never drift.
  */
 export function moduleSettingsForVesselPath(vesselRest: string): string[] {
   return vesselSettingKeysForRest(vesselRest);

@@ -7,7 +7,8 @@
  */
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import type { QueryClient } from '@tanstack/react-query';
 
 vi.mock('@/integrations/supabase/client', async () => (await import('./fakeSupabase')).fakeSupabaseModule);
 vi.mock('@/modules/auth/contexts/AuthContext', async () => {
@@ -57,6 +58,20 @@ const fix = (vesselId: string, navStatus: string | null, at = minutesAgo(10), co
   timestamp_utc: at,
 });
 const alert = (vesselId: string, severity: string) => ({ vessel_id: vesselId, severity_color: severity, status: 'OPEN', company_id: COMPANY_ID });
+
+/** The scope control's open-alert summary query (every reachable vessel, sorted) and its position query. */
+const ALERTS_KEY = ['shell', 'vessel-alerts', COMPANY_ID, ...[DRAAK.id, HYDRA.id, XIPHIAS.id].sort()];
+const POSITIONS_KEY = ['latest-vessel-positions', DRAAK.id];
+
+/**
+ * Wait until a query has finished (success or error), then let the render it
+ * causes run inside act. Only then is a "nothing shown" assertion about the
+ * settled state; before it, the loading state shows the same nothing.
+ */
+async function settled(queryClient: QueryClient, key: readonly unknown[]): Promise<void> {
+  await waitFor(() => expect(queryClient.getQueryState(key)?.status).toMatch(/^(success|error)$/));
+  await act(async () => {});
+}
 
 beforeEach(() => {
   localStorage.clear();
@@ -123,11 +138,91 @@ describe('the five states (fail closed)', () => {
 });
 
 describe('workspace chip', () => {
+  const healthScope = { scope: 'workspace' as const, workspace: 'health' };
+  /** The chip's parts: the short label (below 640 px), the screen-reader name, the full label (from 640 px). */
+  const chipParts = (chip: HTMLElement) => {
+    const [short, srName, full] = Array.from(chip.children) as HTMLElement[];
+    return { short, srName, full };
+  };
+
   it('names the workspace and lights neither segment', async () => {
     renderShell(<ScopeControl />, { path: '/hris/people', scope: { scope: 'workspace', workspace: 'hris' }, access: FLEET_ACCESS });
-    expect(await screen.findByTestId(SHELL_TEST_IDS.scopeWorkspaceChip)).toHaveTextContent('HRIS');
+    const chip = await screen.findByTestId(SHELL_TEST_IDS.scopeWorkspaceChip);
+    expect(chipParts(chip).full).toHaveTextContent(/^HRIS$/);
+    expect(chip).toHaveAttribute('title', 'HRIS');
     expect(screen.getByTestId(SHELL_TEST_IDS.scopeFleet)).not.toHaveAttribute('aria-current');
     expect(screen.getByTestId(SHELL_TEST_IDS.scopeVessel)).not.toHaveAttribute('aria-current');
+  });
+
+  it('shows below 640 px too: a short label, the full name for assistive technology (D-70)', async () => {
+    renderShell(<ScopeControl />, { path: '/health/medical/dashboard', scope: healthScope, access: FLEET_ACCESS });
+    const chip = await screen.findByTestId(SHELL_TEST_IDS.scopeWorkspaceChip);
+    // Never hidden at any width: no `hidden` on the chip itself.
+    expect(chip).toHaveClass('inline-flex');
+    expect(chip).not.toHaveClass('hidden');
+    const { short, srName, full } = chipParts(chip);
+    expect(short).toHaveTextContent(/^Health$/);
+    expect(short).toHaveAttribute('aria-hidden', 'true');
+    expect(short).toHaveClass('sm:hidden', 'truncate');
+    expect(srName).toHaveTextContent(/^Health & Wellness$/);
+    expect(srName).toHaveClass('sr-only', 'sm:hidden');
+    expect(full).toHaveTextContent(/^Health & Wellness$/);
+    expect(full).toHaveClass('hidden', 'sm:block', 'truncate');
+    expect(chip).toHaveAttribute('title', 'Health & Wellness');
+  });
+
+  it('is the part that gives way below 1024 px, never the vessel segment', async () => {
+    renderShell(<ScopeControl />, { path: '/health/medical/dashboard', scope: healthScope, access: FLEET_ACCESS });
+    const chip = await screen.findByTestId(SHELL_TEST_IDS.scopeWorkspaceChip);
+    expect(chip).toHaveClass('min-w-0', 'shrink', 'lg:shrink-0');
+    expect(chip).not.toHaveClass('shrink-0');
+    const segment = screen.getByTestId(SHELL_TEST_IDS.scopeVessel);
+    expect(segment).toHaveClass('shrink-0', 'lg:shrink');
+    // The segmented control (the switcher's anchor) keeps its width too.
+    const control = screen.getByTestId(SHELL_TEST_IDS.vesselSwitcherTrigger).parentElement;
+    expect(control).toHaveClass('shrink-0', 'lg:shrink');
+  });
+
+  it('next to a chip the vessel shows its code up to 1024 px, then its name', async () => {
+    renderShell(<ScopeControl />, { path: '/health/medical/dashboard', scope: healthScope, access: FLEET_ACCESS });
+    const segment = await screen.findByTestId(SHELL_TEST_IDS.scopeVessel);
+    const code = within(segment).getByText('DRA');
+    expect(code).toHaveClass('lg:hidden');
+    expect(code).not.toHaveClass('sm:hidden');
+    expect(within(segment).getByText('DRAAK', { selector: '.sr-only' })).toHaveClass('lg:hidden');
+    const name = within(segment).getByText('DRAAK', { selector: ':not(.sr-only)' });
+    expect(name).toHaveClass('hidden', 'lg:inline');
+    expect(name).not.toHaveClass('sm:inline');
+  });
+
+  it('next to a chip the Fleet segment is its globe up to 1024 px, still named Fleet', async () => {
+    renderShell(<ScopeControl />, { path: '/health/medical/dashboard', scope: healthScope, access: FLEET_ACCESS });
+    const fleet = await screen.findByTestId(SHELL_TEST_IDS.scopeFleet);
+    // jsdom applies no Tailwind CSS: both spans count here; in the browser one is display:none.
+    expect(fleet).toHaveAccessibleName(/Fleet/);
+    expect(within(fleet).getByText('Fleet', { selector: '.sr-only' })).toHaveClass('lg:hidden');
+    expect(within(fleet).getByText('Fleet', { selector: ':not(.sr-only)' })).toHaveClass('hidden', 'lg:inline');
+  });
+
+  it('one vessel and no fleet reach: the plain label shows the code next to a chip as well', async () => {
+    asVesselMaster([DRAAK]);
+    renderShell(<ScopeControl />, { path: '/health/medical/dashboard', scope: healthScope, access: VESSEL_ONLY_ACCESS });
+    const label = await screen.findByTestId(SHELL_TEST_IDS.scopeVessel);
+    expect(within(label).getByText('DRA')).toHaveClass('lg:hidden');
+    expect(within(label).getByText('DRAAK', { selector: ':not(.sr-only)' })).toHaveClass('hidden', 'lg:inline');
+    expect(screen.getByTestId(SHELL_TEST_IDS.scopeWorkspaceChip)).toBeInTheDocument();
+  });
+
+  it('without a chip the code still gives way to the name from 640 px', async () => {
+    renderShell(<ScopeControl />, { path: '/v/dra', scope: vesselScope, access: FLEET_ACCESS });
+    const segment = await screen.findByTestId(SHELL_TEST_IDS.scopeVessel);
+    expect(within(segment).getByText('DRA')).toHaveClass('sm:hidden');
+    expect(within(segment).getByText('DRA')).not.toHaveClass('lg:hidden');
+    expect(within(segment).getByText('DRAAK', { selector: ':not(.sr-only)' })).toHaveClass('hidden', 'sm:inline');
+    expect(segment).toHaveClass('min-w-0');
+    expect(segment).not.toHaveClass('shrink-0');
+    const fleet = screen.getByTestId(SHELL_TEST_IDS.scopeFleet);
+    expect(within(fleet).getByText('Fleet', { selector: ':not(.sr-only)' })).toHaveClass('hidden', 'sm:inline');
   });
 
   it('is absent outside a workspace', async () => {
@@ -192,9 +287,9 @@ describe('the vessel segment', () => {
 
 describe('AIS mark (D-22)', () => {
   const mark = async () => {
-    renderShell(<ScopeControl />, { path: '/v/dra', scope: vesselScope, access: FLEET_ACCESS });
+    const { queryClient } = renderShell(<ScopeControl />, { path: '/v/dra', scope: vesselScope, access: FLEET_ACCESS });
     const segment = await screen.findByTestId(SHELL_TEST_IDS.scopeVessel);
-    return segment;
+    return Object.assign(segment, { queryClient });
   };
 
   it.each([
@@ -227,8 +322,8 @@ describe('AIS mark (D-22)', () => {
   it('shows no mark while positions fail to load', async () => {
     fakeDb.failures.ais_snapshots = { message: 'network down' };
     const segment = await mark();
-    // Let the failed request settle.
-    await new Promise((r) => setTimeout(r, 20));
+    await settled(segment.queryClient, POSITIONS_KEY);
+    expect(segment.queryClient.getQueryState(POSITIONS_KEY)?.status).toBe('error');
     expect(segment.querySelector('[data-ais]')).toBeNull();
   });
 
@@ -260,18 +355,20 @@ describe('compliance dot (D-57)', () => {
 
   it('no open alert: no dot', async () => {
     fakeDb.tables.alerts = [alert(HYDRA.id, 'RED')];
-    renderShell(<ScopeControl />, { path: '/v/dra', scope: vesselScope, access: FLEET_ACCESS });
+    const { queryClient } = renderShell(<ScopeControl />, { path: '/v/dra', scope: vesselScope, access: FLEET_ACCESS });
     const segment = await screen.findByTestId(SHELL_TEST_IDS.scopeVessel);
-    await new Promise((r) => setTimeout(r, 20));
+    await settled(queryClient, ALERTS_KEY);
+    expect(queryClient.getQueryState(ALERTS_KEY)?.status).toBe('success');
     expect(segment.querySelector('[data-compliance]')).toBeNull();
     expect(within(segment).queryByText(/alert/)).toBeNull();
   });
 
   it('an alerts error: no dot (never a reassuring one)', async () => {
     fakeDb.failures.alerts = { message: 'permission denied' };
-    renderShell(<ScopeControl />, { path: '/v/dra', scope: vesselScope, access: FLEET_ACCESS });
+    const { queryClient } = renderShell(<ScopeControl />, { path: '/v/dra', scope: vesselScope, access: FLEET_ACCESS });
     const segment = await screen.findByTestId(SHELL_TEST_IDS.scopeVessel);
-    await new Promise((r) => setTimeout(r, 20));
+    await settled(queryClient, ALERTS_KEY);
+    expect(queryClient.getQueryState(ALERTS_KEY)?.status).toBe('error');
     expect(segment.querySelector('[data-compliance]')).toBeNull();
   });
 

@@ -3,6 +3,10 @@
  * found, no access, vessel archived, page not found. They render no shell; the
  * scope layout puts them inside its DashboardLayout. Built on the shared page
  * states (`@/shared/components/states`, gap/00 D7, gap/10 §A.12).
+ *
+ * Each state that replaces a page names itself to the page header
+ * (`usePageLocationOverride`, spec §7), so the document title and the
+ * breadcrumb say what is shown ("Page not found"), never the URL's nav title.
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
@@ -10,6 +14,7 @@ import { Loader2, SearchX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AccessDenied, EmptyState, PageLoading, VesselArchived } from '@/shared/components/states';
 import RbacRetryNotice from '@/shared/components/layout/topbar/RbacRetryNotice';
+import { usePageLocationOverride } from '@/shared/components/layout/pageLocationOverride';
 
 /**
  * Placeholder inside the shell while a scope works out what to show. It
@@ -44,34 +49,42 @@ const homeLink = (homePath: string) => (
   </Button>
 );
 
-/** 404 for a vessel code that matches no vessel of the company. */
-export const VesselNotFound: React.FC<{ code: string; homePath: string }> = ({ code, homePath }) => (
-  <EmptyState
-    kind="filtered"
-    icon={SearchX}
-    headingLevel={1}
-    title="Vessel not found"
-    body={
-      <>
-        No vessel has the code <span className="font-mono">{code.toUpperCase()}</span>. Check the link, or pick the
-        vessel from the vessel menu.
-      </>
-    }
-    action={homeLink(homePath)}
-  />
-);
+/** 404 for a vessel code that matches no vessel of the company. No scope root to name: the title alone. */
+export const VesselNotFound: React.FC<{ code: string; homePath: string }> = ({ code, homePath }) => {
+  usePageLocationOverride({ title: 'Vessel not found', crumbs: 'none' });
+  return (
+    <EmptyState
+      kind="filtered"
+      icon={SearchX}
+      headingLevel={1}
+      title="Vessel not found"
+      body={
+        <>
+          No vessel has the code <span className="font-mono">{code.toUpperCase()}</span>. Check the link, or pick the
+          vessel from the vessel menu.
+        </>
+      }
+      action={homeLink(homePath)}
+    />
+  );
+};
 
 /** No reach: the vessel (or scope) exists but the user may not open it. */
 export const ScopeAccessDenied: React.FC<{ title?: string; detail?: string; homePath: string }> = ({
   title = "You don't have access to this vessel",
   detail = 'This vessel is not one of the vessels assigned to you. Ask your account admin if you need access.',
   homePath,
-}) => <AccessDenied title={title} detail={detail} backTo={{ to: homePath, label: 'Go to my start page' }} headingLevel={1} />;
+}) => {
+  usePageLocationOverride({ title });
+  return <AccessDenied title={title} detail={detail} backTo={{ to: homePath, label: 'Go to my start page' }} headingLevel={1} />;
+};
 
 /** The vessel has been sold or archived; its records are kept but its pages are closed. */
-export const VesselArchivedState: React.FC<{ name: string; homePath: string }> = ({ name, homePath }) => (
-  <VesselArchived vesselName={name} action={homeLink(homePath)} headingLevel={1} />
-);
+export const VesselArchivedState: React.FC<{ name: string; homePath: string }> = ({ name, homePath }) => {
+  // VesselArchived's own heading.
+  usePageLocationOverride({ title: `${name} is archived` });
+  return <VesselArchived vesselName={name} action={homeLink(homePath)} headingLevel={1} />;
+};
 
 /**
  * A vessel link that means "my vessel", for someone with no vessel to open
@@ -86,13 +99,16 @@ export const NoVesselState: React.FC<{ homePath: string }> = ({ homePath }) => (
 );
 
 /** A path inside a scope that no page answers. */
-export const ScopePageNotFound: React.FC<{ homePath: string }> = ({ homePath }) => (
-  <EmptyState
-    kind="filtered"
-    icon={SearchX}
-    headingLevel={1}
-    title="Page not found"
-    body="This page does not exist, or it has moved."
-    action={homeLink(homePath)}
-  />
-);
+export const ScopePageNotFound: React.FC<{ homePath: string }> = ({ homePath }) => {
+  usePageLocationOverride({ title: 'Page not found' });
+  return (
+    <EmptyState
+      kind="filtered"
+      icon={SearchX}
+      headingLevel={1}
+      title="Page not found"
+      body="This page does not exist, or it has moved."
+      action={homeLink(homePath)}
+    />
+  );
+};

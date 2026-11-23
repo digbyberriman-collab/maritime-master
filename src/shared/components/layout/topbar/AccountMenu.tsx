@@ -68,6 +68,7 @@ import { useHelpItems } from './helpItems';
 import { useWorkspaceApps } from './useWorkspaceApps';
 import { useShellVessel } from './useShellVessel';
 import { focusRing } from './styles';
+import TopBarTooltip from './TopBarTooltip';
 
 const item = 'gap-2.5 [@media(pointer:coarse)]:min-h-11';
 const icon = 'h-[18px] w-[18px] shrink-0 text-muted-foreground';
@@ -88,10 +89,16 @@ const SECTION_TITLE: Readonly<Record<Section, string>> = {
 const AppearanceItems: React.FC = () => {
   const { theme, choose } = useThemeChoice();
   const [density, setDensity] = useDensity();
+  // Each radio group is named by its visible label.
+  const themeLabelId = React.useId();
+  const densityLabelId = React.useId();
   return (
     <>
-      <DropdownMenuLabel className="type-eyebrow text-muted-foreground">Theme</DropdownMenuLabel>
+      <DropdownMenuLabel id={themeLabelId} className="type-eyebrow text-muted-foreground">
+        Theme
+      </DropdownMenuLabel>
       <DropdownMenuRadioGroup
+        aria-labelledby={themeLabelId}
         value={theme ?? undefined}
         onValueChange={(next) => {
           if (isThemePreference(next)) void choose(next);
@@ -111,8 +118,11 @@ const AppearanceItems: React.FC = () => {
         </DropdownMenuRadioItem>
       </DropdownMenuRadioGroup>
       <DropdownMenuSeparator />
-      <DropdownMenuLabel className="type-eyebrow text-muted-foreground">Density · this device</DropdownMenuLabel>
+      <DropdownMenuLabel id={densityLabelId} className="type-eyebrow text-muted-foreground">
+        Density · this device
+      </DropdownMenuLabel>
       <DropdownMenuRadioGroup
+        aria-labelledby={densityLabelId}
         value={density}
         onValueChange={(next) => {
           if (isDensity(next)) setDensity(next);
@@ -257,6 +267,7 @@ const AccountMenu: React.FC<{ className?: string }> = ({ className }) => {
   const setPanelOpen = useFeedbackStore((s) => s.setPanelOpen);
   const { openKeyboardShortcuts } = useShellActions();
   const wide = useMediaQuery(SHELL_MEDIA.md);
+  const [menuOpen, setMenuOpen] = React.useState(false);
   const [section, setSection] = React.useState<Section | null>(null);
   const [returnTo, setReturnTo] = React.useState<Section | null>(null);
   const sectionItems = React.useRef<Partial<Record<Section, HTMLDivElement | null>>>({});
@@ -297,7 +308,9 @@ const AccountMenu: React.FC<{ className?: string }> = ({ className }) => {
 
   return (
     <DropdownMenu
+      open={menuOpen}
       onOpenChange={(open) => {
+        setMenuOpen(open);
         if (!open) {
           setSection(null);
           setReturnTo(null);
@@ -305,16 +318,18 @@ const AccountMenu: React.FC<{ className?: string }> = ({ className }) => {
       }}
     >
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          data-testid={SHELL_TEST_IDS.accountTrigger}
-          aria-label={fullName ? `Account menu for ${fullName}` : 'Account menu'}
-          className={cn('inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full', focusRing, className)}
-        >
-          <Avatar className="h-9 w-9">
-            <AvatarFallback className="bg-slate-ui-900 text-sm font-semibold text-drift-50">{initials}</AvatarFallback>
-          </Avatar>
-        </button>
+        <TopBarTooltip label="Account" suppressed={menuOpen}>
+          <button
+            type="button"
+            data-testid={SHELL_TEST_IDS.accountTrigger}
+            aria-label={fullName ? `Account menu for ${fullName}` : 'Account menu'}
+            className={cn('inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full', focusRing, className)}
+          >
+            <Avatar className="h-9 w-9">
+              <AvatarFallback className="bg-slate-ui-900 text-sm font-semibold text-drift-50">{initials}</AvatarFallback>
+            </Avatar>
+          </button>
+        </TopBarTooltip>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"

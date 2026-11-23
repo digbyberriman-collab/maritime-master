@@ -1,8 +1,6 @@
 import React from 'react';
-import { format } from 'date-fns';
-import { Award, MapPin, RefreshCw } from 'lucide-react';
+import { Award, MapPin } from 'lucide-react';
 import PageHeader from '@/shared/components/layout/PageHeader';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { VesselDashboardData } from '@/modules/vessels/hooks/useVesselDashboard';
 
@@ -10,39 +8,29 @@ interface VesselHeaderProps {
   data: VesselDashboardData | null;
   isLoading: boolean;
   isAllVessels: boolean;
-  onRefresh?: () => void;
+  /** The page's actions (freshness stamp, filter, Refresh, quick actions), in PageHeader's actions slot. */
+  actions?: React.ReactNode;
   userName?: string;
 }
 
-function RefreshAction({ refreshedAt, onRefresh }: { refreshedAt?: string | null; onRefresh?: () => void }) {
-  if (!refreshedAt && !onRefresh) return null;
-  return (
-    <div className="flex items-center gap-2">
-      {refreshedAt ? (
-        <span className="text-xs tabular-nums text-muted-foreground">Updated {format(new Date(refreshedAt), 'HH:mm')}</span>
-      ) : null}
-      {onRefresh ? (
-        <Button variant="outline" size="icon" onClick={onRefresh} aria-label="Refresh dashboard" title="Refresh dashboard">
-          <RefreshCw aria-hidden="true" className="h-4 w-4" />
-        </Button>
-      ) : null}
-    </div>
-  );
-}
-
 /**
- * The vessel dashboard's page heading (Phase 1 S7): `PageHeader` with the
- * vessel name as the page's only h1, IMO as the reference chip and flag /
- * class society underneath. It replaces the gradient hero card.
+ * The vessel dashboard's page heading (Phase 1 S7; D-82): `PageHeader` with
+ * the vessel name as the page's only h1, IMO as the reference chip and flag /
+ * class society underneath, and the page's actions in its actions slot (they
+ * wrap under the title on narrow screens). It replaces the gradient hero card.
  */
-const VesselHeader: React.FC<VesselHeaderProps> = ({ data, isLoading, isAllVessels, onRefresh }) => {
+const VesselHeader: React.FC<VesselHeaderProps> = ({ data, isLoading, isAllVessels, actions }) => {
   if (isLoading) {
     return (
-      <div role="status" aria-busy="true" className="mb-4 min-w-0 flex-1 space-y-2">
-        <Skeleton className="h-3 w-24" />
-        <Skeleton className="h-7 w-56" />
-        <Skeleton className="h-4 w-72 max-w-full" />
-        <span className="sr-only">Loading vessel</span>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        {/* The same 18rem title room as PageHeader, so the actions do not jump when the vessel loads. */}
+        <div role="status" aria-busy="true" className="min-w-[min(18rem,100%)] flex-1 space-y-2">
+          <Skeleton className="h-3 w-24" />
+          <Skeleton className="h-7 w-56 max-w-full" />
+          <Skeleton className="h-4 w-72 max-w-full" />
+          <span className="sr-only">Loading vessel</span>
+        </div>
+        {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
       </div>
     );
   }
@@ -50,11 +38,10 @@ const VesselHeader: React.FC<VesselHeaderProps> = ({ data, isLoading, isAllVesse
   if (isAllVessels) {
     return (
       <PageHeader
-        className="min-w-0 flex-1"
         eyebrow="All vessels"
         title="Fleet overview"
         description="Every vessel you can reach, at a glance."
-        actions={<RefreshAction refreshedAt={data?.data_refreshed_at} onRefresh={onRefresh} />}
+        actions={actions}
       />
     );
   }
@@ -66,7 +53,6 @@ const VesselHeader: React.FC<VesselHeaderProps> = ({ data, isLoading, isAllVesse
 
   return (
     <PageHeader
-      className="min-w-0 flex-1"
       eyebrow="Vessel"
       title={data?.vessel_name || 'Unknown vessel'}
       reference={data?.imo_number ? `IMO ${data.imo_number}` : undefined}
@@ -83,7 +69,7 @@ const VesselHeader: React.FC<VesselHeaderProps> = ({ data, isLoading, isAllVesse
           </span>
         ) : undefined
       }
-      actions={<RefreshAction refreshedAt={data?.data_refreshed_at} onRefresh={onRefresh} />}
+      actions={actions}
     />
   );
 };

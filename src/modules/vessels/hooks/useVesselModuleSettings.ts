@@ -3,11 +3,14 @@
  * D-01, D-04; spec §5.3). The only place that builds the vessels pending
  * client, so the pending-table ratchet sees one shim and one client.
  *
- * - The table not existing yet (`isMissingRelation`) is not an error: the
- *   state is `ready` with `source: 'table-missing'` and no rows, which the
- *   resolver reads as "every module on" (D-01).
+ * - The table not existing yet (`isMissingTable`: 42P01, PGRST205, or the
+ *   "relation … does not exist" message) is not an error: the state is
+ *   `ready` with `source: 'table-missing'` and no rows, which the resolver
+ *   reads as "every module on" (D-01, D-63).
  * - Any other failure is an `error` state (the shell shows a Retry strip and
- *   hides what the settings gate). Never mock rows.
+ *   hides what the settings gate), including a missing column (42703,
+ *   PGRST204): the table exists, so its `enabled = false` rows may be real
+ *   and must not be read as "every module on" (D-04). Never mock rows.
  *
  * `vesselModuleSettingsQueryOptions` is shared with `useVesselSwitch`, which
  * fetches the target vessel's settings before it navigates, so both read one
@@ -16,7 +19,7 @@
  */
 import { useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { isMissingRelation, pendingClient } from '@/integrations/supabase/pending';
+import { isMissingTable, pendingClient } from '@/integrations/supabase/pending';
 import { normaliseError } from '@/shared/lib/notify';
 import type { VesselsPendingTables } from '../types/db.pending';
 import { TABLE_MISSING_STATE, type ModuleSettingsState, type VesselModuleSetting } from '../lib/moduleSettings';
@@ -33,14 +36,14 @@ export type ReadyModuleSettings = Extract<ModuleSettingsState, { status: 'ready'
 /** Settings stay fresh for 30 s; Vessel Settings invalidates them on save (W4). */
 export const VESSEL_MODULE_SETTINGS_STALE_MS = 30_000;
 
-/** The vessel's settings; a missing table resolves as "nothing stored". Throws on any other error. */
+/** The vessel's settings; a missing table resolves as "nothing stored". Throws on any other error (a missing column included). */
 export async function fetchVesselModuleSettings(vesselId: string): Promise<ReadyModuleSettings> {
   const { data, error } = await vesselsDb
     .from('vessel_module_settings')
     .select('vessel_id, module_key, enabled, enabled_from, label_override')
     .eq('vessel_id', vesselId);
   if (error) {
-    if (isMissingRelation(error)) return TABLE_MISSING_STATE;
+    if (isMissingTable(error)) return TABLE_MISSING_STATE;
     throw error;
   }
   const settings = new Map<string, VesselModuleSetting>();

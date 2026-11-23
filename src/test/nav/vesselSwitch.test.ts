@@ -12,8 +12,8 @@ vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 import { vesselSettingKeysForRest, vesselSwitchTarget, vesselTabRootForRest } from '@/app/nav/vesselSwitch';
 import { COUNTERPARTS, fleetCounterpart, vesselCounterpart } from '@/app/nav/counterparts';
 import { parseRecentVessels, readRecentVessels, recentVesselsKey, recordRecentVessel } from '@/app/nav/recentVessels';
-import { vesselRestVisibility } from '@/app/nav/useVesselSwitch';
-import { NAVIGATION_ITEMS } from '@/config/sitemap';
+import { buildVesselTabs, vesselRestVisibilityFromTabs } from '@/app/nav/vesselNavModel';
+import type { NavNodeDecision } from '@/app/nav/visibility';
 import type { NavChild } from '@/config/navigation-types';
 
 const allOn = () => true;
@@ -103,21 +103,37 @@ describe('module-setting keys of a vessel page', () => {
   });
 });
 
-describe('vessel page visibility in the static tree', () => {
-  const tree: readonly NavChild[] = NAVIGATION_ITEMS.find((m) => m.id === 'vessel')?.children ?? [];
+describe('vessel page visibility in the filtered vessel nav', () => {
+  const visibility = (decide: (node: NavChild) => NavNodeDecision) =>
+    vesselRestVisibilityFromTabs(buildVesselTabs({ code: 'HYD', resolver: { labelFor: () => null }, decide }), 'HYD');
+  const builtOnly = (node: NavChild): NavNodeDecision => (node.status === 'planned' ? 'hidden' : 'visible');
 
-  it('needs every node from the tab down to pass', () => {
-    const visible = vesselRestVisibility(tree, (item) => item.status !== 'planned');
+  it('the vessel home and a visible tab root are visible', () => {
+    const visible = visibility(builtOnly);
     expect(visible('')).toBe(true);
     expect(visible('crew')).toBe(true);
     expect(visible('crew/training')).toBe(true);
+  });
+
+  it('a planned (hidden) child or tab is not', () => {
+    const visible = visibility(builtOnly);
     // Crew Medical and the whole Charter tab are planned.
     expect(visible('crew/medical')).toBe(false);
     expect(visible('charter')).toBe(false);
   });
 
+  it('a locked tab (an add-on the vessel lacks) is not', () => {
+    const visible = visibility((node) => (node.id === 'vessel-technical' ? 'locked' : builtOnly(node)));
+    expect(visible('technical')).toBe(false);
+    expect(visible('technical/jobs')).toBe(false);
+    expect(visible('crew/list')).toBe(true);
+  });
+
   it('fails closed with a filter that shows nothing', () => {
-    expect(vesselRestVisibility(tree, () => false)('crew/list')).toBe(false);
+    const visible = visibility(() => 'hidden');
+    expect(visible('crew/list')).toBe(false);
+    expect(visible('crew')).toBe(false);
+    expect(visible('')).toBe(true);
   });
 });
 

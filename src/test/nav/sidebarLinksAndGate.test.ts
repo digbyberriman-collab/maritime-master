@@ -71,6 +71,11 @@ describe('the module-off route gate', () => {
   it('lists the keys a page needs, tab first', () => {
     expect(moduleSettingsForVesselPath('technical/jobs/123')).toEqual(['technical', 'technical.jobs']);
     expect(moduleSettingsForVesselPath('crew/hours-of-rest')).toEqual(['crew', 'crew_hor']);
+    // One crew member's month is an Hours of Rest page too (the leaf's alsoCovers).
+    expect(moduleSettingsForVesselPath('crew/people/p1/hours-of-rest')).toEqual(['crew', 'crew_hor']);
+    expect(moduleSettingsForVesselPath('crew/people/p1/hours-of-rest/2026-11')).toEqual(['crew', 'crew_hor']);
+    expect(moduleSettingsForVesselPath('crew/people/p1')).toEqual(['crew']);
+    expect(moduleSettingsForVesselPath('crew/people/p1/hours-of-restless')).toEqual(['crew']);
     expect(moduleSettingsForVesselPath('')).toEqual([]);
     expect(moduleSettingsForVesselPath('calendar')).toEqual([]);
   });
@@ -90,6 +95,20 @@ describe('the module-off route gate', () => {
     expect(vesselRouteDecision('technical/jobs/7', off('technical.jobs'))).toEqual({ off: 'technical.jobs' });
     expect(vesselRouteDecision('technical/surveys', off('technical.jobs'))).toBe('ok');
     expect(vesselRouteDecision('crew/list', ALL_MODULES_ON)).toBe('ok');
+  });
+
+  it('closes one crew member’s Hours of Rest month when crew_hor is not on yet (D-63)', () => {
+    const horLater = resolveModuleSettings(
+      {
+        status: 'ready',
+        source: 'table',
+        settings: new Map([['crew_hor', { moduleKey: 'crew_hor', enabled: true, enabledFrom: '2099-01-01', labelOverride: null }]]),
+      },
+      '2026-11-22',
+    );
+    expect(vesselRouteDecision('crew/hours-of-rest', horLater)).toEqual({ off: 'crew_hor' });
+    expect(vesselRouteDecision('crew/people/p1/hours-of-rest', horLater)).toEqual({ off: 'crew_hor' });
+    expect(vesselRouteDecision('crew/list', horLater)).toBe('ok');
   });
 
   it('names an off key the way the nav does, after the vessel’s override', () => {

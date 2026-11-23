@@ -32,7 +32,7 @@ describe('useSidebarCollapsed', () => {
     fakeDb.tables.user_preferences = [{ user_id: USER_ID, sidebar_collapsed: false }];
     const { result } = renderHook(() => useSidebarCollapsed());
     expect(result.current.collapsed).toBe(true);
-    await new Promise((r) => setTimeout(r, 0));
+    await act(async () => {});
     expect(prefReads()).toEqual([]);
     expect(result.current.collapsed).toBe(true);
   });
@@ -49,13 +49,24 @@ describe('useSidebarCollapsed', () => {
   });
 
   it('a toggle while the profile read is in flight wins over the profile', async () => {
-    fakeDb.delayMs = 30;
-    fakeDb.tables.user_preferences = [{ user_id: USER_ID, sidebar_collapsed: false }];
-    const { result } = renderHook(() => useSidebarCollapsed());
-    act(() => result.current.toggle());
-    expect(result.current.collapsed).toBe(true);
-    await new Promise((r) => setTimeout(r, 60));
-    expect(result.current.collapsed).toBe(true);
+    vi.useFakeTimers();
+    try {
+      fakeDb.delayMs = 30;
+      fakeDb.tables.user_preferences = [{ user_id: USER_ID, sidebar_collapsed: false }];
+      const { result } = renderHook(() => useSidebarCollapsed());
+      // The read has started and has not come back yet.
+      expect(prefReads()).toHaveLength(1);
+      act(() => result.current.toggle());
+      expect(result.current.collapsed).toBe(true);
+      // Let the read come back and the hook handle it, then check it lost.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(fakeDb.delayMs);
+      });
+      expect(result.current.collapsed).toBe(true);
+      expect(localStorage.getItem(SIDEBAR_COLLAPSED_KEY)).toBe('true');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('a toggle writes the device value and mirrors it to the profile', async () => {
@@ -84,7 +95,7 @@ describe('useSidebarCollapsed', () => {
     shellState.auth.user = null;
     const { result } = renderHook(() => useSidebarCollapsed());
     act(() => result.current.toggle());
-    await new Promise((r) => setTimeout(r, 0));
+    await act(async () => {});
     expect(fakeDb.calls).toEqual([]);
     expect(localStorage.getItem(SIDEBAR_COLLAPSED_KEY)).toBe('true');
   });

@@ -16,6 +16,7 @@ import {
   vesselModuleSettingsKeys,
   vesselModuleSettingsQueryOptions,
 } from '@/modules/vessels/hooks/useVesselModuleSettings';
+import { resolveModuleSettings } from '@/modules/vessels/lib/moduleSettings';
 import { fakeDb, resetFakeDb } from '../shell/fakeSupabase';
 
 beforeEach(() => resetFakeDb());
@@ -50,6 +51,26 @@ describe('fetchVesselModuleSettings', () => {
     expect(state.settings.size).toBe(0);
   });
 
+  it('treats PGRST205 (table not in the schema cache) as table-missing', async () => {
+    fakeDb.failures.vessel_module_settings = { code: 'PGRST205', message: "Could not find the table 'public.vessel_module_settings' in the schema cache" };
+    await expect(fetchVesselModuleSettings('v-dra')).resolves.toMatchObject({ status: 'ready', source: 'table-missing' });
+  });
+
+  it('treats an uncoded "relation … does not exist" as table-missing', async () => {
+    fakeDb.failures.vessel_module_settings = { message: 'relation "public.vessel_module_settings" does not exist' };
+    await expect(fetchVesselModuleSettings('v-dra')).resolves.toMatchObject({ status: 'ready', source: 'table-missing' });
+  });
+
+  it.each([
+    ['42703 missing column', { code: '42703', message: 'column vessel_module_settings.enabled_from does not exist' }],
+    ['PGRST204 column not in the schema cache', { code: 'PGRST204', message: "Could not find the 'enabled_from' column of 'vessel_module_settings' in the schema cache" }],
+    ['uncoded missing column', { message: 'column vessel_module_settings.enabled_from does not exist' }],
+    ['uncoded column of relation', { message: 'column "enabled_from" of relation "vessel_module_settings" does not exist' }],
+  ])('a %s is an error, never "every module on" (D-63, D-04)', async (_label, failure) => {
+    fakeDb.failures.vessel_module_settings = failure;
+    await expect(fetchVesselModuleSettings('v-dra')).rejects.toMatchObject({ message: failure.message });
+  });
+
   it('throws any other error', async () => {
     fakeDb.failures.vessel_module_settings = { code: '57014', message: 'canceling statement due to statement timeout' };
     await expect(fetchVesselModuleSettings('v-dra')).rejects.toMatchObject({ code: '57014' });
@@ -74,6 +95,15 @@ describe('useVesselModuleSettings', () => {
     const { result } = renderHook(() => useVesselModuleSettings('v-dra'), { wrapper: wrapper(client()) });
     expect(result.current.state.status).toBe('loading');
     await waitFor(() => expect(result.current.state.status).toBe('ready'));
+  });
+
+  it('a missing column ends in the error state, where every module is off', async () => {
+    fakeDb.failures.vessel_module_settings = { code: '42703', message: 'column vessel_module_settings.enabled_from does not exist' };
+    const { result } = renderHook(() => useVesselModuleSettings('v-dra'), { wrapper: wrapper(client()) });
+    await waitFor(() => expect(result.current.state.status).toBe('error'), { timeout: 4000 });
+    const modules = resolveModuleSettings(result.current.state, '2026-11-22');
+    expect(modules.isModuleOn('technical')).toBe(false);
+    expect(modules.isModuleOn('crew')).toBe(false);
   });
 
   it('reports an error with a message and recovers on retry', async () => {

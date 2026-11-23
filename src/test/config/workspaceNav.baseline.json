@@ -1821,5 +1821,51 @@
       "selfServe": false,
       "crossLink": false
     }
+  ],
+  "legal": [
+    {
+      "kind": "leaf",
+      "id": "departments-legal-dashboard",
+      "label": "Dashboard",
+      "path": "/departments/legal/dashboard",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "departments-legal-requests",
+      "label": "Requests",
+      "path": "/departments/legal/requests",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "departments-legal-documents",
+      "label": "Documents",
+      "path": "/departments/legal/documents",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    },
+    {
+      "kind": "leaf",
+      "id": "departments-legal-forms",
+      "label": "Forms",
+      "path": "/departments/legal/forms",
+      "status": "live",
+      "moduleKey": null,
+      "minPermission": null,
+      "selfServe": false,
+      "crossLink": false
+    }
   ]
 }

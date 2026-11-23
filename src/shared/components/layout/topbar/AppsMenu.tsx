@@ -3,7 +3,11 @@
  * STORM workspaces this user can open, two tiles a row, each with its icon,
  * name and one line of purpose. Hidden while access loads and when the user
  * can open no workspace. Shown from 768 px; on phones the same list sits in
- * the account menu's More group.
+ * the account menu's More group. Each tile opens the workspace's first page
+ * the user may open; the workspace the user is in is marked current.
+ *
+ * Opening it starts keyboard users on the current workspace's tile, else
+ * the first (Radix's focus scope skips links and would land on the panel).
  */
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
@@ -13,25 +17,28 @@ import { cn } from '@/lib/utils';
 import { SHELL_TEST_IDS } from '@/app/shell/testIds';
 import { topBarIconButton } from './styles';
 import { useWorkspaceApps } from './useWorkspaceApps';
+import TopBarTooltip from './TopBarTooltip';
 
 const AppsMenu: React.FC<{ className?: string }> = ({ className }) => {
   const { ready, apps } = useWorkspaceApps();
   const { pathname } = useLocation();
   const [open, setOpen] = React.useState(false);
+  const listRef = React.useRef<HTMLUListElement>(null);
   if (!ready || apps.length === 0) return null;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <button
-          type="button"
-          data-testid={SHELL_TEST_IDS.appsTrigger}
-          aria-label="Apps"
-          title="Apps"
-          className={cn(topBarIconButton, className)}
-        >
-          <LayoutGrid strokeWidth={1.75} aria-hidden="true" />
-        </button>
+        <TopBarTooltip label="Apps" suppressed={open}>
+          <button
+            type="button"
+            data-testid={SHELL_TEST_IDS.appsTrigger}
+            aria-label="Apps"
+            className={cn(topBarIconButton, className)}
+          >
+            <LayoutGrid strokeWidth={1.75} aria-hidden="true" />
+          </button>
+        </TopBarTooltip>
       </PopoverTrigger>
       <PopoverContent
         align="start"
@@ -39,11 +46,16 @@ const AppsMenu: React.FC<{ className?: string }> = ({ className }) => {
         data-testid={SHELL_TEST_IDS.appsMenu}
         aria-label="Apps"
         className="w-[min(26rem,calc(100vw-2rem))] p-2"
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          const list = listRef.current;
+          (list?.querySelector<HTMLElement>('[aria-current="true"]') ?? list?.querySelector<HTMLElement>('a,button'))?.focus();
+        }}
       >
         <p className="type-eyebrow px-1.5 pb-2 pt-1 text-muted-foreground">Workspaces</p>
-        <ul className="grid grid-cols-1 gap-1 min-[420px]:grid-cols-2">
+        <ul ref={listRef} className="grid grid-cols-1 gap-1 min-[420px]:grid-cols-2">
           {apps.map((app) => {
-            const root = app.path.split(/[?#]/)[0];
+            const { root } = app;
             const current = pathname === root || pathname.startsWith(`${root}/`);
             return (
               <li key={app.id}>

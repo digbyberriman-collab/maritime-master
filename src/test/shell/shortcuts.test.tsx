@@ -6,7 +6,7 @@
  */
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 vi.mock('@/integrations/supabase/client', async () => (await import('./fakeSupabase')).fakeSupabaseModule);
 
@@ -183,5 +183,82 @@ describe('the keyboard shortcuts dialog', () => {
     );
     fireEvent.keyDown(screen.getByTestId(SHELL_TEST_IDS.keyboardShortcuts), { key: 'Escape' });
     expect(setOpen).toHaveBeenCalledWith(false);
+  });
+});
+
+describe('focus after the shortcuts dialog closes (gap/10 A.5, WCAG 2.4.3)', () => {
+  const closed = { open: false, setOpen: () => undefined };
+
+  /** The shell's `?` key and the dialog, on real open state, with a button and a main region around them. */
+  const Shell: React.FC<{ showOpener?: boolean; menu?: boolean }> = ({ showOpener = true, menu = false }) => {
+    const [open, setOpen] = React.useState(false);
+    const ui: ShellUi = { notifications: closed, vesselSwitcher: closed, help: closed, keyboardShortcuts: { open, setOpen }, staticSidebar: true };
+    const actions: ShellActions = { openKeyboardShortcuts: () => setOpen(true) };
+    return (
+      <NavAccessContext.Provider value={FLEET_ACCESS}>
+        <ShellActionsContext.Provider value={actions}>
+          <ShellUiContext.Provider value={ui}>
+            <Harness handlers={{ openKeyboardShortcuts: () => setOpen(true) }}>
+              {menu && (
+                <>
+                  <button type="button" aria-controls="account-menu">
+                    Account
+                  </button>
+                  {!open && (
+                    <div role="menu" id="account-menu">
+                      <button type="button" role="menuitem" onClick={() => setOpen(true)}>
+                        Keyboard shortcuts
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+              {showOpener && <button type="button">Opener</button>}
+              <main id="main-content" tabIndex={-1}>
+                Page
+              </main>
+              <KeyboardShortcutsDialog />
+            </Harness>
+          </ShellUiContext.Provider>
+        </ShellActionsContext.Provider>
+      </NavAccessContext.Provider>
+    );
+  };
+
+  const escape = async () => {
+    const dialog = await screen.findByTestId(SHELL_TEST_IDS.keyboardShortcuts);
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByTestId(SHELL_TEST_IDS.keyboardShortcuts)).toBeNull());
+  };
+
+  it('returns focus to the element that had it when ? opened the dialog', async () => {
+    render(<Shell />);
+    const opener = screen.getByRole('button', { name: 'Opener' });
+    opener.focus();
+    key(opener, { key: '?', shiftKey: true });
+    await escape();
+    expect(document.activeElement).toBe(opener);
+  });
+
+  it('opened from a menu item that is gone by then: the menu’s trigger', async () => {
+    render(<Shell menu />);
+    const item = screen.getByRole('menuitem', { name: 'Keyboard shortcuts' });
+    item.focus();
+    fireEvent.click(item);
+    await escape();
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Account' }));
+  });
+
+  it('the opener removed while open: the main content, never the page body', async () => {
+    const { rerender } = render(<Shell />);
+    const opener = screen.getByRole('button', { name: 'Opener' });
+    opener.focus();
+    key(opener, { key: '?', shiftKey: true });
+    await screen.findByTestId(SHELL_TEST_IDS.keyboardShortcuts);
+    rerender(<Shell showOpener={false} />);
+    expect(opener.isConnected).toBe(false);
+    await escape();
+    expect(document.activeElement).toBe(document.getElementById('main-content'));
+    expect(document.activeElement).not.toBe(document.body);
   });
 });

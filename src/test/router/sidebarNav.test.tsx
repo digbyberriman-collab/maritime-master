@@ -1,7 +1,7 @@
 /**
  * The sidebar over the real nav tree (BUILD-PLAN B3, B7, S3; D-06; gap/10
  * IA6, IA7, IA10): planned leaves are hidden by default, shown with a
- * "Planned" chip when an owner or admin turns on "Show roadmap", and never
+ * planned mark when an owner or admin turns on "Show roadmap", and never
  * shown to anyone else. The Fleet tree renders its section headings; fleet
  * and vessel nodes need reach to that scope. Vessel URLs light up their leaf.
  *
@@ -100,7 +100,7 @@ describe('planned leaves in the sidebar', () => {
     expect(within(nav).getByRole('link', { name: /^Calendar/ })).toBeInTheDocument();
   });
 
-  it('show with a Planned chip when an admin turns on Show roadmap', () => {
+  it('show with a planned mark when an admin turns on Show roadmap', () => {
     renderSidebar(DRILLS, admin);
     const toggle = screen.getByRole('switch', { name: /Show roadmap/ });
     expect(toggle).toHaveAttribute('aria-checked', 'false');
@@ -110,8 +110,13 @@ describe('planned leaves in the sidebar', () => {
     expect(localStorage.getItem(SHOW_ROADMAP_KEY)).toBe('true');
     expect(toggle).toHaveAttribute('aria-checked', 'true');
     const nav = screen.getByRole('navigation', { name: 'Vessel folders' });
-    expect(within(nav).getByRole('link', { name: 'Summary, planned' })).toBeInTheDocument();
-    expect(within(nav).getAllByText('Planned').length).toBeGreaterThan(0);
+    const summary = within(nav).getByRole('link', { name: 'Summary, planned' });
+    // A compact visual mark (the accessible name says "planned"), and the label keeps its width.
+    const mark = summary.querySelector('[data-nav-status="planned"]');
+    expect(mark).not.toBeNull();
+    expect(mark).toHaveAttribute('aria-hidden', 'true');
+    expect(within(nav).queryByText('Planned')).toBeNull();
+    expect(within(summary).getByText('Summary')).toHaveAttribute('title', 'Summary');
     expect(within(nav).getByRole('button', { name: /^Finance section/ })).toBeInTheDocument();
     expect(within(nav).getByRole('button', { name: /^Charter section/ })).toBeInTheDocument();
   });

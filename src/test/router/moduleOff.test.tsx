@@ -27,9 +27,6 @@ vi.mock('@/modules/auth/store/permissionsStore', async () => {
 });
 vi.mock('@/shared/hooks/useSidebarBadgeCounts', () => ({ useSidebarBadgeCounts: () => ({ data: undefined }) }));
 vi.mock('@/shared/contexts/BrandingContext', () => ({ useBrandingContext: () => ({ clientDisplayName: 'TEST', clientLogoUrl: null }) }));
-vi.mock('@/modules/dashboard/contexts/DashboardFilterContext', () => ({
-  DashboardFilterProvider: ({ children }: { children: React.ReactNode }) => children,
-}));
 vi.mock('@/shared/components/layout/InkfishFooter', () => ({ default: () => null }));
 vi.mock('@/shared/components/InkfishWatermark', () => ({ default: () => null }));
 vi.mock('@/shared/components/layout/topbar/TopBar', () => ({ default: () => null }));
@@ -156,8 +153,12 @@ describe('pages no setting governs', () => {
     fakeDb.failures.vessel_module_settings = TIMEOUT;
     renderAt('/v/hyd/calendar');
     expect(screen.getByRole('heading', { name: 'Vessel calendar' })).toBeInTheDocument();
-    await new Promise((r) => setTimeout(r, 20));
+    // Wait for the failed read itself (the shell's Retry strip shows it), not a fixed time.
+    await screen.findByTestId(SHELL_TEST_IDS.moduleSettingsRetry, {}, { timeout: 4000 });
+    expect(fakeDb.calls.some((c) => c.table === 'vessel_module_settings')).toBe(true);
+    await act(async () => {});
     expect(screen.getByRole('heading', { name: 'Vessel calendar' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: "This vessel's modules could not load" })).toBeNull();
   });
 });
 

@@ -1,8 +1,8 @@
 /**
  * Open another vessel, keeping the user's place (gap/10 W2, IA23; contract,
  * BUILD-PLAN S1, S4, S5; spec §6.2). The vessel switcher, the scope control's
- * vessel segment and the command palette's Vessels group call this; none
- * navigates on its own.
+ * vessel segment, the in-page vessel pickers and the command palette's
+ * Vessels group call this; none navigates on its own.
  *
  * 1. Fetch the target vessel's module settings (one cache entry with the
  *    vessel nav, `vesselModuleSettingsQueryOptions`). A missing table means
@@ -13,15 +13,19 @@
  *    the vessel counterpart under the same checks.
  * 3. Navigate and put the vessel at the front of the user's recent list.
  *
- * Latest selection wins: a switch overtaken by a later one never navigates.
+ * Latest selection wins across callers (one epoch shared by every caller):
+ * a switch overtaken by a later one never navigates. A switch is abandoned
+ * when the user closes the switcher (`cancelPendingVesselSwitch`) or
+ * navigates elsewhere (`useInvalidateVesselSwitchOnNavigate`, mounted once
+ * in the top bar), so a settings read the user stopped waiting for never
+ * moves them later.
  */
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
-import { NAVIGATION_ITEMS } from '@/config/sitemap';
 import type { NavChild } from '@/config/navigation-types';
-import { VESSEL_SCOPE_PATTERN, vesselPath } from '@/modules/vessels/lib/vesselCode';
+import { vesselPath } from '@/modules/vessels/lib/vesselCode';
 import { vesselModuleSettingsQueryOptions, type ReadyModuleSettings } from '@/modules/vessels/hooks/useVesselModuleSettings';
 import { localIsoDate, resolveModuleSettings } from '@/modules/vessels/lib/moduleSettings';
 import { applySidebarOrder, useSidebarOrder } from '@/shared/hooks/useSidebarOrder';
@@ -37,46 +41,30 @@ export interface VesselSwitchTargetVessel {
   code: string;
 }
 
-const strip = (path: string): string => path.replace(/^\/+|\/+$/g, '');
-
 /**
- * Whether a vessel page (`rest` after `/v/<code>/`) is visible in a vessel nav
- * tree on the `/v/:vesselCode` pattern: every node from its tab down to the
- * most specific node the page sits under must pass `canShow`. The vessel home
- * is always visible; a page the tree does not know is left to its own guard.
- * (The static check; the switch itself uses the target vessel's filtered nav.)
+ * Every switch takes the next value; a switch navigates only while it is
+ * still the latest. Shared by every caller, so a later pick anywhere (the
+ * switcher, the palette, a page picker) overtakes an earlier one.
  */
-export function vesselRestVisibility(
-  tree: readonly NavChild[],
-  canShow: (item: NavChild) => boolean,
-): (vesselRest: string) => boolean {
-  const base = strip(VESSEL_SCOPE_PATTERN);
-  return (vesselRest: string) => {
-    const rest = strip(vesselRest.split(/[?#]/)[0]);
-    if (!rest) return true;
-    const target = `${base}/${rest}`;
-    let best: readonly NavChild[] = [];
-    let bestLength = -1;
-    const visit = (nodes: readonly NavChild[], above: readonly NavChild[]) => {
-      for (const node of nodes) {
-        if (node.crossLink) continue;
-        const path = strip(node.path.split(/[?#]/)[0]);
-        const chain = [...above, node];
-        const under = path !== base && (target === path || target.startsWith(`${path}/`));
-        if (under && (path.length > bestLength || (path.length === bestLength && chain.length > best.length))) {
-          best = chain;
-          bestLength = path.length;
-        }
-        if (node.children?.length) visit(node.children, chain);
-      }
-    };
-    visit(tree, []);
-    return best.every((node) => canShow(node));
-  };
+let switchEpoch = 0;
+
+/** Abandon the switch in flight, if any (the user closed the switcher). */
+export function cancelPendingVesselSwitch(): void {
+  switchEpoch += 1;
 }
 
-/** The static vessel tree (`/v/:vesselCode` pattern), for `vesselRestVisibility`. */
-export const VESSEL_PATTERN_TREE: readonly NavChild[] = NAVIGATION_ITEMS.find((item) => item.id === 'vessel')?.children ?? [];
+/**
+ * Abandon any switch in flight whenever the location changes. Mount once in
+ * a component that stays mounted for the whole shell (the top bar): a
+ * caller such as the palette unmounts before its switch resolves. The bump
+ * caused by a switch's own navigation is harmless (it has navigated).
+ */
+export function useInvalidateVesselSwitchOnNavigate(): void {
+  const { key } = useLocation();
+  useEffect(() => {
+    switchEpoch += 1;
+  }, [key]);
+}
 
 /** Returns `switchTo(vessel)`, which navigates once the target vessel's settings are known. */
 export function useVesselSwitch(): (vessel: VesselSwitchTargetVessel) => void {
@@ -93,13 +81,23 @@ export function useVesselSwitch(): (vessel: VesselSwitchTargetVessel) => void {
     [map],
   );
   const current = `${location.pathname}${location.search}${location.hash}`;
-  const latest = useRef(0);
+
+  // While a caller stays mounted it also abandons on a location change (not on
+  // mount); the top bar's `useInvalidateVesselSwitchOnNavigate` covers callers
+  // that unmount on pick, such as the palette.
+  const seenKey = useRef(location.key);
+  useEffect(() => {
+    if (seenKey.current === location.key) return;
+    seenKey.current = location.key;
+    switchEpoch += 1;
+  }, [location.key]);
 
   return useCallback(
     (vessel: VesselSwitchTargetVessel) => {
-      const ticket = ++latest.current;
+      switchEpoch += 1;
+      const ticket = switchEpoch;
       const go = (target: string) => {
-        if (ticket !== latest.current) return;
+        if (ticket !== switchEpoch) return;
         recordRecentVessel(userId, vessel.id);
         navigate(target);
       };

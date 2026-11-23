@@ -31,7 +31,8 @@ import {
   Sun,
   type LucideIcon,
 } from 'lucide-react';
-import { useVisibleNavLeaves } from '@/app/nav/useVisibleNav';
+import { useVisibleNavLeaves, type VisibleNavLeaf } from '@/app/nav/useVisibleNav';
+import { NAVIGATION_ITEMS } from '@/config/sitemap';
 import { useNavAccess } from '@/app/nav/navAccess';
 import { useScopeAccess } from '@/app/router/useScopeAccess';
 import { useScope } from '@/app/router/scopeContext';
@@ -66,15 +67,30 @@ export function resolveVesselPattern(path: string, code: string | null | undefin
   return vesselPath(code, rest);
 }
 
+/** The Fleet tree's label, the first entry of a Fleet leaf's trail. */
+const FLEET_LABEL = NAVIGATION_ITEMS.find((item) => item.id === 'fleet')?.label ?? 'Fleet';
+
+/**
+ * A leaf's subtitle trail. A workspace entry of Fleet's WORKSPACES section
+ * reads "Workspace" for a viewer without fleet reach, who has no Fleet view
+ * to place it in (D-58).
+ */
+export function paletteTrail(leaf: Pick<VisibleNavLeaf, 'trail' | 'crossLink' | 'scope'>, fleetReach: boolean): string[] {
+  const trail = leaf.trail.filter(Boolean);
+  if (!fleetReach && leaf.crossLink && leaf.scope === 'workspace' && trail[0] === FLEET_LABEL) return ['Workspace'];
+  return trail;
+}
+
 export function usePalettePages(): PaletteSource {
   const nav = useVisibleNavLeaves();
   const scope = useScope();
+  const { fleetReach } = useNavAccess();
   const { lastVesselCode } = useScopeAccess();
   const vesselCode = (scope.scope === 'vessel' ? scope.vesselCode : undefined) ?? lastVesselCode;
   return useMemo<PaletteSource>(() => {
     if (!nav.ready) return LOADING_SOURCE;
     const items = nav.leaves.map<PaletteItem>((leaf) => {
-      const trail = leaf.trail.filter(Boolean);
+      const trail = paletteTrail(leaf, fleetReach);
       return {
         id: `page:${leaf.path}`,
         group: 'pages',
@@ -88,7 +104,7 @@ export function usePalettePages(): PaletteSource {
       };
     });
     return { status: 'ready', items };
-  }, [nav, vesselCode]);
+  }, [nav, vesselCode, fleetReach]);
 }
 
 export function usePaletteVessels(): PaletteSource {

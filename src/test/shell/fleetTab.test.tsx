@@ -35,9 +35,6 @@ vi.mock('@/modules/feedback/store/feedbackStore', async () => {
   const { shellState } = await import('./shellFakes');
   return { useFeedbackStore: (selector?: (s: object) => unknown) => (selector ? selector(shellState.feedback) : shellState.feedback) };
 });
-vi.mock('@/modules/dashboard/contexts/DashboardFilterContext', () => ({
-  DashboardFilterProvider: ({ children }: { children: React.ReactNode }) => children,
-}));
 vi.mock('@/shared/components/layout/SidebarNavigation', () => ({ default: () => <nav aria-label="Test sidebar" /> }));
 vi.mock('@/shared/components/layout/PageLocationHeader', () => ({ default: () => null }));
 vi.mock('@/shared/components/layout/InkfishFooter', () => ({ default: () => null }));

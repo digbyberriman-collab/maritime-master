@@ -138,7 +138,21 @@ export interface CrewChangeRow {
   createdAt: string;
 }
 
-export function RecentCrewChangesCard({ changes, isLoading }: { changes: readonly CrewChangeRow[] | undefined; isLoading: boolean }) {
+/**
+ * The latest joins and sign-offs. A failed read shows an error with Retry,
+ * never the first-use empty state (D-04: no fake success).
+ */
+export function RecentCrewChangesCard({
+  changes,
+  isLoading,
+  isError,
+  onRetry,
+}: {
+  changes: readonly CrewChangeRow[] | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  onRetry: () => void;
+}) {
   return (
     <Card className="h-full">
       <CardHeader>
@@ -149,7 +163,21 @@ export function RecentCrewChangesCard({ changes, isLoading }: { changes: readonl
         <CardDescription>Latest joins and sign-offs across the fleet</CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {isError ? (
+          <EmptyState
+            kind="error"
+            compact
+            icon={ArrowRightLeft}
+            headingLevel={3}
+            title="Crew changes could not load"
+            body="Check your connection and try again."
+            action={
+              <Button variant="outline" size="sm" className="[@media(pointer:coarse)]:min-h-11" onClick={onRetry}>
+                Retry
+              </Button>
+            }
+          />
+        ) : isLoading ? (
           <div role="status" aria-busy="true" className="space-y-3">
             {[0, 1, 2].map((row) => (
               <Skeleton key={row} className="h-10 w-full" />

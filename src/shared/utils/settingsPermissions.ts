@@ -54,17 +54,6 @@ export const hasSettingsPermission = (userRole: string | null, permission: strin
 };
 
 /**
- * Get visible navigation items based on user role
- */
-export const getVisibleNavItems = (userRole: string | null): SettingsNavItem[] => {
-  return SETTINGS_NAV_ITEMS.filter(item => {
-    if (item.scope === 'self') return true;
-    if (item.permission) return hasSettingsPermission(userRole, item.permission);
-    return false;
-  });
-};
-
-/**
  * Check if user can access a specific settings section
  */
 export const canAccessSection = (userRole: string | null, sectionId: string): boolean => {

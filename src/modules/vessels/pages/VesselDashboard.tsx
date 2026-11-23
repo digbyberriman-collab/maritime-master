@@ -50,6 +50,21 @@ import { getIncidentTypeColor } from '@/modules/incidents/constants';
 import { getWidgetsForRole, type WidgetKey } from '@/modules/dashboard/types';
 import { cn } from '@/lib/utils';
 
+const UPDATED_FORMAT = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+  timeZone: 'UTC',
+});
+
+/** "22 Nov 2026, 22:18 UTC" (gap/10 A.3), formatted in UTC so the label is true. */
+function formatUpdatedUtc(at: Date): string {
+  return `${UPDATED_FORMAT.format(at)} UTC`;
+}
+
 const VesselDashboard: React.FC = () => {
   const navigate = useNavigate();
   const { profile } = useAuth();
@@ -158,41 +173,28 @@ const VesselDashboard: React.FC = () => {
           <FleetDashboardView />
         ) : (
           <>
-        {/* Enhanced Header with Fleet Filter */}
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <VesselHeader
-            data={dashboardData}
-            isLoading={isLoading}
-            isAllVessels={isAllVessels}
-            userName={profile?.first_name}
-          />
-          
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Fleet Filter (DPA/Fleet roles only) */}
-            {canAccessAllVessels && <FleetFilter />}
-            
-            {/* Refresh Button */}
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-            >
-              <RefreshCw className={cn('w-4 h-4 mr-2', isRefreshing && 'animate-spin')} />
-              Refresh
-            </Button>
-            
-            {/* Quick Actions Menu */}
-            <QuickActionsMenu />
-          </div>
-        </div>
-
-        {/* Last Updated */}
-        {lastRefreshed && (
-          <p className="text-xs text-muted-foreground -mt-4">
-            Last updated: {lastRefreshed.toLocaleString()}
-          </p>
-        )}
+        {/* The page heading; its actions wrap under the title when they do not fit beside it. */}
+        <VesselHeader
+          data={dashboardData}
+          isLoading={isLoading}
+          isAllVessels={isAllVessels}
+          userName={profile?.first_name}
+          actions={
+            <div className="flex flex-wrap items-center gap-3">
+              {/* One freshness stamp: when the store last refreshed (the Refresh button's source). */}
+              {lastRefreshed && (
+                <span className="type-caption tabular-nums text-muted-foreground">Updated {formatUpdatedUtc(lastRefreshed)}</span>
+              )}
+              {/* Fleet Filter (DPA/Fleet roles only) */}
+              {canAccessAllVessels && <FleetFilter />}
+              <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+                <RefreshCw aria-hidden="true" className={cn('mr-2 h-4 w-4', isRefreshing && 'motion-safe:animate-spin')} />
+                Refresh
+              </Button>
+              <QuickActionsMenu />
+            </div>
+          }
+        />
 
         {/* Vessel Profile - visible when a single vessel is selected */}
         {selectedVesselId && !isAllVessels && (

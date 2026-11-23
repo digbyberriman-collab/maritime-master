@@ -84,10 +84,12 @@ describe('sidebar text contrast', () => {
     expect(failures).toEqual([]);
   });
 
-  it('section headings, "Planned" chips and the roadmap switch use the muted token', () => {
+  it('section headings, planned marks and the roadmap switch use the muted token', () => {
     const nav = readRepoFile('src/shared/components/layout/SidebarNavigation.tsx');
     const footer = readRepoFile('src/shared/components/layout/SidebarFooter.tsx');
     expect(nav.match(/text-sidebar-muted-foreground/g)?.length ?? 0).toBeGreaterThanOrEqual(2);
+    // The planned mark is drawn in the muted token, never a raw colour.
+    expect(nav).toMatch(/data-nav-status="planned"[^>]*text-sidebar-muted-foreground/);
     expect(footer).toMatch(/sidebar-muted-foreground/);
   });
 

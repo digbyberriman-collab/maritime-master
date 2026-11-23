@@ -3,10 +3,17 @@
  * groups, search by name, code and IMO, "All vessels" for fleet users only,
  * selection through the vessel switch keeping the sub-path and query, alert
  * pills that never show a 0 or a guess, positions requested only while open.
+ * The list is a lazy chunk (cmdk out of the entry bundle): it shows once
+ * loaded, and closing the switcher abandons a switch still in flight.
+ *
+ * No sleeps: each "nothing happened" check first waits for the request it is
+ * about to rule on to settle, so a slow request fails the test instead of
+ * passing it.
  */
 import React from 'react';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
+import type { QueryClient, QueryKey } from '@tanstack/react-query';
 
 vi.mock('@/integrations/supabase/client', async () => (await import('./fakeSupabase')).fakeSupabaseModule);
 vi.mock('@/modules/auth/contexts/AuthContext', async () => {
@@ -25,6 +32,7 @@ vi.mock('@/modules/auth/store/permissionsStore', async () => {
 import ScopeControl from '@/shared/components/layout/topbar/ScopeControl';
 import { SHELL_TEST_IDS } from '@/app/shell/testIds';
 import { readRecentVessels, recordRecentVessel } from '@/app/nav/recentVessels';
+import { vesselModuleSettingsQueryOptions } from '@/modules/vessels/hooks/useVesselModuleSettings';
 import { fakeDb, resetFakeDb } from './fakeSupabase';
 import {
   COMPANY_ID,
@@ -55,13 +63,27 @@ const vesselScope = { scope: 'vessel' as const, vessel: DRAAK, vesselCode: 'DRA'
 const location = () => screen.getByTestId('location').textContent;
 const alert = (vesselId: string, severity: string) => ({ vessel_id: vesselId, severity_color: severity, status: 'OPEN', company_id: COMPANY_ID });
 
+/** Open the switcher and wait for its lazy list. */
 async function openSwitcher(path = '/v/dra', access = FLEET_ACCESS) {
-  renderShell(<ScopeControl />, { path, scope: vesselScope, access });
+  const { queryClient } = renderShell(<ScopeControl />, { path, scope: vesselScope, access });
   const trigger = await screen.findByTestId(SHELL_TEST_IDS.vesselSwitcherTrigger);
   fireEvent.click(trigger);
   const panel = await screen.findByTestId(SHELL_TEST_IDS.vesselSwitcher);
-  return { trigger, panel };
+  await within(panel).findByRole('combobox');
+  return { trigger, panel, queryClient };
 }
+
+/** Wait until the query has answered (success or error), then let React apply it. */
+async function settled(queryClient: QueryClient, queryKey: QueryKey) {
+  await waitFor(() => {
+    const status = queryClient.getQueryState(queryKey)?.status;
+    expect(status === 'success' || status === 'error').toBe(true);
+  });
+  await act(async () => {});
+}
+
+const fleetGroupsKey = ['fleet-groups', COMPANY_ID];
+const alertSummaryKey = ['shell', 'vessel-alerts', COMPANY_ID, DRAAK.id, HYDRA.id, XIPHIAS.id];
 
 const groupHeadings = (panel: HTMLElement) => Array.from(panel.querySelectorAll('[cmdk-group-heading]')).map((h) => h.textContent);
 
@@ -101,16 +123,16 @@ describe('rows and groups', () => {
 
   it('one "Vessels" group when the fleet groups cannot be read', async () => {
     fakeDb.failures.fleet_groups = { message: 'permission denied' };
-    const { panel } = await openSwitcher();
-    await new Promise((r) => setTimeout(r, 20));
+    const { panel, queryClient } = await openSwitcher();
+    await settled(queryClient, fleetGroupsKey);
     expect(groupHeadings(panel)).toEqual(['Vessels']);
   });
 
   it('drops a recent vessel that is no longer in reach', async () => {
     recordRecentVessel(USER_ID, 'v-sold');
-    const { panel } = await openSwitcher();
-    await new Promise((r) => setTimeout(r, 20));
-    expect(groupHeadings(panel)).not.toContain('Recent');
+    const { panel, queryClient } = await openSwitcher();
+    await settled(queryClient, fleetGroupsKey);
+    expect(groupHeadings(panel)).toEqual(['Caribbean', 'Mediterranean', 'Other vessels']);
   });
 
   it('offers "All vessels" only with fleet reach', async () => {
@@ -143,8 +165,12 @@ describe('search', () => {
 
 describe('choosing a vessel', () => {
   it('keeps the sub-path and the query, records the vessel, closes and gives focus back', async () => {
-    const { trigger, panel } = await openSwitcher('/v/dra/safety/drills?x=1');
-    const hydra = (await within(panel).findAllByRole('option')).find((o) => o.textContent?.startsWith('HYDRA')) as HTMLElement;
+    const { trigger, panel, queryClient } = await openSwitcher('/v/dra/safety/drills?x=1');
+    // The rows regroup once the fleet groups are in; pick from the final list.
+    await settled(queryClient, fleetGroupsKey);
+    const hydra = within(panel)
+      .getAllByRole('option')
+      .find((o) => o.textContent?.startsWith('HYDRA')) as HTMLElement;
     fireEvent.click(hydra);
     await waitFor(() => expect(location()).toBe('/v/hyd/safety/drills?x=1'));
     await waitFor(() => expect(screen.queryByTestId(SHELL_TEST_IDS.vesselSwitcher)).toBeNull());
@@ -156,6 +182,23 @@ describe('choosing a vessel', () => {
     const { panel } = await openSwitcher('/v/dra/crew/list');
     fireEvent.click(within(panel).getByRole('option', { name: /All vessels/ }));
     await waitFor(() => expect(location()).toBe('/fleet/dashboard'));
+  });
+
+  it('Esc before the switch lands abandons it: the page stays', async () => {
+    fakeDb.delayMs = 200;
+    const { panel, queryClient } = await openSwitcher('/v/dra/crew/list');
+    await settled(queryClient, fleetGroupsKey);
+    const hydra = within(panel)
+      .getAllByRole('option')
+      .find((o) => o.textContent?.startsWith('HYDRA')) as HTMLElement;
+    fireEvent.click(hydra);
+    expect(await within(panel).findByLabelText('Opening')).toBeInTheDocument();
+    fireEvent.keyDown(within(panel).getByRole('combobox'), { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByTestId(SHELL_TEST_IDS.vesselSwitcher)).toBeNull());
+    // The target's settings read finishes after the switcher closed…
+    await settled(queryClient, vesselModuleSettingsQueryOptions(HYDRA.id).queryKey);
+    // …and does not move the user.
+    expect(location()).toBe('/v/dra/crew/list');
   });
 
   it('the current vessel just closes the list', async () => {
@@ -194,16 +237,17 @@ describe('alert pills and AIS marks', () => {
 
   it('no pills at all when alerts fail to load (never a 0)', async () => {
     fakeDb.failures.alerts = { message: 'timeout' };
-    const { panel } = await openSwitcher();
-    await new Promise((r) => setTimeout(r, 20));
+    const { panel, queryClient } = await openSwitcher();
+    await settled(queryClient, alertSummaryKey);
     expect(panel.querySelector('[data-tone]')).toBeNull();
     expect(within(panel).queryByText('0')).toBeNull();
   });
 
   it('asks for every vessel position only once the list is open', async () => {
-    renderShell(<ScopeControl />, { path: '/v/dra', scope: vesselScope, access: FLEET_ACCESS });
+    const { queryClient } = renderShell(<ScopeControl />, { path: '/v/dra', scope: vesselScope, access: FLEET_ACCESS });
     const trigger = await screen.findByTestId(SHELL_TEST_IDS.vesselSwitcherTrigger);
-    await new Promise((r) => setTimeout(r, 20));
+    // The scope control's own position read has answered…
+    await settled(queryClient, ['latest-vessel-positions', DRAAK.id]);
     const asked = () => new Set(fakeDb.calls.filter((c) => c.table === 'ais_snapshots').map((c) => c.filters.find((f) => f[0] === 'vessel_id')?.[2]));
     expect(asked()).toEqual(new Set([DRAAK.id]));
     fireEvent.click(trigger);

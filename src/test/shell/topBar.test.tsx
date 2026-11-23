@@ -54,6 +54,7 @@ import { ShellActionsContext } from '@/app/shell/shellActions';
 import { SHELL_TEST_IDS } from '@/app/shell/testIds';
 import { notify } from '@/shared/lib/notify';
 import type { ScopeValue } from '@/app/router/scopeContext';
+import type { QueryClient } from '@tanstack/react-query';
 import { fakeDb, resetFakeDb } from './fakeSupabase';
 import { COMPANY_ID, DRAAK, FLEET_ACCESS, USER_ID, renderShell, resetShellState, shellState } from './shellFakes';
 
@@ -89,6 +90,19 @@ afterEach(() => {
 const openMenu = (trigger: HTMLElement) => fireEvent.keyDown(trigger, { key: 'Enter' });
 const topBarProps = { mobileNavAvailable: true, mobileNavOpen: false, onOpenMobileNav: () => undefined };
 
+/** Wait for the bell's reads (list and counts) to answer, then let React apply them. */
+async function bellSettled(queryClient: QueryClient) {
+  await waitFor(() => {
+    const reads = queryClient.getQueryCache().findAll({ queryKey: ['shell', 'bell'] });
+    expect(reads.length).toBeGreaterThan(0);
+    expect(reads.every((q) => q.state.status !== 'pending')).toBe(true);
+  });
+  await act(async () => {});
+}
+
+/** The tooltip Radix shows for the focused trigger (its visually hidden copy has role=tooltip). */
+const tooltipText = () => screen.queryByRole('tooltip')?.textContent ?? null;
+
 describe('per scope', () => {
   const scopes: Array<[string, ScopeValue, string]> = [
     ['fleet', { scope: 'fleet' }, '/fleet/dashboard'],
@@ -99,7 +113,7 @@ describe('per scope', () => {
   ];
 
   it.each(scopes)('%s: the same controls, with the scope shown in the scope control', async (name, scope, path) => {
-    renderShell(<TopBar {...topBarProps} />, { path, scope, access: FLEET_ACCESS });
+    const { queryClient } = renderShell(<TopBar {...topBarProps} />, { path, scope, access: FLEET_ACCESS });
     const bar = screen.getByTestId(SHELL_TEST_IDS.topBar);
     for (const id of [SHELL_TEST_IDS.searchTrigger, SHELL_TEST_IDS.notificationsTrigger, SHELL_TEST_IDS.accountTrigger, SHELL_TEST_IDS.mobileNavTrigger]) {
       expect(within(bar).getByTestId(id)).toBeInTheDocument();
@@ -109,17 +123,89 @@ describe('per scope', () => {
     expect(fleet.getAttribute('aria-current')).toBe(name === 'fleet' ? 'true' : null);
     expect(vessel.getAttribute('aria-current')).toBe(name === 'vessel' ? 'true' : null);
     expect(within(bar).queryByTestId(SHELL_TEST_IDS.scopeWorkspaceChip) !== null).toBe(name === 'workspace');
+    await bellSettled(queryClient);
   });
 
-  it('is 52 px tall below 1024 px and 56 px from there, on the translucent top-bar surface', () => {
-    renderShell(<TopBar {...topBarProps} />, { path: '/fleet/dashboard', scope: { scope: 'fleet' } });
+  it('is 52 px tall below 1024 px and 56 px from there, on the translucent top-bar surface', async () => {
+    const { queryClient } = renderShell(<TopBar {...topBarProps} />, { path: '/fleet/dashboard', scope: { scope: 'fleet' } });
     expect(screen.getByTestId(SHELL_TEST_IDS.topBar)).toHaveClass('h-[52px]', 'lg:h-14', 'bg-topbar/[0.88]', 'backdrop-blur-md', 'border-b', 'border-border');
+    await bellSettled(queryClient);
   });
 
-  it('turns warning-muted while impersonating', () => {
-    renderShell(<TopBar {...topBarProps} impersonating />, { path: '/fleet/dashboard', scope: { scope: 'fleet' } });
+  it('turns warning-muted while impersonating', async () => {
+    const { queryClient } = renderShell(<TopBar {...topBarProps} impersonating />, { path: '/fleet/dashboard', scope: { scope: 'fleet' } });
     expect(screen.getByTestId(SHELL_TEST_IDS.topBar)).toHaveClass('bg-warning-muted');
     expect(screen.getByTestId(SHELL_TEST_IDS.topBar)).not.toHaveClass('bg-topbar/[0.88]');
+    await bellSettled(queryClient);
+  });
+});
+
+describe('tooltips', () => {
+  beforeEach(() => {
+    localStorage.setItem('storm_alert_helper_shown', 'true');
+  });
+  const palette: CommandPaletteApi = { isOpen: false, open: () => undefined, close: () => undefined, toggle: () => undefined, available: true };
+  const withShell = (ui: React.ReactElement) => (
+    <CommandPaletteContext.Provider value={palette}>
+      <ShellActionsContext.Provider value={{ openKeyboardShortcuts: () => undefined }}>{ui}</ShellActionsContext.Provider>
+    </CommandPaletteContext.Provider>
+  );
+
+  it.each([
+    [SHELL_TEST_IDS.appsTrigger, 'Apps'],
+    [SHELL_TEST_IDS.searchTrigger, 'Search STORM'],
+    [SHELL_TEST_IDS.favouritesTrigger, 'Favourites'],
+    [SHELL_TEST_IDS.helpTrigger, 'Help'],
+    [SHELL_TEST_IDS.notificationsTrigger, 'Notifications'],
+    [SHELL_TEST_IDS.accountTrigger, 'Account'],
+  ])('%s shows its tooltip on keyboard focus', async (testId, label) => {
+    const { queryClient } = renderShell(withShell(<TopBar {...topBarProps} />), {
+      path: '/fleet/dashboard',
+      scope: { scope: 'fleet' },
+      access: FLEET_ACCESS,
+    });
+    const trigger = await screen.findByTestId(testId);
+    await bellSettled(queryClient);
+    act(() => trigger.focus());
+    await waitFor(() => expect(tooltipText()).toMatch(new RegExp(`^${label}`)));
+    expect(trigger).toHaveAttribute('aria-describedby');
+    // The name stays the control's own label.
+    expect(trigger.getAttribute('aria-label')).toMatch(new RegExp(`^${label}`));
+  });
+
+  it('gives the shortcut: Help says ? opens the shortcuts, search gives Ctrl K', async () => {
+    const { queryClient } = renderShell(withShell(<TopBar {...topBarProps} />), { path: '/fleet/dashboard', scope: { scope: 'fleet' } });
+    await bellSettled(queryClient);
+    const help = screen.getByTestId(SHELL_TEST_IDS.helpTrigger);
+    expect(help).toHaveAttribute('aria-keyshortcuts', 'Shift+?');
+    expect(help).not.toHaveAttribute('title');
+    act(() => help.focus());
+    await waitFor(() => expect(tooltipText()).toBe('Help? for keyboard shortcuts'));
+    const search = screen.getByTestId(SHELL_TEST_IDS.searchTrigger);
+    expect(search).not.toHaveAttribute('title');
+    act(() => search.focus());
+    await waitFor(() => expect(tooltipText()).toBe('Search STORMCtrl K'));
+  });
+
+  it('shows no tooltip while the menu is open, even with focus back on the trigger', async () => {
+    const { queryClient } = renderShell(<TopBar {...topBarProps} />, { path: '/fleet/dashboard', scope: { scope: 'fleet' }, access: FLEET_ACCESS });
+    await bellSettled(queryClient);
+    const apps = await screen.findByTestId(SHELL_TEST_IDS.appsTrigger);
+    act(() => apps.focus());
+    await waitFor(() => expect(tooltipText()).toBe('Apps'));
+    fireEvent.click(apps);
+    await screen.findByTestId(SHELL_TEST_IDS.appsMenu);
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    act(() => apps.focus());
+    expect(apps).toHaveAttribute('data-state', 'open');
+    expect(screen.queryByRole('tooltip')).toBeNull();
+
+    const bell = screen.getByTestId(SHELL_TEST_IDS.notificationsTrigger);
+    fireEvent.click(bell);
+    await screen.findByTestId(SHELL_TEST_IDS.notificationsPanel);
+    act(() => bell.focus());
+    expect(bell).toHaveAttribute('data-state', 'open');
+    expect(screen.queryByRole('tooltip')).toBeNull();
   });
 });
 
@@ -147,6 +233,13 @@ describe('tenant logo', () => {
 });
 
 describe('search trigger', () => {
+  it('is --control-h tall at every width (36 px fine, 44 px touch): no fixed xl height', () => {
+    render(<SearchTrigger />);
+    const trigger = screen.getByTestId(SHELL_TEST_IDS.searchTrigger);
+    expect(trigger).toHaveClass('h-[var(--control-h)]');
+    expect(trigger.className).not.toMatch(/(^|\s)xl:h-/);
+  });
+
   it('opens the command palette, and warms it on hover and focus', () => {
     const open = vi.fn();
     const api: CommandPaletteApi = { isOpen: false, open, close: () => undefined, toggle: () => undefined, available: true };
@@ -189,14 +282,24 @@ describe('Apps', () => {
       .map((a) => [a.querySelector('.font-semibold')?.textContent, a.getAttribute('href')]);
   };
 
-  it('lists exactly the workspaces the nav shows (planned Shoreside hidden)', async () => {
+  it('lists exactly the workspaces the nav shows (planned Shoreside hidden), each opening its first page', async () => {
     renderShell(<AppsMenu />, { path: '/fleet/dashboard', access: FLEET_ACCESS });
     expect(await tiles()).toEqual([
-      ['HRIS', '/hris'],
-      ['Health & Wellness', '/health'],
-      ['Yard', '/yard'],
-      ['Legal', '/departments/legal'],
+      ['HRIS', '/hr?module=hris'],
+      ['Health & Wellness', '/health/medical/dashboard?module=health'],
+      ['Yard', '/yard/refit/overview/dashboard?module=yard'],
+      ['Legal', expect.stringMatching(/^\/departments\/legal/)],
     ]);
+  });
+
+  it('marks the workspace the user is in as current, from its root', async () => {
+    renderShell(<AppsMenu />, { path: '/health/spa/dashboard', access: FLEET_ACCESS });
+    fireEvent.click(await screen.findByTestId(SHELL_TEST_IDS.appsTrigger));
+    const menu = await screen.findByTestId(SHELL_TEST_IDS.appsMenu);
+    const current = within(menu)
+      .getAllByRole('link')
+      .filter((a) => a.getAttribute('aria-current') === 'true');
+    expect(current.map((a) => a.querySelector('.font-semibold')?.textContent)).toEqual(['Health & Wellness']);
   });
 
   it('drops a workspace the user cannot open (Yard without maintenance)', async () => {
@@ -273,6 +376,15 @@ describe('favourites', () => {
     expect(items[2]).toHaveAttribute('href', '/me/shortcuts');
   });
 
+  it('the menu chevron is 24 px on a fine pointer and 44 px on touch (D-35)', async () => {
+    fakeDb.tables.user_pinned_shortcuts = [];
+    renderShell(<FavouritesControl />, { path: '/fleet/documents', scope: { scope: 'fleet' } });
+    const chevron = screen.getByTestId(SHELL_TEST_IDS.favouritesTrigger);
+    expect(chevron).toHaveClass('w-6', '[@media(pointer:coarse)]:w-11');
+    expect(chevron.className).not.toMatch(/\[@media\(pointer:coarse\)\]:w-8/);
+    await waitFor(() => expect(screen.getByTestId(SHELL_TEST_IDS.favouriteToggle)).not.toHaveAttribute('aria-disabled'));
+  });
+
   it('an empty list says how to add one, with no suggested defaults', async () => {
     fakeDb.tables.user_pinned_shortcuts = [];
     renderShell(<FavouritesControl />, { path: '/fleet/documents', scope: { scope: 'fleet' } });
@@ -339,6 +451,70 @@ describe('notification bell', () => {
     expect(await within(panel).findByText('Alerts could not load')).toBeInTheDocument();
     expect(within(panel).queryByText('No open alerts')).toBeNull();
   });
+
+  it('says when Acknowledge fails (RLS or network), and refreshes the list', async () => {
+    fakeDb.tables.alerts = [row('a', 'RED')];
+    fakeDb.writeFailures.alerts = { message: 'new row violates row-level security policy for table "alerts"', code: '42501' };
+    const error = vi.spyOn(notify, 'error').mockImplementation(() => 1);
+    const { queryClient } = renderShell(<NotificationBell open onOpenChange={() => undefined} />);
+    const panel = await screen.findByTestId(SHELL_TEST_IDS.notificationsPanel);
+    await bellSettled(queryClient);
+    const reads = fakeDb.calls.filter((c) => c.table === 'alerts' && c.op === 'select').length;
+    fireEvent.click(within(panel).getByRole('button', { name: 'Acknowledge Alert a' }));
+    await waitFor(() => expect(error).toHaveBeenCalledTimes(1));
+    expect(error.mock.calls[0][1]).toMatchObject({ title: 'Could not acknowledge the alert' });
+    const update = fakeDb.calls.find((c) => c.table === 'alerts' && c.op === 'update');
+    expect(update?.payload).toMatchObject({ status: 'ACKNOWLEDGED', acknowledged_by: USER_ID });
+    expect(update?.returning).toBe(true);
+    await waitFor(() => expect(fakeDb.calls.filter((c) => c.table === 'alerts' && c.op === 'select').length).toBeGreaterThan(reads));
+    await bellSettled(queryClient);
+  });
+
+  it('a write that comes back with no row (hidden by RLS) is a failure too', async () => {
+    fakeDb.tables.alerts = [row('a', 'RED')];
+    const error = vi.spyOn(notify, 'error').mockImplementation(() => 1);
+    const { queryClient } = renderShell(<NotificationBell open onOpenChange={() => undefined} />);
+    const panel = await screen.findByTestId(SHELL_TEST_IDS.notificationsPanel);
+    await bellSettled(queryClient);
+    // The row vanished before the write: the update matches nothing.
+    fakeDb.tables.alerts = [];
+    fireEvent.click(within(panel).getByRole('button', { name: 'Acknowledge Alert a' }));
+    await waitFor(() => expect(error).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ title: 'Could not acknowledge the alert' })));
+    await bellSettled(queryClient);
+  });
+
+  it('an acknowledged alert shows no error, and a second click while it saves sends no second write', async () => {
+    fakeDb.tables.alerts = [row('a', 'RED')];
+    const error = vi.spyOn(notify, 'error').mockImplementation(() => 1);
+    const { queryClient } = renderShell(<NotificationBell open onOpenChange={() => undefined} />);
+    const panel = await screen.findByTestId(SHELL_TEST_IDS.notificationsPanel);
+    await bellSettled(queryClient);
+    fakeDb.delayMs = 30;
+    const button = within(panel).getByRole('button', { name: 'Acknowledge Alert a' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    await waitFor(() => expect(button).toHaveAttribute('aria-disabled', 'true'));
+    fakeDb.applyWrites = true;
+    await waitFor(() => expect(fakeDb.calls.filter((c) => c.op === 'update')).toHaveLength(1));
+    await waitFor(() => expect(button).not.toHaveAttribute('aria-disabled'));
+    await bellSettled(queryClient);
+    expect(error).not.toHaveBeenCalled();
+  });
+
+  it('the first-run hint keeps 44 px targets on touch, and its "Got it" overrides the small size at every width', async () => {
+    fakeDb.tables.alerts = [row('a', 'YELLOW')];
+    const { queryClient } = renderShell(<NotificationBell open onOpenChange={() => undefined} />);
+    const panel = await screen.findByTestId(SHELL_TEST_IDS.notificationsPanel);
+    const gotIt = await within(panel).findByRole('button', { name: 'Got it' });
+    expect(gotIt).toHaveClass(
+      'h-auto',
+      'md:h-auto',
+      '[@media(pointer:coarse)]:min-h-11',
+      '[@media(pointer:coarse)]:min-w-11',
+      '[@media(pointer:coarse)]:justify-start',
+    );
+    await bellSettled(queryClient);
+  });
 });
 
 describe('account menu', () => {
@@ -374,6 +550,18 @@ describe('account menu', () => {
     const menu = await open();
     expect(within(menu).queryByRole('menuitem', { name: 'Branding' })).toBeNull();
     expect(within(menu).queryByRole('menuitem', { name: 'Keyboard shortcuts' })).toBeNull();
+  });
+
+  it('names the Theme and Density radio groups by their visible labels', async () => {
+    wide();
+    renderShell(<AccountMenu />, { path: '/fleet/dashboard' });
+    const menu = await open();
+    fireEvent.keyDown(within(menu).getByRole('menuitem', { name: 'Appearance' }), { key: 'ArrowRight' });
+    const theme = await screen.findByRole('group', { name: 'Theme' });
+    expect(within(theme).getAllByRole('menuitemradio').map((r) => r.textContent)).toEqual(['Dark', 'Light', 'System']);
+    const density = screen.getByRole('group', { name: /Density/ });
+    expect(density).toHaveAccessibleName('Density · this device');
+    expect(density).not.toHaveAttribute('aria-label');
   });
 
   it('the Theme radio applies the theme and mirrors it to the user preferences', async () => {

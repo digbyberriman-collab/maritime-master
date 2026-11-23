@@ -6,7 +6,10 @@
  * they agree on what is on, what it is called and what the viewer may open.
  *
  * Default vessel: the one the URL is on; outside the vessel scope the vessel
- * the top bar names (the last one opened, else the selected or first).
+ * the top bar names (the last one opened, else the selected or first). Inside
+ * the vessel scope only the URL's vessel counts: an unresolved one (unknown
+ * code, out of reach, sold) has no nav at all, never another vessel's (D-04;
+ * spec §1), and no tab is active.
  *
  * Status:
  * - `loading` while access or the vessel's settings load: no tabs (the tab
@@ -44,7 +47,7 @@ export interface VesselNavModel {
   vessel: VesselNavTarget | null;
   /** Filtered and labelled, in tab order; empty while loading. */
   tabs: readonly VesselTab[];
-  /** The tab the current URL is on (in the vessel scope), else null. */
+  /** The tab the current URL is on (in the vessel scope), else null; null with no vessel. */
   activeTabId: string | null;
   resolver: ModuleSettingsResolver;
   /** Why the settings failed (`status === 'error'`), for the error state; else null. */
@@ -60,13 +63,18 @@ export interface UseVesselNavOptions {
   providers?: readonly NavChildrenProvider[];
 }
 
-/** The vessel in scope, else the one the top bar names; null when there is none. */
+/**
+ * The vessel in scope; outside the vessel scope the one the top bar names
+ * (spec §5.3). Null when there is none, and in a vessel scope whose URL
+ * resolved to no vessel (`useShellVessel`'s last-vessel fallback is for the
+ * surfaces outside the vessel scope only; D-64, spec §6.1).
+ */
 function useDefaultTarget(): VesselNavTarget | null {
   const scope = useScope();
   const shellVessel = useShellVessel();
   const { getVesselCodeById } = useVessel();
   const scoped = scope.scope === 'vessel' && scope.vessel && scope.vesselCode ? scope.vessel : null;
-  const vessel = scoped ?? shellVessel ?? null;
+  const vessel = scope.scope === 'vessel' ? scoped : shellVessel ?? null;
   const code = scoped ? scope.vesselCode ?? null : vessel ? getVesselCodeById(vessel.id) : null;
   const id = vessel?.id ?? null;
   const name = vessel?.name ?? null;
@@ -98,7 +106,8 @@ export function useVesselNav(target?: VesselNavTarget | null, options: UseVessel
   const providerResults = useNavProviderResults(providerVessel, options.providers);
 
   const { pathname } = useLocation();
-  const rest = parseVesselPath(pathname)?.rest ?? null;
+  // No vessel, no active tab: no link is ever current for a URL it does not point to.
+  const rest = vessel ? parseVesselPath(pathname)?.rest ?? null : null;
   const activeTabId = rest === null ? null : vesselModuleForPath(rest)?.id ?? null;
 
   const status: VesselNavModel['status'] = !vessel

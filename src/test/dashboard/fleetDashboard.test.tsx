@@ -246,6 +246,44 @@ describe('fleet overview KPI row (other fleet roles)', () => {
   });
 });
 
+describe.each(['dpa', 'superadmin'])('recent crew changes (%s)', (role) => {
+  beforeEach(() => {
+    state.role = role;
+  });
+
+  const card = () => {
+    const title = screen.getByText('Recent crew changes', { selector: '[class*="type-subtitle"]' });
+    const el = title.closest<HTMLElement>('.h-full');
+    if (!el) throw new Error('no crew changes card');
+    return el;
+  };
+
+  it('a failed read says so with Retry, never the first-use empty state (D-04)', () => {
+    const query = failed<unknown[]>();
+    state.recentChanges = query;
+    renderDashboard();
+    const alert = within(card()).getByRole('alert');
+    expect(alert).toHaveTextContent('Crew changes could not load');
+    expect(screen.queryByText('No recent crew changes')).toBeNull();
+    fireEvent.click(within(alert).getByRole('button', { name: 'Retry' }));
+    expect(query.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('a real empty answer still shows the first-use empty state', () => {
+    state.recentChanges = ready([]);
+    renderDashboard();
+    expect(within(card()).getByText('No recent crew changes')).toBeInTheDocument();
+    expect(within(card()).queryByRole('alert')).toBeNull();
+  });
+
+  it('shows skeletons while loading', () => {
+    state.recentChanges = loading();
+    renderDashboard();
+    expect(within(card()).getByRole('status')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByText('No recent crew changes')).toBeNull();
+  });
+});
+
 describe('FleetKPITiles (vessel dashboard, fleet view)', () => {
   const kpi = {
     documentAlerts: { value: 4, sub: '4 expiring within 90 days' },

@@ -11,14 +11,14 @@
  * - `fleet.*`: the six section headings of the Fleet sidebar (gap/10 IA7, R1).
  * - `vessel.*`: one per vessel tab, in tab order; the slot fills that tab's
  *   sidebar. Paths in a vessel fragment are relative to `/v/:vesselCode`.
- * - `workspace.*`: the sidebar of a STORM workspace (D-09). Legal has no
- *   sidebar tree here: it runs in its own shell and is linked from
- *   `fleet.workspaces` (R4).
+ * - `workspace.*`: the sidebar of a STORM workspace (D-09). Legal's tree is
+ *   its four tabs (gap/10 Workspaces table, D-83); it stays at
+ *   `/departments/legal` (R4) and is also linked from `fleet.workspaces`.
  *
  * This file stays light (lucide icons and types only): the sitemap and every
  * manifest import it eagerly.
  */
-import { Briefcase, Hammer, Heart, Waves, type LucideIcon } from 'lucide-react';
+import { Briefcase, Hammer, Heart, Scale, Waves, type LucideIcon } from 'lucide-react';
 
 export const FLEET_SLOTS = [
   'fleet.overview',
@@ -45,7 +45,7 @@ export const VESSEL_SLOTS = [
   'vessel.reports',
 ] as const;
 
-export const WORKSPACE_SLOTS = ['workspace.shoreside', 'workspace.health', 'workspace.yard', 'workspace.hris'] as const;
+export const WORKSPACE_SLOTS = ['workspace.shoreside', 'workspace.health', 'workspace.yard', 'workspace.hris', 'workspace.legal'] as const;
 
 export type FleetSlotId = (typeof FLEET_SLOTS)[number];
 export type VesselSlotId = (typeof VESSEL_SLOTS)[number];
@@ -79,4 +79,7 @@ export const WORKSPACE_TREES: readonly WorkspaceTree[] = [
   { id: 'health', label: 'Health & Wellness', icon: Heart, path: '/health', slot: 'workspace.health' },
   { id: 'yard', label: 'Yard', icon: Hammer, path: '/yard', slot: 'workspace.yard' },
   { id: 'hris', label: 'HRIS', icon: Briefcase, path: '/hris', slot: 'workspace.hris' },
+  // R4: Legal keeps its department URL. A literal, not LEGAL_ROOT, so this
+  // file stays free of module imports.
+  { id: 'legal', label: 'Legal', icon: Scale, path: '/departments/legal', slot: 'workspace.legal' },
 ];

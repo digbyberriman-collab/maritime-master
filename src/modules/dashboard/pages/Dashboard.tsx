@@ -2,7 +2,7 @@ import React from 'react';
 import { AlertTriangle, ClipboardCheck, FileCheck, Ship, Users } from 'lucide-react';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { KpiGrid, KpiTile } from '@/shared/components/data';
+import { KpiGrid, KpiTile } from '@/shared/components/data/KpiTile';
 import { useVesselCount } from '@/modules/vessels/hooks/useVessels';
 import { useCrewCount, useRecentCrewChanges } from '@/modules/crew/hooks/useCrew';
 import { useMandatoryDocumentsPending, useAcknowledgmentStats } from '@/modules/auth/hooks/useAcknowledgments';
@@ -72,7 +72,14 @@ const FleetOverviewDashboard: React.FC<{ roleLabel: string | null }> = ({ roleLa
     'quick-links': <QuickLinks />,
     'recent-incidents': recentIncidents && recentIncidents.length > 0 ? <RecentIncidentsCard incidents={recentIncidents} /> : null,
     'ack-stats': ackStats && ackStats.length > 0 ? <AcknowledgementProgressCard stats={ackStats} /> : null,
-    'crew-changes': <RecentCrewChangesCard changes={recentChanges.data} isLoading={recentChanges.isPending} />,
+    'crew-changes': (
+      <RecentCrewChangesCard
+        changes={recentChanges.data}
+        isLoading={recentChanges.isPending}
+        isError={recentChanges.isError}
+        onRetry={() => void recentChanges.refetch()}
+      />
+    ),
     maintenance: <MaintenanceWidgets />,
   };
 

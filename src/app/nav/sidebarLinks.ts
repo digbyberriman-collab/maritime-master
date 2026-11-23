@@ -32,8 +32,11 @@ export function isScopedPath(path: string): boolean {
   return SCOPED_PREFIXES.some((prefix) => under(pathname, prefix));
 }
 
-/** Workspace roots: the trees' prefixes and Legal's (R4: it stays at `/departments/legal`). */
-export const WORKSPACE_ROOTS: readonly string[] = Object.freeze([...WORKSPACE_TREES.map((w) => w.path), '/departments/legal']);
+/**
+ * Workspace roots: the trees' prefixes, Legal's among them (R4: it stays at
+ * `/departments/legal`). Listed once each, Legal also when it had no tree.
+ */
+export const WORKSPACE_ROOTS: readonly string[] = Object.freeze(Array.from(new Set([...WORKSPACE_TREES.map((w) => w.path), '/departments/legal'])));
 
 export interface SidebarTreeContext {
   /** The workspace or legacy tree's id (`hris`); null for Fleet, vessel and personal sidebars. */
