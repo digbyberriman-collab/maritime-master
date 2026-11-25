@@ -4,7 +4,11 @@
  * `POST { action, ... }`. Every action except the caller's own PIN pair needs
  * `admin.access.users_access.admin` in the target's company (`assertCapability`).
  * Targets are read with the caller's RLS client (not visible → 404); acting
- * on yourself → 403 (except PIN); an account owner → 403. Every change is
+ * on yourself → 403 (except PIN). Every action on a person then runs
+ * `assertMayActOnUser` (D-194 / D-195 / D-207: the service-role
+ * `admin_may_act_on_user`, and a manager of administrators for an
+ * administrator target) → 403 `forbidden` `details.reason: out_of_reach` /
+ * `manages_admins_required`; an account owner → 403. Every change is
  * written to `admin_action_log` without email addresses. No response says
  * sent, reset or disabled unless that step succeeded.
  *
@@ -12,25 +16,31 @@
  * |---|---|---|---|
  * | `set_pin` | `pin` (6 digits) | 200 `{ ok: true }` | 400 |
  * | `verify_pin` | `pin` | 200 `{ ok: true, confirmedUntil }` | 400 `reason: pin_format / pin_not_set`, 403 `reason: pin_invalid` (+ `attempts_remaining`) / `pin_locked` (+ `retry_after_seconds`), 429 |
- * | `reset_account` + `resetType: 'password_reset'` | `targetUserId`, `reason?` | 200 `{ ok: true, reset: { status: 'sent' } }` | 502 `send_failed` `details.email_error`; 409 `conflict` (access disabled); 429 `cooldown` (`retry_after_seconds`, `Retry-After`: a reset for this person in the last 60 s, no link made); 503 (the cooldown could not be checked) |
- * | `reset_account` + `resetType: 'resend_invitation'` | `targetUserId` or `targetProfileId` | as send-invitation (200 / 502 / 409 / 429 …; top-level `assignment: 'created' \| 'failed'` when the invitation linked a login for an imported vessel, D-199) | |
- * | `reset_account` + `resetType: 'invalidate_sessions'` | `targetUserId` | — | 501 `not_supported` (no supported revoke by user id; never faked) |
- * | `toggle_access` | `targetUserId`, `enableAccess`, `reason` (required to disable) | 200 `{ ok: true, statusStored: true, banApplied: true, accountStatus }` | 502 `partial_failure` `details: { statusStored, banApplied }`; 403 refusal (self, owner, admin without manages-admins, last manager; `reason: invitation_withdrawn` / `membership_removed` for a withdrawn invitation, nothing changed and no ban lifted); 400 |
- * | `reallocate_vessel` | `targetUserId`, `vesselId`, `reason`, `position?`, `effectiveDate?`, `endDate?` | 200 `{ ok: true, assignment }` | 502 `partial_failure` `details: { assignmentCreated, previousEnded }`; 404 vessel; 409 |
+ * | `reset_account` + `resetType: 'password_reset'` | `targetUserId`, `reason?` | 200 `{ ok: true, reset: { status: 'sent' } }` | 502 `send_failed` `details.email_error`; 409 `conflict` (`reason: access_disabled`; `login_missing`: no auth user; `login_blocked`: the login is banned, D-208, no link and no email); 429 `cooldown` (`retry_after_seconds`, `Retry-After`: a reset for this person in the last 60 s, no link made); 503 (the cooldown or the login could not be checked) |
+ * | `reset_account` + `resetType: 'resend_invitation'` | `targetUserId` or `targetProfileId` | as send-invitation (200 / 502 / 409 / 429 …; top-level `assignment: 'created' \| 'failed'` when the invitation linked a login for an imported vessel, D-199) | 409 `conflict` `reason: login_blocked` (a banned login no revoke explains, D-208: no link, no email, nothing recorded), `login_not_created_by_storm` (D-205) |
+ * | `reset_account` + `resetType: 'invalidate_sessions'` | `targetUserId` | — | 501 `not_supported` after the target checks (no supported revoke by user id; never faked) |
+ * | `toggle_access` | `targetUserId`, `enableAccess`, `reason` (required to disable) | 200 `{ ok: true, statusStored: true, banApplied: true, accountStatus }` | 502 `partial_failure` `details: { statusStored, banApplied }`; 403 refusal (self, owner, `out_of_reach`, `manages_admins_required`, last manager; `reason: invitation_withdrawn` / `membership_removed` for a withdrawn invitation, nothing changed and no ban lifted); 400 |
+ * | `reallocate_vessel` | `targetUserId`, `vesselId`, `reason`, `position?`, `effectiveDate?`, `endDate?` | 200 `{ ok: true, assignment }` | 502 `partial_failure` `details: { assignmentCreated, previousEnded }`; 404 vessel; 409; 403 (destination and every source vessel need users_access.admin, D-198; `out_of_reach` for a vessel-scoped administrator; nothing written) |
  * | `revoke_invitation` | `invitationId`, `reason?` | 200 `{ ok: true, invitation: { id, status: 'revoked', profileId, revokedAt }, loginBlocked, loginNote }`: `loginNote` `banned` (a login that never signed in is banned, so the emailed link and "Forgot password" stop working; `loginBlocked: true`), `no_login` (`loginBlocked: true`), `signed_in_before` (not banned; `loginBlocked: false`: turn access off to stop them) | 404 `not_found` (not visible, not live); 403 `forbidden` (capability, own / owner login); 501 `not_supported` `details.reason: invitations_not_live`; 502 `partial_failure` `details: { revoked: true, loginBlocked: false }` + `invitation`; 503 |
+ *
+ * Every target action (`reset_account` of all three types, `toggle_access`,
+ * `reallocate_vessel`) answers 403 `forbidden` `details.reason:
+ * out_of_reach` (a person on a vessel the caller does not administer, or
+ * without a vessel for an admin who does not administer every vessel) and
+ * `manages_admins_required` (an administrator target), before any change.
  *
  * Email idempotency keys (D-146 as amended): `reset:<userId>:<minute>:<h16>`
  * of the recovery link; invitations use `_shared/invitations.ts`.
  */
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.49.2';
 import { type AuthContext, getAuthContext } from '../_shared/auth.ts';
-import { assertCapability } from '../_shared/capability.ts';
-import { asRow, bool, errorCode, errorMessage, int, isMissingFunction, isMissingTable, rowsOf, text, timeOf, type Row } from '../_shared/db.ts';
+import { assertCapability, assertCapabilityForVessels, assertMayActOnUser, legacyManagesAdmins } from '../_shared/capability.ts';
+import { asRow, errorCode, errorMessage, int, isMissingFunction, isMissingTable, rowsOf, text, timeOf, type Row } from '../_shared/db.ts';
 import { type EdgeDeps, edgeDeps, originsOf } from '../_shared/deps.ts';
 import { type EmailMessage, type EmailResult, payloadTag, sendEmail } from '../_shared/email.ts';
 import { type EdgeEnv, linkLanding } from '../_shared/env.ts';
 import { errorBody, type Handler, HttpError, json, type JsonValue, readJson, withHttp } from '../_shared/http.ts';
-import { type InviteDeps, inviteProfile, invitationResponse, outcomeDetails } from '../_shared/invitations.ts';
+import { type InviteDeps, inviteProfile, invitationResponse, LOGIN_BLOCKED, outcomeDetails } from '../_shared/invitations.ts';
 import { log, stripControls } from '../_shared/log.ts';
 import { RateLimiter } from '../_shared/rateLimit.ts';
 import { type Body, objectBody, optionalDate, optionalString, optionalUuid, requiredBoolean, requiredString, requiredUuid } from '../_shared/validate.ts';
@@ -113,12 +123,16 @@ async function loadTarget(ctx: AuthContext, by: { userId?: string | null; profil
   return toTarget(asRow(res.data));
 }
 
-/** Self, capability, owner — in that order, before any change. */
+/**
+ * Self, capability, the person (D-194 / D-195 / D-207: `assertMayActOnUser`),
+ * owner — in that order, before any change. Shared by every target action.
+ */
 async function guardTarget(ctx: AuthContext, target: Target, vesselId: string | null = null): Promise<void> {
   if ((target.userId && target.userId === ctx.user.id) || target.profileId === ctx.profileId) {
     throw new HttpError(403, 'forbidden', 'You cannot do this to your own account.');
   }
   await assertCapability(ctx, 'admin.access.users_access.admin', { companyId: target.companyId, vesselId });
+  await assertMayActOnUser(ctx, { companyId: target.companyId, userId: target.userId, profileId: target.profileId, role: target.role });
   if (!target.userId) return;
   const owner = await ctx.serviceClient()
     .from('account_memberships')
@@ -230,6 +244,8 @@ async function resetAccount(ctx: AuthContext, body: Body, deps: AdminActionsDeps
   if (DISABLED.has(target.status)) {
     throw new HttpError(409, 'conflict', "This person's access is disabled. Turn access on first.", { reason: 'access_disabled' });
   }
+  // A banned login cannot use a recovery link (D-208): refuse before any link, email or 'sent' audit row.
+  await assertLoginUsable(ctx, target.userId, deps.now());
   // Every recovery link replaces the last one: refuse a second reset inside the window before any link is made.
   await assertResetWindow(ctx, target.userId, deps);
   const landing = linkLanding(ctx.env, 'recovery');
@@ -258,6 +274,19 @@ async function resetAccount(ctx: AuthContext, body: Body, deps: AdminActionsDeps
     throw new HttpError(502, 'send_failed', 'The reset email could not be sent.', { email_error: result.errorCode });
   }
   return json({ ok: true, reset: { status: 'sent' } });
+}
+
+/** The login exists and is not banned now: else 409 `login_missing` / `login_blocked`; a read error is 503. */
+async function assertLoginUsable(ctx: AuthContext, userId: string, now: Date): Promise<void> {
+  const found = await ctx.serviceClient().auth.admin.getUserById(userId);
+  if (found.error) {
+    if (isUserNotFound(found.error)) {
+      throw new HttpError(409, 'conflict', "This person's login could not be found. Contact STORM support.", { reason: 'login_missing' });
+    }
+    throw UNAVAILABLE();
+  }
+  const bannedUntil = timeOf(asRow(found.data?.user), 'banned_until');
+  if (bannedUntil !== null && bannedUntil > now.getTime()) throw LOGIN_BLOCKED();
 }
 
 function resetCooldown(seconds: number): HttpError {
@@ -440,24 +469,15 @@ const REFUSAL_COPY: ReadonlyArray<readonly [RegExp, string]> = [
   [/status/, 'Choose whether access is on or off.'],
 ];
 
-/** The legacy W7 guards for databases without `set_membership_status` (D-01). */
+/**
+ * The legacy W7 guards for databases without `set_membership_status` (D-01):
+ * a manager of administrators for an administrator target (the shared
+ * `legacyManagesAdmins`; `guardTarget` already asked `assertMayActOnUser`),
+ * and never the company's last active DPA.
+ */
 async function legacyGuards(ctx: AuthContext, target: Target, disable: boolean): Promise<void> {
   if (!ADMIN_ROLES.has(target.role)) return;
-  const actorRes = await ctx.userClient.from('profiles').select('role').eq('user_id', ctx.user.id).maybeSingle();
-  if (actorRes.error) throw UNAVAILABLE();
-  let managesAdmins = (text(asRow(actorRes.data), 'role') ?? '').toLowerCase() === 'dpa';
-  if (!managesAdmins) {
-    const roles = await ctx.userClient.from('user_roles').select('role, company_id, is_active, expires_at').eq('user_id', ctx.user.id);
-    if (roles.error) throw UNAVAILABLE();
-    const now = Date.now();
-    managesAdmins = rowsOf(roles.data).some((r) => {
-      const expires = text(r, 'expires_at');
-      const company = text(r, 'company_id');
-      return ['dpa', 'superadmin'].includes((text(r, 'role') ?? '').toLowerCase()) && bool(r, 'is_active') === true &&
-        (expires === null || Date.parse(expires) > now) && (company === null || company === ctx.companyId);
-    });
-  }
-  if (!managesAdmins) {
+  if (!(await legacyManagesAdmins(ctx))) {
     throw new HttpError(403, 'forbidden', 'Only an administrator who manages administrators can change this access.');
   }
   if (disable && target.role === 'dpa') {
@@ -557,16 +577,35 @@ async function reallocateVessel(ctx: AuthContext, body: Body, deps: AdminActions
   await guardTarget(ctx, target, vesselId);
   if (text(vessel, 'status') === 'Sold') throw new HttpError(409, 'conflict', 'That vessel is archived.', { reason: 'vessel_archived' });
 
-  const currentRes = await ctx.userClient.from('crew_assignments').select('id, vessel_id, position').eq('user_id', target.userId).eq('is_current', true);
+  // The source assignments with the service client (the caller's RLS view may hide one), kept for vessels of the
+  // target's company; every source vessel needs the admin capability too (D-198: old and new vessel on a move).
+  const service = ctx.serviceClient();
+  const currentRes = await service
+    .from('crew_assignments')
+    .select('id, vessel_id, position, join_date')
+    .eq('user_id', target.userId)
+    .eq('is_current', true)
+    .order('join_date', { ascending: false });
   if (currentRes.error) throw UNAVAILABLE();
-  const current = rowsOf(currentRes.data);
+  const rows = rowsOf(currentRes.data);
+  const vesselIds = [...new Set(rows.map((a) => text(a, 'vessel_id')).filter((v): v is string => v !== null))];
+  let ours = new Set<string>();
+  if (vesselIds.length > 0) {
+    const vesselsRes = await service.from('vessels').select('id, company_id').in('id', vesselIds);
+    if (vesselsRes.error) throw UNAVAILABLE();
+    ours = new Set(rowsOf(vesselsRes.data).filter((v) => text(v, 'company_id') === target.companyId).map((v) => text(v, 'id') ?? ''));
+  }
+  const current = rows.filter((a) => ours.has(text(a, 'vessel_id') ?? ''));
   const onDestination = current.find((a) => text(a, 'vessel_id') === vesselId);
   const previous = current.filter((a) => a !== onDestination);
+  const sourceVessels = [...new Set(previous.map((a) => text(a, 'vessel_id')).filter((v): v is string => v !== null))];
+  if (sourceVessels.length > 0) {
+    await assertCapabilityForVessels(ctx, 'admin.access.users_access.admin', target.companyId, sourceVessels);
+  }
   if (onDestination && previous.length === 0) {
     throw new HttpError(409, 'conflict', 'This person is already assigned to that vessel.', { reason: 'already_assigned' });
   }
-  const position = positionInput ?? text(current[0] ?? null, 'position') ?? text(target.row, 'rank') ?? 'Crew';
-  const service = ctx.serviceClient();
+  const position = positionInput ?? text(previous[0] ?? onDestination ?? null, 'position') ?? text(target.row, 'rank') ?? 'Crew';
 
   // New assignment first, then close the previous ones: a failure never leaves the person on no vessel.
   let assignmentId = text(onDestination ?? null, 'id');
@@ -595,7 +634,7 @@ async function reallocateVessel(ctx: AuthContext, body: Body, deps: AdminActions
     action_type: 'REALLOCATE_VESSEL',
     target_user_id: target.userId,
     target_crew_id: target.profileId,
-    before_json: { vessel_ids: previous.map((a) => text(a, 'vessel_id')) },
+    before_json: { vessel_ids: sourceVessels },
     after_json: { vessel_id: vesselId, position, effective_date: effectiveDate, end_date: endDate, previous_ended: previousEnded },
     reason,
   });

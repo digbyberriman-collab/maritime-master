@@ -1,5 +1,5 @@
 /**
- * send-invitation (Phase 2 spec §C.3; gap/01 F46, W2; D-121, D-125).
+ * send-invitation (Phase 2 spec §C.3; gap/01 F46, W2; D-121, D-125, D-205, D-207, D-208).
  *
  * `POST { profileId }` (legacy `userId` still accepted: resolved through the
  * caller's RLS view of profiles). `redirectTo` from the client is ignored:
@@ -14,8 +14,15 @@
  * - 409 `conflict` with `details.reason: counter_exhausted` when the attempt
  *   counter is at its ceiling (nothing linked or sent, D-196)
  * - 400 `invalid_request` (no id; `details.reason` `missing_email` / `placeholder_email`)
- * - 401 `unauthorized`, 403 `account_disabled` / `forbidden` / `cross_company`
+ * - 401 `unauthorized`, 403 `account_disabled` / `forbidden` / `cross_company`;
+ *   `forbidden` with `details.reason: out_of_reach` (a person on a vessel the
+ *   caller does not administer, or the vessel-less / administrator person an
+ *   admin of some vessels may not act on; D-194, D-207) or
+ *   `manages_admins_required` (an administrator invitee; D-195)
  * - 404 `not_found` (not visible to the caller), 409 `already_active` / `conflict`
+ *   (`details.reason: login_not_created_by_storm`: a login with this address
+ *   that STORM did not create, never adopted, D-205; `login_blocked`: a banned
+ *   login no revoke explains, D-208; nothing reserved, linked or sent)
  * - 429 `cooldown` (5 minutes, `Retry-After`) / `rate_limited`
  * - 500 `server_misconfigured` (`STORM_SITE_URL` missing: nothing sent or stamped), 503 `status_unavailable`
  */

@@ -158,11 +158,25 @@ Deno.test('toggle_access: status failure → 502 "Nothing was changed", no ban a
   assertEquals(bans(h.world).length, 0);
 });
 
-Deno.test('toggle_access: a 42501 refusal from set_membership_status → 403 with its message, nothing else done', async () => {
+Deno.test('toggle_access: an admin who does not manage admins acting on the DPA → 403 manages_admins_required before any change', async () => {
+  for (const p3 of [true, false]) {
+    const h = setup({ p3 });
+    // shoreA (shore_management) administers every vessel but does not manage admins.
+    const res = await call(h, P.shoreA.token, { action: 'toggle_access', targetUserId: P.adminA.userId, enableAccess: false, reason: 'x' });
+    assertEquals(res.status, 403, `p3=${p3}`);
+    const error = await errorOf(res);
+    assertEquals([error.code, error.message], ['forbidden', 'Only an administrator who manages administrators can do this for an administrator.']);
+    assertEquals(error.details, { reason: 'manages_admins_required' });
+    assertEquals(callsOf(h.world, 'rpc').filter((c) => c.fn === 'set_membership_status').length, 0, 'the edge refused first');
+    assertEquals(bans(h.world).length, 0);
+    assertEquals(profileRow(h.world, P.adminA.profileId).account_status, 'active');
+  }
+});
+
+Deno.test('toggle_access: a 42501 refusal sentence from set_membership_status passes through as 403, nothing else done', async () => {
   const h = setup();
-  // shoreA (shore_management) is an admin but does not manage admins: disabling the DPA is refused by SQL.
-  profileRow(h.world, P.shoreA.profileId).role = 'shore_management';
-  const res = await call(h, P.shoreA.token, { action: 'toggle_access', targetUserId: P.adminA.userId, enableAccess: false, reason: 'x' });
+  h.world.rpcs.set_membership_status = () => fail('42501', 'Only an administrator who manages administrators can change this access.');
+  const res = await call(h, P.adminA.token, { action: 'toggle_access', targetUserId: P.crewA.userId, enableAccess: false, reason: 'x' });
   assertEquals(res.status, 403);
   assertEquals((await errorOf(res)).message, 'Only an administrator who manages administrators can change this access.');
   assertEquals(bans(h.world).length, 0);
@@ -657,3 +671,211 @@ Deno.test('revoke, then re-invite after a failed send: the key is never reused a
   assertFalse(provider.log.some((l) => l.status === 409));
 });
 
+
+// ---- round 3: a vessel-scoped admin acts only within reach (D-194, D-207) -----------------------
+
+const TARGET_ACTIONS = (who: { userId: string | null }) => [
+  { action: 'reset_account', resetType: 'resend_invitation', targetUserId: who.userId },
+  { action: 'reset_account', resetType: 'password_reset', targetUserId: who.userId },
+  { action: 'reset_account', resetType: 'invalidate_sessions', targetUserId: who.userId },
+  { action: 'toggle_access', targetUserId: who.userId, enableAccess: false, reason: 'Left' },
+  { action: 'toggle_access', targetUserId: who.userId, enableAccess: true },
+];
+
+Deno.test('admin-actions: a vessel-scoped admin is refused out_of_reach for a person on another vessel and for the DPA (every target action)', async () => {
+  for (const target of [P.crewA, P.adminA]) {
+    for (const body of TARGET_ACTIONS(target)) {
+      const h = setup();
+      if (target === P.crewA) profileRow(h.world, P.crewA.profileId).account_status = 'invited'; // so a resend would otherwise run
+      const res = await call(h, P.vesselAdminA.token, body);
+      const label = `${target.key} ${JSON.stringify(body)}`;
+      assertEquals(res.status, 403, label);
+      const error = await errorOf(res);
+      assertEquals([error.code, error.details], ['forbidden', { reason: 'out_of_reach' }], label);
+      assertEquals(error.message, 'You can only do this for people on the vessels you administer.');
+      assertEquals(linkCount(h.world), 0, label);
+      assertEquals(h.sent.length, 0, label);
+      assertEquals(bans(h.world).length, 0, `${label}: no ban change`);
+      assertEquals(callsOf(h.world, 'rpc').filter((c) => ['set_membership_status', 'reserve_invitation_attempt'].includes(c.fn)).length, 0, label);
+    }
+  }
+});
+
+Deno.test('admin-actions: a vessel-scoped admin acts on a person of their own vessel', async () => {
+  const h = setup();
+  const res = await call(h, P.vesselAdminA.token, { action: 'reset_account', resetType: 'password_reset', targetUserId: P.crewA2.userId });
+  assertEquals(res.status, 200);
+  assertEquals(h.sent.length, 1);
+});
+
+Deno.test('admin-actions: an all-vessels admin who does not manage admins → 403 manages_admins_required on the DPA (reset, resend)', async () => {
+  for (const resetType of ['password_reset', 'resend_invitation']) {
+    const h = setup();
+    const res = await call(h, P.shoreA.token, { action: 'reset_account', resetType, targetUserId: P.adminA.userId });
+    assertEquals(res.status, 403, resetType);
+    assertEquals((await errorOf(res)).details, { reason: 'manages_admins_required' });
+    assertEquals(linkCount(h.world), 0);
+    assertEquals(h.sent.length, 0);
+  }
+});
+
+// ---- round 3: the revoke's ban, the resend and the reset (D-208) --------------------------------
+
+function activeWithLiveInvitation(h: ReturnType<typeof setup>): void {
+  // A legacy profile: account_status 'active' (the column default), a login never confirmed or signed in, a live invitation.
+  profileRow(h.world, P.invitedA.profileId).account_status = 'active';
+  seedInvitation(h.world, P.invitedA);
+}
+
+const loginOf = (world: FakeWorld, userId: string | null) => {
+  const login = world.authUsers.find((u) => u.id === userId);
+  assert(login);
+  return login;
+};
+
+Deno.test('revoke then resend (active profile): the revoke\'s ban is lifted first, then sent; banned_until cleared', async () => {
+  let t = NOW.getTime();
+  const world = buildWorld({ p3: true, now: () => new Date(t) });
+  const sent: EmailMessage[] = [];
+  const sendEmail = (m: EmailMessage) => {
+    sent.push(m);
+    return Promise.resolve({ ok: true as const, providerMessageId: 'msg-x' });
+  };
+  const handler = createHandler({ env: () => TEST_ENV, createClient: fakeClientFactory(world), now: () => new Date(t), sendEmail, invite: { now: () => new Date(t), isFakeEmail: () => false, sendEmail } });
+  profileRow(world, P.invitedA.profileId).account_status = 'active';
+  seedInvitation(world, P.invitedA);
+  const revoke = await handler(request(P.adminA.token, REVOKE));
+  assertEquals((await bodyOf(revoke)).loginNote, 'banned');
+  assertEquals(loginOf(world, P.invitedA.userId).banned_until, '2126-01-01T00:00:00Z');
+  t += 3600_000;
+  const res = await handler(request(P.adminA.token, { action: 'reset_account', resetType: 'resend_invitation', targetUserId: P.invitedA.userId }));
+  assertEquals(res.status, 200);
+  assertEquals(obj(await bodyOf(res), 'invitation').status, 'sent');
+  assertEquals(bans(world), [DISABLE_BAN, 'none']);
+  const unban = callsOf(world, 'admin').filter((c) => c.method === 'updateUserById').at(-1);
+  const link = callsOf(world, 'admin').find((c) => c.method === 'generateLink');
+  assert(unban && link && world.calls.indexOf(unban) < world.calls.indexOf(link), 'unbanned before the link');
+  assertEquals(loginOf(world, P.invitedA.userId).banned_until, null);
+  assertEquals(sent.length, 1);
+});
+
+Deno.test('revoke, a TOGGLE_ACCESS decision after it, then resend → 409 login_blocked: no link, no email, nothing recorded', async () => {
+  const h = setup();
+  activeWithLiveInvitation(h);
+  assertEquals((await call(h, P.adminA.token, REVOKE)).status, 200);
+  (h.world.tables.admin_action_log ??= []).push({
+    id: 'later', action_type: 'TOGGLE_ACCESS', target_user_id: P.invitedA.userId, created_at: new Date(NOW.getTime() + 60_000).toISOString(),
+    after_json: { sign_in_block: 'applied', status_stored: true },
+  });
+  const res = await call(h, P.adminA.token, { action: 'reset_account', resetType: 'resend_invitation', targetUserId: P.invitedA.userId });
+  assertEquals(res.status, 409);
+  const error = await errorOf(res);
+  assertEquals([error.code, error.message, error.details], ['conflict', "This person's sign-in is blocked. Turn access on first.", { reason: 'login_blocked' }]);
+  assertEquals(h.sent.length, 0);
+  assertEquals(linkCount(h.world), 0);
+  assertEquals(bans(h.world), [DISABLE_BAN], 'the ban stays');
+  assertEquals(callsOf(h.world, 'rpc').filter((c) => c.fn === 'reserve_invitation_attempt' || c.fn === 'record_invitation_send').length, 0);
+});
+
+Deno.test('revoke then password_reset → 409 login_blocked, no link, no email, no "sent" audit row', async () => {
+  for (const p3 of [true, false]) {
+    const h = setup({ p3 });
+    if (p3) {
+      activeWithLiveInvitation(h);
+      assertEquals((await call(h, P.adminA.token, REVOKE)).status, 200);
+    } else {
+      loginOf(h.world, P.crewA.userId).banned_until = '2126-01-01T00:00:00Z'; // D-01: any ban
+    }
+    const target = p3 ? P.invitedA : P.crewA;
+    const res = await call(h, P.adminA.token, { action: 'reset_account', resetType: 'password_reset', targetUserId: target.userId });
+    assertEquals(res.status, 409, `p3=${p3}`);
+    assertEquals((await errorOf(res)).details, { reason: 'login_blocked' });
+    assertEquals(h.sent.length, 0);
+    assertEquals(linkCount(h.world), 0);
+    assertFalse(auditRows(h.world, 'RESET_ACCOUNT').some((r) => (r.after_json as Record<string, unknown>).reset_type === 'password_reset'));
+  }
+});
+
+Deno.test('password_reset: no login → 409 login_missing; the login cannot be read → 503; neither makes a link', async () => {
+  const missing = setup();
+  missing.world.authUsers = missing.world.authUsers.filter((u) => u.id !== P.crewA.userId);
+  const r1 = await call(missing, P.adminA.token, RESET);
+  assertEquals(r1.status, 409);
+  assertEquals((await errorOf(r1)).details, { reason: 'login_missing' });
+  assertEquals(linkCount(missing.world), 0);
+
+  const broken = setup();
+  broken.world.hooks.admin = (a) => (a.method === 'getUserById' ? fail('unexpected_failure', 'auth down', 500) : undefined);
+  const r2 = await call(broken, P.adminA.token, RESET);
+  assertEquals(r2.status, 503);
+  assertEquals(linkCount(broken.world), 0);
+  assertEquals(broken.sent.length, 0);
+});
+
+Deno.test('toggle_access enable whose ban lift failed, then resend → 409 login_blocked (never "sent" to a banned login)', async () => {
+  const h = setup();
+  // invitedA was turned off (disabled + banned); turning access on stores the status but the lift fails.
+  profileRow(h.world, P.invitedA.profileId).account_status = 'disabled';
+  loginOf(h.world, P.invitedA.userId).banned_until = '2126-01-01T00:00:00Z';
+  h.world.hooks.admin = (a) => (a.method === 'updateUserById' ? fail('unexpected_failure', 'auth down', 500) : undefined);
+  const enable = await call(h, P.adminA.token, { action: 'toggle_access', targetUserId: P.invitedA.userId, enableAccess: true });
+  assertEquals(enable.status, 502);
+  assertEquals(profileRow(h.world, P.invitedA.profileId).account_status, 'active');
+  h.world.hooks.admin = undefined;
+  const res = await call(h, P.adminA.token, { action: 'reset_account', resetType: 'resend_invitation', targetUserId: P.invitedA.userId });
+  assertEquals(res.status, 409);
+  assertEquals((await errorOf(res)).details, { reason: 'login_blocked' });
+  assertEquals(h.sent.length, 0);
+  assertEquals(linkCount(h.world), 0);
+  assertEquals(loginOf(h.world, P.invitedA.userId).banned_until, '2126-01-01T00:00:00Z');
+});
+
+// ---- round 3: reallocate_vessel checks the source vessels too (D-198) ----------------------------
+
+const MOVE = { action: 'reallocate_vessel', targetUserId: P.crewA.userId, vesselId: V_A2, reason: 'Crew change' };
+const currentVessels = (world: FakeWorld, userId: string | null) =>
+  (world.tables.crew_assignments ?? []).filter((a) => a.user_id === userId && a.is_current).map((a) => a.vessel_id).sort();
+const assignmentWrites = (world: FakeWorld) => callsOf(world, 'query').filter((q) => q.table === 'crew_assignments' && q.op !== 'select');
+
+Deno.test('reallocate_vessel: the Borealis admin cannot move crewA off Aurora (403, no insert, no audit row claiming previous_ended)', async () => {
+  const h = setup();
+  const res = await call(h, P.vesselAdminA.token, MOVE);
+  assertEquals(res.status, 403);
+  assertEquals((await errorOf(res)).details, { reason: 'out_of_reach' });
+  assertEquals(assignmentWrites(h.world).length, 0);
+  assertEquals(currentVessels(h.world, P.crewA.userId), [V_A1]);
+  assertEquals(auditRows(h.world, 'REALLOCATE_VESSEL').length, 0);
+});
+
+Deno.test('reallocate_vessel: a vessel admin with a company-wide HR view still cannot end the other vessel\'s row', async () => {
+  const h = setup();
+  const base = h.world.rls;
+  h.world.rls = (table, row, caller, w) =>
+    table === 'crew_assignments' && caller.userId === P.vesselAdminA.userId ? true : base(table, row, caller, w);
+  const res = await call(h, P.vesselAdminA.token, MOVE);
+  assertEquals(res.status, 403);
+  assertEquals(assignmentWrites(h.world).length, 0);
+  assertEquals(currentVessels(h.world, P.crewA.userId), [V_A1]);
+  // Defence in depth: even if the person check passed, the source vessel's own capability check refuses before any insert.
+  h.world.hooks.rpc = (r) => (r.fn === 'admin_may_act_on_user' ? { data: true, error: null } : undefined);
+  const second = await call(h, P.vesselAdminA.token, MOVE);
+  assertEquals(second.status, 403);
+  assertEquals((await errorOf(second)).details, { reason: 'out_of_reach' });
+  assertEquals(assignmentWrites(h.world).length, 0);
+  assertEquals(auditRows(h.world, 'REALLOCATE_VESSEL').length, 0);
+});
+
+Deno.test('reallocate_vessel: the DPA moves crewA and closes the previous row; the sources are read with the service client', async () => {
+  for (const p3 of [true, false]) {
+    const h = setup({ p3 });
+    const res = await call(h, P.adminA.token, MOVE);
+    assertEquals(res.status, 200, `p3=${p3}`);
+    assertEquals(currentVessels(h.world, P.crewA.userId), [V_A2]);
+    const [row] = auditRows(h.world, 'REALLOCATE_VESSEL');
+    assertEquals(row.before_json, { vessel_ids: [V_A1] });
+    assertEquals((row.after_json as Record<string, unknown>).previous_ended, true);
+    const read = callsOf(h.world, 'query').find((q) => q.table === 'crew_assignments' && q.op === 'select');
+    assertEquals(read?.caller.role, 'service');
+    assertEquals(obj(await bodyOf(await call(h, P.adminA.token, { ...MOVE, vesselId: V_A1 })), 'assignment').position, 'Deckhand', 'the position comes from the real row');
+  }
+});

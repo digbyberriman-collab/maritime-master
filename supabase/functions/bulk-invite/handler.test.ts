@@ -1,7 +1,7 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1.0.13';
 import type { EmailMessage, EmailResult } from '../_shared/email.ts';
 import { callsOf, fakeClientFactory } from '../_shared/testing/fakeSupabase.ts';
-import { bodyOf, buildWorld, envWith, obj, P, profileRow, request, TEST_ENV } from '../_shared/testing/world.ts';
+import { bodyOf, buildWorld, envWith, obj, P, profileRow, request, TEST_ENV, V_A2 } from '../_shared/testing/world.ts';
 import { createHandler } from './handler.ts';
 
 const NOW = new Date('2026-11-23T10:00:00Z');
@@ -91,4 +91,22 @@ Deno.test('bulk-invite: no JWT → 401; disabled caller → 403; per-caller rate
   for (let i = 0; i < 6; i++) last = (await h.handler(request(P.adminA.token, { profileIds: [P.crewA.profileId] }))).status;
   assertEquals(last, 429);
   assert(h.sent.length === 0, 'crewA is already active: nothing sent');
+});
+
+Deno.test('bulk-invite: a vessel-scoped admin gets refused rows (forbidden, out_of_reach) for people elsewhere and the DPA; their own vessel is sent', async () => {
+  const h = setup();
+  profileRow(h.world, P.crewA.profileId).account_status = 'invited';
+  profileRow(h.world, P.importedA.profileId).imported_vessel_id = V_A2;
+  const res = await h.handler(request(P.vesselAdminA.token, { profileIds: [P.crewA.profileId, P.adminA.profileId, P.importedA.profileId] }));
+  assertEquals(res.status, 200);
+  const body = await bodyOf(res);
+  const results = body.results as Array<Record<string, unknown>>;
+  assertEquals(results.map((r) => [r.status, r.code ?? null, r.reason ?? null]), [
+    ['refused', 'forbidden', 'out_of_reach'],
+    ['refused', 'forbidden', 'out_of_reach'],
+    ['sent', null, null],
+  ]);
+  assertEquals([body.sent, body.failed, body.refused], [1, 0, 2]);
+  assertEquals(h.sent.map((m) => m.to), [P.importedA.email]);
+  assertEquals(callsOf(h.world, 'admin').filter((c) => c.method === 'generateLink').length, 1);
 });

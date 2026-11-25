@@ -1,9 +1,9 @@
 import { assert, assertEquals, assertFalse, assertRejects } from 'jsr:@std/assert@1.0.13';
 import { getAuthContext } from './auth.ts';
-import { assertCapability, type CapabilityKey, hasCapability, legacyCapability } from './capability.ts';
+import { assertCapability, assertCapabilityForVessels, assertMayActOnUser, type CapabilityKey, hasCapability, legacyCapability } from './capability.ts';
 import { HttpError } from './http.ts';
-import { callsOf, fail, fakeClientFactory, type FakeWorld } from './testing/fakeSupabase.ts';
-import { buildWorld, CO_A, CO_B, P, type Persona, request, TEST_ENV, V_A1, V_A2, V_A_SOLD, V_B1 } from './testing/world.ts';
+import { callsOf, fail, fakeClientFactory, type FakeWorld, ok } from './testing/fakeSupabase.ts';
+import { buildWorld, CO_A, CO_B, P, type Persona, profileRow, request, TEST_ENV, V_A1, V_A2, V_A_SOLD, V_B1 } from './testing/world.ts';
 
 const ctxFor = (world: FakeWorld, who: Persona) =>
   getAuthContext(request(who.token, {}), { env: TEST_ENV, createClient: fakeClientFactory(world) });
@@ -126,4 +126,118 @@ Deno.test('legacy: a read error while checking → 503 (fail closed)', async () 
   world.hooks.query = (q) => (q.table === 'user_roles' ? fail('XX000', 'boom') : undefined);
   const err = await assertRejects(() => hasCapability(ctx, 'admin.access.users_access.admin', { companyId: CO_A }), HttpError);
   assertEquals(err.code, 'status_unavailable');
+});
+
+// ---- assertMayActOnUser (D-194, D-195, D-207) ---------------------------------------------------
+
+const targetOf = (who: Persona, patch: { kind?: string } = {}) => ({ companyId: who.companyId, userId: who.userId, profileId: who.profileId, role: who.role, ...patch });
+
+async function refusal(promise: Promise<unknown>): Promise<[number, string, unknown]> {
+  const err = await assertRejects(() => promise, HttpError);
+  return [err.status, err.code, err.details?.reason];
+}
+
+Deno.test('assertMayActOnUser (P3): admin_may_act_on_user true passes; asked with the service client and the target ids', async () => {
+  const world = buildWorld({ p3: true });
+  await assertMayActOnUser(await ctxFor(world, P.adminA), targetOf(P.crewA));
+  const call = callsOf(world, 'rpc').find((c) => c.fn === 'admin_may_act_on_user');
+  assert(call);
+  assertEquals(call.caller.role, 'service');
+  assertEquals(call.args, { _actor: P.adminA.userId, _target_user: P.crewA.userId, _company: CO_A, _target_profile: P.crewA.profileId });
+  // A vessel-scoped admin acts on a person of their own vessel.
+  await assertMayActOnUser(await ctxFor(world, P.vesselAdminA), targetOf(P.crewA2));
+});
+
+Deno.test('assertMayActOnUser (P3): false → 403 out_of_reach (a vessel admin and a person elsewhere, the DPA, a vessel-less person)', async () => {
+  const world = buildWorld({ p3: true });
+  const ctx = await ctxFor(world, P.vesselAdminA);
+  for (const who of [P.crewA, P.adminA, P.importedA]) {
+    assertEquals(await refusal(assertMayActOnUser(ctx, targetOf(who))), [403, 'forbidden', 'out_of_reach'], who.key);
+  }
+  // Any answer but true is a refusal.
+  world.hooks.rpc = (r) => (r.fn === 'admin_may_act_on_user' ? ok(null) : undefined);
+  assertEquals(await refusal(assertMayActOnUser(await ctxFor(world, P.adminA), targetOf(P.crewA))), [403, 'forbidden', 'out_of_reach']);
+});
+
+Deno.test('assertMayActOnUser: an error that is not "missing" → 503; another or no company → 403 before any RPC', async () => {
+  const world = buildWorld({ p3: true });
+  const ctx = await ctxFor(world, P.adminA);
+  world.hooks.rpc = (r) => (r.fn === 'admin_may_act_on_user' ? fail('40001', 'serialization failure') : undefined);
+  assertEquals(await refusal(assertMayActOnUser(ctx, targetOf(P.crewA))), [503, 'status_unavailable', undefined]);
+  world.hooks.rpc = undefined;
+  const before = callsOf(world, 'rpc').length;
+  assertEquals(await refusal(assertMayActOnUser(ctx, targetOf(P.crewB))), [403, 'cross_company', undefined]);
+  assertEquals(await refusal(assertMayActOnUser(ctx, { ...targetOf(P.crewA), companyId: null })), [403, 'forbidden', undefined]);
+  assertEquals(callsOf(world, 'rpc').length, before);
+});
+
+Deno.test('assertMayActOnUser (D-01, function missing): a full legacy admin passes; others only for people of vessels they are on', async () => {
+  const world = buildWorld({ p3: false });
+  await assertMayActOnUser(await ctxFor(world, P.adminA), targetOf(P.crewA2));
+  const master = await ctxFor(world, P.masterA);
+  await assertMayActOnUser(master, targetOf(P.importedA)); // waits for Aurora, the master's vessel (D-125)
+  await assertMayActOnUser(master, targetOf(P.crewA)); // on Aurora
+  assertEquals(await refusal(assertMayActOnUser(master, targetOf(P.crewA2))), [403, 'forbidden', 'out_of_reach'], 'on Borealis');
+  assertEquals(await refusal(assertMayActOnUser(master, targetOf(P.shoreA))), [403, 'forbidden', 'out_of_reach'], 'an administrator');
+  profileRow(world, P.importedA.profileId).imported_vessel_id = V_A2;
+  assertEquals(await refusal(assertMayActOnUser(master, targetOf(P.importedA))), [403, 'forbidden', 'out_of_reach'], 'waits for Borealis');
+  world.tables.crew_assignments = (world.tables.crew_assignments ?? []).filter((a) => a.user_id !== P.crewA.userId);
+  assertEquals(await refusal(assertMayActOnUser(master, targetOf(P.crewA))), [403, 'forbidden', 'out_of_reach'], 'no vessel at all');
+  // Every read is the service client's (never the caller's RLS view).
+  assertFalse(callsOf(world, 'query').some((q) => q.table === 'crew_assignments' && q.caller.role !== 'service'));
+});
+
+Deno.test('assertMayActOnUser (D-01): a read error → 503 (fail closed)', async () => {
+  const world = buildWorld({ p3: false });
+  const ctx = await ctxFor(world, P.masterA);
+  world.hooks.query = (q) => (q.table === 'crew_assignments' && q.caller.role === 'service' ? fail('XX000', 'boom') : undefined);
+  assertEquals(await refusal(assertMayActOnUser(ctx, targetOf(P.crewA))), [503, 'status_unavailable', undefined]);
+});
+
+Deno.test('assertMayActOnUser: an administrator target needs a manager of administrators (role, kind, user_is_admin_target)', async () => {
+  const world = buildWorld({ p3: true });
+  const shore = await ctxFor(world, P.shoreA); // every vessel, does not manage administrators
+  const dpa = await ctxFor(world, P.adminA);
+  assertEquals(await refusal(assertMayActOnUser(shore, targetOf(P.adminA))), [403, 'forbidden', 'manages_admins_required'], 'role dpa');
+  assertEquals(await refusal(assertMayActOnUser(shore, targetOf(P.importedA, { kind: 'admin' }))), [403, 'forbidden', 'manages_admins_required'], 'kind admin');
+  await assertMayActOnUser(shore, targetOf(P.crewA));
+  (world.tables.user_roles ??= []).push({ id: 'ur', user_id: P.crewA.userId, role: 'dpa', company_id: CO_A, is_active: true, expires_at: null });
+  assertEquals(await refusal(assertMayActOnUser(shore, targetOf(P.crewA))), [403, 'forbidden', 'manages_admins_required'], 'user_is_admin_target');
+  await assertMayActOnUser(dpa, targetOf(P.shoreA));
+  await assertMayActOnUser(dpa, targetOf(P.crewA));
+  const asked = callsOf(world, 'rpc').filter((c) => c.fn === 'user_manages_admins_for');
+  assert(asked.length > 0 && asked.every((c) => c.caller.role === 'service'));
+
+  world.hooks.rpc = (r) => (r.fn === 'user_manages_admins_for' ? fail('XX000', 'boom') : undefined);
+  assertEquals(await refusal(assertMayActOnUser(dpa, targetOf(P.shoreA))), [503, 'status_unavailable', undefined]);
+  world.hooks.rpc = (r) => (r.fn === 'user_is_admin_target' ? fail('XX000', 'boom') : undefined);
+  assertEquals(await refusal(assertMayActOnUser(dpa, targetOf(P.crewA2))), [503, 'status_unavailable', undefined]);
+});
+
+Deno.test('assertMayActOnUser (D-01): manages-admins falls back to the legacy rule; user_is_admin_target missing → role and kind only', async () => {
+  const world = buildWorld({ p3: true });
+  delete world.rpcs.user_manages_admins_for;
+  delete world.rpcs.user_is_admin_target;
+  const shore = await ctxFor(world, P.shoreA);
+  assertEquals(await refusal(assertMayActOnUser(shore, targetOf(P.adminA))), [403, 'forbidden', 'manages_admins_required']);
+  (world.tables.user_roles ??= []).push({ id: 'ur', user_id: P.crewA.userId, role: 'dpa', company_id: CO_A, is_active: true, expires_at: null });
+  await assertMayActOnUser(shore, targetOf(P.crewA)); // a user_roles row alone does not make an administrator target without the function
+  world.tables.user_roles.push({ id: 'ur2', user_id: P.shoreA.userId, role: 'dpa', company_id: CO_A, is_active: true, expires_at: null });
+  await assertMayActOnUser(shore, targetOf(P.adminA)); // now a manager (an own-company user_roles dpa row)
+  const legacy = buildWorld({ p3: false });
+  assertEquals(await refusal(assertMayActOnUser(await ctxFor(legacy, P.shoreA), targetOf(P.adminA))), [403, 'forbidden', 'manages_admins_required']);
+  await assertMayActOnUser(await ctxFor(legacy, P.adminA), targetOf(P.shoreA));
+});
+
+Deno.test('assertCapabilityForVessels: every vessel must pass; a vessel-scoped admin gets out_of_reach, a master the plain refusal', async () => {
+  const world = buildWorld({ p3: true });
+  const vesselAdmin = await ctxFor(world, P.vesselAdminA);
+  await assertCapabilityForVessels(vesselAdmin, 'admin.access.users_access.assign', CO_A, [V_A2]);
+  await assertCapabilityForVessels(vesselAdmin, 'admin.access.users_access.assign', CO_A, []); // no vessel: SQL passes a NULL vessel
+  assertEquals(await refusal(assertCapabilityForVessels(vesselAdmin, 'admin.access.users_access.assign', CO_A, [V_A2, V_A1])), [403, 'forbidden', 'out_of_reach']);
+  const master = await ctxFor(world, P.masterA);
+  await assertCapabilityForVessels(master, 'admin.access.users_access.assign', CO_A, [V_A1]);
+  assertEquals(await refusal(assertCapabilityForVessels(master, 'admin.access.users_access.assign', CO_A, [V_A1, V_A2])), [403, 'forbidden', undefined]);
+  assertEquals(await refusal(assertCapabilityForVessels(master, 'admin.access.users_access.assign', CO_A, [])), [403, 'forbidden', undefined]);
+  assertEquals(await refusal(assertCapabilityForVessels(master, 'admin.access.users_access.assign', CO_B, [V_B1])), [403, 'cross_company', undefined]);
 });

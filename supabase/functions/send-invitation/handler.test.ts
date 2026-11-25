@@ -169,3 +169,40 @@ Deno.test('send-invitation: bad bodies → 400; GET → 405; preflight → 204',
   assertEquals((await h.handler(request(null, null, { method: 'OPTIONS' }))).status, 204);
   assertEquals(CO_A.length, 36);
 });
+
+Deno.test('send-invitation: a vessel-scoped admin → 403 out_of_reach for a person on another vessel and for the DPA; no link, no email', async () => {
+  const h = setup();
+  profileRow(h.world, P.crewA.profileId).account_status = 'invited';
+  for (const target of [P.crewA, P.adminA]) {
+    const res = await invite(h, P.vesselAdminA.token, { profileId: target.profileId });
+    assertEquals(res.status, 403, target.key);
+    const error = obj(await bodyOf(res), 'error');
+    assertEquals([error.code, error.message], ['forbidden', 'You can only do this for people on the vessels you administer.']);
+    assertEquals(obj(error, 'details'), { reason: 'out_of_reach' });
+  }
+  assertEquals(generatedLinks(h.world).length, 0);
+  assertEquals(h.sent.length, 0);
+  assertEquals(callsOf(h.world, 'admin').filter((c) => c.method === 'updateUserById').length, 0);
+});
+
+Deno.test('send-invitation: an admin of every vessel who does not manage admins → 403 manages_admins_required for an administrator', async () => {
+  const h = setup();
+  profileRow(h.world, P.importedA.profileId).role = 'shore_management';
+  const res = await invite(h, P.shoreA.token, { profileId: P.importedA.profileId });
+  assertEquals(res.status, 403);
+  assertEquals(obj(obj(await bodyOf(res), 'error'), 'details'), { reason: 'manages_admins_required' });
+  assertEquals(generatedLinks(h.world).length, 0);
+});
+
+Deno.test('send-invitation: a login with the address that STORM did not create → 409 login_not_created_by_storm, nothing sent', async () => {
+  const h = setup();
+  h.world.authUsers.push({ id: '99999999-9999-4999-8999-999999999999', email: P.importedA.email, email_confirmed_at: '2026-11-20T09:00:00Z', last_sign_in_at: '2026-11-20T09:00:00Z', password_set: true });
+  const res = await invite(h, P.adminA.token, { profileId: P.importedA.profileId });
+  assertEquals(res.status, 409);
+  const error = obj(await bodyOf(res), 'error');
+  assertEquals(error.message, 'An account with this email exists that STORM did not create. Contact STORM support.');
+  assertEquals(obj(error, 'details'), { reason: 'login_not_created_by_storm' });
+  assertEquals(generatedLinks(h.world).length, 0);
+  assertEquals(h.sent.length, 0);
+  assertEquals(profileRow(h.world, P.importedA.profileId).user_id, null);
+});

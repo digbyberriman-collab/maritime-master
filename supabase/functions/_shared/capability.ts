@@ -9,9 +9,22 @@
  * tables and RPCs only. Fails closed: an unknown key, a company that is not
  * the caller's, a missing company, or a denial is 403; an error while
  * checking is 503 `status_unavailable` (never "assume allowed").
+ *
+ * `assertCapabilityForVessels(ctx, key, companyId, vesselIds)` asserts the
+ * key for every vessel of a set (with none, once without a vessel). A
+ * vessel-scoped administrator (the key holds without a vessel, not for this
+ * one) gets 403 `forbidden` `details.reason: out_of_reach`.
+ *
+ * `assertMayActOnUser(ctx, target)` is the one edge check of the D-194 /
+ * D-195 / D-207 rule "this admin may act on this person": the service-role
+ * `admin_may_act_on_user()` (every structural vessel of the target is in the
+ * admin's reach, or the admin administers every vessel), then, for an
+ * administrator target, the service-role `user_manages_admins_for()`. Every
+ * edge path that acts on a person calls it (invitations, admin-actions);
+ * nothing else calls `admin_may_act_on_user` directly.
  */
 import type { AuthContext } from './auth.ts';
-import { asRow, bool, isMissingFunction, rowsOf, text } from './db.ts';
+import { asRow, bool, isMissingFunction, type Row, rowsOf, text } from './db.ts';
 import { HttpError } from './http.ts';
 
 /** Every key `has_capability` answers in Phase 2 (spec §A.4). Anything else is false. */
@@ -181,4 +194,206 @@ export async function legacyCapability(ctx: AuthContext, key: CapabilityKey, sco
     default:
       return false;
   }
+}
+
+// ---- a set of vessels ---------------------------------------------------------------------------
+
+/** 403 `out_of_reach` (D-194): the person is on a vessel the caller does not administer. */
+export const OUT_OF_REACH = (): HttpError =>
+  new HttpError(403, 'forbidden', 'You can only do this for people on the vessels you administer.', { reason: 'out_of_reach' });
+
+/** 403 `manages_admins_required` (D-195, gap/01 F23): an administrator target needs a manager of administrators. */
+export const MANAGES_ADMINS_REQUIRED = (): HttpError =>
+  new HttpError(403, 'forbidden', 'Only an administrator who manages administrators can do this for an administrator.', {
+    reason: 'manages_admins_required',
+  });
+
+/**
+ * `assertCapability(ctx, key, { companyId, vesselId })` for every vessel in
+ * `vesselIds` (all must pass); with none, once with no vessel. A denial for
+ * one vessel when the caller holds the key without a vessel (a
+ * vessel-scoped administrator: SQL `has_capability` passes a NULL vessel for
+ * any users-access writer) is `OUT_OF_REACH`; any other denial is the plain
+ * 403 of `assertCapability`.
+ */
+export async function assertCapabilityForVessels(
+  ctx: AuthContext,
+  key: CapabilityKey,
+  companyId: string | null,
+  vesselIds: readonly string[],
+): Promise<void> {
+  if (vesselIds.length === 0) {
+    await assertCapability(ctx, key, { companyId, vesselId: null });
+    return;
+  }
+  for (const vesselId of new Set(vesselIds)) {
+    try {
+      await assertCapability(ctx, key, { companyId, vesselId });
+    } catch (err) {
+      if (err instanceof HttpError && err.status === 403 && err.code === 'forbidden' && (await hasCapability(ctx, key, { companyId, vesselId: null }))) {
+        throw OUT_OF_REACH();
+      }
+      throw err;
+    }
+  }
+}
+
+// ---- acting on a person (D-194, D-195, D-207) -----------------------------------------------------
+
+/** The person an admin acts on. */
+export interface ActTarget {
+  /** The target's company (`profiles.company_id`): must be the caller's. */
+  companyId: string | null;
+  /** The target's login, when there is one. */
+  userId: string | null;
+  profileId: string;
+  /** `profiles.role`: dpa / shore_management are administrators. */
+  role?: string | null;
+  /** The invitation kind: admin / owner invitations are for administrators. */
+  kind?: string | null;
+}
+
+const ADMIN_TARGET_KINDS = new Set(['admin', 'owner']);
+
+/**
+ * The D-194 / D-207 rule, after the action's own capability check:
+ * 1. the target's company must be the caller's (another → 403
+ *    `cross_company`; none → 403 `forbidden`);
+ * 2. service-role `admin_may_act_on_user(_actor, _target_user, _company,
+ *    _target_profile)`: true passes, false → 403 `out_of_reach`. D-01
+ *    (function missing): `legacyMayActOnUser`. Any other error → 503;
+ * 3. an administrator target (role dpa / shore_management, kind admin /
+ *    owner, or the service-role `user_is_admin_target()`; D-01: role / kind
+ *    only) needs the service-role `user_manages_admins_for()` (D-01:
+ *    `legacyManagesAdmins`) → else 403 `manages_admins_required`; an error
+ *    → 503.
+ */
+export async function assertMayActOnUser(ctx: AuthContext, target: ActTarget): Promise<void> {
+  const companyId = target.companyId;
+  if (!companyId || !ctx.companyId) throw new HttpError(403, 'forbidden', 'You do not have permission to do that.');
+  if (companyId !== ctx.companyId) throw new HttpError(403, 'cross_company', 'That belongs to another account.');
+  const service = ctx.serviceClient();
+
+  const may = await service.rpc('admin_may_act_on_user', {
+    _actor: ctx.user.id,
+    _target_user: target.userId,
+    _company: companyId,
+    _target_profile: target.profileId,
+  });
+  if (may.error) {
+    if (!isMissingFunction(may.error)) throw UNAVAILABLE();
+    if (!(await legacyMayActOnUser(ctx, target, companyId))) throw OUT_OF_REACH();
+  } else if (may.data !== true) {
+    throw OUT_OF_REACH();
+  }
+
+  if (await isAdminTarget(ctx, target, companyId)) {
+    const manages = await service.rpc('user_manages_admins_for', { _user_id: ctx.user.id, _company_id: companyId });
+    if (manages.error) {
+      if (!isMissingFunction(manages.error)) throw UNAVAILABLE();
+      if (!(await legacyManagesAdmins(ctx))) throw MANAGES_ADMINS_REQUIRED();
+    } else if (manages.data !== true) {
+      throw MANAGES_ADMINS_REQUIRED();
+    }
+  }
+}
+
+async function isAdminTarget(ctx: AuthContext, target: ActTarget, companyId: string): Promise<boolean> {
+  if (LEGACY_ADMIN_PROFILE_ROLES.has((target.role ?? '').toLowerCase())) return true;
+  if (ADMIN_TARGET_KINDS.has((target.kind ?? '').toLowerCase())) return true;
+  if (!target.userId) return false;
+  const res = await ctx.serviceClient().rpc('user_is_admin_target', { _user_id: target.userId, _company_id: companyId });
+  if (res.error) {
+    if (!isMissingFunction(res.error)) throw UNAVAILABLE();
+    return false; // D-01: the role and the kind decide
+  }
+  return res.data === true;
+}
+
+/**
+ * Who manages administrators without `user_manages_admins_for` (D-01; the
+ * W7 legacy guard admin-actions used): the caller's profile role dpa, or an
+ * active, unexpired `user_roles` dpa / superadmin row of the caller's
+ * company or of no company (CC-5).
+ */
+export async function legacyManagesAdmins(ctx: AuthContext): Promise<boolean> {
+  const profile = await ctx.userClient.from('profiles').select('role').eq('user_id', ctx.user.id).maybeSingle();
+  if (profile.error) throw UNAVAILABLE();
+  if ((text(asRow(profile.data), 'role') ?? '').toLowerCase() === 'dpa') return true;
+  const roles = await ctx.userClient.from('user_roles').select('role, company_id, is_active, expires_at').eq('user_id', ctx.user.id);
+  if (roles.error) throw UNAVAILABLE();
+  const now = Date.now();
+  return rowsOf(roles.data).some((r) => {
+    const expires = text(r, 'expires_at');
+    const company = text(r, 'company_id');
+    return LEGACY_ADMIN_RBAC_ROLES.has((text(r, 'role') ?? '').toLowerCase()) && bool(r, 'is_active') === true &&
+      (expires === null || Date.parse(expires) > now) && (company === null || company === ctx.companyId);
+  });
+}
+
+/** A vessel that counts for reach: set status, not Sold, not archived (SQL `vessel_in_reachable_state`). */
+function reachable(row: Row): boolean {
+  const status = text(row, 'status');
+  return status !== null && status !== 'Sold' && text(row, 'lifecycle_status') !== 'archived';
+}
+
+/** Of `ids`, the vessels of `companyId` in a reachable state (service read; an error is 503). */
+async function companyVessels(ctx: AuthContext, companyId: string, ids: readonly string[]): Promise<Set<string>> {
+  const unique = [...new Set(ids)];
+  if (unique.length === 0) return new Set();
+  const res = await ctx.serviceClient().from('vessels').select('id, company_id, status, lifecycle_status').in('id', unique);
+  if (res.error) throw UNAVAILABLE();
+  const out = new Set<string>();
+  for (const row of rowsOf(res.data)) {
+    const id = text(row, 'id');
+    if (id && text(row, 'company_id') === companyId && reachable(row)) out.add(id);
+  }
+  return out;
+}
+
+/** The vessels of `userId`'s current crew assignments (service read; an error is 503). */
+async function currentAssignmentVessels(ctx: AuthContext, userId: string): Promise<string[]> {
+  const res = await ctx.serviceClient().from('crew_assignments').select('vessel_id').eq('user_id', userId).eq('is_current', true).limit(50);
+  if (res.error) throw UNAVAILABLE();
+  return rowsOf(res.data).map((r) => text(r, 'vessel_id')).filter((v): v is string => v !== null);
+}
+
+/**
+ * `admin_may_act_on_user` for a database without it (D-01): a full legacy
+ * admin (`legacyCapability` users_access.admin) passes; otherwise only a
+ * target that is not dpa / shore_management whose structural vessels (the
+ * current assignments of the login on vessels of the company; for a profile
+ * without a login, `imported_vessel_id` while `is_imported`) are non-empty
+ * and every one a vessel the caller currently reaches (an own current
+ * assignment, the vessel not Sold). That keeps today's legacy-master
+ * invitation for their own vessel (D-125). Every read is the service
+ * client's (the caller's RLS view never decides a vessel); an error is 503.
+ */
+async function legacyMayActOnUser(ctx: AuthContext, target: ActTarget, companyId: string): Promise<boolean> {
+  if (await legacyCapability(ctx, 'admin.access.users_access.admin', { companyId })) return true;
+  if (LEGACY_ADMIN_PROFILE_ROLES.has((target.role ?? '').toLowerCase())) return false;
+
+  const service = ctx.serviceClient();
+  const profileRes = await service
+    .from('profiles')
+    .select('id, user_id, company_id, role, is_imported, imported_vessel_id')
+    .eq('id', target.profileId)
+    .maybeSingle();
+  if (profileRes.error) throw UNAVAILABLE();
+  const profile = asRow(profileRes.data);
+  if (!profile || text(profile, 'company_id') !== companyId) return false;
+  if (LEGACY_ADMIN_PROFILE_ROLES.has((text(profile, 'role') ?? '').toLowerCase())) return false;
+
+  const userId = target.userId ?? text(profile, 'user_id');
+  let candidates: string[] = [];
+  if (userId) {
+    candidates = await currentAssignmentVessels(ctx, userId);
+  } else if (bool(profile, 'is_imported') === true) {
+    const imported = text(profile, 'imported_vessel_id');
+    if (imported) candidates = [imported];
+  }
+  const structural = await companyVessels(ctx, companyId, candidates);
+  if (structural.size === 0) return false;
+  const reach = await companyVessels(ctx, companyId, await currentAssignmentVessels(ctx, ctx.user.id));
+  return [...structural].every((v) => reach.has(v));
 }

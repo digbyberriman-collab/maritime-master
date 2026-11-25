@@ -14,10 +14,13 @@
  *   answer PGRST205 (D-01 "not live yet").
  * - `rpc(fn, args)`: handlers in `world.rpcs`; an unknown function answers
  *   PGRST202, exactly like PostgREST for a migration that is not applied.
- * - `auth.admin.{generateLink, getUserById, updateUserById, signOut}` over
- *   `world.authUsers`. Like the real auth server, every `generateLink` call
- *   issues a new one-time token (`world.linkSerial`), so two links for the
- *   same person differ.
+ * - `auth.admin.{generateLink, getUserById, updateUserById, deleteUser,
+ *   signOut}` over `world.authUsers`. Like the real auth server, every
+ *   `generateLink` call issues a new one-time token (`world.linkSerial`), so
+ *   two links for the same person differ; an `invite` link for a new address
+ *   creates the login (`invited_at` now, one `email` identity, no password).
+ *   A user's `identities` are public (as in the auth API); `password_set`
+ *   is not (only the SQL fakes read it, as SQL reads `encrypted_password`).
  * - `world.hooks` can answer any call first (inject errors).
  * - Every call is recorded in `world.calls` for assertions.
  *
@@ -56,7 +59,10 @@ export interface FakeAuthUser {
   invited_at?: string | null;
   banned_until?: string | null;
   last_sign_in_at?: string | null;
+  /** The login has a password (SQL `encrypted_password`); never in the auth API's user object. */
   password_set?: boolean;
+  /** Auth identities (`provider` only); an invite-created login has one `email` identity. */
+  identities?: Array<{ provider: string }>;
 }
 
 type FilterOp = 'eq' | 'neq' | 'in' | 'is' | 'gt' | 'gte' | 'lt' | 'lte' | 'ilike';
@@ -93,7 +99,7 @@ export interface RpcRecord {
 export interface AdminRecord {
   kind: 'admin';
   caller: Caller;
-  method: 'generateLink' | 'getUserById' | 'updateUserById' | 'signOut';
+  method: 'generateLink' | 'getUserById' | 'updateUserById' | 'deleteUser' | 'signOut';
   args: Record<string, unknown>;
 }
 
@@ -400,6 +406,7 @@ function publicUser(u: FakeAuthUser): Record<string, unknown> {
     invited_at: u.invited_at ?? null,
     banned_until: u.banned_until ?? null,
     last_sign_in_at: u.last_sign_in_at ?? null,
+    identities: (u.identities ?? []).map((i) => ({ provider: i.provider })),
   };
 }
 
@@ -449,7 +456,13 @@ export class FakeClient {
             return { data: { properties: null, user: null }, error: authError('User not found', 404, 'user_not_found') };
           }
           if (!user) {
-            user = { id: crypto.randomUUID(), email: params.email, email_confirmed_at: null, invited_at: world.now().toISOString() };
+            user = {
+              id: crypto.randomUUID(),
+              email: params.email,
+              email_confirmed_at: null,
+              invited_at: world.now().toISOString(),
+              identities: [{ provider: 'email' }],
+            };
             world.authUsers.push(user);
           }
           const redirect = params.options?.redirectTo ?? '';
@@ -484,6 +497,14 @@ export class FakeClient {
           return { data: { user: publicUser(user) }, error: null };
         }));
       },
+      deleteUser: (id: string, shouldSoftDelete = false) =>
+        Promise.resolve(this.admin('deleteUser', { id, shouldSoftDelete }, () => {
+          const world = this.world;
+          const index = world.authUsers.findIndex((u) => u.id === id);
+          if (index < 0) return { data: { user: null }, error: authError('User not found', 404, 'user_not_found') };
+          const [removed] = world.authUsers.splice(index, 1);
+          return { data: { user: publicUser(removed) }, error: null };
+        })),
       signOut: (jwt: string, scope?: string) =>
         Promise.resolve(this.admin('signOut', { jwt, scope: scope ?? 'global' }, () => ({ data: null, error: null }))),
     },

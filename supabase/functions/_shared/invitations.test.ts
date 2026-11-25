@@ -7,6 +7,7 @@ import { bulkRow, bulkSummary, type InviteDeps, inviteProfile, invitationRespons
 import { idempotentProvider } from './testing/fakeFetch.ts';
 import { callsOf, fail, fakeClientFactory, type FakeWorld, ok } from './testing/fakeSupabase.ts';
 import { buildWorld, CO_A, envWith, P, type Persona, profileRow, request, TEST_ENV, V_A1, V_A2, V_A_SOLD, V_B1 } from './testing/world.ts';
+import type { FakeAuthUser } from './testing/fakeSupabase.ts';
 
 const NOW = new Date('2026-11-23T10:00:00Z');
 
@@ -275,12 +276,21 @@ Deno.test('invite: a link that cannot be made is a recorded send failure (link_f
   assertEquals((world.tables.user_invitations ?? [])[0].last_error_code, 'link_failed');
 });
 
-Deno.test('invite: a record RPC error after a successful send still answers sent (stored:false) and stamps the profile', async () => {
-  const world = buildWorld({ p3: true });
-  world.rpcs.record_invitation_send = () => fail('23505', 'duplicate key');
-  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, mailer().deps);
-  assert(outcome.status === 'sent' && !outcome.stored);
-  assertEquals(profileRow(world, P.importedA.profileId).account_status, 'invited');
+Deno.test('invite: a record RPC error after a successful send answers sent (stored:false); nothing is stamped, linked or assigned', async () => {
+  // Only a missing function (D-01) takes the legacy stamp; a refusal or a failure never links a login behind SQL's back.
+  for (const [code, message] of [['23505', 'duplicate key'], ['42501', 'login_not_invited'], ['42501', 'inviter_out_of_reach'], ['42501', 'manages_admins_required'], ['42501', 'login_email_mismatch']]) {
+    const world = buildWorld({ p3: true });
+    world.rpcs.record_invitation_send = () => fail(code, message);
+    const m = mailer();
+    const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, m.deps);
+    assert(outcome.status === 'sent' && !outcome.stored, message);
+    assertEquals(outcome.assignment, undefined, `${message}: no step 11`);
+    assertEquals(m.sent.length, 1, 'the email really went out');
+    const profile = profileRow(world, P.importedA.profileId);
+    assertEquals([profile.account_status, profile.user_id, profile.last_invited_at], ['not_invited', null, null], message);
+    assertEquals(fulfilCalls(world).length, 0);
+    assertEquals(callsOf(world, 'query').filter((q) => q.table === 'profiles' && q.op === 'update').length, 0, `${message}: no legacy stamp`);
+  }
 });
 
 Deno.test('bulk rows: sent / send_failed / refused counts; server errors count as failed', () => {
@@ -392,16 +402,25 @@ Deno.test('invite: a failed unban is an honest link_failed send failure; no link
   assertEquals(profileRow(world, P.invitedA.profileId).account_status, 'not_invited');
 });
 
-Deno.test('invite: a ban is never lifted for an active profile', async () => {
-  const world = buildWorld({ p3: true });
-  // Active in STORM but the login was never confirmed (so the invite path runs) and is banned.
-  profileRow(world, P.invitedA.profileId).account_status = 'active';
-  const login = world.authUsers.find((u) => u.id === P.invitedA.userId);
-  assert(login);
-  login.banned_until = '2126-01-01T00:00:00Z';
-  await inviteProfile(await ctxFor(world, P.adminA), P.invitedA.profileId, mailer().deps);
-  assertEquals(callsOf(world, 'admin').filter((c) => c.method === 'updateUserById').length, 0);
-  assertEquals(login.banned_until, '2126-01-01T00:00:00Z');
+Deno.test('invite: a ban is never lifted for an active profile without a revoke: 409 login_blocked, never "sent"', async () => {
+  for (const p3 of [true, false]) {
+    const world = buildWorld({ p3 });
+    // Active in STORM but the login was never confirmed (so the invite path runs) and is banned; no revoke explains it.
+    profileRow(world, P.invitedA.profileId).account_status = 'active';
+    const login = world.authUsers.find((u) => u.id === P.invitedA.userId);
+    assert(login);
+    login.banned_until = '2126-01-01T00:00:00Z';
+    const m = mailer();
+    const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.invitedA.profileId, m.deps);
+    assert(outcome.status === 'refused', `p3=${p3}: never sent while banned`);
+    assertEquals([outcome.error.status, outcome.error.code, outcome.error.details?.reason], [409, 'conflict', 'login_blocked']);
+    assertEquals(outcome.error.publicMessage, "This person's sign-in is blocked. Turn access on first.");
+    assertEquals(callsOf(world, 'admin').filter((c) => c.method === 'updateUserById').length, 0);
+    assertEquals(linkCalls(world).length, 0);
+    assertEquals(m.sent.length, 0);
+    assertEquals(callsOf(world, 'rpc').filter((c) => c.fn === 'reserve_invitation_attempt' || c.fn === 'record_invitation_send').length, 0, 'nothing reserved or recorded');
+    assertEquals(login.banned_until, '2126-01-01T00:00:00Z');
+  }
 });
 
 Deno.test('invite: a provider_duplicate answer is a failed attempt for the caller; a sent row is not downgraded', async () => {
@@ -534,7 +553,9 @@ Deno.test('assignment (D-01): a login already on a vessel the caller cannot see 
   (world.tables.crew_assignments ??= []).push({ id: 'elsewhere', user_id: login.id, vessel_id: V_B1, is_current: true, position: 'Deckhand', join_date: '2026-01-01' });
   const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, mailer().deps);
   assert(outcome.status === 'sent');
-  assertEquals(outcome.assignment, 'failed');
+  // The service read sees the current assignment, so step 11 does not run at all (no claim either way).
+  assertEquals(outcome.assignment, undefined);
+  assertEquals(fulfilCalls(world).length, 0);
   assertEquals(assignmentInserts(world).length, 0);
   assertEquals(assignmentsOf(world, login.id).map((a) => a.vessel_id), [V_B1]);
   assertEquals(profileRow(world, P.importedA.profileId).imported_vessel_id, V_A1, 'still pending: the admin sees the vessel was not assigned');
@@ -589,4 +610,360 @@ Deno.test('invite: an exhausted attempt counter → 409 counter_exhausted, no li
   assertEquals(linkCalls(legacy).length, 0);
   assertEquals(l.sent.length, 0);
   assertEquals(bulkRow(refused).reason, 'counter_exhausted');
+});
+
+// ---- round 3: who may be invited, by whom (D-194, D-195, D-207) ---------------------------------
+
+const reserveCalls = (world: FakeWorld) => callsOf(world, 'rpc').filter((c) => c.fn === 'reserve_invitation_attempt');
+
+Deno.test('invite: a vessel-scoped admin is refused for a person on another vessel (the hidden assignment is read) and for the DPA', async () => {
+  const world = buildWorld({ p3: true });
+  const ctx = await ctxFor(world, P.vesselAdminA);
+  // crewA is on Aurora: invisible to the Borealis admin's RLS, found by the service read.
+  profileRow(world, P.crewA.profileId).account_status = 'invited';
+  for (const target of [P.crewA, P.adminA]) {
+    const m = mailer();
+    const outcome = await inviteProfile(ctx, target.profileId, m.deps);
+    assert(outcome.status === 'refused', target.key);
+    assertEquals([outcome.error.status, outcome.error.code, outcome.error.details?.reason], [403, 'forbidden', 'out_of_reach'], target.key);
+    assertEquals(outcome.error.publicMessage, 'You can only do this for people on the vessels you administer.');
+    assertEquals(bulkRow(outcome), { profileId: target.profileId, status: 'refused', code: 'forbidden', reason: 'out_of_reach', stored: false, invitationId: null });
+    assertEquals(m.sent.length, 0);
+  }
+  const read = callsOf(world, 'query').find((q) => q.table === 'crew_assignments' && q.op === 'select' && q.filters.some((f) => f.value === P.crewA.userId));
+  assert(read && read.caller.role === 'service', 'the assignments behind the capability are read with the service client');
+  assertEquals(linkCalls(world).length, 0);
+  assertEquals(reserveCalls(world).length, 0, 'refused before an attempt is reserved');
+  assertEquals(callsOf(world, 'admin').filter((c) => c.method === 'updateUserById').length, 0);
+});
+
+Deno.test('invite: a vessel-scoped admin invites a person waiting for their own vessel', async () => {
+  const world = buildWorld({ p3: true });
+  profileRow(world, P.importedA.profileId).imported_vessel_id = V_A2;
+  const m = mailer();
+  const outcome = await inviteProfile(await ctxFor(world, P.vesselAdminA), P.importedA.profileId, m.deps);
+  assertEquals(outcome.status, 'sent');
+  assert(outcome.status === 'sent' && outcome.assignment === 'created');
+  const may = callsOf(world, 'rpc').find((c) => c.fn === 'admin_may_act_on_user');
+  assert(may && may.caller.role === 'service');
+  assertEquals(may.args, { _actor: P.vesselAdminA.userId, _target_user: null, _company: CO_A, _target_profile: P.importedA.profileId });
+  assertEquals(m.sent.length, 1);
+});
+
+Deno.test('invite: every structural vessel needs the capability (a person on two vessels, a master of one)', async () => {
+  for (const p3 of [true, false]) {
+    const world = buildWorld({ p3 });
+    // crewA2 (invited) is on Borealis and on Aurora; the master of Aurora administers only one of them.
+    profileRow(world, P.crewA2.profileId).account_status = 'invited';
+    (world.tables.crew_assignments ??= []).push({ id: 'second', user_id: P.crewA2.userId, vessel_id: V_A1, is_current: true, position: 'Deckhand', join_date: '2026-05-01' });
+    const m = mailer();
+    const outcome = await inviteProfile(await ctxFor(world, P.masterA), P.crewA2.profileId, m.deps);
+    assert(outcome.status === 'refused', `p3=${p3}`);
+    assertEquals([outcome.error.status, outcome.error.code], [403, 'forbidden']);
+    assertEquals(outcome.error.details, undefined, 'a master is not a vessel-scoped administrator: the plain refusal');
+    assertEquals(m.sent.length, 0);
+  }
+});
+
+Deno.test('invite: an administrator invitee needs a manager of administrators (manages_admins_required), before anything is reserved', async () => {
+  for (const p3 of [true, false]) {
+    const world = buildWorld({ p3 });
+    profileRow(world, P.importedA.profileId).role = 'dpa';
+    const refused = await inviteProfile(await ctxFor(world, P.shoreA), P.importedA.profileId, mailer().deps);
+    assert(refused.status === 'refused', `p3=${p3}`);
+    assertEquals([refused.error.status, refused.error.details?.reason], [403, 'manages_admins_required']);
+    assertEquals(refused.error.publicMessage, 'Only an administrator who manages administrators can do this for an administrator.');
+    assertEquals(reserveCalls(world).length, 0);
+    assertEquals(linkCalls(world).length, 0);
+    const sent = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, mailer().deps);
+    assertEquals(sent.status, 'sent', `p3=${p3}: the DPA manages administrators`);
+  }
+});
+
+Deno.test('invite: the reservation\'s forbidden / manages_admins_required answers are 403 (not 503); nothing linked or sent', async () => {
+  for (const [code, reason] of [['forbidden', 'out_of_reach'], ['manages_admins_required', 'manages_admins_required']]) {
+    const world = buildWorld({ p3: true });
+    world.hooks.rpc = (r) => (r.fn === 'reserve_invitation_attempt' ? ok({ ok: false, code }) : undefined);
+    const m = mailer();
+    const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, m.deps);
+    assert(outcome.status === 'refused', code);
+    assertEquals([outcome.error.status, outcome.error.code, outcome.error.details?.reason], [403, 'forbidden', reason]);
+    assertEquals(linkCalls(world).length, 0);
+    assertEquals(m.sent.length, 0);
+  }
+});
+
+Deno.test('invite: admin_may_act_on_user failing (not missing) → 503, nothing reserved', async () => {
+  const world = buildWorld({ p3: true });
+  world.hooks.rpc = (r) => (r.fn === 'admin_may_act_on_user' ? fail('XX000', 'boom') : undefined);
+  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, mailer().deps);
+  assert(outcome.status === 'refused');
+  assertEquals([outcome.error.status, outcome.error.code], [503, 'status_unavailable']);
+  assertEquals(reserveCalls(world).length, 0);
+});
+
+// ---- round 3: the login an invitation adopts (D-205) -------------------------------------------
+
+const OUTSIDER = '99999999-9999-4999-8999-999999999999';
+
+function outsider(world: FakeWorld, patch: Partial<FakeAuthUser> = {}): FakeAuthUser {
+  const user: FakeAuthUser = {
+    id: OUTSIDER,
+    email: P.importedA.email,
+    email_confirmed_at: '2026-11-20T09:00:00Z',
+    invited_at: null,
+    last_sign_in_at: '2026-11-20T09:00:00Z',
+    password_set: true,
+    identities: [{ provider: 'email' }],
+    banned_until: null,
+    ...patch,
+  };
+  world.authUsers.push(user);
+  return user;
+}
+
+Deno.test('invite: a self-registered login with the invitee\'s address is never adopted → 409 login_not_created_by_storm', async () => {
+  for (const p3 of [true, false]) {
+    const world = buildWorld({ p3 });
+    profileRow(world, P.importedA.profileId).role = 'dpa'; // the person the company invites is an administrator
+    outsider(world);
+    const m = mailer();
+    const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, m.deps);
+    assert(outcome.status === 'refused', `p3=${p3}`);
+    assertEquals([outcome.error.status, outcome.error.code, outcome.error.details?.reason], [409, 'conflict', 'login_not_created_by_storm']);
+    assertEquals(outcome.error.publicMessage, 'An account with this email exists that STORM did not create. Contact STORM support.');
+    assertEquals(m.sent.length, 0, `p3=${p3}: no email`);
+    assertEquals(profileRow(world, P.importedA.profileId).user_id, null, `p3=${p3}: never linked`);
+    assertEquals(callsOf(world, 'rpc').filter((c) => c.fn === 'record_invitation_send').length, 0);
+    if (p3) {
+      assertEquals(reserveCalls(world).length, 0, 'decided before the reservation');
+      assertEquals(linkCalls(world).length, 0, 'and before any link');
+    } else {
+      // D-01 (no lookup): `invite` answers "already registered"; the magic link names the login, which is vetted before any email.
+      assertEquals(linkCalls(world).map((c) => c.args.type), ['invite', 'magiclink']);
+    }
+  }
+});
+
+Deno.test('invite: the state answers decide (email_mismatch / foreign / unknown / linked_elsewhere / error)', async () => {
+  const cases: Array<[ReturnType<typeof ok> | ReturnType<typeof fail>, number, string, string | undefined]> = [
+    [ok('email_mismatch'), 409, 'conflict', 'login_not_created_by_storm'],
+    [ok('foreign'), 409, 'conflict', 'login_not_created_by_storm'],
+    [ok('unknown'), 409, 'conflict', 'login_not_created_by_storm'],
+    [ok('something_new'), 409, 'conflict', 'login_not_created_by_storm'],
+    [ok('linked_elsewhere'), 409, 'conflict', undefined],
+    [fail('XX000', 'boom'), 503, 'status_unavailable', undefined],
+  ];
+  for (const [answer, status, code, reason] of cases) {
+    const world = buildWorld({ p3: true });
+    outsider(world, { email_confirmed_at: null, last_sign_in_at: null, password_set: false });
+    world.hooks.rpc = (r) => (r.fn === 'invitation_login_state' ? answer : undefined);
+    const m = mailer();
+    const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, m.deps);
+    assert(outcome.status === 'refused', JSON.stringify(answer));
+    assertEquals([outcome.error.status, outcome.error.code, outcome.error.details?.reason], [status, code, reason]);
+    assertEquals(reserveCalls(world).length, 0);
+    assertEquals(linkCalls(world).length, 0);
+    assertEquals(callsOf(world, 'admin').filter((c) => c.method === 'deleteUser').length, 0);
+    assertEquals(m.sent.length, 0);
+  }
+});
+
+Deno.test('invite: an unused orphan login (never confirmed, never signed in) is removed after the reservation and a fresh login invited', async () => {
+  const world = buildWorld({ p3: true });
+  outsider(world, { email_confirmed_at: null, last_sign_in_at: null, password_set: true });
+  const m = mailer();
+  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, m.deps);
+  assertEquals(outcome.status, 'sent');
+  const del = callsOf(world, 'admin').find((c) => c.method === 'deleteUser');
+  assert(del && del.caller.role === 'service');
+  assertEquals(del.args.id, OUTSIDER);
+  const [reserve] = reserveCalls(world);
+  const [link] = linkCalls(world);
+  assert(world.calls.indexOf(reserve) < world.calls.indexOf(del) && world.calls.indexOf(del) < world.calls.indexOf(link), 'reserve, remove, then link');
+  assertEquals(link.args.type, 'invite', 'a fresh login, created by STORM');
+  assertFalse(world.authUsers.some((u) => u.id === OUTSIDER));
+  const linked = profileRow(world, P.importedA.profileId).user_id;
+  assert(typeof linked === 'string' && linked !== OUTSIDER);
+  assertEquals(m.sent.length, 1);
+});
+
+Deno.test('invite: a failed orphan removal is an honest link_failed send failure (recorded, no link, no email)', async () => {
+  const world = buildWorld({ p3: true });
+  outsider(world, { email_confirmed_at: null, last_sign_in_at: null });
+  world.hooks.admin = (a) => (a.method === 'deleteUser' ? fail('unexpected_failure', 'auth down', 500) : undefined);
+  const m = mailer();
+  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, m.deps);
+  assert(outcome.status === 'send_failed' && outcome.emailError === 'link_failed' && outcome.stored);
+  assertEquals(linkCalls(world).length, 0);
+  assertEquals(m.sent.length, 0);
+  assertEquals(profileRow(world, P.importedA.profileId).user_id, null);
+  assertEquals((world.tables.user_invitations ?? [])[0].last_error_code, 'link_failed');
+});
+
+Deno.test('invite: a login STORM invited for this profile but never linked is adopted (magic link), in both modes', async () => {
+  for (const p3 of [true, false]) {
+    const world = buildWorld({ p3 });
+    const stormLogin = outsider(world, { email_confirmed_at: null, last_sign_in_at: null, password_set: false, invited_at: '2026-11-10T00:00:00Z' });
+    const m = mailer();
+    const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, m.deps);
+    assertEquals(outcome.status, 'sent', `p3=${p3}`);
+    assertEquals(linkCalls(world).map((c) => c.args.type), p3 ? ['magiclink'] : ['invite', 'magiclink']);
+    assertEquals(profileRow(world, P.importedA.profileId).user_id, stormLogin.id, `p3=${p3}`);
+    assertEquals(m.sent.length, 1);
+  }
+});
+
+Deno.test('invite: a login that appears after the lookup is vetted before any magic link (foreign → 409; STORM-invited → sent)', async () => {
+  for (const invitedByStorm of [false, true]) {
+    const world = buildWorld({ p3: true });
+    const login = outsider(world, invitedByStorm ? { email_confirmed_at: null, last_sign_in_at: null, password_set: false, invited_at: '2026-11-10T00:00:00Z' } : {});
+    let lookups = 0;
+    world.hooks.rpc = (r) => (r.fn === 'auth_user_id_for_email' && lookups++ === 0 ? ok(null) : undefined); // the first lookup misses it
+    const m = mailer();
+    const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, m.deps);
+    if (invitedByStorm) {
+      assertEquals(outcome.status, 'sent');
+      assertEquals(linkCalls(world).map((c) => c.args.type), ['invite', 'magiclink']);
+      assertEquals(profileRow(world, P.importedA.profileId).user_id, login.id);
+    } else {
+      assert(outcome.status === 'refused');
+      assertEquals(outcome.error.details?.reason, 'login_not_created_by_storm');
+      assertEquals(linkCalls(world).map((c) => c.args.type), ['invite'], 'no magic link for a login STORM did not create');
+      assertEquals(m.sent.length, 0);
+      assertEquals(profileRow(world, P.importedA.profileId).user_id, null);
+    }
+  }
+});
+
+Deno.test('invite: a magic link for another login than the vetted one → 409 conflict, no email', async () => {
+  const world = buildWorld({ p3: true });
+  world.hooks.admin = (a, w) => {
+    if (a.method !== 'generateLink') return undefined;
+    w.linkSerial += 1;
+    return {
+      data: { properties: { action_link: `https://project.supabase.test/auth/v1/verify?token=x${w.linkSerial}` }, user: { id: OUTSIDER, email: P.invitedA.email } },
+      error: null,
+    };
+  };
+  const m = mailer();
+  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.invitedA.profileId, m.deps);
+  assert(outcome.status === 'refused' && outcome.error.code === 'conflict');
+  assertEquals(m.sent.length, 0);
+});
+
+Deno.test('record_invitation_send (fake of the SQL contract): an outsider login is refused 42501, a STORM-created one is linked', () => {
+  const world = buildWorld({ p3: true });
+  const login = outsider(world);
+  const rpc = world.rpcs.record_invitation_send;
+  const service = { role: 'service' as const, userId: null };
+  const args = { p_profile_id: P.importedA.profileId, p_outcome: 'sent', p_invited_by: P.adminA.userId, p_kind: 'crew', p_user_id: OUTSIDER };
+  assertEquals(rpc(args, service, world).error?.message, 'login_not_invited');
+  assertEquals(profileRow(world, P.importedA.profileId).user_id, null);
+  assertEquals(rpc({ ...args, p_invited_by: P.vesselAdminA.userId, p_user_id: null }, service, world).error?.message, 'inviter_out_of_reach');
+  assertEquals((world.tables.user_invitations ?? []).length, 0, 'nothing is written on a refusal');
+  Object.assign(login, { email_confirmed_at: null, last_sign_in_at: null, password_set: false, invited_at: '2026-11-10T00:00:00Z' });
+  assertEquals(rpc(args, service, world).error, null);
+  assertEquals(profileRow(world, P.importedA.profileId).user_id, OUTSIDER);
+});
+
+// ---- round 3: the revoke's ban and the re-invite's lift cover the same people (D-208) -----------
+
+function revokeLog(world: FakeWorld, userId: string | null, at: string, note = 'banned'): void {
+  (world.tables.admin_action_log ??= []).push({
+    id: crypto.randomUUID(), action_type: 'RESET_ACCOUNT', actor_user_id: P.adminA.userId, target_user_id: userId, created_at: at,
+    after_json: { reset_type: 'revoke_invitation', login_note: note, login_blocked: note === 'banned' },
+  });
+}
+
+function activeBanned(world: FakeWorld): FakeAuthUser {
+  profileRow(world, P.invitedA.profileId).account_status = 'active';
+  const login = world.authUsers.find((u) => u.id === P.invitedA.userId);
+  assert(login);
+  login.banned_until = '2126-01-01T00:00:00Z';
+  return login;
+}
+
+Deno.test('invite: an active profile whose ban came from a revoke (never signed in) is unbanned, then sent', async () => {
+  const world = buildWorld({ p3: true });
+  const login = activeBanned(world);
+  revokeLog(world, P.invitedA.userId, '2026-11-23T09:00:00Z');
+  const m = mailer();
+  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.invitedA.profileId, m.deps);
+  assertEquals(outcome.status, 'sent');
+  const unban = callsOf(world, 'admin').find((c) => c.method === 'updateUserById');
+  assert(unban && world.calls.indexOf(unban) < world.calls.indexOf(linkCalls(world)[0]));
+  assertEquals(login.banned_until, null);
+  assertEquals(m.sent.length, 1);
+});
+
+Deno.test('invite: a newer TOGGLE_ACCESS row, a revoke that did not ban, or a sign-in since → login_blocked, nothing reserved', async () => {
+  const variants: Array<[string, (w: FakeWorld, login: FakeAuthUser) => void]> = [
+    ['toggle after the revoke', (w) => {
+      revokeLog(w, P.invitedA.userId, '2026-11-23T09:00:00Z');
+      (w.tables.admin_action_log ??= []).push({ id: 't', action_type: 'TOGGLE_ACCESS', target_user_id: P.invitedA.userId, created_at: '2026-11-23T09:30:00Z', after_json: { sign_in_block: 'applied' } });
+    }],
+    ['revoke note failed', (w) => revokeLog(w, P.invitedA.userId, '2026-11-23T09:00:00Z', 'failed')],
+    ['signed in since', (w, login) => {
+      revokeLog(w, P.invitedA.userId, '2026-11-23T09:00:00Z');
+      login.last_sign_in_at = '2026-11-23T09:10:00Z';
+    }],
+  ];
+  for (const [label, arrange] of variants) {
+    const world = buildWorld({ p3: true });
+    arrange(world, activeBanned(world));
+    const m = mailer();
+    const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.invitedA.profileId, m.deps);
+    assert(outcome.status === 'refused', label);
+    assertEquals(outcome.error.details?.reason, 'login_blocked', label);
+    assertEquals(reserveCalls(world).length, 0, label);
+    assertEquals(linkCalls(world).length, 0, label);
+    assertEquals(callsOf(world, 'admin').filter((c) => c.method === 'updateUserById').length, 0, label);
+    assertEquals(m.sent.length, 0, label);
+  }
+});
+
+Deno.test('invite: the sign-in block history cannot be read → 503, nothing reserved (fail closed)', async () => {
+  const world = buildWorld({ p3: true });
+  activeBanned(world);
+  world.hooks.query = (q) => (q.table === 'admin_action_log' && q.op === 'select' ? fail('XX000', 'boom') : undefined);
+  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.invitedA.profileId, mailer().deps);
+  assert(outcome.status === 'refused');
+  assertEquals([outcome.error.status, outcome.error.code], [503, 'status_unavailable']);
+  assertEquals(reserveCalls(world).length, 0);
+});
+
+// ---- round 3: the Master office is never written for an inviter without users_access.admin (D-198) --
+
+Deno.test('assignment: a tampered Master position invited by the master (assign only) → failed, no Master row; by the DPA → created', async () => {
+  for (const p3 of [true, false]) {
+    for (const position of ['Master', ' captain ']) {
+      const world = buildWorld({ p3 });
+      Object.assign(profileRow(world, P.importedA.profileId), { position });
+      const byMaster = await inviteProfile(await ctxFor(world, P.masterA), P.importedA.profileId, mailer().deps);
+      assert(byMaster.status === 'sent', `p3=${p3} ${position}`);
+      assertEquals(byMaster.assignment, 'failed', `p3=${p3} ${position}`);
+      const userId = profileRow(world, P.importedA.profileId).user_id;
+      assertEquals(assignmentsOf(world, userId).length, 0, `p3=${p3} ${position}: no Master row`);
+      assertEquals(assignmentInserts(world).length, 0);
+      assertEquals(profileRow(world, P.importedA.profileId).imported_vessel_id, V_A1, 'still pending: an admin decides');
+    }
+    const admin = buildWorld({ p3 });
+    Object.assign(profileRow(admin, P.importedA.profileId), { position: 'Master' });
+    const byAdmin = await inviteProfile(await ctxFor(admin, P.adminA), P.importedA.profileId, mailer().deps);
+    assert(byAdmin.status === 'sent' && byAdmin.assignment === 'created', `p3=${p3}`);
+    assertEquals(assignmentsOf(admin, profileRow(admin, P.importedA.profileId).user_id).map((a) => [a.vessel_id, a.position]), [[V_A1, 'Master']]);
+  }
+});
+
+Deno.test('assignment (D-01): a login that already had the profile is not placed by the edge (pending_needs_review)', async () => {
+  const world = buildWorld({ p3: false });
+  // invitedA's login has no current assignment but the profile names an import vessel (written by someone, not by STORM's create).
+  world.tables.crew_assignments = (world.tables.crew_assignments ?? []).filter((a) => a.user_id !== P.invitedA.userId);
+  Object.assign(profileRow(world, P.invitedA.profileId), { is_imported: true, imported_vessel_id: V_A1, position: 'Deckhand' });
+  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.invitedA.profileId, mailer().deps);
+  assert(outcome.status === 'sent');
+  assertEquals(outcome.assignment, 'failed');
+  assertEquals(assignmentInserts(world).length, 0);
+  assertEquals(assignmentsOf(world, P.invitedA.userId).length, 0);
 });

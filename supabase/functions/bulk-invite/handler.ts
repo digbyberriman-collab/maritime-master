@@ -14,7 +14,10 @@
  * - `send_failed`: the email (or its link) failed, or the server could not
  *   finish that row (`code` says which: `send_failed`, `status_unavailable`, …);
  * - `refused`: a rule (`not_found`, `forbidden`, `cross_company`, `cooldown`,
- *   `already_active`, `conflict`, `invalid_request` with `reason`).
+ *   `already_active`, `conflict`, `invalid_request` with `reason`; e.g.
+ *   `forbidden` + `reason: out_of_reach` / `manages_admins_required` (D-207),
+ *   `conflict` + `reason: login_not_created_by_storm` (D-205) /
+ *   `login_blocked` (D-208)).
  * Request errors: 400 (no ids, more than 50, bad ids), 401 / 403 (caller),
  * 429 `rate_limited`, 500 `server_misconfigured` (`STORM_SITE_URL` missing:
  * nothing sent or stamped).

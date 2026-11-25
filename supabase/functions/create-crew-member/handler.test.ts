@@ -2,7 +2,7 @@ import { assert, assertEquals, assertFalse } from 'jsr:@std/assert@1.0.13';
 import type { EmailMessage, EmailResult } from '../_shared/email.ts';
 import type { EdgeEnv } from '../_shared/env.ts';
 import { callsOf, fail, fakeClientFactory, type FakeWorld, ok } from '../_shared/testing/fakeSupabase.ts';
-import { bodyOf, buildWorld, CO_A, CO_B, envWith, obj, P, profileRow, request, TEST_ENV, V_A1, V_A_SOLD, V_B1 } from '../_shared/testing/world.ts';
+import { bodyOf, buildWorld, CO_A, CO_B, envWith, obj, P, profileRow, request, TEST_ENV, V_A1, V_A2, V_A_SOLD, V_B1 } from '../_shared/testing/world.ts';
 import { createHandler as bulkInvite } from '../bulk-invite/handler.ts';
 import { createHandler as sendInvitation } from '../send-invitation/handler.ts';
 import { createHandler } from './handler.ts';
@@ -356,4 +356,53 @@ Deno.test('create-crew-member: no JWT 401, crew 403, a master 403 (admin capabil
   }
   assertEquals(writes(h.world).length, 0);
   assertEquals((await h.handler(request(P.adminA.token, null, { method: 'GET' }))).status, 405);
+});
+
+// ---- round 3: a person without a vessel needs an admin of every vessel (D-194, D-207) ------------
+
+Deno.test('create-crew-member: a vessel-scoped admin without a vesselId → 403 vessel_required, nothing written; the DPA → 201', async () => {
+  const h = setup();
+  const res = await create(h, P.vesselAdminA.token, body());
+  assertEquals(res.status, 403);
+  const error = await errorOf(res);
+  assertEquals([error.code, error.message, error.details], ['forbidden', 'Choose the vessel this person joins.', { reason: 'vessel_required' }]);
+  assertEquals(writes(h.world).length, 0);
+  assertEquals(created(h.world).length, 0);
+  const scope = callsOf(h.world, 'rpc').find((c) => c.fn === 'admin_scope_all');
+  assert(scope && scope.caller.role === 'service');
+  assertEquals(scope.args, { _actor: P.vesselAdminA.userId, _company: CO_A });
+
+  const dpa = setup();
+  assertEquals((await create(dpa, P.adminA.token, body())).status, 201);
+});
+
+Deno.test('create-crew-member: a vessel-scoped admin adds a person to their own vessel (201, invited, assigned); another vessel is not visible (404)', async () => {
+  const h = setup();
+  const res = await create(h, P.vesselAdminA.token, body({ vesselId: V_A2, position: 'Deckhand' }));
+  assertEquals(res.status, 201);
+  const answer = await bodyOf(res);
+  assertEquals(obj(answer, 'invitation').status, 'sent');
+  assertEquals(answer.assignment, 'created');
+  const [profile] = created(h.world);
+  assertEquals(assignmentsOf(h.world, profile.user_id).map((a) => [a.vessel_id, a.position]), [[V_A2, 'Deckhand']]);
+
+  const other = setup();
+  assertEquals((await create(other, P.vesselAdminA.token, body({ vesselId: V_A1 }))).status, 404);
+  assertEquals(writes(other.world).length, 0);
+});
+
+Deno.test('create-crew-member: admin_scope_all missing (D-01) → only a full legacy admin adds a vessel-less person; an error → 503', async () => {
+  const missing = setup();
+  delete missing.world.rpcs.admin_scope_all;
+  const refused = await create(missing, P.vesselAdminA.token, body());
+  assertEquals(refused.status, 403);
+  assertEquals((await errorOf(refused)).details, { reason: 'vessel_required' });
+  assertEquals(writes(missing.world).length, 0);
+  assertEquals((await create(missing, P.adminA.token, body())).status, 201);
+
+  const broken = setup();
+  broken.world.hooks.rpc = (r) => (r.fn === 'admin_scope_all' ? fail('XX000', 'boom') : undefined);
+  const res = await create(broken, P.adminA.token, body());
+  assertEquals(res.status, 503);
+  assertEquals(writes(broken.world).length, 0);
 });

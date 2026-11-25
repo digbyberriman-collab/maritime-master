@@ -18,7 +18,13 @@
  *    vessel is 409 `conflict` `reason: vessel_archived` after step 5.
  * 5. `assertCapability('admin.access.users_access.admin', { companyId,
  *    vesselId })`: the `has_capability_for` rule (CC-5: only unexpired,
- *    same-company `user_roles` rows count) → 403.
+ *    same-company `user_roles` rows count) → 403. Without a `vesselId` the
+ *    caller must administer every vessel (D-194, D-207): the service-role
+ *    `admin_scope_all()` → else 403 `forbidden` `details.reason:
+ *    vessel_required` (a vessel-scoped administrator chooses the vessel the
+ *    person joins); D-01 (function missing): only a full legacy admin
+ *    (`legacyCapability` users_access.admin); an error → 503. Nothing is
+ *    written before.
  * 6. `role`: the legacy crew vocabulary only (`CREW_ROLES`), default `crew`.
  *    `dpa` / `shore_management` → 403 `forbidden` `details.reason:
  *    admin_role` (admin roles are given in Users & Access, D-124); anything
@@ -52,13 +58,13 @@
  *   (the invitation path refused after the profile was saved, e.g. 503)
  * - 502 `partial_failure` `details: { profileCreated: true, profileId, assignmentCreated: false, assignment: 'failed' }` + `invitation`
  *   (invited, but the vessel assignment could not be saved)
- * - 400 / 403 / 404 / 409 (`conflict`: email in use, `reason: vessel_archived`) / 429 / 500 / 503 as above.
+ * - 400 / 403 (`reason: admin_role`, `vessel_required`) / 404 / 409 (`conflict`: email in use, `reason: vessel_archived`) / 429 / 500 / 503 as above.
  * `assignment` (only when a vessel was given): `created` (the invitation linked a login and wrote the row),
  * `pending_login` (no login linked yet) or, in a 502 only, `failed` (then also `assignmentCreated: false`).
  */
-import { getAuthContext } from '../_shared/auth.ts';
-import { assertCapability } from '../_shared/capability.ts';
-import { asRow, errorCode, rowsOf, text } from '../_shared/db.ts';
+import { type AuthContext, getAuthContext } from '../_shared/auth.ts';
+import { assertCapability, legacyCapability } from '../_shared/capability.ts';
+import { asRow, errorCode, isMissingFunction, rowsOf, text } from '../_shared/db.ts';
 import { type EdgeDeps, edgeDeps, originsOf } from '../_shared/deps.ts';
 import { isValidRecipient } from '../_shared/email.ts';
 import { linkLanding } from '../_shared/env.ts';
@@ -135,6 +141,22 @@ function literalPattern(value: string): string {
 
 const DUPLICATE_SCAN = 25;
 
+/**
+ * Step 5 without a vessel (D-194, D-207): only an admin of every vessel adds
+ * a person with no vessel; a vessel-scoped administrator must choose one.
+ */
+async function assertMayAddWithoutVessel(ctx: AuthContext, companyId: string): Promise<void> {
+  const scope = await ctx.serviceClient().rpc('admin_scope_all', { _actor: ctx.user.id, _company: companyId });
+  let all: boolean;
+  if (scope.error) {
+    if (!isMissingFunction(scope.error)) throw UNAVAILABLE();
+    all = await legacyCapability(ctx, 'admin.access.users_access.admin', { companyId }); // D-01: a full legacy admin only
+  } else {
+    all = scope.data === true;
+  }
+  if (!all) throw new HttpError(403, 'forbidden', 'Choose the vessel this person joins.', { reason: 'vessel_required' });
+}
+
 export function createHandler(patch: Partial<CreateCrewMemberDeps> = {}): Handler {
   const base = edgeDeps(patch);
   const now = patch.now ?? (() => new Date());
@@ -167,6 +189,7 @@ export function createHandler(patch: Partial<CreateCrewMemberDeps> = {}): Handle
         archived = text(row, 'status') === 'Sold';
       }
       await assertCapability(ctx, 'admin.access.users_access.admin', { companyId, vesselId: body.vesselId });
+      if (!body.vesselId) await assertMayAddWithoutVessel(ctx, companyId);
       if (archived) throw new HttpError(409, 'conflict', 'That vessel is archived.', { reason: 'vessel_archived' });
       const role = crewRole(body.role);
 

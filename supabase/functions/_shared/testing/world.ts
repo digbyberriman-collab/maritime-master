@@ -5,11 +5,23 @@
  * `p3: true` = the Phase 2 P2/P3 migrations are applied: `my_account_status`,
  * `has_capability`, `reserve_invitation_attempt`, `record_invitation_send`,
  * `revoke_invitation`, `auth_user_id_for_email`, `set_membership_status`,
- * `fulfil_imported_assignment` and `invitation_withdrawn_for` answer,
- * `user_invitations` exists, and a disabled user reads no rows at all
- * (file 7). `p3: false` = today's live database: those RPCs answer PGRST202
- * and `user_invitations` PGRST205 (D-01), so every function takes its
- * documented legacy branch.
+ * `fulfil_imported_assignment`, `invitation_withdrawn_for` and the
+ * service-only `admin_may_act_on_user`, `admin_scope_all`,
+ * `user_manages_admins_for`, `user_is_admin_target` and
+ * `invitation_login_state` answer, `user_invitations`,
+ * `account_memberships` and `account_membership_vessels` exist, and a
+ * disabled user reads no rows at all (file 7). `p3: false` = today's live
+ * database: those RPCs answer PGRST202 and those tables PGRST205 (D-01), so
+ * every function takes its documented legacy branch.
+ *
+ * Reach (`fakeReach`, SQL `reach_vessels_for`): a user with a non-legacy
+ * membership reaches its vessel rows (all with `vessel_scope: 'all'`) plus
+ * their current assignments; anyone else is treated as holding the
+ * backfilled legacy membership: dpa / shore_management reach every vessel,
+ * others their current assignments. Sold vessels are never reached. Under
+ * `p3` a non-legacy member's RLS shows vessels and crew assignments of
+ * reached vessels only (file 8), so `P.vesselAdminA` (an admin of Borealis
+ * only) sees every company profile but not crewA's Aurora assignment.
  *
  * The invitation fakes follow the SQL contracts: the reservation locks the
  * profile's live row, applies the 5 min (after a send) / 30 s (after a
@@ -19,7 +31,15 @@
  * downgrades a `sent` row on `provider_duplicate`, a `sent` outcome
  * restores a removed membership, and once the profile has a login it calls
  * `fulfil_imported_assignment` (D-199: through `world.rpcs`, so a test that
- * replaces or deletes that function changes both); `revoke_invitation`
+ * replaces or deletes that function changes both). The round-3 contract:
+ * `reserve_invitation_attempt` answers `{ ok: false, code: 'forbidden' }`
+ * for an inviter who may not act on the person and `manages_admins_required`
+ * for an administrator target; `record_invitation_send` raises 42501
+ * `inviter_out_of_reach` / `manages_admins_required` /
+ * `login_email_mismatch` / `login_not_invited` (a login STORM did not
+ * invite, D-205) before writing anything; `fulfil_imported_assignment`
+ * answers `not_eligible` for a Master / Captain position unless the actor
+ * has users_access.admin for the vessel (D-198). `revoke_invitation`
  * (users-access admin) also resets a never-signed-in `invited` profile to
  * `not_invited` and removes the never-accepted membership;
  * `invitation_withdrawn_for` answers true for a profile that is neither
@@ -74,7 +94,17 @@ export const P = {
   invitedA: persona(8, 'invited-a', CO_A, 'crew', { status: 'invited' }),
   adminB: persona(9, 'dpa-b', CO_B, 'dpa'),
   crewB: persona(10, 'crew-b', CO_B, 'crew'),
+  /**
+   * A vessel-scoped administrator (p3): profile role crew, a non-legacy
+   * admin membership with users_access write for Borealis (V_A2) only, and a
+   * current assignment there. Under `p3: false` (no memberships yet) just a
+   * crew member.
+   */
+  vesselAdminA: persona(11, 'vessel-admin-a', CO_A, 'crew'),
 } as const;
+
+/** The non-legacy admin membership of `P.vesselAdminA` (one vessel row: V_A2). */
+export const VESSEL_ADMIN_MEMBERSHIP = id(0x4001);
 
 /** An auth user with a valid token and no profile row. */
 export const NO_PROFILE_USER = { userId: id(0x1fff), token: 'tok-no-profile', email: 'no-profile@example.test' };
@@ -119,14 +149,22 @@ export function buildWorld(options: WorldOptions = {}): FakeWorld {
   const now = options.now ?? (() => new Date('2026-11-23T10:00:00Z'));
   const personas = Object.values(P);
 
+  // Invited personas: a login STORM invited (never confirmed, never signed in, no password); the others joined.
   const authUsers: FakeAuthUser[] = personas
     .filter((p) => p.userId)
-    .map((p) => ({
-      id: p.userId as string,
-      email: p.email,
-      email_confirmed_at: p.accountStatus === 'invited' ? null : '2026-01-01T00:00:00Z',
-      banned_until: null,
-    }));
+    .map((p) => {
+      const invited = p.accountStatus === 'invited';
+      return {
+        id: p.userId as string,
+        email: p.email,
+        email_confirmed_at: invited ? null : '2026-01-01T00:00:00Z',
+        invited_at: invited ? '2026-11-01T00:00:00Z' : null,
+        last_sign_in_at: invited ? null : '2026-11-01T08:00:00Z',
+        password_set: !invited,
+        identities: [{ provider: 'email' }],
+        banned_until: null,
+      };
+    });
   authUsers.push({ id: NO_PROFILE_USER.userId, email: NO_PROFILE_USER.email, email_confirmed_at: '2026-01-01T00:00:00Z' });
 
   const tokens: Record<string, string> = { [NO_PROFILE_USER.token]: NO_PROFILE_USER.userId };
@@ -170,28 +208,38 @@ export function buildWorld(options: WorldOptions = {}): FakeWorld {
         { id: id(0x3003), user_id: P.crewA2.userId, vessel_id: V_A2, is_current: true, position: 'Deckhand', join_date: '2026-03-01' },
         { id: id(0x3004), user_id: P.invitedA.userId, vessel_id: V_A1, is_current: true, position: 'Steward', join_date: '2026-03-01' },
         { id: id(0x3005), user_id: P.disabledA.userId, vessel_id: V_A1, is_current: true, position: 'Deckhand', join_date: '2026-03-01' },
+        { id: id(0x3006), user_id: P.vesselAdminA.userId, vessel_id: V_A2, is_current: true, position: 'Chief Officer', join_date: '2026-04-01' },
       ],
       user_roles: [],
       rbac_roles_full: [],
       user_invitations: [],
-      account_memberships: [],
+      account_memberships: [
+        {
+          id: VESSEL_ADMIN_MEMBERSHIP, user_id: P.vesselAdminA.userId, profile_id: P.vesselAdminA.profileId, company_id: CO_A,
+          kind: 'admin', status: 'active', legacy_managed: false, users_access_level: 'write', vessel_scope: 'vessels',
+          manages_admins: false, fleet_access: false, is_dpa: false, valid_from: null, valid_until: null, accepted_at: '2026-10-01T00:00:00Z',
+        },
+      ],
+      account_membership_vessels: [{ id: id(0x4101), membership_id: VESSEL_ADMIN_MEMBERSHIP, vessel_id: V_A2, valid_from: null, valid_until: null }],
       admin_pins: [],
       admin_action_log: [],
       notification_logs: [],
     },
-    missingTables: new Set(p3 ? [] : ['user_invitations', 'account_memberships']),
+    missingTables: new Set(p3 ? [] : ['user_invitations', 'account_memberships', 'account_membership_vessels']),
   });
 
   world.rls = (table, row, caller, w) => {
     const me = profileOf(w, caller.userId);
     if (p3 && isDisabled(me)) return false; // file 7: a disabled user reads nothing, not even their own row
+    // File 8: a non-legacy member sees the vessels (and their crew assignments) they reach.
+    const reached = (vesselId: unknown) => !p3 || !fakeMembership(w, caller.userId) || fakeReach(w, caller.userId).has(String(vesselId));
     switch (table) {
       case 'profiles':
         return row.user_id === caller.userId || (!!me && row.company_id === me.company_id);
       case 'vessels':
-        return !!me && row.company_id === me.company_id;
+        return !!me && row.company_id === me.company_id && reached(row.id);
       case 'crew_assignments':
-        return !!me && vesselCompany(w, row.vessel_id) === me.company_id;
+        return !!me && vesselCompany(w, row.vessel_id) === me.company_id && reached(row.vessel_id);
       case 'companies':
         return !!me && row.id === me.company_id;
       case 'user_roles':
@@ -223,37 +271,226 @@ const LIVE = ['pending', 'sent', 'send_failed'];
 export const INVITE_COOLDOWN_MS = 5 * 60_000;
 export const INVITE_RETRY_COOLDOWN_MS = 30_000;
 
+const ADMIN_PROFILE_ROLES = ['dpa', 'shore_management'];
+const norm = (v: unknown): string => String(v ?? '').trim().toLowerCase();
+
+function inWindow(row: FakeRow, now: number): boolean {
+  const from = typeof row.valid_from === 'string' ? Date.parse(row.valid_from) : null;
+  const until = typeof row.valid_until === 'string' ? Date.parse(row.valid_until) : null;
+  return (from === null || from <= now) && (until === null || until > now);
+}
+
+/** SQL `vessel_in_reachable_state`: a set status that is not Sold, not archived. */
+function reachableVessel(v: FakeRow): boolean {
+  return typeof v.status === 'string' && v.status !== 'Sold' && v.lifecycle_status !== 'archived';
+}
+
+/** The user's active, in-window, non-legacy membership in the company (default: their profile company), if any. */
+export function fakeMembership(wd: FakeWorld, userId: string | null, companyId?: unknown): FakeRow | undefined {
+  if (!userId || wd.missingTables.has('account_memberships')) return undefined;
+  const company = companyId ?? profileOf(wd, userId)?.company_id;
+  const now = wd.now().getTime();
+  return (wd.tables.account_memberships ?? []).find((m) =>
+    m.user_id === userId && m.company_id === company && m.legacy_managed === false && m.status === 'active' && inWindow(m, now)
+  );
+}
+
+function membershipVessels(wd: FakeWorld, membership: FakeRow): Set<string> {
+  if (wd.missingTables.has('account_membership_vessels')) return new Set();
+  const now = wd.now().getTime();
+  return new Set(
+    (wd.tables.account_membership_vessels ?? []).filter((mv) => mv.membership_id === membership.id && inWindow(mv, now)).map((mv) => String(mv.vessel_id)),
+  );
+}
+
+/** SQL `reach_vessels_for` (see the file comment for the legacy-membership simplification). */
+export function fakeReach(wd: FakeWorld, userId: string | null): Set<string> {
+  const me = profileOf(wd, userId);
+  const out = new Set<string>();
+  if (!userId || !me || isDisabled(me)) return out;
+  const m = fakeMembership(wd, userId, me.company_id);
+  const rows = m ? membershipVessels(wd, m) : new Set<string>();
+  for (const v of wd.tables.vessels ?? []) {
+    if (v.company_id !== me.company_id || !reachableVessel(v)) continue;
+    const assigned = currentAssignment(wd, userId, v.id);
+    const reached = m
+      ? m.vessel_scope === 'all' || rows.has(String(v.id)) || (m.kind !== 'external' && assigned)
+      : ADMIN_PROFILE_ROLES.includes(String(me.role)) || assigned;
+    if (reached) out.add(String(v.id));
+  }
+  return out;
+}
+
+/**
+ * SQL `legacy_user_admin`: an admin profile role, an active, unexpired dpa /
+ * superadmin `user_roles` row of the company or of no company (CC-5:
+ * another company's row, or an expired one, never counts), or an RBAC
+ * superadmin / dpa role.
+ */
+function fakeLegacyAdmin(wd: FakeWorld, userId: string, companyId: unknown): boolean {
+  const me = profileOf(wd, userId);
+  if (!me) return false;
+  const now = wd.now().getTime();
+  const roleRow = (wd.tables.user_roles ?? []).some((r) =>
+    r.user_id === userId && ['dpa', 'superadmin'].includes(norm(r.role)) && r.is_active === true &&
+    (r.expires_at === null || r.expires_at === undefined || Date.parse(String(r.expires_at)) > now) &&
+    (r.company_id === null || r.company_id === undefined || r.company_id === companyId)
+  );
+  const rbac = (wd.tables.rbac_roles_full ?? []).some((r) => r.user_id === userId && ['superadmin', 'dpa'].includes(norm(r.role_name)));
+  return ADMIN_PROFILE_ROLES.includes(String(me.role)) || roleRow || rbac;
+}
+
 /**
  * `has_capability_for` as the SQL defines it: an active profile of the
- * company, and an admin profile role or an active, unexpired dpa / superadmin
- * `user_roles` row of that company or of no company (CC-5: another company's
- * row, or an expired one, never counts).
+ * company; a full admin (`legacy_user_admin`, or an owner membership) holds
+ * every key; a non-legacy admin membership holds users_access at its level
+ * for a vessel it reaches, or with no vessel at all (as SQL does); the
+ * master rule needs a vessel in reach.
  */
 export function fakeCapability(wd: FakeWorld, userId: string | null, key: string, companyId: unknown, vesselId: unknown = null): boolean {
   const me = profileOf(wd, userId);
   if (!userId || !me || isDisabled(me) || me.company_id !== companyId) return false;
   const vessel = vesselId ?? null;
   if (vessel !== null && vesselCompany(wd, vessel) !== companyId) return false;
-  const now = wd.now().getTime();
-  const roleRow = (wd.tables.user_roles ?? []).some((r) =>
-    r.user_id === userId && ['dpa', 'superadmin'].includes(String(r.role).toLowerCase()) && r.is_active === true &&
-    (r.expires_at === null || r.expires_at === undefined || Date.parse(String(r.expires_at)) > now) &&
-    (r.company_id === null || r.company_id === undefined || r.company_id === companyId)
-  );
-  const fullAdmin = me.role === 'dpa' || me.role === 'shore_management' || roleRow;
+  const m = fakeMembership(wd, userId, companyId);
+  const fullAdmin = fakeLegacyAdmin(wd, userId, companyId) || m?.kind === 'owner';
+  const ua = fullAdmin ? 'write' : m?.kind === 'admin' ? String(m.users_access_level ?? 'none') : 'none';
+  const reaches = vessel !== null && fakeReach(wd, userId).has(String(vessel));
+  const scopeOk = fullAdmin || vessel === null || reaches;
   switch (key) {
     case 'admin.access.users_access.view':
+      return (ua === 'read' || ua === 'write') && scopeOk;
     case 'admin.access.users_access.admin':
-    case 'fleet.operations.vessels.admin':
-    case 'admin.access.permission_audit_log.view':
-      return fullAdmin;
+      return ua === 'write' && scopeOk;
     case 'admin.access.users_access.assign':
-      return fullAdmin || (me.role === 'master' && vessel !== null && currentAssignment(wd, userId, vessel));
+      return (ua === 'write' && scopeOk) || (me.role === 'master' && reaches);
+    case 'fleet.operations.vessels.admin':
+      return fullAdmin || (m?.kind === 'admin' && m.vessel_scope === 'all');
+    case 'admin.access.permission_audit_log.view':
+      return fullAdmin || m?.is_dpa === true || me.role === 'dpa';
     case 'fleet.operations.vessels.view':
-      return fullAdmin || (vessel !== null && currentAssignment(wd, userId, vessel));
+      return fullAdmin || (vessel !== null && (currentAssignment(wd, userId, vessel) || reaches));
     default:
       return false;
   }
+}
+
+/** SQL `admin_scope_all`: an active actor of the company who is a full legacy admin, an owner, or an admin of every vessel. */
+export function fakeScopeAll(wd: FakeWorld, actor: unknown, companyId: unknown): boolean {
+  const userId = typeof actor === 'string' ? actor : null;
+  const me = profileOf(wd, userId);
+  if (!userId || !companyId || !me || isDisabled(me) || me.company_id !== companyId) return false;
+  if (fakeLegacyAdmin(wd, userId, companyId)) return true;
+  const m = fakeMembership(wd, userId, companyId);
+  return !!m && (m.kind === 'owner' || (m.kind === 'admin' && m.vessel_scope === 'all'));
+}
+
+/** SQL D-01 legacy fleet reach of a target (dpa / shore_management, an RBAC fleet role). */
+function fakeLegacyFleetReach(wd: FakeWorld, userId: string): boolean {
+  if (ADMIN_PROFILE_ROLES.includes(String(profileOf(wd, userId)?.role))) return true;
+  return (wd.tables.rbac_roles_full ?? []).some((r) =>
+    r.user_id === userId && (r.is_fleet_wide === true || ['superadmin', 'dpa', 'fleet_master'].includes(norm(r.role_name)))
+  );
+}
+
+/**
+ * SQL `admin_may_act_on_user` (D-194): `admin_scope_all`, or every vessel of
+ * the target's structural set (membership vessel rows, current assignments;
+ * else, only for a profile without a login, its `imported_vessel_id`:
+ * D-204) is in the actor's reach. Administrator /
+ * fleet-wide targets and an empty set need `admin_scope_all`. Unknown ids,
+ * an inactive actor or another company: false.
+ */
+export function fakeMayAct(wd: FakeWorld, actor: unknown, targetUser: unknown, companyId: unknown, targetProfile: unknown): boolean {
+  const actorId = typeof actor === 'string' ? actor : null;
+  const actorProfile = profileOf(wd, actorId);
+  if (!actorId || !companyId || (!targetUser && !targetProfile)) return false;
+  if (!actorProfile || isDisabled(actorProfile) || actorProfile.company_id !== companyId) return false;
+  let profile = typeof targetUser === 'string' ? profileOf(wd, targetUser) : undefined;
+  if (!profile && typeof targetProfile === 'string') profile = (wd.tables.profiles ?? []).find((p) => p.id === targetProfile);
+  const user = typeof targetUser === 'string' ? targetUser : typeof profile?.user_id === 'string' ? profile.user_id : null;
+  const memberships = wd.missingTables.has('account_memberships') ? [] : wd.tables.account_memberships ?? [];
+  const membership = memberships.find((m) => m.company_id === companyId && ((user && m.user_id === user) || (profile && m.profile_id === profile.id)));
+  if (!profile && !membership) return false;
+  if (profile?.company_id !== companyId && !membership) return false;
+  if (fakeScopeAll(wd, actorId, companyId)) return true;
+  if (!profile || profile.company_id !== companyId) return false;
+  if (
+    ADMIN_PROFILE_ROLES.includes(String(profile.role)) || (user && fakeLegacyFleetReach(wd, user)) ||
+    (membership && membership.legacy_managed === false && (membership.vessel_scope === 'all' || membership.fleet_access === true))
+  ) return false;
+  const rows = membership && membership.legacy_managed === false ? membershipVessels(wd, membership) : new Set<string>();
+  let vessels = (wd.tables.vessels ?? [])
+    .filter((v) => v.company_id === companyId && reachableVessel(v) && (rows.has(String(v.id)) || (!!user && currentAssignment(wd, user, v.id))))
+    .map((v) => String(v.id));
+  if (vessels.length === 0 && !user && profile.imported_vessel_id) {
+    vessels = (wd.tables.vessels ?? []).filter((v) => v.id === profile?.imported_vessel_id && v.company_id === companyId && reachableVessel(v)).map((v) => String(v.id));
+  }
+  if (vessels.length === 0) return false;
+  const reach = fakeReach(wd, actorId);
+  return vessels.every((v) => reach.has(v));
+}
+
+/** SQL `user_manages_admins_for`: owner / manages_admins membership, legacy dpa, or a dpa / superadmin `user_roles` row. */
+export function fakeManagesAdmins(wd: FakeWorld, userId: unknown, companyId: unknown): boolean {
+  const id = typeof userId === 'string' ? userId : null;
+  const me = profileOf(wd, id);
+  if (!id || !me || me.company_id !== companyId) return false;
+  const m = fakeMembership(wd, id, companyId);
+  if (m && (m.kind === 'owner' || m.manages_admins === true)) return true;
+  if (me.role === 'dpa') return true;
+  const now = wd.now().getTime();
+  return (wd.tables.user_roles ?? []).some((r) =>
+    r.user_id === id && r.is_active === true && ['dpa', 'superadmin'].includes(norm(r.role)) &&
+    (r.expires_at === null || r.expires_at === undefined || Date.parse(String(r.expires_at)) > now) &&
+    (r.company_id === null || r.company_id === undefined || r.company_id === companyId)
+  );
+}
+
+/** SQL `user_is_admin_target`, whatever the user's active state. */
+export function fakeIsAdminTarget(wd: FakeWorld, userId: unknown, companyId: unknown): boolean {
+  const id = typeof userId === 'string' ? userId : null;
+  if (!id || !companyId) return false;
+  const profile = profileOf(wd, id);
+  if (profile && profile.company_id === companyId && ADMIN_PROFILE_ROLES.includes(String(profile.role))) return true;
+  const memberships = wd.missingTables.has('account_memberships') ? [] : wd.tables.account_memberships ?? [];
+  if (memberships.some((m) => m.user_id === id && m.company_id === companyId && ['admin', 'owner'].includes(String(m.kind)))) return true;
+  if ((wd.tables.user_roles ?? []).some((r) => r.user_id === id && ['dpa', 'superadmin'].includes(norm(r.role)) && (r.company_id == null || r.company_id === companyId))) return true;
+  return (wd.tables.rbac_roles_full ?? []).some((r) => r.user_id === id && ['superadmin', 'dpa'].includes(norm(r.role_name)));
+}
+
+/** An administrator person for the invitation checks: role, invitation kind, or `user_is_admin_target`. */
+function fakeAdminInvitee(wd: FakeWorld, profile: FakeRow, kind: unknown): boolean {
+  return ADMIN_PROFILE_ROLES.includes(String(profile.role)) || ['admin', 'owner'].includes(String(kind ?? '')) ||
+    fakeIsAdminTarget(wd, profile.user_id, profile.company_id);
+}
+
+/** STORM invited this login for this profile (SQL `storm_invited`). */
+function fakeStormInvited(wd: FakeWorld, profile: FakeRow, login: FakeAuthUser): boolean {
+  if (invitationRows(wd).some((r) => r.profile_id === profile.id && r.user_id === login.id)) return true;
+  const emailOnly = (login.identities ?? []).every((i) => i.provider === 'email');
+  return !!login.invited_at && !login.last_sign_in_at && login.password_set !== true && emailOnly;
+}
+
+export type LoginState = 'unknown' | 'linked' | 'linked_elsewhere' | 'email_mismatch' | 'storm_invited' | 'unused_orphan' | 'foreign';
+
+/** SQL `invitation_login_state` (D-205): the first match wins. */
+export function fakeLoginState(wd: FakeWorld, profileId: unknown, userId: unknown): LoginState {
+  const profile = (wd.tables.profiles ?? []).find((p) => p.id === profileId);
+  const login = wd.authUsers.find((u) => u.id === userId);
+  if (!profile || !login) return 'unknown';
+  if (profile.user_id === login.id) return 'linked';
+  if (profile.user_id || (wd.tables.profiles ?? []).some((p) => p.id !== profile.id && p.user_id === login.id)) return 'linked_elsewhere';
+  if (norm(login.email) !== norm(profile.email)) return 'email_mismatch';
+  if (fakeStormInvited(wd, profile, login)) return 'storm_invited';
+  if (!login.email_confirmed_at && !login.last_sign_in_at) return 'unused_orphan';
+  return 'foreign';
+}
+
+/** The Master office in the crew_assignments_guard vocabulary. */
+function isMasterOffice(position: string): boolean {
+  const normalised = position.trim().replace(/[A-Z]/g, (c) => c.toLowerCase()).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return normalised === 'master' || normalised === 'captain';
 }
 
 function invitationRows(wd: FakeWorld): FakeRow[] {
@@ -268,7 +505,8 @@ export type FulfilAnswer = 'created' | 'exists' | 'none' | 'not_eligible';
  * all gets one current `crew_assignments` row on that vessel (its company's,
  * not Sold: else `not_eligible`, profile untouched), from its position (else
  * rank, else Crew; blank counts as missing) and `joining_date` (else today),
- * and the import flags are cleared. Anything else (not imported, no login,
+ * and the import flags are cleared. A Master / Captain position needs an
+ * actor with users_access.admin for the vessel, else `not_eligible`. Anything else (not imported, no login,
  * already a current crew member) is `none` and changes nothing, so a second
  * call adds nothing.
  */
@@ -281,11 +519,16 @@ export function fakeFulfil(wd: FakeWorld, profile: FakeRow, actor: unknown): Ful
   const vessel = (wd.tables.vessels ?? []).find((v) => v.id === vesselId);
   if (!vessel || vessel.company_id !== profile.company_id || vessel.status === 'Sold') return 'not_eligible';
   const filled = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  const position = filled(profile.position) ?? filled(profile.rank) ?? 'Crew';
+  // D-198: the Master office needs an actor with users_access.admin for the vessel, whoever wrote the position.
+  if (isMasterOffice(position) && !(typeof actor === 'string' && fakeCapability(wd, actor, 'admin.access.users_access.admin', profile.company_id, vesselId))) {
+    return 'not_eligible';
+  }
   rows.push({
     id: crypto.randomUUID(),
     user_id: userId,
     vessel_id: vesselId,
-    position: filled(profile.position) ?? filled(profile.rank) ?? 'Crew',
+    position,
     join_date: profile.joining_date ?? wd.now().toISOString().slice(0, 10),
     is_current: true,
     created_by: actor ?? null,
@@ -311,6 +554,13 @@ function installP3Rpcs(world: FakeWorld): void {
     const profile = (wd.tables.profiles ?? []).find((p) => p.id === args.p_profile_id);
     if (!profile) return ok({ ok: false, code: 'not_found' });
     if (isDisabled(profile)) return ok({ ok: false, code: 'disabled' });
+    const inviter = typeof args.p_invited_by === 'string' ? args.p_invited_by : null;
+    if (inviter) {
+      if (!fakeMayAct(wd, inviter, profile.user_id ?? null, profile.company_id, profile.id)) return ok({ ok: false, code: 'forbidden' });
+      if (fakeAdminInvitee(wd, profile, args.p_kind) && !fakeManagesAdmins(wd, inviter, profile.company_id)) {
+        return ok({ ok: false, code: 'manages_admins_required' });
+      }
+    }
     const rows = invitationRows(wd);
     const now = wd.now().getTime();
     let live = rows.find((r) => r.profile_id === profile.id && LIVE.includes(String(r.status)));
@@ -379,6 +629,16 @@ function installP3Rpcs(world: FakeWorld): void {
     const outcome = String(args.p_outcome);
     if (outcome !== 'sent' && outcome !== 'send_failed') return fail('22023', 'invalid_outcome');
     if (outcome === 'send_failed' && !args.p_error_code) return fail('22023', 'error_code_required');
+    const inviter = typeof args.p_invited_by === 'string' ? args.p_invited_by : null;
+    if (inviter) {
+      if (!fakeMayAct(wd, inviter, profile.user_id ?? null, profile.company_id, profile.id)) return fail('42501', 'inviter_out_of_reach');
+      if (fakeAdminInvitee(wd, profile, args.p_kind) && !fakeManagesAdmins(wd, inviter, profile.company_id)) return fail('42501', 'manages_admins_required');
+    }
+    if (typeof args.p_user_id === 'string' && !profile.user_id) {
+      const login = wd.authUsers.find((u) => u.id === args.p_user_id);
+      if (!login || norm(login.email) !== norm(profile.email)) return fail('42501', 'login_email_mismatch');
+      if (!fakeStormInvited(wd, profile, login)) return fail('42501', 'login_not_invited');
+    }
     const rows = invitationRows(wd);
     let live = rows.find((r) => r.profile_id === profile.id && LIVE.includes(String(r.status)));
     const at = wd.now().toISOString();
@@ -424,6 +684,17 @@ function installP3Rpcs(world: FakeWorld): void {
     const profile = (wd.tables.profiles ?? []).find((p) => p.id === args.p_profile_id);
     return ok(profile ? fakeFulfil(wd, profile, args.p_actor) : 'none');
   };
+
+  world.rpcs.admin_may_act_on_user = (args, caller, wd) =>
+    SERVICE_ONLY(caller) ?? ok(fakeMayAct(wd, args._actor, args._target_user ?? null, args._company, args._target_profile ?? null));
+
+  world.rpcs.admin_scope_all = (args, caller, wd) => SERVICE_ONLY(caller) ?? ok(fakeScopeAll(wd, args._actor, args._company));
+
+  world.rpcs.user_manages_admins_for = (args, caller, wd) => SERVICE_ONLY(caller) ?? ok(fakeManagesAdmins(wd, args._user_id, args._company_id));
+
+  world.rpcs.user_is_admin_target = (args, caller, wd) => SERVICE_ONLY(caller) ?? ok(fakeIsAdminTarget(wd, args._user_id, args._company_id));
+
+  world.rpcs.invitation_login_state = (args, caller, wd) => SERVICE_ONLY(caller) ?? ok(fakeLoginState(wd, args.p_profile_id, args.p_user_id));
 
   world.rpcs.invitation_withdrawn_for = (args, caller, wd) => {
     const denied = SERVICE_ONLY(caller);
