@@ -124,8 +124,12 @@ const REASON_COPY: Readonly<Record<string, string>> = {
   pin_not_set: 'Set an admin PIN first.',
   vessel_archived: 'That vessel is archived.',
   already_assigned: 'This person is already assigned to that vessel.',
-  // 409: the login is still banned (a revoke no re-invite lifts, or access turned off), so no link or email goes out (D-208).
+  // 409: the login is still banned (access turned off, or a ban no revoke explains), so no link or email goes out (D-208).
   login_blocked: "This person's sign-in is blocked. Turn access on first.",
+  // 409 to a password reset for a revoked invitee, and 403 to turning their access on: only a new invitation lifts the block (D-208).
+  invitation_withdrawn: 'Their invitation was withdrawn. Send a new invitation instead.',
+  // 403: a pending Master / Captain placement is invited only by a users-access administrator of its vessel (D-198, D-204).
+  master_needs_admin: 'Only a users-access administrator of this vessel can invite a Master.',
   // 409: a login with this address exists that STORM did not create; it is never adopted (D-205).
   login_not_created_by_storm: 'An account with this email exists that STORM did not create. Contact STORM support.',
   // 403: the person is on a vessel the caller does not administer (D-194, D-207).

@@ -15,7 +15,8 @@
  *   finish that row (`code` says which: `send_failed`, `status_unavailable`, …);
  * - `refused`: a rule (`not_found`, `forbidden`, `cross_company`, `cooldown`,
  *   `already_active`, `conflict`, `invalid_request` with `reason`; e.g.
- *   `forbidden` + `reason: out_of_reach` / `manages_admins_required` (D-207),
+ *   `forbidden` + `reason: out_of_reach` / `manages_admins_required` (D-207) /
+ *   `master_needs_admin` (a pending Master or Captain placement; D-219),
  *   `conflict` + `reason: login_not_created_by_storm` (D-205) /
  *   `login_blocked` (D-208)).
  * Request errors: 400 (no ids, more than 50, bad ids), 401 / 403 (caller),

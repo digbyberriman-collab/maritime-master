@@ -1,10 +1,12 @@
 import { assert, assertEquals } from 'jsr:@std/assert@1.0.13';
 import type { EmailMessage, EmailResult } from '../_shared/email.ts';
 import { callsOf, fakeClientFactory } from '../_shared/testing/fakeSupabase.ts';
-import { bodyOf, buildWorld, envWith, obj, P, profileRow, request, TEST_ENV, V_A2 } from '../_shared/testing/world.ts';
+import { bodyOf, buildWorld, CO_A, envWith, obj, P, profileRow, request, TEST_ENV, V_A1, V_A2 } from '../_shared/testing/world.ts';
 import { createHandler } from './handler.ts';
 
 const NOW = new Date('2026-11-23T10:00:00Z');
+/** A second person waiting for Aurora (no login yet). */
+const BOSUN = '00000000-0000-4000-8000-0000000020b5';
 
 function setup(opts: { p3?: boolean; results?: EmailResult[]; siteUrl?: string | null } = {}) {
   const world = buildWorld({ p3: opts.p3 ?? true });
@@ -109,4 +111,26 @@ Deno.test('bulk-invite: a vessel-scoped admin gets refused rows (forbidden, out_
   assertEquals([body.sent, body.failed, body.refused], [1, 0, 2]);
   assertEquals(h.sent.map((m) => m.to), [P.importedA.email]);
   assertEquals(callsOf(h.world, 'admin').filter((c) => c.method === 'generateLink').length, 1);
+});
+
+Deno.test('bulk-invite: a pending Master placement in the master\'s batch is refused (forbidden, master_needs_admin), not failed; the other rows still go', async () => {
+  for (const p3 of [true, false]) {
+    const h = setup({ p3 });
+    // Two people waiting for Aurora, the master's vessel: a Master placement and a Bosun.
+    profileRow(h.world, P.importedA.profileId).position = 'Master';
+    (h.world.tables.profiles ??= []).push({
+      id: BOSUN, user_id: null, email: 'bosun-a@example.test', first_name: 'Deckhand', last_name: 'Example', company_id: CO_A, role: 'crew',
+      account_status: 'not_invited', is_imported: true, imported_vessel_id: V_A1, position: 'Bosun', last_invited_at: null, invited_at: null, invitation_count: 0,
+    });
+    const res = await h.handler(request(P.masterA.token, { profileIds: [P.importedA.profileId, BOSUN] }));
+    assertEquals(res.status, 200, `p3=${p3}`);
+    const body = await bodyOf(res);
+    const results = body.results as Array<Record<string, unknown>>;
+    assertEquals(results[0], { profileId: P.importedA.profileId, status: 'refused', code: 'forbidden', reason: 'master_needs_admin', stored: false, invitationId: null }, `p3=${p3}`);
+    assertEquals([results[1].status, results[1].assignment], ['sent', 'created'], `p3=${p3}`);
+    assertEquals([body.sent, body.failed, body.refused], [1, 0, 1], 'a refusal, never a retryable failure');
+    assertEquals(h.sent.map((m) => m.to), ['bosun-a@example.test']);
+    assertEquals(profileRow(h.world, P.importedA.profileId).user_id, null, 'the Master placement stays unlinked');
+    assertEquals(callsOf(h.world, 'admin').filter((c) => c.method === 'generateLink').length, 1);
+  }
 });

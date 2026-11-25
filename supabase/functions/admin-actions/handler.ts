@@ -16,8 +16,8 @@
  * |---|---|---|---|
  * | `set_pin` | `pin` (6 digits) | 200 `{ ok: true }` | 400 |
  * | `verify_pin` | `pin` | 200 `{ ok: true, confirmedUntil }` | 400 `reason: pin_format / pin_not_set`, 403 `reason: pin_invalid` (+ `attempts_remaining`) / `pin_locked` (+ `retry_after_seconds`), 429 |
- * | `reset_account` + `resetType: 'password_reset'` | `targetUserId`, `reason?` | 200 `{ ok: true, reset: { status: 'sent' } }` | 502 `send_failed` `details.email_error`; 409 `conflict` (`reason: access_disabled`; `login_missing`: no auth user; `login_blocked`: the login is banned, D-208, no link and no email); 429 `cooldown` (`retry_after_seconds`, `Retry-After`: a reset for this person in the last 60 s, no link made); 503 (the cooldown or the login could not be checked) |
- * | `reset_account` + `resetType: 'resend_invitation'` | `targetUserId` or `targetProfileId` | as send-invitation (200 / 502 / 409 / 429 …; top-level `assignment: 'created' \| 'failed'` when the invitation linked a login for an imported vessel, D-199) | 409 `conflict` `reason: login_blocked` (a banned login no revoke explains, D-208: no link, no email, nothing recorded), `login_not_created_by_storm` (D-205) |
+ * | `reset_account` + `resetType: 'password_reset'` | `targetUserId`, `reason?` | 200 `{ ok: true, reset: { status: 'sent' } }` | 502 `send_failed` `details.email_error`; 409 `conflict` (`reason: access_disabled`; `no_login`; `login_missing`: no auth user; `invitation_withdrawn`: the login of a revoked invitee, a `not_invited` / `invited` profile, is banned and only a new invitation lifts that, D-208; `login_blocked`: any other ban; neither makes a link, sends an email or writes an audit row); 429 `cooldown` (`retry_after_seconds`, `Retry-After`: a reset for this person in the last 60 s, no link made); 503 (the cooldown or the login could not be checked) |
+ * | `reset_account` + `resetType: 'resend_invitation'` | `targetUserId` or `targetProfileId` | as send-invitation (200 / 502 / 409 / 429 …; top-level `assignment: 'created' \| 'failed'` when the invitation linked a login for an imported vessel, D-199) | 409 `conflict` `reason: login_blocked` (a banned login no revoke explains, D-208: no link, no email, nothing recorded), `login_not_created_by_storm` (D-205); 403 `forbidden` `reason: master_needs_admin` (a pending Master / Captain placement and a caller without users_access.admin for its vessel: nothing reserved, linked or sent, D-198, D-204) |
  * | `reset_account` + `resetType: 'invalidate_sessions'` | `targetUserId` | — | 501 `not_supported` after the target checks (no supported revoke by user id; never faked) |
  * | `toggle_access` | `targetUserId`, `enableAccess`, `reason` (required to disable) | 200 `{ ok: true, statusStored: true, banApplied: true, accountStatus }` | 502 `partial_failure` `details: { statusStored, banApplied }`; 403 refusal (self, owner, `out_of_reach`, `manages_admins_required`, last manager; `reason: invitation_withdrawn` / `membership_removed` for a withdrawn invitation, nothing changed and no ban lifted); 400 |
  * | `reallocate_vessel` | `targetUserId`, `vesselId`, `reason`, `position?`, `effectiveDate?`, `endDate?` | 200 `{ ok: true, assignment }` | 502 `partial_failure` `details: { assignmentCreated, previousEnded }`; 404 vessel; 409; 403 (destination and every source vessel need users_access.admin, D-198; `out_of_reach` for a vessel-scoped administrator; nothing written) |
@@ -40,7 +40,15 @@ import { type EdgeDeps, edgeDeps, originsOf } from '../_shared/deps.ts';
 import { type EmailMessage, type EmailResult, payloadTag, sendEmail } from '../_shared/email.ts';
 import { type EdgeEnv, linkLanding } from '../_shared/env.ts';
 import { errorBody, type Handler, HttpError, json, type JsonValue, readJson, withHttp } from '../_shared/http.ts';
-import { type InviteDeps, inviteProfile, invitationResponse, LOGIN_BLOCKED, outcomeDetails } from '../_shared/invitations.ts';
+import {
+  INVITATION_WITHDRAWN_FOR_RESET,
+  type InviteDeps,
+  inviteProfile,
+  invitationResponse,
+  isReinvitableStatus,
+  LOGIN_BLOCKED,
+  outcomeDetails,
+} from '../_shared/invitations.ts';
 import { log, stripControls } from '../_shared/log.ts';
 import { RateLimiter } from '../_shared/rateLimit.ts';
 import { type Body, objectBody, optionalDate, optionalString, optionalUuid, requiredBoolean, requiredString, requiredUuid } from '../_shared/validate.ts';
@@ -68,6 +76,7 @@ const DISABLED = new Set(['disabled', 'deactivated']);
 
 const UNAVAILABLE = (): HttpError => new HttpError(503, 'status_unavailable', 'This could not be checked. Try again.');
 const NOT_FOUND = (): HttpError => new HttpError(404, 'not_found', 'That person was not found.');
+const NO_LOGIN = (): HttpError => new HttpError(409, 'conflict', 'This person has not joined STORM yet. Send an invitation instead.', { reason: 'no_login' });
 
 type AuditAction = 'RESET_ACCOUNT' | 'TOGGLE_ACCESS' | 'REALLOCATE_VESSEL' | 'SET_PIN';
 
@@ -238,14 +247,12 @@ async function resetAccount(ctx: AuthContext, body: Body, deps: AdminActionsDeps
   }
 
   // password_reset: our own email with a recovery link (generateLink alone sends nothing; gap/01 F47).
-  if (!target.userId || !target.email) {
-    throw new HttpError(409, 'conflict', 'This person has not joined STORM yet. Send an invitation instead.', { reason: 'no_login' });
-  }
+  if (!target.userId || !target.email) throw NO_LOGIN();
   if (DISABLED.has(target.status)) {
     throw new HttpError(409, 'conflict', "This person's access is disabled. Turn access on first.", { reason: 'access_disabled' });
   }
   // A banned login cannot use a recovery link (D-208): refuse before any link, email or 'sent' audit row.
-  await assertLoginUsable(ctx, target.userId, deps.now());
+  await assertLoginUsable(ctx, target, deps.now());
   // Every recovery link replaces the last one: refuse a second reset inside the window before any link is made.
   await assertResetWindow(ctx, target.userId, deps);
   const landing = linkLanding(ctx.env, 'recovery');
@@ -276,9 +283,17 @@ async function resetAccount(ctx: AuthContext, body: Body, deps: AdminActionsDeps
   return json({ ok: true, reset: { status: 'sent' } });
 }
 
-/** The login exists and is not banned now: else 409 `login_missing` / `login_blocked`; a read error is 503. */
-async function assertLoginUsable(ctx: AuthContext, userId: string, now: Date): Promise<void> {
-  const found = await ctx.serviceClient().auth.admin.getUserById(userId);
+/**
+ * The target's login exists and is not banned now; a read error is 503.
+ * Else 409: `login_missing` (no auth user); for a banned login of a revoked
+ * invitee (`not_invited` / `invited`: turning access on is refused for them,
+ * only a new invitation lifts the block, D-208) `invitation_withdrawn`; for
+ * any other ban (access turned off, or a ban no revoke explains)
+ * `login_blocked`.
+ */
+async function assertLoginUsable(ctx: AuthContext, target: Target, now: Date): Promise<void> {
+  if (!target.userId) throw NO_LOGIN();
+  const found = await ctx.serviceClient().auth.admin.getUserById(target.userId);
   if (found.error) {
     if (isUserNotFound(found.error)) {
       throw new HttpError(409, 'conflict', "This person's login could not be found. Contact STORM support.", { reason: 'login_missing' });
@@ -286,7 +301,9 @@ async function assertLoginUsable(ctx: AuthContext, userId: string, now: Date): P
     throw UNAVAILABLE();
   }
   const bannedUntil = timeOf(asRow(found.data?.user), 'banned_until');
-  if (bannedUntil !== null && bannedUntil > now.getTime()) throw LOGIN_BLOCKED();
+  if (bannedUntil !== null && bannedUntil > now.getTime()) {
+    throw isReinvitableStatus(target.status) ? INVITATION_WITHDRAWN_FOR_RESET() : LOGIN_BLOCKED();
+  }
 }
 
 function resetCooldown(seconds: number): HttpError {

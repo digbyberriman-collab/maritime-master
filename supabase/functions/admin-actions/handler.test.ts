@@ -879,3 +879,96 @@ Deno.test('reallocate_vessel: the DPA moves crewA and closes the previous row; t
     assertEquals(obj(await bodyOf(await call(h, P.adminA.token, { ...MOVE, vesselId: V_A1 })), 'assignment').position, 'Deckhand', 'the position comes from the real row');
   }
 });
+
+// ---- round 4: a revoked invitee's reset names the action that works; a pending Master needs a vessel admin ----
+
+const WITHDRAWN_COPY = 'Their invitation was withdrawn. Send a new invitation instead.';
+
+Deno.test('revoke (invited profile) then password_reset → 409 invitation_withdrawn, no link, no email, no password_reset audit row; a resend is still sent', async () => {
+  let t = NOW.getTime();
+  const world = buildWorld({ p3: true, now: () => new Date(t) });
+  const sent: EmailMessage[] = [];
+  const sendEmail = (m: EmailMessage) => {
+    sent.push(m);
+    return Promise.resolve({ ok: true as const, providerMessageId: 'msg-x' });
+  };
+  const handler = createHandler({ env: () => TEST_ENV, createClient: fakeClientFactory(world), now: () => new Date(t), sendEmail, invite: { now: () => new Date(t), isFakeEmail: () => false, sendEmail } });
+  assertEquals(profileRow(world, P.invitedA.profileId).account_status, 'invited');
+  seedInvitation(world, P.invitedA);
+  const revoke = await handler(request(P.adminA.token, REVOKE));
+  assertEquals((await bodyOf(revoke)).loginNote, 'banned');
+  assertEquals(profileRow(world, P.invitedA.profileId).account_status, 'not_invited', 'the revoke withdrew the invited status');
+  t += 3600_000;
+
+  const res = await handler(request(P.adminA.token, { action: 'reset_account', resetType: 'password_reset', targetUserId: P.invitedA.userId }));
+  assertEquals(res.status, 409);
+  const error = await errorOf(res);
+  assertEquals([error.code, error.message, error.details], ['conflict', WITHDRAWN_COPY, { reason: 'invitation_withdrawn' }]);
+  assertEquals(linkCount(world), 0, 'no recovery link');
+  assertEquals(sent.length, 0, 'no email');
+  assertFalse(auditRows(world, 'RESET_ACCOUNT').some((r) => (r.after_json as Record<string, unknown>).reset_type === 'password_reset'));
+  assertEquals(loginOf(world, P.invitedA.userId).banned_until, '2126-01-01T00:00:00Z', 'the revoke ban stays');
+
+  // The action the copy names works: a new invitation lifts the ban and is sent.
+  const resend = await handler(request(P.adminA.token, { action: 'reset_account', resetType: 'resend_invitation', targetUserId: P.invitedA.userId }));
+  assertEquals(resend.status, 200);
+  assertEquals(obj(await bodyOf(resend), 'invitation').status, 'sent');
+  assertEquals(loginOf(world, P.invitedA.userId).banned_until, null);
+  assertEquals(sent.length, 1);
+});
+
+Deno.test('password_reset: a banned not_invited / invited profile answers invitation_withdrawn in both modes; an active or legacy profile keeps login_blocked', async () => {
+  for (const p3 of [true, false]) {
+    for (const [status, reason] of [['not_invited', 'invitation_withdrawn'], ['invited', 'invitation_withdrawn'], ['active', 'login_blocked']]) {
+      const h = setup({ p3 });
+      profileRow(h.world, P.invitedA.profileId).account_status = status;
+      loginOf(h.world, P.invitedA.userId).banned_until = '2126-01-01T00:00:00Z';
+      const res = await call(h, P.adminA.token, { action: 'reset_account', resetType: 'password_reset', targetUserId: P.invitedA.userId });
+      const label = `p3=${p3} ${status}`;
+      assertEquals(res.status, 409, label);
+      const error = await errorOf(res);
+      assertEquals(error.details, { reason }, label);
+      assertEquals(error.message, reason === 'login_blocked' ? "This person's sign-in is blocked. Turn access on first." : WITHDRAWN_COPY, label);
+      assertEquals(linkCount(h.world), 0, label);
+      assertEquals(h.sent.length, 0, label);
+      assertEquals(auditRows(h.world, 'RESET_ACCOUNT').length, 0, label);
+    }
+  }
+  // An expired ban blocks nothing: the reset goes out.
+  const h = setup();
+  profileRow(h.world, P.invitedA.profileId).account_status = 'not_invited';
+  loginOf(h.world, P.invitedA.userId).banned_until = '2026-01-01T00:00:00Z';
+  assertEquals((await call(h, P.adminA.token, { action: 'reset_account', resetType: 'password_reset', targetUserId: P.invitedA.userId })).status, 200);
+});
+
+Deno.test('resend_invitation: a pending Master placement — the master cannot use admin-actions at all (403 before anything); a refused vessel admin capability → 403 master_needs_admin, nothing reserved or sent', async () => {
+  for (const p3 of [true, false]) {
+    const h = setup({ p3 });
+    profileRow(h.world, P.importedA.profileId).position = 'Master';
+    const resend = { action: 'reset_account', resetType: 'resend_invitation', targetProfileId: P.importedA.profileId };
+    // admin-actions needs users_access.admin; the master (assign only) is refused by the action's own gate.
+    const byMaster = await call(h, P.masterA.token, resend);
+    assertEquals(byMaster.status, 403, `p3=${p3}`);
+    assertEquals((await errorOf(byMaster)).code, 'forbidden');
+    assertEquals(callsOf(h.world, 'rpc').filter((c) => c.fn === 'reserve_invitation_attempt').length, 0);
+
+    // The resend runs the invitation path's Master check: an admin whose users_access.admin is refused for the vessel.
+    h.world.hooks.rpc = (r) =>
+      r.fn === 'has_capability' && r.args.p_key === 'admin.access.users_access.admin' && r.args.p_vessel_id === V_A1 ? { data: false, error: null } : undefined;
+    const res = await call(h, P.adminA.token, resend);
+    assertEquals(res.status, 403, `p3=${p3}`);
+    const error = await errorOf(res);
+    assertEquals([error.code, error.message, error.details], ['forbidden', 'Only a users-access administrator of this vessel can invite a Master.', { reason: 'master_needs_admin' }]);
+    assertEquals(callsOf(h.world, 'rpc').filter((c) => c.fn === 'reserve_invitation_attempt' || c.fn === 'record_invitation_send').length, 0, `p3=${p3}: nothing reserved`);
+    assertEquals(linkCount(h.world), 0);
+    assertEquals(h.sent.length, 0);
+    assertEquals(auditRows(h.world, 'RESET_ACCOUNT').length, 0, 'a refusal writes no audit row');
+    assertEquals(profileRow(h.world, P.importedA.profileId).user_id, null);
+
+    // A users-access admin of the vessel (the DPA) resends it: sent, and the Master row is written.
+    h.world.hooks.rpc = undefined;
+    const ok = await call(h, P.adminA.token, resend);
+    assertEquals(ok.status, 200, `p3=${p3}`);
+    assertEquals((await bodyOf(ok)).assignment, 'created');
+  }
+});

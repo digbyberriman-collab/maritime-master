@@ -499,6 +499,8 @@ describe('refusals of review round 3 (D-205, D-207, D-208)', () => {
   const OUT_OF_REACH = 'You can only do this for people on the vessels you administer.';
   const MANAGES_ADMINS = 'Only an administrator who manages administrators can do this for an administrator.';
   const VESSEL_REQUIRED = 'Choose the vessel this person joins.';
+  const INVITATION_WITHDRAWN = 'Their invitation was withdrawn. Send a new invitation instead.';
+  const MASTER_NEEDS_ADMIN = 'Only a users-access administrator of this vessel can invite a Master.';
 
   it.each([
     [409, 'conflict', 'login_blocked', LOGIN_BLOCKED],
@@ -506,6 +508,11 @@ describe('refusals of review round 3 (D-205, D-207, D-208)', () => {
     [403, 'forbidden', 'out_of_reach', OUT_OF_REACH],
     [403, 'forbidden', 'manages_admins_required', MANAGES_ADMINS],
     [403, 'forbidden', 'vessel_required', VESSEL_REQUIRED],
+    // Review round 4: a password reset for a revoked invitee (409) and turning their access on (403) name the action that works.
+    [409, 'conflict', 'invitation_withdrawn', INVITATION_WITHDRAWN],
+    [403, 'forbidden', 'invitation_withdrawn', INVITATION_WITHDRAWN],
+    // Review round 4: a pending Master placement needs a users-access administrator of its vessel (D-198, D-204).
+    [403, 'forbidden', 'master_needs_admin', MASTER_NEEDS_ADMIN],
   ] as const)('failureFrom: %i %s %s gives STORM copy (never the server wording) and is not retryable', (status, code, reason, copy) => {
     const failure = failureFrom({ status, body: edgeError(code, 'Server wording that is never shown.', { reason }) });
     expect(failure).toMatchObject({ status, code, reason, message: copy });
@@ -523,6 +530,46 @@ describe('refusals of review round 3 (D-205, D-207, D-208)', () => {
     const notice = passwordResetNotice(outcome, 'crew-member@example.test');
     expect(notice).toEqual({ tone: 'error', title: 'Could not send the reset email', description: LOGIN_BLOCKED, retry: false });
     expect(`${notice.title} ${notice.description}`).not.toMatch(/\bsent\b/i);
+  });
+
+  it('a 409 invitation_withdrawn answer to a password reset is a failure that names the new invitation, never "sent"', async () => {
+    httpError(409, edgeError('conflict', 'Server wording that is never shown.', { reason: 'invitation_withdrawn' }));
+    const outcome = await sendPasswordReset('u-1');
+    expect(outcome).toMatchObject({ kind: 'failed', failure: { status: 409, code: 'conflict', reason: 'invitation_withdrawn', message: INVITATION_WITHDRAWN } });
+    const notice = passwordResetNotice(outcome, 'crew-member@example.test');
+    expect(notice).toEqual({ tone: 'error', title: 'Could not send the reset email', description: INVITATION_WITHDRAWN, retry: false });
+    expect(`${notice.title} ${notice.description}`).not.toMatch(/\bsent\b/i);
+    expect(notice.description).not.toMatch(/turn access on/i);
+  });
+
+  it('a 403 invitation_withdrawn answer to turning access on is an error with the same copy', async () => {
+    httpError(403, edgeError('forbidden', INVITATION_WITHDRAWN, { reason: 'invitation_withdrawn' }));
+    expect(accessNotice(await setAccess('u-1', true))).toMatchObject({ tone: 'error', description: INVITATION_WITHDRAWN, retry: false });
+  });
+
+  it('a 403 master_needs_admin answer to an invitation, a resend or a bulk row is a failure with that copy, never "sent", not retryable', async () => {
+    httpError(403, edgeError('forbidden', 'x', { reason: 'master_needs_admin' }));
+    const single = await sendInvitation('p-1');
+    expect(single).toMatchObject({ kind: 'failed', failure: { status: 403, code: 'forbidden', reason: 'master_needs_admin', message: MASTER_NEEDS_ADMIN } });
+    const notice = inviteNotice(single, 'crew-member@example.test');
+    expect(notice).toEqual({ tone: 'error', title: 'Could not send the invitation', description: MASTER_NEEDS_ADMIN, retry: false });
+    expect(`${notice.title} ${notice.description}`).not.toMatch(/\bsent\b/i);
+    httpError(403, edgeError('forbidden', 'x', { reason: 'master_needs_admin' }));
+    expect(inviteNotice(await resendInvitation({ profileId: 'p-1' }))).toEqual({ tone: 'error', title: 'Could not send the invitation', description: MASTER_NEEDS_ADMIN, retry: false });
+
+    ok({
+      ok: true,
+      results: [
+        { profileId: 'p-1', status: 'refused', stored: false, invitationId: null, code: 'forbidden', reason: 'master_needs_admin' },
+        { profileId: 'p-2', status: 'sent', stored: true, invitationId: 'inv-2', assignment: 'created' },
+      ],
+      sent: 1,
+      failed: 0,
+      refused: 1,
+    });
+    const bulk = await bulkInvite(['p-1', 'p-2']);
+    expect(bulk).toMatchObject({ kind: 'done', sent: 1, failed: 0, refused: 1 });
+    expect(bulk.results[0]).toMatchObject({ profileId: 'p-1', status: 'refused', code: 'forbidden', reason: 'master_needs_admin', retryable: false });
   });
 
   it('a 409 login_blocked answer to a resend is a failure with that copy, never "sent"', async () => {

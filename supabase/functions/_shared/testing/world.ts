@@ -39,7 +39,13 @@
  * `login_email_mismatch` / `login_not_invited` (a login STORM did not
  * invite, D-205) before writing anything; `fulfil_imported_assignment`
  * answers `not_eligible` for a Master / Captain position unless the actor
- * has users_access.admin for the vessel (D-198). `revoke_invitation`
+ * has users_access.admin for the vessel (D-198). The round-4 contract
+ * (`fakeMasterNeedsAdmin`): for a given inviter of a pending Master /
+ * Captain placement (imported, `imported_vessel_id` set, the login, if
+ * any, with no current assignment) who lacks users_access.admin for that
+ * vessel, `reserve_invitation_attempt` answers `{ ok: false, code:
+ * 'master_needs_admin' }` and `record_invitation_send` raises 42501
+ * `master_needs_admin`, both before any write. `revoke_invitation`
  * (users-access admin) also resets a never-signed-in `invited` profile to
  * `not_invited` and removes the never-accepted membership;
  * `invitation_withdrawn_for` answers true for a profile that is neither
@@ -493,6 +499,30 @@ function isMasterOffice(position: string): boolean {
   return normalised === 'master' || normalised === 'captain';
 }
 
+const filledText = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+/** The office an imported placement gets: position, else rank, else Crew (blank counts as missing). */
+function placementOffice(profile: FakeRow): string {
+  return filledText(profile.position) ?? filledText(profile.rank) ?? 'Crew';
+}
+
+/**
+ * The review-round-4 rule of `reserve_invitation_attempt` /
+ * `record_invitation_send` (D-198, D-204): a given inviter of a pending
+ * Master / Captain placement (an imported profile with `imported_vessel_id`
+ * whose login, `loginId`, has no current assignment) needs
+ * users_access.admin for that vessel. True = refuse with
+ * `master_needs_admin`.
+ */
+export function fakeMasterNeedsAdmin(wd: FakeWorld, profile: FakeRow, inviter: string, loginId: unknown): boolean {
+  const vesselId = profile.imported_vessel_id;
+  if (profile.is_imported !== true || !vesselId) return false;
+  const login = typeof loginId === 'string' && loginId ? loginId : null;
+  if (login && (wd.tables.crew_assignments ?? []).some((a) => a.user_id === login && a.is_current === true)) return false;
+  if (!isMasterOffice(placementOffice(profile))) return false;
+  return !fakeCapability(wd, inviter, 'admin.access.users_access.admin', profile.company_id, vesselId);
+}
+
 function invitationRows(wd: FakeWorld): FakeRow[] {
   return (wd.tables.user_invitations ??= []);
 }
@@ -518,8 +548,7 @@ export function fakeFulfil(wd: FakeWorld, profile: FakeRow, actor: unknown): Ful
   if (rows.some((a) => a.user_id === userId && a.is_current === true)) return 'none';
   const vessel = (wd.tables.vessels ?? []).find((v) => v.id === vesselId);
   if (!vessel || vessel.company_id !== profile.company_id || vessel.status === 'Sold') return 'not_eligible';
-  const filled = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
-  const position = filled(profile.position) ?? filled(profile.rank) ?? 'Crew';
+  const position = placementOffice(profile);
   // D-198: the Master office needs an actor with users_access.admin for the vessel, whoever wrote the position.
   if (isMasterOffice(position) && !(typeof actor === 'string' && fakeCapability(wd, actor, 'admin.access.users_access.admin', profile.company_id, vesselId))) {
     return 'not_eligible';
@@ -560,6 +589,7 @@ function installP3Rpcs(world: FakeWorld): void {
       if (fakeAdminInvitee(wd, profile, args.p_kind) && !fakeManagesAdmins(wd, inviter, profile.company_id)) {
         return ok({ ok: false, code: 'manages_admins_required' });
       }
+      if (fakeMasterNeedsAdmin(wd, profile, inviter, profile.user_id)) return ok({ ok: false, code: 'master_needs_admin' });
     }
     const rows = invitationRows(wd);
     const now = wd.now().getTime();
@@ -633,6 +663,7 @@ function installP3Rpcs(world: FakeWorld): void {
     if (inviter) {
       if (!fakeMayAct(wd, inviter, profile.user_id ?? null, profile.company_id, profile.id)) return fail('42501', 'inviter_out_of_reach');
       if (fakeAdminInvitee(wd, profile, args.p_kind) && !fakeManagesAdmins(wd, inviter, profile.company_id)) return fail('42501', 'manages_admins_required');
+      if (fakeMasterNeedsAdmin(wd, profile, inviter, profile.user_id ?? args.p_user_id)) return fail('42501', 'master_needs_admin');
     }
     if (typeof args.p_user_id === 'string' && !profile.user_id) {
       const login = wd.authUsers.find((u) => u.id === args.p_user_id);

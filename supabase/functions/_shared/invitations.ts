@@ -24,8 +24,16 @@
  *    out_of_reach` for a vessel-scoped administrator), then
  *    `assertMayActOnUser` (D-194 / D-207: `admin_may_act_on_user`, and a
  *    manager of administrators for an administrator, kind from the role) →
- *    403 `out_of_reach` / `manages_admins_required`. A refusal reserves
- *    nothing.
+ *    403 `out_of_reach` / `manages_admins_required`. Then a pending Master /
+ *    Captain placement (D-198, D-204; review round 4): an imported profile
+ *    with `imported_vessel_id` whose login has no current assignment, and
+ *    whose office (position, else rank, else Crew, normalised as SQL does)
+ *    is Master or Captain, is invited only by a caller with
+ *    `admin.access.users_access.admin` for that vessel → else 403
+ *    `forbidden` `reason: master_needs_admin` (an assign-only inviter such
+ *    as the legacy Master would link the login without the assignment step
+ *    11 may write, stranding the placement). A refusal reserves, links,
+ *    sends and audits nothing.
  * 4. Email present, a real inbox (`isFakeEmail`, injectable) → else 400
  *    `invalid_request`; access disabled → 409 `conflict`.
  * 5. With the service client: an existing, confirmed login whose profile is
@@ -57,7 +65,8 @@
  *    almost at once) and returns the attempt number → 429 `cooldown` (with
  *    `Retry-After`), 404 `not_found`, 409 `conflict` (disabled; `reason:
  *    counter_exhausted` when the attempt number would pass the integer
- *    range), 403 `out_of_reach` / `manages_admins_required`. Two concurrent
+ *    range), 403 `out_of_reach` / `manages_admins_required` /
+ *    `master_needs_admin` (step 3's rules, asked again by SQL). Two concurrent
  *    requests: one reserves, the other gets 429 and makes no link. D-01 (RPC
  *    or table missing): the same cooldown computed here from the live row
  *    (when the table exists) and the profile's `last_invited_at`, and the
@@ -82,9 +91,10 @@
  *    vetted login (adopted, or the one `invite` just created), and the
  *    answer says `stored: false`. Any other error (a 42501 refusal such as
  *    `inviter_out_of_reach`, `manages_admins_required`,
- *    `login_email_mismatch`, `login_not_invited`, or a failure) stores and
- *    links nothing and skips step 11: the answer keeps the email's real
- *    result with `stored: false`.
+ *    `master_needs_admin`, `login_email_mismatch`, `login_not_invited`, or
+ *    a failure) stores and links nothing and skips step 11: the answer
+ *    keeps the email's real result with `stored: false`, and the refusal
+ *    code is logged (`invite_record_refused`, `reason`).
  * 11. The vessel of an imported profile (D-199, D-204): when the profile has
  *    `is_imported` and `imported_vessel_id`, its login had no current
  *    assignment at step 2, and a login is now linked to the profile (its
@@ -93,10 +103,12 @@
  *    row (`created` / `exists` → `created`; `none` → the row is looked up,
  *    since `record_invitation_send` may already have written it;
  *    `not_eligible`, which includes a Master / Captain position for an
- *    inviter without users_access.admin on the vessel → `failed`). D-01
+ *    inviter without users_access.admin on the vessel → `failed`; step 3
+ *    already refused that inviter, so this stays as defence in depth). D-01
  *    (RPC missing): only for a login this invitation linked (else `failed`,
  *    `pending_needs_review`); a Master / Captain position needs
- *    users_access.admin for the vessel (else `failed`, nothing written); the
+ *    users_access.admin for the vessel (else `failed`, nothing written;
+ *    defence in depth behind step 3); the
  *    login's current assignments are looked up (service client); one on
  *    another vessel → `failed`; else the vessel must be the target
  *    company's and not Sold, and the edge inserts it with the service
@@ -185,6 +197,27 @@ const LOGIN_NOT_CREATED_BY_STORM = (): HttpError =>
 /** D-208: a banned login that no revoke explains; an invitation it could not use is never sent. */
 export const LOGIN_BLOCKED = (): HttpError =>
   new HttpError(409, 'conflict', "This person's sign-in is blocked. Turn access on first.", { reason: 'login_blocked' });
+/**
+ * D-208 (review round 4): a password reset for a revoked invitee (a banned
+ * login of a `not_invited` / `invited` profile). Turning access on is
+ * refused for them (`set_membership_status` `invitation_withdrawn`); only a
+ * new invitation lifts the block, so the copy names that.
+ */
+export const INVITATION_WITHDRAWN_FOR_RESET = (): HttpError =>
+  new HttpError(409, 'conflict', 'Their invitation was withdrawn. Send a new invitation instead.', { reason: 'invitation_withdrawn' });
+
+/** A profile status whose banned login a new invitation unbans (a revoked invitee): `not_invited`, `invited`. */
+export function isReinvitableStatus(status: string): boolean {
+  return REINVITABLE.has(status.trim().toLowerCase());
+}
+
+/**
+ * D-198 / D-204 (review round 4): a pending Master / Captain placement is
+ * invited only by a users-access administrator of its vessel (an
+ * assign-only inviter would link the login without the assignment).
+ */
+export const MASTER_NEEDS_ADMIN = (): HttpError =>
+  new HttpError(403, 'forbidden', 'Only a users-access administrator of this vessel can invite a Master.', { reason: 'master_needs_admin' });
 
 function cooldownError(seconds: number): HttpError {
   const wait = Math.max(1, Math.ceil(seconds));
@@ -524,7 +557,7 @@ async function banCameFromRevoke(ctx: AuthContext, userId: string): Promise<bool
 async function mayLiftBan(ctx: AuthContext, target: Target, userId: string | null, user: Row | null, now: Date): Promise<boolean> {
   if (!userId || !bannedNow(user, now)) return false;
   if (!DISABLED.has(target.status)) {
-    if (REINVITABLE.has(target.status)) return true;
+    if (isReinvitableStatus(target.status)) return true;
     if (!text(user, 'last_sign_in_at') && (await banCameFromRevoke(ctx, userId))) return true;
   }
   throw LOGIN_BLOCKED();
@@ -565,6 +598,8 @@ async function reserveAttempt(ctx: AuthContext, target: Target, kind: string, no
         throw OUT_OF_REACH();
       case 'manages_admins_required':
         throw MANAGES_ADMINS_REQUIRED();
+      case 'master_needs_admin':
+        throw MASTER_NEEDS_ADMIN();
       default:
         throw UNAVAILABLE();
     }
@@ -622,6 +657,11 @@ function isMasterOffice(position: string): boolean {
   return normalised === 'master' || normalised === 'captain';
 }
 
+/** The office an imported profile's placement would get: position, else rank, else Crew (blank counts as missing, as in SQL). */
+function placementOffice(row: Row | null): string {
+  return filled(row, 'position') ?? filled(row, 'rank') ?? 'Crew';
+}
+
 function assignmentFailed(profileId: string, code: string): AssignmentResult {
   log('warn', 'invite_assignment_failed', { profile_id: profileId, code });
   return 'failed';
@@ -656,8 +696,9 @@ async function fulfilAssignment(ctx: AuthContext, target: Target, vesselId: stri
   // D-01: the function is not in the database yet. The same rule, with the service client. Only for a login this
   // invitation linked: a login that already had the profile may have written the import columns itself (D-204).
   if (target.userId) return assignmentFailed(target.profileId, 'pending_needs_review');
-  const position = filled(target.row, 'position') ?? filled(target.row, 'rank') ?? 'Crew';
-  // D-198: making anyone Master needs users_access.admin for the vessel, whoever wrote the position.
+  const position = placementOffice(target.row);
+  // D-198: making anyone Master needs users_access.admin for the vessel, whoever wrote the position (step 3 already
+  // refused such an inviter; kept as defence in depth).
   if (isMasterOffice(position) && !(await hasCapability(ctx, 'admin.access.users_access.admin', { companyId: target.companyId, vesselId }))) {
     return assignmentFailed(target.profileId, 'master_needs_admin');
   }
@@ -695,9 +736,18 @@ async function runInvite(ctx: AuthContext, profileId: string, deps: InviteDeps):
   const landing = linkLanding(ctx.env, 'invite');
   const target = await readTarget(ctx, profileId);
   const kind = ADMIN_ROLES.has(target.role) ? 'admin' : 'crew';
-  // Step 3: every structural vessel, then the person (D-194 / D-207). Nothing is reserved or written before.
+  // Step 3: every structural vessel, the person (D-194 / D-207), then a pending Master placement. Nothing is reserved
+  // or written before.
   await assertCapabilityForVessels(ctx, 'admin.access.users_access.assign', target.companyId, target.structuralVessels);
   await assertMayActOnUser(ctx, { companyId: target.companyId, userId: target.userId, profileId, role: target.role, kind });
+  // A pending Master / Captain placement (D-198, D-204): only a users-access admin of its vessel invites it, so the
+  // login is never linked without the assignment step 11 may write. Nothing is reserved, linked, sent or audited.
+  if (
+    target.pendingVesselId && !target.assigned && isMasterOffice(placementOffice(target.row)) &&
+    !(await hasCapability(ctx, 'admin.access.users_access.admin', { companyId: target.companyId, vesselId: target.pendingVesselId }))
+  ) {
+    throw MASTER_NEEDS_ADMIN();
+  }
 
   const email = target.email;
   if (!email) {
@@ -793,8 +843,9 @@ async function runInvite(ctx: AuthContext, profileId: string, deps: InviteDeps):
     if (isMissingFunction(record.error)) {
       if (result.ok) linkStored = await stampLegacyProfile(ctx, target, linkUserId, now);
     } else {
-      // A refusal (42501 inviter_out_of_reach, manages_admins_required, login_email_mismatch, login_not_invited) or a
-      // failure: nothing is stored or linked here, and the answer keeps what the email did.
+      // A refusal (42501 inviter_out_of_reach, manages_admins_required, master_needs_admin, login_email_mismatch,
+      // login_not_invited) or a failure: nothing is stored or linked here, and the answer keeps what the email did.
+      // The refusal code is logged as `reason`.
       recordAccepted = false;
       log('warn', 'invite_record_refused', { profile_id: profileId, outcome, code: errorCode(record.error) || 'none', reason: refusalCode(record.error) });
     }

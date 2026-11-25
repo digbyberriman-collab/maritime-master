@@ -206,3 +206,25 @@ Deno.test('send-invitation: a login with the address that STORM did not create â
   assertEquals(h.sent.length, 0);
   assertEquals(profileRow(h.world, P.importedA.profileId).user_id, null);
 });
+
+Deno.test('send-invitation: a pending Master placement sent by the master (assign only) â†’ 403 master_needs_admin; nothing reserved, linked or sent', async () => {
+  for (const p3 of [true, false]) {
+    const h = setup({ p3 });
+    profileRow(h.world, P.importedA.profileId).position = 'Master';
+    const res = await invite(h, P.masterA.token, { profileId: P.importedA.profileId });
+    assertEquals(res.status, 403, `p3=${p3}`);
+    const error = obj(await bodyOf(res), 'error');
+    assertEquals([error.code, error.message], ['forbidden', 'Only a users-access administrator of this vessel can invite a Master.']);
+    assertEquals(obj(error, 'details'), { reason: 'master_needs_admin' });
+    assertEquals(generatedLinks(h.world).length, 0);
+    assertEquals(h.sent.length, 0);
+    assertEquals(callsOf(h.world, 'rpc').filter((c) => c.fn === 'reserve_invitation_attempt' || c.fn === 'record_invitation_send').length, 0);
+    assertEquals((h.world.tables.user_invitations ?? []).length, 0);
+    assertEquals(profileRow(h.world, P.importedA.profileId).user_id, null, 'the placement stays pending, unlinked');
+
+    // The DPA sends the same placement, and the Master row is written.
+    const admin = await invite(h, P.adminA.token, { profileId: P.importedA.profileId });
+    assertEquals(admin.status, 200, `p3=${p3}`);
+    assertEquals((await bodyOf(admin)).assignment, 'created');
+  }
+});

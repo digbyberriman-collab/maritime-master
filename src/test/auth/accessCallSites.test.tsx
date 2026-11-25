@@ -87,6 +87,18 @@ describe('ResetAccountModal', () => {
     expect(h.invoke).toHaveBeenCalledWith('admin-actions', { body: { action: 'reset_account', resetType: 'resend_invitation', targetProfileId: 'p-14' } });
   });
 
+  it('a reset for a revoked invitee says to send a new invitation (409 invitation_withdrawn), never "sent", no Try again', async () => {
+    httpError(409, { error: { code: 'conflict', message: 'Server wording that is never shown.', details: { reason: 'invitation_withdrawn' } } });
+    const onOpenChange = vi.fn();
+    render(wrap(<ResetAccountModal open onOpenChange={onOpenChange} crewMember={member({ account_status: 'not_invited' })} />));
+    fireEvent.click(screen.getByRole('button', { name: 'Send reset email' }));
+    expect(await screen.findByText('Their invitation was withdrawn. Send a new invitation instead.')).toBeInTheDocument();
+    expect(screen.queryByText(/Turn access on first/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(h.notify.success).not.toHaveBeenCalled();
+  });
+
   it('ending sessions is shown as not available yet, and cannot be chosen', () => {
     render(wrap(<ResetAccountModal open onOpenChange={vi.fn()} crewMember={member()} />));
     expect(screen.getByText('Ending sessions from STORM is not available yet. Turn off their access to stop new sign-ins.')).toBeInTheDocument();

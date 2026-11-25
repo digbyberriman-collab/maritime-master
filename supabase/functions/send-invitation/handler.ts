@@ -17,8 +17,11 @@
  * - 401 `unauthorized`, 403 `account_disabled` / `forbidden` / `cross_company`;
  *   `forbidden` with `details.reason: out_of_reach` (a person on a vessel the
  *   caller does not administer, or the vessel-less / administrator person an
- *   admin of some vessels may not act on; D-194, D-207) or
- *   `manages_admins_required` (an administrator invitee; D-195)
+ *   admin of some vessels may not act on; D-194, D-207),
+ *   `manages_admins_required` (an administrator invitee; D-195) or
+ *   `master_needs_admin` (a pending Master or Captain placement and the
+ *   caller is not a users-access admin of that vessel; nothing reserved,
+ *   linked or sent; D-219)
  * - 404 `not_found` (not visible to the caller), 409 `already_active` / `conflict`
  *   (`details.reason: login_not_created_by_storm`: a login with this address
  *   that STORM did not create, never adopted, D-205; `login_blocked`: a banned

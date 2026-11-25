@@ -6,7 +6,7 @@ import { HttpError } from './http.ts';
 import { bulkRow, bulkSummary, type InviteDeps, inviteProfile, invitationResponse, isFakeEmail, MAX_INVITE_ATTEMPT } from './invitations.ts';
 import { idempotentProvider } from './testing/fakeFetch.ts';
 import { callsOf, fail, fakeClientFactory, type FakeWorld, ok } from './testing/fakeSupabase.ts';
-import { buildWorld, CO_A, envWith, P, type Persona, profileRow, request, TEST_ENV, V_A1, V_A2, V_A_SOLD, V_B1 } from './testing/world.ts';
+import { buildWorld, CO_A, envWith, obj, P, type Persona, profileRow, request, TEST_ENV, V_A1, V_A2, V_A_SOLD, V_B1 } from './testing/world.ts';
 import type { FakeAuthUser } from './testing/fakeSupabase.ts';
 
 const NOW = new Date('2026-11-23T10:00:00Z');
@@ -933,27 +933,139 @@ Deno.test('invite: the sign-in block history cannot be read → 503, nothing res
   assertEquals(reserveCalls(world).length, 0);
 });
 
-// ---- round 3: the Master office is never written for an inviter without users_access.admin (D-198) --
+// ---- round 4: a pending Master placement is invited only by a users-access admin of its vessel (D-198, D-204) --
 
-Deno.test('assignment: a tampered Master position invited by the master (assign only) → failed, no Master row; by the DPA → created', async () => {
+const MASTER_NEEDS_ADMIN_COPY = 'Only a users-access administrator of this vessel can invite a Master.';
+
+Deno.test('invite: a pending Master placement invited by the master (assign only) → 403 master_needs_admin before anything is reserved, linked, sent or audited', async () => {
   for (const p3 of [true, false]) {
     for (const position of ['Master', ' captain ']) {
+      const label = `p3=${p3} ${JSON.stringify(position)}`;
       const world = buildWorld({ p3 });
       Object.assign(profileRow(world, P.importedA.profileId), { position });
-      const byMaster = await inviteProfile(await ctxFor(world, P.masterA), P.importedA.profileId, mailer().deps);
-      assert(byMaster.status === 'sent', `p3=${p3} ${position}`);
-      assertEquals(byMaster.assignment, 'failed', `p3=${p3} ${position}`);
-      const userId = profileRow(world, P.importedA.profileId).user_id;
-      assertEquals(assignmentsOf(world, userId).length, 0, `p3=${p3} ${position}: no Master row`);
-      assertEquals(assignmentInserts(world).length, 0);
-      assertEquals(profileRow(world, P.importedA.profileId).imported_vessel_id, V_A1, 'still pending: an admin decides');
+      const loginsBefore = world.authUsers.length;
+      const countBefore = profileRow(world, P.importedA.profileId).invitation_count;
+      const m = mailer();
+      const outcome = await inviteProfile(await ctxFor(world, P.masterA), P.importedA.profileId, m.deps);
+      assert(outcome.status === 'refused', label);
+      assertEquals([outcome.error.status, outcome.error.code, outcome.error.details?.reason], [403, 'forbidden', 'master_needs_admin'], label);
+      assertEquals(outcome.error.publicMessage, MASTER_NEEDS_ADMIN_COPY, label);
+      const res = invitationResponse(outcome);
+      assertEquals(res.status, 403);
+      assertEquals(await res.json(), { error: { code: 'forbidden', message: MASTER_NEEDS_ADMIN_COPY, details: { reason: 'master_needs_admin' } } });
+      // Nothing reserved: no reservation call, no invitation row, the attempt counter unchanged.
+      assertEquals(reserveCalls(world).length, 0, label);
+      assertEquals((world.tables.user_invitations ?? []).length, 0, label);
+      assertEquals(profileRow(world, P.importedA.profileId).invitation_count, countBefore, label);
+      // Nothing linked, no login created, nothing sent or recorded.
+      assertEquals(profileRow(world, P.importedA.profileId).user_id, null, label);
+      assertEquals(world.authUsers.length, loginsBefore, `${label}: no auth user created`);
+      assertEquals(linkCalls(world).length, 0, label);
+      assertEquals(m.sent.length, 0, `${label}: mailer not called`);
+      assertEquals(callsOf(world, 'rpc').filter((c) => c.fn === 'record_invitation_send' || c.fn === 'fulfil_imported_assignment').length, 0, label);
+      assertEquals((world.tables.admin_action_log ?? []).length, 0, `${label}: no audit row`);
+      assertEquals(assignmentInserts(world).length, 0, label);
+      // The placement stays pending, so a users-access admin of the vessel can still finish it.
+      const profile = profileRow(world, P.importedA.profileId);
+      assertEquals([profile.is_imported, profile.imported_vessel_id, profile.account_status], [true, V_A1, 'not_invited'], label);
+      assertEquals(bulkRow(outcome), { profileId: P.importedA.profileId, status: 'refused', code: 'forbidden', reason: 'master_needs_admin', stored: false, invitationId: null });
     }
+    // The DPA (users_access.admin for every vessel) invites the same placement: sent, and the Master row is written.
     const admin = buildWorld({ p3 });
     Object.assign(profileRow(admin, P.importedA.profileId), { position: 'Master' });
     const byAdmin = await inviteProfile(await ctxFor(admin, P.adminA), P.importedA.profileId, mailer().deps);
     assert(byAdmin.status === 'sent' && byAdmin.assignment === 'created', `p3=${p3}`);
     assertEquals(assignmentsOf(admin, profileRow(admin, P.importedA.profileId).user_id).map((a) => [a.vessel_id, a.position]), [[V_A1, 'Master']]);
   }
+});
+
+Deno.test('invite: the rank decides when the position is blank; a non-Master pending placement invited by the master is still sent and assigned', async () => {
+  for (const p3 of [true, false]) {
+    const byRank = buildWorld({ p3 });
+    Object.assign(profileRow(byRank, P.importedA.profileId), { position: '  ', rank: 'Captain' });
+    const refused = await inviteProfile(await ctxFor(byRank, P.masterA), P.importedA.profileId, mailer().deps);
+    assert(refused.status === 'refused' && refused.error.details?.reason === 'master_needs_admin', `p3=${p3}: rank Captain`);
+
+    const world = buildWorld({ p3 });
+    Object.assign(profileRow(world, P.importedA.profileId), { position: 'Bosun', rank: 'Master' });
+    const m = mailer();
+    const outcome = await inviteProfile(await ctxFor(world, P.masterA), P.importedA.profileId, m.deps);
+    assert(outcome.status === 'sent', `p3=${p3}: the position (Bosun) decides, not the rank`);
+    assertEquals(outcome.assignment, 'created', `p3=${p3}`);
+    assertEquals(assignmentsOf(world, profileRow(world, P.importedA.profileId).user_id).map((a) => [a.vessel_id, a.position]), [[V_A1, 'Bosun']]);
+    assertEquals(m.sent.length, 1);
+  }
+});
+
+Deno.test('invite: a Master office is no placement once the login is on a vessel (no step 11), so the master\'s check does not apply', async () => {
+  const world = buildWorld({ p3: true });
+  // invitedA is on Aurora already; a stale import link with a Master position adds nothing and needs no admin.
+  Object.assign(profileRow(world, P.invitedA.profileId), { is_imported: true, imported_vessel_id: V_A1, position: 'Master' });
+  const outcome = await inviteProfile(await ctxFor(world, P.masterA), P.invitedA.profileId, mailer().deps);
+  assertEquals(outcome.status, 'sent');
+  assert(outcome.status === 'sent' && outcome.assignment === undefined);
+  assertEquals(assignmentsOf(world, P.invitedA.userId).map((a) => a.position), ['Steward']);
+});
+
+Deno.test('invite: a forced reserve answer of master_needs_admin is the same 403; nothing linked or sent', async () => {
+  const world = buildWorld({ p3: true });
+  world.hooks.rpc = (r) => (r.fn === 'reserve_invitation_attempt' ? ok({ ok: false, code: 'master_needs_admin' }) : undefined);
+  const m = mailer();
+  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, m.deps);
+  assert(outcome.status === 'refused');
+  assertEquals([outcome.error.status, outcome.error.code, outcome.error.details?.reason], [403, 'forbidden', 'master_needs_admin']);
+  assertEquals(outcome.error.publicMessage, MASTER_NEEDS_ADMIN_COPY);
+  assertEquals(reserveCalls(world).length, 1);
+  assertEquals(linkCalls(world).length, 0);
+  assertEquals(m.sent.length, 0);
+  assertEquals(profileRow(world, P.importedA.profileId).user_id, null);
+});
+
+Deno.test('invite: a 42501 master_needs_admin from record_invitation_send is a refused record: sent (stored:false), nothing linked or assigned, the reason logged', async () => {
+  const world = buildWorld({ p3: true });
+  world.rpcs.record_invitation_send = () => fail('42501', 'master_needs_admin');
+  const lines: string[] = [];
+  const original = console.warn;
+  console.warn = (...args: unknown[]) => {
+    lines.push(args.map(String).join(' '));
+  };
+  const ctx = await ctxFor(world, P.adminA);
+  const outcome = await inviteProfile(ctx, P.importedA.profileId, mailer().deps).finally(() => {
+    console.warn = original;
+  });
+  assert(outcome.status === 'sent' && !outcome.stored && outcome.assignment === undefined);
+  assertEquals(profileRow(world, P.importedA.profileId).user_id, null);
+  const refused = lines.map((l) => JSON.parse(l)).find((l) => l.event === 'invite_record_refused');
+  assert(refused, 'the refused record is logged');
+  assertEquals([refused.code, refused.reason], ['42501', 'master_needs_admin']);
+});
+
+Deno.test('the fakes mirror the SQL rule: reserve answers master_needs_admin and record raises 42501 master_needs_admin for an inviter without users_access.admin of the vessel', () => {
+  const world = buildWorld({ p3: true });
+  Object.assign(profileRow(world, P.importedA.profileId), { position: 'Master' });
+  const service = { role: 'service' as const, userId: null };
+  const reserve = (inviter: string | null) => world.rpcs.reserve_invitation_attempt({ p_profile_id: P.importedA.profileId, p_invited_by: inviter, p_kind: 'crew' }, service, world);
+  const record = (inviter: string | null) =>
+    world.rpcs.record_invitation_send({ p_profile_id: P.importedA.profileId, p_outcome: 'sent', p_invited_by: inviter, p_kind: 'crew', p_user_id: null }, service, world);
+  assertEquals(reserve(P.masterA.userId).data, { ok: false, code: 'master_needs_admin' });
+  assertEquals(record(P.masterA.userId).error?.message, 'master_needs_admin');
+  assertEquals((world.tables.user_invitations ?? []).length, 0, 'nothing is written on a refusal');
+  assertEquals(profileRow(world, P.importedA.profileId).user_id, null);
+  // A NULL inviter (service role, ops) is not limited; nor is a users-access admin of the vessel.
+  assertEquals(obj(reserve(null), 'data').ok, true);
+  const admin = buildWorld({ p3: true });
+  Object.assign(profileRow(admin, P.importedA.profileId), { position: 'Master' });
+  const byAdmin = admin.rpcs.reserve_invitation_attempt({ p_profile_id: P.importedA.profileId, p_invited_by: P.adminA.userId, p_kind: 'crew' }, service, admin);
+  assertEquals(obj(byAdmin, 'data').ok, true);
+  // A login already on a vessel is no pending placement (record_invitation_send reads the login it would link).
+  const onboard = buildWorld({ p3: true });
+  Object.assign(profileRow(onboard, P.importedA.profileId), { position: 'Master' });
+  const linked = onboard.rpcs.record_invitation_send(
+    { p_profile_id: P.importedA.profileId, p_outcome: 'sent', p_invited_by: P.masterA.userId, p_kind: 'crew', p_user_id: P.crewA.userId },
+    service,
+    onboard,
+  );
+  assertFalse(linked.error?.message === 'master_needs_admin', 'crewA is on Aurora: not a pending placement');
 });
 
 Deno.test('assignment (D-01): a login that already had the profile is not placed by the edge (pending_needs_review)', async () => {
