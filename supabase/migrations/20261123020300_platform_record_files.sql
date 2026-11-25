@@ -363,8 +363,13 @@ CREATE POLICY record_links_select ON public.record_links
 -- the object is stored (storage.objects; P0002 otherwise) and was uploaded by
 -- the caller (owner, when Storage recorded one), its stored size and type
 -- (metadata, when present) equal what is registered, the type is on the
--- allow-list and the size within 50 MB (22023 otherwise). Company, vessel,
--- module and entity come from the path. Idempotent on (bucket, path).
+-- allow-list and the size within 50 MB (22023 otherwise); a given p_sha256
+-- is 64 lower-case hex (22023 sha256_invalid, checked first). Company,
+-- vessel, module and entity come from the path. Idempotent on (bucket,
+-- path): a second call returns the row, except that the uploader's call
+-- with a valid p_sha256 fills a missing hash (never overwriting a stored
+-- one; review round 3, sign-image-requires-unsent-sha256). The hash is
+-- client-asserted: nothing here reads the stored bytes.
 CREATE OR REPLACE FUNCTION public.register_file_object(
   p_bucket text,
   p_path text,
@@ -393,8 +398,21 @@ BEGIN
   IF NOT public.storage_path_allowed(p_bucket, p_path, true) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'file_access_denied', DETAIL = 'This file path is outside the records you can add files to.';
   END IF;
+  IF p_sha256 IS NOT NULL AND p_sha256 !~ '^[0-9a-f]{64}$' THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'sha256_invalid';
+  END IF;
   SELECT * INTO f FROM public.file_objects WHERE bucket = p_bucket AND storage_path = p_path;
   IF FOUND THEN
+    -- A registration without a hash gets it when its uploader registers
+    -- the same object again with one (review round 3,
+    -- sign-image-requires-unsent-sha256); a stored hash is never
+    -- overwritten, and nobody else's call changes the row.
+    IF f.sha256 IS NULL AND p_sha256 IS NOT NULL AND f.uploaded_by = v_uid THEN
+      UPDATE public.file_objects SET sha256 = p_sha256 WHERE id = f.id AND sha256 IS NULL RETURNING * INTO f;
+      IF f.id IS NULL THEN
+        SELECT * INTO f FROM public.file_objects WHERE bucket = p_bucket AND storage_path = p_path;
+      END IF;
+    END IF;
     RETURN f;
   END IF;
 
@@ -426,9 +444,6 @@ BEGIN
   END IF;
   IF o.metadata ? 'mimetype' AND (o.metadata ->> 'mimetype') IS DISTINCT FROM p_mime_type THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'file_type_mismatch', DETAIL = 'The stored file has a different type.';
-  END IF;
-  IF p_sha256 IS NOT NULL AND p_sha256 !~ '^[0-9a-f]{64}$' THEN
-    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'sha256_invalid';
   END IF;
 
   v_parts := string_to_array(p_path, '/');
@@ -790,7 +805,7 @@ COMMENT ON TABLE public.record_attachments IS 'A file attached to a record (enve
 COMMENT ON TABLE public.record_links IS 'Generic links between records, or from a record to an item (C8): related, duplicate_of, follow_up, caused_by, parent. company_id / vessel_id are stamped from the from-record by trg_record_links_scope (CC-12) and read through record_readable. No client writes: link_records / unlink_records only (soft remove).';
 COMMENT ON FUNCTION public.storage_path_allowed(text, text, boolean) IS 'The C7 path rule of the records bucket for auth.uid(): six segments, an active member of the company, fleet reach for fleet paths, reach to the vessel otherwise. Unknown anything -> false.';
 COMMENT ON FUNCTION public.record_links_scope() IS 'Trigger: a link''s company and vessel are its from-record''s (a client value is overwritten).';
-COMMENT ON FUNCTION public.register_file_object(text, text, text, text, bigint, text) IS 'Registers an uploaded object of the records bucket (path allowed, object stored by the caller, size and type checked). Idempotent on (bucket, path).';
+COMMENT ON FUNCTION public.register_file_object(text, text, text, text, bigint, text) IS 'Registers an uploaded object of the records bucket (path allowed, object stored by the caller, size and type checked, a given sha256 64 lower-case hex). Idempotent on (bucket, path); the uploader registering again with a sha256 fills a missing hash (a stored hash is never overwritten). The hash is client-asserted.';
 COMMENT ON FUNCTION public.attach_record_file(uuid, uuid, text, text, uuid) IS 'Attaches a registered file to a record (or its entity); refuses closed / void records unless the kind allows late evidence. Event attachment.added.';
 COMMENT ON FUNCTION public.remove_record_attachment(uuid, text) IS 'Soft-removes an attachment: the uploader or a vessel member before submission, a company actor with a reason after; legal hold refuses. Event attachment.removed.';
 COMMENT ON FUNCTION public.link_records(uuid, uuid, text, uuid, text, text) IS 'Links a record to another record of the same company (or to an item). Both readable by the caller. Event link.added.';

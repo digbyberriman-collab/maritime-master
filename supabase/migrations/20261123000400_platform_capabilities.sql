@@ -46,7 +46,8 @@
 -- is a full admin or a non-legacy admin over all vessels of the company;
 -- anyone else acts on a user only when every vessel of the target's
 -- structural vessel set (membership vessel rows, current crew assignments,
--- else the profile's imported vessel, D-125; Sold and archived vessels
+-- else, for a profile with no login only, its imported vessel, D-125,
+-- D-204; Sold and archived vessels
 -- excluded; read whatever the target's active state) is in their own
 -- reach, and never on a target with an empty set, vessel_scope all, fleet
 -- access or legacy fleet reach (admin_may_act_on_user(), for definers;
@@ -374,8 +375,13 @@ $$;
 -- The set is read whatever the target's active state (reach_vessels_for()
 -- of a disabled user is empty, which would make the rule vacuous): the
 -- target membership's account_membership_vessels rows (any window) plus
--- the target's current crew assignments, else the profile's
--- imported_vessel_id (D-125); Sold and archived vessels excluded. A target
+-- the target's current crew assignments, else, only for a target with no
+-- login (a pending profile create-crew-member wrote), the profile's
+-- imported_vessel_id (D-125, D-204); Sold and archived vessels excluded. A
+-- signed-in target with no membership vessel and no current assignment has
+-- an empty set: its imported_vessel_id never counts, so an HR edit of that
+-- column never pulls a person into a vessel admin's scope (review round 3,
+-- profile-imported-columns-unguarded). A target
 -- with an empty set, a membership with vessel_scope all or fleet access,
 -- or legacy fleet reach (a dpa / shore_management profile, an RBAC fleet
 -- role) needs admin_scope_all(). The target is resolved from the user, or
@@ -453,7 +459,9 @@ BEGIN
            WHERE ca.user_id = v_user AND ca.vessel_id = v.id AND ca.is_current))
       )
   );
-  IF cardinality(v_vessels) = 0 AND v_profile.imported_vessel_id IS NOT NULL THEN
+  -- The pending vessel counts only for a profile with no login yet (D-204):
+  -- a signed-in target falls through with an empty set (admin_scope_all only).
+  IF cardinality(v_vessels) = 0 AND v_user IS NULL AND v_profile.imported_vessel_id IS NOT NULL THEN
     v_vessels := ARRAY(
       SELECT v.id FROM public.vessels AS v
       WHERE v.id = v_profile.imported_vessel_id
@@ -539,5 +547,5 @@ COMMENT ON FUNCTION public.has_capability(text, uuid, uuid) IS 'has_capability_f
 COMMENT ON FUNCTION public.user_company_for_admin(uuid) IS 'The target user''s company when the active caller is in it (service role: always); ignores the target''s own active state. Used by RBAC policies.';
 COMMENT ON FUNCTION public.is_company_actor(uuid, uuid) IS 'gap/01 W10 interim: whether the user acts as the company for a vessel (or, with no vessel, a fleet record): full admin, or a non-legacy admin membership reaching the vessel. Never shore staff or crew.';
 COMMENT ON FUNCTION public.admin_scope_all(uuid, uuid) IS 'gap/01 F23: the active actor (profile in the company) is a full legacy admin, or holds a non-legacy owner membership or a non-legacy admin membership with vessel_scope all there. Internal (service role; definers).';
-COMMENT ON FUNCTION public.admin_may_act_on_user(uuid, uuid, uuid, uuid) IS 'gap/01 F23: whether the actor may act on the target user / profile of the company: admin_scope_all(), or every vessel of the target''s structural set (membership vessel rows, current crew assignments, else imported_vessel_id per D-125; Sold / archived excluded; whatever the target''s active state) is in the actor''s reach. Empty set, vessel_scope all, fleet access or legacy fleet reach need admin_scope_all(). Unknown ids, an inactive actor or another company: false. Internal (service role; definers).';
+COMMENT ON FUNCTION public.admin_may_act_on_user(uuid, uuid, uuid, uuid) IS 'gap/01 F23: whether the actor may act on the target user / profile of the company: admin_scope_all(), or every vessel of the target''s structural set (membership vessel rows, current crew assignments, else imported_vessel_id per D-125 / D-204 only for a target with no login; Sold / archived excluded; whatever the target''s active state) is in the actor''s reach. A signed-in target without a membership vessel or a current assignment has an empty set. Empty set, vessel_scope all, fleet access or legacy fleet reach need admin_scope_all(). Unknown ids, an inactive actor or another company: false. Internal (service role; definers).';
 COMMENT ON FUNCTION public.admin_may_view_user(uuid, uuid, uuid) IS 'RLS predicate (rule 11) of the admin read policies on memberships, membership vessels, user_roles, rbac_user_roles, overrides and invitations: the caller has admin.access.users_access.view in the company and admin_may_act_on_user(auth.uid(), ...). False without a caller.';

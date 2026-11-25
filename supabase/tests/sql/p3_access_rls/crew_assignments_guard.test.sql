@@ -113,3 +113,73 @@ SELECT tests.reset_role();
 SELECT tests.ok(NOT has_function_privilege(r, 'public.crew_assignments_guard()', 'EXECUTE'), 'the guard is not executable by ' || r)
 FROM unnest(ARRAY['anon', 'authenticated', 'service_role']) AS r;
 SELECT tests.ok((SELECT prosecdef AND proconfig @> ARRAY['search_path=public'] FROM pg_proc WHERE oid = 'public.crew_assignments_guard()'::regprocedure), 'the guard is SECURITY DEFINER with search_path');
+
+-- ------------------------------------------------------------ DELETE (review round 3, crew-assignment-delete-unguarded)
+
+-- The legacy "HR managers can delete crew assignments" policy admits every
+-- vessel an HR viewer sees; the guard's rules b (the caller reaches the
+-- row's vessel, or holds fleet reach / users-access admin there) and e (a
+-- current Master row needs users-access admin of the vessel) apply to a
+-- DELETE too. Ports scratchpad frr/repro/r1_ca_delete.sql and
+-- r2sec/s2_assign_delete.sql.
+-- (the service-role HYDRA row of the DRAAK Master above is removed first,
+-- so the Master is again an HR editor who does not reach HYDRA)
+DELETE FROM public.crew_assignments WHERE user_id = tests.user_id('A.master_dra') AND vessel_id = tests.vessel_id('A.hyd');
+SELECT tests.seed_user('A', 'A.master_hyd', 'crew');
+SELECT tests.seed_assignment('A.master_hyd', 'A.hyd', true, 'Master');
+SELECT tests.seed_user('A', 'A.cook_dra', 'crew');
+SELECT tests.seed_assignment('A.cook_dra', 'A.dra', true, 'Cook');
+SELECT tests.ok(public.record_is_master(tests.user_id('A.master_hyd'), tests.vessel_id('A.hyd'))
+            AND public.record_is_master(tests.user_id('A.master_dra'), tests.vessel_id('A.dra'))
+            AND public.reach_vessel_for(tests.user_id('A.crew_hyd'), tests.vessel_id('A.hyd'))
+            AND NOT public.reach_vessel_for(tests.user_id('A.master_dra'), tests.vessel_id('A.hyd')), 'setup: Masters of HYDRA and DRAAK, HYDRA crew reaches HYDRA, the DRAAK Master does not');
+SELECT tests.as_user(tests.user_id('A.master_dra'));
+SELECT tests.throws_like(format('DELETE FROM public.crew_assignments WHERE id = %L', tests.id('assignment:A.crew_hyd@A.hyd')), '42501', 'assignment_vessel_out_of_reach',
+                         'the DRAAK Master cannot delete HYDRA''s Deckhand row');
+SELECT tests.throws_like(format('DELETE FROM public.crew_assignments WHERE id = %L', tests.id('assignment:A.master_hyd@A.hyd')), '42501', 'assignment_vessel_out_of_reach',
+                         'nor HYDRA''s Master row');
+SELECT tests.throws_like(format('DELETE FROM public.crew_assignments WHERE vessel_id = %L', tests.vessel_id('A.hyd')), '42501', 'assignment_vessel_out_of_reach',
+                         'nor every HYDRA row at once');
+SELECT tests.throws_like(format('DELETE FROM public.crew_assignments WHERE id = %L', tests.id('assignment:A.master_dra@A.dra')), '42501', 'master_office_change_refused',
+                         'nor the current DRAAK Master row (own vessel, no users-access admin)');
+SELECT tests.lives(format('DELETE FROM public.crew_assignments WHERE id = %L', tests.id('assignment:A.cook_dra@A.dra')), 'a non-Master DRAAK row is still deleted (legacy HR administration)');
+SELECT tests.reset_role();
+SELECT tests.ok(public.record_is_master(tests.user_id('A.master_hyd'), tests.vessel_id('A.hyd')), 'r1 / s2: record_is_master(HYDRA Master) stays t');
+SELECT tests.ok(public.reach_vessel_for(tests.user_id('A.crew_hyd'), tests.vessel_id('A.hyd')), 'r1 / s2: HYDRA crew still reach HYDRA');
+SELECT tests.ok(public.record_is_master(tests.user_id('A.master_dra'), tests.vessel_id('A.dra')), 'the DRAAK Master row is still there');
+SELECT tests.is((SELECT count(*) FROM public.crew_assignments WHERE vessel_id = tests.vessel_id('A.hyd') AND user_id IN (tests.user_id('A.master_hyd'), tests.user_id('A.crew_hyd'))), 2::bigint,
+                'HYDRA keeps both rows');
+SELECT tests.is((SELECT count(*) FROM public.crew_assignments WHERE id = tests.id('assignment:A.cook_dra@A.dra')), 0::bigint, 'the cook''s row is gone');
+-- A users-access admin of the vessel removes a Master.
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.lives(format('DELETE FROM public.crew_assignments WHERE id = %L', tests.id('assignment:A.master_hyd@A.hyd')), 'a users-access admin deletes a Master row');
+SELECT tests.reset_role();
+SELECT tests.ok(NOT public.record_is_master(tests.user_id('A.master_hyd'), tests.vessel_id('A.hyd')), 'and the office is gone');
+-- The service role, no JWT and the engine flag are not limited.
+SELECT tests.as_service();
+SELECT tests.lives(format('DELETE FROM public.crew_assignments WHERE id = %L', tests.id('assignment:A.master_dra@A.gam')), 'the service role deletes any row');
+SELECT tests.reset_role();
+SELECT tests.lives(format('DELETE FROM public.crew_assignments WHERE id = %L', tests.id('assignment:A.purser_dra@A.dra')), 'no JWT (a migration) deletes any row');
+SELECT tests.as_user(tests.user_id('A.captain'));
+SELECT set_config('storm.access_engine', 'on', true);
+SELECT tests.lives(format('DELETE FROM public.crew_assignments WHERE id = %L', tests.id('assignment:A.master_dra@A.dra')), 'storm.access_engine lets an engine definer delete a Master row');
+SELECT set_config('storm.access_engine', '', true);
+SELECT tests.reset_role();
+-- A vessel delete (RLS-checked: vessels admin) cascades to its assignments.
+SELECT tests.seed_vessel('A', 'A.scrap', 'OLD HULL');
+SELECT tests.seed_user('A', 'A.scrap_master', 'crew');
+SELECT tests.seed_assignment('A.scrap_master', 'A.scrap', true, 'Master');
+SELECT tests.seed_assignment('A.deckhand', 'A.scrap', true, 'Deckhand');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.lives(format('DELETE FROM public.vessels WHERE id = %L', tests.vessel_id('A.scrap')), 'the fleet manager deletes a vessel with assignments (a Master row included)');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT count(*) FROM public.crew_assignments WHERE vessel_id = tests.vessel_id('A.scrap')), 0::bigint, 'its assignments cascaded');
+-- A profile delete (here from a session that does not reach the vessel)
+-- cascades too: the parent row is already gone.
+SELECT tests.seed_user('A', 'A.leaver_hyd', 'crew');
+SELECT tests.seed_assignment('A.leaver_hyd', 'A.hyd', true, 'Master');
+SELECT tests._set_claims(jsonb_build_object('sub', tests.user_id('A.master_dra'), 'role', 'authenticated'));
+SELECT tests.lives(format('DELETE FROM public.profiles WHERE id = %L', tests.profile_id('A.leaver_hyd')), 'a profile delete cascades to its assignments');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT count(*) FROM public.crew_assignments WHERE user_id = tests.user_id('A.leaver_hyd')), 0::bigint, 'its assignments are gone');
+SELECT tests.ok((SELECT (tgtype & 8) <> 0 FROM pg_trigger WHERE tgrelid = 'public.crew_assignments'::regclass AND tgname = 'trg_crew_assignments_guard'), 'the guard fires on DELETE');

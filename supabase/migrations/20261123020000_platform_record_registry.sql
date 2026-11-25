@@ -953,6 +953,7 @@ DECLARE
   v_sig_id uuid;
   v_signed_at timestamptz;
   v_digest text;
+  v_signer_name text;
   v_payload jsonb;
   v_seq integer;
 BEGIN
@@ -1045,14 +1046,17 @@ BEGIN
       v_sig_id := gen_random_uuid();
       v_signed_at := clock_timestamp();
       v_digest := public.record_digest_of(n.section_digests, CASE WHEN v_slot_id IS NULL THEN NULL ELSE v_slot_covers END);
+      -- The stored name is also what the integrity hash binds to the
+      -- profile id (D-209; review round 3, signer-name-self-editable).
+      v_signer_name := left(coalesce(nullif(btrim(coalesce(v_profile.first_name, '') || ' ' || coalesce(v_profile.last_name, '')), ''), 'Company'), 120);
       INSERT INTO public.record_signatures (
         id, envelope_id, slot_id, company_id, vessel_id, cycle, slot_key, party, signer_user_id, signer_profile_id, signer_name,
         signer_kind, method, decision, record_digest, record_version, integrity_hash, signed_at
       ) VALUES (
         v_sig_id, e.id, v_slot_id, e.company_id, e.vessel_id, v_old_cycle, v_slot_key, 'company', v_uid, v_profile.id,
-        left(coalesce(nullif(btrim(coalesce(v_profile.first_name, '') || ' ' || coalesce(v_profile.last_name, '')), ''), 'Company'), 120),
+        v_signer_name,
         'shore', 'verified', v_decision, v_digest, n.version,
-        public.record_signature_hash(v_digest, v_slot_id, v_profile.id, NULL, v_signed_at, NULL), v_signed_at
+        public.record_signature_hash(v_digest, v_slot_id, v_profile.id, v_signer_name, v_signed_at, NULL), v_signed_at
       );
       IF v_slot_id IS NOT NULL THEN
         UPDATE public.record_signature_slots SET passed_to_profile_id = NULL, passed_at = NULL, passed_by = NULL WHERE id = v_slot_id;
@@ -1496,7 +1500,7 @@ COMMENT ON FUNCTION public.record_vessel_slots_complete(uuid) IS 'Internal: ever
 COMMENT ON FUNCTION public.record_stale_required(uuid) IS 'Internal: a live required signature of the current cycle is stale.';
 COMMENT ON FUNCTION public.record_caller_reaches(uuid, uuid, uuid) IS 'Internal: the user has fleet reach in the company or reach to the vessel (write access on the vessel side).';
 COMMENT ON FUNCTION public.record_impersonating() IS 'Internal: the JWT marks a login-as session (app_metadata.impersonating).';
-COMMENT ON FUNCTION public.record_engine_apply(uuid, text, text, jsonb, jsonb) IS 'Internal: applies an engine outcome (status, stamps, effects, whose move, version, one event) under storm.record_engine.';
+COMMENT ON FUNCTION public.record_engine_apply(uuid, text, text, jsonb, jsonb) IS 'Internal: applies an engine outcome (status, stamps, effects, whose move, version, one event) under storm.record_engine. A company signature''s integrity hash covers the stored signer name with the profile id (D-209).';
 COMMENT ON FUNCTION public.record_whose_move(uuid) IS 'whoseMove() over the envelope status and its status_updates thread. Internal (service role).';
 COMMENT ON FUNCTION public.record_open_envelope(text, uuid, uuid, text) IS 'Opens a record envelope for a kind (vessel or fleet), with its reference and cycle-1 slots; idempotent on (kind, entity) within the same company and vessel (42501 record_access_denied / 22023 envelope_scope_mismatch otherwise). From a signed-in session an entity id needs the transaction-local storm.record_domain flag a domain definer sets after verifying the entity (22023 entity_unverified).';
 COMMENT ON FUNCTION public.record_transition(uuid, text, jsonb, integer) IS 'The only status change path for a record (D-132): server-derived party and guards, record_transition_decide, effects applied, one event. Returns a result envelope.';

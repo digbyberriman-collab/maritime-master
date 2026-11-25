@@ -36,6 +36,7 @@
     "public.has_role_in_company(uuid, app_role, uuid)": ["authenticated", "service_role"],
     "public.has_role_in_company(uuid, app_role[], uuid)": ["authenticated", "service_role"],
     "public.hr_anonymize_profile(uuid, text)": ["authenticated", "service_role"],
+    "public.invitation_login_state(uuid, uuid)": ["service_role"],
     "public.invitation_withdraw_access(uuid)": [],
     "public.invitation_withdrawn_for(uuid)": ["service_role"],
     "public.is_company_actor(uuid, uuid)": ["authenticated", "service_role"],

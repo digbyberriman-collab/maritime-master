@@ -44,6 +44,19 @@ SELECT tests.ok(NOT public.admin_may_act_on_user(tests.user_id('A.ua_write_hyd')
 FROM unnest(ARRAY['A.master_dra', 'A.disabled', 'A.no_vessel', 'A.fleet_manager']) AS k;
 SELECT tests.ok(public.admin_may_act_on_user(tests.user_id('A.ua_write_hyd'), NULL, tests.company_id('A'), tests.profile_id('A.new_crew_hyd')),
                 'an imported HYDRA invitee (no login) counts by imported_vessel_id (D-125)');
+-- The imported vessel counts only for a profile with no login (review
+-- round 3, profile-imported-columns-unguarded; D-204): a signed-in user
+-- with no membership vessel and no current assignment has an empty set,
+-- whatever imported_vessel_id says (fail closed: an all-vessels admin only).
+SELECT tests.seed_user('A', 'A.signed_imported', 'crew', 'active', jsonb_build_object('is_imported', true, 'imported_vessel_id', tests.vessel_id('A.hyd')));
+SELECT tests.ok(NOT public.admin_may_act_on_user(tests.user_id('A.ua_write_hyd'), tests.user_id('A.signed_imported'), tests.company_id('A')),
+                'a signed-in vessel-less user with imported_vessel_id HYDRA: not for the HYDRA admin');
+SELECT tests.ok(NOT public.admin_may_act_on_user(tests.user_id('A.ua_write_hyd'), NULL, tests.company_id('A'), tests.profile_id('A.signed_imported')),
+                'not by profile either');
+SELECT tests.ok(public.admin_may_act_on_user(tests.user_id('A.fleet_manager'), tests.user_id('A.signed_imported'), tests.company_id('A')),
+                'but for an all-vessels admin');
+SELECT tests.ok(NOT public.admin_may_act_on_user(tests.user_id('A.ua_write_hyd'), NULL, tests.company_id('A'), tests.profile_id('A.new_crew_dra')),
+                'the DRAAK invitee (a login and a DRAAK assignment): not for the HYDRA admin');
 SELECT tests.ok(NOT public.admin_may_act_on_user(tests.user_id('A.ua_write_hyd'), tests.user_id('B.admin'), tests.company_id('B')), 'nor on another company''s user');
 SELECT tests.ok(NOT public.admin_may_act_on_user(tests.user_id('A.ua_write_hyd'), tests.id('user:nobody'), tests.company_id('A')), 'unknown target: false');
 SELECT tests.ok(NOT public.admin_may_act_on_user(tests.user_id('A.disabled'), tests.user_id('A.crew_hyd'), tests.company_id('A')), 'an inactive actor: false');

@@ -255,6 +255,41 @@ CREATE POLICY "Users can update their own profile" ON public.profiles
 --   (actor = the caller, the target, old and new role, the company);
 --   a new dpa / shore_management profile needs users-access admin over all
 --   vessels, a manager of admins and the rank check in its company.
+--   The pending vessel placement (review round 3, D-204; the columns
+--   fulfil_imported_assignment() and admin_may_act_on_user() trust):
+--     a new profile with an imported_vessel_id,
+--     unless the caller is a users-access admin
+--     of that vessel (create-crew-member is the
+--     service role; recruitment_hire_candidate
+--     runs as the HR editor)                    profile_access_columns_locked
+--     is_imported / imported_vessel_id on your
+--     own row, or is_imported false -> true     profile_access_columns_locked
+--     otherwise: users-access admin of the
+--     company, admin_may_act_on_user() (read
+--     from the OLD row, so a vessel-less target
+--     needs an all-vessels admin) and
+--     users-access admin of the old and the
+--     new vessel                                profile_access_columns_locked
+--     position, rank or joining_date while the
+--     placement is pending (is_imported with an
+--     imported_vessel_id): users-access admin
+--     of the pending vessel                     profile_access_columns_locked
+--   The invitation address (review round 3, D-206): an email change on a
+--   profile with no login, a live invitation (pending / sent /
+--   send_failed) or a login without sign-in evidence
+--   (coalesce(last_login_at, auth last_sign_in_at)):
+--     an administrator target (old or new role
+--     dpa / shore_management, or
+--     user_is_admin_target()): an all-vessels
+--     users-access admin                        profile_access_columns_locked
+--     who manages admins (under
+--     lock_company_admin_managers())            manages_admins_required
+--     anyone else: users-access admin who may
+--     act on the person (admin_may_act_on_user) profile_access_columns_locked
+--   and every allowed such change writes one permission_audit_log row
+--   (scope_changed, high impact, the sha256 of the old and new address,
+--   never the address). A signed-in person's own address change is not
+--   limited here.
 -- No JWT (SQL editor, cron, the service-role client) or the engine flag:
 -- allowed. The legacy guard (row 12) still applies on top.
 CREATE OR REPLACE FUNCTION public.profiles_guard_access_columns()
@@ -268,6 +303,9 @@ DECLARE
   v_new_rank integer;
   v_kind text;
   v_actor_role text;
+  v_live boolean := false;
+  v_signed_in timestamptz;
+  v_admin_target boolean;
 BEGIN
   IF v_uid IS NULL OR current_setting('storm.access_engine', true) = 'on' THEN
     RETURN NEW;
@@ -288,6 +326,19 @@ BEGIN
        OR coalesce(NEW.invitation_count, 0) <> 0 THEN
       RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'profile_access_columns_locked',
         DETAIL = 'Invitation and sign-in bookkeeping is written by the access engine only.';
+    END IF;
+    -- A pending vessel placement (D-184, D-204) is written by
+    -- create-crew-member (service role), or by a users-access admin of
+    -- that vessel: the live recruitment_hire_candidate() definer inserts
+    -- the hired profile (is_imported, the vacancy's vessel) under the HR
+    -- editor's session, so a hire onto a vessel needs the same right
+    -- create-crew-member checks. is_imported without a vessel places
+    -- nobody (fulfil_imported_assignment and admin_may_act_on_user need
+    -- the vessel) and stays allowed.
+    IF NEW.imported_vessel_id IS NOT NULL
+       AND NOT public.has_capability_for(v_uid, 'admin.access.users_access.admin', NEW.company_id, NEW.imported_vessel_id) THEN
+      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'profile_access_columns_locked',
+        DETAIL = 'A pending vessel placement is written by create-crew-member only.';
     END IF;
     IF NEW.role::text IN ('dpa', 'shore_management') THEN
       IF NOT public.has_capability_for(v_uid, 'admin.access.users_access.admin', NEW.company_id) THEN
@@ -328,6 +379,101 @@ BEGIN
      OR NEW.last_login_at IS DISTINCT FROM OLD.last_login_at THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'profile_access_columns_locked',
       DETAIL = 'Invitation and sign-in bookkeeping is written by the access engine only.';
+  END IF;
+
+  -- The pending vessel placement (D-184, D-204; review round 3,
+  -- profile-imported-columns-unguarded): fulfil_imported_assignment() and
+  -- admin_may_act_on_user() trust is_imported / imported_vessel_id, so
+  -- they never change on your own row, never turn a profile imported, and
+  -- otherwise need a users-access admin who may act on the person (read
+  -- from the OLD row: a vessel-less target needs admin_scope_all()) and
+  -- administers the old and the new vessel.
+  IF NEW.is_imported IS DISTINCT FROM OLD.is_imported OR NEW.imported_vessel_id IS DISTINCT FROM OLD.imported_vessel_id THEN
+    IF OLD.user_id IS NOT DISTINCT FROM v_uid THEN
+      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'profile_access_columns_locked',
+        DETAIL = 'You cannot change your own pending vessel placement.';
+    END IF;
+    IF NOT coalesce(OLD.is_imported, false) AND NEW.is_imported IS TRUE THEN
+      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'profile_access_columns_locked',
+        DETAIL = 'A pending vessel placement is written by create-crew-member only.';
+    END IF;
+    IF NOT (public.has_capability_for(v_uid, 'admin.access.users_access.admin', OLD.company_id)
+            AND public.admin_may_act_on_user(v_uid, OLD.user_id, OLD.company_id, OLD.id)
+            AND (OLD.imported_vessel_id IS NULL
+                 OR public.has_capability_for(v_uid, 'admin.access.users_access.admin', OLD.company_id, OLD.imported_vessel_id))
+            AND (NEW.imported_vessel_id IS NULL
+                 OR public.has_capability_for(v_uid, 'admin.access.users_access.admin', OLD.company_id, NEW.imported_vessel_id))) THEN
+      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'profile_access_columns_locked',
+        DETAIL = 'Only a users-access administrator of the vessels involved can change a pending vessel placement.';
+    END IF;
+  END IF;
+
+  -- While a placement is pending, its position, rank and joining date are
+  -- what fulfil_imported_assignment() writes into crew_assignments (the
+  -- Master office included, D-198): a users-access admin of the pending
+  -- vessel only. Other profiles keep their HR edits (rank feeds
+  -- trg_profiles_sync_hw_person).
+  IF coalesce(OLD.is_imported, false) AND OLD.imported_vessel_id IS NOT NULL
+     AND (NEW.position IS DISTINCT FROM OLD.position OR NEW.rank IS DISTINCT FROM OLD.rank OR NEW.joining_date IS DISTINCT FROM OLD.joining_date)
+     AND NOT public.has_capability_for(v_uid, 'admin.access.users_access.admin', OLD.company_id, OLD.imported_vessel_id) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'profile_access_columns_locked',
+      DETAIL = 'Only a users-access administrator of the pending vessel can change the position, rank or joining date of a pending crew member.';
+  END IF;
+
+  -- The address an invitation goes to decides who gets the profile (D-121,
+  -- D-206; review round 3, profile-email-unguarded). A change is an access
+  -- change when the profile has no login, a live invitation, or a login
+  -- with no sign-in evidence (coalesce(last_login_at, auth
+  -- last_sign_in_at)); a signed-in person's own address change is not.
+  IF NEW.email IS DISTINCT FROM OLD.email THEN
+    IF to_regclass('public.user_invitations') IS NOT NULL THEN
+      EXECUTE 'SELECT EXISTS (SELECT 1 FROM public.user_invitations AS ui WHERE ui.profile_id = $1 AND ui.status IN (''pending'', ''sent'', ''send_failed''))'
+        INTO v_live USING OLD.id;
+    END IF;
+    IF OLD.user_id IS NOT NULL THEN
+      v_signed_in := coalesce(OLD.last_login_at, (SELECT u.last_sign_in_at FROM auth.users AS u WHERE u.id = OLD.user_id));
+    END IF;
+    IF OLD.user_id IS NULL OR coalesce(v_live, false) OR v_signed_in IS NULL THEN
+      v_admin_target := OLD.role::text IN ('dpa', 'shore_management') OR NEW.role::text IN ('dpa', 'shore_management')
+        OR (OLD.user_id IS NOT NULL AND public.user_is_admin_target(OLD.user_id, OLD.company_id));
+      IF v_admin_target THEN
+        PERFORM public.lock_company_admin_managers(OLD.company_id);
+        IF NOT (public.has_capability_for(v_uid, 'admin.access.users_access.admin', OLD.company_id)
+                AND public.admin_scope_all(v_uid, OLD.company_id)) THEN
+          RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'profile_access_columns_locked',
+            DETAIL = 'Only a users-access administrator of every vessel can change the address an administrator''s invitation goes to.';
+        END IF;
+        IF NOT public.user_manages_admins_for(v_uid, OLD.company_id) THEN
+          RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'manages_admins_required',
+            DETAIL = 'Only an administrator who manages administrators can change the address an administrator''s invitation goes to.';
+        END IF;
+      ELSIF NOT (public.has_capability_for(v_uid, 'admin.access.users_access.admin', OLD.company_id)
+                 AND public.admin_may_act_on_user(v_uid, OLD.user_id, OLD.company_id, OLD.id)) THEN
+        RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'profile_access_columns_locked',
+          DETAIL = 'Only a users-access administrator of this person''s vessel can change the address an invitation goes to.';
+      END IF;
+      -- One audit row per allowed change; hashes only, never the address
+      -- (audit_action_type has no email value: scope_changed).
+      SELECT p.role::text INTO v_actor_role FROM public.profiles AS p WHERE p.user_id = v_uid;
+      IF EXISTS (SELECT 1 FROM pg_attribute WHERE attrelid = 'public.permission_audit_log'::regclass AND attname = 'company_id' AND NOT attisdropped) THEN
+        EXECUTE 'INSERT INTO public.permission_audit_log (actor_user_id, actor_role, action_type, target_user_id, before_state, after_state, is_high_impact, company_id)
+                 VALUES ($1, $2, ''scope_changed'', $3, $4, $5, true, $6)'
+          USING v_uid, coalesce(v_actor_role, 'unknown'), OLD.user_id,
+                jsonb_build_object('profile_id', OLD.id, 'field', 'email',
+                                   'email_sha256', encode(sha256(convert_to(lower(btrim(OLD.email)), 'UTF8')), 'hex')),
+                jsonb_build_object('profile_id', OLD.id, 'field', 'email',
+                                   'email_sha256', encode(sha256(convert_to(lower(btrim(NEW.email)), 'UTF8')), 'hex'), 'via', 'profiles'),
+                OLD.company_id;
+      ELSE
+        INSERT INTO public.permission_audit_log (actor_user_id, actor_role, action_type, target_user_id, before_state, after_state, is_high_impact)
+        VALUES (v_uid, coalesce(v_actor_role, 'unknown'), 'scope_changed', OLD.user_id,
+                jsonb_build_object('profile_id', OLD.id, 'field', 'email',
+                                   'email_sha256', encode(sha256(convert_to(lower(btrim(OLD.email)), 'UTF8')), 'hex')),
+                jsonb_build_object('profile_id', OLD.id, 'field', 'email',
+                                   'email_sha256', encode(sha256(convert_to(lower(btrim(NEW.email)), 'UTF8')), 'hex'), 'via', 'profiles'),
+                true);
+      END IF;
+    END IF;
   END IF;
 
   IF NEW.role IS DISTINCT FROM OLD.role THEN
@@ -849,7 +995,7 @@ COMMENT ON FUNCTION public.current_user_company_id() IS 'The company of the call
 COMMENT ON FUNCTION public.has_role(uuid, public.app_role) IS 'has_any_role(_user_id, ARRAY[_role]): an active, unexpired user_roles row with that role that counts in the holder''s own company (CC-5, D-181), for an active user only (D-122).';
 COMMENT ON FUNCTION public.has_any_role(uuid, public.app_role[]) IS 'An active, unexpired user_roles row with one of the roles, for an active user only (D-122), that names the holder''s profile company or no company (CC-5, D-181): a company-less superadmin row counts anywhere, another company-less row for the holder''s own company only, a row naming another company never. No caller probe guard (definers pass arbitrary ids).';
 COMMENT ON FUNCTION public.legacy_profile_role(uuid) IS 'The legacy profiles.role for an active user, else NULL, so the HR / legal / health helpers built on it deny a disabled user (D-122).';
-COMMENT ON FUNCTION public.profiles_guard_access_columns() IS 'Trigger (CC-6, W7; D-174): from a signed-in session without storm.access_engine, company_id / user_id / account_status never change (42501 profile_access_columns_locked: use admin-actions / set_membership_status), nor the invitation and sign-in bookkeeping (invitation_token, invitation_token_expires, invitation_count, last_invited_at, invited_at, last_login_at; your own row included) and a new profile starts with none of it; role never on your own row and otherwise needs users-access admin and an actor who may act on the target (vessel reach; an all-vessels admin for a dpa / shore_management role) (profile_access_columns_locked), a manager of admins when an administrator is involved (manages_admins_required), at most the caller''s rank (rank_exceeded), never dpa away from the last manager of admins (last_manager_of_admins, under lock_company_admin_managers), and is audited in permission_audit_log; a new dpa / shore_management profile needs an all-vessels users-access admin, a manager of admins and the rank check.';
+COMMENT ON FUNCTION public.profiles_guard_access_columns() IS 'Trigger (CC-6, W7; D-174): from a signed-in session without storm.access_engine, company_id / user_id / account_status never change (42501 profile_access_columns_locked: use admin-actions / set_membership_status), nor the invitation and sign-in bookkeeping (invitation_token, invitation_token_expires, invitation_count, last_invited_at, invited_at, last_login_at; your own row included) and a new profile starts with none of it; role never on your own row and otherwise needs users-access admin and an actor who may act on the target (vessel reach; an all-vessels admin for a dpa / shore_management role) (profile_access_columns_locked), a manager of admins when an administrator is involved (manages_admins_required), at most the caller''s rank (rank_exceeded), never dpa away from the last manager of admins (last_manager_of_admins, under lock_company_admin_managers), and is audited in permission_audit_log; a new dpa / shore_management profile needs an all-vessels users-access admin, a manager of admins and the rank check. Review round 3 (D-204, D-206): the pending vessel placement (is_imported, imported_vessel_id) is set on a new profile only by a users-access admin of that vessel (or the service role), never changes on your own row, never turns imported, and otherwise needs a users-access admin who may act on the person and administers the old and the new vessel; while a placement is pending its position, rank and joining_date need users-access admin of the pending vessel; an email change on a profile with no login, a live invitation or no sign-in evidence needs, for an administrator target, an all-vessels users-access admin who manages admins (manages_admins_required), else a users-access admin who may act on the person, and writes one scope_changed permission_audit_log row with sha256 hashes of the old and new address, never the address (all profile_access_columns_locked unless noted).';
 COMMENT ON FUNCTION public.user_manages_admins_for(uuid, uuid) IS 'Whether the user manages admins in the company (non-legacy owner / manages_admins membership, legacy dpa, or a user_roles dpa / superadmin row of the company). Internal to set_membership_status (service role).';
 COMMENT ON FUNCTION public.set_membership_status(uuid, text, uuid, text) IS 'gap/01 W7, F23: turns a user''s access off / on for an actor who is a users-access admin of their company and may act on the user (vessel reach, admin_may_act_on_user); no self, never the owner, manages-admins to change an admin, never the last manager of admins (serialised by lock_company_admin_managers), reason to disable; enabling restores a removed membership, except a withdrawn invitee, who is re-invited, not enabled (42501 invitation_withdrawn). Mirrors profiles.account_status and logs TOGGLE_ACCESS. Service role only (admin-actions).';
 COMMENT ON FUNCTION public.hr_anonymize_profile(uuid, text) IS 'HRIS GDPR erasure (live body of 20260917190000) for an own-company users-access admin who may act on the person (42501 not_permitted; a user_roles row naming another company never opens it, CC-5 / D-181), with the W7 guards of set_membership_status under lock_company_admin_managers before the account is disabled (reason, no self, no owner, manages-admins for an administrator, never the last manager of admins); the disable runs under storm.access_engine and is logged as TOGGLE_ACCESS.';

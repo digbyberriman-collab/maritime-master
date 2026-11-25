@@ -70,7 +70,11 @@ AS $$
 $$;
 
 -- SIG16 integrity hash: sha256 (hex) of record_digest | slot_id |
--- signer profile (or name) | signed_at (UTC, microseconds) | image sha256.
+-- signer profile id | signer name (the name stored on the row) |
+-- signed_at (UTC, microseconds) | image sha256. The profile id and the
+-- stored name are two elements (review round 3, signer-name-self-editable;
+-- D-209), so the hash binds the name the row shows to the identity that
+-- signed: a later edit of either is detectable.
 CREATE OR REPLACE FUNCTION public.record_signature_hash(p_digest text, p_slot_id uuid, p_signer_profile_id uuid, p_signer_name text, p_signed_at timestamptz, p_image_sha256 text)
 RETURNS text
 LANGUAGE sql
@@ -81,7 +85,8 @@ AS $$
   SELECT encode(sha256(convert_to(concat_ws('|',
     coalesce(p_digest, ''),
     coalesce(p_slot_id::text, ''),
-    coalesce(p_signer_profile_id::text, p_signer_name, ''),
+    coalesce(p_signer_profile_id::text, ''),
+    coalesce(p_signer_name, ''),
     to_char(p_signed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
     coalesce(p_image_sha256, '')), 'UTF8')), 'hex')
 $$;
@@ -530,6 +535,8 @@ DECLARE
   v_opened record;
   v_image_path text := nullif(btrim(coalesce(p_image_path, '')), '');
   v_image_sha text;
+  v_image_found boolean;
+  v_stored_name text;
 BEGIN
   IF v_uid IS NULL OR NOT public.user_is_active(v_uid) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'record_access_denied';
@@ -652,20 +659,30 @@ BEGIN
   -- records bucket of this record's company and vessel, with its sha256,
   -- which the integrity hash covers. Anything else (another tenant's path,
   -- a traversal, an unregistered or removed object, file_objects not yet
-  -- created) is refused.
+  -- created) is refused as not found; a registered object without a hash
+  -- gets its own honest refusal (review round 3,
+  -- sign-image-requires-unsent-sha256: register_file_object backfills the
+  -- hash when the uploader registers it again with one).
   IF v_image_path IS NOT NULL THEN
     IF to_regclass('public.file_objects') IS NULL THEN
       RETURN public.record_refusal('invalid_input', 'That signature image was not found.');
     END IF;
-    EXECUTE 'SELECT f.sha256 FROM public.file_objects AS f
+    EXECUTE 'SELECT true, f.sha256 FROM public.file_objects AS f
               WHERE f.bucket = ''records'' AND f.storage_path = $1 AND f.company_id = $2
-                AND f.vessel_id IS NOT DISTINCT FROM $3 AND f.removed_at IS NULL AND f.sha256 IS NOT NULL'
-      INTO v_image_sha
+                AND f.vessel_id IS NOT DISTINCT FROM $3 AND f.removed_at IS NULL'
+      INTO v_image_found, v_image_sha
       USING v_image_path, e.company_id, e.vessel_id;
-    IF v_image_sha IS NULL THEN
+    IF NOT coalesce(v_image_found, false) THEN
       RETURN public.record_refusal('invalid_input', 'That signature image was not found.');
     END IF;
+    IF v_image_sha IS NULL THEN
+      RETURN public.record_refusal('invalid_input', 'That signature image has no content hash yet. Upload it again.');
+    END IF;
   END IF;
+
+  -- The name stored on the row, and the same value in the integrity hash
+  -- (D-209), whatever the branch (verified, witnessed, visitor).
+  v_stored_name := left(coalesce(nullif(v_signer_name, ''), 'Signer'), 120);
 
   -- The slots of this cycle waiting now (to tell who may sign next).
   v_waiting := ARRAY(SELECT o.id FROM public.record_signature_slots AS o WHERE o.envelope_id = e.id AND o.cycle = e.current_cycle AND public.record_slot_state(o.id) = 'waiting');
@@ -678,9 +695,9 @@ BEGIN
     record_digest, record_version, integrity_hash, signed_at
   ) VALUES (
     p_signature_id, e.id, sl.id, e.company_id, e.vessel_id, sl.cycle, sl.slot_key, sl.party, v_signer_user, v_signer_profile,
-    left(coalesce(nullif(v_signer_name, ''), 'Signer'), 120), v_signer_kind, v_visitor_company, v_visitor_capacity, p_method,
+    v_stored_name, v_signer_kind, v_visitor_company, v_visitor_capacity, p_method,
     CASE WHEN p_method = 'witnessed' THEN v_caller.id END, CASE WHEN p_method = 'witnessed' THEN v_uid END, v_image_path, v_image_sha,
-    v_digest, e.version, public.record_signature_hash(v_digest, sl.id, v_signer_profile, v_signer_name, v_signed_at, v_image_sha), v_signed_at
+    v_digest, e.version, public.record_signature_hash(v_digest, sl.id, v_signer_profile, v_stored_name, v_signed_at, v_image_sha), v_signed_at
   );
   UPDATE public.record_signature_slots SET passed_to_profile_id = NULL, passed_at = NULL, passed_by = NULL WHERE id = sl.id AND passed_to_profile_id IS NOT NULL;
 
@@ -929,6 +946,7 @@ DECLARE
   v_digest text;
   v_signed_at timestamptz := clock_timestamp();
   v_image_sha text;
+  v_image_found boolean;
 BEGIN
   IF v_uid IS NULL OR NOT public.user_is_active(v_uid) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'record_access_denied';
@@ -977,18 +995,25 @@ BEGIN
     RETURN public.record_refusal('not_eligible', format('You can no longer sign as %s on this record.', sl.label));
   END IF;
   -- The image is resolved again (record_sign_slot's rule): still a live,
-  -- registered object of this record's company and vessel, unchanged.
+  -- registered object of this record's company and vessel, with a hash,
+  -- unchanged since it was signed (each case its own honest refusal).
   IF live.image_path IS NOT NULL THEN
     IF to_regclass('public.file_objects') IS NULL THEN
       RETURN public.record_refusal('invalid_input', 'That signature image was not found.');
     END IF;
-    EXECUTE 'SELECT f.sha256 FROM public.file_objects AS f
+    EXECUTE 'SELECT true, f.sha256 FROM public.file_objects AS f
               WHERE f.bucket = ''records'' AND f.storage_path = $1 AND f.company_id = $2
-                AND f.vessel_id IS NOT DISTINCT FROM $3 AND f.removed_at IS NULL AND f.sha256 IS NOT NULL'
-      INTO v_image_sha
+                AND f.vessel_id IS NOT DISTINCT FROM $3 AND f.removed_at IS NULL'
+      INTO v_image_found, v_image_sha
       USING live.image_path, e.company_id, e.vessel_id;
-    IF v_image_sha IS NULL OR (live.image_sha256 IS NOT NULL AND v_image_sha <> live.image_sha256) THEN
+    IF NOT coalesce(v_image_found, false) THEN
       RETURN public.record_refusal('invalid_input', 'That signature image was not found.');
+    END IF;
+    IF v_image_sha IS NULL THEN
+      RETURN public.record_refusal('invalid_input', 'That signature image has no content hash yet. Upload it again.');
+    END IF;
+    IF live.image_sha256 IS NOT NULL AND v_image_sha <> live.image_sha256 THEN
+      RETURN public.record_refusal('invalid_input', 'That signature image has changed since it was signed.');
     END IF;
   END IF;
 
@@ -1053,7 +1078,7 @@ COMMENT ON TABLE public.record_signature_slots IS 'Signature slots per envelope 
 COMMENT ON TABLE public.record_signatures IS 'Signatures (gap/08 SIG3-SIG17): append-only except removed_* / superseded_at set once by the engine (trg_record_signatures_guard); slot-less rows are company decisions. integrity_hash per SIG16. No updated_at (rule 3 exception). Read: record_readable. No client writes.';
 COMMENT ON VIEW public.record_signature_slot_states IS 'Every slot with its derived state (slotState(): signed / waiting / requested / open), live signature and stale flag. security_invoker: the reader''s RLS applies.';
 COMMENT ON FUNCTION public.record_refusal(text, text) IS 'A business refusal result envelope {ok:false, error:{code, message}}.';
-COMMENT ON FUNCTION public.record_signature_hash(text, uuid, uuid, text, timestamptz, text) IS 'SIG16 integrity hash of a signature (sha256 hex). Internal.';
+COMMENT ON FUNCTION public.record_signature_hash(text, uuid, uuid, text, timestamptz, text) IS 'SIG16 integrity hash of a signature (sha256 hex) of record_digest | slot_id | signer profile id | stored signer name | signed_at (UTC, microseconds) | image sha256; the profile id and the name are separate elements (D-209), so the hash binds the shown name to the signing identity. Internal.';
 COMMENT ON FUNCTION public.record_normalise_office(text) IS 'An office, position or rank as a snake_case key (ASCII lower case).';
 COMMENT ON FUNCTION public.record_signatures_guard() IS 'Trigger: signatures are never deleted; only removed_* / superseded_at change, once, inside the engine.';
 COMMENT ON FUNCTION public.record_slot_state(uuid) IS 'Internal: a slot''s derived state (as the view).';
@@ -1061,8 +1086,8 @@ COMMENT ON FUNCTION public.record_is_master(uuid, uuid) IS 'Internal: the user i
 COMMENT ON FUNCTION public.record_slot_eligible(uuid, uuid) IS 'Interim slot eligibility (D-132): same company and active; named slots admit the named; company slots company actors; vessel slots reach or the office on this vessel.';
 COMMENT ON FUNCTION public.record_instantiate_slots(uuid, integer) IS 'Internal: the kind template''s slots for one cycle of an envelope.';
 COMMENT ON FUNCTION public.record_vessel_completion(uuid) IS 'Internal: the vessel_sign transition after a vessel signature.';
-COMMENT ON FUNCTION public.record_sign_slot(uuid, uuid, text, uuid, jsonb, text, text, text, integer) IS 'Sign a slot (signSlot() / signBlocker(), same codes); on-behalf is refused (D-48). A signature image must be a registered, live records-bucket object of the record''s company and vessel (invalid_input otherwise); its sha256 is stored and covered by the integrity hash (SIG16). Returns a result envelope.';
+COMMENT ON FUNCTION public.record_sign_slot(uuid, uuid, text, uuid, jsonb, text, text, text, integer) IS 'Sign a slot (signSlot() / signBlocker(), same codes); on-behalf is refused (D-48). A signature image must be a registered, live records-bucket object of the record''s company and vessel (invalid_input: not found) with a content hash (invalid_input: no content hash yet, upload it again); its sha256 is stored and covered by the integrity hash (SIG16), which also binds the stored signer name to the signer profile id (D-209). Returns a result envelope.';
 COMMENT ON FUNCTION public.record_pass_slot(uuid, uuid) IS 'Pass an open slot to an eligible person (passSlotTo()).';
 COMMENT ON FUNCTION public.record_cancel_pass(uuid) IS 'Cancel a pass (cancelPass()).';
 COMMENT ON FUNCTION public.record_remove_signature(uuid, text) IS 'Remove a signature (removeBlocker() / removeSignature(): reverse order, who may, D-51 lock, reason once submitted).';
-COMMENT ON FUNCTION public.record_resign_slot(uuid, uuid) IS 'Re-sign a stale signature (reSignSlot()); the signature image is resolved again (live, registered, same sha256) and covered by the new integrity hash.';
+COMMENT ON FUNCTION public.record_resign_slot(uuid, uuid) IS 'Re-sign a stale signature (reSignSlot()); the signature image is resolved again (live and registered, else not found; with a hash, else no content hash yet; the same sha256 as signed, else changed since it was signed; all invalid_input) and covered by the new integrity hash with the stored signer name (D-209).';

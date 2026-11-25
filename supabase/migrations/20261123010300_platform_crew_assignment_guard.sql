@@ -25,8 +25,8 @@
 --      vessel (a fleet admin joining a vessel as crew)
 --                                                   self_assignment_refused
 --   b. the caller already reaches the new vessel (and, on UPDATE, the old
---      one), or holds fleet reach or users-access admin in its company for
---      that vessel
+--      one; on DELETE, the row's vessel), or holds fleet reach or
+--      users-access admin in its company for that vessel
 --                                                   assignment_vessel_out_of_reach
 --   c. a changed user_id goes through the same checks (someone else's row
 --      re-pointed to the caller is a self-placement)
@@ -37,9 +37,17 @@
 --   e. the Master office (a current row whose normalised position or rank
 --      is master or captain): a row that becomes or stops being a Master
 --      row, or a Master row whose user or vessel changes (a revived ended
---      Master row and an INSERT of one included) needs users-access admin
---      for the company and the vessel (and the old vessel on a move)
+--      Master row and an INSERT of one included), and a DELETE of a current
+--      Master row, needs users-access admin for the company and the vessel
+--      (and the old vessel on a move)
 --                                                   master_office_change_refused
+--
+-- DELETE (review round 3, crew-assignment-delete-unguarded; the legacy
+-- "HR managers can delete crew assignments" policy admits every vessel an
+-- HR viewer sees, i.e. every company vessel): rules b and e apply to the
+-- removed row. An FK cascade from a vessels or profiles delete (which RLS
+-- already checked) finds the parent row gone and passes: an assignment
+-- row cannot exist without both parents otherwise.
 --
 -- The normalisation is the same ASCII translate / regexp as
 -- record_normalise_office() (20261123020100, applied later), inlined here.
@@ -86,7 +94,40 @@ DECLARE
   v_admin boolean;
 BEGIN
   IF v_uid IS NULL OR current_setting('storm.access_engine', true) = 'on' THEN
+    -- NEW is NULL on a DELETE: returning it would cancel the delete.
+    IF TG_OP = 'DELETE' THEN
+      RETURN OLD;
+    END IF;
     RETURN NEW;
+  END IF;
+
+  -- DELETE (review round 3, crew-assignment-delete-unguarded): rules b and
+  -- e apply to removing a row too.
+  IF TG_OP = 'DELETE' THEN
+    SELECT v.company_id INTO v_old_company FROM public.vessels AS v WHERE v.id = OLD.vessel_id;
+    -- An FK cascade of an RLS-checked vessels / profiles delete: the parent
+    -- row is already gone (a row cannot exist without it otherwise).
+    IF v_old_company IS NULL OR NOT EXISTS (SELECT 1 FROM public.profiles AS p WHERE p.user_id = OLD.user_id) THEN
+      RETURN OLD;
+    END IF;
+    -- b. The caller reaches the vessel, or holds fleet reach / users-access
+    -- admin there.
+    IF NOT (public.reach_vessel_for(v_uid, OLD.vessel_id)
+            OR public.fleet_reach_for(v_uid, v_old_company)
+            OR public.has_capability_for(v_uid, 'admin.access.users_access.admin', v_old_company, OLD.vessel_id)) THEN
+      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'assignment_vessel_out_of_reach',
+        DETAIL = 'You can only remove an assignment from a vessel you reach.';
+    END IF;
+    -- e. Removing a current Master / Captain row.
+    v_old_pos := nullif(btrim(regexp_replace(translate(btrim(coalesce(OLD.position, '')), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '[^a-z0-9]+', '_', 'g'), '_'), '');
+    v_old_rank := nullif(btrim(regexp_replace(translate(btrim(coalesce(OLD.rank, '')), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '[^a-z0-9]+', '_', 'g'), '_'), '');
+    IF coalesce(OLD.is_current, false)
+       AND (coalesce(v_old_pos IN ('master', 'captain'), false) OR coalesce(v_old_rank IN ('master', 'captain'), false))
+       AND NOT public.has_capability_for(v_uid, 'admin.access.users_access.admin', v_old_company, OLD.vessel_id) THEN
+      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'master_office_change_refused',
+        DETAIL = 'Only a users-access administrator of the vessel can appoint or remove a Master.';
+    END IF;
+    RETURN OLD;
   END IF;
 
   SELECT v.company_id INTO v_company FROM public.vessels AS v WHERE v.id = NEW.vessel_id;
@@ -159,7 +200,7 @@ $$;
 
 DROP TRIGGER IF EXISTS trg_crew_assignments_guard ON public.crew_assignments;
 CREATE TRIGGER trg_crew_assignments_guard
-  BEFORE INSERT OR UPDATE ON public.crew_assignments
+  BEFORE INSERT OR UPDATE OR DELETE ON public.crew_assignments
   FOR EACH ROW EXECUTE FUNCTION public.crew_assignments_guard();
 
 -- ---------------------------------------------------------------- privileges (rule 5)
@@ -168,4 +209,4 @@ REVOKE ALL ON FUNCTION public.crew_assignments_guard() FROM PUBLIC, anon, authen
 
 -- ---------------------------------------------------------------- comments
 
-COMMENT ON FUNCTION public.crew_assignments_guard() IS 'Trigger trg_crew_assignments_guard (no self-escalation): for a signed-in caller without storm.access_engine, an assignment of your own that grants reach needs users-access admin for the vessel (self_assignment_refused); the caller must already reach the new (and old) vessel or hold fleet reach / users-access admin for it (assignment_vessel_out_of_reach); an own-row change of the normalised position or rank needs users-access admin for the vessel (self_office_change_refused); appointing, removing or moving a Master / Captain row needs users-access admin for the vessel (and the old one on a move) (master_office_change_refused). Service role, migrations and the engine definers unaffected.';
+COMMENT ON FUNCTION public.crew_assignments_guard() IS 'Trigger trg_crew_assignments_guard (no self-escalation): for a signed-in caller without storm.access_engine, an assignment of your own that grants reach needs users-access admin for the vessel (self_assignment_refused); the caller must already reach the new (and old) vessel or hold fleet reach / users-access admin for it (assignment_vessel_out_of_reach); an own-row change of the normalised position or rank needs users-access admin for the vessel (self_office_change_refused); appointing, removing or moving a Master / Captain row needs users-access admin for the vessel (and the old one on a move) (master_office_change_refused). DELETE (review round 3): the caller must reach the row''s vessel or hold fleet reach / users-access admin for it (assignment_vessel_out_of_reach), and deleting a current Master / Captain row needs users-access admin for the vessel (master_office_change_refused); an FK cascade of a vessel or profile delete passes. Service role, migrations and the engine definers unaffected.';

@@ -12,7 +12,7 @@
 
 SELECT tests.seed_two_tenants();
 SELECT tests.seed_profile('A', 'A.newbie', 'crew', 'not_invited');       -- imported crew, no login yet
-SELECT tests.seed_auth_user('A.newbie');                                  -- the login generateLink created
+SELECT tests.seed_auth_user('A.newbie', jsonb_build_object('invited_at', now(), 'email_confirmed_at', NULL));  -- the login generateLink('invite') created (D-205)
 SELECT tests.seed_profile('A', 'A.imported', 'crew', 'not_invited');
 SELECT tests.seed_user('A', 'A.active_crew', 'crew', 'active');
 
@@ -103,13 +103,18 @@ SELECT tests.as_service();
 SELECT tests.is(public.reserve_invitation_attempt(tests.id('profile:nobody')), '{"ok": false, "code": "not_found"}'::jsonb, 'unknown profile: not_found');
 SELECT tests.is(public.reserve_invitation_attempt(tests.profile_id('A.disabled')), '{"ok": false, "code": "disabled"}'::jsonb, 'disabled profile: disabled');
 SELECT tests.throws_like(format($q$SELECT public.reserve_invitation_attempt(%L, NULL, 'captain')$q$, tests.profile_id('A.reserve')), '22023', 'kind_invalid', 'kind from the membership vocabulary');
-SELECT tests.is(public.reserve_invitation_attempt(tests.profile_id('A.reserve'), tests.user_id('B.admin')) ->> 'attempt', '3', 'the first reservation creates the live row; attempt = invitation_count + 1');
+SELECT tests.is(public.reserve_invitation_attempt(tests.profile_id('A.reserve'), tests.user_id('B.admin')), '{"ok": false, "code": "forbidden"}'::jsonb,
+                'an inviter of another company is refused (forbidden: admin_may_act_on_user, D-207)');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT count(*) FROM public.user_invitations WHERE profile_id = tests.profile_id('A.reserve')), 0::bigint, 'and nothing was written');
+SELECT tests.as_service();
+SELECT tests.is(public.reserve_invitation_attempt(tests.profile_id('A.reserve')) ->> 'attempt', '3', 'the first reservation creates the live row; attempt = invitation_count + 1');
 SELECT tests.is(public.reserve_invitation_attempt(tests.profile_id('A.reserve')) ->> 'code', 'cooldown', 'two reservations in a row: the second is a cooldown (one send for a double click)');
 SELECT tests.reset_role();
 SELECT tests.results_eq(
   format($q$SELECT status, send_attempts, last_attempt_at IS NOT NULL, invited_by IS NULL, expires_at > now() + interval '6 days' FROM public.user_invitations WHERE profile_id = %L$q$, tests.profile_id('A.reserve')),
   $q$VALUES ('pending'::text, 3, true, true, true)$q$,
-  'the reserved live row: pending, attempt 3 stamped, an inviter of another company not kept, 7-day expiry');
+  'the reserved live row: pending, attempt 3 stamped, no inviter (the service role), 7-day expiry');
 SELECT tests.is((SELECT account_status FROM public.profiles WHERE id = tests.profile_id('A.reserve')), 'not_invited', 'a reservation never stamps the profile');
 -- Revoke, then re-invite: the numbers continue.
 SELECT id AS reserve_invitation FROM public.user_invitations WHERE profile_id = tests.profile_id('A.reserve') \gset
@@ -176,7 +181,7 @@ SELECT tests.results_eq(
 -- The real shape: an imported profile, the login generateLink created, a
 -- sent invitation linking it, a vessel assignment.
 SELECT tests.seed_profile('A', 'A.revokee', 'crew', 'not_invited');
-SELECT tests.seed_auth_user('A.revokee');
+SELECT tests.seed_auth_user('A.revokee', jsonb_build_object('invited_at', now(), 'email_confirmed_at', NULL));
 SELECT tests.as_service();
 SELECT tests.is((public.record_invitation_send(tests.profile_id('A.revokee'), 'sent', NULL, 'msg-1', tests.user_id('A.fleet_manager'), 'crew', NULL, tests.user_id('A.revokee'))).status, 'sent', 'the invitation is sent');
 SELECT tests.reset_role();
@@ -252,7 +257,7 @@ SELECT tests.ok(public.user_is_active(tests.user_id('A.active_crew')) AND (SELEC
                 'an active user whose re-invite expired stays active');
 -- Expiry withdraws the access of a never-accepted invitation, like a revoke.
 SELECT tests.seed_profile('A', 'A.expiree', 'crew', 'not_invited');
-SELECT tests.seed_auth_user('A.expiree');
+SELECT tests.seed_auth_user('A.expiree', jsonb_build_object('invited_at', now(), 'email_confirmed_at', NULL));
 SELECT tests.as_service();
 SELECT public.record_invitation_send(tests.profile_id('A.expiree'), 'sent', NULL, 'msg-3', tests.user_id('A.fleet_manager'), 'crew', NULL, tests.user_id('A.expiree'));
 SELECT tests.reset_role();

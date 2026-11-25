@@ -60,6 +60,16 @@
 --                                 to the crew member's company
 --   crew / recipient column    -> user_company_for_admin(<column>): the
 --                                 person's company when the caller is in it
+--   vessel, else crew          -> CASE WHEN vessel_id IS NOT NULL THEN
+--                                 vessel_company_of(vessel_id) ELSE
+--                                 user_company_for_admin(crew_id) END (review
+--                                 round 3): a row with a vessel never falls
+--                                 back to the crew member's company,
+--                                 whatever the helper answers
+--   (vessel_company_of() and profile_company_of() answer only a caller of
+--   that company, a superadmin there or no JWT: NULL for anyone else, a
+--   disabled caller included, so neither is a cross-tenant oracle; review
+--   round 3, company-of-definers-oracle)
 --   parent record              -> the parent's company (flight_bookings via
 --                                 flight_requests; work-rest notes and
 --                                 signatures via their submission's vessel)
@@ -69,7 +79,9 @@
 -- and on writes are pinned to the caller's tenancy (review round 2, D-172,
 -- CC-5): a flight request in the caller's own company; a vessel row on a
 -- vessel the caller reaches (or none); destinations, trip suggestions and
--- support tickets in the caller's company. Every crew + vessel WITH CHECK
+-- support tickets in the caller's company; work-rest child rows (notes,
+-- blocks, compliance checks, non-conformities) on a parent the caller can
+-- read and that belongs to the same crew member (review round 3). Every crew + vessel WITH CHECK
 -- also pins the vessel to the crew member's own company
 -- (vessel_company_of(vessel_id) = profile_company_of(crew_id)), so no branch
 -- pairs a crew member with a foreign vessel or re-points a row to one.
@@ -187,8 +199,14 @@ COMMENT ON FUNCTION public.has_role_in_company(uuid, public.app_role[], uuid) IS
 -- caller's vessel RLS, so a vessel the caller cannot see resolves to NULL
 -- and a coalesce with the crew member's company would then let a caller
 -- plant a row on another tenant's vessel (review round 2). Answers only
--- the owning company's id for a known vessel id (no names); NULL for an
--- unknown or NULL id. Policies of this file call it.
+-- the owning company's id for a known vessel id (no names), and only to a
+-- caller of that company (user_belongs_to_company(), so an active member),
+-- a superadmin there (has_role_in_company(); a company-less superadmin row
+-- counts anywhere, D-192) or no JWT (the service role, migrations); NULL
+-- for anyone else, a disabled caller included, and for an unknown or NULL
+-- id (review round 3, company-of-definers-oracle: no cross-tenant
+-- company oracle). Policies of this file call it; a NULL never matches a
+-- company, so they fail closed.
 CREATE OR REPLACE FUNCTION public.vessel_company_of(_vessel_id uuid)
 RETURNS uuid
 LANGUAGE sql
@@ -196,13 +214,20 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT v.company_id FROM public.vessels AS v WHERE v.id = _vessel_id
+  SELECT v.company_id
+  FROM public.vessels AS v
+  WHERE v.id = _vessel_id
+    AND (auth.uid() IS NULL
+         OR public.user_belongs_to_company(auth.uid(), v.company_id)
+         OR public.has_role_in_company(auth.uid(), ARRAY['superadmin']::public.app_role[], v.company_id))
 $$;
 
 -- A person's profile company, read without the caller's RLS (rule 15: no
 -- inline profiles subquery in a build-out policy). Used to pin a crew +
--- vessel row's vessel to the crew member's own company. NULL for an
--- unknown or NULL id.
+-- vessel row's vessel to the crew member's own company. Answers only a
+-- caller of that company, a superadmin there or no JWT, as
+-- vessel_company_of() (review round 3); NULL otherwise and for an unknown
+-- or NULL id.
 CREATE OR REPLACE FUNCTION public.profile_company_of(_user_id uuid)
 RETURNS uuid
 LANGUAGE sql
@@ -210,7 +235,12 @@ STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT p.company_id FROM public.profiles AS p WHERE p.user_id = _user_id
+  SELECT p.company_id
+  FROM public.profiles AS p
+  WHERE p.user_id = _user_id
+    AND (auth.uid() IS NULL
+         OR public.user_belongs_to_company(auth.uid(), p.company_id)
+         OR public.has_role_in_company(auth.uid(), ARRAY['superadmin']::public.app_role[], p.company_id))
 $$;
 
 REVOKE ALL ON FUNCTION public.vessel_company_of(uuid) FROM PUBLIC, anon, authenticated, service_role;
@@ -218,8 +248,8 @@ REVOKE ALL ON FUNCTION public.profile_company_of(uuid) FROM PUBLIC, anon, authen
 GRANT EXECUTE ON FUNCTION public.vessel_company_of(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.profile_company_of(uuid) TO authenticated, service_role;
 
-COMMENT ON FUNCTION public.vessel_company_of(uuid) IS 'RLS helper (rule 11): the owning company id of a vessel, read without the caller''s vessel RLS, so the role-scoped policies resolve a vessel the caller cannot see to its real company and fail closed. NULL for an unknown id.';
-COMMENT ON FUNCTION public.profile_company_of(uuid) IS 'RLS helper (rule 11, rule 15): a person''s profile company id, read without the caller''s RLS; pins a crew + vessel row''s vessel to the crew member''s company. NULL for an unknown id.';
+COMMENT ON FUNCTION public.vessel_company_of(uuid) IS 'RLS helper (rule 11): the owning company id of a vessel, read without the caller''s vessel RLS, so the role-scoped policies resolve a vessel the caller cannot see to its real company and fail closed. Answers only a caller of that company (user_belongs_to_company), a superadmin there (has_role_in_company) or no JWT; NULL for anyone else (a disabled caller included) and for an unknown id.';
+COMMENT ON FUNCTION public.profile_company_of(uuid) IS 'RLS helper (rule 11, rule 15): a person''s profile company id, read without the caller''s RLS; pins a crew + vessel row''s vessel to the crew member''s company. Answers only a caller of that company (user_belongs_to_company), a superadmin there (has_role_in_company) or no JWT; NULL for anyone else (a disabled caller included) and for an unknown id.';
 
 -- ---------------------------------------------------------------- crew_change_dates (vessel)
 
@@ -330,16 +360,16 @@ DROP POLICY IF EXISTS "Users can manage own rest records" ON public.hours_of_res
 CREATE POLICY "Users can manage own rest records" ON public.hours_of_rest_records
   FOR ALL
   USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND (vessel_id IS NULL OR public.user_can_reach_vessel(auth.uid(), vessel_id))) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain']::public.app_role[],
-           coalesce(public.vessel_company_of(hours_of_rest_records.vessel_id), public.user_company_for_admin(hours_of_rest_records.crew_id))))
+           CASE WHEN hours_of_rest_records.vessel_id IS NOT NULL THEN public.vessel_company_of(hours_of_rest_records.vessel_id) ELSE public.user_company_for_admin(hours_of_rest_records.crew_id) END))
   WITH CHECK (((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND (vessel_id IS NULL OR public.user_can_reach_vessel(auth.uid(), vessel_id))) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain']::public.app_role[],
-                coalesce(public.vessel_company_of(hours_of_rest_records.vessel_id), public.user_company_for_admin(hours_of_rest_records.crew_id))))
+                CASE WHEN hours_of_rest_records.vessel_id IS NOT NULL THEN public.vessel_company_of(hours_of_rest_records.vessel_id) ELSE public.user_company_for_admin(hours_of_rest_records.crew_id) END))
               AND (hours_of_rest_records.vessel_id IS NULL OR public.vessel_company_of(hours_of_rest_records.vessel_id) = public.profile_company_of(hours_of_rest_records.crew_id)));
 
 DROP POLICY IF EXISTS "Users can view own rest records" ON public.hours_of_rest_records;
 CREATE POLICY "Users can view own rest records" ON public.hours_of_rest_records
   FOR SELECT
   USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser']::public.app_role[],
-           coalesce(public.vessel_company_of(hours_of_rest_records.vessel_id), public.user_company_for_admin(hours_of_rest_records.crew_id))));
+           CASE WHEN hours_of_rest_records.vessel_id IS NOT NULL THEN public.vessel_company_of(hours_of_rest_records.vessel_id) ELSE public.user_company_for_admin(hours_of_rest_records.crew_id) END));
 
 -- ---------------------------------------------------------------- leave_requests (vessel, else crew)
 
@@ -347,16 +377,16 @@ DROP POLICY IF EXISTS "Authorized users can manage leave requests" ON public.lea
 CREATE POLICY "Authorized users can manage leave requests" ON public.leave_requests
   FOR UPDATE
   USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND (vessel_id IS NULL OR public.user_can_reach_vessel(auth.uid(), vessel_id))) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser']::public.app_role[],
-           coalesce(public.vessel_company_of(leave_requests.vessel_id), public.user_company_for_admin(leave_requests.crew_id))))
+           CASE WHEN leave_requests.vessel_id IS NOT NULL THEN public.vessel_company_of(leave_requests.vessel_id) ELSE public.user_company_for_admin(leave_requests.crew_id) END))
   WITH CHECK (((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND (vessel_id IS NULL OR public.user_can_reach_vessel(auth.uid(), vessel_id))) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser']::public.app_role[],
-                coalesce(public.vessel_company_of(leave_requests.vessel_id), public.user_company_for_admin(leave_requests.crew_id))))
+                CASE WHEN leave_requests.vessel_id IS NOT NULL THEN public.vessel_company_of(leave_requests.vessel_id) ELSE public.user_company_for_admin(leave_requests.crew_id) END))
               AND (leave_requests.vessel_id IS NULL OR public.vessel_company_of(leave_requests.vessel_id) = public.profile_company_of(leave_requests.crew_id)));
 
 DROP POLICY IF EXISTS "Users can view own leave requests" ON public.leave_requests;
 CREATE POLICY "Users can view own leave requests" ON public.leave_requests
   FOR SELECT
   USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser']::public.app_role[],
-           coalesce(public.vessel_company_of(leave_requests.vessel_id), public.user_company_for_admin(leave_requests.crew_id))));
+           CASE WHEN leave_requests.vessel_id IS NOT NULL THEN public.vessel_company_of(leave_requests.vessel_id) ELSE public.user_company_for_admin(leave_requests.crew_id) END));
 
 -- ---------------------------------------------------------------- medical_reports (vessel, else crew)
 
@@ -364,9 +394,9 @@ DROP POLICY IF EXISTS "DPA and Captain can manage medical reports" ON public.med
 CREATE POLICY "DPA and Captain can manage medical reports" ON public.medical_reports
   FOR ALL
   USING (public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain']::public.app_role[],
-           coalesce(public.vessel_company_of(medical_reports.vessel_id), public.user_company_for_admin(medical_reports.crew_id))))
+           CASE WHEN medical_reports.vessel_id IS NOT NULL THEN public.vessel_company_of(medical_reports.vessel_id) ELSE public.user_company_for_admin(medical_reports.crew_id) END))
   WITH CHECK (public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain']::public.app_role[],
-                coalesce(public.vessel_company_of(medical_reports.vessel_id), public.user_company_for_admin(medical_reports.crew_id)))
+                CASE WHEN medical_reports.vessel_id IS NOT NULL THEN public.vessel_company_of(medical_reports.vessel_id) ELSE public.user_company_for_admin(medical_reports.crew_id) END)
               AND (medical_reports.vessel_id IS NULL OR medical_reports.crew_id IS NULL OR public.vessel_company_of(medical_reports.vessel_id) = public.profile_company_of(medical_reports.crew_id)));
 
 DROP POLICY IF EXISTS "Medical reports visible to authorized users" ON public.medical_reports;
@@ -374,7 +404,7 @@ CREATE POLICY "Medical reports visible to authorized users" ON public.medical_re
   FOR SELECT
   USING (
     public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain']::public.app_role[],
-      coalesce(public.vessel_company_of(medical_reports.vessel_id), public.user_company_for_admin(medical_reports.crew_id)))
+      CASE WHEN medical_reports.vessel_id IS NOT NULL THEN public.vessel_company_of(medical_reports.vessel_id) ELSE public.user_company_for_admin(medical_reports.crew_id) END)
     OR (crew_id = auth.uid() AND public.user_is_active(auth.uid()))
   );
 
@@ -467,16 +497,16 @@ DROP POLICY IF EXISTS "Authorized update of submission" ON public.work_rest_mont
 CREATE POLICY "Authorized update of submission" ON public.work_rest_monthly_submissions
   FOR UPDATE
   USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND (vessel_id IS NULL OR public.user_can_reach_vessel(auth.uid(), vessel_id))) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[],
-           coalesce(public.vessel_company_of(work_rest_monthly_submissions.vessel_id), public.user_company_for_admin(work_rest_monthly_submissions.crew_id))))
+           CASE WHEN work_rest_monthly_submissions.vessel_id IS NOT NULL THEN public.vessel_company_of(work_rest_monthly_submissions.vessel_id) ELSE public.user_company_for_admin(work_rest_monthly_submissions.crew_id) END))
   WITH CHECK (((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND (vessel_id IS NULL OR public.user_can_reach_vessel(auth.uid(), vessel_id))) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[],
-                coalesce(public.vessel_company_of(work_rest_monthly_submissions.vessel_id), public.user_company_for_admin(work_rest_monthly_submissions.crew_id))))
+                CASE WHEN work_rest_monthly_submissions.vessel_id IS NOT NULL THEN public.vessel_company_of(work_rest_monthly_submissions.vessel_id) ELSE public.user_company_for_admin(work_rest_monthly_submissions.crew_id) END))
               AND (work_rest_monthly_submissions.vessel_id IS NULL OR public.vessel_company_of(work_rest_monthly_submissions.vessel_id) = public.profile_company_of(work_rest_monthly_submissions.crew_id)));
 
 DROP POLICY IF EXISTS "Crew create own submission" ON public.work_rest_monthly_submissions;
 CREATE POLICY "Crew create own submission" ON public.work_rest_monthly_submissions
   FOR INSERT
   WITH CHECK (((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND (vessel_id IS NULL OR public.user_can_reach_vessel(auth.uid(), vessel_id))) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[],
-                coalesce(public.vessel_company_of(work_rest_monthly_submissions.vessel_id), public.user_company_for_admin(work_rest_monthly_submissions.crew_id))))
+                CASE WHEN work_rest_monthly_submissions.vessel_id IS NOT NULL THEN public.vessel_company_of(work_rest_monthly_submissions.vessel_id) ELSE public.user_company_for_admin(work_rest_monthly_submissions.crew_id) END))
               AND (work_rest_monthly_submissions.vessel_id IS NULL OR public.vessel_company_of(work_rest_monthly_submissions.vessel_id) = public.profile_company_of(work_rest_monthly_submissions.crew_id)));
 
 DROP POLICY IF EXISTS "Crew view own submission" ON public.work_rest_monthly_submissions;
@@ -484,15 +514,15 @@ CREATE POLICY "Crew view own submission" ON public.work_rest_monthly_submissions
   FOR SELECT
   USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(),
            ARRAY['superadmin', 'dpa', 'fleet_master', 'captain', 'purser', 'hod', 'chief_officer', 'chief_engineer', 'auditor_flag', 'auditor_class']::public.app_role[],
-           coalesce(public.vessel_company_of(work_rest_monthly_submissions.vessel_id), public.user_company_for_admin(work_rest_monthly_submissions.crew_id))));
+           CASE WHEN work_rest_monthly_submissions.vessel_id IS NOT NULL THEN public.vessel_company_of(work_rest_monthly_submissions.vessel_id) ELSE public.user_company_for_admin(work_rest_monthly_submissions.crew_id) END));
 
 DROP POLICY IF EXISTS "Crew manage own records" ON public.work_rest_records;
 CREATE POLICY "Crew manage own records" ON public.work_rest_records
   FOR ALL
   USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND (vessel_id IS NULL OR public.user_can_reach_vessel(auth.uid(), vessel_id))) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[],
-           coalesce(public.vessel_company_of(work_rest_records.vessel_id), public.user_company_for_admin(work_rest_records.crew_id))))
+           CASE WHEN work_rest_records.vessel_id IS NOT NULL THEN public.vessel_company_of(work_rest_records.vessel_id) ELSE public.user_company_for_admin(work_rest_records.crew_id) END))
   WITH CHECK (((crew_id = auth.uid() AND public.user_is_active(auth.uid()) AND (vessel_id IS NULL OR public.user_can_reach_vessel(auth.uid(), vessel_id))) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[],
-                coalesce(public.vessel_company_of(work_rest_records.vessel_id), public.user_company_for_admin(work_rest_records.crew_id))))
+                CASE WHEN work_rest_records.vessel_id IS NOT NULL THEN public.vessel_company_of(work_rest_records.vessel_id) ELSE public.user_company_for_admin(work_rest_records.crew_id) END))
               AND (work_rest_records.vessel_id IS NULL OR public.vessel_company_of(work_rest_records.vessel_id) = public.profile_company_of(work_rest_records.crew_id)));
 
 DROP POLICY IF EXISTS "Crew view own records" ON public.work_rest_records;
@@ -500,13 +530,18 @@ CREATE POLICY "Crew view own records" ON public.work_rest_records
   FOR SELECT
   USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(),
            ARRAY['superadmin', 'dpa', 'fleet_master', 'captain', 'purser', 'hod', 'chief_officer', 'chief_engineer', 'auditor_flag', 'auditor_class']::public.app_role[],
-           coalesce(public.vessel_company_of(work_rest_records.vessel_id), public.user_company_for_admin(work_rest_records.crew_id))));
+           CASE WHEN work_rest_records.vessel_id IS NOT NULL THEN public.vessel_company_of(work_rest_records.vessel_id) ELSE public.user_company_for_admin(work_rest_records.crew_id) END));
 
+-- Child rows are pinned to a parent the caller can already read, of the
+-- same crew member (review round 3, work-rest-own-row-writes-unpinned;
+-- D-172, D-193): the parent's own RLS carries the tenancy and fails closed
+-- for a foreign or unknown id.
 DROP POLICY IF EXISTS "Manage blocks via record" ON public.work_rest_blocks;
 CREATE POLICY "Manage blocks via record" ON public.work_rest_blocks
   FOR ALL
   USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_blocks.crew_id)))
-  WITH CHECK ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_blocks.crew_id)));
+  WITH CHECK (((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_blocks.crew_id)))
+              AND EXISTS (SELECT 1 FROM public.work_rest_records AS r WHERE r.id = work_rest_blocks.record_id AND r.crew_id = work_rest_blocks.crew_id));
 
 DROP POLICY IF EXISTS "View blocks via record visibility" ON public.work_rest_blocks;
 CREATE POLICY "View blocks via record visibility" ON public.work_rest_blocks
@@ -519,7 +554,10 @@ DROP POLICY IF EXISTS "System manages compliance checks" ON public.work_rest_com
 CREATE POLICY "System manages compliance checks" ON public.work_rest_compliance_checks
   FOR ALL
   USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_compliance_checks.crew_id)))
-  WITH CHECK ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_compliance_checks.crew_id)));
+  WITH CHECK (((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_compliance_checks.crew_id)))
+              AND (work_rest_compliance_checks.submission_id IS NULL
+                   OR EXISTS (SELECT 1 FROM public.work_rest_monthly_submissions AS s
+                               WHERE s.id = work_rest_compliance_checks.submission_id AND s.crew_id = work_rest_compliance_checks.crew_id)));
 
 DROP POLICY IF EXISTS "View own compliance checks" ON public.work_rest_compliance_checks;
 CREATE POLICY "View own compliance checks" ON public.work_rest_compliance_checks
@@ -532,7 +570,10 @@ DROP POLICY IF EXISTS "Manage NCs" ON public.work_rest_non_conformities;
 CREATE POLICY "Manage NCs" ON public.work_rest_non_conformities
   FOR ALL
   USING ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_non_conformities.crew_id)))
-  WITH CHECK ((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_non_conformities.crew_id)));
+  WITH CHECK (((crew_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[], public.user_company_for_admin(work_rest_non_conformities.crew_id)))
+              AND (work_rest_non_conformities.submission_id IS NULL
+                   OR EXISTS (SELECT 1 FROM public.work_rest_monthly_submissions AS s
+                               WHERE s.id = work_rest_non_conformities.submission_id AND s.crew_id = work_rest_non_conformities.crew_id)));
 
 DROP POLICY IF EXISTS "View own NCs" ON public.work_rest_non_conformities;
 CREATE POLICY "View own NCs" ON public.work_rest_non_conformities
@@ -550,15 +591,27 @@ CREATE POLICY "View audit log" ON public.work_rest_audit_log
                     (SELECT public.vessel_company_of(s.vessel_id) FROM public.work_rest_monthly_submissions AS s
                       WHERE s.id = work_rest_audit_log.submission_id))));
 
+-- A note hangs off at least one parent, and every parent it names must be
+-- one the caller can already read (the parents' own RLS); an author keeps
+-- no handle on a note planted on a parent they cannot read (review round
+-- 3, work-rest-own-row-writes-unpinned).
 DROP POLICY IF EXISTS "Manage own notes" ON public.work_rest_notes;
 CREATE POLICY "Manage own notes" ON public.work_rest_notes
   FOR ALL
-  USING ((author_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[],
+  USING ((author_id = auth.uid() AND public.user_is_active(auth.uid())
+          AND (work_rest_notes.submission_id IS NULL OR EXISTS (SELECT 1 FROM public.work_rest_monthly_submissions AS s WHERE s.id = work_rest_notes.submission_id))
+          AND (work_rest_notes.record_id IS NULL OR EXISTS (SELECT 1 FROM public.work_rest_records AS r WHERE r.id = work_rest_notes.record_id))
+          AND (work_rest_notes.block_id IS NULL OR EXISTS (SELECT 1 FROM public.work_rest_blocks AS b WHERE b.id = work_rest_notes.block_id)))
+         OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[],
            coalesce((SELECT public.vessel_company_of(s.vessel_id) FROM public.work_rest_monthly_submissions AS s WHERE s.id = work_rest_notes.submission_id),
                     (SELECT public.vessel_company_of(r.vessel_id) FROM public.work_rest_records AS r WHERE r.id = work_rest_notes.record_id))))
-  WITH CHECK ((author_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[],
+  WITH CHECK (((author_id = auth.uid() AND public.user_is_active(auth.uid())) OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'hod']::public.app_role[],
            coalesce((SELECT public.vessel_company_of(s.vessel_id) FROM public.work_rest_monthly_submissions AS s WHERE s.id = work_rest_notes.submission_id),
-                    (SELECT public.vessel_company_of(r.vessel_id) FROM public.work_rest_records AS r WHERE r.id = work_rest_notes.record_id))));
+                    (SELECT public.vessel_company_of(r.vessel_id) FROM public.work_rest_records AS r WHERE r.id = work_rest_notes.record_id))))
+              AND (work_rest_notes.submission_id IS NOT NULL OR work_rest_notes.record_id IS NOT NULL OR work_rest_notes.block_id IS NOT NULL)
+              AND (work_rest_notes.submission_id IS NULL OR EXISTS (SELECT 1 FROM public.work_rest_monthly_submissions AS s WHERE s.id = work_rest_notes.submission_id))
+              AND (work_rest_notes.record_id IS NULL OR EXISTS (SELECT 1 FROM public.work_rest_records AS r WHERE r.id = work_rest_notes.record_id))
+              AND (work_rest_notes.block_id IS NULL OR EXISTS (SELECT 1 FROM public.work_rest_blocks AS b WHERE b.id = work_rest_notes.block_id)));
 
 DROP POLICY IF EXISTS "View notes" ON public.work_rest_notes;
 CREATE POLICY "View notes" ON public.work_rest_notes

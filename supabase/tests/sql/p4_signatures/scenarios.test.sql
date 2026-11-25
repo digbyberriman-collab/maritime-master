@@ -141,6 +141,13 @@ SELECT tests.is((SELECT decision_conditions FROM public.record_envelopes AS r JO
 SELECT tests.ok((SELECT bool_and(s.integrity_hash ~ '^[0-9a-f]{64}$' AND s.integrity_hash = public.record_signature_hash(s.record_digest, s.slot_id, s.signer_profile_id, s.signer_name, s.signed_at, s.image_sha256))
                  FROM public.record_signatures AS s JOIN sig_envelopes AS e ON e.envelope_id = s.envelope_id),
   'every integrity hash recomputes (SIG16)');
+SELECT tests.ok((SELECT bool_and(s.integrity_hash <> public.record_signature_hash(s.record_digest, s.slot_id, s.signer_profile_id, s.signer_name || ' (edited)', s.signed_at, s.image_sha256))
+                 FROM public.record_signatures AS s JOIN sig_envelopes AS e ON e.envelope_id = s.envelope_id),
+  'and binds the stored signer name: another name gives another hash, company signatures included (D-209)');
+SELECT tests.ok((SELECT count(*) > 0 AND bool_and(s.signer_profile_id IS NOT NULL AND s.signer_name IS NOT NULL)
+                 FROM public.record_signatures AS s JOIN sig_envelopes AS e ON e.envelope_id = s.envelope_id
+                 WHERE s.party = 'company'),
+  'the company signatures (record_engine_apply) carry both the profile id and the stored name');
 SELECT tests.ok((SELECT bool_and(s.signer_kind = 'visitor' AND s.signer_profile_id IS NULL AND s.visitor_company IS NOT NULL AND s.witness_profile_id = tests.profile_id('SG.crew1'))
                  FROM public.record_signatures AS s JOIN sig_envelopes AS e ON e.envelope_id = s.envelope_id
                  WHERE e.name = 'witnessed_rules' AND s.slot_key = 'visitor_ack'),

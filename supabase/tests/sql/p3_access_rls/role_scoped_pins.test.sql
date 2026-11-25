@@ -139,3 +139,67 @@ SELECT tests.is_empty(
        AND tablename IN ('hours_of_rest_records', 'leave_requests', 'medical_reports', 'work_rest_monthly_submissions', 'work_rest_records')
        AND (coalesce(qual, '') || coalesce(with_check, '')) ~ 'SELECT v\.company_id\s+FROM vessels'$q$,
   'no role-scoped policy resolves a vessel''s company through a subquery under the caller''s RLS');
+
+-- ------------------------------------------------------------ work-rest child rows hang off a readable parent (review round 3)
+
+-- work-rest-own-row-writes-unpinned (D-172, D-193): a note needs at least
+-- one parent and every parent it names must be readable by the caller; a
+-- block's record, and an NC's or a check's submission, must be readable and
+-- belong to the same crew member. Ports scratchpad frr/repro/r2_notes.sql
+-- and verify-wr/children.sql.
+INSERT INTO public.work_rest_monthly_submissions (id, crew_id, vessel_id, period_year, period_month)
+VALUES (tests.id('ws:a-hyd'), tests.user_id('A.crew_hyd'), tests.vessel_id('A.hyd'), 2026, 10);
+INSERT INTO public.work_rest_records (id, submission_id, crew_id, vessel_id, record_date)
+VALUES (tests.id('wr:a-hyd'), tests.id('ws:a-hyd'), tests.user_id('A.crew_hyd'), tests.vessel_id('A.hyd'), '2026-10-01');
+INSERT INTO public.work_rest_blocks (id, record_id, crew_id, block_type, start_minute, end_minute)
+VALUES (tests.id('wb:a-hyd'), tests.id('wr:a-hyd'), tests.user_id('A.crew_hyd'), 'work', 0, 240);
+-- B's admin cannot see A's parents.
+SELECT tests.as_user(tests.user_id('B.admin'));
+SELECT tests.is_empty(format('SELECT 1 FROM public.work_rest_monthly_submissions WHERE id = %L', tests.id('ws:a-hyd')), 'setup: B''s admin cannot see A''s submission');
+SELECT tests.throws(format($q$INSERT INTO public.work_rest_notes (submission_id, author_id, body) VALUES (%L, auth.uid(), 'planted by another tenant')$q$, tests.id('ws:a-hyd')),
+                    '42501', 'r2: B''s admin cannot plant a note on A''s submission');
+SELECT tests.throws(format($q$INSERT INTO public.work_rest_notes (record_id, author_id, body) VALUES (%L, auth.uid(), 'note on A record by B')$q$, tests.id('wr:a-hyd')),
+                    '42501', 'nor on A''s record');
+SELECT tests.throws(format($q$INSERT INTO public.work_rest_notes (block_id, author_id, body) VALUES (%L, auth.uid(), 'note on A block by B')$q$, tests.id('wb:a-hyd')),
+                    '42501', 'nor on A''s block');
+SELECT tests.throws($q$INSERT INTO public.work_rest_notes (author_id, body) VALUES (auth.uid(), 'a note with no parent')$q$,
+                    '42501', 'nor a note with no parent at all');
+SELECT tests.throws(format($q$INSERT INTO public.work_rest_blocks (record_id, crew_id, block_type, start_minute, end_minute) VALUES (%L, auth.uid(), 'work', 0, 600)$q$, tests.id('wr:a-hyd')),
+                    '42501', 'nor a block of their own on A''s record');
+SELECT tests.throws(format($q$INSERT INTO public.work_rest_non_conformities (crew_id, submission_id, rule_code, rule_description, window_start, window_end) VALUES (auth.uid(), %L, 'X', 'planted', now(), now())$q$, tests.id('ws:a-hyd')),
+                    '42501', 'nor an NC on A''s submission');
+SELECT tests.throws(format($q$INSERT INTO public.work_rest_compliance_checks (crew_id, submission_id, check_window, window_start, window_end, rest_minutes, work_minutes, passes) VALUES (auth.uid(), %L, 'daily', now(), now(), 0, 0, false)$q$, tests.id('ws:a-hyd')),
+                    '42501', 'nor a compliance check on A''s submission');
+SELECT tests.reset_role();
+-- Same tenant, another vessel: the DRAAK Master cannot read HYDRA crew's submission.
+SELECT tests.as_user(tests.user_id('A.master_dra'));
+SELECT tests.is_empty(format('SELECT 1 FROM public.work_rest_monthly_submissions WHERE id = %L', tests.id('ws:a-hyd')), 'setup: the DRAAK Master cannot see the HYDRA submission');
+SELECT tests.throws(format($q$INSERT INTO public.work_rest_notes (submission_id, author_id, body) VALUES (%L, auth.uid(), 'same tenant other vessel')$q$, tests.id('ws:a-hyd')),
+                    '42501', 'and cannot plant a note on it');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT count(*) FROM public.work_rest_notes WHERE submission_id = tests.id('ws:a-hyd') OR record_id = tests.id('wr:a-hyd') OR block_id = tests.id('wb:a-hyd')), 0::bigint,
+                'nothing was planted');
+SELECT tests.is((SELECT count(*) FROM public.work_rest_blocks WHERE record_id = tests.id('wr:a-hyd')), 1::bigint, 'the record keeps its one block');
+SELECT tests.is((SELECT count(*) FROM public.work_rest_non_conformities WHERE submission_id = tests.id('ws:a-hyd')) + (SELECT count(*) FROM public.work_rest_compliance_checks WHERE submission_id = tests.id('ws:a-hyd')),
+                0::bigint, 'and no NC or check');
+-- The crew member's own child rows still work.
+SELECT tests.as_user(tests.user_id('A.crew_hyd'));
+SELECT tests.lives(format($q$INSERT INTO public.work_rest_notes (submission_id, author_id, body) VALUES (%L, auth.uid(), 'own note on own submission')$q$, tests.id('ws:a-hyd')), 'an own note on an own submission');
+SELECT tests.lives(format($q$INSERT INTO public.work_rest_notes (record_id, block_id, author_id, body) VALUES (%L, %L, auth.uid(), 'own note on own record and block')$q$, tests.id('wr:a-hyd'), tests.id('wb:a-hyd')),
+                   'an own note on an own record and block');
+SELECT tests.lives(format($q$INSERT INTO public.work_rest_blocks (record_id, crew_id, block_type, start_minute, end_minute) VALUES (%L, auth.uid(), 'rest', 240, 600)$q$, tests.id('wr:a-hyd')), 'an own block on an own record');
+SELECT tests.lives(format($q$INSERT INTO public.work_rest_non_conformities (crew_id, submission_id, rule_code, rule_description, window_start, window_end) VALUES (auth.uid(), %L, 'R1', 'own', now(), now())$q$, tests.id('ws:a-hyd')),
+                   'an own NC on an own submission');
+SELECT tests.lives(format($q$INSERT INTO public.work_rest_compliance_checks (crew_id, submission_id, check_window, window_start, window_end, rest_minutes, work_minutes, passes) VALUES (auth.uid(), %L, 'daily', now(), now(), 600, 840, true)$q$, tests.id('ws:a-hyd')),
+                   'an own compliance check on an own submission');
+SELECT tests.lives($q$INSERT INTO public.work_rest_non_conformities (crew_id, rule_code, rule_description, window_start, window_end) VALUES (auth.uid(), 'R2', 'no submission', now(), now())$q$,
+                   'an own NC with no submission');
+SELECT tests.ok((SELECT count(*) FROM public.work_rest_notes WHERE submission_id = tests.id('ws:a-hyd') OR record_id = tests.id('wr:a-hyd')) = 2, 'and reads both own notes');
+SELECT tests.reset_role();
+-- A row of one crew member never attaches to another's parent.
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.throws(format($q$INSERT INTO public.work_rest_blocks (record_id, crew_id, block_type, start_minute, end_minute) VALUES (%L, %L, 'work', 600, 700)$q$, tests.id('wr:a-hyd'), tests.user_id('A.master_dra')),
+                    '42501', 'A''s DPA cannot put another crew member''s block on a HYDRA record');
+SELECT tests.throws(format($q$INSERT INTO public.work_rest_non_conformities (crew_id, submission_id, rule_code, rule_description, window_start, window_end) VALUES (%L, %L, 'X', 'mismatched', now(), now())$q$, tests.user_id('A.master_dra'), tests.id('ws:a-hyd')),
+                    '42501', 'nor another crew member''s NC on that submission');
+SELECT tests.reset_role();

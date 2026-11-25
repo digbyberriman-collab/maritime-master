@@ -9,7 +9,8 @@
 --   expire_invitations() (service role; for a later cron),
 --   invitation_withdraw_access() (internal to revoke / expire),
 --   fulfil_imported_assignment() (service role; D-184) and its profile
---   trigger trg_profiles_fulfil_imported_assignment
+--   trigger trg_profiles_fulfil_imported_assignment,
+--   invitation_login_state() (service role; D-205)
 -- TS mirror: src/modules/auth/types/db.pending.ts (AuthPendingTables
 --   user_invitations, AuthPendingFunctions revoke_invitation),
 --   src/modules/auth/services/invitations.ts
@@ -158,8 +159,13 @@ CREATE POLICY user_invitations_select ON public.user_invitations
 --                   assignment (an existing crew member is never re-pointed
 --                   from a stale imported_vessel_id)
 --   'not_eligible'  the imported vessel is not a vessel of the profile's
---                   company, or it is Sold or archived: the profile is left
---                   as it is
+--                   company, or it is Sold or archived; or the position
+--                   (normalised as crew_assignments_guard does) is Master
+--                   or Captain and p_actor is not a users-access admin of
+--                   the vessel (D-198: the engine flag never appoints a
+--                   Master on its own; review round 3,
+--                   profile-imported-columns-unguarded): nothing is
+--                   written, the profile is left as it is (still pending)
 --   'created'       one current assignment is written under
 --                   storm.access_engine (position = the profile's position,
 --                   else its rank, else 'Crew'; join_date = joining_date,
@@ -181,6 +187,8 @@ DECLARE
   v_actor uuid;
   v_engine text := current_setting('storm.access_engine', true);
   v_inserted integer;
+  v_position text;
+  v_office text;
 BEGIN
   IF p_profile_id IS NULL THEN
     RETURN 'none';
@@ -197,6 +205,14 @@ BEGIN
      OR NOT public.vessel_in_reachable_state(v_vessel.lifecycle_status, v_vessel.status) THEN
     RETURN 'not_eligible';
   END IF;
+  -- The Master office (D-198): only a users-access admin of the vessel
+  -- appoints one, whatever the profile columns say.
+  v_position := coalesce(nullif(btrim(v_profile.position), ''), nullif(btrim(v_profile.rank), ''), 'Crew');
+  v_office := btrim(regexp_replace(translate(btrim(v_position), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '[^a-z0-9]+', '_', 'g'), '_');
+  IF v_office IN ('master', 'captain')
+     AND NOT (p_actor IS NOT NULL AND public.has_capability_for(p_actor, 'admin.access.users_access.admin', v_profile.company_id, v_vessel.id)) THEN
+    RETURN 'not_eligible';
+  END IF;
   v_actor := CASE
     WHEN p_actor IS NOT NULL AND EXISTS (SELECT 1 FROM public.profiles AS a WHERE a.user_id = p_actor AND a.company_id = v_profile.company_id)
     THEN p_actor
@@ -204,8 +220,7 @@ BEGIN
 
   PERFORM set_config('storm.access_engine', 'on', true);
   INSERT INTO public.crew_assignments (user_id, vessel_id, position, join_date, is_current, created_by)
-  SELECT v_profile.user_id, v_vessel.id,
-         coalesce(nullif(btrim(v_profile.position), ''), nullif(btrim(v_profile.rank), ''), 'Crew'),
+  SELECT v_profile.user_id, v_vessel.id, v_position,
          coalesce(v_profile.joining_date, current_date), true, v_actor
   WHERE NOT EXISTS (
     SELECT 1 FROM public.crew_assignments AS ca
@@ -248,6 +263,77 @@ CREATE TRIGGER trg_profiles_fulfil_imported_assignment
   WHEN (OLD.user_id IS NULL AND NEW.user_id IS NOT NULL AND NEW.is_imported AND NEW.imported_vessel_id IS NOT NULL)
   EXECUTE FUNCTION public.profiles_fulfil_imported_assignment();
 
+-- ---------------------------------------------------------------- invitation_login_state (service role; D-205)
+
+-- Whether a login found for an invitee (auth_user_id_for_email, or the user
+-- the auth API returns for an address already registered) may be adopted
+-- by this profile (D-205: an invitation adopts only a login STORM created;
+-- review round 3, invite-adopts-foreign-login). First match wins:
+--   'unknown'           either id NULL, no such profile, or no auth.users
+--                       row for p_user_id
+--   'linked'            the profile already carries this login
+--   'linked_elsewhere'  the profile carries another login, or another
+--                       profile carries this one
+--   'email_mismatch'    the login's address is not the profile's
+--                       (lower(btrim(...)); a NULL on either side counts as
+--                       a mismatch)
+--   'storm_invited'     an invitation row of this profile already carries
+--                       the login, or the login is an untouched invite
+--                       login: invited_at set, never signed in, no
+--                       password, no identity other than email
+--   'unused_orphan'     never confirmed and never signed in (the edge may
+--                       delete it and invite afresh)
+--   'foreign'           anything else (confirmed, a password, a sign-in,
+--                       or another provider): never adopted
+-- Reads no address out (the answer is a word). Service role only (the edge
+-- functions; record_invitation_send asks the same question).
+CREATE OR REPLACE FUNCTION public.invitation_login_state(p_profile_id uuid, p_user_id uuid)
+RETURNS text
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_profile public.profiles;
+  v_user auth.users;
+BEGIN
+  IF p_profile_id IS NULL OR p_user_id IS NULL THEN
+    RETURN 'unknown';
+  END IF;
+  SELECT * INTO v_profile FROM public.profiles WHERE id = p_profile_id;
+  IF NOT FOUND THEN
+    RETURN 'unknown';
+  END IF;
+  SELECT * INTO v_user FROM auth.users WHERE id = p_user_id;
+  IF NOT FOUND THEN
+    RETURN 'unknown';
+  END IF;
+  IF v_profile.user_id = p_user_id THEN
+    RETURN 'linked';
+  END IF;
+  IF v_profile.user_id IS NOT NULL
+     OR EXISTS (SELECT 1 FROM public.profiles AS o WHERE o.user_id = p_user_id AND o.id <> v_profile.id) THEN
+    RETURN 'linked_elsewhere';
+  END IF;
+  IF v_user.email IS NULL OR v_profile.email IS NULL
+     OR lower(btrim(v_user.email::text)) <> lower(btrim(v_profile.email::text)) THEN
+    RETURN 'email_mismatch';
+  END IF;
+  IF EXISTS (SELECT 1 FROM public.user_invitations AS ui WHERE ui.profile_id = p_profile_id AND ui.user_id = p_user_id)
+     OR (v_user.invited_at IS NOT NULL
+         AND v_user.last_sign_in_at IS NULL
+         AND coalesce(v_user.encrypted_password, '') = ''
+         AND NOT EXISTS (SELECT 1 FROM auth.identities AS i WHERE i.user_id = v_user.id AND i.provider <> 'email')) THEN
+    RETURN 'storm_invited';
+  END IF;
+  IF v_user.email_confirmed_at IS NULL AND v_user.last_sign_in_at IS NULL THEN
+    RETURN 'unused_orphan';
+  END IF;
+  RETURN 'foreign';
+END;
+$$;
+
 -- ---------------------------------------------------------------- record_invitation_send (service role)
 
 -- The edge functions record every send attempt with the outcome they
@@ -255,8 +341,19 @@ CREATE TRIGGER trg_profiles_fulfil_imported_assignment
 -- send_failed needs a stable snake_case code), kind_invalid,
 -- profile_without_company; P0002 profile_not_found; 42501
 -- inviter_not_member (p_invited_by is not an active member of the
--- profile's company); 23505 user_linked_elsewhere (p_user_id belongs to
--- another profile, or the profile has another login). Upserts the profile's
+-- profile's company); 42501 inviter_out_of_reach (p_invited_by may not act
+-- on the invitee: admin_may_act_on_user() on the locked profile, before
+-- any login is linked; D-207) and 42501 manages_admins_required (an
+-- administrator target: a dpa / shore_management profile, an admin /
+-- owner invitation, or a login that user_is_admin_target(); the inviter
+-- does not manage admins; W7), both only when p_invited_by is given (the
+-- service role / ops pass NULL); 23505 user_linked_elsewhere (p_user_id
+-- belongs to another profile, or the profile has another login); and, when
+-- p_user_id links a login to a profile that has none yet (D-205; review
+-- round 3, invite-adopts-foreign-login): 42501 login_email_mismatch (the
+-- login's address is not the profile's) and 42501 login_not_invited (any
+-- invitation_login_state() other than storm_invited: a login STORM did not
+-- create is never adopted). Nothing is written on a refusal. Upserts the profile's
 -- live row; a sent invitation also stamps the legacy profile columns
 -- (account_status 'invited' unless active / disabled / deactivated,
 -- last_invited_at, invited_at, invitation_count) and brings back a
@@ -296,6 +393,7 @@ DECLARE
   v_membership uuid;
   v_next bigint;
   v_result public.user_invitations;
+  v_state text;
 BEGIN
   IF p_outcome IS NULL OR p_outcome NOT IN ('sent', 'send_failed') THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'outcome_invalid';
@@ -325,11 +423,38 @@ BEGIN
   ) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'inviter_not_member';
   END IF;
+  -- The inviter may act on the person (D-207, gap/01 F23, W7), asked of the
+  -- locked profile before any login is linked.
+  IF p_invited_by IS NOT NULL THEN
+    IF NOT public.admin_may_act_on_user(p_invited_by, v_profile.user_id, v_profile.company_id, v_profile.id) THEN
+      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'inviter_out_of_reach',
+        DETAIL = 'The inviter cannot act on this person.';
+    END IF;
+    IF (v_profile.role::text IN ('dpa', 'shore_management')
+        OR coalesce(p_kind, 'crew') IN ('admin', 'owner')
+        OR (v_profile.user_id IS NOT NULL AND public.user_is_admin_target(v_profile.user_id, v_profile.company_id)))
+       AND NOT public.user_manages_admins_for(p_invited_by, v_profile.company_id) THEN
+      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'manages_admins_required',
+        DETAIL = 'Only an administrator who manages administrators can invite an administrator.';
+    END IF;
+  END IF;
   IF p_user_id IS NOT NULL AND (
     (v_profile.user_id IS NOT NULL AND v_profile.user_id <> p_user_id)
     OR EXISTS (SELECT 1 FROM public.profiles AS o WHERE o.user_id = p_user_id AND o.id <> v_profile.id)
   ) THEN
     RAISE EXCEPTION USING ERRCODE = '23505', MESSAGE = 'user_linked_elsewhere';
+  END IF;
+  -- A login is adopted only when STORM created it for this profile (D-205).
+  IF p_user_id IS NOT NULL AND v_profile.user_id IS NULL THEN
+    v_state := public.invitation_login_state(v_profile.id, p_user_id);
+    IF v_state = 'email_mismatch' THEN
+      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'login_email_mismatch',
+        DETAIL = 'That login''s address is not the address this invitation goes to.';
+    END IF;
+    IF v_state IS DISTINCT FROM 'storm_invited' THEN
+      RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'login_not_invited',
+        DETAIL = 'That login was not created by a STORM invitation.';
+    END IF;
   END IF;
   v_user := coalesce(v_profile.user_id, p_user_id);
 
@@ -413,6 +538,14 @@ $$;
 -- row with this file's defaults is created when there is none):
 --   unknown profile (or no company)     {"ok": false, "code": "not_found"}
 --   disabled / deactivated profile      {"ok": false, "code": "disabled"}
+--   p_invited_by given and it may not   {"ok": false, "code": "forbidden"}
+--     act on the person (admin_may_act_on_user(); D-207, gap/01 F23)
+--   p_invited_by given, an administrator {"ok": false, "code": "manages_admins_required"}
+--     target (a dpa / shore_management profile, an admin / owner kind, or
+--     a login that user_is_admin_target()) and the inviter does not
+--     manage admins (W7)
+--     (both before the counter, the cooldown or any write; NULL is the
+--     service role / ops and is not limited)
 --   the next number would pass          {"ok": false, "code": "counter_exhausted"}
 --     2147483647 (computed in bigint, never raises; nothing is written)
 --   inside the cooldown                 {"ok": false, "code": "cooldown", "retry_after_seconds": n}
@@ -422,8 +555,8 @@ $$;
 --     n = greatest(max(send_attempts) over all the profile's rows,
 --     invitation_count) + 1, stamped on the live row with last_attempt_at.
 -- p_invited_by is kept on a new row only when it is an active member of
--- the profile's company; 22023 kind_invalid for a kind outside the
--- membership vocabulary.
+-- the profile's company (always true once the checks above passed); 22023
+-- kind_invalid for a kind outside the membership vocabulary.
 CREATE OR REPLACE FUNCTION public.reserve_invitation_attempt(p_profile_id uuid, p_invited_by uuid DEFAULT NULL, p_kind text DEFAULT 'crew')
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -448,6 +581,19 @@ BEGIN
   END IF;
   IF lower(coalesce(v_profile.account_status, '')) IN ('disabled', 'deactivated') THEN
     RETURN jsonb_build_object('ok', false, 'code', 'disabled');
+  END IF;
+  -- The inviter may act on the person (D-207; defence in depth behind the
+  -- edge's own check), before the counter, the cooldown or any write.
+  IF p_invited_by IS NOT NULL THEN
+    IF NOT public.admin_may_act_on_user(p_invited_by, v_profile.user_id, v_profile.company_id, v_profile.id) THEN
+      RETURN jsonb_build_object('ok', false, 'code', 'forbidden');
+    END IF;
+    IF (v_profile.role::text IN ('dpa', 'shore_management')
+        OR coalesce(p_kind, 'crew') IN ('admin', 'owner')
+        OR (v_profile.user_id IS NOT NULL AND public.user_is_admin_target(v_profile.user_id, v_profile.company_id)))
+       AND NOT public.user_manages_admins_for(p_invited_by, v_profile.company_id) THEN
+      RETURN jsonb_build_object('ok', false, 'code', 'manages_admins_required');
+    END IF;
   END IF;
   -- The next attempt number, in bigint: a counter at the integer ceiling
   -- answers counter_exhausted instead of raising (a new live row starts at
@@ -692,6 +838,7 @@ REVOKE ALL ON FUNCTION public.invitation_withdraw_access(uuid) FROM PUBLIC, anon
 REVOKE ALL ON FUNCTION public.revoke_invitation(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.expire_invitations() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.fulfil_imported_assignment(uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.invitation_login_state(uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.profiles_fulfil_imported_assignment() FROM PUBLIC, anon, authenticated, service_role;
 
 GRANT EXECUTE ON FUNCTION public.record_invitation_send(uuid, text, text, text, uuid, text, timestamptz, uuid) TO service_role;
@@ -699,15 +846,17 @@ GRANT EXECUTE ON FUNCTION public.reserve_invitation_attempt(uuid, uuid, text) TO
 GRANT EXECUTE ON FUNCTION public.revoke_invitation(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.expire_invitations() TO service_role;
 GRANT EXECUTE ON FUNCTION public.fulfil_imported_assignment(uuid, uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.invitation_login_state(uuid, uuid) TO service_role;
 
 -- ---------------------------------------------------------------- comments
 
 COMMENT ON TABLE public.user_invitations IS 'Honest invitations (gap/01 F46; D-121): one live row (pending | sent | send_failed) per profile, then accepted | expired | revoked. send_attempts, last_attempt_at, last_sent_at, last_error_code (stable codes only, never provider text or addresses). No email column (the profile holds it). Read: users-access viewers of the company. Writes: record_invitation_send (service role), revoke_invitation, expire_invitations, record_session_start.';
 COMMENT ON COLUMN public.user_invitations.last_error_code IS 'Stable snake_case code of the last failed attempt (e.g. provider_rejected, not_configured, legacy_unverified); NULL after a successful send.';
-COMMENT ON FUNCTION public.record_invitation_send(uuid, text, text, text, uuid, text, timestamptz, uuid) IS 'Records one invitation send outcome (sent | send_failed with a code) on the profile''s live row for the reserved attempt (not counted again); only a sent invitation stamps profiles.account_status invited and restores a removed legacy membership (under storm.access_engine); provider_duplicate never downgrades a sent row. Service role only (send-invitation, bulk-invite, admin-actions).';
-COMMENT ON FUNCTION public.reserve_invitation_attempt(uuid, uuid, text) IS 'D-146: reserves the next invitation attempt number before a link is generated, under the profile and live-row locks: {ok, invitation_id, attempt} or {ok: false, code: not_found | disabled | counter_exhausted (the next number would pass 2147483647; computed in bigint, never raises) | cooldown (retry_after_seconds)}. Cooldown 5 min after a send, 30 s after a failed attempt. Service role only.';
+COMMENT ON FUNCTION public.record_invitation_send(uuid, text, text, text, uuid, text, timestamptz, uuid) IS 'Records one invitation send outcome (sent | send_failed with a code) on the profile''s live row for the reserved attempt (not counted again); only a sent invitation stamps profiles.account_status invited and restores a removed legacy membership (under storm.access_engine); provider_duplicate never downgrades a sent row. A given p_invited_by must be a member who may act on the invitee (42501 inviter_not_member, inviter_out_of_reach; D-207) and manage admins for an administrator target (42501 manages_admins_required); a login linked to a profile without one must be one STORM created for it (invitation_login_state storm_invited; 42501 login_email_mismatch, login_not_invited; D-205). Nothing is written on a refusal. Service role only (send-invitation, bulk-invite, admin-actions).';
+COMMENT ON FUNCTION public.reserve_invitation_attempt(uuid, uuid, text) IS 'D-146: reserves the next invitation attempt number before a link is generated, under the profile and live-row locks: {ok, invitation_id, attempt} or {ok: false, code: not_found | disabled | forbidden (a given p_invited_by may not act on the person, D-207) | manages_admins_required (an administrator target and an inviter who does not manage admins, W7) | counter_exhausted (the next number would pass 2147483647; computed in bigint, never raises) | cooldown (retry_after_seconds)}. Cooldown 5 min after a send, 30 s after a failed attempt. Service role only.';
+COMMENT ON FUNCTION public.invitation_login_state(uuid, uuid) IS 'D-205: whether a login may be adopted by the profile, first match wins: unknown (NULL id, no profile, no auth user) | linked | linked_elsewhere | email_mismatch (lower(btrim) addresses differ; NULL counts as a mismatch) | storm_invited (an invitation row of the profile carries the login, or invited_at set, never signed in, no password, no non-email identity) | unused_orphan (never confirmed, never signed in) | foreign. Only storm_invited is adoptable. Service role only.';
 COMMENT ON FUNCTION public.invitation_withdraw_access(uuid) IS 'Internal to revoke / expire: for an ended, never-accepted invitation of a still invited / not_invited profile, the legacy invitation_token / invitation_token_expires are cleared (whatever the sign-in evidence); without sign-in evidence the still-invited profile -> not_invited and the never-accepted legacy membership -> removed (under storm.access_engine, JWT claims suspended). Active / disabled profiles untouched.';
 COMMENT ON FUNCTION public.revoke_invitation(uuid) IS 'A users-access admin of the invitation''s company who may act on the invitee (vessel reach, gap/01 F23) revokes a live invitation and withdraws the access it opened when never accepted (42501 not_permitted; 42501 manages_admins_required for an admin / owner invitation, an administrator target or a dpa / shore_management profile, W7; P0002 invitation_not_found / invitation_not_live).';
-COMMENT ON FUNCTION public.fulfil_imported_assignment(uuid, uuid) IS 'D-184: once a login is linked, an imported profile''s imported_vessel_id becomes one current crew_assignments row (position, else rank, else Crew; join_date = joining_date, else today) under storm.access_engine, then imported_vessel_id is cleared and is_imported set false. Returns created | exists | none (not imported, no login, or already a current crew member: nothing changes) | not_eligible (a vessel of another company, Sold or archived: profile untouched). Service role only (record_invitation_send, the profile trigger, the edge).';
+COMMENT ON FUNCTION public.fulfil_imported_assignment(uuid, uuid) IS 'D-184: once a login is linked, an imported profile''s imported_vessel_id becomes one current crew_assignments row (position, else rank, else Crew; join_date = joining_date, else today) under storm.access_engine, then imported_vessel_id is cleared and is_imported set false. Returns created | exists | none (not imported, no login, or already a current crew member: nothing changes) | not_eligible (a vessel of another company, Sold or archived; or a Master / Captain position without p_actor being a users-access admin of the vessel, D-198: nothing written, profile untouched and still pending). Service role only (record_invitation_send, the profile trigger, the edge).';
 COMMENT ON FUNCTION public.profiles_fulfil_imported_assignment() IS 'Trigger trg_profiles_fulfil_imported_assignment (AFTER UPDATE OF user_id, a login newly linked to an imported profile with an imported vessel): fulfil_imported_assignment(NEW.id, the inviter named in storm.fulfil_actor).';
 COMMENT ON FUNCTION public.expire_invitations() IS 'Live invitations past expires_at -> expired, access withdrawn when never accepted; returns the count. Service role (a later cron).';

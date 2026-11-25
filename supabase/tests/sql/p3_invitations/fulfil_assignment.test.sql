@@ -22,15 +22,15 @@ RETURNS uuid LANGUAGE sql SECURITY DEFINER AS $$
                               'joining_date', (current_date - 3)::text, 'position', 'Bosun', 'rank', 'Rating') || p_extra);
 $$;
 SELECT tests.seed_imported('A.sent_crew', 'A.dra');
-SELECT tests.seed_auth_user('A.sent_crew');
+SELECT tests.seed_auth_user('A.sent_crew', jsonb_build_object('invited_at', now(), 'email_confirmed_at', NULL));
 SELECT tests.seed_imported('A.failed_crew', 'A.dra', '{"position": "  ", "rank": "Deck rating"}');
-SELECT tests.seed_auth_user('A.failed_crew');
+SELECT tests.seed_auth_user('A.failed_crew', jsonb_build_object('invited_at', now(), 'email_confirmed_at', NULL));
 SELECT tests.seed_imported('A.foreign_vessel', 'B.lev');
-SELECT tests.seed_auth_user('A.foreign_vessel');
+SELECT tests.seed_auth_user('A.foreign_vessel', jsonb_build_object('invited_at', now(), 'email_confirmed_at', NULL));
 SELECT tests.seed_imported('A.sold_vessel', 'A.sold');
-SELECT tests.seed_auth_user('A.sold_vessel');
+SELECT tests.seed_auth_user('A.sold_vessel', jsonb_build_object('invited_at', now(), 'email_confirmed_at', NULL));
 SELECT tests.seed_imported('A.archived_vessel', 'A.archived');
-SELECT tests.seed_auth_user('A.archived_vessel');
+SELECT tests.seed_auth_user('A.archived_vessel', jsonb_build_object('invited_at', now(), 'email_confirmed_at', NULL));
 -- (linked from the start: the profile row is inserted with its login, so
 -- the link trigger does not fire)
 SELECT tests.seed_auth_user('A.already_crew');
@@ -118,6 +118,55 @@ SELECT tests.results_eq(
   format($q$VALUES (%L::uuid, 'Bosun'::text, current_date, NULL::uuid)$q$, tests.vessel_id('A.gam')),
   'a login linked by the service role (the edge D-01 fallback) is fulfilled by the trigger (today when no join date)');
 SELECT tests.is((SELECT is_imported FROM public.profiles WHERE id = tests.profile_id('A.linked_later')), false, 'and the profile is no longer imported');
+
+-- ------------------------------------------------------------ the Master office needs a users-access admin (D-198; review round 3)
+
+-- profile-imported-columns-unguarded: the engine flag never appoints a
+-- Master on its own. A pending profile whose position (else rank) is
+-- Master / Captain is fulfilled only for an actor who is a users-access
+-- admin of the vessel; otherwise not_eligible, nothing written, the
+-- profile still pending.
+SELECT tests.seed_imported(k, 'A.dra', jsonb_build_object('position', 'Master'))
+FROM unnest(ARRAY['A.master_by_master', 'A.master_by_ops', 'A.master_by_dpa']) AS k;
+SELECT tests.seed_imported('A.captain_by_rank', 'A.dra', jsonb_build_object('position', ' ', 'rank', 'CAPTAIN'));
+SELECT tests.seed_auth_user(k, jsonb_build_object('invited_at', now(), 'email_confirmed_at', NULL))
+FROM unnest(ARRAY['A.master_by_master', 'A.master_by_ops', 'A.master_by_dpa', 'A.captain_by_rank']) AS k;
+SELECT tests.ok(public.has_capability_for(tests.user_id('A.master_dra'), 'admin.access.users_access.assign', tests.company_id('A'), tests.vessel_id('A.dra'))
+            AND NOT public.has_capability_for(tests.user_id('A.master_dra'), 'admin.access.users_access.admin', tests.company_id('A'), tests.vessel_id('A.dra')),
+                'setup: the DRAAK Master may assign on DRAAK (D-125) but is not a users-access admin');
+SELECT tests.as_service();
+SELECT tests.is((public.record_invitation_send(tests.profile_id('A.master_by_master'), 'sent', NULL, NULL, tests.user_id('A.master_dra'), 'crew', NULL, tests.user_id('A.master_by_master'))).status,
+                'sent', 'the Master invites a pending profile on their own vessel (the invitation goes out)');
+SELECT tests.is((public.record_invitation_send(tests.profile_id('A.master_by_ops'), 'sent', NULL, NULL, NULL, 'crew', NULL, tests.user_id('A.master_by_ops'))).status,
+                'sent', 'a send with no inviter (service / ops)');
+SELECT tests.is((public.record_invitation_send(tests.profile_id('A.captain_by_rank'), 'sent', NULL, NULL, NULL, 'crew', NULL, tests.user_id('A.captain_by_rank'))).status,
+                'sent', 'a pending profile whose rank says Captain');
+SELECT tests.is(public.fulfil_imported_assignment(tests.profile_id(v.k), v.actor), 'not_eligible', v.k || ': fulfil without a users-access admin answers not_eligible')
+FROM (VALUES ('A.master_by_master', tests.user_id('A.master_dra')), ('A.master_by_ops', NULL::uuid), ('A.captain_by_rank', NULL::uuid)) AS v(k, actor);
+SELECT tests.reset_role();
+SELECT tests.is((SELECT count(*) FROM public.crew_assignments WHERE user_id = tests.user_id(k)), 0::bigint, k || ': no assignment (no Master row)')
+FROM unnest(ARRAY['A.master_by_master', 'A.master_by_ops', 'A.captain_by_rank']) AS k;
+SELECT tests.ok(NOT public.record_is_master(tests.user_id(k), tests.vessel_id('A.dra')), k || ': record_is_master stays f')
+FROM unnest(ARRAY['A.master_by_master', 'A.master_by_ops', 'A.captain_by_rank']) AS k;
+SELECT tests.results_eq(
+  format($q$SELECT is_imported, imported_vessel_id, position, user_id IS NOT NULL FROM public.profiles WHERE id IN (%L, %L) ORDER BY id$q$,
+         tests.profile_id('A.master_by_master'), tests.profile_id('A.master_by_ops')),
+  format($q$VALUES (true, %L::uuid, 'Master'::text, true), (true, %L::uuid, 'Master'::text, true)$q$, tests.vessel_id('A.dra'), tests.vessel_id('A.dra')),
+  'both profiles are still pending (imported, the vessel waiting, the position kept; the login linked)');
+-- The fleet manager (a users-access admin of DRAAK) appoints the Master.
+SELECT tests.as_service();
+SELECT tests.is((public.record_invitation_send(tests.profile_id('A.master_by_dpa'), 'sent', NULL, NULL, tests.user_id('A.fleet_manager'), 'crew', NULL, tests.user_id('A.master_by_dpa'))).status,
+                'sent', 'the fleet manager invites the pending Master');
+SELECT tests.is(public.fulfil_imported_assignment(tests.profile_id('A.master_by_master'), tests.user_id('A.fleet_manager')), 'created',
+                'and fulfils the pending Master the DRAAK Master invited');
+SELECT tests.reset_role();
+SELECT tests.results_eq(
+  format($q$SELECT user_id, position, is_current, created_by FROM public.crew_assignments WHERE vessel_id = %L AND user_id IN (%L, %L) ORDER BY user_id$q$,
+         tests.vessel_id('A.dra'), tests.user_id('A.master_by_dpa'), tests.user_id('A.master_by_master')),
+  format($q$SELECT * FROM (VALUES (%L::uuid, 'Master'::text, true, %L::uuid), (%L::uuid, 'Master'::text, true, %L::uuid)) AS t ORDER BY 1$q$,
+         tests.user_id('A.master_by_dpa'), tests.user_id('A.fleet_manager'), tests.user_id('A.master_by_master'), tests.user_id('A.fleet_manager')),
+  'a users-access admin of the vessel gets the Master rows written');
+SELECT tests.ok(public.record_is_master(tests.user_id('A.master_by_dpa'), tests.vessel_id('A.dra')), 'record_is_master is t for the fleet manager''s appointment');
 
 -- ------------------------------------------------------------ unknown ids and ACLs
 
