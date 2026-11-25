@@ -8,22 +8,25 @@
  *   (src/app/staleChunkRecovery.ts): at most twice in a minute, then the
  *   recovery panel (D-39).
  * - Optional UI chunks, listed here, are a dialog or a popover on top of a
- *   page that already works: the command palette's dialog and the vessel
- *   switcher's list. They never reload the page on their own (D-100): a hover
+ *   page that already works: the command palette's dialog, the vessel
+ *   switcher's list, and the Red Room panel's Snooze and Assign task dialogs
+ *   (the panel is on the dashboard, in the entry chunk; its dialogs load on
+ *   first open). They never reload the page on their own (D-100): a hover
  *   or background preload on a flaky link, or a failed Try again, must not
  *   throw away what the user has typed (D-04). A failed one rejects to its
- *   own boundary, which says "Search could not load" or "The vessel list
- *   could not load", names both causes (an update or the connection) and
- *   offers Try again / Retry (a new import) and Reload. Only the user's
- *   Reload goes through the guard (`requestChunkRecovery`), so after a deploy,
- *   when the old hashed file is gone, the page can still pick up the new one.
+ *   own boundary, which says "Search could not load", "The vessel list
+ *   could not load" or "The dialog could not load", names both causes (an
+ *   update or the connection) and offers Try again / Retry (a new import)
+ *   and Reload. Only the user's Reload goes through the guard
+ *   (`requestChunkRecovery`), so after a deploy, when the old hashed file is
+ *   gone, the page can still pick up the new one.
  *
  * main.tsx imports this module at boot, before React, so it must not import
  * React or anything that does.
  */
 
 /** Base names of the optional chunks (the file name without its build hash). */
-export const OPTIONAL_CHUNKS = ['PaletteDialog', 'VesselSwitcherPanel'] as const;
+export const OPTIONAL_CHUNKS = ['PaletteDialog', 'VesselSwitcherPanel', 'SnoozeDialog', 'AssignTaskDialog'] as const;
 
 export type OptionalChunk = (typeof OPTIONAL_CHUNKS)[number];
 

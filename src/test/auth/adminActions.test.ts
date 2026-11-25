@@ -23,9 +23,12 @@ import {
   emailErrorIsRetryable,
   bulkInvite,
   bulkInviteNotice,
+  createCrewMember,
+  createCrewNotice,
   endAllSessions,
   endSessionsNotice,
   failureFrom,
+  failureIsRetryable,
   inviteNotice,
   NOT_STORED_NOTE,
   passwordResetNotice,
@@ -487,5 +490,88 @@ describe('admin-actions', () => {
       previousEnded: false,
       message: 'The new assignment was saved, but the previous one could not be closed. Try again.',
     });
+  });
+});
+
+describe('refusals of review round 3 (D-205, D-207, D-208)', () => {
+  const LOGIN_BLOCKED = "This person's sign-in is blocked. Turn access on first.";
+  const NOT_CREATED_BY_STORM = 'An account with this email exists that STORM did not create. Contact STORM support.';
+  const OUT_OF_REACH = 'You can only do this for people on the vessels you administer.';
+  const MANAGES_ADMINS = 'Only an administrator who manages administrators can do this for an administrator.';
+  const VESSEL_REQUIRED = 'Choose the vessel this person joins.';
+
+  it.each([
+    [409, 'conflict', 'login_blocked', LOGIN_BLOCKED],
+    [409, 'conflict', 'login_not_created_by_storm', NOT_CREATED_BY_STORM],
+    [403, 'forbidden', 'out_of_reach', OUT_OF_REACH],
+    [403, 'forbidden', 'manages_admins_required', MANAGES_ADMINS],
+    [403, 'forbidden', 'vessel_required', VESSEL_REQUIRED],
+  ] as const)('failureFrom: %i %s %s gives STORM copy (never the server wording) and is not retryable', (status, code, reason, copy) => {
+    const failure = failureFrom({ status, body: edgeError(code, 'Server wording that is never shown.', { reason }) });
+    expect(failure).toMatchObject({ status, code, reason, message: copy });
+    expect(failureIsRetryable(failure)).toBe(false);
+    // The same reason without a code in the body still reads by its HTTP status.
+    const bare = failureFrom({ status, body: { error: { message: 'x', details: { reason } } } });
+    expect(bare).toMatchObject({ code, reason, message: copy });
+    expect(failureIsRetryable(bare)).toBe(false);
+  });
+
+  it('a 409 login_blocked answer to a password reset is a failure with that copy, never "sent"', async () => {
+    httpError(409, edgeError('conflict', LOGIN_BLOCKED, { reason: 'login_blocked' }));
+    const outcome = await sendPasswordReset('u-1');
+    expect(outcome).toMatchObject({ kind: 'failed', failure: { status: 409, code: 'conflict', reason: 'login_blocked', message: LOGIN_BLOCKED } });
+    const notice = passwordResetNotice(outcome, 'crew-member@example.test');
+    expect(notice).toEqual({ tone: 'error', title: 'Could not send the reset email', description: LOGIN_BLOCKED, retry: false });
+    expect(`${notice.title} ${notice.description}`).not.toMatch(/\bsent\b/i);
+  });
+
+  it('a 409 login_blocked answer to a resend is a failure with that copy, never "sent"', async () => {
+    httpError(409, edgeError('conflict', LOGIN_BLOCKED, { reason: 'login_blocked' }));
+    const outcome = await resendInvitation({ userId: 'u-1' });
+    expect(outcome).toMatchObject({ kind: 'failed', failure: { code: 'conflict', reason: 'login_blocked' } });
+    const notice = inviteNotice(outcome, 'crew-member@example.test');
+    expect(notice).toEqual({ tone: 'error', title: 'Could not send the invitation', description: LOGIN_BLOCKED, retry: false });
+    expect(`${notice.title} ${notice.description}`).not.toMatch(/\bsent\b/i);
+  });
+
+  it('a 409 login_not_created_by_storm and a 403 manages_admins_required to an invitation are errors with their copy', async () => {
+    httpError(409, edgeError('conflict', 'x', { reason: 'login_not_created_by_storm' }));
+    expect(inviteNotice(await sendInvitation('p-1'))).toEqual({ tone: 'error', title: 'Could not send the invitation', description: NOT_CREATED_BY_STORM, retry: false });
+    httpError(403, edgeError('forbidden', 'x', { reason: 'manages_admins_required' }));
+    expect(inviteNotice(await resendInvitation({ profileId: 'p-1' }))).toEqual({ tone: 'error', title: 'Could not send the invitation', description: MANAGES_ADMINS, retry: false });
+  });
+
+  it('a 403 out_of_reach to a password reset or an access change is an error with that copy', async () => {
+    httpError(403, edgeError('forbidden', 'x', { reason: 'out_of_reach' }));
+    expect(passwordResetNotice(await sendPasswordReset('u-1'))).toMatchObject({ tone: 'error', description: OUT_OF_REACH, retry: false });
+    httpError(403, edgeError('forbidden', 'x', { reason: 'out_of_reach' }));
+    expect(accessNotice(await setAccess('u-1', false, 'Left'))).toMatchObject({ tone: 'error', description: OUT_OF_REACH, retry: false });
+  });
+
+  it('a bulk row refused 403 out_of_reach keeps its reason and is not retryable', async () => {
+    ok({
+      ok: true,
+      results: [
+        { profileId: 'p-1', status: 'refused', stored: false, invitationId: null, code: 'forbidden', reason: 'out_of_reach' },
+        { profileId: 'p-2', status: 'refused', stored: false, invitationId: null, code: 'conflict', reason: 'login_blocked' },
+        { profileId: 'p-3', status: 'sent', stored: true, invitationId: 'inv-3' },
+      ],
+      sent: 1,
+      failed: 0,
+      refused: 2,
+    });
+    const outcome = await bulkInvite(['p-1', 'p-2', 'p-3']);
+    expect(outcome).toMatchObject({ kind: 'done', sent: 1, failed: 0, refused: 2 });
+    expect(outcome.results[0]).toMatchObject({ profileId: 'p-1', status: 'refused', code: 'forbidden', reason: 'out_of_reach', retryable: false });
+    expect(outcome.results[1]).toMatchObject({ profileId: 'p-2', status: 'refused', code: 'conflict', reason: 'login_blocked', retryable: false });
+    expect(bulkInviteNotice(outcome)).toMatchObject({ tone: 'warning', title: 'Sent 1 · Failed 0 · Not sent 2', retry: false });
+  });
+
+  it('create-crew-member 403 vessel_required is an error notice with that copy, never "added"', async () => {
+    httpError(403, edgeError('forbidden', VESSEL_REQUIRED, { reason: 'vessel_required' }));
+    const outcome = await createCrewMember({ email: 'new-crew@example.test', firstName: 'New', lastName: 'Crew' });
+    expect(outcome).toMatchObject({ kind: 'failed', failure: { status: 403, code: 'forbidden', reason: 'vessel_required' } });
+    const notice = createCrewNotice(outcome);
+    expect(notice).toEqual({ tone: 'error', title: 'Could not add the crew member', description: VESSEL_REQUIRED, retry: false });
   });
 });

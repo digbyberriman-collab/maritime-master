@@ -1,7 +1,8 @@
 /**
  * Optional UI chunks (src/app/optionalChunks.ts): which failed imports main.tsx
  * leaves to their own boundary instead of reloading (D-39 for route chunks,
- * D-81 for the palette), and the shared loader that forgets a failed import,
+ * D-81 for the palette, D-100 for the vessel switcher and the Red Room
+ * dialogs), and the shared loader that forgets a failed import,
  * including one that resolves to something that is not a module.
  */
 import { describe, expect, it, vi } from 'vitest';
@@ -9,8 +10,8 @@ import { OPTIONAL_CHUNKS, createOptionalChunkLoader, isOptionalChunkError } from
 import { createPaletteLoader, type PaletteDialogModule } from '@/shared/components/command-palette/preload';
 
 describe('isOptionalChunkError', () => {
-  it('lists the palette dialog and the vessel switcher panel', () => {
-    expect([...OPTIONAL_CHUNKS]).toEqual(['PaletteDialog', 'VesselSwitcherPanel']);
+  it('lists the palette dialog, the vessel switcher panel and the Red Room Snooze / Assign task dialogs', () => {
+    expect([...OPTIONAL_CHUNKS]).toEqual(['PaletteDialog', 'VesselSwitcherPanel', 'SnoozeDialog', 'AssignTaskDialog']);
   });
 
   it.each([
@@ -22,6 +23,13 @@ describe('isOptionalChunkError', () => {
     'Uncaught TypeError: Failed to fetch dynamically imported module: http://127.0.0.1:4511/src/shared/components/layout/topbar/VesselSwitcherPanel.tsx?t=1700000000000',
     'error loading dynamically imported module: http://127.0.0.1/assets/VesselSwitcherPanel-abc.js',
     '/assets/PaletteDialog.js',
+    // The Red Room panel's dialogs (D-100).
+    'Failed to fetch dynamically imported module: https://storm.example/assets/SnoozeDialog-BcrYV0_K.js',
+    'Failed to fetch dynamically imported module: https://storm.example/assets/AssignTaskDialog-D4x-9qTz.js',
+    'error loading dynamically imported module: http://127.0.0.1/assets/SnoozeDialog-abc.js',
+    'Failed to fetch dynamically imported module: http://127.0.0.1:4511/src/modules/red-room/components/AssignTaskDialog.tsx?t=1',
+    '/assets/SnoozeDialog-abc.js',
+    '/assets/AssignTaskDialog-abc.js',
   ])('matches %s', (msg) => {
     expect(isOptionalChunkError(msg)).toBe(true);
   });
@@ -32,6 +40,11 @@ describe('isOptionalChunkError', () => {
     ['a longer hashed name', 'Failed to fetch dynamically imported module: http://127.0.0.1/assets/PaletteDialogFoo-abc.js'],
     ['a name ending like one', 'Failed to fetch dynamically imported module: http://127.0.0.1/assets/MyPaletteDialog-abc.js'],
     ['another extension', 'Failed to fetch dynamically imported module: http://127.0.0.1/assets/PaletteDialog-abc.jsx'],
+    ['a longer Snooze name alone', 'SnoozeDialogFoo'],
+    ['a longer Snooze name', 'Failed to fetch dynamically imported module: http://127.0.0.1/assets/SnoozeDialogFoo.js'],
+    ['a longer hashed Snooze name', 'Failed to fetch dynamically imported module: http://127.0.0.1/assets/SnoozeDialogFoo-abc.js'],
+    ['a name ending like Assign', 'Failed to fetch dynamically imported module: http://127.0.0.1/assets/BulkAssignTaskDialog-abc.js'],
+    ['the Red Room panel (a route chunk part)', 'Failed to fetch dynamically imported module: http://127.0.0.1/assets/RedRoomPanel-abc.js'],
     ['the name without a file', 'PaletteDialog failed to render'],
     ["Safari's message (no URL)", 'Importing a module script failed.'],
     ['an empty message', ''],

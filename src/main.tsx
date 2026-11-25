@@ -57,9 +57,10 @@ const isStaleChunkMessage = (msg: string) =>
   msg.includes("Unable to preload CSS") || msg.includes("Failed to fetch dynamically imported module");
 
 // Route chunks reload (D-39). Optional UI chunks (the palette dialog, the
-// vessel switcher's list; src/app/optionalChunks.ts) never reload on their
-// own (D-100): no preventDefault, so Vite rethrows, the chunk's loader forgets
-// the attempt and its boundary shows "could not load" with Try again / Retry
+// vessel switcher's list, the Red Room Snooze and Assign task dialogs;
+// src/app/optionalChunks.ts) never reload on their own (D-100): no
+// preventDefault, so Vite rethrows, the chunk's loader forgets the attempt
+// and its boundary shows "could not load" with Try again / Retry
 // (a new import) and Reload, which the user presses to go through the same
 // guard (requestChunkRecovery). Matching is by the chunk's URL in the error
 // message. Safari's import error ("Importing a module script failed.")

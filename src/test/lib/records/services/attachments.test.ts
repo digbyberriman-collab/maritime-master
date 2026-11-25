@@ -8,7 +8,11 @@
  * - `uploadRecordFile` sends the bytes with an XHR to the storage endpoint
  *   with the session token, reports only real progress, can be aborted, then
  *   registers and attaches the file; every failure is `refused` with its
- *   storage or SQL code, or `missing` when the bucket or RPCs are not live.
+ *   storage or SQL code, or `missing` when the bucket or RPCs are not live;
+ * - the file's SHA-256 is computed before the upload and sent to
+ *   `register_file_object` as `p_sha256` (D-160, D-178); without
+ *   `crypto.subtle`, or when hashing fails, no hash is sent (never an
+ *   invented one) and the upload still goes ahead.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -38,6 +42,7 @@ import {
   UPLOAD_REFUSAL_MESSAGES,
   buildRecordFilePath,
   classifyStorageAnswer,
+  fileSha256,
   recordFileUploadUrl,
   safeFileName,
   uploadRecordFile,
@@ -116,6 +121,13 @@ const scope: RecordFileScope = {
   entityId: '33333333-3333-4333-8333-333333333333',
 };
 const pdf = (size = 2048, name = 'Damage report.pdf') => new File([new Uint8Array(size)], name, { type: 'application/pdf' });
+/** jsdom's File has no `arrayBuffer()` (a browser's has): give one its bytes. Without it, nothing can be hashed. */
+const withBytes = (file: File, bytes: Uint8Array): File =>
+  Object.defineProperty(file, 'arrayBuffer', { value: async () => bytes.slice().buffer, configurable: true });
+const ABC = new TextEncoder().encode('abc');
+/** SHA-256('abc'), the FIPS 180-2 test vector. */
+const ABC_SHA256 = 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad';
+const realCrypto = globalThis.crypto;
 const fileRow = { id: 'f-1', storage_path: 'x' };
 const attachmentRow = { id: 'a-1', file_id: 'f-1' };
 
@@ -351,6 +363,77 @@ describe('uploadRecordFile', () => {
   it('attach refused by a rule (22023 record_closed) carries the stable code', async () => {
     h.replies.set('attach_record_file', { data: null, error: { code: '22023', message: 'record_closed' } });
     await expect(uploadRecordFile({ file: pdf(), scope, envelopeId: 'e1' })).resolves.toEqual({ status: 'refused', code: 'record_closed', message: UPLOAD_REFUSAL_MESSAGES.attach_failed });
+  });
+
+  it('sends the lowercase hex SHA-256 of the file to register_file_object, computed before the upload', async () => {
+    const order: string[] = [];
+    vi.stubGlobal('crypto', {
+      randomUUID: () => realCrypto.randomUUID(),
+      subtle: {
+        digest: (algorithm: AlgorithmIdentifier, data: BufferSource) => {
+          order.push(FakeXhr.last ? 'digest after upload' : 'digest before upload');
+          return realCrypto.subtle.digest(algorithm, data);
+        },
+      },
+    });
+    const file = withBytes(new File([ABC], 'Hull photo.png', { type: 'image/png' }), ABC);
+    const result = await uploadRecordFile({ file, scope });
+    expect(result.status).toBe('ok');
+    expect(order).toEqual(['digest before upload']);
+    const register = h.rpcs.find((r) => r.name === 'register_file_object');
+    expect(register?.args.p_sha256).toBe(ABC_SHA256);
+    expect(register?.args.p_sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(register?.args).toMatchObject({ p_original_name: 'Hull photo.png', p_mime_type: 'image/png', p_size_bytes: 3 });
+  });
+
+  it('fileSha256: the hex digest of known content, and of an empty buffer', async () => {
+    await expect(fileSha256(withBytes(new File([ABC], 'a.png', { type: 'image/png' }), ABC))).resolves.toBe(ABC_SHA256);
+    await expect(fileSha256(withBytes(new File([], 'e.png'), new Uint8Array(0)))).resolves.toBe('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+  });
+
+  it('no crypto.subtle (an insecure context): registered without p_sha256, and the upload still goes ahead', async () => {
+    vi.stubGlobal('crypto', { randomUUID: () => realCrypto.randomUUID() });
+    const file = withBytes(new File([ABC], 'Hull photo.png', { type: 'image/png' }), ABC);
+    await expect(uploadRecordFile({ file, scope })).resolves.toMatchObject({ status: 'ok' });
+    expect(FakeXhr.last).not.toBeNull();
+    const register = h.rpcs.find((r) => r.name === 'register_file_object');
+    expect(register).toBeDefined();
+    expect(register?.args).not.toHaveProperty('p_sha256');
+    await expect(fileSha256(file)).resolves.toBeNull();
+  });
+
+  it('hashing that fails, or a file that cannot be read: no p_sha256, never an invented one', async () => {
+    vi.stubGlobal('crypto', {
+      randomUUID: () => realCrypto.randomUUID(),
+      subtle: { digest: () => Promise.reject(new Error('OperationError')) },
+    });
+    const file = withBytes(new File([ABC], 'Hull photo.png', { type: 'image/png' }), ABC);
+    await expect(uploadRecordFile({ file, scope })).resolves.toMatchObject({ status: 'ok' });
+    expect(h.rpcs.find((r) => r.name === 'register_file_object')?.args).not.toHaveProperty('p_sha256');
+
+    vi.unstubAllGlobals();
+    vi.stubGlobal('XMLHttpRequest', FakeXhr);
+    h.rpcs.length = 0;
+    // jsdom's File cannot be read (no arrayBuffer): nothing to hash.
+    await expect(uploadRecordFile({ file: pdf(), scope })).resolves.toMatchObject({ status: 'ok' });
+    expect(h.rpcs.find((r) => r.name === 'register_file_object')?.args).not.toHaveProperty('p_sha256');
+  });
+
+  it('an abort while the file is being hashed sends nothing', async () => {
+    const controller = new AbortController();
+    vi.stubGlobal('crypto', {
+      randomUUID: () => realCrypto.randomUUID(),
+      subtle: {
+        digest: (algorithm: AlgorithmIdentifier, data: BufferSource) => {
+          controller.abort();
+          return realCrypto.subtle.digest(algorithm, data);
+        },
+      },
+    });
+    const file = withBytes(new File([ABC], 'Hull photo.png', { type: 'image/png' }), ABC);
+    await expect(uploadRecordFile({ file, scope, signal: controller.signal })).resolves.toMatchObject({ status: 'refused', code: 'aborted' });
+    expect(FakeXhr.last).toBeNull();
+    expect(h.rpcs).toEqual([]);
   });
 
   it('classifyStorageAnswer reads the status from the body when present', () => {

@@ -12,6 +12,13 @@
  * failure comes back as `refused` with the storage or SQL code (or
  * `missing` when the bucket or the RPCs are not live yet, D-01); nothing
  * says "uploaded" unless the object is stored, registered and attached.
+ *
+ * The file's SHA-256 is computed in the browser before the upload and sent
+ * to `register_file_object` as `p_sha256` (D-160, D-178): a signature image
+ * needs it (SIG16). It is client-asserted, not checked against the stored
+ * bytes, until a server-side hasher exists. Without `crypto.subtle` (an
+ * insecure context) or when hashing fails, the file is registered without a
+ * hash, never with an invented one, and the upload still goes ahead.
  */
 import { recordsDb } from './client';
 import { isMissingRelation } from '@/integrations/supabase/missingRelation';
@@ -123,6 +130,26 @@ export function recordFileUploadUrl(path: string): string | null {
 /** Fresh uuid for the file segment (`<uuid>-<safe name>`), so two uploads never share a path. */
 const newFileId = (): string => crypto.randomUUID();
 
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+
+/**
+ * The lowercase hex SHA-256 of the file's bytes, or null when the browser
+ * cannot hash here (no `crypto.subtle` outside a secure context, no
+ * `Blob.arrayBuffer`) or hashing fails. Files are at most 50 MB, so reading
+ * them whole is bounded. Never throws.
+ */
+export async function fileSha256(file: Blob): Promise<string | null> {
+  try {
+    const subtle = globalThis.crypto?.subtle;
+    if (!subtle || typeof subtle.digest !== 'function' || typeof file.arrayBuffer !== 'function') return null;
+    const digest = await subtle.digest('SHA-256', await file.arrayBuffer());
+    const hex = Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+    return SHA256_HEX.test(hex) ? hex : null;
+  } catch {
+    return null;
+  }
+}
+
 export type StorageAnswer =
   | { kind: 'stored' }
   | { kind: 'bucket_missing' }
@@ -202,11 +229,12 @@ function rpcRefusal(error: { code?: string; message?: string }, fallback: 'regis
 
 /**
  * Upload one file to the record's folder, then register and attach it
- * (Phase 2 spec §B.6): validate → a fresh uuid and the C7 path → XHR `POST`
- * to `{VITE_SUPABASE_URL}/storage/v1/object/records/<path>` with the
- * session's bearer token and the publishable key (`x-upsert: false`, so an
- * existing object is never overwritten) → `register_file_object` →
- * `attach_record_file`.
+ * (Phase 2 spec §B.6): validate → a fresh uuid and the C7 path → the file's
+ * SHA-256 (`fileSha256`) → XHR `POST` to
+ * `{VITE_SUPABASE_URL}/storage/v1/object/records/<path>` with the session's
+ * bearer token and the publishable key (`x-upsert: false`, so an existing
+ * object is never overwritten) → `register_file_object` (with `p_sha256`
+ * when the hash could be computed) → `attach_record_file`.
  *
  * `onProgress` reports the bytes actually sent; `signal` cancels the
  * transfer (once the bytes are stored the registration runs to the end, so
@@ -229,6 +257,11 @@ export async function uploadRecordFile(request: UploadRecordFileRequest): Promis
   const token = sessionData?.session?.access_token;
   if (sessionError || !token) return refused('not_signed_in');
 
+  // Before the upload, so the hash is of the bytes being sent (D-160, D-178).
+  const sha256 = await fileSha256(file);
+  // Hashing a large file takes a moment: an abort meanwhile sends nothing.
+  if (signal?.aborted) return refused('aborted');
+
   const stored = await sendToStorage(
     url,
     file,
@@ -247,6 +280,7 @@ export async function uploadRecordFile(request: UploadRecordFileRequest): Promis
     p_original_name: file.name.slice(0, 255) || 'file',
     p_mime_type: file.type,
     p_size_bytes: file.size,
+    ...(sha256 ? { p_sha256: sha256 } : {}),
   });
   if (registered.error) return rpcRefusal(registered.error, 'register_failed');
   if (!registered.data) return refused('register_failed');

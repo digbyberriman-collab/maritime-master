@@ -124,6 +124,16 @@ const REASON_COPY: Readonly<Record<string, string>> = {
   pin_not_set: 'Set an admin PIN first.',
   vessel_archived: 'That vessel is archived.',
   already_assigned: 'This person is already assigned to that vessel.',
+  // 409: the login is still banned (a revoke no re-invite lifts, or access turned off), so no link or email goes out (D-208).
+  login_blocked: "This person's sign-in is blocked. Turn access on first.",
+  // 409: a login with this address exists that STORM did not create; it is never adopted (D-205).
+  login_not_created_by_storm: 'An account with this email exists that STORM did not create. Contact STORM support.',
+  // 403: the person is on a vessel the caller does not administer (D-194, D-207).
+  out_of_reach: 'You can only do this for people on the vessels you administer.',
+  // 403: an administrator target needs a manager of administrators (D-195, D-207).
+  manages_admins_required: 'Only an administrator who manages administrators can do this for an administrator.',
+  // 403: create-crew-member without a vessel needs an all-vessels administrator (D-207).
+  vessel_required: 'Choose the vessel this person joins.',
 };
 
 /** What the person reads for each email error (send_failed). */

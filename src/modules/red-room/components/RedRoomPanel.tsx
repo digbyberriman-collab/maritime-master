@@ -22,11 +22,24 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { RedRoomItem } from '@/modules/red-room/types';
+import { createOptionalChunkLoader } from '@/app/optionalChunks';
+import { RedRoomDialogBoundary } from './RedRoomDialogBoundary';
 
 // The panel is on the dashboard, in the entry chunk, so its two dialogs load
-// the first time one opens and then stay mounted (gap/00 I6 budget).
-const SnoozeDialog = lazy(() => import('./SnoozeDialog').then((m) => ({ default: m.SnoozeDialog })));
-const AssignTaskDialog = lazy(() => import('./AssignTaskDialog').then((m) => ({ default: m.AssignTaskDialog })));
+// the first time one opens and then stay mounted (gap/00 I6 budget). They are
+// optional UI chunks (src/app/optionalChunks.ts, D-100): one import at a time,
+// shared by the hover / focus preloads and the lazy component, and a failed
+// import is forgotten. A failure shows the dialog's own boundary
+// (RedRoomDialogBoundary: Close, Try again, Reload), never a page reload on
+// its own. Try again gets a fresh lazy() bound to a new loader.load(), because
+// React.lazy keeps a rejection; the boundary is keyed by the attempt. The
+// import specifiers stay literal so the built chunks keep their names
+// (SnoozeDialog-<hash>.js, AssignTaskDialog-<hash>.js) for isOptionalChunkError.
+const snoozeLoader = createOptionalChunkLoader<typeof import('./SnoozeDialog')>(() => import('./SnoozeDialog'));
+const assignLoader = createOptionalChunkLoader<typeof import('./AssignTaskDialog')>(() => import('./AssignTaskDialog'));
+
+const snoozeAttempt = (attempt: number) => ({ attempt, Dialog: lazy(snoozeLoader.load) });
+const assignAttempt = (attempt: number) => ({ attempt, Dialog: lazy(assignLoader.load) });
 
 interface RedRoomPanelProps {
   vesselId?: string | null;
@@ -53,6 +66,8 @@ export function RedRoomPanel({ vesselId }: RedRoomPanelProps) {
   const [assignDialogUsed, setAssignDialogUsed] = useState(false);
   const [selectedItem, setSelectedItem] = useState<RedRoomItem | null>(null);
   const [processingId, setProcessingId] = useState<string | null>(null);
+  const [snoozeChunk, setSnoozeChunk] = useState(() => snoozeAttempt(0));
+  const [assignChunk, setAssignChunk] = useState(() => assignAttempt(0));
 
   useEffect(() => {
     checkPermissions();
@@ -149,6 +164,9 @@ export function RedRoomPanel({ vesselId }: RedRoomPanelProps) {
     }
   };
 
+  const SnoozeDialog = snoozeChunk.Dialog;
+  const AssignTaskDialog = assignChunk.Dialog;
+
   if (isLoading && items.length === 0) {
     return (
       <Card className="shadow-card border-muted">
@@ -207,30 +225,49 @@ export function RedRoomPanel({ vesselId }: RedRoomPanelProps) {
         </CardContent>
       </Card>
 
-      <Suspense fallback={null}>
-        {/* Snooze Dialog */}
-        {snoozeDialogUsed && (
-          <SnoozeDialog
-            open={snoozeDialogOpen}
-            onOpenChange={setSnoozeDialogOpen}
-            item={selectedItem}
-            onSuccess={handleSnoozeComplete}
-          />
-        )}
+      {/* Snooze Dialog */}
+      {snoozeDialogUsed && (
+        <RedRoomDialogBoundary
+          key={snoozeChunk.attempt}
+          open={snoozeDialogOpen}
+          onClose={() => setSnoozeDialogOpen(false)}
+          onRetry={() => setSnoozeChunk(snoozeAttempt(snoozeChunk.attempt + 1))}
+        >
+          <Suspense fallback={null}>
+            <SnoozeDialog
+              open={snoozeDialogOpen}
+              onOpenChange={setSnoozeDialogOpen}
+              item={selectedItem}
+              onSuccess={handleSnoozeComplete}
+            />
+          </Suspense>
+        </RedRoomDialogBoundary>
+      )}
 
-        {/* Assign Task Dialog */}
-        {assignDialogUsed && (
-          <AssignTaskDialog
-            open={assignDialogOpen}
-            onOpenChange={setAssignDialogOpen}
-            item={selectedItem}
-            onSuccess={handleAssignComplete}
-          />
-        )}
-      </Suspense>
+      {/* Assign Task Dialog */}
+      {assignDialogUsed && (
+        <RedRoomDialogBoundary
+          key={assignChunk.attempt}
+          open={assignDialogOpen}
+          onClose={() => setAssignDialogOpen(false)}
+          onRetry={() => setAssignChunk(assignAttempt(assignChunk.attempt + 1))}
+        >
+          <Suspense fallback={null}>
+            <AssignTaskDialog
+              open={assignDialogOpen}
+              onOpenChange={setAssignDialogOpen}
+              item={selectedItem}
+              onSuccess={handleAssignComplete}
+            />
+          </Suspense>
+        </RedRoomDialogBoundary>
+      )}
     </>
   );
 }
+
+/** An item's icon-only action: 32 px, 44 px on touch (D-35). */
+const ITEM_ACTION = 'h-8 w-8 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11';
 
 // Individual Item Card
 interface RedRoomItemCardProps {
@@ -327,7 +364,8 @@ function RedRoomItemCard({
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
+                className={ITEM_ACTION}
+                aria-label="View details"
                 onClick={() => onView(item)}
               >
                 <Eye className="w-4 h-4" />
@@ -343,8 +381,11 @@ function RedRoomItemCard({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-950"
+                  className={cn(ITEM_ACTION, 'text-amber-600 hover:text-amber-700 hover:bg-amber-100 dark:hover:bg-amber-950')}
+                  aria-label="Snooze"
                   onClick={() => onSnooze(item)}
+                  onPointerEnter={snoozeLoader.preload}
+                  onFocus={snoozeLoader.preload}
                   disabled={isProcessing || item.snooze_count >= 3}
                 >
                   {isProcessing ? (
@@ -364,7 +405,8 @@ function RedRoomItemCard({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-950"
+                  className={cn(ITEM_ACTION, 'text-green-600 hover:text-green-700 hover:bg-green-100 dark:hover:bg-green-950')}
+                  aria-label="Acknowledge"
                   onClick={() => onAcknowledge(item)}
                   disabled={isProcessing}
                 >
@@ -386,8 +428,11 @@ function RedRoomItemCard({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-purple-600 hover:text-purple-700 hover:bg-purple-100 dark:hover:bg-purple-950"
+                  className={cn(ITEM_ACTION, 'text-purple-600 hover:text-purple-700 hover:bg-purple-100 dark:hover:bg-purple-950')}
+                  aria-label="Assign task"
                   onClick={() => onAssign(item)}
+                  onPointerEnter={assignLoader.preload}
+                  onFocus={assignLoader.preload}
                 >
                   <UserPlus className="w-4 h-4" />
                 </Button>

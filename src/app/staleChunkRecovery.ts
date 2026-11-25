@@ -12,7 +12,8 @@
  * - main.tsx, for a route chunk that failed (vite:preloadError, a window
  *   error, an unhandled rejection);
  * - the optional chunks' boundaries (the palette dialog, the vessel switcher's
- *   list; src/app/optionalChunks.ts), when the user presses Reload. Those
+ *   list, the Red Room Snooze and Assign task dialogs;
+ *   src/app/optionalChunks.ts), when the user presses Reload. Those
  *   chunks never reload on their own: a hover preload or a failed Try again
  *   must not throw away what the page underneath holds (D-04, D-100).
  *
