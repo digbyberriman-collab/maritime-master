@@ -365,7 +365,12 @@ $$;
 -- clamped at 2147483647 (as is the invitation_count stamp), so it never
 -- raises. A failed send with 'provider_duplicate' on a row already sent
 -- keeps it sent (the provider refused a duplicate of an email that went
--- out: never a downgrade). Once a login is linked (the sent branch, or a
+-- out: never a downgrade). A given p_invited_by who is no users-access
+-- admin of the pending vessel of a Master / Captain placement (is_imported,
+-- imported_vessel_id, no current assignment of the login) is refused before
+-- any write (42501 master_needs_admin; review round 4): a NULL inviter
+-- (service role, ops) links without fulfilling, and only an all-vessels
+-- admin (admin_scope_all) finishes such a placement. Once a login is linked (the sent branch, or a
 -- failed send that links p_user_id) an imported profile's vessel becomes
 -- its crew assignment: fulfil_imported_assignment(profile, p_invited_by)
 -- (D-184).
@@ -394,6 +399,7 @@ DECLARE
   v_next bigint;
   v_result public.user_invitations;
   v_state text;
+  v_office text;
 BEGIN
   IF p_outcome IS NULL OR p_outcome NOT IN ('sent', 'send_failed') THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'outcome_invalid';
@@ -436,6 +442,23 @@ BEGIN
        AND NOT public.user_manages_admins_for(p_invited_by, v_profile.company_id) THEN
       RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'manages_admins_required',
         DETAIL = 'Only an administrator who manages administrators can invite an administrator.';
+    END IF;
+    -- A pending Master / Captain placement (review round 4,
+    -- master-placement-stranded-after-link; D-198, D-204): only a
+    -- users-access admin of the pending vessel invites it, so the login is
+    -- never linked without the assignment fulfil_imported_assignment()
+    -- would then refuse (normalised as it does: position, else rank, else
+    -- Crew). Before any write.
+    IF coalesce(v_profile.is_imported, false) AND v_profile.imported_vessel_id IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM public.crew_assignments AS ca
+                       WHERE ca.user_id = coalesce(v_profile.user_id, p_user_id) AND ca.is_current) THEN
+      v_office := btrim(regexp_replace(translate(btrim(coalesce(nullif(btrim(v_profile.position), ''), nullif(btrim(v_profile.rank), ''), 'Crew')),
+                                                 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '[^a-z0-9]+', '_', 'g'), '_');
+      IF v_office IN ('master', 'captain')
+         AND NOT public.has_capability_for(p_invited_by, 'admin.access.users_access.admin', v_profile.company_id, v_profile.imported_vessel_id) THEN
+        RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'master_needs_admin',
+          DETAIL = 'Only a users-access administrator of this vessel can invite a Master.';
+      END IF;
     END IF;
   END IF;
   IF p_user_id IS NOT NULL AND (
@@ -544,6 +567,11 @@ $$;
 --     target (a dpa / shore_management profile, an admin / owner kind, or
 --     a login that user_is_admin_target()) and the inviter does not
 --     manage admins (W7)
+--   p_invited_by given, a pending        {"ok": false, "code": "master_needs_admin"}
+--     Master / Captain placement (is_imported, imported_vessel_id set, the
+--     login has no current assignment; position, else rank, else Crew,
+--     normalised) and the inviter is no users-access admin of that vessel
+--     (review round 4, D-198, D-204)
 --     (both before the counter, the cooldown or any write; NULL is the
 --     service role / ops and is not limited)
 --   the next number would pass          {"ok": false, "code": "counter_exhausted"}
@@ -571,6 +599,7 @@ DECLARE
   v_inviter uuid;
   v_until timestamptz;
   v_attempt bigint;
+  v_office text;
 BEGIN
   IF coalesce(p_kind, 'crew') NOT IN ('owner', 'admin', 'shore', 'crew', 'external') THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'kind_invalid';
@@ -593,6 +622,17 @@ BEGIN
         OR (v_profile.user_id IS NOT NULL AND public.user_is_admin_target(v_profile.user_id, v_profile.company_id)))
        AND NOT public.user_manages_admins_for(p_invited_by, v_profile.company_id) THEN
       RETURN jsonb_build_object('ok', false, 'code', 'manages_admins_required');
+    END IF;
+    -- A pending Master / Captain placement needs a users-access admin of the
+    -- pending vessel (review round 4; record_invitation_send's rule).
+    IF coalesce(v_profile.is_imported, false) AND v_profile.imported_vessel_id IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM public.crew_assignments AS ca WHERE ca.user_id = v_profile.user_id AND ca.is_current) THEN
+      v_office := btrim(regexp_replace(translate(btrim(coalesce(nullif(btrim(v_profile.position), ''), nullif(btrim(v_profile.rank), ''), 'Crew')),
+                                                 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '[^a-z0-9]+', '_', 'g'), '_');
+      IF v_office IN ('master', 'captain')
+         AND NOT public.has_capability_for(p_invited_by, 'admin.access.users_access.admin', v_profile.company_id, v_profile.imported_vessel_id) THEN
+        RETURN jsonb_build_object('ok', false, 'code', 'master_needs_admin');
+      END IF;
     END IF;
   END IF;
   -- The next attempt number, in bigint: a counter at the integer ceiling
@@ -852,8 +892,8 @@ GRANT EXECUTE ON FUNCTION public.invitation_login_state(uuid, uuid) TO service_r
 
 COMMENT ON TABLE public.user_invitations IS 'Honest invitations (gap/01 F46; D-121): one live row (pending | sent | send_failed) per profile, then accepted | expired | revoked. send_attempts, last_attempt_at, last_sent_at, last_error_code (stable codes only, never provider text or addresses). No email column (the profile holds it). Read: users-access viewers of the company. Writes: record_invitation_send (service role), revoke_invitation, expire_invitations, record_session_start.';
 COMMENT ON COLUMN public.user_invitations.last_error_code IS 'Stable snake_case code of the last failed attempt (e.g. provider_rejected, not_configured, legacy_unverified); NULL after a successful send.';
-COMMENT ON FUNCTION public.record_invitation_send(uuid, text, text, text, uuid, text, timestamptz, uuid) IS 'Records one invitation send outcome (sent | send_failed with a code) on the profile''s live row for the reserved attempt (not counted again); only a sent invitation stamps profiles.account_status invited and restores a removed legacy membership (under storm.access_engine); provider_duplicate never downgrades a sent row. A given p_invited_by must be a member who may act on the invitee (42501 inviter_not_member, inviter_out_of_reach; D-207) and manage admins for an administrator target (42501 manages_admins_required); a login linked to a profile without one must be one STORM created for it (invitation_login_state storm_invited; 42501 login_email_mismatch, login_not_invited; D-205). Nothing is written on a refusal. Service role only (send-invitation, bulk-invite, admin-actions).';
-COMMENT ON FUNCTION public.reserve_invitation_attempt(uuid, uuid, text) IS 'D-146: reserves the next invitation attempt number before a link is generated, under the profile and live-row locks: {ok, invitation_id, attempt} or {ok: false, code: not_found | disabled | forbidden (a given p_invited_by may not act on the person, D-207) | manages_admins_required (an administrator target and an inviter who does not manage admins, W7) | counter_exhausted (the next number would pass 2147483647; computed in bigint, never raises) | cooldown (retry_after_seconds)}. Cooldown 5 min after a send, 30 s after a failed attempt. Service role only.';
+COMMENT ON FUNCTION public.record_invitation_send(uuid, text, text, text, uuid, text, timestamptz, uuid) IS 'Records one invitation send outcome (sent | send_failed with a code) on the profile''s live row for the reserved attempt (not counted again); only a sent invitation stamps profiles.account_status invited and restores a removed legacy membership (under storm.access_engine); provider_duplicate never downgrades a sent row. A given p_invited_by must be a member who may act on the invitee (42501 inviter_not_member, inviter_out_of_reach; D-207) and manage admins for an administrator target (42501 manages_admins_required), and be a users-access admin of the pending vessel of a Master / Captain placement (42501 master_needs_admin, DETAIL Only a users-access administrator of this vessel can invite a Master.; review round 4, D-198, D-204); a login linked to a profile without one must be one STORM created for it (invitation_login_state storm_invited; 42501 login_email_mismatch, login_not_invited; D-205). Nothing is written on a refusal. Service role only (send-invitation, bulk-invite, admin-actions).';
+COMMENT ON FUNCTION public.reserve_invitation_attempt(uuid, uuid, text) IS 'D-146: reserves the next invitation attempt number before a link is generated, under the profile and live-row locks: {ok, invitation_id, attempt} or {ok: false, code: not_found | disabled | forbidden (a given p_invited_by may not act on the person, D-207) | manages_admins_required (an administrator target and an inviter who does not manage admins, W7) | master_needs_admin (a pending Master / Captain placement and an inviter who is no users-access admin of the pending vessel; review round 4) | counter_exhausted (the next number would pass 2147483647; computed in bigint, never raises) | cooldown (retry_after_seconds)}. Cooldown 5 min after a send, 30 s after a failed attempt. Service role only.';
 COMMENT ON FUNCTION public.invitation_login_state(uuid, uuid) IS 'D-205: whether a login may be adopted by the profile, first match wins: unknown (NULL id, no profile, no auth user) | linked | linked_elsewhere | email_mismatch (lower(btrim) addresses differ; NULL counts as a mismatch) | storm_invited (an invitation row of the profile carries the login, or invited_at set, never signed in, no password, no non-email identity) | unused_orphan (never confirmed, never signed in) | foreign. Only storm_invited is adoptable. Service role only.';
 COMMENT ON FUNCTION public.invitation_withdraw_access(uuid) IS 'Internal to revoke / expire: for an ended, never-accepted invitation of a still invited / not_invited profile, the legacy invitation_token / invitation_token_expires are cleared (whatever the sign-in evidence); without sign-in evidence the still-invited profile -> not_invited and the never-accepted legacy membership -> removed (under storm.access_engine, JWT claims suspended). Active / disabled profiles untouched.';
 COMMENT ON FUNCTION public.revoke_invitation(uuid) IS 'A users-access admin of the invitation''s company who may act on the invitee (vessel reach, gap/01 F23) revokes a live invitation and withdraws the access it opened when never accepted (42501 not_permitted; 42501 manages_admins_required for an admin / owner invitation, an administrator target or a dpa / shore_management profile, W7; P0002 invitation_not_found / invitation_not_live).';

@@ -584,7 +584,7 @@ const SCENARIOS = [
   },
   {
     name: 'witnessed_rules',
-    description: 'Witnessed signing: allowed slots only, a signer is required, the witness is not the signer, the signer must be eligible, visitors only where allowed.',
+    description: 'Witnessed signing: allowed slots only, a signer is required, the witness is not the signer, the signer must be eligible, visitors only where allowed; the witness alone never removes a witnessed signature, the Master does (gap/08 §B).',
     creator: 'SG.crew1',
     slots: [slot('prepared_by', 1, 'vessel', ['SG.crew1', 'SG.crew2']), slot('visitor_ack', 1, 'vessel', ['SG.crew3'], { allowVisitor: true, required: false }), slot('no_witness', 1, 'vessel', ['SG.crew3'], { allowWitnessed: false, required: false }), slot('master', 2, 'vessel', ['SG.master'])],
     steps: [
@@ -596,6 +596,7 @@ const SCENARIOS = [
       { op: 'sign', actor: 'SG.crew1', slot: 'prepared_by', ref: 's5', method: 'witnessed', signer: { profile: 'SG.crew2' } },
       { op: 'sign', actor: 'SG.crew1', slot: 'visitor_ack', ref: 's6', method: 'witnessed', signer: { visitor: 'Class surveyor' } },
       { op: 'remove', actor: 'SG.crew1', slot: 'visitor_ack' },
+      { op: 'remove', actor: 'SG.master', slot: 'visitor_ack' },
       { op: 'remove', actor: 'SG.crew2', slot: 'prepared_by' },
     ],
   },
@@ -766,7 +767,7 @@ const SCENARIOS = [
   },
   {
     name: 'company_slot_rules',
-    description: 'A company slot: only its named company people, never witnessed (company slots default to no witness), removed by a company actor.',
+    description: 'A company slot: only its named company people, never witnessed (a company slot cannot allow it), removed by a company actor.',
     creator: 'SG.crew1', slots: [slot('prepared_by', 1, 'vessel', ['SG.crew1']), slot('company_review', 2, 'company', ['SG.admin1'])],
     steps: [
       { op: 'set_digests', digests: D1 },

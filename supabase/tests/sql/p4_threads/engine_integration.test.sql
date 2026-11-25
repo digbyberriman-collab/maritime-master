@@ -14,19 +14,19 @@ SELECT tests.seed_assignment('A.crew_dra', 'A.dra', true, 'Deckhand');
 SELECT tests.seed_user('A', 'A.off_dra', 'crew');
 SELECT tests.seed_assignment('A.off_dra', 'A.dra', true, 'Deckhand');
 
-INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, company_step, report_first, decision_kind, allow_reopen, allow_close_as, edit_after_sign, delete_rule, slot_template)
+INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, company_step, report_first, decision_kind, allow_reopen, allow_close_as, edit_after_sign, delete_rule, slot_template)
 VALUES
-  ('test.permit', 'test', 'Permit to work', 'PTW', 'vessel', 'sign_off', false, false, true, true, 'lock', 'never_after_submit',
+  ('test.permit', 'test', 'Permit to work', 'PTW', 'vessel', 'vessel.test.records', 'sign_off', false, false, true, true, 'lock', 'never_after_submit',
    jsonb_build_array(
      jsonb_build_object('key', 'prepared_by', 'label', 'Prepared by', 'order', 1, 'party', 'vessel', 'named_profile_ids', jsonb_build_array(tests.profile_id('A.crew_dra'))),
      jsonb_build_object('key', 'master', 'label', 'Master', 'order', 2, 'party', 'vessel', 'office_key', 'master'),
      jsonb_build_object('key', 'company_review', 'label', 'Company review', 'order', 3, 'party', 'company'))),
-  ('test.incident', 'test', 'Incident', 'INC', 'vessel', 'acknowledge', true, false, true, true, 'allow_with_flag', 'never_after_submit',
+  ('test.incident', 'test', 'Incident', 'INC', 'vessel', 'vessel.test.records', 'acknowledge', true, false, true, true, 'allow_with_flag', 'never_after_submit',
    jsonb_build_array(jsonb_build_object('key', 'final_review', 'label', 'Final review', 'order', 1, 'party', 'vessel', 'office_key', 'master'))),
-  ('test.note', 'test', 'Note', 'NTE', 'vessel', 'none', false, false, false, false, 'allow_with_flag', 'draft_only',
+  ('test.note', 'test', 'Note', 'NTE', 'vessel', 'vessel.test.records', 'none', false, false, false, false, 'allow_with_flag', 'draft_only',
    jsonb_build_array(jsonb_build_object('key', 'author', 'label', 'Author', 'order', 1, 'party', 'vessel'))),
-  ('test.loose', 'test', 'Loose', 'LSE', 'vessel', 'none', false, false, false, false, 'allow_with_flag', 'free', '[]'::jsonb),
-  ('test.fleet_review', 'test', 'Fleet review', 'FRV', 'fleet', 'sign_off', false, false, false, false, 'lock', 'draft_only', '[]'::jsonb);
+  ('test.loose', 'test', 'Loose', 'LSE', 'vessel', 'vessel.test.records', 'none', false, false, false, false, 'allow_with_flag', 'free', '[]'::jsonb),
+  ('test.fleet_review', 'test', 'Fleet review', 'FRV', 'fleet', 'fleet.test.records', 'sign_off', false, false, false, false, 'lock', 'draft_only', '[]'::jsonb);
 
 -- helpers for this file (rolled back with it)
 CREATE FUNCTION tests.slot_of(p_env uuid, p_key text) RETURNS uuid LANGUAGE sql SECURITY DEFINER AS $$

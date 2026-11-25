@@ -43,6 +43,7 @@ const AUDIT: RecordKindDefinition = {
   refPrefix: 'AUD',
   scope: 'fleet',
   routePattern: '/fleet/safety/audits/:id',
+  capabilityPath: 'fleet.safety.audits',
   enveloped: false,
   companyStep: 'none',
   editAfterSign: 'lock',
@@ -137,6 +138,9 @@ describe('validation', () => {
     ['vessel route outside /v/:vesselCode', { routePattern: '/safety/corrective-actions/:id' }, /\/v\/:vesselCode/],
     ['relative route', { routePattern: 'safety/x' }, /start with/],
     ['capability path', { capabilityPath: 'vessel.safety' }, /capabilityPath/],
+    // Required, as record_kinds_capability_path_check (review round 4): the
+    // engine evaluates it before the first kind registers (D-132).
+    ['missing capability path', { capabilityPath: undefined }, /capabilityPath/],
     ['status', { statuses: ['open', 'archived' as never] }, /unknown status/],
     ['snapshot reason', { snapshotOn: ['saved' as never] }, /snapshot reason/],
     ['retention', { retentionYears: 0 }, /retentionYears/],

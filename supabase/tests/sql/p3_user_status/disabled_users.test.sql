@@ -465,3 +465,27 @@ SELECT tests.reset_role();
 SELECT tests.ok((SELECT prosecdef AND proconfig @> ARRAY['search_path=public'] FROM pg_proc WHERE oid = f::regprocedure), f || ': SECURITY DEFINER with search_path')
 FROM unnest(ARRAY['public.set_membership_status(uuid,text,uuid,text)', 'public.auth_user_id_for_email(text)', 'public.profiles_guard_access_columns()',
                   'public.user_manages_admins_for(uuid,uuid)', 'public.user_belongs_to_company(uuid,uuid)', 'public.has_any_role(uuid,public.app_role[])']) AS f;
+
+-- ------------------------------------------------------------ an auth soft delete denies everything (review round 4)
+
+-- user-is-active-ignores-soft-delete: a GoTrue soft delete
+-- (admin.deleteUser(id, true)) sets auth.users.deleted_at and leaves the
+-- issued tokens valid until they expire; user_is_active() treats it like a
+-- ban in force. Ports scratchpad r3sec/t5_soft_deleted_login.sql.
+SELECT tests.as_user(tests.user_id('A.master_dra'));
+SELECT tests.ok(public.user_is_active(auth.uid()) AND (SELECT count(*) FROM public.vessels) > 0, 'setup: the Master is active and reads vessels');
+SELECT tests.reset_role();
+UPDATE auth.users SET deleted_at = now() WHERE id = tests.user_id('A.master_dra');
+SELECT tests.as_user(tests.user_id('A.master_dra'));
+SELECT tests.is(public.user_is_active(auth.uid()), false, 'soft-deleted: user_is_active(self) = f');
+SELECT tests.is(public.my_account_status(), 'disabled', 'soft-deleted: my_account_status() = disabled');
+SELECT tests.is(public.user_can_reach_vessel(auth.uid(), tests.vessel_id('A.dra')), false, 'soft-deleted: user_can_reach_vessel = f');
+SELECT tests.is((SELECT count(*) FROM public.vessels), 0::bigint, 'soft-deleted: 0 vessels visible');
+SELECT tests.is((SELECT count(*) FROM public.profiles), 0::bigint, 'soft-deleted: 0 profiles visible');
+SELECT tests.reset_role();
+SELECT tests.is(public.user_is_active(tests.user_id('A.master_dra')), false, 'soft-deleted: inactive for the service role too');
+SELECT tests.ok(position('deleted_at' IN pg_get_functiondef('public.user_is_active(uuid)'::regprocedure)) > 0, 'user_is_active reads auth.users.deleted_at (ledger query I)');
+UPDATE auth.users SET deleted_at = NULL WHERE id = tests.user_id('A.master_dra');
+SELECT tests.as_user(tests.user_id('A.master_dra'));
+SELECT tests.is(public.my_account_status(), 'active', 'restored: my_account_status() active again');
+SELECT tests.reset_role();

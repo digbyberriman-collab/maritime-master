@@ -56,7 +56,11 @@ export interface SlotDefinition {
   namedProfileIds?: readonly string[];
   /** Sections this signature covers; omitted = the whole record. */
   coversSections?: readonly string[];
-  /** "Someone else signing?" allowed. Default: vessel slots yes, company slots no. */
+  /**
+   * "Someone else signing?" allowed. Default: vessel slots yes. Never on
+   * company slots: a company sign-off is made by the company actor on their
+   * own account (`validateSlotTemplate` refuses the flag there).
+   */
   allowWitnessed?: boolean;
   /** A visitor or contractor may sign through the witnessed pad. Never on company slots. */
   allowVisitor?: boolean;
@@ -178,6 +182,7 @@ export function validateSlotTemplate(slots: readonly SlotDefinition[]): void {
     if (keys.has(slot.key)) throw new Error(`Duplicate slot key "${slot.key}"`);
     keys.add(slot.key);
     if (!Number.isInteger(slot.order) || slot.order < 1) throw new Error(`Slot "${slot.key}" needs a whole-number order ≥ 1`);
+    if (slot.party === 'company' && slot.allowWitnessed) throw new Error(`Company slot "${slot.key}" cannot be witnessed`);
     if (slot.party === 'company' && slot.allowVisitor) throw new Error(`Company slot "${slot.key}" cannot allow visitors`);
     if (slot.party === 'company' && slot.allowOnBehalf) throw new Error(`Company slot "${slot.key}" cannot be signed on behalf`);
   }
@@ -207,7 +212,7 @@ export function createSignatureSheet(
 // ─── Derived state ────────────────────────────────────────────────────────
 
 const isRequired = (slot: SlotDefinition) => slot.required !== false;
-const allowsWitnessed = (slot: SlotDefinition) => slot.allowWitnessed ?? slot.party === 'vessel';
+const allowsWitnessed = (slot: SlotDefinition) => slot.party === 'vessel' && (slot.allowWitnessed ?? true);
 
 export function getSlot(sheet: SignatureSheet, slotKey: string): SlotDefinition | undefined {
   return sheet.slots.find((s) => s.key === slotKey);
@@ -494,7 +499,9 @@ export function removeBlocker(
   const laterSigned = activeSignatures(sheet).some((s) => (getSlot(sheet, s.slotKey)?.order ?? 0) > slot.order);
   if (laterSigned) return { code: 'not_latest', message: 'Signatures are removed in reverse order. Remove the later signatures first.' };
 
-  const isSigner = sig.signerProfileId === actor.profileId || sig.witnessProfileId === actor.profileId;
+  // The signer, never the witness alone (gap/08 §B). A visitor row has no
+  // signer profile, so it never matches an actor without one.
+  const isSigner = sig.signerProfileId !== null && sig.signerProfileId === actor.profileId;
   const mayRemove = isSigner || (slot.party === 'vessel' && actor.isMaster) || (slot.party === 'company' && actor.isCompanyActor);
   if (!mayRemove) return { code: 'not_allowed', message: 'Only the signer, the Master (vessel slots) or the company (company slots) can remove this signature.' };
 

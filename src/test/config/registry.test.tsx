@@ -355,6 +355,7 @@ describe('registry mechanism (fixtures)', () => {
       label: key,
       refPrefix,
       scope: 'vessel',
+      capabilityPath: 'vessel.safety.capa',
       enveloped: true,
       companyStep: 'sign_off',
       editAfterSign: 'allow_with_flag',

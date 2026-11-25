@@ -16,8 +16,8 @@ SELECT tests.seed_assignment('A.crew_dra', 'A.dra', true, 'Deckhand');
 SELECT tests.seed_user('A', 'A.ex_master', 'master');
 SELECT tests.seed_assignment('A.ex_master', 'A.dra', false, 'Master');
 
-INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, company_step, edit_after_sign, delete_rule, slot_template)
-VALUES ('test.offices', 'test', 'Offices', 'OFF', 'vessel', 'sign_off', 'lock', 'draft_only', jsonb_build_array(
+INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, company_step, edit_after_sign, delete_rule, slot_template)
+VALUES ('test.offices', 'test', 'Offices', 'OFF', 'vessel', 'vessel.test.records', 'sign_off', 'lock', 'draft_only', jsonb_build_array(
   jsonb_build_object('key', 'anyone', 'label', 'Anyone on board', 'order', 1, 'party', 'vessel', 'required', false),
   jsonb_build_object('key', 'chief', 'label', 'Chief Officer', 'order', 1, 'party', 'vessel', 'office_key', 'chief_officer', 'required', false),
   jsonb_build_object('key', 'named', 'label', 'Named', 'order', 1, 'party', 'vessel', 'named_profile_ids', jsonb_build_array(tests.profile_id('A.crew_dra')), 'required', false),
@@ -112,6 +112,65 @@ SELECT tests.throws_like(format($q$UPDATE public.record_signatures SET removed_a
 SELECT tests.throws_like(format($q$UPDATE public.record_signatures SET signer_name = 'Someone else' WHERE id = %L$q$, tests.id('sig:e:1')), '42501', 'record_history_is_append_only', 'never an edit, even inside the engine');
 SELECT set_config('storm.record_engine', '', true);
 SELECT tests.is(public.record_instantiate_slots(:'env', 1), 0, 'record_instantiate_slots is idempotent per cycle');
+
+-- ------------------------------------------------------------ the witness never removes alone (review round 4, witness-removes-signature)
+
+-- gap/08 §B: the signer, the Master for vessel slots, a company actor for
+-- company slots. The Master slot above was signed by the Master, witnessed
+-- by the deckhand (sig:e:6); a reason is given in case the record is submitted.
+SELECT tests.as_user(tests.user_id('A.crew_dra'));
+SELECT tests.is(public.record_remove_signature(tests.id('sig:e:6'), 'Changed my mind') #>> '{error,code}', 'not_allowed',
+                'the witness of the crew-witnessed Master signature cannot remove it');
+SELECT tests.as_user(tests.user_id('A.master_dra'));
+SELECT tests.is(public.record_remove_signature(tests.id('sig:e:6'), 'Signed the wrong revision') ->> 'ok', 'true', 'the Master (the signer) removes it');
+SELECT tests.reset_role();
+SELECT tests.ok((SELECT removed_at IS NOT NULL AND removed_by = tests.user_id('A.master_dra') FROM public.record_signatures WHERE id = tests.id('sig:e:6')),
+                'removed by the Master, not the witness');
+
+-- ------------------------------------------------------------ company slots are never witnessed (review round 4, company-slot-witnessed-forgery)
+
+SELECT tests.ok(NOT public.record_slot_template_valid('[{"key":"company","label":"Company","order":1,"party":"company","allow_witnessed":true}]', 'sign_off'),
+                'the template validator refuses a witnessed company slot');
+SELECT tests.ok(public.record_slot_template_valid('[{"key":"company","label":"Company","order":1,"party":"company","allow_witnessed":false}]', 'sign_off'),
+                'an explicit allow_witnessed false is fine');
+SELECT tests.throws_like($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, company_step, edit_after_sign, delete_rule, slot_template)
+  VALUES ('test.cw_bad', 'test', 'Bad', 'CWB', 'vessel', 'vessel.test.records', 'sign_off', 'lock', 'draft_only', '[{"key":"company","label":"Company","order":1,"party":"company","allow_witnessed":true}]')$q$,
+  '23514', '%record_kinds_slot_template_check%', 'so a kind cannot register one');
+INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, company_step, edit_after_sign, delete_rule, slot_template)
+VALUES ('test.cw', 'test', 'Company witness', 'CWT', 'vessel', 'vessel.test.records', 'sign_off', 'lock', 'draft_only', jsonb_build_array(
+  jsonb_build_object('key', 'crew', 'label', 'Crew', 'order', 1, 'party', 'vessel', 'required', false),
+  jsonb_build_object('key', 'company', 'label', 'Company', 'order', 2, 'party', 'company')));
+SELECT tests.as_user(tests.user_id('A.crew_dra'));
+SELECT (public.record_open_envelope('test.cw', tests.vessel_id('A.dra'))).id AS cw_env \gset
+SELECT tests.reset_role();
+SELECT tests.ok((SELECT NOT allow_witnessed FROM public.record_signature_slots WHERE id = tests.slot(:'cw_env', 'company')), 'the instantiated company slot does not allow witnessing');
+SELECT tests.throws_like(format($q$INSERT INTO public.record_signature_slots (envelope_id, company_id, vessel_id, cycle, slot_key, label, order_no, party, allow_witnessed)
+  VALUES (%L, %L, %L, 1, 'forged', 'Forged', 3, 'company', true)$q$, :'cw_env', tests.company_id('A'), tests.vessel_id('A.dra')),
+  '23514', '%record_signature_slots_company_party_check%', 'a direct company slot carrying the flag is refused (CHECK)');
+SELECT set_config('storm.record_engine', 'on', true);
+SELECT tests.throws_like(format($q$UPDATE public.record_signature_slots SET allow_witnessed = true WHERE id = %L$q$, tests.slot(:'cw_env', 'company')),
+  '23514', '%record_signature_slots_company_party_check%', 'and so is setting it on one, even under the engine flag');
+SELECT set_config('storm.record_engine', '', true);
+SELECT tests.as_user(tests.user_id('A.crew_dra'));
+SELECT tests.is(public.record_sign_slot(tests.id('sig:cw:1'), tests.slot(:'cw_env', 'company'), 'witnessed', tests.profile_id('A.fleet_manager')) #>> '{error,code}', 'method_not_allowed',
+                'a deckhand cannot sign the company slot witnessed in the fleet manager''s name');
+SELECT tests.reset_role();
+-- Defence in depth: even a slot row that carries the flag (the CHECK
+-- dropped inside a savepoint) is refused by record_sign_slot.
+SAVEPOINT company_witness;
+ALTER TABLE public.record_signature_slots DROP CONSTRAINT record_signature_slots_company_party_check;
+UPDATE public.record_signature_slots SET allow_witnessed = true WHERE id = tests.slot(:'cw_env', 'company');
+SELECT tests.as_user(tests.user_id('A.crew_dra'));
+SELECT tests.is(public.record_sign_slot(tests.id('sig:cw:2'), tests.slot(:'cw_env', 'company'), 'witnessed', tests.profile_id('A.fleet_manager')) #>> '{error,code}', 'method_not_allowed',
+                'record_sign_slot refuses a witnessed company signature whatever the row says');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT count(*) FROM public.record_signatures WHERE envelope_id = :'cw_env'), 0::bigint, 'no signature was written');
+ROLLBACK TO SAVEPOINT company_witness;
+SELECT tests.ok(EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'record_signature_slots_company_party_check'
+                          AND pg_get_constraintdef(oid) LIKE '%allow_witnessed%'), 'the CHECK is back and covers allow_witnessed');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.is(public.record_sign_slot(tests.id('sig:cw:3'), tests.slot(:'cw_env', 'company'), 'verified') ->> 'ok', 'true', 'the company actor signs it on their own account');
+SELECT tests.reset_role();
 
 -- ------------------------------------------------------------ an HR editor cannot make themselves the Master (review round 2)
 

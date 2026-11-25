@@ -424,6 +424,7 @@ describe('record kind and id (registry route patterns)', () => {
   it('works with patterns the real registry accepts (vessel and fleet kinds)', () => {
     const registry = createRecordKindRegistry();
     const base: Omit<RecordKindDefinition, 'key' | 'moduleKey' | 'label' | 'refPrefix' | 'scope' | 'routePattern'> = {
+      capabilityPath: 'records.test.links',
       enveloped: false,
       companyStep: 'none',
       editAfterSign: 'allow_with_flag',

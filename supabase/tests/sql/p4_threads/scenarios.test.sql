@@ -18,8 +18,8 @@ SELECT tests.seed_vessel('SG', 'SG.v', 'M/Y SIGNAL', 'Active', NULL, '2026-01-01
 SELECT tests.seed_user('SG', 'SG.crew1', 'crew'), tests.seed_user('SG', 'SG.crew2', 'crew'),
        tests.seed_user('SG', 'SG.admin1', 'dpa'), tests.seed_user('SG', 'SG.admin2', 'dpa');
 SELECT tests.seed_assignment(k, 'SG.v', true, 'Deckhand') FROM unnest(ARRAY['SG.crew1', 'SG.crew2']) AS k;
-INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, company_step, edit_after_sign, delete_rule, allow_reopen, report_first)
-VALUES ('test.thread', 'test', 'Thread scenario', 'THR', 'vessel', 'sign_off', 'allow_with_flag', 'draft_only', true, true);
+INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, company_step, edit_after_sign, delete_rule, allow_reopen, report_first)
+VALUES ('test.thread', 'test', 'Thread scenario', 'THR', 'vessel', 'vessel.test.records', 'sign_off', 'allow_with_flag', 'draft_only', true, true);
 
 DO $$
 DECLARE

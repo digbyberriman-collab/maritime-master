@@ -11,7 +11,8 @@
 --   record_vessel_signatures_locked() (pure mirror of
 --   vesselSignaturesLocked()), record_state_of(), record_open_requests(),
 --   record_vessel_slots_complete(), record_stale_required(),
---   record_caller_reaches(), record_impersonating(), record_engine_apply(),
+--   record_caller_reaches(), record_user_is_external(),
+--   record_caller_may_write(), record_impersonating(), record_engine_apply(),
 --   record_whose_move(), record_open_envelope(), record_transition(),
 --   record_set_section_digests(), record_slot_digest(), record_log_event()
 -- TS mirror: src/lib/records/services/db.pending.ts (RecordsPendingTables
@@ -39,6 +40,15 @@
 -- of transitionEnvelope(); record_transition() derives the party and every
 -- guard (open requests, stale signatures, all vessel slots signed)
 -- server-side, never from the payload, and applies the outcome's effects.
+--
+-- Write access (review round 4, record-engine-external-writes): reading a
+-- record is record_readable(); changing one as the vessel party (open,
+-- transition, thread post, sign, pass, attach, link) needs
+-- record_caller_may_write(): reach to the record (its vessel, or fleet
+-- reach) and no external membership in the company (gap/01 F36, D-123: an
+-- external viewer is view-only). A company actor (is_company_actor) acts as
+-- the company. Module capabilities per kind (capability_path, required on
+-- every kind) are not evaluated yet (D-132; BUILD-PLAN open item).
 --
 -- Errors: a business refusal is a result envelope {ok:false, error:{code,
 -- message}} and writes nothing; authorisation failures raise 42501 (P0002
@@ -128,7 +138,10 @@ BEGIN
     IF jsonb_typeof(e -> 'label') IS DISTINCT FROM 'string' OR length(btrim(e ->> 'label')) NOT BETWEEN 1 AND 80 THEN RETURN false; END IF;
     v_party := e ->> 'party';
     IF v_party IS NULL OR v_party NOT IN ('vessel', 'company') THEN RETURN false; END IF;
-    IF v_party = 'company' AND (public.record_json_truthy(e -> 'allow_visitor') OR public.record_json_truthy(e -> 'allow_on_behalf')) THEN RETURN false; END IF;
+    -- A company slot is signed by a company actor on their own account:
+    -- never witnessed, by a visitor or on someone's behalf (review round 4,
+    -- company-slot-witnessed-forgery).
+    IF v_party = 'company' AND (public.record_json_truthy(e -> 'allow_witnessed') OR public.record_json_truthy(e -> 'allow_visitor') OR public.record_json_truthy(e -> 'allow_on_behalf')) THEN RETURN false; END IF;
     IF v_party = 'company' AND p_company_step IS DISTINCT FROM 'acknowledge' AND p_company_step IS DISTINCT FROM 'sign_off' THEN RETURN false; END IF;
     FOREACH v_flag IN ARRAY ARRAY['required', 'allow_witnessed', 'allow_visitor', 'allow_on_behalf', 'on_behalf_reason_required'] LOOP
       IF jsonb_typeof(e -> v_flag) IS NOT NULL AND jsonb_typeof(e -> v_flag) NOT IN ('boolean', 'null') THEN RETURN false; END IF;
@@ -224,7 +237,7 @@ CREATE TABLE IF NOT EXISTS public.record_kinds (
   CONSTRAINT record_kinds_ref_prefix_check CHECK (ref_prefix ~ '^[A-Z][A-Z0-9]{0,7}$'),
   CONSTRAINT record_kinds_scope_check CHECK (scope IN ('vessel', 'fleet')),
   CONSTRAINT record_kinds_route_pattern_check CHECK (route_pattern IS NULL OR (route_pattern LIKE '/%' AND (scope = 'fleet' OR route_pattern LIKE '/v/:vesselCode/%'))),
-  CONSTRAINT record_kinds_capability_path_check CHECK (capability_path IS NULL OR capability_path ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$'),
+  CONSTRAINT record_kinds_capability_path_check CHECK (capability_path IS NOT NULL AND capability_path ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$'),
   CONSTRAINT record_kinds_company_step_check CHECK (company_step IN ('none', 'acknowledge', 'sign_off')),
   CONSTRAINT record_kinds_edit_after_sign_check CHECK (edit_after_sign IN ('allow_with_flag', 'lock', 'revert_to_draft')),
   CONSTRAINT record_kinds_delete_rule_check CHECK (delete_rule IN ('draft_only', 'never_after_submit', 'until_signed', 'free', 'cascade_parent')),
@@ -314,6 +327,8 @@ CREATE TABLE IF NOT EXISTS public.record_envelopes (
   CONSTRAINT record_envelopes_cycle_check CHECK (current_cycle >= 1 AND (acknowledged_cycle IS NULL OR acknowledged_cycle BETWEEN 1 AND current_cycle)),
   CONSTRAINT record_envelopes_void_check CHECK (status <> 'void' OR voided_at IS NOT NULL),
   CONSTRAINT record_envelopes_title_check CHECK (title IS NULL OR length(title) <= 200),
+  CONSTRAINT record_envelopes_void_reason_check CHECK (void_reason IS NULL OR length(void_reason) <= 2000),
+  CONSTRAINT record_envelopes_decision_conditions_check CHECK (decision_conditions IS NULL OR length(decision_conditions) <= 2000),
   CONSTRAINT record_envelopes_section_digests_check CHECK (jsonb_typeof(section_digests) = 'object')
 );
 
@@ -894,9 +909,9 @@ BEGIN
 END;
 $$;
 
--- Does the user reach the record (write access on the vessel side): reach
--- to its vessel or fleet reach in its company; for fleet records fleet
--- reach.
+-- Does the user reach the record: reach to its vessel or fleet reach in
+-- its company; for fleet records fleet reach. Reach alone is not write
+-- access: the write paths ask record_caller_may_write() (review round 4).
 CREATE OR REPLACE FUNCTION public.record_caller_reaches(p_user_id uuid, p_company_id uuid, p_vessel_id uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -907,6 +922,46 @@ AS $$
   SELECT p_user_id IS NOT NULL
      AND (public.fleet_reach_for(p_user_id, p_company_id)
           OR (p_vessel_id IS NOT NULL AND public.reach_vessel_for(p_user_id, p_vessel_id)))
+$$;
+
+-- The user holds an external membership in the company (gap/01 F36, C17,
+-- D-123: an external viewer is view-only). Any account_memberships row of
+-- kind 'external', whatever its status, window or legacy_managed: an
+-- external has no other reach in that company, so counting every such row
+-- fails closed. NULL ids -> false (callers AND it with a reach check that
+-- is itself false for NULL).
+CREATE OR REPLACE FUNCTION public.record_user_is_external(p_user_id uuid, p_company_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT p_user_id IS NOT NULL AND p_company_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.account_memberships AS m
+    WHERE m.user_id = p_user_id AND m.company_id = p_company_id AND m.kind = 'external'
+  )
+$$;
+
+-- Write access to a record as the vessel party (review round 4,
+-- record-engine-external-writes; D-132): the user reaches it
+-- (record_caller_reaches) and is no external viewer of its company. Every
+-- engine write path asks this (company actors pass through
+-- is_company_actor where the company may act); reads stay on
+-- record_readable(). NULL or unknown ids -> false (fail closed).
+CREATE OR REPLACE FUNCTION public.record_caller_may_write(p_user_id uuid, p_company_id uuid, p_vessel_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT coalesce(
+    p_user_id IS NOT NULL
+    AND p_company_id IS NOT NULL
+    AND public.record_caller_reaches(p_user_id, p_company_id, p_vessel_id)
+    AND NOT public.record_user_is_external(p_user_id, p_company_id),
+    false)
 $$;
 
 -- The session is a "login as" (impersonation) session: any value of the
@@ -1159,8 +1214,10 @@ $$;
 -- ---------------------------------------------------------------- the record API
 
 -- Opens an envelope for a kind (and an entity): vessel kinds need a vessel
--- the caller reaches (fleet reach also passes), fleet kinds no vessel and
--- fleet reach or company-actor rights; the caller is active. The
+-- the caller may write (record_caller_may_write: reach, fleet reach also
+-- passes, and no external membership), fleet kinds no vessel and write
+-- access to the fleet (fleet reach, not external) or company-actor
+-- rights; the caller is active. The
 -- reference comes from format_reference(); cycle-1 slots from the kind's
 -- template (file 11); event 'created'. Idempotent on (kind, entity): a
 -- second call returns the existing envelope (if the caller may read it).
@@ -1207,7 +1264,7 @@ BEGIN
     END IF;
     IF v_uid IS NOT NULL AND NOT (
       public.user_belongs_to_company(v_uid, v_company)
-      AND (public.reach_vessel_for(v_uid, p_vessel_id) OR public.fleet_reach_for(v_uid, v_company))
+      AND public.record_caller_may_write(v_uid, v_company, p_vessel_id)
     ) THEN
       RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'record_access_denied';
     END IF;
@@ -1219,7 +1276,7 @@ BEGIN
       RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'company_required', DETAIL = 'A fleet record is opened by a signed-in member of the company.';
     END IF;
     SELECT company_id INTO v_company FROM public.profiles WHERE user_id = v_uid;
-    IF v_company IS NULL OR NOT (public.fleet_reach_for(v_uid, v_company) OR public.is_company_actor(v_uid, NULL)) THEN
+    IF v_company IS NULL OR NOT (public.record_caller_may_write(v_uid, v_company, NULL) OR public.is_company_actor(v_uid, NULL)) THEN
       RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'record_access_denied';
     END IF;
   END IF;
@@ -1275,9 +1332,13 @@ $$;
 -- slots signed" are derived here; the payload carries only reason,
 -- decision, conditions, closedAs and duplicateOf. Returns
 -- {ok:true, value:{envelope, effects, notification}} or the decide
--- function's {ok:false, error}; impersonating sessions, vessel_sign and
--- unknown actions / payload keys are refused as results. Raises 42501 when
--- the caller is inactive or cannot read the record, P0002 for an unknown id.
+-- function's {ok:false, error}; impersonating sessions, vessel_sign,
+-- unknown actions / payload keys, a reason or conditions over 2000
+-- characters (invalid_input; never truncated) and a caller who can read
+-- the record but neither acts for the company nor may write it
+-- (no_write_access: an external viewer, review round 4) are refused as
+-- results. Raises 42501 when the caller is inactive or cannot read the
+-- record, P0002 for an unknown id.
 CREATE OR REPLACE FUNCTION public.record_transition(p_envelope_id uuid, p_action text, p_payload jsonb DEFAULT '{}'::jsonb, p_expected_version integer DEFAULT NULL)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -1316,13 +1377,27 @@ BEGIN
   IF jsonb_typeof(v_payload) <> 'object' OR EXISTS (SELECT 1 FROM jsonb_object_keys(v_payload) AS key WHERE key NOT IN ('reason', 'decision', 'conditions', 'closedAs', 'duplicateOf')) THEN
     RETURN jsonb_build_object('ok', false, 'error', jsonb_build_object('code', 'invalid_input', 'message', 'Only a reason, decision, conditions, close-as option or duplicate record can be sent.'));
   END IF;
+  -- Bounded free text (review round 4, record-free-text-unbounded): refused,
+  -- never truncated (a stored reason is what the user wrote).
+  IF coalesce(length(v_payload ->> 'reason'), 0) > 2000 OR coalesce(length(v_payload ->> 'conditions'), 0) > 2000 THEN
+    RETURN jsonb_build_object('ok', false, 'error', jsonb_build_object('code', 'invalid_input', 'message', 'Keep the reason and conditions to 2000 characters.'));
+  END IF;
 
   v_company_actor := public.is_company_actor(v_uid, e.vessel_id);
-  v_reaches := CASE WHEN e.vessel_id IS NULL THEN public.fleet_reach_for(v_uid, e.company_id) ELSE public.reach_vessel_for(v_uid, e.vessel_id) END;
+  -- The vessel party submits: write access to the record (no external
+  -- membership), and for a vessel record reach to that vessel itself (fleet
+  -- reach alone does not make a company user the vessel).
+  v_reaches := public.record_caller_may_write(v_uid, e.company_id, e.vessel_id)
+    AND (e.vessel_id IS NULL OR public.reach_vessel_for(v_uid, e.vessel_id));
   v_party := CASE
     WHEN p_action = 'submit' THEN CASE WHEN v_reaches THEN 'vessel' ELSE 'company' END
     ELSE CASE WHEN v_company_actor THEN 'company' ELSE 'vessel' END
   END;
+  -- Readable is not writable (review round 4, record-engine-external-writes):
+  -- an external viewer reads the record and changes nothing.
+  IF NOT v_company_actor AND NOT public.record_caller_may_write(v_uid, e.company_id, e.vessel_id) THEN
+    RETURN jsonb_build_object('ok', false, 'error', jsonb_build_object('code', 'no_write_access', 'message', 'You can view this record but not change it.'));
+  END IF;
 
   v_input := jsonb_strip_nulls(jsonb_build_object(
     'action', p_action,
@@ -1449,6 +1524,8 @@ REVOKE ALL ON FUNCTION public.record_open_requests(uuid) FROM PUBLIC, anon, auth
 REVOKE ALL ON FUNCTION public.record_vessel_slots_complete(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.record_stale_required(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.record_caller_reaches(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.record_user_is_external(uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.record_caller_may_write(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.record_impersonating() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.record_engine_apply(uuid, text, text, jsonb, jsonb) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.record_whose_move(uuid) FROM PUBLIC, anon, authenticated, service_role;
@@ -1470,6 +1547,8 @@ GRANT EXECUTE ON FUNCTION public.record_open_requests(uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.record_vessel_slots_complete(uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.record_stale_required(uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.record_caller_reaches(uuid, uuid, uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.record_user_is_external(uuid, uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.record_caller_may_write(uuid, uuid, uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.record_impersonating() TO service_role;
 GRANT EXECUTE ON FUNCTION public.record_engine_apply(uuid, text, text, jsonb, jsonb) TO service_role;
 GRANT EXECUTE ON FUNCTION public.record_whose_move(uuid) TO service_role;
@@ -1481,13 +1560,13 @@ GRANT EXECUTE ON FUNCTION public.record_log_event(uuid, text, text, jsonb, text,
 
 -- ---------------------------------------------------------------- comments
 
-COMMENT ON TABLE public.record_kinds IS 'Record-kind catalogue (gap/08 REG1; G7): one row per workflow record kind, mirroring src/lib/records/registry.ts definitions (snake_case slot template). Platform catalogue: no company_id (rule 3 exception). Read: active users; writes: service role (domain migrations from Phase 3; none seeded in Phase 2).';
-COMMENT ON TABLE public.record_envelopes IS 'The record envelope (gap/08 §A; D-132): status, whose move, the company step, cycles, acknowledgements, digests and version of one workflow record. Read: company members with fleet reach or reach to the vessel (record_readable). No client writes: record_open_envelope / record_transition / record_sign_slot only; trg_record_envelopes_guard refuses status changes outside the engine, for every role.';
+COMMENT ON TABLE public.record_kinds IS 'Record-kind catalogue (gap/08 REG1; G7): one row per workflow record kind, mirroring src/lib/records/registry.ts definitions (snake_case slot template). Every kind names its capability_path (domain.module.subcategory; record_kinds_capability_path_check, review round 4): the engine evaluates it before the first kind registers (D-132; BUILD-PLAN open item), never a hard-coded list of legacy role names. Platform catalogue: no company_id (rule 3 exception). Read: active users; writes: service role (domain migrations from Phase 3; none seeded in Phase 2).';
+COMMENT ON TABLE public.record_envelopes IS 'The record envelope (gap/08 §A; D-132): status, whose move, the company step, cycles, acknowledgements, digests and version of one workflow record. Free text is bounded (title 200, void_reason and decision_conditions 2000). Read: company members with fleet reach or reach to the vessel (record_readable); writes need record_caller_may_write or a company actor. No client writes: record_open_envelope / record_transition / record_sign_slot only; trg_record_envelopes_guard refuses status changes outside the engine, for every role.';
 COMMENT ON TABLE public.record_events IS 'Append-only audit trail of record actions (gap/08 AU1-AU2): who (actor, party), what (action, from -> to status, cycle, reason), ids and codes in the payload (no names or emails), the notification type. No updated_at (rule 3 exception). Never updated or deleted (trg_record_events_append_only).';
 COMMENT ON TABLE public.record_snapshots IS 'Append-only snapshots (gap/08 SN1): the envelope and the live signatures of the cycle at submit / decision / close / reopen / void, with a sha256. No updated_at (rule 3 exception).';
 COMMENT ON FUNCTION public.record_text_blank(text) IS 'JS blankness: NULL or only JS whitespace (record engine parity).';
 COMMENT ON FUNCTION public.record_json_truthy(jsonb) IS 'JS truthiness of a JSON value (record engine parity).';
-COMMENT ON FUNCTION public.record_slot_template_valid(jsonb, text) IS 'validateSlotTemplate() on a snake_case slot template, plus "company slots need a company step". Immutable (backs record_kinds_slot_template_check).';
+COMMENT ON FUNCTION public.record_slot_template_valid(jsonb, text) IS 'validateSlotTemplate() on a snake_case slot template (a company slot is never witnessed, visitor or on-behalf), plus "company slots need a company step". Immutable (backs record_kinds_slot_template_check).';
 COMMENT ON FUNCTION public.record_digest_of(jsonb, text[]) IS 'sha256 hex of the sorted key:digest lines of the covered sections (* when none named); empty when none known. Pure.';
 COMMENT ON FUNCTION public.record_envelopes_guard() IS 'Trigger: status columns and deletes only under storm.record_engine (every role); a record created outside the engine starts open.';
 COMMENT ON FUNCTION public.record_append_only_guard() IS 'Trigger: append-only history (UPDATE / DELETE refused) except storm.record_purge and referential set-null of the named columns.';
@@ -1498,12 +1577,14 @@ COMMENT ON FUNCTION public.record_state_of(uuid) IS 'Internal: the TS EnvelopeSt
 COMMENT ON FUNCTION public.record_open_requests(uuid) IS 'Internal: open requests in the envelope''s status_updates thread.';
 COMMENT ON FUNCTION public.record_vessel_slots_complete(uuid) IS 'Internal: every required vessel slot of the current cycle has a live signature.';
 COMMENT ON FUNCTION public.record_stale_required(uuid) IS 'Internal: a live required signature of the current cycle is stale.';
-COMMENT ON FUNCTION public.record_caller_reaches(uuid, uuid, uuid) IS 'Internal: the user has fleet reach in the company or reach to the vessel (write access on the vessel side).';
+COMMENT ON FUNCTION public.record_caller_reaches(uuid, uuid, uuid) IS 'Internal: the user has fleet reach in the company or reach to the vessel. Reach only: write access is record_caller_may_write().';
+COMMENT ON FUNCTION public.record_user_is_external(uuid, uuid) IS 'Internal (service role): the user has an account_memberships row of kind external in the company, whatever its status, window or legacy_managed (gap/01 F36, D-123: external viewers are view-only; fails closed). NULL ids -> false.';
+COMMENT ON FUNCTION public.record_caller_may_write(uuid, uuid, uuid) IS 'Internal (service role): write access to a record as the vessel party (review round 4; D-132): record_caller_reaches() and not record_user_is_external(). Every record-engine write path asks it; reads stay on record_readable(). NULL or unknown ids -> false.';
 COMMENT ON FUNCTION public.record_impersonating() IS 'Internal: the JWT marks a login-as session (app_metadata.impersonating).';
 COMMENT ON FUNCTION public.record_engine_apply(uuid, text, text, jsonb, jsonb) IS 'Internal: applies an engine outcome (status, stamps, effects, whose move, version, one event) under storm.record_engine. A company signature''s integrity hash covers the stored signer name with the profile id (D-209).';
 COMMENT ON FUNCTION public.record_whose_move(uuid) IS 'whoseMove() over the envelope status and its status_updates thread. Internal (service role).';
-COMMENT ON FUNCTION public.record_open_envelope(text, uuid, uuid, text) IS 'Opens a record envelope for a kind (vessel or fleet), with its reference and cycle-1 slots; idempotent on (kind, entity) within the same company and vessel (42501 record_access_denied / 22023 envelope_scope_mismatch otherwise). From a signed-in session an entity id needs the transaction-local storm.record_domain flag a domain definer sets after verifying the entity (22023 entity_unverified).';
-COMMENT ON FUNCTION public.record_transition(uuid, text, jsonb, integer) IS 'The only status change path for a record (D-132): server-derived party and guards, record_transition_decide, effects applied, one event. Returns a result envelope.';
+COMMENT ON FUNCTION public.record_open_envelope(text, uuid, uuid, text) IS 'Opens a record envelope for a kind (vessel or fleet), with its reference and cycle-1 slots; the caller may write the vessel (record_caller_may_write) or, for a fleet kind, the fleet, or is a company actor (42501 record_access_denied otherwise: an external viewer opens nothing); idempotent on (kind, entity) within the same company and vessel (42501 record_access_denied / 22023 envelope_scope_mismatch otherwise). From a signed-in session an entity id needs the transaction-local storm.record_domain flag a domain definer sets after verifying the entity (22023 entity_unverified).';
+COMMENT ON FUNCTION public.record_transition(uuid, text, jsonb, integer) IS 'The only status change path for a record (D-132): server-derived party and guards, record_transition_decide, effects applied, one event. A reader who neither acts for the company nor may write the record (record_caller_may_write) gets no_write_access; a reason or conditions over 2000 characters invalid_input. Returns a result envelope.';
 COMMENT ON FUNCTION public.record_set_section_digests(uuid, jsonb) IS 'Merges section digests (sha256 hex) into an envelope and recomputes content_digest. Service role / domain definers only.';
 COMMENT ON FUNCTION public.record_slot_digest(uuid, text[]) IS 'The current digest of the covered sections of an envelope. Service role only.';
 COMMENT ON FUNCTION public.record_log_event(uuid, text, text, jsonb, text, text) IS 'Writes one record_events row for an envelope (actor = auth.uid()). Service role / definers.';

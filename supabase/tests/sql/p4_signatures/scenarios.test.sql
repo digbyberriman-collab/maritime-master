@@ -27,9 +27,9 @@ CREATE TEMP TABLE sig_scenarios ON COMMIT DROP AS
 SELECT ord, s ->> 'name' AS name, s AS scenario, 'test.sig_' || ord AS kind_key, 'SIG' || ord AS prefix
 FROM sig_fx, jsonb_array_elements(j -> 'scenarios') WITH ORDINALITY AS x(s, ord);
 GRANT SELECT ON sig_scenarios TO PUBLIC;
-INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, enveloped, company_step, report_first, decision_kind,
+INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, enveloped, company_step, report_first, decision_kind,
                                  allow_reopen, allow_close_as, edit_after_sign, delete_rule, slot_template)
-SELECT kind_key, 'test', 'Scenario ' || name, prefix, 'vessel', true,
+SELECT kind_key, 'test', 'Scenario ' || name, prefix, 'vessel', 'vessel.test.records', true,
        scenario #>> '{kind,companyStep}', (scenario #>> '{kind,reportFirst}')::boolean, (scenario #>> '{kind,decisionKind}')::boolean,
        (scenario #>> '{kind,allowReopen}')::boolean, (scenario #>> '{kind,allowCloseAs}')::boolean, 'allow_with_flag', scenario #>> '{kind,deleteRule}',
        (SELECT jsonb_agg(jsonb_strip_nulls(jsonb_build_object(

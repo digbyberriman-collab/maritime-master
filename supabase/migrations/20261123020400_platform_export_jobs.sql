@@ -38,6 +38,13 @@
 -- viewers of the company), whatever record_readable() allows for other
 -- record events.
 --
+-- Deleting a user or a vessel (review round 4, export-jobs-block-user-delete):
+-- a job is an anonymised audit row then. requested_by and vessel_id are set
+-- NULL by their foreign keys (ON DELETE SET NULL), export_jobs_guard lets
+-- exactly that referential SET NULL through, and nobody can cancel an
+-- orphaned job (the requester is gone). Jobs themselves are still never
+-- deleted (a company delete stays blocked by record_events, D-152).
+--
 -- Errors: a business rule raises 22023 with a stable code as the message;
 -- authorisation 42501; an unknown id P0002.
 --
@@ -68,7 +75,7 @@ CREATE TABLE IF NOT EXISTS public.export_jobs (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   company_id uuid NOT NULL,
   vessel_id uuid NULL,
-  requested_by uuid NOT NULL,
+  requested_by uuid NULL,
   kind text NOT NULL,
   generated_by text NOT NULL,
   source_key text NOT NULL,
@@ -89,7 +96,7 @@ CREATE TABLE IF NOT EXISTS public.export_jobs (
   CONSTRAINT export_jobs_pkey PRIMARY KEY (id),
   CONSTRAINT export_jobs_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE,
   CONSTRAINT export_jobs_vessel_id_fkey FOREIGN KEY (vessel_id) REFERENCES public.vessels(id) ON DELETE SET NULL,
-  CONSTRAINT export_jobs_requested_by_fkey FOREIGN KEY (requested_by) REFERENCES auth.users(id) ON DELETE CASCADE,
+  CONSTRAINT export_jobs_requested_by_fkey FOREIGN KEY (requested_by) REFERENCES auth.users(id) ON DELETE SET NULL,
   CONSTRAINT export_jobs_kind_check CHECK (kind IN ('record_pdf', 'register_pdf', 'csv', 'xlsx', 'zip', 'compliance_pack', 'gdpr_subject', 'ics')),
   CONSTRAINT export_jobs_generated_by_check CHECK (generated_by IN ('client', 'server')),
   CONSTRAINT export_jobs_source_key_check CHECK (source_key ~ '^[a-z][a-z0-9_.:-]{0,120}$'),
@@ -138,8 +145,10 @@ CREATE POLICY record_events_export_job_audience ON public.record_events
 -- ---------------------------------------------------------------- guard (storm.record_engine, every role)
 
 -- Outside the engine flag nothing but updated_at changes on an export job,
--- no job is deleted, and a new job starts requested (server). The flag is
--- set and reset by the definers of this file only.
+-- except the referential SET NULL of requested_by or vessel_id when that
+-- user or vessel is deleted (review round 4); no job is deleted, and a new
+-- job starts requested (server). The flag is set and reset by the definers
+-- of this file only.
 CREATE OR REPLACE FUNCTION public.export_jobs_guard()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -161,6 +170,13 @@ BEGIN
     RETURN NEW;
   END IF;
   IF (to_jsonb(NEW) - 'updated_at') IS DISTINCT FROM (to_jsonb(OLD) - 'updated_at') THEN
+    -- A deleted user or vessel (ON DELETE SET NULL): only those columns, and
+    -- only to NULL, never to another value.
+    IF (to_jsonb(NEW) - ARRAY['updated_at', 'requested_by', 'vessel_id']) IS NOT DISTINCT FROM (to_jsonb(OLD) - ARRAY['updated_at', 'requested_by', 'vessel_id'])
+       AND (NEW.requested_by IS NULL OR NEW.requested_by = OLD.requested_by)
+       AND (NEW.vessel_id IS NULL OR NEW.vessel_id = OLD.vessel_id) THEN
+      RETURN NEW;
+    END IF;
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'export_status_is_server_owned', DETAIL = 'Only the export engine (export_job_transition) changes a job.';
   END IF;
   RETURN NEW;
@@ -425,7 +441,8 @@ END;
 $$;
 
 -- cancel_export_job: the requester only (42501 for anyone else, admins
--- included), requested -> cancelled (22023 export_not_cancellable from any
+-- included, and for everyone on an orphaned job whose requester was
+-- deleted), requested -> cancelled (22023 export_not_cancellable from any
 -- other status; an already cancelled job is returned unchanged).
 CREATE OR REPLACE FUNCTION public.cancel_export_job(p_job_id uuid)
 RETURNS public.export_jobs
@@ -445,7 +462,7 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = 'P0002', MESSAGE = 'export_not_found';
   END IF;
-  IF j.requested_by <> v_uid THEN
+  IF j.requested_by IS DISTINCT FROM v_uid THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'export_access_denied', DETAIL = 'Only the person who asked for an export cancels it.';
   END IF;
   IF j.status = 'cancelled' THEN
@@ -479,12 +496,12 @@ GRANT EXECUTE ON FUNCTION public.cancel_export_job(uuid) TO authenticated;
 
 -- ---------------------------------------------------------------- comments
 
-COMMENT ON TABLE public.export_jobs IS 'Export jobs (gap/08 EX1, EX3, EX4; C10): server jobs requested -> running -> ready | failed (-> expired -> purged), client exports logged as ready before the download. Read: the requester, and admins who may read the permission audit log; their record_events (entity export_job) have the same audience (record_events_export_job_audience). No client writes: request_export / log_client_export / cancel_export_job; only export_job_transition (service role) moves a server job (trg_export_jobs_guard, every role). export_downloads lands with the export builder (C10, deferred).';
-COMMENT ON FUNCTION public.export_jobs_guard() IS 'Trigger: export jobs change only under storm.record_engine (every role); never deleted; a job created outside the engine starts requested (server).';
+COMMENT ON TABLE public.export_jobs IS 'Export jobs (gap/08 EX1, EX3, EX4; C10): server jobs requested -> running -> ready | failed (-> expired -> purged), client exports logged as ready before the download. Read: the requester, and admins who may read the permission audit log; their record_events (entity export_job) have the same audience (record_events_export_job_audience). requested_by and vessel_id become NULL when that user or vessel is deleted (ON DELETE SET NULL): the job stays as an anonymised audit row (review round 4). No client writes: request_export / log_client_export / cancel_export_job; only export_job_transition (service role) moves a server job (trg_export_jobs_guard, every role). export_downloads lands with the export builder (C10, deferred).';
+COMMENT ON FUNCTION public.export_jobs_guard() IS 'Trigger: export jobs change only under storm.record_engine (every role), except the referential SET NULL of requested_by or vessel_id (a deleted user or vessel); never deleted; a job created outside the engine starts requested (server).';
 COMMENT ON FUNCTION public.export_module_key(text) IS 'The module of an export source key (its first snake_case word). Pure.';
 COMMENT ON FUNCTION public.export_job_log(public.export_jobs, text, text, text, text) IS 'Internal: one record_events row for an export job (entity export_job; ids and codes only).';
 COMMENT ON FUNCTION public.export_scope_check(text, text, jsonb, uuid) IS 'Internal: the caller''s company for an export, after the reach (vessel or fleet) and input checks.';
 COMMENT ON FUNCTION public.export_job_transition(uuid, text, jsonb) IS 'The export machine (service role): requested -> running | failed | cancelled; running -> ready | failed; ready -> expired; expired -> purged. Event export.<status>; ready / failed notify the requester.';
 COMMENT ON FUNCTION public.request_export(text, text, jsonb, boolean, uuid) IS 'Requests a server export (stays requested until a builder exists). Vessel exports need reach, fleet exports fleet reach.';
 COMMENT ON FUNCTION public.log_client_export(text, text, jsonb, boolean, integer, uuid) IS 'Logs a browser-generated export before its download (EX4): generated_by client, ready.';
-COMMENT ON FUNCTION public.cancel_export_job(uuid) IS 'Cancels the caller''s own queued (requested) export.';
+COMMENT ON FUNCTION public.cancel_export_job(uuid) IS 'Cancels the caller''s own queued (requested) export; nobody cancels an orphaned job (requested_by NULL).';

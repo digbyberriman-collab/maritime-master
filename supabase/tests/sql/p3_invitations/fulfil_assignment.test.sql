@@ -119,54 +119,108 @@ SELECT tests.results_eq(
   'a login linked by the service role (the edge D-01 fallback) is fulfilled by the trigger (today when no join date)');
 SELECT tests.is((SELECT is_imported FROM public.profiles WHERE id = tests.profile_id('A.linked_later')), false, 'and the profile is no longer imported');
 
--- ------------------------------------------------------------ the Master office needs a users-access admin (D-198; review round 3)
+-- ------------------------------------------------------------ the Master office needs a users-access admin (D-198; review rounds 3 and 4)
 
--- profile-imported-columns-unguarded: the engine flag never appoints a
--- Master on its own. A pending profile whose position (else rank) is
--- Master / Captain is fulfilled only for an actor who is a users-access
--- admin of the vessel; otherwise not_eligible, nothing written, the
--- profile still pending.
+-- profile-imported-columns-unguarded (round 3): the engine flag never
+-- appoints a Master on its own. A pending profile whose position (else
+-- rank) is Master / Captain is fulfilled only for an actor who is a
+-- users-access admin of the vessel; otherwise not_eligible, nothing
+-- written, the profile still pending.
+-- master-placement-stranded-after-link (round 4): a given inviter who is no
+-- users-access admin of the pending vessel is refused before anything is
+-- reserved, linked or sent (reserve_invitation_attempt master_needs_admin,
+-- record_invitation_send 42501 master_needs_admin), so the vessel's
+-- users-access admin can still finish the placement.
 SELECT tests.seed_imported(k, 'A.dra', jsonb_build_object('position', 'Master'))
-FROM unnest(ARRAY['A.master_by_master', 'A.master_by_ops', 'A.master_by_dpa']) AS k;
+FROM unnest(ARRAY['A.master_by_master', 'A.master_by_ops', 'A.master_by_dpa', 'A.master_by_ua']) AS k;
 SELECT tests.seed_imported('A.captain_by_rank', 'A.dra', jsonb_build_object('position', ' ', 'rank', 'CAPTAIN'));
 SELECT tests.seed_auth_user(k, jsonb_build_object('invited_at', now(), 'email_confirmed_at', NULL))
-FROM unnest(ARRAY['A.master_by_master', 'A.master_by_ops', 'A.master_by_dpa', 'A.captain_by_rank']) AS k;
+FROM unnest(ARRAY['A.master_by_master', 'A.master_by_ops', 'A.master_by_dpa', 'A.master_by_ua', 'A.captain_by_rank']) AS k;
+-- A vessel-scoped users-access admin: non-legacy admin membership, write, DRAAK only.
+SELECT tests.seed_user('A', 'A.ua_dra', 'crew');
+UPDATE public.account_memberships SET legacy_managed = false, source = 'admin', kind = 'admin', users_access_level = 'write', vessel_scope = 'assigned', fleet_access = false
+WHERE user_id = tests.user_id('A.ua_dra');
+INSERT INTO public.account_membership_vessels (membership_id, company_id, vessel_id)
+SELECT id, company_id, tests.vessel_id('A.dra') FROM public.account_memberships WHERE user_id = tests.user_id('A.ua_dra');
 SELECT tests.ok(public.has_capability_for(tests.user_id('A.master_dra'), 'admin.access.users_access.assign', tests.company_id('A'), tests.vessel_id('A.dra'))
             AND NOT public.has_capability_for(tests.user_id('A.master_dra'), 'admin.access.users_access.admin', tests.company_id('A'), tests.vessel_id('A.dra')),
                 'setup: the DRAAK Master may assign on DRAAK (D-125) but is not a users-access admin');
+SELECT tests.ok(public.has_capability_for(tests.user_id('A.ua_dra'), 'admin.access.users_access.admin', tests.company_id('A'), tests.vessel_id('A.dra'))
+            AND NOT public.admin_scope_all(tests.user_id('A.ua_dra'), tests.company_id('A')),
+                'setup: A.ua_dra is a users-access admin of DRAAK only (not an all-vessels admin)');
 SELECT tests.as_service();
-SELECT tests.is((public.record_invitation_send(tests.profile_id('A.master_by_master'), 'sent', NULL, NULL, tests.user_id('A.master_dra'), 'crew', NULL, tests.user_id('A.master_by_master'))).status,
-                'sent', 'the Master invites a pending profile on their own vessel (the invitation goes out)');
+SELECT tests.is(public.reserve_invitation_attempt(tests.profile_id('A.master_by_master'), tests.user_id('A.master_dra')) ->> 'code', 'master_needs_admin',
+                'the DRAAK Master cannot reserve an invitation for a pending Master (master_needs_admin)');
+SELECT tests.throws_like(format($q$SELECT public.record_invitation_send(%L, 'sent', NULL, NULL, %L, 'crew', NULL, %L)$q$,
+                                tests.profile_id('A.master_by_master'), tests.user_id('A.master_dra'), tests.user_id('A.master_by_master')),
+                         '42501', 'master_needs_admin', 'nor record a send for one (42501 master_needs_admin)');
+SELECT tests.throws_like(format($q$SELECT public.record_invitation_send(%L, 'send_failed', 'provider_rejected', NULL, %L, 'crew', NULL, %L)$q$,
+                                tests.profile_id('A.master_by_master'), tests.user_id('A.master_dra'), tests.user_id('A.master_by_master')),
+                         '42501', 'master_needs_admin', 'nor a failed send that would link the login');
+SELECT tests.is(public.reserve_invitation_attempt(tests.profile_id('A.captain_by_rank'), tests.user_id('A.master_dra')) ->> 'code', 'master_needs_admin',
+                'a rank of CAPTAIN (blank position) counts as the Master office too');
 SELECT tests.is((public.record_invitation_send(tests.profile_id('A.master_by_ops'), 'sent', NULL, NULL, NULL, 'crew', NULL, tests.user_id('A.master_by_ops'))).status,
-                'sent', 'a send with no inviter (service / ops)');
+                'sent', 'a send with no inviter (service / ops) keeps today''s behaviour');
 SELECT tests.is((public.record_invitation_send(tests.profile_id('A.captain_by_rank'), 'sent', NULL, NULL, NULL, 'crew', NULL, tests.user_id('A.captain_by_rank'))).status,
-                'sent', 'a pending profile whose rank says Captain');
+                'sent', 'a pending profile whose rank says Captain, no inviter');
 SELECT tests.is(public.fulfil_imported_assignment(tests.profile_id(v.k), v.actor), 'not_eligible', v.k || ': fulfil without a users-access admin answers not_eligible')
-FROM (VALUES ('A.master_by_master', tests.user_id('A.master_dra')), ('A.master_by_ops', NULL::uuid), ('A.captain_by_rank', NULL::uuid)) AS v(k, actor);
+FROM (VALUES ('A.master_by_ops', NULL::uuid), ('A.captain_by_rank', tests.user_id('A.master_dra'))) AS v(k, actor);
+SELECT tests.reset_role();
+SELECT tests.results_eq(
+  format($q$SELECT is_imported, imported_vessel_id, position, user_id IS NOT NULL FROM public.profiles WHERE id = %L$q$, tests.profile_id('A.master_by_master')),
+  format($q$VALUES (true, %L::uuid, 'Master'::text, false)$q$, tests.vessel_id('A.dra')),
+  'the refused profile stays pending and unlinked (imported, the vessel waiting, the position kept, no login)');
+SELECT tests.is((SELECT count(*) FROM public.user_invitations WHERE profile_id = tests.profile_id('A.master_by_master')), 0::bigint,
+                'and nothing was reserved or recorded for it');
+SELECT tests.as_service();
+SELECT tests.ok(public.admin_may_act_on_user(tests.user_id('A.ua_dra'), NULL, tests.company_id('A'), tests.profile_id('A.master_by_master')),
+                'so the DRAAK users-access admin can still act on the refused placement');
 SELECT tests.reset_role();
 SELECT tests.is((SELECT count(*) FROM public.crew_assignments WHERE user_id = tests.user_id(k)), 0::bigint, k || ': no assignment (no Master row)')
 FROM unnest(ARRAY['A.master_by_master', 'A.master_by_ops', 'A.captain_by_rank']) AS k;
 SELECT tests.ok(NOT public.record_is_master(tests.user_id(k), tests.vessel_id('A.dra')), k || ': record_is_master stays f')
 FROM unnest(ARRAY['A.master_by_master', 'A.master_by_ops', 'A.captain_by_rank']) AS k;
 SELECT tests.results_eq(
-  format($q$SELECT is_imported, imported_vessel_id, position, user_id IS NOT NULL FROM public.profiles WHERE id IN (%L, %L) ORDER BY id$q$,
-         tests.profile_id('A.master_by_master'), tests.profile_id('A.master_by_ops')),
-  format($q$VALUES (true, %L::uuid, 'Master'::text, true), (true, %L::uuid, 'Master'::text, true)$q$, tests.vessel_id('A.dra'), tests.vessel_id('A.dra')),
-  'both profiles are still pending (imported, the vessel waiting, the position kept; the login linked)');
--- The fleet manager (a users-access admin of DRAAK) appoints the Master.
+  format($q$SELECT is_imported, imported_vessel_id, position, user_id IS NOT NULL FROM public.profiles WHERE id = %L$q$, tests.profile_id('A.master_by_ops')),
+  format($q$VALUES (true, %L::uuid, 'Master'::text, true)$q$, tests.vessel_id('A.dra')),
+  'the no-inviter send left a linked, unfulfilled Master placement (imported, the vessel waiting, the login linked)');
+-- That linked, unfulfilled placement (a NULL inviter: service role, ops)
+-- is left to an all-vessels admin (admin_scope_all): admin_may_act_on_user
+-- counts imported_vessel_id only for a target without a login (D-204), so
+-- the DRAAK-only admin no longer reaches it. Documented, not widened.
 SELECT tests.as_service();
+SELECT tests.ok(public.admin_may_act_on_user(tests.user_id('A.fleet_manager'), tests.user_id('A.master_by_ops'), tests.company_id('A'), tests.profile_id('A.master_by_ops')),
+                'the stranded placement: the fleet manager (admin_scope_all) may act on it');
+SELECT tests.ok(NOT public.admin_may_act_on_user(tests.user_id('A.ua_dra'), tests.user_id('A.master_by_ops'), tests.company_id('A'), tests.profile_id('A.master_by_ops')),
+                'the stranded placement: the DRAAK-only admin may not');
+SELECT tests.is(public.reserve_invitation_attempt(tests.profile_id('A.master_by_ops'), tests.user_id('A.ua_dra')) ->> 'code', 'forbidden',
+                'and so cannot resend it (forbidden)');
+-- The vessel-scoped users-access admin invites a pending Master: sent, and
+-- the Master assignment is created.
+SELECT tests.is(public.reserve_invitation_attempt(tests.profile_id('A.master_by_ua'), tests.user_id('A.ua_dra')) ->> 'ok', 'true',
+                'the DRAAK users-access admin reserves an invitation for a pending Master');
+SELECT tests.is((public.record_invitation_send(tests.profile_id('A.master_by_ua'), 'sent', NULL, 'msg-ua', tests.user_id('A.ua_dra'), 'crew', NULL, tests.user_id('A.master_by_ua'))).status,
+                'sent', 'and sends it');
+-- The fleet manager (a users-access admin of DRAAK) appoints the Master.
 SELECT tests.is((public.record_invitation_send(tests.profile_id('A.master_by_dpa'), 'sent', NULL, NULL, tests.user_id('A.fleet_manager'), 'crew', NULL, tests.user_id('A.master_by_dpa'))).status,
                 'sent', 'the fleet manager invites the pending Master');
-SELECT tests.is(public.fulfil_imported_assignment(tests.profile_id('A.master_by_master'), tests.user_id('A.fleet_manager')), 'created',
-                'and fulfils the pending Master the DRAAK Master invited');
+SELECT tests.is(public.fulfil_imported_assignment(tests.profile_id('A.master_by_ops'), tests.user_id('A.fleet_manager')), 'created',
+                'and finishes the stranded placement the no-inviter send left');
 SELECT tests.reset_role();
 SELECT tests.results_eq(
-  format($q$SELECT user_id, position, is_current, created_by FROM public.crew_assignments WHERE vessel_id = %L AND user_id IN (%L, %L) ORDER BY user_id$q$,
-         tests.vessel_id('A.dra'), tests.user_id('A.master_by_dpa'), tests.user_id('A.master_by_master')),
-  format($q$SELECT * FROM (VALUES (%L::uuid, 'Master'::text, true, %L::uuid), (%L::uuid, 'Master'::text, true, %L::uuid)) AS t ORDER BY 1$q$,
-         tests.user_id('A.master_by_dpa'), tests.user_id('A.fleet_manager'), tests.user_id('A.master_by_master'), tests.user_id('A.fleet_manager')),
-  'a users-access admin of the vessel gets the Master rows written');
-SELECT tests.ok(public.record_is_master(tests.user_id('A.master_by_dpa'), tests.vessel_id('A.dra')), 'record_is_master is t for the fleet manager''s appointment');
+  format($q$SELECT user_id, position, is_current, created_by FROM public.crew_assignments WHERE vessel_id = %L AND user_id IN (%L, %L, %L) ORDER BY user_id$q$,
+         tests.vessel_id('A.dra'), tests.user_id('A.master_by_dpa'), tests.user_id('A.master_by_ops'), tests.user_id('A.master_by_ua')),
+  format($q$SELECT * FROM (VALUES (%L::uuid, 'Master'::text, true, %L::uuid), (%L::uuid, 'Master'::text, true, %L::uuid), (%L::uuid, 'Master'::text, true, %L::uuid)) AS t ORDER BY 1$q$,
+         tests.user_id('A.master_by_dpa'), tests.user_id('A.fleet_manager'), tests.user_id('A.master_by_ops'), tests.user_id('A.fleet_manager'),
+         tests.user_id('A.master_by_ua'), tests.user_id('A.ua_dra')),
+  'a users-access admin of the vessel gets the Master rows written (the fleet manager, the DRAAK-only admin)');
+SELECT tests.ok(public.record_is_master(tests.user_id('A.master_by_dpa'), tests.vessel_id('A.dra')) AND public.record_is_master(tests.user_id('A.master_by_ua'), tests.vessel_id('A.dra')),
+                'record_is_master is t for both appointments');
+SELECT tests.results_eq(format($q$SELECT is_imported, imported_vessel_id FROM public.profiles WHERE id = %L$q$, tests.profile_id('A.master_by_ua')),
+                        $q$VALUES (false, NULL::uuid)$q$, 'the DRAAK admin''s invitee is no longer pending');
+SELECT tests.ok(position('master_needs_admin' IN pg_get_functiondef('public.record_invitation_send(uuid,text,text,text,uuid,text,timestamptz,uuid)'::regprocedure)) > 0
+            AND position('master_needs_admin' IN pg_get_functiondef('public.reserve_invitation_attempt(uuid,uuid,text)'::regprocedure)) > 0,
+                'both functions carry the master_needs_admin check (ledger query O)');
 
 -- ------------------------------------------------------------ unknown ids and ACLs
 

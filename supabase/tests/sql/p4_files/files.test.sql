@@ -15,13 +15,13 @@ SELECT tests.seed_user('A', 'A.crew_dra', 'crew');
 SELECT tests.seed_assignment('A.crew_dra', 'A.dra', true, 'Deckhand');
 SELECT tests.seed_assignment('A.disabled', 'A.dra', true, 'Deckhand');
 
-INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, company_step, report_first, decision_kind, allow_reopen, allow_close_as, edit_after_sign, delete_rule, slot_template, allow_late_evidence)
+INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, company_step, report_first, decision_kind, allow_reopen, allow_close_as, edit_after_sign, delete_rule, slot_template, allow_late_evidence)
 VALUES
-  ('test.permit', 'test', 'Permit to work', 'PTW', 'vessel', 'sign_off', false, false, true, true, 'lock', 'never_after_submit',
+  ('test.permit', 'test', 'Permit to work', 'PTW', 'vessel', 'vessel.test.records', 'sign_off', false, false, true, true, 'lock', 'never_after_submit',
    jsonb_build_array(jsonb_build_object('key', 'prepared_by', 'label', 'Prepared by', 'order', 1, 'party', 'vessel')), false),
-  ('test.note', 'test', 'Note', 'NTE', 'vessel', 'none', false, false, false, false, 'allow_with_flag', 'draft_only',
+  ('test.note', 'test', 'Note', 'NTE', 'vessel', 'vessel.test.records', 'none', false, false, false, false, 'allow_with_flag', 'draft_only',
    jsonb_build_array(jsonb_build_object('key', 'author', 'label', 'Author', 'order', 1, 'party', 'vessel')), false),
-  ('test.evidence', 'test', 'Evidence log', 'EVL', 'vessel', 'none', false, false, false, false, 'allow_with_flag', 'draft_only',
+  ('test.evidence', 'test', 'Evidence log', 'EVL', 'vessel', 'vessel.test.records', 'none', false, false, false, false, 'allow_with_flag', 'draft_only',
    jsonb_build_array(jsonb_build_object('key', 'author', 'label', 'Author', 'order', 1, 'party', 'vessel')), true);
 
 -- helpers (rolled back with the file)

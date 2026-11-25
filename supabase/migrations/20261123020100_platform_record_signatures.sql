@@ -33,9 +33,19 @@
 -- company slots admit company actors (is_company_actor), and vessel slots
 -- without an office anyone who reaches the vessel, with an office the
 -- holder of a current crew assignment on THIS vessel whose position or
--- rank matches it. On-behalf signing is refused (D-48: no on-behalf
--- predicate yet). The D-51 lock is record_vessel_signatures_locked() of
--- the envelope for the slot's cycle.
+-- rank matches it. A login with an external membership in the company
+-- (record_user_is_external; gap/01 F36, D-123) is never eligible for a
+-- vessel slot, named or not (review round 4). On-behalf signing is refused
+-- (D-48: no on-behalf predicate yet). The D-51 lock is
+-- record_vessel_signatures_locked() of the envelope for the slot's cycle.
+--
+-- Witnessing, passing, cancelling a pass and re-signing need write access
+-- to the record (record_caller_may_write, or a company actor where the
+-- company may act; no_write_access otherwise). A company slot is signed by
+-- a company actor on their own account: never witnessed, by a visitor or
+-- on someone's behalf (the template validator, the table CHECK and
+-- record_sign_slot each refuse it; review round 4,
+-- company-slot-witnessed-forgery).
 --
 -- A vessel signature (or re-signature) runs the envelope's vessel_sign
 -- transition: every required vessel slot signed -> the company step
@@ -139,7 +149,7 @@ CREATE TABLE IF NOT EXISTS public.record_signature_slots (
   CONSTRAINT record_signature_slots_label_check CHECK (length(btrim(label)) BETWEEN 1 AND 80),
   CONSTRAINT record_signature_slots_order_no_check CHECK (order_no >= 1),
   CONSTRAINT record_signature_slots_party_check CHECK (party IN ('vessel', 'company')),
-  CONSTRAINT record_signature_slots_company_party_check CHECK (party <> 'company' OR (NOT allow_visitor AND NOT allow_on_behalf)),
+  CONSTRAINT record_signature_slots_company_party_check CHECK (party <> 'company' OR (NOT allow_witnessed AND NOT allow_visitor AND NOT allow_on_behalf)),
   CONSTRAINT record_signature_slots_pass_check CHECK ((passed_to_profile_id IS NULL) = (passed_at IS NULL))
 );
 
@@ -194,6 +204,10 @@ CREATE TABLE IF NOT EXISTS public.record_signatures (
   CONSTRAINT record_signatures_image_hashed_check CHECK (image_path IS NULL OR image_sha256 IS NOT NULL),
   CONSTRAINT record_signatures_integrity_hash_check CHECK (integrity_hash ~ '^[0-9a-f]{64}$'),
   CONSTRAINT record_signatures_removal_reason_check CHECK (removal_reason IS NULL OR length(removal_reason) <= 500),
+  CONSTRAINT record_signatures_visitor_company_check CHECK (visitor_company IS NULL OR length(visitor_company) <= 120),
+  CONSTRAINT record_signatures_visitor_capacity_check CHECK (visitor_capacity IS NULL OR length(visitor_capacity) <= 120),
+  CONSTRAINT record_signatures_on_behalf_of_office_check CHECK (on_behalf_of_office IS NULL OR length(on_behalf_of_office) <= 80),
+  CONSTRAINT record_signatures_on_behalf_reason_check CHECK (on_behalf_reason IS NULL OR length(on_behalf_reason) <= 2000),
   CONSTRAINT record_signatures_slot_or_decision_check CHECK (slot_id IS NOT NULL OR (party = 'company' AND decision IS NOT NULL)),
   CONSTRAINT record_signatures_witness_check CHECK (method <> 'witnessed' OR witness_profile_id IS NOT NULL),
   CONSTRAINT record_signatures_visitor_check CHECK (signer_kind NOT IN ('visitor', 'contractor') OR (signer_profile_id IS NULL AND visitor_company IS NOT NULL AND visitor_capacity IS NOT NULL))
@@ -360,7 +374,8 @@ AS $$
 $$;
 
 -- May the profile sign the slot? (interim eligibility, see the header.)
--- Unknown slot / profile / office -> false.
+-- A login with an external membership in the record's company never signs
+-- a vessel slot (review round 4). Unknown slot / profile / office -> false.
 CREATE OR REPLACE FUNCTION public.record_slot_eligible(p_slot_id uuid, p_profile_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -395,15 +410,18 @@ BEGIN
        AND (cardinality(v_slot.named_profile_ids) = 0 OR p_profile_id = ANY (v_slot.named_profile_ids));
   END IF;
   IF cardinality(v_slot.named_profile_ids) > 0 THEN
-    RETURN p_profile_id = ANY (v_slot.named_profile_ids);
+    RETURN p_profile_id = ANY (v_slot.named_profile_ids)
+       AND (v_profile.user_id IS NULL OR NOT public.record_user_is_external(v_profile.user_id, v_company));
   END IF;
   IF v_profile.user_id IS NULL THEN
     RETURN false;
   END IF;
   IF v_slot.office_key IS NULL THEN
-    RETURN CASE WHEN v_vessel IS NULL THEN public.fleet_reach_for(v_profile.user_id, v_company) ELSE public.reach_vessel_for(v_profile.user_id, v_vessel) END;
+    RETURN CASE WHEN v_vessel IS NULL THEN public.fleet_reach_for(v_profile.user_id, v_company) ELSE public.reach_vessel_for(v_profile.user_id, v_vessel) END
+       AND NOT public.record_user_is_external(v_profile.user_id, v_company);
   END IF;
-  RETURN v_vessel IS NOT NULL AND public.reach_vessel_for(v_profile.user_id, v_vessel) AND EXISTS (
+  RETURN v_vessel IS NOT NULL AND public.reach_vessel_for(v_profile.user_id, v_vessel)
+     AND NOT public.record_user_is_external(v_profile.user_id, v_company) AND EXISTS (
     SELECT 1 FROM public.crew_assignments AS ca
     WHERE ca.user_id = v_profile.user_id AND ca.vessel_id = v_vessel AND ca.is_current
       AND public.record_normalise_office(v_slot.office_key) IN (public.record_normalise_office(ca.position), public.record_normalise_office(ca.rank))
@@ -436,7 +454,7 @@ BEGIN
          nullif(btrim(coalesce(t ->> 'office_key', '')), ''),
          coalesce(ARRAY(SELECT x::uuid FROM jsonb_array_elements_text(CASE WHEN jsonb_typeof(t -> 'named_profile_ids') = 'array' THEN t -> 'named_profile_ids' ELSE '[]'::jsonb END) AS x), '{}'),
          CASE WHEN jsonb_typeof(t -> 'covers_sections') = 'array' THEN ARRAY(SELECT jsonb_array_elements_text(t -> 'covers_sections')) END,
-         coalesce((t ->> 'allow_witnessed')::boolean, t ->> 'party' = 'vessel'),
+         (t ->> 'party' = 'vessel' AND coalesce((t ->> 'allow_witnessed')::boolean, true)),
          coalesce((t ->> 'allow_visitor')::boolean, false),
          coalesce((t ->> 'allow_on_behalf')::boolean, false),
          coalesce((t ->> 'on_behalf_reason_required')::boolean, false),
@@ -490,10 +508,11 @@ $$;
 
 -- signSlot() / signBlocker(): idempotent replay, id conflict, impersonation,
 -- version, closed / void, old cycle, signed / waiting, then per method
--- (verified: eligible; witnessed: allowed, write access, a signer, not the
--- witness, visitors where allowed, an eligible crew signer; on_behalf:
--- allowed, write access, then not_eligible, D-48), then separation of
--- duties. On success: the signature, the slot's pass cleared, events
+-- (verified: eligible; witnessed: a vessel slot that allows it, write
+-- access (record_caller_may_write), a signer, not the witness, visitors
+-- where allowed (name, company and capacity of 120 characters at most), an
+-- eligible crew signer; on_behalf: allowed, write access, then
+-- not_eligible, D-48), then separation of duties. On success: the signature, the slot's pass cleared, events
 -- (signature.signed; signature.slot_opened with signature_requested for
 -- each slot it opened), and the vessel_sign transition for a vessel slot.
 CREATE OR REPLACE FUNCTION public.record_sign_slot(
@@ -589,10 +608,12 @@ BEGIN
     v_signer_name := btrim(coalesce(v_caller.first_name, '') || ' ' || coalesce(v_caller.last_name, ''));
     v_signer_kind := CASE WHEN sl.party = 'company' THEN 'shore' ELSE 'crew' END;
   ELSIF p_method = 'witnessed' THEN
-    IF NOT sl.allow_witnessed THEN
+    -- Never on a company slot, whatever the row says (review round 4,
+    -- company-slot-witnessed-forgery; defence in depth behind the CHECK).
+    IF sl.party = 'company' OR NOT sl.allow_witnessed THEN
       RETURN public.record_refusal('method_not_allowed', format('The %s slot can''t be signed on someone else''s behalf on this device.', sl.label));
     END IF;
-    IF NOT public.record_caller_reaches(v_uid, e.company_id, e.vessel_id) THEN
+    IF NOT public.record_caller_may_write(v_uid, e.company_id, e.vessel_id) THEN
       RETURN public.record_refusal('no_write_access', 'You need write access to this record to witness a signature.');
     END IF;
     IF p_signer_profile_id IS NOT NULL THEN
@@ -616,8 +637,9 @@ BEGIN
       END IF;
       v_visitor_company := nullif(btrim(coalesce(p_visitor ->> 'company', '')), '');
       v_visitor_capacity := nullif(btrim(coalesce(p_visitor ->> 'capacity', '')), '');
-      IF v_visitor_company IS NULL OR v_visitor_capacity IS NULL OR length(btrim(p_visitor ->> 'name')) > 120 THEN
-        RETURN public.record_refusal('invalid_input', 'Give the visitor''s name, company and capacity.');
+      IF v_visitor_company IS NULL OR v_visitor_capacity IS NULL OR length(btrim(p_visitor ->> 'name')) > 120
+         OR length(v_visitor_company) > 120 OR length(v_visitor_capacity) > 120 THEN
+        RETURN public.record_refusal('invalid_input', 'Give the visitor''s name, company and capacity (120 characters each at most).');
       END IF;
       v_signer_name := btrim(p_visitor ->> 'name');
       v_signer_kind := CASE WHEN p_visitor ->> 'kind' = 'contractor' THEN 'contractor' ELSE 'visitor' END;
@@ -628,7 +650,7 @@ BEGIN
     IF NOT sl.allow_on_behalf THEN
       RETURN public.record_refusal('method_not_allowed', format('The %s slot can''t be signed on someone''s behalf.', sl.label));
     END IF;
-    IF NOT public.record_caller_reaches(v_uid, e.company_id, e.vessel_id) THEN
+    IF NOT public.record_caller_may_write(v_uid, e.company_id, e.vessel_id) THEN
       RETURN public.record_refusal('no_write_access', 'You need write access to this record to sign on behalf.');
     END IF;
     -- D-48: no on-behalf predicate exists yet; fail closed.
@@ -726,9 +748,11 @@ BEGIN
 END;
 $$;
 
--- passSlotTo(): an open slot only (not_open when waiting, signed or
--- already passed), to an eligible person; event signature.passed with
--- signature_requested for the person it was passed to.
+-- passSlotTo(): write access to the record or a company actor
+-- (no_write_access; review round 4), an open slot only (not_open when
+-- waiting, signed or already passed), to an eligible person; event
+-- signature.passed with signature_requested for the person it was passed
+-- to.
 CREATE OR REPLACE FUNCTION public.record_pass_slot(p_slot_id uuid, p_to_profile_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -757,6 +781,9 @@ BEGIN
   IF public.record_impersonating() THEN
     RETURN public.record_refusal('impersonating', 'Signature requests cannot be made while acting as another user.');
   END IF;
+  IF NOT (public.is_company_actor(v_uid, e.vessel_id) OR public.record_caller_may_write(v_uid, e.company_id, e.vessel_id)) THEN
+    RETURN public.record_refusal('no_write_access', 'You can view this record but not change it.');
+  END IF;
   IF e.status IN ('closed', 'void') OR sl.cycle <> e.current_cycle THEN
     RETURN public.record_refusal('not_open', 'This record is not open for signatures.');
   END IF;
@@ -780,7 +807,9 @@ BEGIN
 END;
 $$;
 
--- cancelPass(): a requested slot back to open (not_requested otherwise).
+-- cancelPass(): write access to the record or a company actor
+-- (no_write_access; review round 4), a requested slot back to open
+-- (not_requested otherwise).
 CREATE OR REPLACE FUNCTION public.record_cancel_pass(p_slot_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -807,6 +836,9 @@ BEGIN
   IF public.record_impersonating() THEN
     RETURN public.record_refusal('impersonating', 'Signature requests cannot be changed while acting as another user.');
   END IF;
+  IF NOT (public.is_company_actor(v_uid, e.vessel_id) OR public.record_caller_may_write(v_uid, e.company_id, e.vessel_id)) THEN
+    RETURN public.record_refusal('no_write_access', 'You can view this record but not change it.');
+  END IF;
   IF public.record_slot_state(sl.id) <> 'requested' THEN
     RETURN public.record_refusal('not_requested', format('The %s slot has not been passed to anyone.', sl.label));
   END IF;
@@ -819,8 +851,9 @@ $$;
 -- removeBlocker() / removeSignature(): impersonation, the live signature of
 -- the slot (not_signed), closed / void (not_open), the D-51 lock for vessel
 -- slots (company_acknowledged), reverse order (not_latest), who may remove
--- (signer, witness, the Master for vessel slots, a company actor for
--- company slots: not_allowed), a reason once submitted (reason_required).
+-- (the signer, the Master for vessel slots, a company actor for company
+-- slots: not_allowed; never the witness alone, gap/08 §B, review round 4
+-- witness-removes-signature), a reason once submitted (reason_required).
 -- A required slot's removal clears the passes of the slots now waiting;
 -- the status steps back for a vessel slot.
 CREATE OR REPLACE FUNCTION public.record_remove_signature(p_signature_id uuid, p_reason text DEFAULT NULL)
@@ -876,7 +909,7 @@ BEGIN
   END IF;
   SELECT id INTO v_caller FROM public.profiles WHERE user_id = v_uid;
   IF NOT coalesce(
-    (v_caller IS NOT NULL AND (sg.signer_profile_id IS NOT DISTINCT FROM v_caller OR sg.witness_profile_id IS NOT DISTINCT FROM v_caller))
+    (v_caller IS NOT NULL AND sg.signer_profile_id IS NOT DISTINCT FROM v_caller)
     OR (sl.party = 'vessel' AND public.record_is_master(v_uid, e.vessel_id))
     OR (sl.party = 'company' AND public.is_company_actor(v_uid, e.vessel_id)),
     false
@@ -922,8 +955,9 @@ BEGIN
 END;
 $$;
 
--- reSignSlot(): idempotent replay, id conflict, impersonation, the slot's
--- live signature (not_signed), not stale (not_stale), witnessed ones need a
+-- reSignSlot(): idempotent replay, id conflict, impersonation, write
+-- access to the record or a company actor (no_write_access; review round
+-- 4), the slot's live signature (not_signed), not stale (not_stale), witnessed ones need a
 -- new ceremony (needs_ceremony), only the same signer (different_signer),
 -- still eligible (not_eligible). The old row is superseded and a new one
 -- signed with the current digest; then the vessel_sign transition for a
@@ -971,6 +1005,9 @@ BEGIN
   END IF;
   IF public.record_impersonating() THEN
     RETURN public.record_refusal('impersonating', 'Signatures cannot be made while acting as another user.');
+  END IF;
+  IF NOT (public.is_company_actor(v_uid, e.vessel_id) OR public.record_caller_may_write(v_uid, e.company_id, e.vessel_id)) THEN
+    RETURN public.record_refusal('no_write_access', 'You can view this record but not change it.');
   END IF;
   SELECT * INTO live FROM public.record_signatures AS s
   WHERE s.slot_id = sl.id AND s.removed_at IS NULL AND s.superseded_at IS NULL AND s.cycle = e.current_cycle;
@@ -1074,8 +1111,8 @@ GRANT EXECUTE ON FUNCTION public.record_resign_slot(uuid, uuid) TO authenticated
 
 -- ---------------------------------------------------------------- comments
 
-COMMENT ON TABLE public.record_signature_slots IS 'Signature slots per envelope and review cycle (gap/08 §B), instantiated from the kind''s slot template. State is derived (record_signature_slot_states), never stored; the pass request lives here. Read: record_readable. No client writes.';
-COMMENT ON TABLE public.record_signatures IS 'Signatures (gap/08 SIG3-SIG17): append-only except removed_* / superseded_at set once by the engine (trg_record_signatures_guard); slot-less rows are company decisions. integrity_hash per SIG16. No updated_at (rule 3 exception). Read: record_readable. No client writes.';
+COMMENT ON TABLE public.record_signature_slots IS 'Signature slots per envelope and review cycle (gap/08 §B), instantiated from the kind''s slot template. A company slot is never witnessed, visitor or on-behalf (record_signature_slots_company_party_check). State is derived (record_signature_slot_states), never stored; the pass request lives here. Read: record_readable. No client writes.';
+COMMENT ON TABLE public.record_signatures IS 'Signatures (gap/08 SIG3-SIG17): append-only except removed_* / superseded_at set once by the engine (trg_record_signatures_guard); slot-less rows are company decisions. integrity_hash per SIG16. Free text is bounded (signer name and visitor company / capacity 120, on-behalf office 80, on-behalf reason and comment 2000, removal reason 500). No updated_at (rule 3 exception). Read: record_readable. No client writes.';
 COMMENT ON VIEW public.record_signature_slot_states IS 'Every slot with its derived state (slotState(): signed / waiting / requested / open), live signature and stale flag. security_invoker: the reader''s RLS applies.';
 COMMENT ON FUNCTION public.record_refusal(text, text) IS 'A business refusal result envelope {ok:false, error:{code, message}}.';
 COMMENT ON FUNCTION public.record_signature_hash(text, uuid, uuid, text, timestamptz, text) IS 'SIG16 integrity hash of a signature (sha256 hex) of record_digest | slot_id | signer profile id | stored signer name | signed_at (UTC, microseconds) | image sha256; the profile id and the name are separate elements (D-209), so the hash binds the shown name to the signing identity. Internal.';
@@ -1083,11 +1120,11 @@ COMMENT ON FUNCTION public.record_normalise_office(text) IS 'An office, position
 COMMENT ON FUNCTION public.record_signatures_guard() IS 'Trigger: signatures are never deleted; only removed_* / superseded_at change, once, inside the engine.';
 COMMENT ON FUNCTION public.record_slot_state(uuid) IS 'Internal: a slot''s derived state (as the view).';
 COMMENT ON FUNCTION public.record_is_master(uuid, uuid) IS 'Internal: the user is the Master of the vessel (current assignment, position or rank master / captain).';
-COMMENT ON FUNCTION public.record_slot_eligible(uuid, uuid) IS 'Interim slot eligibility (D-132): same company and active; named slots admit the named; company slots company actors; vessel slots reach or the office on this vessel.';
-COMMENT ON FUNCTION public.record_instantiate_slots(uuid, integer) IS 'Internal: the kind template''s slots for one cycle of an envelope.';
+COMMENT ON FUNCTION public.record_slot_eligible(uuid, uuid) IS 'Interim slot eligibility (D-132): same company and active; named slots admit the named; company slots company actors; vessel slots reach or the office on this vessel. A login with an external membership in the company is never eligible for a vessel slot (record_user_is_external; review round 4).';
+COMMENT ON FUNCTION public.record_instantiate_slots(uuid, integer) IS 'Internal: the kind template''s slots for one cycle of an envelope (allow_witnessed defaults to true on vessel slots and is always false on company slots).';
 COMMENT ON FUNCTION public.record_vessel_completion(uuid) IS 'Internal: the vessel_sign transition after a vessel signature.';
-COMMENT ON FUNCTION public.record_sign_slot(uuid, uuid, text, uuid, jsonb, text, text, text, integer) IS 'Sign a slot (signSlot() / signBlocker(), same codes); on-behalf is refused (D-48). A signature image must be a registered, live records-bucket object of the record''s company and vessel (invalid_input: not found) with a content hash (invalid_input: no content hash yet, upload it again); its sha256 is stored and covered by the integrity hash (SIG16), which also binds the stored signer name to the signer profile id (D-209). Returns a result envelope.';
-COMMENT ON FUNCTION public.record_pass_slot(uuid, uuid) IS 'Pass an open slot to an eligible person (passSlotTo()).';
-COMMENT ON FUNCTION public.record_cancel_pass(uuid) IS 'Cancel a pass (cancelPass()).';
-COMMENT ON FUNCTION public.record_remove_signature(uuid, text) IS 'Remove a signature (removeBlocker() / removeSignature(): reverse order, who may, D-51 lock, reason once submitted).';
-COMMENT ON FUNCTION public.record_resign_slot(uuid, uuid) IS 'Re-sign a stale signature (reSignSlot()); the signature image is resolved again (live and registered, else not found; with a hash, else no content hash yet; the same sha256 as signed, else changed since it was signed; all invalid_input) and covered by the new integrity hash with the stored signer name (D-209).';
+COMMENT ON FUNCTION public.record_sign_slot(uuid, uuid, text, uuid, jsonb, text, text, text, integer) IS 'Sign a slot (signSlot() / signBlocker(), same codes); on-behalf is refused (D-48). Witnessing needs a vessel slot that allows it (method_not_allowed: never a company slot) and write access (record_caller_may_write; no_write_access); a visitor''s name, company and capacity are 120 characters at most (invalid_input). A signature image must be a registered, live records-bucket object of the record''s company and vessel (invalid_input: not found) with a content hash (invalid_input: no content hash yet, upload it again); its sha256 is stored and covered by the integrity hash (SIG16), which also binds the stored signer name to the signer profile id (D-209). Returns a result envelope.';
+COMMENT ON FUNCTION public.record_pass_slot(uuid, uuid) IS 'Pass an open slot to an eligible person (passSlotTo()); needs write access to the record or a company actor (no_write_access).';
+COMMENT ON FUNCTION public.record_cancel_pass(uuid) IS 'Cancel a pass (cancelPass()); needs write access to the record or a company actor (no_write_access).';
+COMMENT ON FUNCTION public.record_remove_signature(uuid, text) IS 'Remove a signature (removeBlocker() / removeSignature(): reverse order, who may (the signer, the Master for vessel slots, a company actor for company slots; never the witness alone), D-51 lock, reason once submitted).';
+COMMENT ON FUNCTION public.record_resign_slot(uuid, uuid) IS 'Re-sign a stale signature (reSignSlot()); needs write access to the record or a company actor (no_write_access); the signature image is resolved again (live and registered, else not found; with a hash, else no content hash yet; the same sha256 as signed, else changed since it was signed; all invalid_input) and covered by the new integrity hash with the stored signer name (D-209).';

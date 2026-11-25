@@ -159,7 +159,9 @@ GRANT ALL ON TABLE public.account_membership_vessels TO service_role;
 -- deactivated, no membership in the profile's company is disabled or
 -- removed or (a non-legacy one) outside its valid_from / valid_until window
 -- (an external viewer's access ends with the window, C17), and auth has no
--- ban in force. Legacy-managed rows have no window, so nobody's access
+-- ban in force and no soft delete (auth.users.deleted_at: a GoTrue soft
+-- delete leaves issued tokens valid until they expire; review round 4,
+-- user-is-active-ignores-soft-delete). Legacy-managed rows have no window, so nobody's access
 -- changes when this file is applied. NULL → false. Asked about another
 -- user, a signed-in caller gets the truth only for an active member of
 -- their own company (no cross-tenant probing); without a JWT (SQL editor,
@@ -184,7 +186,9 @@ AS $$
                         OR (m.valid_until IS NOT NULL AND m.valid_until <= now())))))
             AND NOT EXISTS (
               SELECT 1 FROM auth.users AS u
-              WHERE u.id = p.user_id AND u.banned_until IS NOT NULL AND u.banned_until > now())
+              WHERE u.id = p.user_id
+                AND (u.deleted_at IS NOT NULL
+                     OR (u.banned_until IS NOT NULL AND u.banned_until > now())))
            ) AS active
     FROM public.profiles AS p
     WHERE p.user_id = _user_id OR p.user_id = auth.uid()
@@ -802,7 +806,7 @@ COMMENT ON COLUMN public.account_memberships.vessel_scope IS 'all = every reacha
 COMMENT ON COLUMN public.account_memberships.is_dpa IS 'DECISIONS C19: DPA is a flag on the membership (legacy dpa profiles).';
 COMMENT ON COLUMN public.account_memberships.valid_until IS 'End of the membership window; required for external viewers (C17).';
 
-COMMENT ON FUNCTION public.user_is_active(uuid) IS 'D-122: profile not disabled / deactivated, no disabled / removed membership in the profile''s company and no non-legacy membership outside its valid_from / valid_until window (C17), no auth ban in force. Signed-in callers get the truth about themselves and active members of their own company only; no JWT: anyone. Reads the tables directly (file 7 builds the legacy helpers on it).';
+COMMENT ON FUNCTION public.user_is_active(uuid) IS 'D-122: profile not disabled / deactivated, no disabled / removed membership in the profile''s company and no non-legacy membership outside its valid_from / valid_until window (C17), no auth ban in force and no auth soft delete (auth.users.deleted_at). Signed-in callers get the truth about themselves and active members of their own company only; no JWT: anyone. Reads the tables directly (file 7 builds the legacy helpers on it).';
 COMMENT ON FUNCTION public.my_account_status() IS 'The caller''s status: active | disabled | no_profile (D-141). disabled also when the access was withdrawn with a revoked or expired invitation that was never accepted. Works for a disabled user (the sign-in screen uses it).';
 COMMENT ON FUNCTION public.invitation_withdrawn_for(uuid) IS 'Internal (service role; definers): the profile is neither invited nor active and the user''s newest invitation is revoked or expired and was never accepted. False before user_invitations exists.';
 COMMENT ON FUNCTION public.record_session_start() IS 'Called by the client after sign-in: same answer as my_account_status(); for an active user records last_login_at (5-minute throttle), invited -> active, membership accepted_at / last_active_at and accepted invitations (once user_invitations exists), under storm.access_engine.';

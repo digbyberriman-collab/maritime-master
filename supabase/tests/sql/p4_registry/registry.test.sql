@@ -12,45 +12,45 @@ SELECT tests.seed_user('A', 'A.off_dra', 'crew');
 SELECT tests.seed_assignment('A.off_dra', 'A.dra', true, 'Deckhand');
 UPDATE public.account_memberships SET status = 'disabled' WHERE user_id = tests.user_id('A.off_dra');
 
-INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, route_pattern, company_step, allow_reopen, allow_close_as, edit_after_sign, delete_rule, slot_template)
+INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, route_pattern, company_step, allow_reopen, allow_close_as, edit_after_sign, delete_rule, slot_template)
 VALUES
-  ('test.permit', 'test', 'Permit to work', 'PTW', 'vessel', '/v/:vesselCode/safety/permits/:id', 'sign_off', true, true, 'lock', 'never_after_submit',
+  ('test.permit', 'test', 'Permit to work', 'PTW', 'vessel', 'vessel.test.records', '/v/:vesselCode/safety/permits/:id', 'sign_off', true, true, 'lock', 'never_after_submit',
    jsonb_build_array(
      jsonb_build_object('key', 'prepared_by', 'label', 'Prepared by', 'order', 1, 'party', 'vessel', 'named_profile_ids', jsonb_build_array(tests.profile_id('A.crew_dra'))),
      jsonb_build_object('key', 'master', 'label', 'Master', 'order', 2, 'party', 'vessel', 'office_key', 'master'),
      jsonb_build_object('key', 'company_review', 'label', 'Company review', 'order', 3, 'party', 'company'))),
-  ('test.fleet_review', 'test', 'Fleet review', 'FRV', 'fleet', '/fleet/reviews/:id', 'sign_off', false, false, 'lock', 'draft_only', '[]'::jsonb);
+  ('test.fleet_review', 'test', 'Fleet review', 'FRV', 'fleet', 'fleet.test.records', '/fleet/reviews/:id', 'sign_off', false, false, 'lock', 'draft_only', '[]'::jsonb);
 
 -- ------------------------------------------------------------ record_kinds
 
-SELECT tests.throws_like($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, company_step, edit_after_sign, delete_rule, slot_template)
-  VALUES ('test.bad1', 'test', 'Bad', 'BADA', 'vessel', 'none', 'lock', 'draft_only', '[{"key":"company","label":"Company","order":1,"party":"company"}]')$q$,
+SELECT tests.throws_like($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, company_step, edit_after_sign, delete_rule, slot_template)
+  VALUES ('test.bad1', 'test', 'Bad', 'BADA', 'vessel', 'vessel.test.records', 'none', 'lock', 'draft_only', '[{"key":"company","label":"Company","order":1,"party":"company"}]')$q$,
   '23514', '%record_kinds_slot_template_check%', 'company slots need a company step');
-SELECT tests.throws_like($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, company_step, edit_after_sign, delete_rule, slot_template)
-  VALUES ('test.bad2', 'test', 'Bad', 'BADB', 'vessel', 'sign_off', 'lock', 'draft_only', '[{"key":"a","label":"A","order":1,"party":"vessel"},{"key":"a","label":"A","order":2,"party":"vessel"}]')$q$,
+SELECT tests.throws_like($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, company_step, edit_after_sign, delete_rule, slot_template)
+  VALUES ('test.bad2', 'test', 'Bad', 'BADB', 'vessel', 'vessel.test.records', 'sign_off', 'lock', 'draft_only', '[{"key":"a","label":"A","order":1,"party":"vessel"},{"key":"a","label":"A","order":2,"party":"vessel"}]')$q$,
   '23514', '%record_kinds_slot_template_check%', 'duplicate slot keys');
-SELECT tests.throws_like($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, company_step, edit_after_sign, delete_rule, slot_template)
-  VALUES ('test.bad3', 'test', 'Bad', 'BADC', 'vessel', 'sign_off', 'lock', 'draft_only', '[{"key":"a","label":"A","order":0.5,"party":"vessel"}]')$q$,
+SELECT tests.throws_like($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, company_step, edit_after_sign, delete_rule, slot_template)
+  VALUES ('test.bad3', 'test', 'Bad', 'BADC', 'vessel', 'vessel.test.records', 'sign_off', 'lock', 'draft_only', '[{"key":"a","label":"A","order":0.5,"party":"vessel"}]')$q$,
   '23514', '%record_kinds_slot_template_check%', 'orders are whole numbers >= 1');
-SELECT tests.throws_like($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, company_step, edit_after_sign, delete_rule, slot_template)
-  VALUES ('test.bad4', 'test', 'Bad', 'BADD', 'vessel', 'sign_off', 'lock', 'draft_only', '[{"key":"c","label":"C","order":1,"party":"company","allow_visitor":true}]')$q$,
+SELECT tests.throws_like($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, company_step, edit_after_sign, delete_rule, slot_template)
+  VALUES ('test.bad4', 'test', 'Bad', 'BADD', 'vessel', 'vessel.test.records', 'sign_off', 'lock', 'draft_only', '[{"key":"c","label":"C","order":1,"party":"company","allow_visitor":true}]')$q$,
   '23514', '%record_kinds_slot_template_check%', 'no visitors on company slots');
-SELECT tests.throws_like($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, company_step, edit_after_sign, delete_rule, slot_template)
-  VALUES ('test.bad5', 'test', 'Bad', 'BADE', 'vessel', 'sign_off', 'lock', 'draft_only', '[{"key":"a","label":"A","order":1,"party":"vessel","distinct_from":["ghost"]}]')$q$,
+SELECT tests.throws_like($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, company_step, edit_after_sign, delete_rule, slot_template)
+  VALUES ('test.bad5', 'test', 'Bad', 'BADE', 'vessel', 'vessel.test.records', 'sign_off', 'lock', 'draft_only', '[{"key":"a","label":"A","order":1,"party":"vessel","distinct_from":["ghost"]}]')$q$,
   '23514', '%record_kinds_slot_template_check%', 'distinct_from names a known slot or creator');
-SELECT tests.throws_like($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, company_step, report_first, edit_after_sign, delete_rule)
-  VALUES ('test.bad6', 'test', 'Bad', 'BADF', 'vessel', 'none', true, 'lock', 'draft_only')$q$, '23514', '%record_kinds_report_first_step%', 'report-first kinds go to the company');
-SELECT tests.throws_like($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, route_pattern, company_step, edit_after_sign, delete_rule)
-  VALUES ('test.bad7', 'test', 'Bad', 'BADG', 'vessel', '/safety/x/:id', 'none', 'lock', 'draft_only')$q$, '23514', '%record_kinds_route_pattern_check%', 'vessel records live under /v/:vesselCode/');
-SELECT tests.throws_like($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, company_step, edit_after_sign, delete_rule)
-  VALUES ('other.kind', 'test', 'Bad', 'BADH', 'vessel', 'none', 'lock', 'draft_only')$q$, '23514', '%record_kinds_module_key_check%', 'module_key is the key''s first segment');
+SELECT tests.throws_like($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, company_step, report_first, edit_after_sign, delete_rule)
+  VALUES ('test.bad6', 'test', 'Bad', 'BADF', 'vessel', 'vessel.test.records', 'none', true, 'lock', 'draft_only')$q$, '23514', '%record_kinds_report_first_step%', 'report-first kinds go to the company');
+SELECT tests.throws_like($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, route_pattern, company_step, edit_after_sign, delete_rule)
+  VALUES ('test.bad7', 'test', 'Bad', 'BADG', 'vessel', 'vessel.test.records', '/safety/x/:id', 'none', 'lock', 'draft_only')$q$, '23514', '%record_kinds_route_pattern_check%', 'vessel records live under /v/:vesselCode/');
+SELECT tests.throws_like($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, company_step, edit_after_sign, delete_rule)
+  VALUES ('other.kind', 'test', 'Bad', 'BADH', 'vessel', 'vessel.test.records', 'none', 'lock', 'draft_only')$q$, '23514', '%record_kinds_module_key_check%', 'module_key is the key''s first segment');
 SELECT tests.ok(public.record_slot_template_valid('[]', 'none'), 'an empty template is valid');
 SELECT tests.ok(NOT public.record_slot_template_valid('{}', 'none'), 'a template is an array');
 SELECT tests.ok((SELECT provolatile = 'i' FROM pg_proc WHERE oid = 'public.record_slot_template_valid(jsonb,text)'::regprocedure), 'the CHECK function is IMMUTABLE');
 
 SELECT tests.as_user(tests.user_id('A.crew_hyd'));
 SELECT tests.is((SELECT count(*) FROM public.record_kinds WHERE key LIKE 'test.%'), 2::bigint, 'an active user reads the catalogue');
-SELECT tests.throws($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, company_step, edit_after_sign, delete_rule) VALUES ('test.mine', 'test', 'Mine', 'MINE', 'vessel', 'none', 'lock', 'free')$q$, '42501', 'tenants cannot add kinds');
+SELECT tests.throws($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, company_step, edit_after_sign, delete_rule) VALUES ('test.mine', 'test', 'Mine', 'MINE', 'vessel', 'vessel.test.records', 'none', 'lock', 'free')$q$, '42501', 'tenants cannot add kinds');
 SELECT tests.denied($q$UPDATE public.record_kinds SET label = 'x' WHERE key = 'test.permit' RETURNING key$q$, 'tenants cannot change kinds');
 SELECT tests.as_user(tests.user_id('A.disabled'));
 SELECT tests.is_empty('SELECT 1 FROM public.record_kinds', 'a disabled user reads no kind');

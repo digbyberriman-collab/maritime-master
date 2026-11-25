@@ -45,8 +45,13 @@ export interface RecordKindDefinition {
   scope: RecordScope;
   /** Route of the record page, e.g. `/v/:vesselCode/safety/corrective-actions/:id`. */
   routePattern?: string;
-  /** PMS subcategory the kind's capabilities live under, e.g. `vessel.safety.capa`. */
-  capabilityPath?: string;
+  /**
+   * PMS subcategory the kind's capabilities live under, e.g. `vessel.safety.capa`.
+   * Required: `validateRecordKind` refuses a kind without one, as
+   * `record_kinds_capability_path_check` does (the engine evaluates it before
+   * the first kind registers, D-132).
+   */
+  capabilityPath: string;
   /** Rides on `record_envelopes` (status, whose move, threads, signatures). */
   enveloped: boolean;
   companyStep: CompanyStep;
@@ -124,7 +129,7 @@ export function validateRecordKind(def: RecordKindDefinition): void {
       throw new RecordKindError(`${where}: vessel records live under /v/:vesselCode/ (DECISIONS R7)`);
     }
   }
-  if (def.capabilityPath !== undefined && !SUBCATEGORY_PATH.test(def.capabilityPath)) {
+  if (def.capabilityPath === undefined || !SUBCATEGORY_PATH.test(def.capabilityPath)) {
     throw new RecordKindError(`${where}: capabilityPath must be "domain.module.subcategory"`);
   }
   for (const s of def.statuses ?? []) {

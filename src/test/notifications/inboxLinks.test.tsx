@@ -82,6 +82,7 @@ describe('useInboxLinks', () => {
       refPrefix: 'TPX',
       scope: 'vessel',
       routePattern: '/v/:vesselCode/safety/test-permits/:id',
+      capabilityPath: 'vessel.safety.permits',
       enveloped: false,
       companyStep: 'none',
       editAfterSign: 'allow_with_flag',

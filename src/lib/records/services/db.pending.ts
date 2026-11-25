@@ -361,7 +361,8 @@ export type ExportJobRow = {
   id: string;
   company_id: string;
   vessel_id: string | null;
-  requested_by: string;
+  /** NULL once the requester's login is deleted (ON DELETE SET NULL): the job stays as an anonymised audit row. */
+  requested_by: string | null;
   kind: ExportKind;
   generated_by: ExportGeneratedBy;
   source_key: string;
@@ -387,7 +388,7 @@ export type RecordRpcResult<T = Json> =
   | { ok: false; value?: undefined; error: { code: string; message: string } };
 
 export type RecordsPendingTables = {
-  record_kinds: PendingTable<RecordKindRow, 'key' | 'module_key' | 'label' | 'ref_prefix' | 'scope' | 'company_step' | 'edit_after_sign' | 'delete_rule'>;
+  record_kinds: PendingTable<RecordKindRow, 'key' | 'module_key' | 'label' | 'ref_prefix' | 'scope' | 'capability_path' | 'company_step' | 'edit_after_sign' | 'delete_rule'>;
   record_envelopes: PendingTable<RecordEnvelopeRow, 'company_id' | 'module_key' | 'kind_key' | 'reference'>;
   record_events: PendingTable<RecordEventRow, 'company_id' | 'module_key' | 'action' | 'party'>;
   record_snapshots: PendingTable<RecordSnapshotRow, 'envelope_id' | 'company_id' | 'seq' | 'reason' | 'payload' | 'sha256'>;
@@ -398,7 +399,7 @@ export type RecordsPendingTables = {
   file_objects: PendingTable<FileObjectRow, 'company_id' | 'bucket' | 'storage_path' | 'module_key' | 'entity_type' | 'entity_id' | 'original_name' | 'mime_type' | 'size_bytes'>;
   record_attachments: PendingTable<RecordAttachmentRow, 'file_id' | 'company_id'>;
   record_links: PendingTable<RecordLinkRow, 'company_id' | 'from_envelope_id' | 'link_kind'>;
-  export_jobs: PendingTable<ExportJobRow, 'company_id' | 'requested_by' | 'kind' | 'generated_by' | 'source_key'>;
+  export_jobs: PendingTable<ExportJobRow, 'company_id' | 'kind' | 'generated_by' | 'source_key'>;
 };
 
 export type RecordsPendingViews = {

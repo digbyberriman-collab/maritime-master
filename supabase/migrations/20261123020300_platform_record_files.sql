@@ -37,6 +37,12 @@
 -- message (record_closed, reason_required, legal_hold, …), which the client
 -- maps to "refused"; authorisation raises 42501, an unknown id P0002.
 --
+-- Writes need write access (review round 4, record-engine-external-writes):
+-- attaching, removing an attachment, linking and unlinking ask
+-- record_caller_may_write() (reach and no external membership; gap/01 F36,
+-- D-123) or a company actor, and a write path through storage_path_allowed
+-- refuses an external viewer. Reads stay on record_readable().
+--
 -- file_objects.vessel_id: the spec lists ON DELETE SET NULL, but the
 -- storage_path CHECK pins the vessel segment, so setting it NULL could never
 -- succeed; the key is NO ACTION instead (a vessel with files is archived,
@@ -49,7 +55,8 @@ DO $$
 BEGIN
   IF to_regclass('public.record_envelopes') IS NULL OR to_regprocedure('public.record_readable(uuid,uuid)') IS NULL
      OR to_regprocedure('public.record_log_event(uuid,text,text,jsonb,text,text)') IS NULL
-     OR to_regprocedure('public.record_impersonating()') IS NULL OR to_regprocedure('public.record_caller_reaches(uuid,uuid,uuid)') IS NULL THEN
+     OR to_regprocedure('public.record_impersonating()') IS NULL OR to_regprocedure('public.record_caller_reaches(uuid,uuid,uuid)') IS NULL
+     OR to_regprocedure('public.record_user_is_external(uuid,uuid)') IS NULL OR to_regprocedure('public.record_caller_may_write(uuid,uuid,uuid)') IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123020300_platform_record_files needs the record engine: apply 20261123020000_platform_record_registry.sql (with 020100 and 020200) first';
   END IF;
   IF to_regclass('public.record_thread_entries') IS NULL THEN
@@ -91,9 +98,11 @@ ON CONFLICT (id) DO UPDATE SET public = false, file_size_limit = EXCLUDED.file_s
 -- name ^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$; no '..', no empty segment). The
 -- caller is an active member of the company; 'fleet' needs fleet reach (or
 -- being a company actor); a vessel must belong to the company and be
--- reached (fleet reach passes). Writing is the same rule in Phase 2
--- (module write capabilities come with the streams). No caller, another
--- bucket or anything unknown -> false (fail closed).
+-- reached (fleet reach passes). Writing is the same rule, except that an
+-- external viewer of the company (record_user_is_external) never writes
+-- (review round 4; company actors keep their fleet path); module write
+-- capabilities come with the streams. No caller, another bucket or
+-- anything unknown -> false (fail closed).
 CREATE OR REPLACE FUNCTION public.storage_path_allowed(p_bucket text, p_name text, p_for_write boolean)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -129,13 +138,15 @@ BEGIN
     RETURN false;
   END IF;
   IF v_parts[2] = 'fleet' THEN
-    RETURN public.user_has_fleet_reach(v_uid, v_company) OR public.is_company_actor(v_uid, NULL);
+    RETURN (public.user_has_fleet_reach(v_uid, v_company) AND NOT (p_for_write AND public.record_user_is_external(v_uid, v_company)))
+        OR public.is_company_actor(v_uid, NULL);
   END IF;
   v_vessel := v_parts[2]::uuid;
   IF NOT EXISTS (SELECT 1 FROM public.vessels AS v WHERE v.id = v_vessel AND v.company_id = v_company) THEN
     RETURN false;
   END IF;
-  RETURN public.user_has_fleet_reach(v_uid, v_company) OR public.user_can_reach_vessel(v_uid, v_vessel);
+  RETURN (public.user_has_fleet_reach(v_uid, v_company) OR public.user_can_reach_vessel(v_uid, v_vessel))
+     AND NOT (p_for_write AND public.record_user_is_external(v_uid, v_company));
 END;
 $$;
 
@@ -462,7 +473,9 @@ $$;
 -- ---------------------------------------------------------------- attachments
 
 -- attach_record_file: the file and the record are readable by the caller
--- and in the same company and vessel; a closed / void record takes no new
+-- and in the same company and vessel, and the caller may write them
+-- (record_caller_may_write) or is a company actor (42501 otherwise; review
+-- round 4); a closed / void record takes no new
 -- file (22023 record_closed) unless its kind allows late evidence;
 -- version_of names a live attachment of the same record. Without a record
 -- the attachment belongs to the file's entity. Event attachment.added.
@@ -508,6 +521,12 @@ BEGIN
     IF NOT public.record_readable(e.company_id, e.vessel_id) OR e.company_id <> f.company_id THEN
       RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'record_access_denied';
     END IF;
+  END IF;
+  -- Readable is not writable (review round 4): an external viewer attaches nothing.
+  IF NOT (public.is_company_actor(v_uid, f.vessel_id) OR public.record_caller_may_write(v_uid, f.company_id, f.vessel_id))
+     OR (p_envelope_id IS NOT NULL
+         AND NOT (public.is_company_actor(v_uid, e.vessel_id) OR public.record_caller_may_write(v_uid, e.company_id, e.vessel_id))) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'record_access_denied';
   END IF;
   IF public.record_impersonating() THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'impersonating', DETAIL = 'Records cannot be changed while acting as another user.';
@@ -576,8 +595,9 @@ END;
 $$;
 
 -- remove_record_attachment: soft remove. Before the record is first
--- submitted (or with no record): the uploader, anyone who reaches the
--- vessel (fleet reach passes) or a company actor. Once submitted: only a
+-- submitted (or with no record): a company actor, or a caller who may write
+-- the record (record_caller_may_write: reach, fleet reach passes, no
+-- external membership), the uploader included (review round 4). Once submitted: only a
 -- company actor, with a reason. A legal hold on the file or the record
 -- refuses it. Removing an already removed attachment returns it unchanged.
 -- Event attachment.removed.
@@ -630,7 +650,7 @@ BEGIN
     IF v_reason IS NULL THEN
       RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'reason_required';
     END IF;
-  ELSIF NOT (a.added_by = v_uid OR v_actor OR public.record_caller_reaches(v_uid, a.company_id, a.vessel_id)) THEN
+  ELSIF NOT (v_actor OR public.record_caller_may_write(v_uid, a.company_id, a.vessel_id)) THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'not_allowed';
   END IF;
   IF v_reason IS NOT NULL AND length(v_reason) > 500 THEN
@@ -657,7 +677,9 @@ $$;
 -- ---------------------------------------------------------------- links (C8)
 
 -- link_records: the from-record (and the to-record, when it is one) is
--- readable by the caller and in the same company (42501 otherwise); the
+-- readable by the caller and in the same company, and the caller may write
+-- the from-record (record_caller_may_write) or is a company actor (42501
+-- otherwise; review round 4); the
 -- target is a record or an entity (type + id), never itself. A live link
 -- with the same target and kind is returned as it is. Event link.added.
 CREATE OR REPLACE FUNCTION public.link_records(
@@ -701,6 +723,9 @@ BEGIN
       RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'record_access_denied';
     END IF;
   END IF;
+  IF NOT (public.is_company_actor(v_uid, e.vessel_id) OR public.record_caller_may_write(v_uid, e.company_id, e.vessel_id)) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'record_access_denied';
+  END IF;
   IF public.record_impersonating() THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'impersonating', DETAIL = 'Records cannot be changed while acting as another user.';
   END IF;
@@ -740,7 +765,8 @@ BEGIN
 END;
 $$;
 
--- unlink_records: soft remove by the link's creator or a company actor;
+-- unlink_records: soft remove by the link's creator while they may write
+-- the record (record_caller_may_write; review round 4), or a company actor;
 -- an already removed link is returned unchanged. Event link.removed.
 CREATE OR REPLACE FUNCTION public.unlink_records(p_link_id uuid)
 RETURNS public.record_links
@@ -771,7 +797,7 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'impersonating', DETAIL = 'Records cannot be changed while acting as another user.';
   END IF;
   v_actor := public.is_company_actor(v_uid, l.vessel_id);
-  IF NOT (l.created_by = v_uid OR v_actor) THEN
+  IF NOT ((l.created_by = v_uid AND public.record_caller_may_write(v_uid, l.company_id, l.vessel_id)) OR v_actor) THEN
     RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'not_allowed', DETAIL = 'Only the person who added a link, or the company, removes it.';
   END IF;
   UPDATE public.record_links SET removed_at = now(), removed_by = v_uid WHERE id = l.id RETURNING * INTO l;
@@ -803,10 +829,10 @@ GRANT EXECUTE ON FUNCTION public.unlink_records(uuid) TO authenticated;
 COMMENT ON TABLE public.file_objects IS 'One stored file of the private records bucket (gap/08 UP1-UP3; C7): its path <company>/<vessel|fleet>/<module>/<entity_type>/<entity_id>/<uuid>-<name>, type, size and hash. Read: record_readable (company + reach). No client writes: register_file_object only. Removed softly; legal hold blocks removal.';
 COMMENT ON TABLE public.record_attachments IS 'A file attached to a record (envelope) or to an entity (gap/08 UP2): section, caption, versions, order. Read: record_readable. No client writes: attach_record_file / remove_record_attachment only (soft remove).';
 COMMENT ON TABLE public.record_links IS 'Generic links between records, or from a record to an item (C8): related, duplicate_of, follow_up, caused_by, parent. company_id / vessel_id are stamped from the from-record by trg_record_links_scope (CC-12) and read through record_readable. No client writes: link_records / unlink_records only (soft remove).';
-COMMENT ON FUNCTION public.storage_path_allowed(text, text, boolean) IS 'The C7 path rule of the records bucket for auth.uid(): six segments, an active member of the company, fleet reach for fleet paths, reach to the vessel otherwise. Unknown anything -> false.';
+COMMENT ON FUNCTION public.storage_path_allowed(text, text, boolean) IS 'The C7 path rule of the records bucket for auth.uid(): six segments, an active member of the company, fleet reach (or a company actor) for fleet paths, reach to the vessel otherwise; for a write, never an external viewer of the company (record_user_is_external; review round 4; company actors keep the fleet path). Unknown anything -> false.';
 COMMENT ON FUNCTION public.record_links_scope() IS 'Trigger: a link''s company and vessel are its from-record''s (a client value is overwritten).';
 COMMENT ON FUNCTION public.register_file_object(text, text, text, text, bigint, text) IS 'Registers an uploaded object of the records bucket (path allowed, object stored by the caller, size and type checked, a given sha256 64 lower-case hex). Idempotent on (bucket, path); the uploader registering again with a sha256 fills a missing hash (a stored hash is never overwritten). The hash is client-asserted.';
-COMMENT ON FUNCTION public.attach_record_file(uuid, uuid, text, text, uuid) IS 'Attaches a registered file to a record (or its entity); refuses closed / void records unless the kind allows late evidence. Event attachment.added.';
-COMMENT ON FUNCTION public.remove_record_attachment(uuid, text) IS 'Soft-removes an attachment: the uploader or a vessel member before submission, a company actor with a reason after; legal hold refuses. Event attachment.removed.';
-COMMENT ON FUNCTION public.link_records(uuid, uuid, text, uuid, text, text) IS 'Links a record to another record of the same company (or to an item). Both readable by the caller. Event link.added.';
-COMMENT ON FUNCTION public.unlink_records(uuid) IS 'Soft-removes a link (its creator or a company actor). Event link.removed.';
+COMMENT ON FUNCTION public.attach_record_file(uuid, uuid, text, text, uuid) IS 'Attaches a registered file to a record (or its entity); the caller may write the file and the record (record_caller_may_write) or is a company actor (42501 otherwise); refuses closed / void records unless the kind allows late evidence. Event attachment.added.';
+COMMENT ON FUNCTION public.remove_record_attachment(uuid, text) IS 'Soft-removes an attachment: a caller who may write the record (record_caller_may_write) or a company actor before submission, a company actor with a reason after; legal hold refuses. Event attachment.removed.';
+COMMENT ON FUNCTION public.link_records(uuid, uuid, text, uuid, text, text) IS 'Links a record to another record of the same company (or to an item). Both readable by the caller, who may write the from-record (record_caller_may_write) or is a company actor (42501 otherwise). Event link.added.';
+COMMENT ON FUNCTION public.unlink_records(uuid) IS 'Soft-removes a link (its creator while they may write the record, or a company actor). Event link.removed.';

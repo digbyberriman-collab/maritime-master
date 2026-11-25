@@ -1,7 +1,7 @@
 {
   "counts": {
     "scenarios": 19,
-    "steps": 152
+    "steps": 153
   },
   "description": "Signature-sheet scenarios replayed by supabase/tests/sql/p4_signatures through record_sign_slot / record_pass_slot / record_cancel_pass / record_remove_signature / record_resign_slot / record_transition / record_set_section_digests. Expected values come from signatures.ts (signSlot, passSlotTo, cancelPass, removeSignature, reSignSlot, startNextCycle, slotState, isSignatureStale) composed with companyStep.ts as the SQL engine composes them (see the generator header). World: company SG, vessel SG.v, SG.crew1-3, SG.master (on board), SG.admin1-2 (company actors). Eligibility is by namedProfileIds only. Signature ids are keyUuid(\"signature:<scenario>:<ref>\"), profile ids keyUuid(\"profile:<key>\"). Regenerate with node scripts/db/gen-record-fixtures.mjs; never edit by hand.",
   "generator": "scripts/db/gen-record-fixtures.mjs",
@@ -168,7 +168,7 @@
     },
     {
       "creator": "SG.crew1",
-      "description": "Witnessed signing: allowed slots only, a signer is required, the witness is not the signer, the signer must be eligible, visitors only where allowed.",
+      "description": "Witnessed signing: allowed slots only, a signer is required, the witness is not the signer, the signer must be eligible, visitors only where allowed; the witness alone never removes a witnessed signature, the Master does (gap/08 §B).",
       "kind": {
         "allowCloseAs": false,
         "allowReopen": true,
@@ -192,7 +192,8 @@
         {"actor":"SG.crew1","after":{"cycle":1,"stale":{},"states":{"master":"waiting","no_witness":"open","prepared_by":"open","visitor_ack":"open"},"status":"open"},"expected":{"code":"visitor_not_allowed","ok":false},"method":"witnessed","op":"sign","ref":"s4","signer":{"visitor":"Surveyor"},"slot":"prepared_by"},
         {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"master":"open","no_witness":"open","prepared_by":"signed","visitor_ack":"open"},"status":"in_review"},"expected":{"ok":true},"method":"witnessed","op":"sign","ref":"s5","signer":{"profile":"SG.crew2"},"slot":"prepared_by"},
         {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false,"visitor_ack":false},"states":{"master":"open","no_witness":"open","prepared_by":"signed","visitor_ack":"signed"},"status":"in_review"},"expected":{"ok":true},"method":"witnessed","op":"sign","ref":"s6","signer":{"visitor":"Class surveyor"},"slot":"visitor_ack"},
-        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"master":"open","no_witness":"open","prepared_by":"signed","visitor_ack":"open"},"status":"in_review"},"expected":{"ok":true},"op":"remove","reason":null,"signatureId":"5662731f-2a49-632f-1c7b-ca8a678c6d0b","slot":"visitor_ack"},
+        {"actor":"SG.crew1","after":{"cycle":1,"stale":{"prepared_by":false,"visitor_ack":false},"states":{"master":"open","no_witness":"open","prepared_by":"signed","visitor_ack":"signed"},"status":"in_review"},"expected":{"code":"not_allowed","ok":false},"op":"remove","reason":null,"signatureId":"5662731f-2a49-632f-1c7b-ca8a678c6d0b","slot":"visitor_ack"},
+        {"actor":"SG.master","after":{"cycle":1,"stale":{"prepared_by":false},"states":{"master":"open","no_witness":"open","prepared_by":"signed","visitor_ack":"open"},"status":"in_review"},"expected":{"ok":true},"op":"remove","reason":null,"signatureId":"5662731f-2a49-632f-1c7b-ca8a678c6d0b","slot":"visitor_ack"},
         {"actor":"SG.crew2","after":{"cycle":1,"stale":{},"states":{"master":"waiting","no_witness":"open","prepared_by":"open","visitor_ack":"open"},"status":"open"},"expected":{"ok":true},"op":"remove","reason":null,"signatureId":"1a09343a-a8c5-c14f-32b8-a95b0cda623a","slot":"prepared_by"}
       ]
     },
@@ -488,7 +489,7 @@
     },
     {
       "creator": "SG.crew1",
-      "description": "A company slot: only its named company people, never witnessed (company slots default to no witness), removed by a company actor.",
+      "description": "A company slot: only its named company people, never witnessed (a company slot cannot allow it), removed by a company actor.",
       "kind": {
         "allowCloseAs": false,
         "allowReopen": true,
@@ -543,7 +544,7 @@
   ],
   "sourceSha256": {
     "src/lib/records/companyStep.ts": "f8649873163df4222de352c6395789696e8840c9ec9533ff1bfd5c51ce371373",
-    "src/lib/records/signatures.ts": "c78a5463d645c65a9098eaaddeee6825c1ffbefe468ce68e02c063da06bdb873",
+    "src/lib/records/signatures.ts": "ab8bad38f6dcc1987339762c8ee513ff38e5d8cfdf27665de91a430af69ce491",
     "src/lib/records/types.ts": "0116bcd5621578c97c51636d611d512548566dff38e845276a4cf3d42ded5bfd"
   },
   "version": 1,

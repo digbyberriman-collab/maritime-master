@@ -76,6 +76,12 @@ describe('template validation', () => {
     expect(() => validateSlotTemplate([{ ...CA_SLOTS[0], key: 'Bad Key' }])).toThrow(/snake_case/);
     expect(() => validateSlotTemplate([{ key: 'c', label: 'C', order: 1, party: 'company', allowVisitor: true }])).toThrow(/visitors/);
     expect(() => validateSlotTemplate([{ key: 'c', label: 'C', order: 1, party: 'company', allowOnBehalf: true }])).toThrow(/behalf/);
+    // Review round 4 (company-slot-witnessed-forgery): a company sign-off is
+    // made by the company actor on their own account, never witnessed.
+    expect(() => validateSlotTemplate([{ key: 'c', label: 'C', order: 1, party: 'company', allowWitnessed: true }])).toThrow(
+      'Company slot "c" cannot be witnessed',
+    );
+    expect(() => validateSlotTemplate([{ key: 'c', label: 'C', order: 1, party: 'company', allowWitnessed: false }])).not.toThrow();
     expect(() => validateSlotTemplate([{ ...CA_SLOTS[0], distinctFrom: ['nope'] }])).toThrow(/unknown slot/);
   });
 
@@ -229,6 +235,15 @@ describe('someone else signing (witnessed)', () => {
     s = must(sign(s, 'cp', actor('p-cp')));
     s = must(sign(s, 'hod', HOD));
     expect(code(sign(s, 'company', HOD, witnessed({ profileId: 'p-shore', name: 'Shore' })))).toBe('method_not_allowed');
+  });
+
+  it('a company slot is never witnessed, even when a sheet carries the flag (defence in depth)', () => {
+    // A sheet built around validateSlotTemplate (e.g. stale data): the flag
+    // on a company slot is ignored, as record_sign_slot ignores it.
+    const forged: SlotDefinition[] = [{ key: 'company', label: 'Company', order: 1, party: 'company', allowWitnessed: true }];
+    const sheet: SignatureSheet = { ...createSignatureSheet([]), slots: forged };
+    expect(code(sign(sheet, 'company', CREW, witnessed({ profileId: 'p-shore', name: 'Shore' })))).toBe('method_not_allowed');
+    expect(sheet.signatures).toHaveLength(0);
   });
 
   it('witnessing needs write access, a named signer, and someone other than yourself', () => {
@@ -413,10 +428,19 @@ describe('remove signature: reverse order only', () => {
     expect(code(removeSignature(s, { slotKey: 'company', at: 't' }, actor('p-other-admin', { isCompanyActor: true })))).toBe('ok');
   });
 
-  it('the witness may remove a witnessed signature', () => {
+  it('the witness alone may not remove a witnessed signature; the Master may (gap/08 §B)', () => {
     const slots: SlotDefinition[] = [{ key: 'cp', label: 'CP', order: 1, party: 'vessel', allowVisitor: true }];
     const s = must(sign(createSignatureSheet(slots), 'cp', CREW, { method: 'witnessed', signer: { profileId: null, name: 'Visitor' } }));
-    expect(code(removeSignature(s, { slotKey: 'cp', at: 't' }, CREW))).toBe('ok');
+    expect(code(removeSignature(s, { slotKey: 'cp', at: 't' }, CREW))).toBe('not_allowed');
+    expect(code(removeSignature(s, { slotKey: 'cp', at: 't' }, MASTER))).toBe('ok');
+  });
+
+  it('the witness of a crew-witnessed Master signature is refused; the Master removes it', () => {
+    const slots: SlotDefinition[] = [{ key: 'master', label: 'Master', order: 1, party: 'vessel', officeKey: 'master' }];
+    const s = must(sign(createSignatureSheet(slots), 'master', CREW, { method: 'witnessed', signer: { profileId: 'p-master', name: 'Master' } }));
+    expect(activeSignature(s, 'master')).toMatchObject({ signerProfileId: 'p-master', witnessProfileId: 'p-crew' });
+    expect(code(removeSignature(s, { slotKey: 'master', at: 't' }, CREW))).toBe('not_allowed');
+    expect(code(removeSignature(s, { slotKey: 'master', at: 't' }, MASTER))).toBe('ok');
   });
 
   it('a reason is required once the record is submitted', () => {

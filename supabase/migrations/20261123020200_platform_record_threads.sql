@@ -251,7 +251,8 @@ CREATE TRIGGER trg_record_thread_entries_envelope
 
 -- Post an update, request or reply, or edit an entry (p_replaces_id), with
 -- the threads.ts rules and codes: party = company for a company actor,
--- else vessel for a user who reaches the record (else 42501); requests by
+-- else vessel for a user who may write the record (record_caller_may_write:
+-- reach and no external membership; else 42501, review round 4); requests by
 -- the company with a due date (wrong_party, invalid_date); replies by the
 -- vessel to an open request (wrong_party, unknown_entry, not_a_request,
 -- request_closed); bodies trimmed (empty_body, body_too_long); edits of
@@ -300,7 +301,7 @@ BEGIN
   END IF;
   v_party := CASE
     WHEN public.is_company_actor(v_uid, e.vessel_id) THEN 'company'
-    WHEN public.record_caller_reaches(v_uid, e.company_id, e.vessel_id) THEN 'vessel'
+    WHEN public.record_caller_may_write(v_uid, e.company_id, e.vessel_id) THEN 'vessel'
   END;
   IF v_party IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'record_access_denied';
@@ -412,7 +413,9 @@ $$;
 
 -- Resolve an open request (the company): done (optional note), cancelled
 -- (reason required), change_date (a valid new date, a reason, a different
--- date; the change is appended to due_history). Codes as threads.ts
+-- date; the change is appended to due_history). A reader who neither acts
+-- for the company nor may write the record gets 42501 (review round 4).
+-- Codes as threads.ts
 -- (wrong_party, not_a_request, request_closed, invalid_date,
 -- reason_required, same_date). Event thread.request_<resolution>.
 CREATE OR REPLACE FUNCTION public.record_resolve_thread_request(p_request_id uuid, p_resolution text, p_note text DEFAULT NULL, p_new_due date DEFAULT NULL)
@@ -439,6 +442,9 @@ BEGIN
   END IF;
   SELECT * INTO e FROM public.record_envelopes WHERE id = r.envelope_id FOR UPDATE;
   IF NOT public.record_readable(e.company_id, e.vessel_id) THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'record_access_denied';
+  END IF;
+  IF NOT (public.is_company_actor(v_uid, e.vessel_id) OR public.record_caller_may_write(v_uid, e.company_id, e.vessel_id)) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'record_access_denied';
   END IF;
   IF p_resolution IS NULL OR p_resolution NOT IN ('done', 'cancelled', 'change_date') THEN
@@ -526,5 +532,5 @@ COMMENT ON FUNCTION public.record_js_trim(text) IS 'JS String.prototype.trim() (
 COMMENT ON FUNCTION public.record_follow_up_due(uuid) IS 'followUpDue() of the envelope''s status_updates thread (today = current_date). Internal.';
 COMMENT ON FUNCTION public.record_thread_entries_guard() IS 'Trigger: thread entries are append-only except the request fields, inside the engine.';
 COMMENT ON FUNCTION public.record_thread_entries_envelope() IS 'Trigger: a status_updates entry recomputes the envelope''s whose_move, last_update_at and follow_up_due.';
-COMMENT ON FUNCTION public.record_post_thread_entry(uuid, uuid, text, text, text, date, date, uuid, uuid) IS 'Post an update / request / reply or edit an entry (threads.ts rules and codes); idempotent on the entry id.';
-COMMENT ON FUNCTION public.record_resolve_thread_request(uuid, text, text, date) IS 'The company marks a request done, cancels it (reason) or changes its due date (reason; history kept).';
+COMMENT ON FUNCTION public.record_post_thread_entry(uuid, uuid, text, text, text, date, date, uuid, uuid) IS 'Post an update / request / reply or edit an entry (threads.ts rules and codes); idempotent on the entry id. Party company for a company actor, vessel for a caller who may write the record (record_caller_may_write); anyone else 42501 (an external viewer reads only).';
+COMMENT ON FUNCTION public.record_resolve_thread_request(uuid, text, text, date) IS 'The company marks a request done, cancels it (reason) or changes its due date (reason; history kept). A reader who is neither a company actor nor may write the record gets 42501.';

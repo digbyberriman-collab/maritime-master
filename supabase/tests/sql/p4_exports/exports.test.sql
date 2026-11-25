@@ -209,3 +209,66 @@ SELECT tests.is_empty($q$SELECT 1 FROM public.record_events WHERE entity_type = 
 SELECT tests.as_user(tests.user_id('B.admin'));
 SELECT tests.is_empty(format($q$SELECT 1 FROM public.record_events WHERE entity_id = %L$q$, :'master_job'), 'company B reads none of them');
 SELECT tests.reset_role();
+
+-- ------------------------------------------------------------ a deleted user or vessel leaves an anonymised job (review round 4)
+
+-- export-jobs-block-user-delete: requested_by and vessel_id are ON DELETE
+-- SET NULL and export_jobs_guard lets exactly that referential SET NULL
+-- through, so one logged export no longer makes the login (GDPR erasure)
+-- or the vessel undeletable. Nobody cancels an orphaned job; any other
+-- change is still refused; export_ready on it notifies nobody. Ports
+-- scratchpad r3sec/t6_export_job_blocks_user_delete.sql and
+-- verify-export-del/v.sql.
+SELECT tests.seed_user('A', 'A.leaver', 'crew');
+SELECT tests.seed_assignment('A.leaver', 'A.dra', true, 'Deckhand');
+SELECT tests.seed_vessel('A', 'A.old', 'OLD HULL');
+SELECT tests.as_user(tests.user_id('A.leaver'));
+SELECT (public.log_client_export('csv', 'crew.roster', '{}'::jsonb, true, 12, tests.vessel_id('A.dra'))).id AS leaver_logged \gset
+SELECT (public.request_export('csv', 'crew.roster', '{}'::jsonb, false, tests.vessel_id('A.dra'))).id AS leaver_job \gset
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT (public.log_client_export('csv', 'fleet.vessels', '{}'::jsonb, false, 3, tests.vessel_id('A.old'))).id AS old_vessel_job \gset
+SELECT tests.reset_role();
+SELECT tests.ok((SELECT is_nullable = 'YES' FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'export_jobs' AND column_name = 'requested_by'),
+                'export_jobs.requested_by is nullable');
+SELECT tests.ok((SELECT confdeltype = 'n' FROM pg_constraint WHERE conname = 'export_jobs_requested_by_fkey'), 'export_jobs_requested_by_fkey is ON DELETE SET NULL');
+SELECT tests.lives(format('DELETE FROM auth.users WHERE id = %L', tests.user_id('A.leaver')), 'the requester''s login is deleted after a logged and a requested export');
+SELECT tests.results_eq(format($q$SELECT id, requested_by, status FROM public.export_jobs WHERE id IN (%L, %L)$q$, :'leaver_logged', :'leaver_job'),
+                        format($q$VALUES (%L::uuid, NULL::uuid, 'ready'::text), (%L::uuid, NULL::uuid, 'requested'::text)$q$, :'leaver_logged', :'leaver_job'),
+                        'both jobs remain, requested_by NULL');
+SELECT tests.is((SELECT count(*) FROM public.record_events WHERE entity_type = 'export_job' AND entity_id IN (:'leaver_logged', :'leaver_job')), 2::bigint, 'and their events remain');
+SELECT tests.is((SELECT count(*) FROM public.record_events WHERE entity_type = 'export_job' AND entity_id IN (:'leaver_logged', :'leaver_job') AND actor_user_id IS NOT NULL), 0::bigint,
+                'with actor_user_id NULL');
+SELECT tests.as_service();
+SELECT tests.lives(format('DELETE FROM public.vessels WHERE id = %L', tests.vessel_id('A.old')), 'the service role deletes a vessel with a logged export');
+SELECT tests.reset_role();
+SELECT tests.results_eq(format($q$SELECT vessel_id, requested_by FROM public.export_jobs WHERE id = %L$q$, :'old_vessel_job'),
+                        format($q$VALUES (NULL::uuid, %L::uuid)$q$, tests.user_id('A.fleet_manager')), 'the job remains with vessel_id NULL (the requester kept)');
+-- Nobody cancels the orphaned job.
+SELECT tests.as_user(tests.user_id('A.crew_dra'));
+SELECT tests.throws_like(format('SELECT public.cancel_export_job(%L)', :'leaver_job'), '42501', 'export_access_denied', 'another active user cannot cancel the orphaned job');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.throws_like(format('SELECT public.cancel_export_job(%L)', :'leaver_job'), '42501', 'export_access_denied', 'nor an admin of the company');
+SELECT tests.as_user(tests.user_id('B.admin'));
+SELECT tests.throws(format('SELECT public.cancel_export_job(%L)', :'leaver_job'), '42501', 'nor a company B user');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT status FROM public.export_jobs WHERE id = :'leaver_job'), 'requested', 'the orphaned job is still requested');
+-- Any other change outside the engine is still refused, the service role included.
+SELECT tests.as_service();
+SELECT tests.throws_like(format($q$UPDATE public.export_jobs SET status = 'ready' WHERE id = %L$q$, :'leaver_job'), '42501', 'export_status_is_server_owned', 'a non-referential status update is refused');
+SELECT tests.throws_like(format($q$UPDATE public.export_jobs SET requested_by = %L WHERE id = %L$q$, tests.user_id('A.crew_dra'), :'leaver_job'), '42501', 'export_status_is_server_owned',
+                         'so is pointing the orphaned job at another user');
+SELECT tests.throws_like(format($q$UPDATE public.export_jobs SET vessel_id = %L WHERE id = %L$q$, tests.vessel_id('A.hyd'), :'old_vessel_job'), '42501', 'export_status_is_server_owned',
+                         'or at another vessel');
+SELECT tests.throws_like(format($q$UPDATE public.export_jobs SET requested_by = NULL, row_count = 99 WHERE id = %L$q$, :'old_vessel_job'), '42501', 'export_status_is_server_owned',
+                         'and a SET NULL that carries another change');
+SELECT tests.throws_like(format('DELETE FROM public.export_jobs WHERE id = %L', :'leaver_job'), '42501', 'export_status_is_server_owned', 'and a job is never deleted');
+-- The machine still moves it; export_ready on an orphaned job notifies nobody.
+SELECT tests.lives(format($q$SELECT public.export_job_transition(%L, 'running')$q$, :'leaver_job'), 'the builder starts the orphaned job');
+SELECT tests.lives(format($q$SELECT public.export_job_transition(%L, 'ready', %L::jsonb)$q$, :'leaver_job', tests.full_patch() - 'error_code'),
+                   'and finishes it without an error');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT count(*) FROM public.record_events WHERE entity_id = :'leaver_job' AND action = 'export.ready' AND notification_type = 'export_ready'), 1::bigint,
+                'the export.ready event is logged with its notification type');
+SELECT tests.is((SELECT count(*) FROM public.notification_outbox WHERE type_key = 'export_ready' AND payload ->> 'entity_id' = :'leaver_job'), 0::bigint,
+                'but no outbox row (no requester: array_remove drops the NULL)');
+SELECT tests.is((SELECT count(*) FROM public.notification_inbox WHERE type_key = 'export_ready' AND payload ->> 'entity_id' = :'leaver_job'), 0::bigint, 'and no inbox row');

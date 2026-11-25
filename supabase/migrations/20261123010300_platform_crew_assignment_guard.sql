@@ -42,6 +42,22 @@
 --      (and the old vessel on a move)
 --                                                   master_office_change_refused
 --
+-- The row as stored (review round 4, master-guard-bypass-via-leave-date):
+-- BEFORE triggers fire in name order, so this guard runs before the legacy
+-- trg_crew_assignments_normalise_dates (20260917110000), which copies
+-- end_date and leave_date into each other and sets is_current false once
+-- the leave date has come. The guard decides on the row as it will be
+-- stored: v_new_current is the normaliser's is_current
+-- (coalesce(NEW.is_current, false) AND NOT coalesce(NEW.leave_date,
+-- NEW.end_date) <= current_date), used for the Master office after the
+-- change and for "is_current turns true" in rule a. So ending a Master row
+-- through leave_date or end_date is a Master office change (e), and an
+-- already-ended Master row (an INSERT of history) is not an appointment.
+-- The guard stays BEFORE on purpose: in an AFTER trigger the caller's own
+-- new or moved row would already count toward reach_vessel_for() and the
+-- vessel-scoped users_access.admin capability (reach-based), so rules a
+-- and b would pass a self-placement onto a vessel the caller did not reach.
+--
 -- DELETE (review round 3, crew-assignment-delete-unguarded; the legacy
 -- "HR managers can delete crew assignments" policy admits every vessel an
 -- HR viewer sees, i.e. every company vessel): rules b and e apply to the
@@ -92,6 +108,8 @@ DECLARE
   v_master_before boolean := false;
   v_master_after boolean;
   v_admin boolean;
+  v_new_leave date;
+  v_new_current boolean;
 BEGIN
   IF v_uid IS NULL OR current_setting('storm.access_engine', true) = 'on' THEN
     -- NEW is NULL on a DELETE: returning it would cancel the delete.
@@ -135,11 +153,18 @@ BEGIN
     SELECT v.company_id INTO v_old_company FROM public.vessels AS v WHERE v.id = OLD.vessel_id;
   END IF;
 
+  -- The row as stored (review round 4): the legacy normaliser
+  -- (trg_crew_assignments_normalise_dates, which fires after this guard)
+  -- takes leave_date, else end_date, and ends the row once that date has
+  -- come. Decide on that is_current, never on the one the caller sent.
+  v_new_leave := coalesce(NEW.leave_date, NEW.end_date);
+  v_new_current := coalesce(NEW.is_current, false) AND NOT coalesce(v_new_leave <= current_date, false);
+
   -- a / c. A row of your own that grants reach.
   v_grants_reach := TG_OP = 'INSERT'
     OR NEW.user_id IS DISTINCT FROM OLD.user_id
     OR NEW.vessel_id IS DISTINCT FROM OLD.vessel_id
-    OR (coalesce(NEW.is_current, false) AND NOT coalesce(OLD.is_current, false));
+    OR (v_new_current AND NOT coalesce(OLD.is_current, false));
   IF NEW.user_id = v_uid AND v_grants_reach
      AND NOT (v_company IS NOT NULL AND public.has_capability_for(v_uid, 'admin.access.users_access.admin', v_company, NEW.vessel_id)) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'self_assignment_refused',
@@ -175,7 +200,7 @@ BEGIN
     v_master_before := coalesce(OLD.is_current, false)
       AND (coalesce(v_old_pos IN ('master', 'captain'), false) OR coalesce(v_old_rank IN ('master', 'captain'), false));
   END IF;
-  v_master_after := coalesce(NEW.is_current, false)
+  v_master_after := v_new_current
     AND (coalesce(v_new_pos IN ('master', 'captain'), false) OR coalesce(v_new_rank IN ('master', 'captain'), false));
   v_admin := v_company IS NOT NULL
     AND public.has_capability_for(v_uid, 'admin.access.users_access.admin', v_company, NEW.vessel_id)
@@ -209,4 +234,4 @@ REVOKE ALL ON FUNCTION public.crew_assignments_guard() FROM PUBLIC, anon, authen
 
 -- ---------------------------------------------------------------- comments
 
-COMMENT ON FUNCTION public.crew_assignments_guard() IS 'Trigger trg_crew_assignments_guard (no self-escalation): for a signed-in caller without storm.access_engine, an assignment of your own that grants reach needs users-access admin for the vessel (self_assignment_refused); the caller must already reach the new (and old) vessel or hold fleet reach / users-access admin for it (assignment_vessel_out_of_reach); an own-row change of the normalised position or rank needs users-access admin for the vessel (self_office_change_refused); appointing, removing or moving a Master / Captain row needs users-access admin for the vessel (and the old one on a move) (master_office_change_refused). DELETE (review round 3): the caller must reach the row''s vessel or hold fleet reach / users-access admin for it (assignment_vessel_out_of_reach), and deleting a current Master / Captain row needs users-access admin for the vessel (master_office_change_refused); an FK cascade of a vessel or profile delete passes. Service role, migrations and the engine definers unaffected.';
+COMMENT ON FUNCTION public.crew_assignments_guard() IS 'Trigger trg_crew_assignments_guard (no self-escalation): decides on the row as stored (review round 4: is_current as the legacy date normaliser leaves it, so ending a Master row through leave_date or end_date is a Master office change); for a signed-in caller without storm.access_engine, an assignment of your own that grants reach needs users-access admin for the vessel (self_assignment_refused); the caller must already reach the new (and old) vessel or hold fleet reach / users-access admin for it (assignment_vessel_out_of_reach); an own-row change of the normalised position or rank needs users-access admin for the vessel (self_office_change_refused); appointing, removing or moving a Master / Captain row needs users-access admin for the vessel (and the old one on a move) (master_office_change_refused). DELETE (review round 3): the caller must reach the row''s vessel or hold fleet reach / users-access admin for it (assignment_vessel_out_of_reach), and deleting a current Master / Captain row needs users-access admin for the vessel (master_office_change_refused); an FK cascade of a vessel or profile delete passes. Service role, migrations and the engine definers unaffected.';

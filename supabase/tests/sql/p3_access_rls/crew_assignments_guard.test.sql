@@ -21,8 +21,16 @@ SELECT tests.throws_like(format($q$INSERT INTO public.crew_assignments (vessel_i
                          '42501', 'self_assignment_refused', 'nor add a second row on their own vessel');
 SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET vessel_id = %L WHERE user_id = auth.uid() AND is_current$q$, tests.vessel_id('A.gam')),
                          '42501', 'self_assignment_refused', 'nor move their own assignment to another vessel');
-SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET is_current = true, leave_date = NULL WHERE id = %L$q$, tests.id('assignment:A.master_dra@A.gam')),
+SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET is_current = true, leave_date = NULL, end_date = NULL WHERE id = %L$q$, tests.id('assignment:A.master_dra@A.gam')),
                          '42501', 'self_assignment_refused', 'nor revive an ended assignment of their own');
+-- The guard decides on the row as stored (review round 4): clearing only
+-- leave_date leaves end_date, which the legacy normaliser copies back, so
+-- the row would stay ended and grant nothing; it is no self-placement, and
+-- rule b still refuses it because the Master does not reach GAME CHANGER.
+SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET is_current = true, leave_date = NULL WHERE id = %L$q$, tests.id('assignment:A.master_dra@A.gam')),
+                         '42501', 'assignment_vessel_out_of_reach', 'a half revive (end_date kept) is no self-placement, and the vessel is still out of reach');
+SELECT tests.ok((SELECT NOT is_current AND leave_date = current_date - 1 FROM public.crew_assignments WHERE id = tests.id('assignment:A.master_dra@A.gam')),
+                'the ended row is unchanged');
 SELECT tests.lives($q$UPDATE public.crew_assignments SET notes = 'Watch schedule agreed' WHERE user_id = auth.uid() AND is_current$q$, 'an own-row edit that grants no reach and changes no office is still allowed');
 -- b. placing someone else needs reach of the vessel
 SELECT tests.throws_like(format($q$INSERT INTO public.crew_assignments (vessel_id, user_id, position, join_date, is_current) VALUES (%L, %L, 'Deckhand', current_date, true)$q$, tests.vessel_id('A.hyd'), tests.user_id('A.deckhand')),
@@ -74,6 +82,11 @@ SELECT tests.seed_assignment('A.purser_dra', 'A.dra', true, 'Purser');
 SELECT tests.seed_user('A', 'A.deck_dra', 'crew');
 SELECT tests.seed_assignment('A.deck_dra', 'A.dra', true, 'Deckhand');
 SELECT tests.seed_user('A', 'A.deck2_dra', 'crew');
+SELECT tests.seed_user('A', 'A.capt_dra', 'crew');
+SELECT tests.seed_assignment('A.capt_dra', 'A.dra', true, 'Chief Officer', '{"rank": "Captain"}');
+SELECT tests.seed_user('A', 'A.steward_dra', 'crew');
+SELECT tests.seed_assignment('A.steward_dra', 'A.dra', true, 'Steward');
+SELECT tests.ok(public.record_is_master(tests.user_id('A.capt_dra'), tests.vessel_id('A.dra')), 'setup: a Captain-rank row on DRAAK holds the Master office');
 SELECT tests.as_user(tests.user_id('A.purser_dra'));
 SELECT tests.ok(public.hr_can_edit(auth.uid()) AND NOT public.has_capability('admin.access.users_access.admin', tests.company_id('A'), tests.vessel_id('A.dra')),
                 'the purser is an HR editor, not a users-access admin');
@@ -86,7 +99,77 @@ SELECT tests.throws_like(format($q$INSERT INTO public.crew_assignments (vessel_i
 SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET position = 'Deckhand' WHERE id = %L$q$, tests.id('assignment:A.master_dra@A.dra')), '42501', 'master_office_change_refused',
                          'nor remove the real Master');
 SELECT tests.lives(format($q$UPDATE public.crew_assignments SET position = 'Bosun' WHERE id = %L$q$, tests.id('assignment:A.deck_dra@A.dra')), 'an HR editor still retitles a deckhand (no office of their own, not Master)');
+-- Ending the Master office through the dates (review round 4,
+-- master-guard-bypass-via-leave-date): the legacy normaliser sets
+-- is_current false once leave_date (or end_date, copied into it) has come,
+-- and the guard decides on that stored row.
+SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET %s WHERE id = %L$q$, v.set_clause, tests.id(v.row_key)), '42501', 'master_office_change_refused',
+                         'the purser cannot end the ' || v.what)
+FROM (VALUES ('leave_date = current_date - 1', 'assignment:A.master_dra@A.dra', 'Master row with leave_date yesterday'),
+             ('end_date = current_date', 'assignment:A.master_dra@A.dra', 'Master row with end_date today'),
+             ('leave_date = current_date - 1', 'assignment:A.capt_dra@A.dra', 'Captain-rank row with leave_date yesterday'),
+             ('end_date = current_date', 'assignment:A.capt_dra@A.dra', 'Captain-rank row with end_date today')) AS v(set_clause, row_key, what);
+SELECT tests.lives(format($q$UPDATE public.crew_assignments SET leave_date = current_date + 30 WHERE id = %L$q$, tests.id('assignment:A.master_dra@A.dra')),
+                   'a future leave date keeps the Master current, so it is no office change');
+SELECT tests.lives(format($q$UPDATE public.crew_assignments SET leave_date = NULL, end_date = NULL WHERE id = %L$q$, tests.id('assignment:A.master_dra@A.dra')),
+                   'and clearing it again is none either');
+SELECT tests.lives(format($q$UPDATE public.crew_assignments SET leave_date = current_date - 1 WHERE id = %L$q$, tests.id('assignment:A.steward_dra@A.dra')),
+                   'the purser still ends a non-Master row by its leave date');
+-- An already-ended Master row (history) is no appointment: the stored row
+-- is not current, so the final rule lets an HR editor record it.
+SELECT tests.lives(format($q$INSERT INTO public.crew_assignments (id, vessel_id, user_id, position, join_date, leave_date, is_current) VALUES (%L, %L, %L, 'Master', current_date - 400, current_date - 30, true)$q$,
+                          tests.id('ca:deck2_master_history'), tests.vessel_id('A.dra'), tests.user_id('A.deck2_dra')),
+                   'the purser records an already-ended Master row');
 SELECT tests.reset_role();
+SELECT tests.ok((SELECT is_current AND leave_date IS NULL AND end_date IS NULL FROM public.crew_assignments WHERE id = tests.id('assignment:A.master_dra@A.dra')),
+                'the DRAAK Master row is unchanged (current, no leave or end date)');
+SELECT tests.ok(public.record_is_master(tests.user_id('A.master_dra'), tests.vessel_id('A.dra')) AND public.record_is_master(tests.user_id('A.capt_dra'), tests.vessel_id('A.dra')),
+                'record_is_master stays t for the Master and the Captain-rank holder');
+SELECT tests.ok((SELECT NOT is_current FROM public.crew_assignments WHERE id = tests.id('assignment:A.steward_dra@A.dra')), 'the steward row is ended');
+SELECT tests.ok((SELECT NOT is_current FROM public.crew_assignments WHERE id = tests.id('ca:deck2_master_history'))
+                AND NOT public.record_is_master(tests.user_id('A.deck2_dra'), tests.vessel_id('A.dra')),
+                'the ended Master row is stored ended and makes nobody Master');
+-- A users-access admin of the vessel may make every one of these edits.
+SAVEPOINT master_dates;
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.lives(format($q$UPDATE public.crew_assignments SET %s WHERE id = %L$q$, v.set_clause, tests.id(v.row_key)), 'a users-access admin ends the ' || v.what)
+FROM (VALUES ('leave_date = current_date - 1', 'assignment:A.master_dra@A.dra', 'Master row with leave_date yesterday'),
+             ('leave_date = current_date - 1', 'assignment:A.capt_dra@A.dra', 'Captain-rank row with leave_date yesterday')) AS v(set_clause, row_key, what);
+SELECT tests.reset_role();
+SELECT tests.ok(NOT public.record_is_master(tests.user_id('A.master_dra'), tests.vessel_id('A.dra')) AND NOT public.record_is_master(tests.user_id('A.capt_dra'), tests.vessel_id('A.dra')),
+                'the admin''s leave dates ended both Master offices');
+ROLLBACK TO SAVEPOINT master_dates;
+SAVEPOINT master_dates;
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.lives(format($q$UPDATE public.crew_assignments SET %s WHERE id = %L$q$, v.set_clause, tests.id(v.row_key)), 'a users-access admin ends the ' || v.what)
+FROM (VALUES ('end_date = current_date', 'assignment:A.master_dra@A.dra', 'Master row with end_date today'),
+             ('end_date = current_date', 'assignment:A.capt_dra@A.dra', 'Captain-rank row with end_date today')) AS v(set_clause, row_key, what);
+SELECT tests.reset_role();
+SELECT tests.ok(NOT public.record_is_master(tests.user_id('A.master_dra'), tests.vessel_id('A.dra')) AND NOT public.record_is_master(tests.user_id('A.capt_dra'), tests.vessel_id('A.dra')),
+                'the admin''s end dates ended both Master offices');
+ROLLBACK TO SAVEPOINT master_dates;
+SELECT tests.ok(public.record_is_master(tests.user_id('A.master_dra'), tests.vessel_id('A.dra')), 'setup restored: the DRAAK Master is Master again');
+-- The guard stays BEFORE (review round 4): a vessel-scoped users-access
+-- admin (non-legacy, DRAAK only) placing themselves on HYDRA is refused,
+-- because their own new row never counts toward the reach that their
+-- users_access.admin capability is scoped by.
+SELECT tests.seed_user('A', 'A.ua_dra', 'crew');
+SELECT tests.seed_rbac_role('A.ua_dra', 'purser', 'A.dra');
+UPDATE public.account_memberships SET legacy_managed = false, source = 'admin', kind = 'admin', users_access_level = 'write', vessel_scope = 'assigned', fleet_access = false
+WHERE user_id = tests.user_id('A.ua_dra');
+INSERT INTO public.account_membership_vessels (membership_id, company_id, vessel_id)
+SELECT id, company_id, tests.vessel_id('A.dra') FROM public.account_memberships WHERE user_id = tests.user_id('A.ua_dra');
+SELECT tests.as_user(tests.user_id('A.ua_dra'));
+SELECT tests.ok(public.hr_can_edit(auth.uid())
+                AND public.has_capability('admin.access.users_access.admin', tests.company_id('A'), tests.vessel_id('A.dra'))
+                AND NOT public.has_capability('admin.access.users_access.admin', tests.company_id('A'), tests.vessel_id('A.hyd')),
+                'setup: a DRAAK-only users-access admin who is an HR editor');
+SELECT tests.throws_like(format($q$INSERT INTO public.crew_assignments (vessel_id, user_id, position, join_date, is_current) VALUES (%L, auth.uid(), 'Deckhand', current_date, true)$q$, tests.vessel_id('A.hyd')),
+                         '42501', 'self_assignment_refused', 'a DRAAK-only admin cannot place themselves on HYDRA (their new row grants no reach in the check)');
+SELECT tests.lives(format($q$INSERT INTO public.crew_assignments (id, vessel_id, user_id, position, join_date, is_current) VALUES (%L, %L, auth.uid(), 'Supernumerary', current_date, true)$q$, tests.id('ca:ua_dra'), tests.vessel_id('A.dra')),
+                   'but joins DRAAK, which they administer');
+SELECT tests.reset_role();
+SELECT tests.ok(NOT public.reach_vessel_for(tests.user_id('A.ua_dra'), tests.vessel_id('A.hyd')), 'the DRAAK-only admin still does not reach HYDRA');
 SELECT tests.ok(NOT public.record_is_master(tests.user_id('A.purser_dra'), tests.vessel_id('A.dra')) AND NOT public.record_is_master(tests.user_id('A.deck_dra'), tests.vessel_id('A.dra')),
                 'nobody new is Master of DRAAK');
 -- A users-access admin of the vessel may.
@@ -183,3 +266,5 @@ SELECT tests.lives(format('DELETE FROM public.profiles WHERE id = %L', tests.pro
 SELECT tests.reset_role();
 SELECT tests.is((SELECT count(*) FROM public.crew_assignments WHERE user_id = tests.user_id('A.leaver_hyd')), 0::bigint, 'its assignments are gone');
 SELECT tests.ok((SELECT (tgtype & 8) <> 0 FROM pg_trigger WHERE tgrelid = 'public.crew_assignments'::regclass AND tgname = 'trg_crew_assignments_guard'), 'the guard fires on DELETE');
+SELECT tests.ok((SELECT (tgtype & 2) <> 0 FROM pg_trigger WHERE tgrelid = 'public.crew_assignments'::regclass AND tgname = 'trg_crew_assignments_guard'), 'the guard is a BEFORE trigger (review round 4)');
+SELECT tests.ok(position('v_new_current' IN pg_get_functiondef('public.crew_assignments_guard()'::regprocedure)) > 0, 'the guard decides on the stored is_current (review round 4)');

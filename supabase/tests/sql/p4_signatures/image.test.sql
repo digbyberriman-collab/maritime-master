@@ -8,8 +8,8 @@ SELECT tests.seed_two_tenants();
 SELECT tests.seed_user('A', 'A.crew_dra', 'crew');
 SELECT tests.seed_assignment('A.crew_dra', 'A.dra', true, 'Deckhand');
 
-INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, company_step, edit_after_sign, delete_rule, slot_template)
-VALUES ('test.img', 'test', 'Image', 'IMG', 'vessel', 'none', 'lock', 'draft_only', jsonb_build_array(
+INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, company_step, edit_after_sign, delete_rule, slot_template)
+VALUES ('test.img', 'test', 'Image', 'IMG', 'vessel', 'vessel.test.records', 'none', 'lock', 'draft_only', jsonb_build_array(
   jsonb_build_object('key', 'anyone', 'label', 'Anyone', 'order', 1, 'party', 'vessel', 'required', true),
   jsonb_build_object('key', 'anyone2', 'label', 'Anyone 2', 'order', 1, 'party', 'vessel', 'required', true),
   jsonb_build_object('key', 'anyone3', 'label', 'Anyone 3', 'order', 1, 'party', 'vessel', 'required', true)));
@@ -86,8 +86,8 @@ SELECT tests.ok(EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'record_sign
 -- else, never over a stored hash). Ports scratchpad verify-sigimg/repro.sql.
 SELECT tests.seed_user('A', 'A.crew_dra2', 'crew');
 SELECT tests.seed_assignment('A.crew_dra2', 'A.dra', true, 'Deckhand');
-INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, company_step, edit_after_sign, delete_rule, slot_template)
-VALUES ('test.img_app', 'test', 'Image (app path)', 'IMA', 'vessel', 'none', 'lock', 'draft_only', jsonb_build_array(
+INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, company_step, edit_after_sign, delete_rule, slot_template)
+VALUES ('test.img_app', 'test', 'Image (app path)', 'IMA', 'vessel', 'vessel.test.records', 'none', 'lock', 'draft_only', jsonb_build_array(
   jsonb_build_object('key', 's1', 'label', 'Slot 1', 'order', 1, 'party', 'vessel', 'required', true),
   jsonb_build_object('key', 's2', 'label', 'Slot 2', 'order', 1, 'party', 'vessel', 'required', true),
   jsonb_build_object('key', 's3', 'label', 'Slot 3', 'order', 1, 'party', 'vessel', 'required', true),

@@ -28,6 +28,7 @@ const INCIDENT: RecordKind = {
   label: 'Incident',
   refPrefix: 'INC',
   scope: 'vessel',
+  capabilityPath: 'vessel.safety.incidents',
   enveloped: true,
   companyStep: 'sign_off',
   reportFirst: true,

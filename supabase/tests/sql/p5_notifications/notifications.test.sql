@@ -23,14 +23,14 @@ SELECT tests.company_id('A') AS ca, tests.company_id('B') AS cb, tests.vessel_id
        tests.user_id('A.fleet_manager') AS u_fm, tests.user_id('A.crew_hyd') AS u_hyd, tests.user_id('A.disabled') AS u_dis,
        tests.user_id('B.admin') AS u_b \gset
 
-INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, company_step, report_first, decision_kind, allow_reopen, allow_close_as, edit_after_sign, delete_rule, slot_template)
+INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, company_step, report_first, decision_kind, allow_reopen, allow_close_as, edit_after_sign, delete_rule, slot_template)
 VALUES
-  ('test.permit', 'test', 'Permit to work', 'PTW', 'vessel', 'sign_off', false, false, true, true, 'lock', 'never_after_submit',
+  ('test.permit', 'test', 'Permit to work', 'PTW', 'vessel', 'vessel.test.records', 'sign_off', false, false, true, true, 'lock', 'never_after_submit',
    jsonb_build_array(
      jsonb_build_object('key', 'prepared_by', 'label', 'Prepared by', 'order', 1, 'party', 'vessel', 'named_profile_ids', jsonb_build_array(tests.profile_id('A.crew_dra'))),
      jsonb_build_object('key', 'checked_by', 'label', 'Checked by', 'order', 2, 'party', 'vessel', 'named_profile_ids', jsonb_build_array(tests.profile_id('A.crew_dra2'))),
      jsonb_build_object('key', 'company_review', 'label', 'Company review', 'order', 3, 'party', 'company'))),
-  ('test.fleet_review', 'test', 'Fleet review', 'FRV', 'fleet', 'sign_off', false, false, false, false, 'lock', 'draft_only', '[]'::jsonb);
+  ('test.fleet_review', 'test', 'Fleet review', 'FRV', 'fleet', 'fleet.test.records', 'sign_off', false, false, false, false, 'lock', 'draft_only', '[]'::jsonb);
 
 -- helpers (rolled back with the file)
 CREATE FUNCTION tests.emit(p_type text, p_company uuid, p_title text, p_scope text, p_vessel uuid DEFAULT NULL,
