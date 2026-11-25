@@ -174,7 +174,8 @@
           "restrictions": {},
           "source": "role"
         }
-      ]
+      ],
+      "has_capability": false
     }
   },
   "module-settings": {

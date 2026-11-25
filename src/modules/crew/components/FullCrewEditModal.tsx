@@ -13,6 +13,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -40,7 +41,15 @@ import {
   Permission,
 } from '@/modules/auth/lib/permissions';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
-import type { CrewMember } from '@/modules/crew/hooks/useCrew';
+import { useCan } from '@/lib/permissions/useCan';
+import type { CrewMember, UpdateCrewMemberData } from '@/modules/crew/hooks/useCrew';
+import {
+  isMasterOffice,
+  isPendingPlacementAssignment,
+  MASTER_OFFICE_MESSAGE,
+  OWN_POSITION_MESSAGE,
+  PENDING_PLACEMENT_MESSAGE,
+} from '@/modules/crew/lib/crewUpdateErrors';
 
 // Extended form schema with all new fields
 const formSchema = z.object({
@@ -91,6 +100,35 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
+/** Profile fields: form field → the profiles column canEditField checks. */
+type ProfileFormField = Exclude<keyof FormValues, 'joinDate' | 'position'>;
+const PROFILE_FIELDS: ReadonlyArray<readonly [ProfileFormField, string]> = [
+  ['firstName', 'first_name'],
+  ['lastName', 'last_name'],
+  ['preferredName', 'preferred_name'],
+  ['dateOfBirth', 'date_of_birth'],
+  ['gender', 'gender'],
+  ['nationality', 'nationality'],
+  ['phone', 'phone'],
+  ['emergencyContactName', 'emergency_contact_name'],
+  ['emergencyContactPhone', 'emergency_contact_phone'],
+  ['rank', 'rank'],
+  ['department', 'department'],
+  ['status', 'status'],
+  ['contractStartDate', 'contract_start_date'],
+  ['contractEndDate', 'contract_end_date'],
+  ['rotation', 'rotation'],
+  ['cabin', 'cabin'],
+  ['medicalExpiry', 'medical_expiry'],
+  ['passportNumber', 'passport_number'],
+  ['passportExpiry', 'passport_expiry'],
+  ['visaStatus', 'visa_status'],
+  ['notes', 'notes'],
+];
+
+/** A Select's "Not specified" reads as empty. */
+const selectText = (value: string | undefined | null): string => (!value || value === '__none__' ? '' : value);
+
 interface ExtendedCrewMember extends CrewMember {
   preferred_name?: string;
   date_of_birth?: string;
@@ -113,7 +151,12 @@ interface FullCrewEditModalProps {
   isOpen: boolean;
   onClose: () => void;
   crewMember: ExtendedCrewMember | null;
-  onSubmit: (data: Record<string, any>) => Promise<void>;
+  /**
+   * Saves the edit (updateCrewMember.mutateAsync). It reports its own
+   * outcome (saved, partly saved, not saved); a rejection keeps the form
+   * open with the edits.
+   */
+  onSubmit: (data: UpdateCrewMemberData) => Promise<unknown>;
   isLoading: boolean;
 }
 
@@ -129,7 +172,34 @@ const FullCrewEditModal: React.FC<FullCrewEditModalProps> = ({
   const [activeTab, setActiveTab] = useState('personal');
   
   const userRole = profile?.role || null;
-  const isOwnProfile = crewMember?.user_id === user?.id;
+  const isOwnProfile = Boolean(crewMember?.user_id) && crewMember?.user_id === user?.id;
+
+  // The crew-assignment and profile guards (Phase 2) decide position, rank
+  // and joining date by users-access admin of the vessel. The form mirrors
+  // them, so a locked field reads as locked before Save, not as a refusal
+  // after it. useCan is false while loading (fail closed, D-04).
+  const assignment = crewMember?.current_assignment ?? null;
+  const isPlacement = isPendingPlacementAssignment(assignment);
+  const pendingVesselId = crewMember?.is_imported
+    ? crewMember.imported_vessel_id ?? (isPlacement ? assignment?.vessel_id ?? null : null)
+    : null;
+  const isPending = Boolean(pendingVesselId);
+  const canAdminVessel = useCan('admin.access.users_access.admin', { vesselId: assignment?.vessel_id ?? null });
+  const canAdminPendingVessel = useCan('admin.access.users_access.admin', { vesselId: pendingVesselId });
+  const canAdminPending = isPending && canAdminPendingVessel;
+  /** Who may make a row a Master: the pending vessel's admin for a placement, else the assignment vessel's. */
+  const mayAppointMaster = isPlacement ? canAdminPending : canAdminVessel;
+
+  /** Why Position is locked, or null when only the role rules apply. */
+  const positionLock: string | null = isPlacement
+    ? (canAdminPending ? null : PENDING_PLACEMENT_MESSAGE)
+    : isOwnProfile && !canAdminVessel
+      ? OWN_POSITION_MESSAGE
+      : isMasterOffice(assignment?.position) && !canAdminVessel
+        ? MASTER_OFFICE_MESSAGE
+        : null;
+  const joinDateLock: string | null = isPlacement && !canAdminPending ? PENDING_PLACEMENT_MESSAGE : null;
+  const rankLock: string | null = isPending && !canAdminPending ? PENDING_PLACEMENT_MESSAGE : null;
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -203,53 +273,68 @@ const FullCrewEditModal: React.FC<FullCrewEditModalProps> = ({
   const handleSubmit = async (values: FormValues) => {
     if (!crewMember) return;
 
+    const editable = (dbField: string) => canEditField(userRole, dbField, isOwnProfile);
+
     // Build update data based on editable fields
-    const updateData: Record<string, any> = {
+    const updateData: UpdateCrewMemberData = {
       userId: crewMember.user_id,
       profileId: crewMember.id,
     };
 
-    // Map form fields to database fields
-    const fieldMapping: Record<string, string> = {
-      firstName: 'first_name',
-      lastName: 'last_name',
-      preferredName: 'preferred_name',
-      dateOfBirth: 'date_of_birth',
-      gender: 'gender',
-      nationality: 'nationality',
-      phone: 'phone',
-      emergencyContactName: 'emergency_contact_name',
-      emergencyContactPhone: 'emergency_contact_phone',
-      rank: 'rank',
-      department: 'department',
-      status: 'status',
-      contractStartDate: 'contract_start_date',
-      contractEndDate: 'contract_end_date',
-      rotation: 'rotation',
-      cabin: 'cabin',
-      joinDate: 'join_date',
-      position: 'position',
-      medicalExpiry: 'medical_expiry',
-      passportNumber: 'passport_number',
-      passportExpiry: 'passport_expiry',
-      visaStatus: 'visa_status',
-      notes: 'notes',
-    };
-
-    // Only include fields the user can edit
-    Object.entries(values).forEach(([formField, value]) => {
-      const dbField = fieldMapping[formField];
-      if (dbField && canEditField(userRole, dbField, isOwnProfile)) {
-        updateData[formField] = value;
+    // Only include fields the user can edit. A pending placement's rank is
+    // sent only when it changed, by an admin of the pending vessel.
+    for (const [formField, dbField] of PROFILE_FIELDS) {
+      if (!editable(dbField)) continue;
+      if (formField === 'rank' && isPending) {
+        if (!rankLock && selectText(values.rank) !== selectText(crewMember.rank)) updateData.rank = values.rank;
+        continue;
       }
-    });
-
-    // Add assignment ID for join date/position updates
-    if (crewMember.current_assignment && (values.joinDate || values.position)) {
-      updateData.assignmentId = crewMember.current_assignment.id;
+      updateData[formField] = values[formField];
     }
 
-    await onSubmit(updateData);
+    // Position and join date: only what changed from the loaded assignment.
+    if (assignment) {
+      const nextPosition = (values.position ?? '').trim();
+      const nextJoinDate = values.joinDate ?? '';
+      const positionChanged =
+        !positionLock && editable('position') && nextPosition !== (assignment.position ?? '').trim();
+      const joinDateChanged = !joinDateLock && editable('join_date') && nextJoinDate !== (assignment.join_date ?? '');
+
+      if (positionChanged && isMasterOffice(nextPosition) && !mayAppointMaster) {
+        form.setError('position', { type: 'manual', message: MASTER_OFFICE_MESSAGE });
+        setActiveTab('employment');
+        return;
+      }
+
+      if (isPlacement) {
+        // Not a crew_assignments row: the placement's position and joining
+        // date live on the profile until the person signs in.
+        if (positionChanged) updateData.pendingPosition = nextPosition;
+        if (joinDateChanged) updateData.pendingJoiningDate = nextJoinDate;
+      } else if (positionChanged || joinDateChanged) {
+        if (positionChanged && !nextPosition) {
+          form.setError('position', { type: 'manual', message: 'Enter a position.' });
+          setActiveTab('employment');
+          return;
+        }
+        if (joinDateChanged && !nextJoinDate) {
+          form.setError('joinDate', { type: 'manual', message: 'Enter a join date.' });
+          setActiveTab('employment');
+          return;
+        }
+        updateData.assignmentId = assignment.id;
+        if (positionChanged) updateData.position = nextPosition;
+        if (joinDateChanged) updateData.joinDate = nextJoinDate;
+      }
+    }
+
+    try {
+      await onSubmit(updateData);
+    } catch {
+      // onSubmit reported the outcome (not saved, or partly saved). Keep
+      // the form open with the edits.
+      return;
+    }
     setHasUnsavedChanges(false);
     onClose();
   };
@@ -537,9 +622,12 @@ const FullCrewEditModal: React.FC<FullCrewEditModalProps> = ({
                               <Input 
                                 placeholder="e.g., Chief Engineer" 
                                 {...field} 
-                                disabled={isFieldDisabled('position')}
+                                disabled={isFieldDisabled('position') || positionLock !== null}
                               />
                             </FormControl>
+                            {positionLock && (
+                              <FormDescription className="text-xs">{positionLock}</FormDescription>
+                            )}
                             <FormMessage />
                           </FormItem>
                         )}
@@ -554,9 +642,12 @@ const FullCrewEditModal: React.FC<FullCrewEditModalProps> = ({
                               <Input 
                                 type="date" 
                                 {...field} 
-                                disabled={isFieldDisabled('join_date')}
+                                disabled={isFieldDisabled('join_date') || joinDateLock !== null}
                               />
                             </FormControl>
+                            {joinDateLock && (
+                              <FormDescription className="text-xs">{joinDateLock}</FormDescription>
+                            )}
                             <FormMessage />
                           </FormItem>
                         )}
@@ -575,7 +666,7 @@ const FullCrewEditModal: React.FC<FullCrewEditModalProps> = ({
                         <Select 
                           onValueChange={field.onChange} 
                           value={field.value || "__none__"}
-                          disabled={isFieldDisabled('rank')}
+                          disabled={isFieldDisabled('rank') || rankLock !== null}
                         >
                           <FormControl>
                             <SelectTrigger>
@@ -589,6 +680,7 @@ const FullCrewEditModal: React.FC<FullCrewEditModalProps> = ({
                             ))}
                           </SelectContent>
                         </Select>
+                        {rankLock && <FormDescription className="text-xs">{rankLock}</FormDescription>}
                         <FormMessage />
                       </FormItem>
                     )}

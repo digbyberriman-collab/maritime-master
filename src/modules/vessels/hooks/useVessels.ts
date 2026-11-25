@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import { toast } from '@/shared/hooks/use-toast';
+import { VesselWriteRefusedError, vesselWriteError } from '@/modules/vessels/lib/vesselWriteErrors';
 
 export interface Vessel {
   id: string;
@@ -102,8 +103,9 @@ export const useVessels = () => {
         })
         .select()
         .single();
-      
-      if (error) throw error;
+
+      if (error) throw vesselWriteError(error, 'create');
+      if (!data) throw new VesselWriteRefusedError('create');
       return data;
     },
     onSuccess: () => {
@@ -116,7 +118,7 @@ export const useVessels = () => {
     },
     onError: (error: Error) => {
       toast({
-        title: 'Error',
+        title: 'Vessel not added',
         description: error.message,
         variant: 'destructive',
       });
@@ -131,8 +133,10 @@ export const useVessels = () => {
         .eq('id', id)
         .select()
         .single();
-      
-      if (error) throw error;
+
+      // A row the policy hides comes back as PGRST116 from `.single()` (D-224).
+      if (error) throw vesselWriteError(error, 'change');
+      if (!data) throw new VesselWriteRefusedError('change');
       return data;
     },
     onSuccess: () => {
@@ -145,7 +149,7 @@ export const useVessels = () => {
     },
     onError: (error: Error) => {
       toast({
-        title: 'Error',
+        title: 'Vessel not updated',
         description: error.message,
         variant: 'destructive',
       });
@@ -154,12 +158,17 @@ export const useVessels = () => {
 
   const deleteVessel = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      // Ask for the row back: an UPDATE that row level security filters out
+      // matches 0 rows and returns no error, which must not read as removed
+      // (non-negotiable 9; D-124, D-224).
+      const { data, error } = await supabase
         .from('vessels')
         .update({ status: 'Sold' })
-        .eq('id', id);
-      
-      if (error) throw error;
+        .eq('id', id)
+        .select('id');
+
+      if (error) throw vesselWriteError(error, 'remove');
+      if (!data || data.length === 0) throw new VesselWriteRefusedError('remove');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vessels'] });
@@ -171,7 +180,7 @@ export const useVessels = () => {
     },
     onError: (error: Error) => {
       toast({
-        title: 'Error',
+        title: 'Vessel not removed',
         description: error.message,
         variant: 'destructive',
       });
@@ -187,7 +196,8 @@ export const useVessels = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) throw vesselWriteError(error, 'change');
+      if (!data) throw new VesselWriteRefusedError('change');
       return data;
     },
     onSuccess: () => {
@@ -200,7 +210,7 @@ export const useVessels = () => {
     },
     onError: (error: Error) => {
       toast({
-        title: 'Error',
+        title: 'Particulars not saved',
         description: error.message,
         variant: 'destructive',
       });

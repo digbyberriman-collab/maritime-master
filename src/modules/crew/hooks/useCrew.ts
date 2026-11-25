@@ -2,7 +2,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
+import type { TablesUpdate } from '@/integrations/supabase/types';
 import { toast } from '@/shared/hooks/use-toast';
+import { notify } from '@/shared/lib/notify';
+import {
+  ASSIGNMENT_NOT_CHANGED_MESSAGE,
+  CrewUpdatePartialError,
+  crewRefusalMessage,
+  PENDING_PLACEMENT_ID_PREFIX,
+} from '@/modules/crew/lib/crewUpdateErrors';
 // Types only: useCrew lands in the entry chunk, so the create-crew-member
 // wrapper (adminActions) is loaded when someone adds crew (gap/00 I6 budget).
 import type {
@@ -55,6 +63,8 @@ export interface CrewMember {
   invited_at?: string | null;
   // Imported via CSV / bulk import — has profile but no auth account yet.
   is_imported?: boolean;
+  /** The pending vessel placement of an imported profile (profiles.imported_vessel_id). */
+  imported_vessel_id?: string | null;
   // Assignment
   current_assignment?: {
     id: string;
@@ -62,6 +72,12 @@ export interface CrewMember {
     vessel_name: string;
     position: string;
     join_date: string;
+    /**
+     * True when this is an imported profile's pending placement, built from
+     * profiles.imported_vessel_id / position / rank / joining_date: not a
+     * crew_assignments row (isPendingPlacementAssignment).
+     */
+    pending_placement?: boolean;
   } | null;
 }
 
@@ -133,10 +149,16 @@ export interface UpdateCrewMemberData {
   visaStatus?: string;
   // Notes
   notes?: string;
-  // Assignment fields
+  // Assignment fields: the current crew_assignments row. Send them only
+  // when they changed; never for a pending placement.
   assignmentId?: string;
   joinDate?: string;
   position?: string;
+  // Pending placement (an imported profile's imported_vessel_id, which is
+  // not a crew_assignments row): profiles.position and profiles.joining_date,
+  // which become the assignment when the person signs in.
+  pendingPosition?: string;
+  pendingJoiningDate?: string;
 }
 
 export interface TransferCrewData {
@@ -239,8 +261,8 @@ export const useCrew = (vesselFilter?: string) => {
       const importedVesselIds = Array.from(
         new Set(
           profiles
-            .filter((p: any) => p.is_imported && p.imported_vessel_id)
-            .map((p: any) => p.imported_vessel_id as string),
+            .filter((p) => p.is_imported && p.imported_vessel_id)
+            .map((p) => p.imported_vessel_id as string),
         ),
       );
       let importedVesselMap: Record<string, { id: string; name: string }> = {};
@@ -260,8 +282,8 @@ export const useCrew = (vesselFilter?: string) => {
         // Imported crew fallback: synthesize a "current assignment"-shaped
         // object from imported_vessel_id so the existing UI keeps working.
         const importedVessel =
-          !assignment && p.is_imported && (p as any).imported_vessel_id
-            ? importedVesselMap[(p as any).imported_vessel_id as string]
+          !assignment && p.is_imported && p.imported_vessel_id
+            ? importedVesselMap[p.imported_vessel_id]
             : null;
         return {
           id: p.id,
@@ -302,6 +324,7 @@ export const useCrew = (vesselFilter?: string) => {
           last_login_at: p.last_login_at,
           invited_at: p.invited_at,
           is_imported: p.is_imported ?? false,
+          imported_vessel_id: p.imported_vessel_id ?? null,
           current_assignment: assignment
             ? {
                 id: assignment.id,
@@ -312,11 +335,14 @@ export const useCrew = (vesselFilter?: string) => {
               }
             : importedVessel
             ? {
-                id: `imported-${p.id}`,
+                // What fulfil_imported_assignment() will write: the
+                // profile's position, else its rank, else Crew.
+                id: `${PENDING_PLACEMENT_ID_PREFIX}${p.id}`,
                 vessel_id: importedVessel.id,
                 vessel_name: importedVessel.name,
-                position: p.rank ?? 'Crew',
-                join_date: p.created_at,
+                position: p.position?.trim() || p.rank?.trim() || 'Crew',
+                join_date: p.joining_date ?? p.created_at,
+                pending_placement: true,
               }
             : null,
         };
@@ -393,6 +419,11 @@ export const useCrew = (vesselFilter?: string) => {
       
       // Notes
       if (data.notes !== undefined) updateData.notes = data.notes || null;
+
+      // Pending placement (imported profile): its position and joining date
+      // live on the profile until the person signs in.
+      if (data.pendingPosition !== undefined) updateData.position = data.pendingPosition.trim() || null;
+      if (data.pendingJoiningDate !== undefined) updateData.joining_date = data.pendingJoiningDate || null;
       
       // Metadata
       updateData.updated_at = new Date().toISOString();
@@ -408,29 +439,41 @@ export const useCrew = (vesselFilter?: string) => {
         : profileQuery.eq('user_id', data.userId as string)
       ).select('id');
 
-      if (error) throw error;
+      // A guard refusal reads as its DETAIL sentence, never the raw code.
+      if (error) throw new Error(crewRefusalMessage(error));
       if (!updatedRows || updatedRows.length === 0) {
         throw new Error('No changes were saved. You may not have permission to edit this crew member.');
       }
 
-      // Update assignment if join date or position changed
-      if (data.assignmentId && (data.joinDate !== undefined || data.position !== undefined)) {
-        const assignmentUpdate: Record<string, any> = {};
+      // Update the current assignment when its join date or position
+      // changed. The profile is saved by now, so a refusal here is a
+      // partial save and is reported as one (non-negotiable 9).
+      if (
+        data.assignmentId &&
+        !data.assignmentId.startsWith(PENDING_PLACEMENT_ID_PREFIX) &&
+        (data.joinDate !== undefined || data.position !== undefined)
+      ) {
+        const assignmentUpdate: TablesUpdate<'crew_assignments'> = { updated_at: new Date().toISOString() };
         if (data.joinDate !== undefined) assignmentUpdate.join_date = data.joinDate;
         if (data.position !== undefined) assignmentUpdate.position = data.position;
-        assignmentUpdate.updated_at = new Date().toISOString();
 
-        const { error: assignmentError } = await supabase
+        const { data: assignmentRows, error: assignmentError } = await supabase
           .from('crew_assignments')
           .update(assignmentUpdate)
-          .eq('id', data.assignmentId);
+          .eq('id', data.assignmentId)
+          .select('id');
 
         if (assignmentError) {
-          console.error('Failed to update assignment:', assignmentError);
-          // Don't throw - profile update succeeded
+          queryClient.invalidateQueries({ queryKey: ['crew'] });
+          throw new CrewUpdatePartialError(crewRefusalMessage(assignmentError));
+        }
+        if (!assignmentRows || assignmentRows.length === 0) {
+          queryClient.invalidateQueries({ queryKey: ['crew'] });
+          throw new CrewUpdatePartialError(ASSIGNMENT_NOT_CHANGED_MESSAGE);
         }
       }
     },
+    // Reached only when the profile and the assignment change both saved.
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crew'] });
       toast({
@@ -439,9 +482,15 @@ export const useCrew = (vesselFilter?: string) => {
       });
     },
     onError: (error: Error) => {
+      if (error instanceof CrewUpdatePartialError) {
+        // The profile did change.
+        queryClient.invalidateQueries({ queryKey: ['crew'] });
+        notify.warning('Partly saved', { description: error.message });
+        return;
+      }
       toast({
-        title: 'Error',
-        description: error.message,
+        title: 'Not saved',
+        description: crewRefusalMessage(error),
         variant: 'destructive',
       });
     },

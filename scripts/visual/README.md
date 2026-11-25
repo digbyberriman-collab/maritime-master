@@ -170,6 +170,7 @@ Tables listed in `missingTables` answer with the PostgREST "table not found" err
 - Alerts, vessel and crew certificates, incidents, corrective actions, equipment, PMS tasks, defects, spares and documents.
 - The dashboard RPCs.
 - Phase 2 (pending tables and RPCs, D-01): `account_memberships.json` (the legacy-managed rows the P2 backfill writes, one per profile with a login, so every persona keeps its reach), `user_invitations.json` (one row per invitation status: accepted, send failed, sent, pending legacy, sent but expired, revoked), seven more role-named profiles (imported, invited and disabled crew), `notification_inbox.json` (ten inbox rows across the four severities and the four link scopes, an unregistered record kind and two archived rows), and the RPC answers `record_session_start`, `my_account_status` (both `"active"`; without them the sign-in account check fails closed on every route) and `notification_inbox_mark_all_read`.
+- `rpc/has_capability.json` (`true`): the Demo Fleet Manager is a full legacy admin and holds `fleet.operations.vessels.admin`, so the vessel write controls on `/fleet/admin/vessels` and the vessel profile card show (D-224). Without it the RPC answers `null`, which the gate reads as denied (D-04). The `vessel-master` persona answers `false`, so the DRAAK master sees the profile card without Edit.
 
 **Rules (D-07, D-08):**
 

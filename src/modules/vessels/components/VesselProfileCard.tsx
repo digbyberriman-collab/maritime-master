@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Ship, Pencil, FileText } from 'lucide-react';
 import { useVessels, type VesselFormData } from '@/modules/vessels/hooks/useVessels';
+import { useVesselAdminGate } from '@/modules/vessels/hooks/useVesselAdminGate';
 import VesselFormModal from '@/modules/vessels/components/VesselFormModal';
 import VesselParticularsModal from '@/modules/vessels/components/VesselParticularsModal';
 import { VESSEL_PARTICULARS_SECTIONS } from '@/modules/vessels/config/particularsSchema';
@@ -26,6 +27,9 @@ const VesselProfileCard: React.FC<VesselProfileCardProps> = ({ vesselId }) => {
   const vessel = vessels.find((v) => v.id === vesselId) || null;
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isParticularsOpen, setIsParticularsOpen] = useState(false);
+  // Edit Profile and Particulars follow the vessel write policy (D-124,
+  // D-224): hidden while the capability loads or fails (D-04).
+  const { allowed: canEdit } = useVesselAdminGate({ companyId: vessel?.company_id, vesselId: vessel?.id });
 
   if (!vessel) return null;
 
@@ -60,10 +64,12 @@ const VesselProfileCard: React.FC<VesselProfileCardProps> = ({ vesselId }) => {
               <CardDescription>Vessel profile and particulars</CardDescription>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setIsEditOpen(true)}>
-            <Pencil className="w-4 h-4 mr-2" />
-            Edit Profile
-          </Button>
+          {canEdit && (
+            <Button variant="outline" size="sm" className="[@media(pointer:coarse)]:h-11" onClick={() => setIsEditOpen(true)}>
+              <Pencil className="w-4 h-4 mr-2" />
+              Edit Profile
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -91,16 +97,19 @@ const VesselProfileCard: React.FC<VesselProfileCardProps> = ({ vesselId }) => {
               </CardDescription>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setIsParticularsOpen(true)}>
-            <Pencil className="w-4 h-4 mr-2" />
-            {hasParticulars ? 'Edit Particulars' : 'Add Particulars'}
-          </Button>
+          {canEdit && (
+            <Button variant="outline" size="sm" className="[@media(pointer:coarse)]:h-11" onClick={() => setIsParticularsOpen(true)}>
+              <Pencil className="w-4 h-4 mr-2" />
+              {hasParticulars ? 'Edit Particulars' : 'Add Particulars'}
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           {!hasParticulars ? (
             <p className="text-sm text-muted-foreground">
-              No particulars recorded yet. Click "Add Particulars" to enter the vessel's
-              specification sheet (dimensions, machinery, classification, ownership, etc.).
+              {canEdit
+                ? 'No particulars recorded yet. Click "Add Particulars" to enter the vessel\'s specification sheet (dimensions, machinery, classification, ownership, etc.).'
+                : 'No particulars recorded yet.'}
             </p>
           ) : (
             <div className="space-y-6">

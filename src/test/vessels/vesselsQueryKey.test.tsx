@@ -83,9 +83,15 @@ vi.mock('@/integrations/supabase/client', () => {
     };
     return chain;
   };
-  return { supabase: { from } };
+  // VesselProfileCard shows Edit Profile only when the vessels-admin gate
+  // answers true (D-224): has_capability grants it here.
+  const rpc = (fn: string) =>
+    Promise.resolve(fn === 'has_capability' ? { data: true, error: null } : { data: null, error: { code: 'PGRST202', message: `unexpected rpc ${fn}` } });
+  return { supabase: { from, rpc } };
 });
-vi.mock('@/modules/auth/contexts/AuthContext', () => ({ useAuth: () => ({ profile: { company_id: 'co-1' } }) }));
+vi.mock('@/modules/auth/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { id: 'u-1' }, profile: { company_id: 'co-1' }, loading: false, profileResolved: true }),
+}));
 vi.mock('@/modules/vessels/contexts/VesselContext', () => ({ useVessel: () => ({ refreshVessels: () => {} }) }));
 
 import { useItineraryVessels } from '@/modules/itinerary/hooks/useItinerary';
@@ -131,7 +137,7 @@ describe('vessels query key: one key, one shape', () => {
     expect(fieldValue('Flag State')).toHaveTextContent('Malta');
 
     // Edit Profile → Save Changes must send back what the record holds.
-    fireEvent.click(screen.getByRole('button', { name: /Edit Profile/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Edit Profile/ }));
     const save = await screen.findByRole('button', { name: /Save Changes/ });
     await act(async () => {
       fireEvent.click(save);

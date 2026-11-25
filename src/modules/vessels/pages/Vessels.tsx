@@ -15,27 +15,37 @@ import {
 } from '@/components/ui/table';
 import { Ship, Plus, Search, Pencil, Trash2, Eye } from 'lucide-react';
 import { useVessels, Vessel, VesselFormData } from '@/modules/vessels/hooks/useVessels';
+import { useVesselAdminGate } from '@/modules/vessels/hooks/useVesselAdminGate';
+import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import VesselFormModal from '@/modules/vessels/components/VesselFormModal';
 import DeleteVesselDialog from '@/modules/vessels/components/DeleteVesselDialog';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const Vessels: React.FC = () => {
   const { vessels, isLoading, createVessel, updateVessel, deleteVessel } = useVessels();
+  const { profile } = useAuth();
+  // Add, Edit and Remove follow the vessel write policy (D-124, D-224): shown
+  // only when the capability resolves granted, hidden while it loads or fails
+  // (D-04). The route stays on fleet reach (D-33, D-49).
+  const adminGate = useVesselAdminGate({ companyId: profile?.company_id });
+  const canAdminVessels = adminGate.allowed;
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormModalOpen, setIsFormModalOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null);
 
-  // Auto-open modal when navigated with ?new=true
+  // Auto-open modal when navigated with ?new=true, once the gate has answered:
+  // without the capability the flag is dropped and nothing opens.
   useEffect(() => {
-    if (searchParams.get('new') === 'true') {
+    if (searchParams.get('new') !== 'true' || adminGate.loading) return;
+    if (canAdminVessels) {
       setSelectedVessel(null);
       setIsFormModalOpen(true);
-      searchParams.delete('new');
-      setSearchParams(searchParams, { replace: true });
     }
-  }, [searchParams, setSearchParams]);
+    searchParams.delete('new');
+    setSearchParams(searchParams, { replace: true });
+  }, [searchParams, setSearchParams, adminGate.loading, canAdminVessels]);
 
   const filteredVessels = useMemo(() => {
     if (!searchQuery.trim()) return vessels;
@@ -71,12 +81,17 @@ const Vessels: React.FC = () => {
     }
   };
 
-  const handleConfirmDelete = async () => {
-    if (selectedVessel) {
-      await deleteVessel.mutateAsync(selectedVessel.id);
-      setIsDeleteDialogOpen(false);
-      setSelectedVessel(null);
-    }
+  // The mutation's own toast reports a refusal or failure (`mutate` never
+  // rejects, so nothing goes unhandled); the selection clears only after a
+  // returned row.
+  const handleConfirmDelete = () => {
+    if (!selectedVessel) return;
+    deleteVessel.mutate(selectedVessel.id, {
+      onSuccess: () => {
+        setIsDeleteDialogOpen(false);
+        setSelectedVessel(null);
+      },
+    });
   };
 
   const getStatusBadgeVariant = (status: string | null) => {
@@ -99,10 +114,12 @@ const Vessels: React.FC = () => {
             <h1 className="text-2xl font-bold text-foreground">Vessels</h1>
             <p className="text-muted-foreground">Manage your fleet vessels</p>
           </div>
-          <Button onClick={handleAddVessel} className="gap-2">
-            <Plus className="w-4 h-4" />
-            Add Vessel
-          </Button>
+          {canAdminVessels && (
+            <Button onClick={handleAddVessel} className="gap-2">
+              <Plus className="w-4 h-4" />
+              Add Vessel
+            </Button>
+          )}
         </div>
 
         {/* Search */}
@@ -141,7 +158,9 @@ const Vessels: React.FC = () => {
                 {vessels.length === 0 ? (
                   <>
                     <p className="text-lg font-medium">No vessels added yet</p>
-                    <p className="text-sm">Click "Add Vessel" to get started.</p>
+                    <p className="text-sm">
+                      {canAdminVessels ? 'Click "Add Vessel" to get started.' : 'A vessel administrator adds vessels here.'}
+                    </p>
                   </>
                 ) : (
                   <>
@@ -160,7 +179,7 @@ const Vessels: React.FC = () => {
                       <TableHead>Flag State</TableHead>
                       <TableHead>Classification</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      {canAdminVessels && <TableHead className="text-right">Actions</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -182,27 +201,31 @@ const Vessels: React.FC = () => {
                             {vessel.status || 'Unknown'}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleEditVessel(vessel)}
-                              title="Edit vessel"
-                            >
-                              <Pencil className="w-4 h-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteVessel(vessel)}
-                              title="Delete vessel"
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
+                        {canAdminVessels && (
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEditVessel(vessel)}
+                                title="Edit vessel"
+                                aria-label={`Edit ${vessel.name}`}
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleDeleteVessel(vessel)}
+                                title="Delete vessel"
+                                aria-label={`Delete ${vessel.name}`}
+                                className="text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
