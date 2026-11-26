@@ -1,18 +1,19 @@
 {
   "routes": [
-    "/fleet/training :: page(/src/modules/development/pages/CrewTraining.tsx) guard=ProtectedRoute layout=-",
-    "/v/:vesselCode/crew/training :: page(/src/modules/development/pages/CrewTraining.tsx) guard=ProtectedRoute layout=-"
+    "/fleet/training :: redirect(overview)",
+    "/fleet/training/:tab :: <ModuleRoute{capability=\"fleet.operations.fleet_training.view\"}> > page(/src/modules/development/pages/FleetTrainingPage.tsx) guard=- layout=- label=Fleet training",
+    "/v/:vesselCode/crew/training :: <ModuleRoute{capability=\"vessel.crew.crew_training.view\"}> > page(/src/modules/development/pages/CrewTraining.tsx) guard=- layout=- label=Crew training"
   ],
   "nav": {
     "NAVIGATION_ITEMS": [
-      "    GraduationCap {\"id\":\"fleet-training\",\"kind\":\"leaf\",\"label\":\"Training\",\"path\":\"/fleet/training\",\"scope\":\"fleet\",\"status\":\"live\"}",
-      "    GraduationCap {\"id\":\"vessel-crew-training\",\"kind\":\"leaf\",\"label\":\"Crew Training\",\"moduleSetting\":\"crew_training\",\"path\":\"/v/:vesselCode/crew/training\",\"scope\":\"vessel\",\"status\":\"live\"}"
+      "    GraduationCap {\"capability\":\"fleet.operations.fleet_training.view\",\"id\":\"fleet-training\",\"kind\":\"leaf\",\"label\":\"Training\",\"path\":\"/fleet/training\",\"scope\":\"fleet\",\"status\":\"beta\"}",
+      "    GraduationCap {\"capability\":\"vessel.crew.crew_training.view\",\"id\":\"vessel-crew-training\",\"kind\":\"leaf\",\"label\":\"Crew Training\",\"moduleSetting\":\"crew_training\",\"path\":\"/v/:vesselCode/crew/training\",\"scope\":\"vessel\",\"status\":\"beta\"}"
     ],
     "VESSEL_MODULES": [
-      "  GraduationCap {\"id\":\"crew-training\",\"kind\":\"leaf\",\"label\":\"Crew Training\",\"moduleSetting\":\"crew_training\",\"path\":\"crew/training\",\"status\":\"live\"}"
+      "  GraduationCap {\"capability\":\"vessel.crew.crew_training.view\",\"id\":\"crew-training\",\"kind\":\"leaf\",\"label\":\"Crew Training\",\"moduleSetting\":\"crew_training\",\"path\":\"crew/training\",\"status\":\"beta\"}"
     ],
     "buildVesselNav": [
-      "  GraduationCap {\"id\":\"vessel-crew-training\",\"kind\":\"leaf\",\"label\":\"Crew Training\",\"moduleSetting\":\"crew_training\",\"path\":\"/v/dra/crew/training\",\"scope\":\"vessel\",\"status\":\"live\"}"
+      "  GraduationCap {\"capability\":\"vessel.crew.crew_training.view\",\"id\":\"vessel-crew-training\",\"kind\":\"leaf\",\"label\":\"Crew Training\",\"moduleSetting\":\"crew_training\",\"path\":\"/v/dra/crew/training\",\"scope\":\"vessel\",\"status\":\"beta\"}"
     ]
   }
 }

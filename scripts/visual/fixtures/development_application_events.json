@@ -7,12 +7,13 @@
     "action": "created",
     "from_status": null,
     "to_status": "draft",
-    "actor_id": "a0000000-0000-4000-8000-000000000001",
     "actor_role": "applicant",
     "comment": null,
     "field_diff": null,
     "payload": {},
-    "created_at": "$ts:-6d"
+    "created_at": "$ts:-6d",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000001",
+    "actor_profile_id": "b0000000-0000-4000-8000-000000000001"
   },
   {
     "id": "7e000000-0000-4000-8000-000000000002",
@@ -22,12 +23,13 @@
     "action": "created",
     "from_status": null,
     "to_status": "draft",
-    "actor_id": "a0000000-0000-4000-8000-000000000001",
     "actor_role": "applicant",
     "comment": null,
     "field_diff": null,
     "payload": {},
-    "created_at": "$ts:-14d"
+    "created_at": "$ts:-14d",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000001",
+    "actor_profile_id": "b0000000-0000-4000-8000-000000000001"
   },
   {
     "id": "7e000000-0000-4000-8000-000000000003",
@@ -37,12 +39,13 @@
     "action": "submit",
     "from_status": "draft",
     "to_status": "hod_review",
-    "actor_id": "a0000000-0000-4000-8000-000000000001",
     "actor_role": "applicant",
     "comment": null,
     "field_diff": null,
     "payload": {},
-    "created_at": "$ts:-11d"
+    "created_at": "$ts:-11d",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000001",
+    "actor_profile_id": "b0000000-0000-4000-8000-000000000001"
   },
   {
     "id": "7e000000-0000-4000-8000-000000000004",
@@ -52,12 +55,13 @@
     "action": "created",
     "from_status": null,
     "to_status": "draft",
-    "actor_id": "a0000000-0000-4000-8000-000000000001",
     "actor_role": "applicant",
     "comment": null,
     "field_diff": null,
     "payload": {},
-    "created_at": "$ts:-34d"
+    "created_at": "$ts:-34d",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000001",
+    "actor_profile_id": "b0000000-0000-4000-8000-000000000001"
   },
   {
     "id": "7e000000-0000-4000-8000-000000000005",
@@ -67,12 +71,13 @@
     "action": "submit",
     "from_status": "draft",
     "to_status": "hod_review",
-    "actor_id": "a0000000-0000-4000-8000-000000000001",
     "actor_role": "applicant",
     "comment": null,
     "field_diff": null,
     "payload": {},
-    "created_at": "$ts:-30d"
+    "created_at": "$ts:-30d",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000001",
+    "actor_profile_id": "b0000000-0000-4000-8000-000000000001"
   },
   {
     "id": "7e000000-0000-4000-8000-000000000006",
@@ -82,12 +87,13 @@
     "action": "hod_return",
     "from_status": "hod_review",
     "to_status": "returned",
-    "actor_id": "a0000000-0000-4000-8000-000000000011",
     "actor_role": "hod",
     "comment": "Add the provider and the course dates.",
     "field_diff": null,
     "payload": {},
-    "created_at": "$ts:-3d"
+    "created_at": "$ts:-3d",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000011",
+    "actor_profile_id": "b0000000-0000-4000-8000-000000000011"
   },
   {
     "id": "7e000000-0000-4000-8000-000000000007",
@@ -97,12 +103,13 @@
     "action": "submit",
     "from_status": "draft",
     "to_status": "hod_review",
-    "actor_id": "a0000000-0000-4000-8000-000000000001",
     "actor_role": "applicant",
     "comment": null,
     "field_diff": null,
     "payload": {},
-    "created_at": "$ts:-70d"
+    "created_at": "$ts:-70d",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000001",
+    "actor_profile_id": "b0000000-0000-4000-8000-000000000001"
   },
   {
     "id": "7e000000-0000-4000-8000-000000000008",
@@ -112,12 +119,13 @@
     "action": "hod_approve",
     "from_status": "hod_review",
     "to_status": "captain_purser_review",
-    "actor_id": "a0000000-0000-4000-8000-000000000011",
     "actor_role": "hod",
     "comment": null,
     "field_diff": null,
     "payload": {},
-    "created_at": "$ts:-64d"
+    "created_at": "$ts:-64d",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000011",
+    "actor_profile_id": "b0000000-0000-4000-8000-000000000011"
   },
   {
     "id": "7e000000-0000-4000-8000-000000000009",
@@ -127,12 +135,13 @@
     "action": "final_approve",
     "from_status": "captain_purser_review",
     "to_status": "captain_purser_review",
-    "actor_id": "a0000000-0000-4000-8000-000000000011",
     "actor_role": "captain",
     "comment": null,
     "field_diff": null,
     "payload": {},
-    "created_at": "$ts:-55d"
+    "created_at": "$ts:-55d",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000011",
+    "actor_profile_id": "b0000000-0000-4000-8000-000000000011"
   },
   {
     "id": "7e000000-0000-4000-8000-000000000010",
@@ -142,12 +151,13 @@
     "action": "final_approve",
     "from_status": "captain_purser_review",
     "to_status": "approved",
-    "actor_id": "a0000000-0000-4000-8000-000000000036",
     "actor_role": "purser",
     "comment": null,
     "field_diff": null,
     "payload": {},
-    "created_at": "$ts:-50d"
+    "created_at": "$ts:-50d",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000036",
+    "actor_profile_id": "b0000000-0000-4000-8000-000000000036"
   },
   {
     "id": "7e000000-0000-4000-8000-000000000011",
@@ -157,12 +167,13 @@
     "action": "submit",
     "from_status": "draft",
     "to_status": "hod_review",
-    "actor_id": "a0000000-0000-4000-8000-000000000014",
     "actor_role": "applicant",
     "comment": null,
     "field_diff": null,
     "payload": {},
-    "created_at": "$ts:-16d"
+    "created_at": "$ts:-16d",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000014",
+    "actor_profile_id": "b0000000-0000-4000-8000-000000000014"
   },
   {
     "id": "7e000000-0000-4000-8000-000000000012",
@@ -172,12 +183,13 @@
     "action": "hod_approve",
     "from_status": "hod_review",
     "to_status": "captain_purser_review",
-    "actor_id": "a0000000-0000-4000-8000-000000000012",
     "actor_role": "hod",
     "comment": null,
     "field_diff": null,
     "payload": {},
-    "created_at": "$ts:-9d"
+    "created_at": "$ts:-9d",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000012",
+    "actor_profile_id": "b0000000-0000-4000-8000-000000000012"
   },
   {
     "id": "7e000000-0000-4000-8000-000000000013",
@@ -187,12 +199,13 @@
     "action": "final_approve",
     "from_status": "captain_purser_review",
     "to_status": "captain_purser_review",
-    "actor_id": "a0000000-0000-4000-8000-000000000011",
     "actor_role": "captain",
     "comment": null,
     "field_diff": null,
     "payload": {},
-    "created_at": "$ts:-5d"
+    "created_at": "$ts:-5d",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000011",
+    "actor_profile_id": "b0000000-0000-4000-8000-000000000011"
   },
   {
     "id": "7e000000-0000-4000-8000-000000000014",
@@ -202,12 +215,13 @@
     "action": "reject",
     "from_status": "hod_review",
     "to_status": "rejected",
-    "actor_id": "a0000000-0000-4000-8000-000000000011",
     "actor_role": "hod",
     "comment": "The course is not on the approved list for this position.",
     "field_diff": null,
     "payload": {},
-    "created_at": "$ts:-35d"
+    "created_at": "$ts:-35d",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000011",
+    "actor_profile_id": "b0000000-0000-4000-8000-000000000011"
   },
   {
     "id": "7e000000-0000-4000-8000-000000000015",
@@ -217,11 +231,37 @@
     "action": "void",
     "from_status": "hod_review",
     "to_status": "voided",
-    "actor_id": "a0000000-0000-4000-8000-000000000001",
     "actor_role": "training_admin",
     "comment": "Entered twice",
     "field_diff": null,
     "payload": {},
-    "created_at": "$ts:-22d"
+    "created_at": "$ts:-22d",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000001",
+    "actor_profile_id": "b0000000-0000-4000-8000-000000000001"
+  },
+  {
+    "id": "7e000000-0000-4000-8000-000000000031",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "application_id": "7a000000-0000-4000-8000-000000000007",
+    "action": "edit_fields",
+    "from_status": "captain_purser_review",
+    "to_status": "captain_purser_review",
+    "actor_role": "captain",
+    "comment": "The provider moved the course by a day.",
+    "field_diff": {
+      "course_end_date": {
+        "from": "2026-12-11",
+        "to": "2026-12-12"
+      },
+      "estimated_tuition_usd": {
+        "from": 900,
+        "to": 950
+      }
+    },
+    "payload": {},
+    "created_at": "$ts:-8d",
+    "actor_profile_id": "b0000000-0000-4000-8000-000000000011",
+    "actor_user_id": "a0000000-0000-4000-8000-000000000001"
   }
 ]

@@ -1,21 +1,32 @@
 /**
  * One training application: its details, the review history, and the
- * steps the viewer may take now (gap/02 W3, TR4–TR6; X5-07A). Every step
- * goes through development_transition (useApplicationTransition); the
- * steps offered come from the machine (lib/applicationMachine.ts) and the
- * viewer's part as far as the page knows it: the applicant on their own
- * application, the review stage a reviewer page opened it for, training
- * admins. The server re-checks every one and refuses in words.
+ * steps the viewer may take now (gap/02 W3, TR4–TR6; X5-07A, X5-07B).
+ * Every step goes through development_transition (useApplicationTransition);
+ * the steps offered come from the machine (lib/applicationMachine.ts) and
+ * the viewer's part as far as the page knows it: the applicant on their
+ * own application, the review stage a reviewer page opened it for, the
+ * parts a page passes (`viewerRoles`), training admins. The server
+ * re-checks every one and refuses in words; nothing says "done" before the
+ * returned answer confirmed it.
+ *
+ * - Return and Reject are distinct: a return goes back to the applicant
+ *   with a comment (the text box here); a rejection is final, confirmed in
+ *   its own dialog with a reason (DecisionDialog).
+ * - Void (TR6, entered in error) is confirmed in its own dialog with a
+ *   reason; the application then leaves every register and total.
+ * - Correct details (TR5, `edit_fields`): approvers fix the course, dates,
+ *   category or estimates in CorrectDetailsDialog; the history records the
+ *   diff and the applicant is told.
+ * - History (TR5): every step from development_application_events, with
+ *   who, from and to, the comment and the field diffs (ApplicationEventLog).
  *
  * While development_transition is missing (D-01), only the applicant's
  * submit and cancel of a draft still work (D-X5-20); every other step is
- * shown disabled with "Not set up yet". Reject and Return are distinct:
- * a return goes back to the applicant with a comment, a rejection is final
- * with a reason.
+ * shown disabled with "Not set up yet".
  */
 import { useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { CheckCircle, XCircle, DollarSign, User, Calendar, Info } from 'lucide-react';
+import { CheckCircle, XCircle, DollarSign, User, Calendar, Info, PencilLine } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -45,6 +56,9 @@ import {
   type ApplicationActor,
   type FinalApproverRole,
 } from '@/modules/development/lib/applicationMachine';
+import { ApplicationEventLog } from '@/modules/development/components/training/ApplicationEventLog';
+import { CorrectDetailsDialog } from '@/modules/development/components/training/CorrectDetailsDialog';
+import { DecisionDialog, type DecisionKind } from '@/modules/development/components/training/DecisionDialog';
 
 /** The application fields the modal reads (a row of development_applications with its joins). */
 export interface DetailApplication {
@@ -110,6 +124,9 @@ const ACTION_VARIANT: Partial<Record<ApplicationAction, 'default' | 'outline' | 
   edit_fields: 'outline',
 };
 
+/** Steps confirmed in their own dialog with a reason (never the shared text box). */
+const DIALOG_STEPS: ReadonlySet<ApplicationAction> = new Set(['reject', 'void']);
+
 /** Steps that need the text box, and what it is called for them. */
 const TEXT_WORDS: Record<'comment' | 'reason' | 'justification', string> = {
   comment: 'What needs to change',
@@ -129,12 +146,16 @@ export default function ApplicationDetailModal({ open, onOpenChange, application
   const [completedOn, setCompletedOn] = useState(todayDateOnly());
   const [certificateNumber, setCertificateNumber] = useState('');
   const [actAs, setActAs] = useState<FinalApproverRole>('captain');
+  const [decision, setDecision] = useState<DecisionKind | null>(null);
+  const [correcting, setCorrecting] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setText('');
       setCertificateNumber('');
       setCompletedOn(todayDateOnly());
+      setDecision(null);
+      setCorrecting(false);
     }
   }, [open, application?.id]);
 
@@ -150,10 +171,9 @@ export default function ApplicationDetailModal({ open, onOpenChange, application
     return out;
   }, [application, user?.id, viewerRoles, canReview, reviewStage, isTrainingAdmin]);
 
-  const actions = useMemo(
-    () => (application ? availableActions(application, roles, mode).filter((a) => a !== 'edit_fields') : []),
-    [application, roles, mode],
-  );
+  const allActions = useMemo(() => (application ? availableActions(application, roles, mode) : []), [application, roles, mode]);
+  const actions = useMemo(() => allActions.filter((a) => a !== 'edit_fields'), [allActions]);
+  const canCorrect = allActions.includes('edit_fields');
 
   if (!application) return null;
 
@@ -172,38 +192,55 @@ export default function ApplicationDetailModal({ open, onOpenChange, application
 
   const disabledReason = (action: ApplicationAction): string | null => {
     if (support === 'missing' && !hasLegacyFallback(action, status, actor)) return 'Not set up yet';
+    if (DIALOG_STEPS.has(action)) return null;
     const need = actionRequirement(action, actionActors(action, knownStatus ?? 'draft').find((a) => roles.includes(a)) ?? null);
     if ((need === 'comment' || need === 'reason' || need === 'justification') && !text.trim()) return `${TEXT_WORDS[need]} is needed`;
     if (need === 'completion' && !completedOn) return 'Enter the completion day';
     return null;
   };
 
-  const run = async (action: ApplicationAction) => {
+  /** Sends one step; resolves once the server confirmed it, rejects (after the hook's toast) when refused. */
+  const send = async (action: ApplicationAction, extra: Record<string, unknown> | null) => {
     const acting = actionActors(action, knownStatus ?? 'draft').find((a) => roles.includes(a)) ?? null;
     const need = actionRequirement(action, acting);
-    const payload: Record<string, unknown> = {};
-    if (need === 'comment') payload.comment = text.trim();
-    if (need === 'reason') payload.reason = text.trim();
-    if (need === 'justification') payload.justification = text.trim();
-    if (need === null && text.trim()) payload.comment = text.trim();
-    if (need === 'completion') {
-      payload.completed_on = completedOn;
-      if (certificateNumber.trim()) payload.certificate_number = certificateNumber.trim();
+    const payload: Record<string, unknown> = { ...(extra ?? {}) };
+    if (extra === null) {
+      if (need === 'comment') payload.comment = text.trim();
+      if (need === 'reason') payload.reason = text.trim();
+      if (need === 'justification') payload.justification = text.trim();
+      if (need === null && text.trim()) payload.comment = text.trim();
+      if (need === 'completion') {
+        payload.completed_on = completedOn;
+        if (certificateNumber.trim()) payload.certificate_number = certificateNumber.trim();
+      }
     }
-    if ((action === 'final_approve' || action === 'return' || action === 'reject') && bothFinal) payload.role = actAs;
+    if ((action === 'final_approve' || action === 'return' || action === 'reject' || action === 'edit_fields') && bothFinal) payload.role = actAs;
+    await transition.mutateAsync({
+      applicationId: application.id,
+      action,
+      payload,
+      expectedUpdatedAt: application.updated_at ?? null,
+      currentStatus: status,
+      actingAs: acting,
+    });
+  };
+
+  const run = async (action: ApplicationAction) => {
+    if (DIALOG_STEPS.has(action)) {
+      setDecision(action as DecisionKind);
+      return;
+    }
     try {
-      await transition.mutateAsync({
-        applicationId: application.id,
-        action,
-        payload,
-        expectedUpdatedAt: application.updated_at ?? null,
-        currentStatus: status,
-        actingAs: acting,
-      });
+      await send(action, null);
       onOpenChange(false);
     } catch {
       // The hook has said why; the dialog stays open.
     }
+  };
+
+  const confirmDecision = async (kind: DecisionKind, reason: string) => {
+    await send(kind, { reason });
+    onOpenChange(false);
   };
 
   const reviews = [
@@ -222,6 +259,7 @@ export default function ApplicationDetailModal({ open, onOpenChange, application
           : null;
 
   const needsText = actions.some((a) => {
+    if (DIALOG_STEPS.has(a)) return false;
     const need = actionRequirement(a, actionActors(a, knownStatus ?? 'draft').find((r) => roles.includes(r)) ?? null);
     return need === 'comment' || need === 'reason' || need === 'justification';
   });
@@ -343,6 +381,28 @@ export default function ApplicationDetailModal({ open, onOpenChange, application
           <p className="text-sm text-muted-foreground">Discretionary: {application.discretionary_justification}</p>
         ) : null}
 
+        <Separator />
+        <ApplicationEventLog applicationId={application.id} enabled={open} />
+
+        {canCorrect ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-input p-3">
+            <p className="text-sm text-muted-foreground">Something wrong in the details? Correct it without sending the application back.</p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="min-h-11"
+              disabled={support === 'missing' || transition.isPending}
+              title={support === 'missing' ? 'Not set up yet' : undefined}
+              onClick={() => setCorrecting(true)}
+            >
+              <PencilLine aria-hidden="true" className="h-4 w-4" />
+              {ACTION_LABELS.edit_fields}
+              {support === 'missing' ? <span className="sr-only">: Not set up yet</span> : null}
+            </Button>
+          </div>
+        ) : null}
+
         {actions.length > 0 ? (
           <>
             <Separator />
@@ -373,7 +433,7 @@ export default function ApplicationDetailModal({ open, onOpenChange, application
                     onChange={(e) => setText(e.target.value)}
                     rows={3}
                     maxLength={2000}
-                    placeholder="Needed to return, reject, void or cancel; optional otherwise"
+                    placeholder="Needed to return, or to cancel an approved application; optional otherwise"
                   />
                 </div>
               ) : null}
@@ -412,6 +472,27 @@ export default function ApplicationDetailModal({ open, onOpenChange, application
             </section>
           </>
         ) : null}
+      <DecisionDialog
+        kind={decision}
+        courseName={application.course_name}
+        pending={transition.isPending}
+        onConfirm={confirmDecision}
+        onClose={() => setDecision(null)}
+      />
+      {correcting ? (
+        <CorrectDetailsDialog
+          open
+          application={application}
+          categoryLabels={labels}
+          pending={transition.isPending}
+          onSubmit={async (payload) => {
+            await send('edit_fields', payload);
+            // The loaded row is now out of date (its updated_at): close, the lists refetch.
+            onOpenChange(false);
+          }}
+          onClose={() => setCorrecting(false)}
+        />
+      ) : null}
       </DialogContent>
     </Dialog>
   );

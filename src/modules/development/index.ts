@@ -15,3 +15,13 @@ export * from './hooks/useDevelopmentMutations';
 
 // Constants
 export * from './constants';
+
+// Routes and capability keys (Fleet › Training, the vessel's Crew Training; X5-07B)
+export {
+  DEVELOPMENT_CAPABILITIES,
+  FLEET_TRAINING_TABS,
+  TRAINING_CAPS,
+  VESSEL_CREW_TRAINING_CAPS,
+  fleetTrainingPath,
+  type FleetTrainingTab,
+} from './paths';
