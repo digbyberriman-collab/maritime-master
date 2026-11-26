@@ -16,7 +16,9 @@
  *     X1-02 folded the roster into the Crew List (beta, behind
  *     vessel.crew.crew_list.view); crew/roster redirects to it, and its
  *     leaf is gone. X1-06B rebuilt Crew Compliance (beta, behind
- *     vessel.crew.crew_compliance.view; crew/compliance/:tab).
+ *     vessel.crew.crew_compliance.view; crew/compliance/:tab). X1-08
+ *     rebuilt Hours of Rest as the vessel board (beta, behind
+ *     vessel.crew.hours_of_rest.approve).
  *     There is no Dashboard leaf yet: a planned leaf at the module root
  *     would turn today's crew -> crew/list redirect into a Coming Soon page
  *     (X1-10B adds it as beta with its page).
@@ -31,7 +33,8 @@
  * - notificationTypes: the crew notification types and their emitters
  *   (platform-prep PP4; deferred until each emitter lands, D-238). The three
  *   crew document types are live from X1-05 (review needed, decided,
- *   expiring).
+ *   expiring), the four hours-of-rest types from X1-08 (reminder, serious
+ *   breach, breach report, correction requested).
  *
  * Platform-prep PP3 moved the routes and leaves here from
  * src/config/sitemap.ts and src/routes/index.tsx unchanged; X1-01 set the
@@ -65,15 +68,17 @@ const manifest: ModuleManifest = {
       order: 30,
       node: L('Crew Compliance', CREW_ROOT, { slug: 'compliance', icon: ShieldCheck, status: 'beta', capability: CREW_CAPS.complianceView }),
     },
-    // One crew member's month is the crew profile's Hours of rest tab
+    // X1-08: the vessel hours-of-rest board, beta behind hours_of_rest.approve
+    // (crew members reach their own month at /me/hours-of-rest). One crew
+    // member's month is the crew profile's Hours of rest tab
     // (`crew/people/:profileId/hours-of-rest`, X1-07B; also the target of the
     // legacy /crew/work-rest/:crewId). It is an Hours of Rest page too: the
-    // crew_hor setting closes it with the overview (gap/10 W4, D-63).
+    // crew_hor setting closes it with the board (gap/10 W4, D-63).
     {
       slot: 'vessel.crew',
       order: 40,
       node: {
-        ...L('Hours of Rest', CREW_ROOT, { icon: Clock, moduleSetting: 'crew_hor', ...LIVE }),
+        ...L('Hours of Rest', CREW_ROOT, { icon: Clock, moduleSetting: 'crew_hor', status: 'beta', capability: CREW_CAPS.horApprove }),
         alsoCovers: ['crew/people/*/hours-of-rest'],
       },
     },
@@ -110,10 +115,11 @@ const manifest: ModuleManifest = {
     { key: 'crew_document_review_needed', status: 'live', emitter: 'crew_certificates_review_notify() trigger (X1-05)' },
     { key: 'crew_document_decided', status: 'live', emitter: 'crew_document_verify() (X1-05)' },
     { key: 'crew_document_expiring', status: 'live', emitter: 'crew_document_expiry_sweep() through hr-daily-sweeper (X1-05)' },
-    { key: 'hor_reminder', status: 'deferred', emitter: 'work_rest_remind() and work_rest_send_due_reminders() (X1-08)' },
-    { key: 'hor_serious_breach', status: 'deferred', emitter: 'work_rest_serious_breach_notify() trigger (X1-08)' },
-    { key: 'hor_breach_report', status: 'deferred', emitter: 'work_rest_breach_report_create() (X1-08)' },
-    { key: 'hor_correction_requested', status: 'deferred', emitter: 'work_rest_review_breach() (X1-08)' },
+    // Live from X1-08 (20261124060800; hor_board.test.sql proves each emitter).
+    { key: 'hor_reminder', status: 'live', emitter: 'work_rest_remind() and work_rest_send_due_reminders() through work_rest_reminder_emit() (X1-08)' },
+    { key: 'hor_serious_breach', status: 'live', emitter: 'work_rest_serious_breach_notify() trigger (X1-08)' },
+    { key: 'hor_breach_report', status: 'live', emitter: 'work_rest_breach_report_create() (X1-08)' },
+    { key: 'hor_correction_requested', status: 'live', emitter: 'work_rest_review_breach() (X1-08)' },
     { key: 'familiarisation_assigned', status: 'deferred', emitter: 'familiarisation_open_required() (X1-10)' },
     { key: 'crew_transfer_submitted', status: 'deferred', emitter: 'transfer_crew_submit() (X1-11)' },
     { key: 'crew_transfer_completed', status: 'deferred', emitter: 'transfer_crew() (X1-11)' },

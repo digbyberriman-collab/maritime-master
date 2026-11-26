@@ -29,9 +29,13 @@ import {
   SubmissionStatus,
   WorkRestBlock,
 } from '../types';
+import { parseVesselBoard, type VesselBoard } from '../lib/horBoard';
 import {
   workRestDb as db,
   type FillDaysResultJson,
+  type RemindResultJson,
+  type ReviewBreachResultJson,
+  type WorkRestVesselBreachRow,
   type MonthTransitionResultJson,
   type SaveDayResultJson,
   type WorkRestBlockArg,
@@ -48,11 +52,15 @@ type SubmissionUpdate = Tables['work_rest_monthly_submissions']['Update'];
 
 // ---------- the engine switch ----------
 
-/** The engine RPCs of 20261124060700. */
+/** The engine RPCs of 20261124060700, and the board's of 20261124060800 (X1-08). */
 export const ENGINE_RPC = {
   saveDay: 'work_rest_save_day',
   fillDays: 'work_rest_fill_days',
   monthTransition: 'work_rest_month_transition',
+  vesselBoard: 'work_rest_vessel_board',
+  vesselBreaches: 'work_rest_vessel_breaches',
+  reviewBreach: 'work_rest_review_breach',
+  remind: 'work_rest_remind',
 } as const;
 export type EngineRpc = (typeof ENGINE_RPC)[keyof typeof ENGINE_RPC];
 
@@ -445,9 +453,28 @@ const monthBounds = (year: number, month: number) => {
 };
 
 /**
- * The legacy vessel overview: everyone assigned to the vessel on any day of
- * the month (ended and transferred-out people included; T-144), with their
- * day records of the month on this vessel.
+ * An assignment covers some day of start..end (YYYY-MM-DD): joined (join
+ * date, else start date) on or before end, and left (leave date, else end
+ * date, inclusive) on or after start, or still current with no end. A row
+ * that is not current and has no end covers nothing. The rule of the
+ * engine's work_rest_assignment_on and the board's membership (T-144).
+ */
+export function assignmentOverlapsMonth(
+  a: { join_date: string | null; start_date: string | null; leave_date: string | null; end_date: string | null; is_current: boolean | null },
+  start: string,
+  end: string,
+): boolean {
+  const joined = (a.join_date ?? a.start_date)?.slice(0, 10) ?? null;
+  if (!joined || joined > end) return false;
+  const left = (a.leave_date ?? a.end_date)?.slice(0, 10) ?? null;
+  return left ? left >= start : Boolean(a.is_current);
+}
+
+/**
+ * The legacy vessel overview (the board's documented fallback while
+ * work_rest_vessel_board is missing, X1-08): everyone assigned to the
+ * vessel on any day of the month (ended and transferred-out people
+ * included; T-144), with their day records of the month on this vessel.
  */
 export async function listVesselMonthMatrix(opts: {
   vesselId: string;
@@ -458,13 +485,9 @@ export async function listVesselMonthMatrix(opts: {
   const { data: assignments, error: aErr } = await db
     .from('crew_assignments')
     .select('user_id, position, join_date, start_date, leave_date, end_date, is_current')
-    .eq('vessel_id', opts.vesselId)
-    .lte('join_date', end);
+    .eq('vessel_id', opts.vesselId);
   if (aErr) throw aErr;
-  const inMonth = (assignments ?? []).filter((a) => {
-    const left = a.leave_date ?? a.end_date;
-    return left ? left >= start : Boolean(a.is_current);
-  });
+  const inMonth = (assignments ?? []).filter((a) => assignmentOverlapsMonth(a, start, end));
   const userIds = Array.from(new Set(inMonth.map((a) => a.user_id)));
   if (!userIds.length) return [];
 
@@ -529,6 +552,108 @@ export async function listVesselMonthMatrix(opts: {
       status,
     }];
   });
+}
+
+// ---------- The vessel board and breach review (X1-08, 20261124060800) ----------
+
+/**
+ * The vessel's board for a month (work_rest_vessel_board), or
+ * `{applied: false}` while the board RPC is missing (D-01: the legacy
+ * overview is the documented fallback). A refusal is a WorkRestRefusal
+ * (42501: not this viewer's board); an answer in an unexpected shape throws.
+ */
+export async function fetchVesselBoard(opts: { vesselId: string; year: number; month: number }): Promise<EngineCall<VesselBoard>> {
+  const { data, error } = await db.rpc(ENGINE_RPC.vesselBoard, { p_vessel_id: opts.vesselId, p_year: opts.year, p_month: opts.month });
+  if (error) {
+    if (isEngineMissing(error, ENGINE_RPC.vesselBoard)) return { applied: false };
+    throw asWorkRestError(error);
+  }
+  return { applied: true, data: parseVesselBoard(data) };
+}
+
+/** The vessel's live breaches in a range (at most a year), or `{applied: false}` while the RPC is missing. */
+export async function listVesselBreaches(opts: {
+  vesselId: string;
+  from: string;
+  to: string;
+  onlyOpen?: boolean;
+}): Promise<EngineCall<WorkRestVesselBreachRow[]>> {
+  const { data, error } = await db.rpc(ENGINE_RPC.vesselBreaches, {
+    p_vessel_id: opts.vesselId,
+    p_from: opts.from,
+    p_to: opts.to,
+    p_only_open: opts.onlyOpen ?? false,
+  });
+  if (error) {
+    if (isEngineMissing(error, ENGINE_RPC.vesselBreaches)) return { applied: false };
+    throw asWorkRestError(error);
+  }
+  return { applied: true, data: (data ?? []).map((r) => ({ ...r, measured_value: numOrNull(r.measured_value), threshold_value: numOrNull(r.threshold_value), deficit_hours: numOrNull(r.deficit_hours) })) };
+}
+
+const numOrNull = (v: unknown): number | null => (v === null || v === undefined || v === '' ? null : Number(v));
+
+/** Parses work_rest_review_breach's answer. */
+export function parseReviewBreachResult(value: Json): ReviewBreachResultJson {
+  const r = asRecord(value);
+  const outcome = str(r.review_outcome);
+  if (outcome !== 'accepted' && outcome !== 'correction_requested' && outcome !== 'dismissed') {
+    throw new Error('The hours-of-rest engine answered in an unexpected shape.');
+  }
+  return {
+    nc_id: str(r.nc_id),
+    review_outcome: outcome,
+    status: str(r.status),
+    month_status: typeof r.month_status === 'string' ? r.month_status : null,
+    reopened: r.reopened === true,
+  };
+}
+
+/**
+ * Reviews one breach through the engine (accepted with a justification,
+ * correction_requested reopening the month, dismissed after a correction).
+ * There is no legacy review: while the RPC is missing it throws
+ * WorkRestEngineRequired (the panel says the review is not set up yet).
+ */
+export async function reviewBreach(opts: { ncId: string; outcome: WorkRestReviewOutcome; note?: string | null }): Promise<ReviewBreachResultJson> {
+  const { data, error } = await db.rpc(ENGINE_RPC.reviewBreach, { p_nc_id: opts.ncId, p_outcome: opts.outcome, p_note: opts.note ?? null });
+  if (error) {
+    if (isEngineMissing(error, ENGINE_RPC.reviewBreach)) throw new WorkRestEngineRequired('Breach review becomes available once the hours-of-rest update is applied.');
+    throw asWorkRestError(error);
+  }
+  return parseReviewBreachResult(data);
+}
+
+/** Parses work_rest_remind's answer. */
+export function parseRemindResult(value: Json): RemindResultJson {
+  const r = asRecord(value);
+  const skipped = Array.isArray(r.skipped) ? r.skipped : [];
+  return {
+    sent: num(r.sent),
+    sent_to: Array.isArray(r.sent_to) ? r.sent_to.map(str) : [],
+    skipped: skipped.map((x) => {
+      const o = asRecord(x);
+      const reason = str(o.reason) === 'month_closed' ? ('month_closed' as const) : ('reminder_rate_limited' as const);
+      return { user_id: str(o.user_id), reason };
+    }),
+    sent_on: str(r.sent_on),
+    by_label: typeof r.by_label === 'string' ? r.by_label : null,
+  };
+}
+
+/** Reminds crew of a month (one manual reminder per person and vessel a day); WorkRestEngineRequired while the RPC is missing. */
+export async function remindCrew(opts: { vesselId: string; crewIds: readonly string[]; year: number; month: number }): Promise<RemindResultJson> {
+  const { data, error } = await db.rpc(ENGINE_RPC.remind, {
+    p_vessel_id: opts.vesselId,
+    p_crew_user_ids: [...opts.crewIds],
+    p_year: opts.year,
+    p_month: opts.month,
+  });
+  if (error) {
+    if (isEngineMissing(error, ENGINE_RPC.remind)) throw new WorkRestEngineRequired('Reminders become available once the hours-of-rest update is applied.');
+    throw asWorkRestError(error);
+  }
+  return parseRemindResult(data);
 }
 
 // ---------- Records & blocks ----------

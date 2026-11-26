@@ -4,6 +4,9 @@
  * src/test/router/logbookScope.test.tsx by platform-prep PP2; the
  * hours-of-rest pages are the work-rest module's (X1).
  *
+ * X1-08: crew/hours-of-rest is the vessel board, for approvers (with no
+ * board RPC it shows the legacy overview, D-01).
+ *
  * X1-07B: one crew member's month is the crew profile's Hours of rest tab
  * (crew/people/:profileId/hours-of-rest). The old links carry a login id
  * and ?year=&month= (the board, the crew list, the legacy
@@ -351,15 +354,24 @@ describe('the Hours of Rest board and links', () => {
   });
 
   it("the board links one's own hours and each crew member's month, which opens on the profile tab in the scope", async () => {
+    // X1-08: the board is for approvers; without its RPC it shows the legacy overview (D-01), whose rows link the month.
+    mocks.caps.add('vessel.crew.hours_of_rest.approve');
     renderApp('/v/dra/crew/hours-of-rest?year=2026&month=11');
     expect(await screen.findByRole('link', { name: 'My hours' })).toHaveAttribute('href', '/me/hours-of-rest');
     const row = await screen.findByRole('link', { name: /Ann Deck/ });
-    expect(row).toHaveAttribute('href', '/v/dra/crew/people/a0000000-0000-4000-8000-0000000000a2/hours-of-rest?year=2026&month=11');
+    expect(row).toHaveAttribute('href', '/v/dra/crew/people/a0000000-0000-4000-8000-0000000000a2/hours-of-rest?month=2026-11');
     act(() => {
       fireEvent.click(row);
     });
-    await waitFor(() => expect(location()).toBe('/v/dra/crew/people/b0000000-0000-4000-8000-0000000000a2/hours-of-rest?year=2026&month=11'));
+    await waitFor(() => expect(location()).toBe('/v/dra/crew/people/b0000000-0000-4000-8000-0000000000a2/hours-of-rest?month=2026-11'));
     expect(await screen.findByText('November 2026')).toBeInTheDocument();
+    expect(mocks.shellMounts).toBe(1);
+  });
+
+  it('without the approve capability the board says it is for approvers and links the own month', async () => {
+    renderApp('/v/dra/crew/hours-of-rest?month=2026-11');
+    expect(await screen.findByText(/No access to this page|The hours of rest board is for approvers/)).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Ann Deck/ })).toBeNull();
     expect(mocks.shellMounts).toBe(1);
   });
 });

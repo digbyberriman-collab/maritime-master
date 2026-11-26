@@ -78,6 +78,9 @@ describe('pending types and the migrations', () => {
       '20261124060400_crew_document_catalogue.sql',
       '20261124060500_crew_document_verification.sql',
       '20261124060600_crew_compliance.sql',
+      // The hours-of-rest engine and board (X1-07, X1-08): their types are the work-rest module's pending file.
+      '20261124060700_crew_hor_engine.sql',
+      '20261124060800_crew_hor_board.sql',
     ]);
   });
 

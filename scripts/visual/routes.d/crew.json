@@ -376,7 +376,7 @@
     "path": "/v/dra/crew/compliance/configuration",
     "slug": "crew-compliance-configuration",
     "waitFor": "[data-compliance-config] table",
-    "note": "X1-06B: Crew Compliance, Configuration: the vessel settings (passenger ship, crew uploads, transfer approval), the requirements x positions matrix with ticks, N options · held by X, Equivalences, Add STCW basic set and Add requirement"
+    "note": "X1-06B: Crew Compliance, Configuration: the vessel settings (passenger ship, crew uploads, transfer approval), the requirements x positions matrix with ticks, N options \u00b7 held by X, Equivalences, Add STCW basic set and Add requirement"
   },
   {
     "path": "/v/dra/crew/compliance/configuration",
@@ -501,5 +501,75 @@
     "slug": "crew-profile-hours-of-rest-legacy-id",
     "expectRedirect": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/hours-of-rest",
     "note": "X1-07B: an old link with the login id and ?year=&month= (the board, the crew list, /crew/work-rest/:crewId) lands on the profile's tab, month kept"
+  },
+  {
+    "path": "/v/dra/crew/hours-of-rest",
+    "slug": "crew-hor-board",
+    "persona": "vessel-master",
+    "waitFor": "[data-hor-board=\"board\"] article",
+    "note": "X1-08: the vessel hours-of-rest board as the Master (final approver): department groups, queue chips with counts, the legend, one card per person (status, Former crew with submit on their behalf, on leave all month collapsed, Remind and the last reminder). Until PR-X1-G gives the base vessel-master persona hours-of-rest approval, capture it with a scratch --fixtures copy that adds the crew.approve_hours_of_rest flag to vessel-master; without it the page shows the approvers-only notice."
+  },
+  {
+    "path": "/v/dra/crew/hours-of-rest",
+    "slug": "crew-hor-board-breaches",
+    "persona": "vessel-master",
+    "waitFor": "[data-hor-board=\"board\"] article",
+    "actions": [
+      {
+        "click": "[data-open-breaches]"
+      },
+      {
+        "waitFor": "[data-breach-panel] [data-breach-filter]"
+      },
+      {
+        "wait": 400
+      }
+    ],
+    "note": "X1-08: the breach review panel open on the board (Non-compliant only, serious first, the deficit column; cards at 390). Until PR-X1-G gives the base vessel-master persona hours-of-rest approval, capture it with a scratch --fixtures copy that adds the crew.approve_hours_of_rest flag to vessel-master; without it the page shows the approvers-only notice."
+  },
+  {
+    "path": "/v/dra/crew/hours-of-rest?queue=ready",
+    "slug": "crew-hor-board-ready",
+    "persona": "vessel-master",
+    "waitFor": "[data-hor-board=\"board\"] article",
+    "note": "X1-08: Ready for you: the months the Master approves now (a submitted month with breaches still to review counts too). Until PR-X1-G gives the base vessel-master persona hours-of-rest approval, capture it with a scratch --fixtures copy that adds the crew.approve_hours_of_rest flag to vessel-master; without it the page shows the approvers-only notice."
+  },
+  {
+    "path": "/v/dra/crew/hours-of-rest?all=1",
+    "slug": "crew-hor-board-calendars",
+    "persona": "vessel-master",
+    "waitFor": "[data-hor-board=\"board\"] [data-mini-calendar]",
+    "note": "X1-08: Show all calendars: every card's month as a mini calendar, each day a link to that day. Until PR-X1-G gives the base vessel-master persona hours-of-rest approval, capture it with a scratch --fixtures copy that adds the crew.approve_hours_of_rest flag to vessel-master; without it the page shows the approvers-only notice."
+  },
+  {
+    "path": "/v/dra/crew/hours-of-rest",
+    "slug": "crew-hor-board-hod",
+    "persona": "vessel-hod",
+    "waitFor": "[data-hor-board=\"board\"] article",
+    "actions": [
+      {
+        "click": "[data-open-breaches]"
+      },
+      {
+        "waitFor": "[data-breach-panel] [data-breach-filter]"
+      },
+      {
+        "wait": 400
+      }
+    ],
+    "note": "X1-08: the board as the Chief Officer, a head of department (not the final approver), with the breach panel open: reviews breaches of the deck department only."
+  },
+  {
+    "path": "/v/dra/crew/hours-of-rest?queue=ready",
+    "slug": "crew-hor-board-hod-ready",
+    "persona": "vessel-hod",
+    "waitFor": "[data-hor-board=\"board\"] article",
+    "note": "X1-08: Ready for you as head of department: the submitted deck months still to sign (Approve is not offered)."
+  },
+  {
+    "path": "/v/dra/crew/hours-of-rest",
+    "slug": "crew-hor-board-denied",
+    "persona": "vessel-crew",
+    "note": "X1-08: crew without hours-of-rest approval: the approvers-only notice with a link to their own month."
   }
 ]

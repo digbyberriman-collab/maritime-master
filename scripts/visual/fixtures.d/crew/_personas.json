@@ -1,10 +1,13 @@
 {
   "crew-list-basic": {
     "note": "X1-02 not applied yet (D-01): crew_vessel_list and crew_vessel_movements are missing, so the crew list is the basic list from the profiles and assignments (with the notice), and the Movements tab says it is not set up yet. Warns by design: the missing RPCs log 404s.",
-    "missingRpcs": ["crew_vessel_list", "crew_vessel_movements"]
+    "missingRpcs": [
+      "crew_vessel_list",
+      "crew_vessel_movements"
+    ]
   },
   "vessel-hod": {
-    "note": "X1-05: the DRAAK chief officer, a head of department (deck): RBAC chief_officer on DRAAK only, with crew view and crew certificates edit (verify and alerts off). On the Chief Stew's documents (interior) the server says out_of_department, so the review line says why there is no Verify; Alerts, Renew and History stay.",
+    "note": "X1-05: the DRAAK chief officer, a head of department (deck): RBAC chief_officer on DRAAK only, with crew view and crew certificates edit (verify and alerts off). On the Chief Stew's documents (interior) the server says out_of_department, so the review line says why there is no Verify; Alerts, Renew and History stay. X1-08: also approves hours of rest on DRAAK (the legacy crew.approve_hours_of_rest flag) as head of department, not as final approver: the board answers can_final_approve false, so Ready for you holds the deck months still to sign and Approve is not offered.",
     "auth": {
       "id": "a0000000-0000-4000-8000-000000000012",
       "email": "chief.officer.12@demo-fleet.example",
@@ -156,6 +159,13 @@
           "scope": "vessel",
           "restrictions": {},
           "source": "role"
+        },
+        {
+          "module_key": "crew.approve_hours_of_rest",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
         }
       ],
       "has_capability": false,
@@ -166,7 +176,768 @@
           "can_mute": true,
           "can_renew": true
         }
+      ],
+      "work_rest_vessel_board": {
+        "vessel_id": "e0000000-0000-4000-8000-000000000001",
+        "year": 2026,
+        "month": 11,
+        "today": "2026-11-26",
+        "first_day": "2026-11-01",
+        "last_day": "2026-11-30",
+        "hor": {
+          "off": false,
+          "from": null
+        },
+        "hod_step": "nudge",
+        "can_final_approve": false,
+        "my_department_key": "deck",
+        "members": [
+          {
+            "profile_id": "b0000000-0000-4000-8000-000000000011",
+            "user_id": "a0000000-0000-4000-8000-000000000011",
+            "first_name": "Demo",
+            "last_name": "Master",
+            "preferred_name": null,
+            "avatar_url": null,
+            "position_name": "Master",
+            "position_text": "Master",
+            "department_key": "deck",
+            "department_label": "Deck",
+            "sort_order": 10,
+            "assignments": [
+              {
+                "from": "2026-07-01",
+                "to": null
+              }
+            ],
+            "month": {
+              "submission_id": "5a000000-0000-4000-8000-000000000011",
+              "status": "submitted",
+              "submitted_at": "2026-11-25T18:00:00Z",
+              "on_behalf": false,
+              "hod_signed": false,
+              "approved_at": null,
+              "locked_at": null
+            },
+            "days": {
+              "records": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25,
+                26
+              ],
+              "leave": [],
+              "breach": [],
+              "warning": []
+            },
+            "counts": {
+              "expected": 26,
+              "logged": 26,
+              "missing": 0,
+              "breach_days": 0,
+              "unreviewed": 0,
+              "blocking_unreviewed": 0,
+              "low_unreviewed": 0,
+              "awaiting_correction": 0,
+              "serious_open": 0
+            },
+            "still_aboard": true,
+            "former_crew": false,
+            "on_leave_all_month": false,
+            "last_reminder": null,
+            "reminded_today": false
+          },
+          {
+            "profile_id": "b0000000-0000-4000-8000-000000000012",
+            "user_id": "a0000000-0000-4000-8000-000000000012",
+            "first_name": "Demo",
+            "last_name": "Chief Officer",
+            "preferred_name": null,
+            "avatar_url": null,
+            "position_name": "Chief Officer",
+            "position_text": "Chief Officer",
+            "department_key": "deck",
+            "department_label": "Deck",
+            "sort_order": 20,
+            "assignments": [
+              {
+                "from": "2026-07-01",
+                "to": null
+              }
+            ],
+            "month": {
+              "submission_id": "5a000000-0000-4000-8000-000000000012",
+              "status": "hod_signed",
+              "submitted_at": "2026-11-25T18:00:00Z",
+              "on_behalf": false,
+              "hod_signed": true,
+              "approved_at": null,
+              "locked_at": null
+            },
+            "days": {
+              "records": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25,
+                26
+              ],
+              "leave": [],
+              "breach": [],
+              "warning": [
+                18
+              ]
+            },
+            "counts": {
+              "expected": 26,
+              "logged": 26,
+              "missing": 0,
+              "breach_days": 0,
+              "unreviewed": 0,
+              "blocking_unreviewed": 0,
+              "low_unreviewed": 0,
+              "awaiting_correction": 0,
+              "serious_open": 0
+            },
+            "still_aboard": true,
+            "former_crew": false,
+            "on_leave_all_month": false,
+            "last_reminder": null,
+            "reminded_today": false
+          },
+          {
+            "profile_id": "b0000000-0000-4000-8000-000000000014",
+            "user_id": "a0000000-0000-4000-8000-000000000014",
+            "first_name": "Demo",
+            "last_name": "Bosun",
+            "preferred_name": null,
+            "avatar_url": null,
+            "position_name": "Bosun",
+            "position_text": "Bosun",
+            "department_key": "deck",
+            "department_label": "Deck",
+            "sort_order": 30,
+            "assignments": [
+              {
+                "from": "2026-07-01",
+                "to": null
+              }
+            ],
+            "month": {
+              "submission_id": "5a000000-0000-4000-8000-000000000014",
+              "status": "submitted",
+              "submitted_at": "2026-11-25T18:00:00Z",
+              "on_behalf": false,
+              "hod_signed": false,
+              "approved_at": null,
+              "locked_at": null
+            },
+            "days": {
+              "records": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25,
+                26
+              ],
+              "leave": [],
+              "breach": [
+                9
+              ],
+              "warning": [
+                10
+              ]
+            },
+            "counts": {
+              "expected": 26,
+              "logged": 26,
+              "missing": 0,
+              "breach_days": 1,
+              "unreviewed": 1,
+              "blocking_unreviewed": 1,
+              "low_unreviewed": 0,
+              "awaiting_correction": 0,
+              "serious_open": 0
+            },
+            "still_aboard": true,
+            "former_crew": false,
+            "on_leave_all_month": false,
+            "last_reminder": null,
+            "reminded_today": false
+          },
+          {
+            "profile_id": "b0000000-0000-4000-8000-000000000016",
+            "user_id": "a0000000-0000-4000-8000-000000000016",
+            "first_name": "Demo",
+            "last_name": "Deckhand",
+            "preferred_name": null,
+            "avatar_url": null,
+            "position_name": "Deckhand",
+            "position_text": "Deckhand",
+            "department_key": "deck",
+            "department_label": "Deck",
+            "sort_order": 40,
+            "assignments": [
+              {
+                "from": "2026-07-01",
+                "to": null
+              }
+            ],
+            "month": {
+              "submission_id": "5a000000-0000-4000-8000-000000000016",
+              "status": "draft",
+              "submitted_at": null,
+              "on_behalf": false,
+              "hod_signed": false,
+              "approved_at": null,
+              "locked_at": null
+            },
+            "days": {
+              "records": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18
+              ],
+              "leave": [],
+              "breach": [],
+              "warning": []
+            },
+            "counts": {
+              "expected": 26,
+              "logged": 18,
+              "missing": 8,
+              "breach_days": 0,
+              "unreviewed": 0,
+              "blocking_unreviewed": 0,
+              "low_unreviewed": 0,
+              "awaiting_correction": 0,
+              "serious_open": 0
+            },
+            "still_aboard": true,
+            "former_crew": false,
+            "on_leave_all_month": false,
+            "last_reminder": {
+              "kind": "manual",
+              "sent_on": "2026-11-24",
+              "sent_at": "2026-11-24T07:45:00Z",
+              "by_label": "Chief Officer"
+            },
+            "reminded_today": false
+          },
+          {
+            "profile_id": "b0000000-0000-4000-8000-000000000013",
+            "user_id": "a0000000-0000-4000-8000-000000000013",
+            "first_name": "Demo",
+            "last_name": "Chief Engineer",
+            "preferred_name": null,
+            "avatar_url": null,
+            "position_name": "Chief Engineer",
+            "position_text": "Chief Engineer",
+            "department_key": "engine",
+            "department_label": "Engine",
+            "sort_order": 50,
+            "assignments": [
+              {
+                "from": "2026-07-01",
+                "to": null
+              }
+            ],
+            "month": {
+              "submission_id": "5a000000-0000-4000-8000-000000000013",
+              "status": "submitted",
+              "submitted_at": "2026-11-25T18:00:00Z",
+              "on_behalf": false,
+              "hod_signed": false,
+              "approved_at": null,
+              "locked_at": null
+            },
+            "days": {
+              "records": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25,
+                26
+              ],
+              "leave": [],
+              "breach": [
+                4,
+                5
+              ],
+              "warning": [
+                6
+              ]
+            },
+            "counts": {
+              "expected": 26,
+              "logged": 26,
+              "missing": 0,
+              "breach_days": 2,
+              "unreviewed": 2,
+              "blocking_unreviewed": 2,
+              "low_unreviewed": 0,
+              "awaiting_correction": 0,
+              "serious_open": 1
+            },
+            "still_aboard": true,
+            "former_crew": false,
+            "on_leave_all_month": false,
+            "last_reminder": null,
+            "reminded_today": false
+          },
+          {
+            "profile_id": "b0000000-0000-4000-8000-000000000032",
+            "user_id": "a0000000-0000-4000-8000-000000000032",
+            "first_name": "Demo",
+            "last_name": "Third Engineer",
+            "preferred_name": null,
+            "avatar_url": null,
+            "position_name": "Third Engineer",
+            "position_text": "Third Engineer",
+            "department_key": "engine",
+            "department_label": "Engine",
+            "sort_order": 60,
+            "assignments": [
+              {
+                "from": "2026-07-01",
+                "to": null
+              }
+            ],
+            "month": {
+              "submission_id": null,
+              "status": null,
+              "submitted_at": null,
+              "on_behalf": false,
+              "hod_signed": false,
+              "approved_at": null,
+              "locked_at": null
+            },
+            "days": {
+              "records": [],
+              "leave": [],
+              "breach": [],
+              "warning": []
+            },
+            "counts": {
+              "expected": 26,
+              "logged": 0,
+              "missing": 26,
+              "breach_days": 0,
+              "unreviewed": 0,
+              "blocking_unreviewed": 0,
+              "low_unreviewed": 0,
+              "awaiting_correction": 0,
+              "serious_open": 0
+            },
+            "still_aboard": true,
+            "former_crew": false,
+            "on_leave_all_month": false,
+            "last_reminder": {
+              "kind": "auto_month_start",
+              "sent_on": "2026-11-01",
+              "sent_at": "2026-11-01T06:00:00Z",
+              "by_label": null
+            },
+            "reminded_today": false
+          },
+          {
+            "profile_id": "b0000000-0000-4000-8000-000000000015",
+            "user_id": "a0000000-0000-4000-8000-000000000015",
+            "first_name": "Demo",
+            "last_name": "Chief Stew",
+            "preferred_name": null,
+            "avatar_url": null,
+            "position_name": "Chief Stew",
+            "position_text": "Chief Stew",
+            "department_key": "interior",
+            "department_label": "Interior",
+            "sort_order": 70,
+            "assignments": [
+              {
+                "from": "2026-07-01",
+                "to": null
+              }
+            ],
+            "month": {
+              "submission_id": "5a000000-0000-4000-8000-000000000015",
+              "status": "approved",
+              "submitted_at": "2026-11-25T18:00:00Z",
+              "on_behalf": false,
+              "hod_signed": false,
+              "approved_at": "2026-11-26T08:30:00Z",
+              "locked_at": null
+            },
+            "days": {
+              "records": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25,
+                26
+              ],
+              "leave": [],
+              "breach": [],
+              "warning": []
+            },
+            "counts": {
+              "expected": 26,
+              "logged": 26,
+              "missing": 0,
+              "breach_days": 0,
+              "unreviewed": 0,
+              "blocking_unreviewed": 0,
+              "low_unreviewed": 0,
+              "awaiting_correction": 0,
+              "serious_open": 0
+            },
+            "still_aboard": true,
+            "former_crew": false,
+            "on_leave_all_month": false,
+            "last_reminder": null,
+            "reminded_today": false
+          },
+          {
+            "profile_id": "b0000000-0000-4000-8000-000000000022",
+            "user_id": "a0000000-0000-4000-8000-000000000022",
+            "first_name": "Demo",
+            "last_name": "Second Stew",
+            "preferred_name": null,
+            "avatar_url": null,
+            "position_name": "Second Stew",
+            "position_text": "Second Stew",
+            "department_key": "interior",
+            "department_label": "Interior",
+            "sort_order": 80,
+            "assignments": [
+              {
+                "from": "2026-05-01",
+                "to": "2026-11-12"
+              }
+            ],
+            "month": {
+              "submission_id": "5a000000-0000-4000-8000-000000000022",
+              "status": "draft",
+              "submitted_at": null,
+              "on_behalf": false,
+              "hod_signed": false,
+              "approved_at": null,
+              "locked_at": null
+            },
+            "days": {
+              "records": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10
+              ],
+              "leave": [],
+              "breach": [],
+              "warning": []
+            },
+            "counts": {
+              "expected": 12,
+              "logged": 10,
+              "missing": 2,
+              "breach_days": 0,
+              "unreviewed": 0,
+              "blocking_unreviewed": 0,
+              "low_unreviewed": 0,
+              "awaiting_correction": 0,
+              "serious_open": 0
+            },
+            "still_aboard": false,
+            "former_crew": true,
+            "on_leave_all_month": false,
+            "last_reminder": null,
+            "reminded_today": false
+          },
+          {
+            "profile_id": "b0000000-0000-4000-8000-000000000036",
+            "user_id": "a0000000-0000-4000-8000-000000000036",
+            "first_name": "Demo",
+            "last_name": "Purser",
+            "preferred_name": null,
+            "avatar_url": null,
+            "position_name": "Purser",
+            "position_text": "Purser",
+            "department_key": "interior",
+            "department_label": "Interior",
+            "sort_order": 90,
+            "assignments": [
+              {
+                "from": "2026-07-01",
+                "to": null
+              }
+            ],
+            "month": {
+              "submission_id": null,
+              "status": null,
+              "submitted_at": null,
+              "on_behalf": false,
+              "hod_signed": false,
+              "approved_at": null,
+              "locked_at": null
+            },
+            "days": {
+              "records": [],
+              "leave": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6,
+                7,
+                8,
+                9,
+                10,
+                11,
+                12,
+                13,
+                14,
+                15,
+                16,
+                17,
+                18,
+                19,
+                20,
+                21,
+                22,
+                23,
+                24,
+                25,
+                26
+              ],
+              "breach": [],
+              "warning": []
+            },
+            "counts": {
+              "expected": 26,
+              "logged": 0,
+              "missing": 0,
+              "breach_days": 0,
+              "unreviewed": 0,
+              "blocking_unreviewed": 0,
+              "low_unreviewed": 0,
+              "awaiting_correction": 0,
+              "serious_open": 0
+            },
+            "still_aboard": true,
+            "former_crew": false,
+            "on_leave_all_month": true,
+            "last_reminder": null,
+            "reminded_today": false
+          }
+        ]
+      }
+    }
+  },
+  "vessel-crew": {
+    "note": "X1-08: the DRAAK deckhand, crew without hours-of-rest approval: RBAC deckhand on DRAAK with crew view only. The vessel hours-of-rest board says it is for approvers and links to their own month (/me/hours-of-rest).",
+    "auth": {
+      "id": "a0000000-0000-4000-8000-000000000016",
+      "email": "deckhand.16@demo-fleet.example",
+      "user_metadata": {
+        "first_name": "Demo",
+        "last_name": "Deckhand"
+      }
+    },
+    "tables": {
+      "user_roles": [
+        {
+          "id": "93000000-0000-4000-8000-000000000016",
+          "user_id": "a0000000-0000-4000-8000-000000000016",
+          "company_id": "c0000000-0000-4000-8000-000000000001",
+          "role": "deckhand",
+          "vessel_id": "e0000000-0000-4000-8000-000000000001",
+          "department": "deck",
+          "is_active": true,
+          "granted_at": "$ts:-300d",
+          "granted_by": null,
+          "expires_at": null,
+          "metadata": null,
+          "created_at": "$ts:-300d",
+          "updated_at": "$ts:-300d"
+        }
       ]
+    },
+    "rpc": {
+      "get_user_roles_full": [
+        {
+          "role_id": "90000000-0000-4000-8000-000000000009",
+          "role_name": "deckhand",
+          "role_display_name": "Deckhand",
+          "vessel_id": "e0000000-0000-4000-8000-000000000001",
+          "vessel_name": "DRAAK",
+          "department": "deck",
+          "is_fleet_wide": false
+        }
+      ],
+      "get_user_rbac_permissions": [
+        {
+          "module_key": "dashboard",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "vessels",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "crew",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "documents",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "training",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        }
+      ],
+      "has_capability": false
     }
   }
 }

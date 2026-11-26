@@ -11,9 +11,11 @@
     },
     {
       "file": "src/modules/work-rest/types/db.pending.ts",
-      "mirrors": "X1 spec §6 060700 (X1-07: the hours-of-rest engine: vessel settings margins, serious thresholds, HoD step and reminders, month signer columns, breach day, serious flag, deficit and review columns, stale signatures, and the save, fill and month RPCs)",
+      "mirrors": "X1 spec §6 060700 (X1-07: the hours-of-rest engine: vessel settings margins, serious thresholds, HoD step and reminders, month signer columns, breach day, serious flag, deficit and review columns, stale signatures, and the save, fill and month RPCs) and 060800 (X1-08: the reminder log, the breach reports, the breach review view for fleet operations R9, and the board, month statistics, breach list, review, reminder and breach report RPCs)",
+      "tables": { "type": "WorkRestPendingTables", "expect": ["work_rest_reminders", "work_rest_breach_reports"] },
+      "views": { "type": "WorkRestPendingViews", "expect": ["work_rest_breach_reviews"] },
       "columns": { "type": "WorkRestPendingColumns", "expect": ["vessel_work_rest_settings", "work_rest_monthly_submissions", "work_rest_non_conformities", "work_rest_signatures"] },
-      "functions": { "type": "WorkRestPendingFunctions", "expect": ["work_rest_save_day", "work_rest_fill_days", "work_rest_month_transition"] }
+      "functions": { "type": "WorkRestPendingFunctions", "expect": ["work_rest_save_day", "work_rest_fill_days", "work_rest_month_transition", "work_rest_vessel_board", "work_rest_month_stats", "work_rest_vessel_breaches", "work_rest_review_breach", "work_rest_remind", "work_rest_breach_report_recipients", "work_rest_breach_report_create"] }
     }
   ],
   "notMirrored": {

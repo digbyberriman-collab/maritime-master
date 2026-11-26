@@ -38,6 +38,12 @@ export const MY_DOCUMENTS_PATH = 'documents';
  * again for the route vessel and the server for every read) in place of the
  * legacy crew documents page; crew/compliance still redirects to status,
  * and the legacy /crew/certificates lands on status?view=documents.
+ * X1-08 serves the vessel hours-of-rest board (HoursOfRestBoardPage) at
+ * crew/hours-of-rest in place of the legacy overview, behind
+ * vessel.crew.hours_of_rest.approve (the page asks again for the route
+ * vessel and sends everyone else to their own month, /me/hours-of-rest;
+ * the legacy overview is the board's D-01 fallback and still the page of
+ * the legacy /crew/work-rest/overview).
  * X1-04B adds the person's own documents at /me/documents (scope personal,
  * path `documents`, guard vessel.crew.crew_certificates.view_own; the page
  * asks again and the server answers only for the caller's own profile). The
@@ -85,7 +91,8 @@ export const CREW_ROUTES: readonly RouteDef[] = [
   // Crew Compliance (X1-06B; gap/04 C33, C35): Status and Configuration tabs; an unknown tab lands on Status in the page.
   vesselRedirect(CREW_PATHS.compliance, 'status'),
   vesselCapabilityPage(`${CREW_PATHS.compliance}/:tab`, CREW_CAPS.complianceView, () => import('@/modules/crew/pages/CrewCompliancePage')),
-  vesselPage(CREW_PATHS.hoursOfRest, () => import('@/modules/work-rest/pages/WorkRestOverview')),
+  // The vessel hours-of-rest board (X1-08; gap/04 C40-C43): for approvers; the page asks again for the route vessel.
+  vesselCapabilityPage(CREW_PATHS.hoursOfRest, CREW_CAPS.horApprove, () => import('@/modules/work-rest/pages/HoursOfRestBoardPage')),
   vesselRedirect(CREW_PATHS.planner, 'timeline'),
   vesselPage(CREW_PATHS.plannerTimeline, () => import('@/modules/rotation-planner/pages/RotationPlannerPage')),
   vesselPage(CREW_PATHS.plannerManning, () => import('@/modules/crew/pages/LeavePlannerPage')),

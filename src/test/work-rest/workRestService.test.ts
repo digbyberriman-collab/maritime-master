@@ -411,6 +411,9 @@ describe('listVesselMonthMatrix (T-144)', () => {
           { user_id: 'u-left-before', join_date: '2026-03-01', leave_date: '2026-10-31', end_date: null, is_current: false },
           { user_id: 'u-ended', join_date: '2026-03-01', leave_date: null, end_date: '2026-11-01', is_current: false },
           { user_id: 'u-stale', join_date: '2026-03-01', leave_date: null, end_date: null, is_current: false },
+          // X1-08: a row with only a start date counts from it (the engine's coalesce(join_date, start_date)).
+          { user_id: 'u-start-only', join_date: null, start_date: '2026-11-15', leave_date: null, end_date: null, is_current: true },
+          { user_id: 'u-joins-later', join_date: '2026-12-01', leave_date: null, end_date: null, is_current: true },
         ]);
       }
       if (c.table === 'profiles') {
@@ -423,13 +426,11 @@ describe('listVesselMonthMatrix (T-144)', () => {
       ]);
     };
     const rows = await listVesselMonthMatrix({ vesselId: V, year: 2026, month: 11 });
-    expect(h.calls[0].filters).toEqual([
-      ['vessel_id', 'eq', V],
-      ['join_date', 'lte', '2026-11-30'],
-    ]);
-    expect(h.calls[1].filters).toEqual([['user_id', 'in', ['u-current', 'u-left-in-month', 'u-ended']]]);
+    // X1-08: every assignment row of the vessel; the overlap rule (assignmentOverlapsMonth) picks the month's.
+    expect(h.calls[0].filters).toEqual([['vessel_id', 'eq', V]]);
+    expect(h.calls[1].filters).toEqual([['user_id', 'in', ['u-current', 'u-left-in-month', 'u-ended', 'u-start-only']]]);
     const byId = new Map(rows.map((r) => [r.crew_id, r]));
-    expect([...byId.keys()].sort()).toEqual(['u-current', 'u-ended', 'u-left-in-month']);
+    expect([...byId.keys()].sort()).toEqual(['u-current', 'u-ended', 'u-left-in-month', 'u-start-only']);
     expect(byId.get('u-current')).toMatchObject({ status: 'review', avg_rest: 10, department: 'DECK', crew_name: 'Deck Rating' });
     expect(byId.get('u-current')?.rest_by_day[2]).toBe(10);
     expect(byId.get('u-current')?.rest_by_day[30]).toBeNull();

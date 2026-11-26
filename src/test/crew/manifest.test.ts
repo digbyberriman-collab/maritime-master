@@ -48,7 +48,8 @@ const TODAY: Record<string, string> = {
   [`vessel ${CREW_PATHS.list}`]: '/src/modules/crew/pages/CrewListPage.tsx',
   // X1-06B: Crew Compliance (status and configuration) replaces the legacy crew documents page.
   [`vessel ${COMPLIANCE_TAB_PATH}`]: '/src/modules/crew/pages/CrewCompliancePage.tsx',
-  [`vessel ${CREW_PATHS.hoursOfRest}`]: '/src/modules/work-rest/pages/WorkRestOverview.tsx',
+  // X1-08: the vessel hours-of-rest board replaces the legacy overview (its D-01 fallback).
+  [`vessel ${CREW_PATHS.hoursOfRest}`]: '/src/modules/work-rest/pages/HoursOfRestBoardPage.tsx',
   // X1-07B: one crew member's month is the profile's Hours of rest tab (crew/people/:profileId/:tab); no route of its own.
   [`vessel ${CREW_PATHS.plannerTimeline}`]: '/src/modules/rotation-planner/pages/RotationPlannerPage.tsx',
   [`vessel ${CREW_PATHS.plannerManning}`]: '/src/modules/crew/pages/LeavePlannerPage.tsx',
@@ -84,6 +85,7 @@ describe('crew routes', () => {
       else if (r.path === PROFILE_TAB_PATH) expect(r.guard, r.path).toEqual({ kind: 'scope' });
       else if (r.path === ADD_CREW_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.profilesCreate });
       else if (r.path === COMPLIANCE_TAB_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.complianceView });
+      else if (r.path === CREW_PATHS.hoursOfRest) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.horApprove });
       else if (r.scope === 'personal' && r.path === MY_DOCUMENTS_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.documentsViewOwn });
       else expect(r.guard, r.path).toEqual({ kind: 'login' });
     }
@@ -145,7 +147,7 @@ describe('every vessel crew URL of today resolves to its page', () => {
     ['/v/dra/crew/compliance', 'crew/pages/CrewCompliancePage.tsx'],
     ['/v/dra/crew/compliance/status', 'crew/pages/CrewCompliancePage.tsx'],
     ['/v/dra/crew/compliance/configuration', 'crew/pages/CrewCompliancePage.tsx'],
-    ['/v/dra/crew/hours-of-rest', 'work-rest/pages/WorkRestOverview.tsx'],
+    ['/v/dra/crew/hours-of-rest', 'work-rest/pages/HoursOfRestBoardPage.tsx'],
     // X1-07B: one crew member's month is the profile's Hours of rest tab (a login id there is resolved by the page).
     ['/v/dra/crew/people/a0000000-0000-4000-8000-000000000011/hours-of-rest', 'crew/pages/CrewProfilePage.tsx'],
     ['/v/dra/crew/planner', 'rotation-planner/pages/RotationPlannerPage.tsx'],
@@ -223,12 +225,17 @@ describe('crew nav', () => {
   });
 
   it('moved leaves keep live and today\'s gates (no capability until their page is rebuilt, D-X1-25)', () => {
-    for (const label of ['Planner', 'Hours of Rest', 'Familiarisation']) {
+    for (const label of ['Planner', 'Familiarisation']) {
       const node = byLabel(label);
       expect(node.status, label).toBe('live');
       expect(node.capability, label).toBeUndefined();
     }
     expect(byLabel('Planner').moduleSetting).toBe('planner');
+  });
+
+  it('the rebuilt Hours of Rest board is beta behind vessel.crew.hours_of_rest.approve, still closed by crew_hor (X1-08)', () => {
+    expect(byLabel('Hours of Rest').status).toBe('beta');
+    expect(byLabel('Hours of Rest').capability).toBe(CREW_CAPS.horApprove);
     expect(byLabel('Hours of Rest').moduleSetting).toBe('crew_hor');
     expect(byLabel('Hours of Rest').alsoCovers).toEqual(['crew/people/*/hours-of-rest']);
   });

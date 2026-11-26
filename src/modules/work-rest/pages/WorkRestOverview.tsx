@@ -1,309 +1,237 @@
-import React, { useEffect, useMemo, useState } from 'react';
+/**
+ * The legacy vessel overview of hours of rest: one row per crew member, the
+ * rest hours of each day of the month and a compliance word.
+ *
+ * Since X1-08 it is the board's documented fallback (D-01): while
+ * work_rest_vessel_board is missing, HoursOfRestBoardPage shows this body
+ * (WorkRestOverviewBody) under an info strip. Membership is anyone assigned
+ * to the vessel on any day of the month, ended and transferred-out people
+ * included (T-144; listVesselMonthMatrix). Reads through React Query with
+ * the vessel and month in the key; an error says so with Try again. The
+ * old export buttons that did nothing are gone.
+ *
+ * The default export is the page the legacy /crew/work-rest/overview route
+ * still renders (src/routes/index.tsx), on the selected vessel.
+ */
+import React, { useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import {
-  Loader2,
-  Download,
-  ChevronLeft,
-  ChevronRight,
-  Users,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  FileText,
-  FileSpreadsheet,
-  UserRound,
-} from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Users, UserRound, XCircle } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { Card, CardContent } from '@/components/ui/card';
+import PageHeader from '@/shared/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { KpiTile } from '@/shared/components/data/KpiTile';
+import { PageEmpty, PageError, PageLoading } from '@/shared/components/states';
+import { StatusPill } from '@/shared/components/status';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import { useScopedPath, useVesselScope } from '@/app/router/scopes';
-import { listVesselMonthMatrix, type VesselMonthCrewRow } from '../services/workRestService';
 import { cn } from '@/lib/utils';
+import { listVesselMonthMatrix, type VesselMonthCrewRow } from '../services/workRestService';
+import { workRestKeys } from '../hooks/workRestKeys';
+import { MonthNav } from '../components/hor-board/MonthNav';
+import { monthLabel, monthParam, parseMonthParam, type YearMonth } from '../lib/horBoard';
 
-const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const DEPT_ORDER = ['DECK', 'BRIDGE', 'ENGINEERING', 'INTERIOR', 'OTHER'];
 
-const WorkRestOverview: React.FC = () => {
-  const { selectedVessel } = useVessel();
-  const [searchParams, setSearchParams] = useSearchParams();
+/** The legacy matrix of a vessel's month (its keys sit under the vessel's, so the board's writes refresh it). */
+const overviewKey = (vesselId: string, year: number, month: number) => [...workRestKeys.vessel(vesselId), 'overview', year, month] as const;
+
+const STATUS_WORD: Readonly<Record<VesselMonthCrewRow['status'], string>> = {
+  compliant: 'compliant',
+  review: 'warning',
+  non_compliant: 'non_compliant',
+  no_data: 'no_data',
+};
+
+export interface WorkRestOverviewBodyProps {
+  vesselId: string;
+  year: number;
+  month: number;
+}
+
+/** The overview's figures and matrix for one vessel and month. */
+export const WorkRestOverviewBody: React.FC<WorkRestOverviewBodyProps> = ({ vesselId, year, month }) => {
   const inVesselScope = useVesselScope() !== null;
   const scoped = useScopedPath();
-  // A crew member's month, in this vessel's scope (gap/00 B4). The legacy
-  // path is only for the old page rendering outside the scope.
+  const query = useQuery({
+    queryKey: overviewKey(vesselId, year, month),
+    queryFn: () => listVesselMonthMatrix({ vesselId, year, month }),
+    staleTime: 30_000,
+  });
+  const rows = useMemo(() => query.data ?? [], [query.data]);
+  const param = monthParam({ year, month });
+  // A crew member's month, in this vessel's scope (gap/00 B4); the profile page resolves the login id.
   const crewMonthPath = (crewId: string) =>
-    inVesselScope ? scoped(`crew/people/${crewId}/hours-of-rest`) : `/crew/work-rest/${crewId}`;
+    inVesselScope ? `${scoped(`crew/people/${crewId}/hours-of-rest`)}?month=${param}` : `/crew/work-rest/${crewId}?month=${param}`;
 
-  const today = new Date();
-  const year = Number(searchParams.get('year')) || today.getFullYear();
-  const month = Number(searchParams.get('month')) || today.getMonth() + 1;
-
-  const [rows, setRows] = useState<VesselMonthCrewRow[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!selectedVessel?.id) return;
-    setLoading(true);
-    listVesselMonthMatrix({ vesselId: selectedVessel.id, year, month })
-      .then(setRows)
-      .finally(() => setLoading(false));
-  }, [selectedVessel?.id, year, month]);
-
-  const lastDay = useMemo(() => new Date(year, month, 0).getDate(), [year, month]);
+  const lastDay = new Date(year, month, 0).getDate();
   const days = useMemo(() => Array.from({ length: lastDay }, (_, i) => i + 1), [lastDay]);
 
   const grouped = useMemo(() => {
     const map = new Map<string, VesselMonthCrewRow[]>();
     for (const r of rows) {
       const k = r.department || 'OTHER';
-      if (!map.has(k)) map.set(k, []);
-      map.get(k)!.push(r);
+      map.set(k, [...(map.get(k) ?? []), r]);
     }
     const ordered: [string, VesselMonthCrewRow[]][] = [];
-    for (const d of DEPT_ORDER) if (map.has(d)) ordered.push([d, map.get(d)!]);
+    for (const d of DEPT_ORDER) {
+      const list = map.get(d);
+      if (list) ordered.push([d, list]);
+    }
     for (const [k, v] of map) if (!DEPT_ORDER.includes(k)) ordered.push([k, v]);
     return ordered;
   }, [rows]);
 
   const stats = useMemo(() => {
     const total = rows.length;
-    const compliant = rows.filter((r) => r.status === 'compliant').length;
-    const review = rows.filter((r) => r.status === 'review' || r.status === 'no_data').length;
-    const nonCompliant = rows.filter((r) => r.status === 'non_compliant').length;
-    return { total, compliant, review, nonCompliant };
+    return {
+      total,
+      compliant: rows.filter((r) => r.status === 'compliant').length,
+      review: rows.filter((r) => r.status === 'review' || r.status === 'no_data').length,
+      nonCompliant: rows.filter((r) => r.status === 'non_compliant').length,
+    };
   }, [rows]);
 
-  const setParam = (k: string, v: string) => {
-    const next = new URLSearchParams(searchParams);
-    if (v) next.set(k, v);
-    else next.delete(k);
-    setSearchParams(next);
-  };
-
-  const changeMonth = (delta: number) => {
-    let m = month + delta;
-    let y = year;
-    if (m < 1) { m = 12; y -= 1; }
-    if (m > 12) { m = 1; y += 1; }
-    const next = new URLSearchParams(searchParams);
-    next.set('year', String(y));
-    next.set('month', String(m));
-    setSearchParams(next);
-  };
+  if (query.isLoading) return <PageLoading variant="list" rows={6} label="Loading the month" />;
+  if (query.error) return <PageError error={query.error} title="The month could not load" onRetry={() => void query.refetch()} headingLevel={2} />;
+  if (!rows.length) {
+    return <PageEmpty icon={Users} title="Nobody on board this month" body={`No one was assigned to this vessel in ${monthLabel({ year, month })}.`} headingLevel={2} bordered />;
+  }
 
   return (
-    <DashboardLayout>
-      <div className="space-y-4">
-        {/* Header */}
-        <div className="flex items-start justify-between flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Hours of Rest</h1>
-            <p className="text-sm text-muted-foreground">
-              {selectedVessel?.name ?? 'No vessel selected'} — Monthly compliance report
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {/* The signed-in crew member's own monthly entry (R8). */}
-            <Button asChild variant="outline" size="sm">
-              <Link to="/me/hours-of-rest">
-                <UserRound className="h-4 w-4 mr-1.5" /> My hours
-              </Link>
-            </Button>
-            <Button variant="outline" size="sm">
-              <FileText className="h-4 w-4 mr-1.5" /> Summary PDF
-            </Button>
-            <Button variant="outline" size="sm">
-              <FileSpreadsheet className="h-4 w-4 mr-1.5" /> Summary Excel
-            </Button>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-1.5" /> Export All Crew (PDF)
-            </Button>
-          </div>
-        </div>
-
-        {/* Month nav */}
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => changeMonth(-1)}>
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <Select value={String(month)} onValueChange={(v) => setParam('month', v)}>
-            <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {MONTH_NAMES.map((n, i) => (
-                <SelectItem key={i} value={String(i + 1)}>{n}</SelectItem>
+    <div className="min-w-0 space-y-4" data-hor-overview="">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <KpiTile label="Crew" icon={Users} value={stats.total} />
+        <KpiTile
+          label="Compliant"
+          icon={CheckCircle2}
+          value={stats.compliant}
+          tone="ok"
+          sub={stats.total ? `${Math.round((stats.compliant / stats.total) * 100)}% of crew` : undefined}
+        />
+        <KpiTile label="Needs review" icon={AlertTriangle} value={stats.review} tone="warn" />
+        <KpiTile label="Non-compliant" icon={XCircle} value={stats.nonCompliant} tone="danger" />
+      </div>
+      <p className="type-caption text-muted-foreground">Open a crew member to see their month.</p>
+      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+        <table className="w-full border-collapse type-caption">
+          <caption className="sr-only">Rest hours by day, {monthLabel({ year, month })}</caption>
+          <thead>
+            <tr className="border-b border-border bg-muted/40">
+              <th scope="col" className="sticky left-0 z-10 min-w-[180px] bg-muted/40 px-3 py-2 text-left">
+                Crew member
+              </th>
+              <th scope="col" className="min-w-[110px] px-2 py-2 text-left">
+                Compliance
+              </th>
+              {days.map((d) => (
+                <th key={d} scope="col" className="min-w-[28px] px-1 py-2 text-center font-medium text-muted-foreground">
+                  {d}
+                </th>
               ))}
-            </SelectContent>
-          </Select>
-          <Select value={String(year)} onValueChange={(v) => setParam('year', v)}>
-            <SelectTrigger className="w-[110px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {Array.from({ length: 5 }, (_, i) => today.getFullYear() - 2 + i).map((y) => (
-                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => changeMonth(1)}>
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-          <span className="ml-2 text-sm text-muted-foreground">
-            {MONTH_NAMES[month - 1]} {year}
-          </span>
-        </div>
-
-        {/* Stat cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <StatCard label="TOTAL CREW" value={stats.total} icon={<Users className="h-4 w-4" />} tone="default" />
-          <StatCard
-            label="COMPLIANT"
-            value={stats.compliant}
-            sub={stats.total ? `${Math.round((stats.compliant / stats.total) * 100)}% of crew` : undefined}
-            icon={<CheckCircle2 className="h-4 w-4" />}
-            tone="success"
-          />
-          <StatCard label="REQUIRES REVIEW" value={stats.review} icon={<AlertTriangle className="h-4 w-4" />} tone="warning" />
-          <StatCard label="NON-COMPLIANT" value={stats.nonCompliant} icon={<XCircle className="h-4 w-4" />} tone="danger" />
-        </div>
-
-        <p className="text-xs text-muted-foreground">
-          Click any crew member to view their individual monthly timesheet
-        </p>
-
-        {/* Matrix */}
-        <Card>
-          <CardContent className="p-0 overflow-x-auto">
-            {loading ? (
-              <div className="p-6 flex items-center gap-2 text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" /> Loading…
-              </div>
-            ) : rows.length === 0 ? (
-              <div className="p-6 text-sm text-muted-foreground">
-                No crew assigned to this vessel.
-              </div>
-            ) : (
-              <table className="w-full text-xs border-collapse">
-                <thead>
-                  <tr className="bg-muted/40 border-b">
-                    <th className="text-left px-3 py-2 sticky left-0 bg-muted/40 z-10 min-w-[180px]">Crew Member</th>
-                    <th className="text-left px-2 py-2 min-w-[100px]">Compliance</th>
+              <th scope="col" className="min-w-[64px] px-2 py-2 text-right">
+                Avg rest
+              </th>
+              <th scope="col" className="min-w-[60px] px-2 py-2 text-right">
+                Logged
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {grouped.map(([dept, deptRows]) => (
+              <React.Fragment key={dept}>
+                <tr className="border-b border-border bg-muted/20">
+                  <th scope="rowgroup" colSpan={days.length + 4} className="px-3 py-1.5 text-left type-eyebrow text-muted-foreground">
+                    {dept}
+                  </th>
+                </tr>
+                {deptRows.map((r) => (
+                  <tr key={r.crew_id} className="border-b border-border transition-colors hover:bg-muted/30">
+                    <th scope="row" className="sticky left-0 z-10 bg-card px-3 py-2 text-left font-normal">
+                      <Link to={crewMonthPath(r.crew_id)} className="focus-ring block rounded-sm">
+                        <span className="block font-medium text-foreground hover:text-primary">{r.crew_name}</span>
+                        <span className="block text-muted-foreground">{r.rank}</span>
+                      </Link>
+                    </th>
+                    <td className="px-2 py-2">
+                      <StatusPill domain="work_rest_compliance" status={STATUS_WORD[r.status]} label={r.status === 'review' ? 'Review' : undefined} />
+                    </td>
                     {days.map((d) => (
-                      <th key={d} className="px-1 py-2 text-center font-medium text-muted-foreground min-w-[28px]">{d}</th>
+                      <td key={d} className="p-0.5 text-center">
+                        <DayCell hours={r.rest_by_day[d]} compliant={r.compliant_by_day[d]} />
+                      </td>
                     ))}
-                    <th className="text-right px-2 py-2 min-w-[64px]">Avg Rest</th>
-                    <th className="text-right px-2 py-2 min-w-[60px]">Logged</th>
+                    <td className="px-2 py-2 text-right font-medium tabular-nums">{r.avg_rest != null ? `${r.avg_rest.toFixed(1)} h` : '–'}</td>
+                    <td
+                      className={cn(
+                        'px-2 py-2 text-right font-medium tabular-nums',
+                        r.logged_pct >= 80 ? 'text-success' : r.logged_pct >= 40 ? 'text-warning' : 'text-muted-foreground',
+                      )}
+                    >
+                      {r.logged_pct}%
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {grouped.map(([dept, deptRows]) => (
-                    <React.Fragment key={dept}>
-                      <tr className="bg-muted/20 border-b">
-                        <td colSpan={days.length + 4} className="px-3 py-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground">
-                          {dept}
-                        </td>
-                      </tr>
-                      {deptRows.map((r) => (
-                        <tr key={r.crew_id} className="border-b hover:bg-muted/30 transition-colors">
-                          <td className="px-3 py-2 sticky left-0 bg-card z-10">
-                            <Link to={`${crewMonthPath(r.crew_id)}?year=${year}&month=${month}`} className="block">
-                              <div className="font-medium text-foreground hover:text-primary">{r.crew_name}</div>
-                              <div className="text-[10px] text-muted-foreground">{r.rank}</div>
-                            </Link>
-                          </td>
-                          <td className="px-2 py-2">
-                            <StatusBadge status={r.status} />
-                          </td>
-                          {days.map((d) => {
-                            const hours = r.rest_by_day[d];
-                            const compliant = r.compliant_by_day[d];
-                            return (
-                              <td key={d} className="p-0.5 text-center">
-                                <DayCell hours={hours} compliant={compliant} />
-                              </td>
-                            );
-                          })}
-                          <td className="px-2 py-2 text-right tabular-nums font-medium">
-                            {r.avg_rest != null ? `${r.avg_rest.toFixed(1)}h` : '—'}
-                          </td>
-                          <td className={cn('px-2 py-2 text-right tabular-nums font-medium',
-                            r.logged_pct >= 80 ? 'text-success' : r.logged_pct >= 40 ? 'text-warning' : 'text-muted-foreground'
-                          )}>
-                            {r.logged_pct}%
-                          </td>
-                        </tr>
-                      ))}
-                    </React.Fragment>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </CardContent>
-        </Card>
+                ))}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
       </div>
-    </DashboardLayout>
-  );
-};
-
-const StatCard: React.FC<{
-  label: string;
-  value: number;
-  sub?: string;
-  icon: React.ReactNode;
-  tone: 'default' | 'success' | 'warning' | 'danger';
-}> = ({ label, value, sub, icon, tone }) => {
-  const toneClass = {
-    default: 'border-border bg-card',
-    success: 'border-success/30 bg-success/5',
-    warning: 'border-warning/30 bg-warning/5',
-    danger: 'border-destructive/30 bg-destructive/5',
-  }[tone];
-  const iconClass = {
-    default: 'text-muted-foreground',
-    success: 'text-success',
-    warning: 'text-warning',
-    danger: 'text-destructive',
-  }[tone];
-  return (
-    <div className={cn('rounded-lg border p-4', toneClass)}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] font-semibold tracking-wider text-muted-foreground">{label}</span>
-        <span className={iconClass}>{icon}</span>
-      </div>
-      <div className="text-3xl font-bold tabular-nums">{value}</div>
-      {sub && <div className="text-xs text-muted-foreground mt-0.5">{sub}</div>}
     </div>
   );
 };
 
-const StatusBadge: React.FC<{ status: VesselMonthCrewRow['status'] }> = ({ status }) => {
-  if (status === 'compliant') return <Badge className="bg-success/15 text-success border-success/30 hover:bg-success/15">Compliant</Badge>;
-  if (status === 'non_compliant') return <Badge className="bg-destructive/15 text-destructive border-destructive/30 hover:bg-destructive/15">Non-compliant</Badge>;
-  if (status === 'review') return <Badge className="bg-warning/15 text-warning border-warning/30 hover:bg-warning/15">Review</Badge>;
-  return <Badge variant="outline" className="text-muted-foreground">No data</Badge>;
-};
-
-const DayCell: React.FC<{ hours: number | null; compliant: boolean | null }> = ({ hours, compliant }) => {
-  if (hours == null) {
-    return <span className="block text-muted-foreground/50 text-[11px]">—</span>;
-  }
+const DayCell: React.FC<{ hours: number | null | undefined; compliant: boolean | null | undefined }> = ({ hours, compliant }) => {
+  if (hours == null) return <span className="block text-muted-foreground/60">–</span>;
   const formatted = hours % 1 === 0 ? hours.toFixed(0) : hours.toFixed(1);
   if (compliant === false) {
     return (
-      <span className="inline-flex items-center justify-center min-w-[26px] h-6 rounded bg-destructive text-destructive-foreground text-[11px] font-semibold tabular-nums">
+      <span className="inline-flex h-6 min-w-[26px] items-center justify-center rounded-sm bg-critical font-semibold tabular-nums text-critical-foreground" title="Breach">
         {formatted}
+        <span className="sr-only"> h, breach</span>
       </span>
     );
   }
+  return <span className="inline-flex h-6 min-w-[26px] items-center justify-center tabular-nums text-foreground">{formatted}</span>;
+};
+
+/** The legacy page (/crew/work-rest/overview): the selected vessel's month. */
+const WorkRestOverview: React.FC = () => {
+  const { selectedVessel } = useVessel();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const now = new Date();
+  const current: YearMonth = { year: now.getFullYear(), month: now.getMonth() + 1 };
+  const place = parseMonthParam(searchParams.get('month'), searchParams.get('year')) ?? current;
+  const setPlace = (next: YearMonth) => {
+    const params = new URLSearchParams(searchParams);
+    params.delete('year');
+    params.set('month', monthParam(next));
+    setSearchParams(params);
+  };
+
   return (
-    <span className="inline-flex items-center justify-center min-w-[26px] h-6 text-foreground text-[11px] tabular-nums">
-      {formatted}
-    </span>
+    <DashboardLayout>
+      <div className="min-w-0 space-y-4">
+        <PageHeader
+          eyebrow={selectedVessel?.name ?? 'No vessel selected'}
+          title="Hours of rest"
+          description="Rest hours by day for everyone on board in the month."
+          actions={
+            <Button asChild variant="outline" size="sm">
+              <Link to="/me/hours-of-rest">
+                <UserRound aria-hidden="true" /> My hours
+              </Link>
+            </Button>
+          }
+        />
+        <MonthNav value={place} current={current} onChange={setPlace} />
+        {selectedVessel?.id ? (
+          <WorkRestOverviewBody vesselId={selectedVessel.id} year={place.year} month={place.month} />
+        ) : (
+          <PageEmpty title="Choose a vessel" body="Hours of rest belong to a vessel. Pick one in the vessel switcher." headingLevel={2} />
+        )}
+      </div>
+    </DashboardLayout>
   );
 };
 
