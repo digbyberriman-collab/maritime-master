@@ -30,6 +30,13 @@ export const fleetDocumentKeys = {
   taxonomy: (companyId: string | null | undefined) => [...company(companyId), 'taxonomy'] as const,
   /** Documents, their current and draft versions, and their targets. */
   library: (companyId: string | null | undefined) => [...company(companyId), 'library'] as const,
+  /**
+   * One document as the version history and the publish dialog read it:
+   * the document, every version the reader may see (superseded ones
+   * included), its targets and the names of the people who acted (X5-04B).
+   */
+  document: (companyId: string | null | undefined, documentId: string | null | undefined) =>
+    [...company(companyId), 'document', documentId ?? NONE] as const,
   /** A filtered view of the library (normalised: trimmed, lower-case search). */
   libraryView: (companyId: string | null | undefined, filters: FleetDocumentLibraryFilters) =>
     [

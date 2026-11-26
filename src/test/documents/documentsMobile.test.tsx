@@ -8,26 +8,33 @@
  * - Below 1024 px the filter column becomes a "Filters" button that opens the
  *   same controls in a sheet; from 1024 px the column sits beside the list.
  * - Status chips come from the status registry (StatusPill), not raw palette.
+ * - X5-04B: `?category=` opens the register on that category (the legacy
+ *   sample-data pages redirect there, gap/00 K1) and the filters write it
+ *   back; in print the card has no fixed height or inner scroller, the
+ *   filters and controls are left off, and rows are not split (BUILD-PLAN
+ *   Phase 1 open item: the list clipped on A4 landscape).
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import type { Document } from '@/modules/documents/hooks/useDocuments';
 
 const state = vi.hoisted(() => ({
   width: 390,
   documents: [] as unknown[],
   isLoading: false,
+  filters: [] as { categories: string[] }[],
 }));
 
 vi.mock('@/shared/components/layout/DashboardLayout', () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock('@/modules/documents/hooks/useDocuments', () => ({
-  useDocuments: () => ({ data: state.documents, isLoading: state.isLoading }),
-  useDocumentCategories: () => ({
-    data: [{ id: 'cat-1', name: 'Manuals', icon: 'book-open', color: 'hsl(var(--chart-1))', display_order: 1 }],
-  }),
+  useDocuments: (filters: { categories: string[] }) => {
+    state.filters.push(filters);
+    return { data: state.documents, isLoading: state.isLoading };
+  },
+  useDocumentCategories: () => ({ data: CATEGORIES }),
 }));
 vi.mock('@/modules/vessels/hooks/useVessels', () => ({ useVessels: () => ({ vessels: [{ id: 'v-1', name: 'DRAAK' }] }) }));
 vi.mock('@/modules/documents/components/UploadDocumentModal', () => ({ default: () => null }));
@@ -37,7 +44,14 @@ vi.mock('@/modules/documents/components/DocumentViewerModal', () => ({
 }));
 vi.mock('@/modules/documents/components/DeleteDocumentDialog', () => ({ default: () => null }));
 
+const CATEGORIES = vi.hoisted(() => [
+  { id: 'cat-1', name: 'Manuals', icon: 'book-open', color: 'hsl(var(--chart-1))', display_order: 1 },
+  { id: 'cat-2', name: 'Procedures', icon: 'list', color: 'hsl(var(--chart-2))', display_order: 2 },
+  { id: 'cat-3', name: 'ISM / SMS', icon: 'file', color: 'hsl(var(--chart-3))', display_order: 3 },
+]);
+
 import Documents from '@/modules/documents/pages/Documents';
+import { categoryIdsForParam, categoryParamFor, categorySlug } from '@/modules/documents/lib/documentFilters';
 
 const doc = (id: string, title: string, status: string, extra: Partial<Document> = {}): Document => ({
   id,
@@ -95,6 +109,7 @@ function installMatchMedia() {
 let restore: () => void = () => undefined;
 
 beforeEach(() => {
+  state.filters = [];
   state.width = 390;
   state.isLoading = false;
   state.documents = [
@@ -107,12 +122,20 @@ beforeEach(() => {
 
 afterEach(() => restore());
 
-const renderPage = () =>
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location">{`${location.pathname}${location.search}`}</output>;
+}
+
+const renderPage = (path = '/fleet/documents/register') =>
   render(
-    <MemoryRouter initialEntries={['/fleet/documents']}>
+    <MemoryRouter initialEntries={[path]}>
       <Documents />
+      <LocationProbe />
     </MemoryRouter>,
   );
+
+const lastFilters = () => state.filters[state.filters.length - 1];
 
 describe('documents at 390 px', () => {
   it('renders one PageHeader with the page title', () => {
@@ -188,5 +211,75 @@ describe('documents on wider screens', () => {
     renderPage();
     expect(screen.getByRole('complementary', { name: 'Document filters' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /^filters/i })).toBeNull();
+  });
+});
+
+describe('the register category from the URL (gap/00 K1)', () => {
+  it('matches names and slugs without case, accents or punctuation, singular or plural', () => {
+    expect(categorySlug('ISM / SMS')).toBe('ism-sms');
+    expect(categoryIdsForParam(CATEGORIES, 'manuals')).toEqual(['cat-1']);
+    expect(categoryIdsForParam(CATEGORIES, 'Manual')).toEqual(['cat-1']);
+    expect(categoryIdsForParam(CATEGORIES, 'procedures,ism-sms')).toEqual(['cat-2', 'cat-3']);
+    expect(categoryIdsForParam(CATEGORIES, 'policies')).toEqual([]);
+    expect(categoryIdsForParam(CATEGORIES, '')).toEqual([]);
+    expect(categoryParamFor(CATEGORIES, ['cat-3', 'cat-1'])).toBe('manuals,ism-sms');
+    expect(categoryParamFor(CATEGORIES, [])).toBeNull();
+  });
+
+  it('?category=manuals opens the register on Manuals (where /documents/manuals lands)', () => {
+    state.width = 1440;
+    renderPage('/fleet/documents/register?category=manuals');
+    expect(lastFilters().categories).toEqual(['cat-1']);
+    expect(screen.getByRole('checkbox', { name: /Manuals/ })).toBeChecked();
+    expect(screen.queryByText(/has no category called/)).toBeNull();
+  });
+
+  it('an unknown category says so and shows every document', () => {
+    state.width = 1440;
+    renderPage('/fleet/documents/register?category=policies');
+    expect(lastFilters().categories).toEqual([]);
+    expect(screen.getByText('The register has no category called “policies”, so every document is shown.')).toBeInTheDocument();
+  });
+
+  it('choosing categories in the filters writes them back to the link', () => {
+    state.width = 1440;
+    renderPage('/fleet/documents/register?category=manuals');
+    fireEvent.click(screen.getByRole('checkbox', { name: /Procedures/ }));
+    expect(screen.getByTestId('location')).toHaveTextContent('/fleet/documents/register?category=manuals%2Cprocedures');
+    fireEvent.click(screen.getByRole('checkbox', { name: /Manuals/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: /Procedures/ }));
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/fleet\/documents\/register$/);
+    expect(lastFilters().categories).toEqual([]);
+  });
+});
+
+describe('printing the register (A4 landscape)', () => {
+  it('drops the fixed height and the inner scroller in print, even where lg: applies', () => {
+    state.width = 1440;
+    renderPage();
+    const card = screen.getByTestId('document-register');
+    expect(card.className).toContain('lg:h-[calc(100dvh-14rem)]');
+    // print:! beats lg:, which Tailwind emits after print:.
+    for (const cls of ['print:!h-auto', 'print:!min-h-0', 'print:!overflow-visible', 'print:block']) expect(card.className).toContain(cls);
+    const list = screen.getByTestId('document-register-list');
+    expect(list.className).toContain('lg:overflow-auto');
+    expect(list.className).toContain('print:!overflow-visible');
+    expect(screen.getByRole('toolbar', { name: 'Document list controls' }).className).toContain('print:hidden');
+    expect(screen.getByRole('complementary', { name: 'Document filters' }).parentElement?.className).toContain('print:hidden');
+    for (const card of within(screen.getByRole('list', { name: 'Documents' })).getAllByRole('listitem')) expect(card.className).toContain('print:break-inside-avoid');
+  });
+
+  it('the table prints whole: no sideways scroll, wrapped titles, rows kept together, no actions column', () => {
+    state.width = 1440;
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Table' }));
+    const wrapper = screen.getByTestId('document-register-table');
+    expect(wrapper.className).toContain('overflow-x-auto');
+    expect(wrapper.className).toContain('print:overflow-visible');
+    const table = screen.getByRole('table');
+    expect(within(table).getByRole('columnheader', { name: 'Actions' }).className).toContain('print:hidden');
+    const rows = within(table).getAllByRole('row').slice(1);
+    expect(rows.every((r) => r.className.includes('print:break-inside-avoid'))).toBe(true);
+    expect(within(rows[0]).getByRole('button', { name: 'Safety Management Manual' }).className).toContain('print:whitespace-normal');
   });
 });

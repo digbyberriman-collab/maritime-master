@@ -1,5 +1,20 @@
-import React, { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+/**
+ * The controlled document register (`/fleet/documents/register`; gap/05,
+ * gap/02 FD2; D-27). Manuals, procedures, policies and drawings with their
+ * review cycle; the fleet library of published documents is
+ * `/fleet/documents`.
+ *
+ * - `?category=<name>` opens the register on that category (the legacy
+ *   `/documents/manuals`, `/policies` and `/procedures` redirect here,
+ *   gap/00 K1); an unknown name says so and shows every document. Choosing
+ *   categories in the filters writes them back, so the link stays true.
+ * - Print (BUILD-PLAN Phase 1 open item): the card drops its fixed height
+ *   and inner scroller, the filter column and the list controls are left
+ *   off the page, and cards are not split across pages, so the whole list
+ *   prints on A4 landscape instead of the part that fitted the scroller.
+ */
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import PageHeader from '@/shared/components/layout/PageHeader';
 import DocumentFilters from '@/modules/documents/components/DocumentFilters';
@@ -8,8 +23,14 @@ import DocumentTable from '@/modules/documents/components/DocumentTable';
 import UploadDocumentModal from '@/modules/documents/components/UploadDocumentModal';
 import DeleteDocumentDialog from '@/modules/documents/components/DeleteDocumentDialog';
 import DocumentViewerModal from '@/modules/documents/components/DocumentViewerModal';
-import { useDocuments, Document, DocumentFilters as Filters } from '@/modules/documents/hooks/useDocuments';
-import { activeFilterCount, EMPTY_DOCUMENT_FILTERS } from '@/modules/documents/lib/documentFilters';
+import { useDocumentCategories, useDocuments, Document, DocumentFilters as Filters } from '@/modules/documents/hooks/useDocuments';
+import {
+  activeFilterCount,
+  categoryIdsForParam,
+  categoryParamFor,
+  EMPTY_DOCUMENT_FILTERS,
+  REGISTER_CATEGORY_PARAM,
+} from '@/modules/documents/lib/documentFilters';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -45,7 +66,40 @@ const Documents: React.FC = () => {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortBy, setSortBy] = useState<SortOption>('updated_at');
-  const [filters, setFilters] = useState<Filters>(EMPTY_DOCUMENT_FILTERS);
+  const [filters, setFiltersState] = useState<Filters>(EMPTY_DOCUMENT_FILTERS);
+  const [params, setParams] = useSearchParams();
+  const categoryParam = params.get(REGISTER_CATEGORY_PARAM);
+  const { data: categories } = useDocumentCategories();
+  // ?category= is applied once the categories are known, and again whenever the link changes.
+  const appliedCategoryParam = useRef<string | null>(null);
+  const [unknownCategory, setUnknownCategory] = useState<string | null>(null);
+  useEffect(() => {
+    if (!categories || appliedCategoryParam.current === categoryParam) return;
+    appliedCategoryParam.current = categoryParam;
+    if (!categoryParam) return;
+    const ids = categoryIdsForParam(categories, categoryParam);
+    setUnknownCategory(ids.length ? null : categoryParam);
+    setFiltersState((current) => ({ ...current, categories: ids }));
+  }, [categories, categoryParam]);
+
+  /** Filters change here; the chosen categories are written back to ?category=. */
+  const setFilters = (next: Filters) => {
+    setFiltersState(next);
+    setUnknownCategory(null);
+    if (!categories) return;
+    const value = categoryParamFor(categories, next.categories);
+    if (value === categoryParam) return;
+    appliedCategoryParam.current = value;
+    setParams(
+      (current) => {
+        const updated = new URLSearchParams(current);
+        if (value) updated.set(REGISTER_CATEGORY_PARAM, value);
+        else updated.delete(REGISTER_CATEGORY_PARAM);
+        return updated;
+      },
+      { replace: true },
+    );
+  };
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [uploadModalOpen, setUploadModalOpen] = useState(false);
   const [viewModalOpen, setViewModalOpen] = useState(false);
@@ -114,11 +168,11 @@ const Documents: React.FC = () => {
         description="Controlled manuals, procedures, policies and drawings for the fleet."
         actions={
           <>
-            <Button variant="outline" className="hidden sm:inline-flex" onClick={() => navigate('/documents/master-index')}>
+            <Button variant="outline" className="hidden sm:inline-flex print:hidden" onClick={() => navigate('/documents/master-index')}>
               <ClipboardList aria-hidden="true" className="mr-2 h-4 w-4" />
               Master document index
             </Button>
-            <Button onClick={() => setUploadModalOpen(true)}>
+            <Button className="print:hidden" onClick={() => setUploadModalOpen(true)}>
               <Upload aria-hidden="true" className="mr-2 h-4 w-4" />
               Upload document
             </Button>
@@ -126,12 +180,25 @@ const Documents: React.FC = () => {
         }
       />
 
-      <Card className="flex min-w-0 overflow-hidden lg:h-[calc(100dvh-14rem)] lg:min-h-[28rem]">
-        {hasFilterColumn ? <DocumentFilters filters={filters} onFiltersChange={setFilters} /> : null}
+      {unknownCategory ? (
+        <p role="status" className="mb-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground print:hidden">
+          {`The register has no category called “${unknownCategory}”, so every document is shown.`}
+        </p>
+      ) : null}
 
-        <div className="flex min-w-0 flex-1 flex-col">
+      <Card
+        data-testid="document-register"
+        className="flex min-w-0 overflow-hidden lg:h-[calc(100dvh-14rem)] lg:min-h-[28rem] print:block print:!h-auto print:!min-h-0 print:!overflow-visible print:border-0 print:shadow-none"
+      >
+        {hasFilterColumn ? (
+          <div className="contents print:hidden">
+            <DocumentFilters filters={filters} onFiltersChange={setFilters} />
+          </div>
+        ) : null}
+
+        <div className="flex min-w-0 flex-1 flex-col print:block">
           {/* Toolbar: wraps on narrow screens; controls are 44 px on touch (D-35). */}
-          <div role="toolbar" aria-label="Document list controls" className="flex flex-wrap items-center gap-2 border-b border-border p-3 lg:p-4">
+          <div role="toolbar" aria-label="Document list controls" className="flex flex-wrap items-center gap-2 border-b border-border p-3 lg:p-4 print:hidden">
             <div className="relative min-w-0 flex-[1_1_16rem]">
               <Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -194,8 +261,13 @@ const Documents: React.FC = () => {
             ) : null}
           </div>
 
-          {/* Document list/grid: scrolls inside the card on desktop, with the page below 1024 px. */}
-          <div className="min-w-0 flex-1 p-3 lg:overflow-auto lg:p-4" data-view={effectiveView}>
+          {/* Document list/grid: scrolls inside the card on desktop, with the page below 1024 px; never in print
+            (the important modifier: the print rule must beat lg:, which Tailwind emits after it). */}
+          <div
+            data-testid="document-register-list"
+            className="min-w-0 flex-1 p-3 lg:overflow-auto lg:p-4 print:!overflow-visible print:!p-0"
+            data-view={effectiveView}
+          >
             {isLoading ? (
               <div role="status" aria-busy="true">
                 {effectiveView === 'grid' ? (
@@ -229,9 +301,9 @@ const Documents: React.FC = () => {
                 }
               />
             ) : effectiveView === 'grid' ? (
-              <ul aria-label="Documents" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+              <ul aria-label="Documents" className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 print:!grid-cols-3">
                 {sortedDocuments.map((doc) => (
-                  <li key={doc.id} className="min-w-0">
+                  <li key={doc.id} className="min-w-0 print:break-inside-avoid">
                     <DocumentCard
                       document={doc}
                       onView={handleView}

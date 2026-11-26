@@ -302,6 +302,11 @@ SELECT tests.results_eq($q$SELECT version_no, version_label, file_object_id, cha
                         format($q$VALUES (1, 'Issue 1'::text, %L::uuid, true)$q$, :'f2'), 'version: one draft, its file and label replaced');
 SELECT tests.is((SELECT count(*) FROM public.fleet_document_events WHERE document_id = pg_temp.id('doc:sms') AND action IN ('version_added', 'version_replaced')), 2::bigint,
                 'version: one event for the add and one for the replace');
+-- The publish dialog (X5-04B) publishes against the updated_at add_version returns on the
+-- version: the version and the document are written by one call, with one now().
+SELECT tests.is((SELECT updated_at FROM public.fleet_document_versions WHERE id = pg_temp.id('ver:sms1')),
+                (SELECT updated_at FROM public.fleet_documents WHERE id = pg_temp.id('doc:sms')),
+                'version: the version''s updated_at is the document''s (the publish dialog chains on it)');
 
 SELECT tests.throws_like(format($q$SELECT public.fleet_document_publish(%L, %L, %L)$q$, pg_temp.id('doc:sms'), pg_temp.id('ver:sms1'), (SELECT updated_at FROM public.fleet_documents WHERE id = pg_temp.id('doc:sms'))),
                          '22023', 'targets_required', 'publish: a selected document without targets is refused');

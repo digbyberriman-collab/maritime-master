@@ -20,6 +20,12 @@
  *   (the live register at /fleet/documents/register), and "Library
  *   settings" for editors (`fleet.operations.fleet_documents.edit`).
  * - Acknowledgements tab: says it is not set up yet (X5-05B builds it).
+ * - Publishing (X5-04B; gap/02 FD3, FD4, W1), for editors only:
+ *   "Publish document" in the header (and on each "Not uploaded" type
+ *   slot) opens PublishDocumentDialog; a row's menu finishes a draft,
+ *   uploads a new version, withdraws (WithdrawDocumentDialog) or deletes a
+ *   draft (DeleteDraftDialog). Every reader opens a row's version history
+ *   (VersionHistoryDrawer) by clicking it or from its menu.
  *
  * D-01: while the library's tables are missing the page says "Fleet
  * documents are not set up yet" with a link to the register; any other
@@ -29,9 +35,16 @@
 import React, { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { BookOpen, FileText, Library, RefreshCw, Settings2 } from 'lucide-react';
+import { BookOpen, FilePlus2, FileText, History, Library, MoreHorizontal, RefreshCw, Settings2, Trash2, Undo2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useCapability } from '@/lib/permissions/useCan';
@@ -44,6 +57,10 @@ import { StatusPill } from '@/shared/components/status';
 import { useBrandingContext } from '@/shared/contexts/BrandingContext';
 import { useFleetVesselsShown, type ShownVessel } from '@/modules/fleet';
 import { DocumentSettingsDrawer } from '../components/DocumentSettingsDrawer';
+import { PublishDocumentDialog } from '../components/PublishDocumentDialog';
+import { VersionHistoryDrawer } from '../components/VersionHistoryDrawer';
+import { DeleteDraftDialog, WithdrawDocumentDialog } from '../components/WithdrawDocumentDialog';
+import { fleetDocumentActions } from '../lib/fleetDocumentMachine';
 import { fleetDocumentKeys } from '../hooks/keys';
 import { useFleetDocuments } from '../hooks/useFleetDocuments';
 import { useFleetDocumentTaxonomy } from '../hooks/useFleetDocumentTaxonomy';
@@ -76,6 +93,23 @@ const parseTab = (value: string | null): Tab => (value === 'acknowledgements' ? 
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
 
+/** The one dialog or drawer open over the library (X5-04B). */
+type Overlay =
+  | { kind: 'publish'; document: LibraryRow | null; typeId: string | null }
+  | { kind: 'history'; document: LibraryRow }
+  | { kind: 'withdraw'; document: LibraryRow }
+  | { kind: 'delete'; document: LibraryRow }
+  | null;
+
+/** What a row (or a type slot) can open. */
+interface LibraryActions {
+  openHistory: (row: LibraryRow) => void;
+  /** Editors only: publish a new document (optionally of a type), finish a draft, or upload a new version. */
+  publish: ((row: LibraryRow | null, typeId?: string | null) => void) | null;
+  withdraw: ((row: LibraryRow) => void) | null;
+  deleteDraft: ((row: LibraryRow) => void) | null;
+}
+
 const FleetDocumentsPage: React.FC = () => {
   const access = useCapability(DOCUMENTS_CAPS.view);
   if (access.status === 'loading') return <PageLoading variant="list" label="Loading fleet documents" />;
@@ -103,6 +137,8 @@ function FleetDocumentsBody() {
   const documents = useFleetDocuments(companyId);
   const shown = useFleetVesselsShown();
   const queryClient = useQueryClient();
+  const [overlay, setOverlay] = useState<Overlay>(null);
+  const closeOverlay = () => setOverlay(null);
 
   const vessels = useMemo<LibraryVessel[]>(
     () => (shown.status === 'ready' ? shown.vessels.map((v: ShownVessel) => ({ id: v.id, name: v.name, code: v.code, counted: v.counted })) : []),
@@ -129,6 +165,14 @@ function FleetDocumentsBody() {
   const stamps = [taxonomy, documents].flatMap((s) => (s.state === 'ready' ? [s.updatedAt] : []));
   const updatedAt = stamps.length === 2 ? Math.min(...stamps) : null;
   const notSetUp = taxonomy.state === 'not_set_up' || documents.state === 'not_set_up';
+  const types = taxonomy.state === 'ready' ? taxonomy.taxonomy.types : [];
+  const canPublish = edit.allowed && !notSetUp && library !== null && types.length > 0;
+  const actions: LibraryActions = {
+    openHistory: (row) => setOverlay({ kind: 'history', document: row }),
+    publish: canPublish ? (row, typeId = null) => setOverlay({ kind: 'publish', document: row, typeId }) : null,
+    withdraw: edit.allowed ? (row) => setOverlay({ kind: 'withdraw', document: row }) : null,
+    deleteDraft: edit.allowed ? (row) => setOverlay({ kind: 'delete', document: row }) : null,
+  };
 
   const header = (
     <PageHeader
@@ -158,6 +202,12 @@ function FleetDocumentsBody() {
             <Button type="button" variant="outline" size="sm" className={COARSE} onClick={() => setParam(FLEET_DOCUMENTS_PARAMS.settings, '1')}>
               <Settings2 aria-hidden="true" className="h-4 w-4" />
               Library settings
+            </Button>
+          ) : null}
+          {canPublish ? (
+            <Button type="button" size="sm" className={COARSE} onClick={() => setOverlay({ kind: 'publish', document: null, typeId: null })}>
+              <FilePlus2 aria-hidden="true" className="h-4 w-4" />
+              Publish document
             </Button>
           ) : null}
         </>
@@ -241,11 +291,48 @@ function FleetDocumentsBody() {
           bordered
         />
       ) : library ? (
-        <LibraryView library={library} vessels={vessels} canEdit={edit.allowed} params={params} setParam={setParam} />
+        <LibraryView library={library} vessels={vessels} canEdit={edit.allowed} actions={actions} params={params} setParam={setParam} />
       ) : (
         <PageLoading variant="list" label="Loading fleet documents" />
       )}
       {drawer}
+      {library ? (
+        <>
+          <PublishDocumentDialog
+            open={overlay?.kind === 'publish'}
+            onOpenChange={(open) => (!open ? closeOverlay() : undefined)}
+            companyId={companyId}
+            types={types}
+            sections={taxonomy.state === 'ready' ? taxonomy.taxonomy.sections : []}
+            vessels={shown.status === 'ready' ? shown.vessels : []}
+            fleetGroups={shown.status === 'ready' ? shown.fleetGroups : []}
+            document={overlay?.kind === 'publish' ? overlay.document : null}
+            initialTypeId={overlay?.kind === 'publish' ? overlay.typeId : null}
+          />
+          <VersionHistoryDrawer
+            open={overlay?.kind === 'history'}
+            onOpenChange={(open) => (!open ? closeOverlay() : undefined)}
+            companyId={companyId}
+            document={overlay?.kind === 'history' ? overlay.document : null}
+            vessels={vessels}
+            canEdit={edit.allowed}
+            onPublish={actions.publish ? (row) => actions.publish?.(row) : undefined}
+            onWithdraw={actions.withdraw ?? undefined}
+          />
+          <WithdrawDocumentDialog
+            open={overlay?.kind === 'withdraw'}
+            onOpenChange={(open) => (!open ? closeOverlay() : undefined)}
+            companyId={companyId}
+            document={overlay?.kind === 'withdraw' ? overlay.document : null}
+          />
+          <DeleteDraftDialog
+            open={overlay?.kind === 'delete'}
+            onOpenChange={(open) => (!open ? closeOverlay() : undefined)}
+            companyId={companyId}
+            document={overlay?.kind === 'delete' ? overlay.document : null}
+          />
+        </>
+      ) : null}
     </div>
   );
 }
@@ -256,13 +343,14 @@ interface LibraryViewProps {
   library: FleetDocumentLibrary;
   vessels: readonly LibraryVessel[];
   canEdit: boolean;
+  actions: LibraryActions;
   params: URLSearchParams;
   setParam: (key: string, value: string | null) => void;
 }
 
 const ALL = '__all__';
 
-function LibraryView({ library, vessels, canEdit, params, setParam }: LibraryViewProps) {
+function LibraryView({ library, vessels, canEdit, actions, params, setParam }: LibraryViewProps) {
   const wide = useMinWidth(TABLET_MIN_WIDTH);
   const rail = useMinWidth(RAIL_MIN_WIDTH);
   const [search, setSearch] = useState('');
@@ -424,11 +512,15 @@ function LibraryView({ library, vessels, canEdit, params, setParam }: LibraryVie
               icon: FileText,
               title: 'Nothing published yet',
               body: 'Documents the company publishes to its vessels appear here, grouped by section.',
+              action: actions.publish ? <PublishFirstButton onClick={() => actions.publish?.(null)} /> : undefined,
             }}
+            onRowClick={actions.openHistory}
+            rowLabel={(r) => `Version history of ${r.title}`}
+            rowActions={(r) => <RowMenu row={r} actions={actions} />}
             maxHeight="none"
           />
         ) : (
-          <DocumentCards rows={rows} vessels={vessels} hasFilters={hasFilters} onClearFilters={clearFilters} total={library.rows.length} />
+          <DocumentCards rows={rows} vessels={vessels} hasFilters={hasFilters} onClearFilters={clearFilters} total={library.rows.length} actions={actions} />
         )}
 
         {notUploaded.length ? (
@@ -438,10 +530,25 @@ function LibraryView({ library, vessels, canEdit, params, setParam }: LibraryVie
             </h2>
             <ul className="mt-2 flex flex-wrap gap-2">
               {notUploaded.map((t) => (
-                <li key={t.id} className="rounded-md border border-border bg-card px-2 py-1 text-sm text-muted-foreground">
-                  <span className="text-foreground">{t.name}</span>
-                  {section ? null : <span>{` · ${t.sectionName}`}</span>}
-                  {t.hideWhenEmpty ? <span>{' · hidden on vessels'}</span> : null}
+                <li key={t.id} className="flex items-center gap-1 rounded-md border border-border bg-card py-1 pl-2 pr-1 text-sm text-muted-foreground">
+                  <span>
+                    <span className="text-foreground">{t.name}</span>
+                    {section ? null : <span>{` · ${t.sectionName}`}</span>}
+                    {t.hideWhenEmpty ? <span>{' · hidden on vessels'}</span> : null}
+                  </span>
+                  {actions.publish ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className={cn('h-7 px-2', COARSE)}
+                      aria-label={`Publish a document of type ${t.name}`}
+                      onClick={() => actions.publish?.(null, t.id)}
+                    >
+                      <Upload aria-hidden="true" className="h-3.5 w-3.5" />
+                      Publish
+                    </Button>
+                  ) : null}
                 </li>
               ))}
             </ul>
@@ -503,18 +610,27 @@ function DocumentCards({
   hasFilters,
   onClearFilters,
   total,
+  actions,
 }: {
   rows: readonly LibraryRow[];
   vessels: readonly LibraryVessel[];
   hasFilters: boolean;
   onClearFilters: () => void;
   total: number;
+  actions: LibraryActions;
 }) {
   if (!rows.length) {
     return hasFilters && total > 0 ? (
       <PageEmpty filtered onClearFilters={onClearFilters} bordered compact />
     ) : (
-      <EmptyState icon={FileText} title="Nothing published yet" body="Documents the company publishes to its vessels appear here, grouped by section." bordered compact />
+      <EmptyState
+        icon={FileText}
+        title="Nothing published yet"
+        body="Documents the company publishes to its vessels appear here, grouped by section."
+        action={actions.publish ? <PublishFirstButton onClick={() => actions.publish?.(null)} /> : undefined}
+        bordered
+        compact
+      />
     );
   }
   return (
@@ -525,8 +641,18 @@ function DocumentCards({
           <li key={r.id}>
             <Card className="space-y-1.5 p-3">
               <div className="flex items-start justify-between gap-2">
-                <p className="min-w-0 break-words font-medium text-foreground">{r.title}</p>
-                <StatusPill domain="fleet_document" status={r.status} />
+                <button
+                  type="button"
+                  onClick={() => actions.openHistory(r)}
+                  aria-label={`Version history of ${r.title}`}
+                  className="focus-ring min-w-0 rounded-sm text-left font-medium text-foreground underline-offset-2 hover:underline"
+                >
+                  <span className="break-words">{r.title}</span>
+                </button>
+                <div className="flex shrink-0 items-center gap-1">
+                  <StatusPill domain="fleet_document" status={r.status} />
+                  <RowMenu row={r} actions={actions} />
+                </div>
               </div>
               <p className="type-caption text-muted-foreground">{[r.typeName, r.sectionName].filter(Boolean).join(' · ')}</p>
               <p className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-foreground">
@@ -541,5 +667,61 @@ function DocumentCards({
         );
       })}
     </ul>
+  );
+}
+
+function PublishFirstButton({ onClick }: { onClick: () => void }) {
+  return (
+    <Button type="button" size="sm" className={COARSE} onClick={onClick}>
+      <FilePlus2 aria-hidden="true" className="h-4 w-4" />
+      Publish document
+    </Button>
+  );
+}
+
+/**
+ * A row's menu: the version history for everyone; for editors the next
+ * step its state allows (lib/fleetDocumentMachine.ts): finish a draft,
+ * upload a new version, withdraw a published document, delete a draft.
+ */
+function RowMenu({ row, actions }: { row: LibraryRow; actions: LibraryActions }) {
+  const allowed = fleetDocumentActions(row.status);
+  const canVersion = !!actions.publish && allowed.includes('add_version');
+  const canWithdraw = !!actions.withdraw && allowed.includes('withdraw');
+  const canDelete = !!actions.deleteDraft && allowed.includes('delete_draft');
+  const publishLabel = row.status === 'draft' ? 'Finish publishing' : row.draft ? `Finish ${row.draft.label}` : 'Upload a new version';
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button type="button" variant="ghost" size="icon" data-row-action="" className={cn('h-8 w-8', COARSE, '[@media(pointer:coarse)]:min-w-11')} aria-label={`Actions for ${row.title}`}>
+          <MoreHorizontal aria-hidden="true" className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuItem onSelect={() => actions.openHistory(row)}>
+          <History aria-hidden="true" className="mr-2 h-4 w-4" />
+          Version history
+        </DropdownMenuItem>
+        {canVersion ? (
+          <DropdownMenuItem onSelect={() => actions.publish?.(row)}>
+            <Upload aria-hidden="true" className="mr-2 h-4 w-4" />
+            {publishLabel}
+          </DropdownMenuItem>
+        ) : null}
+        {canWithdraw || canDelete ? <DropdownMenuSeparator /> : null}
+        {canWithdraw ? (
+          <DropdownMenuItem onSelect={() => actions.withdraw?.(row)}>
+            <Undo2 aria-hidden="true" className="mr-2 h-4 w-4" />
+            Withdraw
+          </DropdownMenuItem>
+        ) : null}
+        {canDelete ? (
+          <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={() => actions.deleteDraft?.(row)}>
+            <Trash2 aria-hidden="true" className="mr-2 h-4 w-4" />
+            Delete draft
+          </DropdownMenuItem>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

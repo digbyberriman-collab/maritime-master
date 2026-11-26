@@ -440,3 +440,87 @@ describe('Fleet documents page', () => {
     expect(within(cards[0]).getByText(/2 of 3/)).toBeInTheDocument();
   });
 });
+
+describe('publishing from the library (X5-04B)', () => {
+  const readerOnly = (key: string) => ({
+    allowed: key !== 'fleet.operations.fleet_documents.edit',
+    status: key === 'fleet.operations.fleet_documents.edit' ? 'denied' : 'granted',
+    reason: '',
+  });
+  async function openMenu(title: string): Promise<HTMLElement> {
+    const trigger = await screen.findByRole('button', { name: `Actions for ${title}` });
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false });
+    return screen.findByRole('menu');
+  }
+  const items = (menu: HTMLElement) => within(menu).getAllByRole('menuitem').map((i) => i.textContent);
+
+  beforeAll(() => {
+    if (typeof globalThis.ResizeObserver === 'undefined') {
+      globalThis.ResizeObserver = class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      } as unknown as typeof ResizeObserver;
+    }
+  });
+
+  it('editors publish from the header and from a type with nothing published; readers do not', async () => {
+    ready();
+    renderPage();
+    await screen.findByRole('table', { name: 'Fleet documents' });
+    fireEvent.click(screen.getByRole('button', { name: 'Publish document' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Publish a document' });
+    expect(within(dialog).getByLabelText('Document type')).toHaveValue('');
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Publish a document' })).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: 'Publish a document of type Checklists' }));
+    expect(within(await screen.findByRole('dialog', { name: 'Publish a document' })).getByLabelText('Document type')).toHaveValue('t-check');
+    cleanup();
+    ready();
+    state.decide = readerOnly;
+    renderPage();
+    await screen.findByRole('table', { name: 'Fleet documents' });
+    expect(screen.queryByRole('button', { name: 'Publish document' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Publish a document of type/ })).toBeNull();
+  });
+
+  it('each row’s menu offers what its state allows; readers only see the history', async () => {
+    ready();
+    renderPage();
+    await screen.findByRole('table', { name: 'Fleet documents' });
+    expect(items(await openMenu('Mooring procedure'))).toEqual(['Version history', 'Finish publishing', 'Delete draft']);
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    expect(items(await openMenu('Safety Management Manual'))).toEqual(['Version history', 'Finish Rev 3', 'Withdraw']);
+    fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+    expect(items(await openMenu('Bunkering procedure'))).toEqual(['Version history', 'Upload a new version', 'Withdraw']);
+    fireEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Withdraw' }));
+    expect(await screen.findByRole('dialog', { name: 'Withdraw Bunkering procedure' })).toBeInTheDocument();
+    cleanup();
+    ready();
+    state.decide = readerOnly;
+    renderPage();
+    await screen.findByRole('table', { name: 'Fleet documents' });
+    expect(items(await openMenu('Bunkering procedure'))).toEqual(['Version history']);
+  });
+
+  it('clicking a row opens its version history', async () => {
+    ready();
+    renderPage();
+    await screen.findByRole('table', { name: 'Fleet documents' });
+    fireEvent.click(within(bodyRows()[0]).getAllByRole('cell')[1]);
+    const drawer = await screen.findByRole('dialog', { name: 'Bunkering procedure' });
+    expect(within(drawer).getByText('Version history')).toBeInTheDocument();
+    expect(state.reads).toContain('fleet_documents');
+  });
+
+  it('below 768 px each card opens its history and has the same menu', async () => {
+    ready();
+    state.wide = false;
+    state.rail = false;
+    renderPage();
+    const list = await screen.findByRole('list', { name: 'Fleet documents' });
+    expect(within(list).getByRole('button', { name: 'Actions for Mooring procedure' })).toBeInTheDocument();
+    fireEvent.click(within(list).getByRole('button', { name: 'Version history of Mooring procedure' }));
+    expect(await screen.findByRole('dialog', { name: 'Mooring procedure' })).toBeInTheDocument();
+  });
+});

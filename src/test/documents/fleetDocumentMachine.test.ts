@@ -45,7 +45,7 @@ const SQL_TEST = readFileSync(join(ROOT, 'supabase/tests/sql/fleet/documents_lib
 /** The cell as the SQL test writes it: the state it leads to, or '!' and the refusal. */
 const cellText = (status: FleetDocumentStatus, action: FleetDocumentAction) => {
   const outcome = FLEET_DOCUMENT_MACHINE[status][action];
-  return outcome.ok ? outcome.to : `!${outcome.refusal}`;
+  return 'refusal' in outcome ? `!${outcome.refusal}` : outcome.to;
 };
 
 const EXPECTED: ReadonlyArray<[FleetDocumentStatus, FleetDocumentAction, string]> = [

@@ -1,3 +1,10 @@
+/**
+ * The controlled register as a table (`/fleet/documents/register`, from
+ * 768 px). In print the wrapper stops scrolling sideways, titles wrap
+ * instead of being cut, rows are not split across pages and the actions
+ * column is left off, so the register prints whole on A4 landscape
+ * (BUILD-PLAN Phase 1 open item).
+ */
 import React from 'react';
 import {
   Table,
@@ -37,7 +44,7 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
   onDelete,
 }) => {
   return (
-    <div className="overflow-x-auto rounded-md border bg-card">
+    <div data-testid="document-register-table" className="overflow-x-auto rounded-md border bg-card print:overflow-visible print:border-0">
       <Table>
         <TableHeader>
           <TableRow>
@@ -48,7 +55,7 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
             <TableHead className="w-[100px]">Status</TableHead>
             <TableHead className="w-[120px]">Vessel</TableHead>
             <TableHead className="w-[120px]">Next Review</TableHead>
-            <TableHead className="w-[80px]">Actions</TableHead>
+            <TableHead className="w-[80px] print:hidden">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -63,20 +70,20 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
               return (
                 <TableRow
                   key={document.id}
-                  className="cursor-pointer hover:bg-accent"
+                  className="cursor-pointer hover:bg-accent print:break-inside-avoid"
                   onClick={() => onView(document)}
                 >
                   <TableCell className="font-mono text-sm">
                     {document.document_number}
                   </TableCell>
-                  <TableCell className="max-w-[300px] font-medium">
+                  <TableCell className="max-w-[300px] font-medium print:max-w-none">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         onView(document);
                       }}
-                      className="block max-w-full truncate rounded-sm text-left focus-ring"
+                      className="block max-w-full truncate rounded-sm text-left focus-ring print:whitespace-normal print:overflow-visible"
                     >
                       {document.title}
                     </button>
@@ -106,7 +113,7 @@ const DocumentTable: React.FC<DocumentTableProps> = ({
                       ? format(new Date(document.next_review_date), 'd MMM yyyy')
                       : '–'}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="print:hidden">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                         <Button variant="ghost" size="icon" aria-label={`Actions for ${document.title}`}>

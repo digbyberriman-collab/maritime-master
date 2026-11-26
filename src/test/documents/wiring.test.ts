@@ -15,6 +15,10 @@
  *   search_path, no write policy, the status vocabulary in the status-tone
  *   registry; the read-hook predicate is not defined yet (X5-05A, after the
  *   platform read-hook test is updated).
+ * - X5-04B: the publish flow uploads only through the records service, to
+ *   the document as the file's entity (no envelope, D-X5-17); the only live
+ *   table the library reads is `profiles` (the actors' names); the sample
+ *   data pages are gone (gap/00 K1) and no documents page holds sample rows.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -58,7 +62,16 @@ const LIBRARY_FILES = [
   'src/modules/documents/hooks/useFleetDocumentMutations.ts',
   'src/modules/documents/pages/FleetDocumentsPage.tsx',
   'src/modules/documents/components/DocumentSettingsDrawer.tsx',
+  'src/modules/documents/lib/fleetDocumentSchema.ts',
+  'src/modules/documents/hooks/useFleetDocumentHistory.ts',
+  'src/modules/documents/hooks/usePublishFleetDocument.ts',
+  'src/modules/documents/components/PublishDocumentDialog.tsx',
+  'src/modules/documents/components/VersionHistoryDrawer.tsx',
+  'src/modules/documents/components/WithdrawDocumentDialog.tsx',
 ];
+
+/** Live tables the library reads (names of the people who acted); not pending, not in block 04. */
+const LIVE_TABLES = new Set(['profiles']);
 const sources = LIBRARY_FILES.map((file) => ({ file, text: read(file) }));
 const allSource = sources.map((s) => s.text).join('\n');
 const SQL = read('supabase/migrations/20261124040300_fleet_documents_library.sql');
@@ -145,7 +158,14 @@ describe('database objects', () => {
       'fleet_document_type_save',
       'fleet_document_withdraw',
     ]);
-    expect([...tables].sort()).toEqual(['fleet_document_sections', 'fleet_document_types', 'fleet_document_versions', 'fleet_document_vessel_targets', 'fleet_documents']);
+    expect([...tables].sort()).toEqual([
+      'fleet_document_sections',
+      'fleet_document_types',
+      'fleet_document_versions',
+      'fleet_document_vessel_targets',
+      'fleet_documents',
+      'profiles',
+    ]);
   });
 
   it('everything it uses is defined in block 04 and declared pending', () => {
@@ -154,6 +174,7 @@ describe('database objects', () => {
       expect(pending, `${fn} in db.pending.ts`).toMatch(new RegExp(`\\b${fn}: \\{`));
     }
     for (const t of tables) {
+      if (LIVE_TABLES.has(t)) continue;
       expect(definedTables.has(t), `${t} in block 04`).toBe(true);
       expect(pending, `${t} in db.pending.ts`).toMatch(new RegExp(`\\b${t}: PendingTable<`));
     }
@@ -206,5 +227,31 @@ describe('database objects', () => {
     for (const status of FLEET_DOCUMENT_STATUSES) expect(statusMeta('fleet_document', status).label, status).not.toBe('');
     expect(statusMeta('fleet_document', 'published').tone).toBe('ok');
     expect(statusMeta('fleet_document', 'draft').tone).toBe('neutral');
+  });
+});
+
+describe('publishing (X5-04B)', () => {
+  it('uploads only through the records service, to the document as the file entity, with no envelope', () => {
+    const flow = read('src/modules/documents/hooks/usePublishFleetDocument.ts');
+    expect(flow).toMatch(/from '@\/lib\/records\/services\/attachments'/);
+    expect(flow).toContain("moduleKey: 'documents', entityType: 'fleet_document'");
+    expect(flow).not.toMatch(/envelopeId/);
+    expect(flow).not.toMatch(/storage\.from\(|\.upload\(/);
+    for (const { file, text } of sources) if (file !== 'src/modules/documents/hooks/usePublishFleetDocument.ts') expect(text, file).not.toMatch(/uploadRecordFile\(/);
+  });
+
+  it('runs the steps in the one order the server needs', () => {
+    const flow = read('src/modules/documents/hooks/usePublishFleetDocument.ts');
+    const order = ["case 'create'", "case 'upload'", "case 'add_version'", "case 'set_targets'", "case 'publish'"].map((c) => flow.indexOf(c));
+    expect(order.every((i) => i > 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+
+  it('the sample-data pages are gone and no documents page holds sample rows (gap/00 K1)', () => {
+    const pages = readdirSync(join(ROOT, 'src/modules/documents/pages'));
+    for (const gone of ['Manuals.tsx', 'Policies.tsx', 'Procedures.tsx']) expect(pages, gone).not.toContain(gone);
+    for (const page of pages) expect(read(`src/modules/documents/pages/${page}`), page).not.toMatch(/const mock|SAMPLE_/);
+    expect(read('src/modules/documents/index.ts')).not.toMatch(/Manuals|Policies|Procedures/);
+    expect(read('src/modules/documents/pages/Documents.tsx')).toMatch(/REGISTER_CATEGORY_PARAM/);
   });
 });

@@ -53,8 +53,5 @@ export { default as DocumentSearch } from './pages/DocumentSearch';
 export { default as MasterDocumentIndex } from './pages/MasterDocumentIndex';
 export { default as ReviewDashboard } from './pages/ReviewDashboard';
 export { default as ReviewQueue } from './pages/ReviewQueue';
-export { default as Manuals } from './pages/Manuals';
-export { default as Policies } from './pages/Policies';
-export { default as Procedures } from './pages/Procedures';
 export { default as ISM_SMS } from './pages/ISM_SMS';
 export { default as Drawings } from './pages/Drawings';
