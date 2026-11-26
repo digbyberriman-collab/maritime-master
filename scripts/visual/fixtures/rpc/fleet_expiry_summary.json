@@ -1,0 +1,74 @@
+[
+  {
+    "source_key": "crew_certificates_legacy",
+    "item_type": "crew_qualification",
+    "vessel_id": null,
+    "bucket": "expired",
+    "endorsement_state": null,
+    "item_count": 1,
+    "muted_count": 0
+  },
+  {
+    "source_key": "vessel_certificates",
+    "item_type": "vessel_certificate",
+    "vessel_id": null,
+    "bucket": "expired",
+    "endorsement_state": null,
+    "item_count": 1,
+    "muted_count": 0
+  },
+  {
+    "source_key": "vessel_certificates",
+    "item_type": "vessel_certificate",
+    "vessel_id": null,
+    "bucket": "expiring_soon",
+    "endorsement_state": null,
+    "item_count": 3,
+    "muted_count": 0
+  },
+  {
+    "source_key": "crew_certificates_legacy",
+    "item_type": "crew_qualification",
+    "vessel_id": null,
+    "bucket": "expiring_soon",
+    "endorsement_state": null,
+    "item_count": 2,
+    "muted_count": 0
+  },
+  {
+    "source_key": "crew_certificates_legacy",
+    "item_type": "crew_qualification",
+    "vessel_id": null,
+    "bucket": "expiring",
+    "endorsement_state": null,
+    "item_count": 2,
+    "muted_count": 0
+  },
+  {
+    "source_key": "vessel_certificates",
+    "item_type": "vessel_certificate",
+    "vessel_id": null,
+    "bucket": "expiring",
+    "endorsement_state": null,
+    "item_count": 1,
+    "muted_count": 0
+  },
+  {
+    "source_key": "vessel_certificates",
+    "item_type": "vessel_certificate",
+    "vessel_id": null,
+    "bucket": "valid",
+    "endorsement_state": null,
+    "item_count": 5,
+    "muted_count": 1
+  },
+  {
+    "source_key": "crew_certificates_legacy",
+    "item_type": "crew_qualification",
+    "vessel_id": null,
+    "bucket": "valid",
+    "endorsement_state": null,
+    "item_count": 3,
+    "muted_count": 0
+  }
+]

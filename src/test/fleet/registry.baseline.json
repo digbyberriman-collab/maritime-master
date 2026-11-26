@@ -5,14 +5,14 @@
   ],
   "nav": {
     "NAVIGATION_ITEMS": [
-      "    Stethoscope {\"id\":\"fleet-medical\",\"kind\":\"leaf\",\"label\":\"Medical\",\"path\":\"/fleet/medical\",\"scope\":\"fleet\",\"status\":\"planned\"}",
-      "    Stethoscope {\"id\":\"vessel-crew-medical\",\"kind\":\"leaf\",\"label\":\"Crew Medical\",\"path\":\"/v/:vesselCode/crew/medical\",\"scope\":\"vessel\",\"status\":\"planned\"}"
+      "    Stethoscope {\"capability\":\"fleet.operations.fleet_medical.view\",\"id\":\"fleet-medical\",\"kind\":\"leaf\",\"label\":\"Medical\",\"path\":\"/fleet/medical\",\"scope\":\"fleet\",\"status\":\"planned\"}",
+      "    Stethoscope {\"capability\":\"vessel.crew.crew_medical.view\",\"id\":\"vessel-crew-medical\",\"kind\":\"leaf\",\"label\":\"Crew Medical\",\"path\":\"/v/:vesselCode/crew/medical\",\"scope\":\"vessel\",\"status\":\"planned\"}"
     ],
     "VESSEL_MODULES": [
-      "  Stethoscope {\"id\":\"crew-medical\",\"kind\":\"leaf\",\"label\":\"Crew Medical\",\"path\":\"crew/medical\",\"status\":\"planned\"}"
+      "  Stethoscope {\"capability\":\"vessel.crew.crew_medical.view\",\"id\":\"crew-medical\",\"kind\":\"leaf\",\"label\":\"Crew Medical\",\"path\":\"crew/medical\",\"status\":\"planned\"}"
     ],
     "buildVesselNav": [
-      "  Stethoscope {\"id\":\"vessel-crew-medical\",\"kind\":\"leaf\",\"label\":\"Crew Medical\",\"path\":\"/v/dra/crew/medical\",\"scope\":\"vessel\",\"status\":\"planned\"}"
+      "  Stethoscope {\"capability\":\"vessel.crew.crew_medical.view\",\"id\":\"vessel-crew-medical\",\"kind\":\"leaf\",\"label\":\"Crew Medical\",\"path\":\"/v/dra/crew/medical\",\"scope\":\"vessel\",\"status\":\"planned\"}"
     ],
     "FLEET_PLACEHOLDER_LEAVES": [
       "medical Medical"

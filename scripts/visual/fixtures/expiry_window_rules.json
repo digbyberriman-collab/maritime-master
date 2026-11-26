@@ -1,0 +1,24 @@
+[
+  {
+    "id": "f5000000-0000-4000-8000-000000000001",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "item_type": "passport",
+    "certificate_type_id": null,
+    "warn_days": 270,
+    "created_by": "a0000000-0000-4000-8000-000000000001",
+    "updated_by": "a0000000-0000-4000-8000-000000000001",
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "id": "f5000000-0000-4000-8000-000000000002",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "item_type": "training_course",
+    "certificate_type_id": null,
+    "warn_days": 60,
+    "created_by": "a0000000-0000-4000-8000-000000000001",
+    "updated_by": "a0000000-0000-4000-8000-000000000001",
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  }
+]
