@@ -198,7 +198,18 @@ const FullCrewEditModal: React.FC<FullCrewEditModalProps> = ({
       : isMasterOffice(assignment?.position) && !canAdminVessel
         ? MASTER_OFFICE_MESSAGE
         : null;
-  const joinDateLock: string | null = isPlacement && !canAdminPending ? PENDING_PLACEMENT_MESSAGE : null;
+  /**
+   * Why Join Date is locked. A Master / Captain row's join date is the start
+   * of the office (D-227), so moving it moves the Master: users-access admin
+   * of the vessel only, as the crew-assignment guard enforces (D-237,
+   * amending D-218). `current_assignment` carries no rank, so the position
+   * decides here; the guard also checks the row's rank.
+   */
+  const joinDateLock: string | null = isPlacement
+    ? (canAdminPending ? null : PENDING_PLACEMENT_MESSAGE)
+    : isMasterOffice(assignment?.position) && !canAdminVessel
+      ? MASTER_OFFICE_MESSAGE
+      : null;
   const rankLock: string | null = isPending && !canAdminPending ? PENDING_PLACEMENT_MESSAGE : null;
 
   const form = useForm<FormValues>({

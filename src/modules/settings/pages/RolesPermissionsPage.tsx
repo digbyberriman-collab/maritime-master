@@ -5,9 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PageError, PageLoading } from '@/shared/components/states';
+import { AccessDenied, PageError, PageLoading } from '@/shared/components/states';
 import { RoleDefinitionsMatrix, RoleDefinitionsNotice } from '@/modules/auth/components/RoleDefinitionsMatrix';
-import { usePermissionHistory } from '@/modules/auth/hooks/useRoleDefinitions';
+import { usePermissionAuditGate, usePermissionHistory } from '@/modules/auth/hooks/useRoleDefinitions';
 
 /**
  * Roles & Permissions (gap/03 B6; Phase 2 spec §A.8, proposed D-124): the
@@ -15,7 +15,8 @@ import { usePermissionHistory } from '@/modules/auth/hooks/useRoleDefinitions';
  * company and frozen to the service role (migration file 8), so this page
  * has no save controls, writes nothing to `roles` / `role_permissions` and
  * never calls `log_permission_change` (service-only). Access for one person
- * is changed in Users & Access.
+ * is changed in Users & Access. The Change history tab reads the
+ * permission log only for a caller the database says may see it (D-240).
  */
 export default function RolesPermissionsPage() {
   return (
@@ -47,9 +48,21 @@ export default function RolesPermissionsPage() {
   );
 }
 
-/** Access changes recorded in `permission_audit_log` (only people allowed to see the log read rows). */
+/** Shown in place of the history to a caller the log's RLS would filter out. */
+const PERMISSION_HISTORY_RESTRICTED = 'Only DPAs and full administrators can see the change history.';
+
+/**
+ * The Change history tab (D-240; D-04, D-124, non-negotiable 9). The log's
+ * RLS answers an empty list, not an error, to anyone it filters out, so the
+ * tab asks the database the policy's own question first
+ * (`usePermissionAuditGate`) and reads `permission_audit_log` only on a
+ * yes. A caller without the capability is told the history is restricted,
+ * never "No permission changes recorded yet", and gets no table, no Export
+ * CSV and no log request. A failed check shows the error state with Retry.
+ */
 function PermissionHistory() {
-  const { data: logs = [], isLoading, error, refetch } = usePermissionHistory();
+  const gate = usePermissionAuditGate();
+  const { data: logs = [], isLoading, error, refetch } = usePermissionHistory({ enabled: gate.status === 'allowed' });
 
   function exportCSV() {
     const csv = [
@@ -65,6 +78,28 @@ function PermissionHistory() {
     URL.revokeObjectURL(url);
   }
 
+  if (gate.status === 'loading') return <PageLoading label="Checking who can see the change history" />;
+  if (gate.status === 'error') return <PageError error={gate.error} onRetry={gate.retry} />;
+  if (gate.status === 'denied') {
+    return (
+      <Card>
+        <CardContent className="p-0">
+          <AccessDenied
+            title="The change history is restricted"
+            detail={
+              <div className="space-y-1">
+                <p>{PERMISSION_HISTORY_RESTRICTED}</p>
+                <p>One person's access is changed in Users & Access.</p>
+              </div>
+            }
+            backTo={null}
+            headingLevel={2}
+          />
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (isLoading) return <PageLoading />;
   if (error) return <PageError error={error} onRetry={() => void refetch()} />;
 
@@ -76,7 +111,13 @@ function PermissionHistory() {
             <CardTitle>Permission change history</CardTitle>
             <CardDescription>Recent changes to who can do what</CardDescription>
           </div>
-          <Button variant="outline" size="sm" onClick={exportCSV} className="gap-2" disabled={logs.length === 0}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportCSV}
+            className="gap-2 [@media(pointer:coarse)]:h-11"
+            disabled={logs.length === 0}
+          >
             <Download aria-hidden="true" className="h-4 w-4" />
             Export CSV
           </Button>

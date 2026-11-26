@@ -10,7 +10,11 @@
  *   changed, and a pending placement (built from imported_vessel_id) is
  *   never sent as an assignment;
  * - a pending crew member's rank, position and joining date need
- *   users-access admin of the pending vessel.
+ *   users-access admin of the pending vessel;
+ * - a Master / Captain row's join date needs users-access admin of the
+ *   vessel too (D-237, amending D-218): the office starts on the join date
+ *   (D-227), so moving it moves the office. Without the capability Join
+ *   Date is disabled with the Master sentence and never sent.
  */
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -128,6 +132,7 @@ function open(crewMember: CrewMember) {
 
 const save = () => fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
 const position = () => screen.getByLabelText('Position') as HTMLInputElement;
+const joinDate = () => screen.getByLabelText('Join Date') as HTMLInputElement;
 
 beforeEach(() => {
   h.role = 'master';
@@ -150,7 +155,7 @@ describe('FullCrewEditModal position and rank locks', () => {
     open(member({ current_assignment: { id: 'a-2', vessel_id: 'v-1', vessel_name: 'DRAAK', position: 'Master', join_date: '2025-06-01' } }));
 
     expect(position()).toBeDisabled();
-    expect(screen.getByText(MASTER_HINT)).toBeInTheDocument();
+    expect(position()).toHaveAttribute('aria-describedby', expect.stringContaining(screen.getAllByText(MASTER_HINT)[0].id));
   });
 
   it('locks a Captain row too (normalised as the guard does)', () => {
@@ -267,5 +272,59 @@ describe('FullCrewEditModal position and rank locks', () => {
     expect(payload).toMatchObject({ profileId: 'p-pending', rank: 'Bosun', pendingPosition: 'Bosun' });
     expect(payload).not.toHaveProperty('assignmentId');
     expect(payload).not.toHaveProperty('position');
+  });
+});
+
+describe('FullCrewEditModal Master join date (D-237)', () => {
+  const masterRow = (title: string): CrewMember =>
+    member({ current_assignment: { id: 'a-m', vessel_id: 'v-1', vessel_name: 'DRAAK', position: title, join_date: '2025-06-01' } });
+
+  it.each(['Master', ' CAPTAIN '])('disables the join date of a %j row without users-access admin, and never sends it', async (title) => {
+    // An HR editor of the vessel (role dpa edits every field) who is not a users-access admin.
+    h.role = 'dpa';
+    const { onSubmit } = open(masterRow(title));
+
+    expect(joinDate()).toBeDisabled();
+    const hints = screen.getAllByText(MASTER_HINT);
+    expect(hints).toHaveLength(2);
+    expect(joinDate()).toHaveAttribute('aria-describedby', expect.stringContaining(hints[1].id));
+
+    // Even a changed value (the field is disabled; the guard is the real control) is not sent.
+    fireEvent.change(joinDate(), { target: { value: '2026-12-01' } });
+    save();
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    const payload = onSubmit.mock.calls[0][0];
+    expect(payload).not.toHaveProperty('joinDate');
+    expect(payload).not.toHaveProperty('assignmentId');
+    expect(h.can).toHaveBeenCalledWith(ADMIN, { vesselId: 'v-1' });
+  });
+
+  it.each(['Master', ' CAPTAIN '])('lets a users-access admin of the vessel move a %j row’s join date', async (title) => {
+    h.role = 'dpa';
+    h.can.mockImplementation((key: string, ctx?: { vesselId?: string | null }) => key === ADMIN && ctx?.vesselId === 'v-1');
+    const { onSubmit } = open(masterRow(title));
+
+    expect(joinDate()).toBeEnabled();
+    expect(screen.queryByText(MASTER_HINT)).toBeNull();
+    fireEvent.change(joinDate(), { target: { value: '2026-12-01' } });
+    save();
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ assignmentId: 'a-m', joinDate: '2026-12-01' });
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('position');
+  });
+
+  it('keeps a non-Master row’s join date open without users-access admin', async () => {
+    h.role = 'dpa';
+    const { onSubmit } = open(member());
+
+    expect(joinDate()).toBeEnabled();
+    expect(screen.queryByText(MASTER_HINT)).toBeNull();
+    fireEvent.change(joinDate(), { target: { value: '2026-03-15' } });
+    save();
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ assignmentId: 'a-1', joinDate: '2026-03-15' });
   });
 });

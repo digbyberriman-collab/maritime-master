@@ -6,6 +6,14 @@
  * as read-only marks, no save controls, no writes to `roles` /
  * `role_permissions`, and no `log_permission_change` call. A failed read
  * shows the error state, never an empty matrix.
+ *
+ * The Change history tab (finding permission-history-fake-empty; D-240,
+ * D-04, D-124, non-negotiable 9) asks the database first
+ * (`has_capability('admin.access.permission_audit_log.view', company)`):
+ * a caller the log's RLS would filter out is told the history is
+ * restricted, never "No permission changes recorded yet", and no
+ * `permission_audit_log` request is made for them. A missing RPC (D-01)
+ * falls back to the useCan adaptor; any other error shows Retry.
  */
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -19,6 +27,8 @@ const h = vi.hoisted(() => ({
   rpc: vi.fn(),
   fail: null as string | null,
   role: 'dpa',
+  companyId: 'c-1' as string | null,
+  auditRows: [] as Array<Record<string, unknown>>,
 }));
 
 const ROLES = [
@@ -43,17 +53,38 @@ vi.mock('@/integrations/supabase/client', () => {
     for (const op of ['insert', 'update', 'delete', 'upsert']) chain[op] = record(op);
     chain.then = (resolve: (v: unknown) => unknown) => {
       if (h.fail === table) return Promise.resolve({ data: null, error: { code: '42501', message: 'permission denied' } }).then(resolve);
-      const data = table === 'roles' ? ROLES : table === 'modules' ? MODULES : table === 'role_permissions' ? PERMS : [];
+      const data =
+        table === 'roles'
+          ? ROLES
+          : table === 'modules'
+            ? MODULES
+            : table === 'role_permissions'
+              ? PERMS
+              : table === 'permission_audit_log'
+                ? h.auditRows
+                : [];
       return Promise.resolve({ data, error: null }).then(resolve);
     };
     return chain;
   };
   return { supabase: { from, rpc: (...args: unknown[]) => h.rpc(...args) } };
 });
-vi.mock('@/modules/auth/contexts/AuthContext', () => ({ useAuth: () => ({ profile: { id: 'p-1', company_id: 'c-1', role: h.role }, user: { id: 'u-1' } }) }));
+vi.mock('@/modules/auth/contexts/AuthContext', () => ({
+  useAuth: () => ({
+    profile: { id: 'p-1', company_id: h.companyId, role: h.role },
+    user: { id: 'u-1' },
+    loading: false,
+    profileResolved: true,
+    // The useCan adaptor reads these; nobody here reaches the admin module by nav.
+    canAccessModule: () => false,
+    practitionerDisciplines: [],
+    practitionerDisciplinesLoaded: true,
+  }),
+}));
 
 import RolesPermissionsPage from '@/modules/settings/pages/RolesPermissionsPage';
 import PermissionsSection from '@/modules/settings/components/sections/PermissionsSection';
+import { usePermissionsStore } from '@/modules/auth/store/permissionsStore';
 
 function renderWith(node: React.ReactNode) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -71,6 +102,10 @@ beforeEach(() => {
   h.rpc.mockReset();
   h.fail = null;
   h.role = 'dpa';
+  h.companyId = 'c-1';
+  h.auditRows = [];
+  // RBAC loaded with no roles: the adaptor decides on the legacy profile role.
+  usePermissionsStore.setState({ isInitialized: true, isLoading: false, permissions: [], userRoles: [] });
 });
 
 describe('Roles & Permissions page', () => {
@@ -102,6 +137,134 @@ describe('Roles & Permissions page', () => {
     renderWith(<RolesPermissionsPage />);
     expect(await screen.findByRole('button', { name: /retry|try again/i })).toBeInTheDocument();
     expect(screen.queryByRole('table', { name: /Permissions of/ })).toBeNull();
+  });
+});
+
+const AUDIT_VIEW = 'admin.access.permission_audit_log.view';
+const RESTRICTED = 'Only DPAs and full administrators can see the change history.';
+const EMPTY_HISTORY = 'No permission changes recorded yet';
+const AUDIT_ROW = {
+  id: 'pal-1',
+  timestamp_utc: '2026-11-20T09:00:00Z',
+  actor_user_id: 'u-9',
+  actor_role: 'dpa',
+  action_type: 'override_added',
+  target_user_id: 'u-3',
+  target_role_id: null,
+  target_module_key: 'crew_roster',
+  before_state: null,
+  after_state: null,
+  reason_text: 'Relief rotation cover',
+  vessel_scope: null,
+  ip_address: null,
+  user_agent: null,
+  session_id: null,
+  is_high_impact: true,
+};
+
+/** has_capability answers `answer` (a value, or an error); every other RPC is unexpected. */
+function capabilityAnswers(...answers: Array<{ data?: unknown; error?: { code: string; message: string } }>) {
+  let i = 0;
+  h.rpc.mockImplementation(async (fn: string) => {
+    if (fn !== 'has_capability') throw new Error(`unexpected rpc ${fn}`);
+    const answer = answers[Math.min(i, answers.length - 1)];
+    i += 1;
+    return { data: answer.data ?? null, error: answer.error ?? null };
+  });
+}
+
+function openHistory() {
+  renderWith(<RolesPermissionsPage />);
+  // Radix Tabs activate on mousedown.
+  fireEvent.mouseDown(screen.getByRole('tab', { name: /Change history/ }));
+}
+
+const auditReads = () => h.calls.filter((c) => c.table === 'permission_audit_log');
+
+describe('Roles & Permissions → Change history', () => {
+  it('a caller without the capability sees the restricted notice, not an empty history, and the log is never read', async () => {
+    capabilityAnswers({ data: false });
+    openHistory();
+
+    expect(await screen.findByText(RESTRICTED)).toBeInTheDocument();
+    expect(h.rpc).toHaveBeenCalledWith('has_capability', { p_key: AUDIT_VIEW, p_company_id: 'c-1' });
+    expect(screen.queryByText(EMPTY_HISTORY)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Export CSV/ })).toBeNull();
+    expect(screen.queryByRole('table')).toBeNull();
+    expect(auditReads()).toEqual([]);
+  });
+
+  it('a holder with no recorded changes sees the empty copy', async () => {
+    capabilityAnswers({ data: true });
+    openHistory();
+
+    expect(await screen.findByText(EMPTY_HISTORY)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Export CSV/ })).toBeDisabled();
+    expect(screen.queryByText(RESTRICTED)).toBeNull();
+    expect(auditReads().length).toBeGreaterThan(0);
+  });
+
+  it('a holder sees the recorded changes and can export them', async () => {
+    h.auditRows = [AUDIT_ROW];
+    capabilityAnswers({ data: true });
+    openHistory();
+
+    expect(await screen.findByText('Relief rotation cover')).toBeInTheDocument();
+    expect(screen.getByText('override added')).toBeInTheDocument();
+    expect(screen.getByText('High')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Export CSV/ })).toBeEnabled();
+    expect(screen.queryByText(EMPTY_HISTORY)).toBeNull();
+  });
+
+  it('with no company the answer is no: nothing is asked and nothing is read', async () => {
+    h.companyId = null;
+    capabilityAnswers({ data: true });
+    openHistory();
+
+    expect(await screen.findByText(RESTRICTED)).toBeInTheDocument();
+    expect(h.rpc).not.toHaveBeenCalled();
+    expect(auditReads()).toEqual([]);
+  });
+
+  it.each([
+    ['PGRST202', 'Could not find the function public.has_capability'],
+    ['42883', 'function public.has_capability(text, uuid) does not exist'],
+  ])('a missing has_capability (%s) falls back to the adaptor: a legacy DPA reads the log', async (code, message) => {
+    h.auditRows = [AUDIT_ROW];
+    capabilityAnswers({ error: { code, message } });
+    openHistory();
+
+    expect(await screen.findByText('Relief rotation cover')).toBeInTheDocument();
+    expect(screen.queryByText(RESTRICTED)).toBeNull();
+  });
+
+  it.each([
+    ['PGRST202', 'Could not find the function public.has_capability'],
+    ['42883', 'function public.has_capability(text, uuid) does not exist'],
+  ])('a missing has_capability (%s) falls back to the adaptor: crew are denied and nothing is read', async (code, message) => {
+    h.role = 'crew';
+    capabilityAnswers({ error: { code, message } });
+    openHistory();
+
+    expect(await screen.findByText(RESTRICTED)).toBeInTheDocument();
+    expect(screen.queryByText(EMPTY_HISTORY)).toBeNull();
+    expect(auditReads()).toEqual([]);
+  });
+
+  it('any other has_capability error shows the error state with Retry, and Retry asks again', async () => {
+    capabilityAnswers({ error: { code: 'XX000', message: 'internal error' } }, { data: true });
+    openHistory();
+
+    const retry = await screen.findByRole('button', { name: /try again/i });
+    expect(screen.queryByText(EMPTY_HISTORY)).toBeNull();
+    expect(screen.queryByText(RESTRICTED)).toBeNull();
+    expect(auditReads()).toEqual([]);
+    expect(h.rpc).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(retry);
+
+    expect(await screen.findByText(EMPTY_HISTORY)).toBeInTheDocument();
+    expect(h.rpc).toHaveBeenCalledTimes(2);
   });
 });
 

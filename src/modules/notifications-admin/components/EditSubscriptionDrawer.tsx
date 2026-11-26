@@ -6,8 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { X, Plus } from 'lucide-react';
 import { useToast } from '@/shared/hooks/use-toast';
+import { errorMessage } from '@/shared/lib/notify';
 import { CadenceBadge } from './CadenceBadge';
 import { type NotificationType, type NotificationSubscription, useSaveSubscriptions } from '../hooks/useNotificationData';
+import { isNotificationTypeAvailable } from '../lib/notificationEmitters';
 
 interface Props {
   type: NotificationType | null;
@@ -21,6 +23,9 @@ export const EditSubscriptionDrawer: React.FC<Props> = ({ type, existing, open, 
   const [input, setInput] = useState('');
   const save = useSaveSubscriptions();
   const { toast } = useToast();
+  // A deferred engine type (D-238) never takes a subscription, even if the
+  // drawer were opened for one: Save stays disabled and handleSave refuses.
+  const available = !!type && isNotificationTypeAvailable(type.key);
 
   useEffect(() => {
     if (open) {
@@ -37,7 +42,7 @@ export const EditSubscriptionDrawer: React.FC<Props> = ({ type, existing, open, 
   };
 
   const handleSave = () => {
-    if (!type) return;
+    if (!type || !available) return;
     save.mutate(
       {
         typeKey: type.key,
@@ -54,7 +59,12 @@ export const EditSubscriptionDrawer: React.FC<Props> = ({ type, existing, open, 
           toast({ title: 'Recipients updated' });
           onClose();
         },
-        onError: (e: any) => toast({ title: 'Failed to save', description: e.message, variant: 'destructive' }),
+        onError: (e: unknown) =>
+          toast({
+            title: 'Failed to save',
+            description: errorMessage(e, 'The recipients were not saved.'),
+            variant: 'destructive',
+          }),
       }
     );
   };
@@ -97,7 +107,7 @@ export const EditSubscriptionDrawer: React.FC<Props> = ({ type, existing, open, 
         </div>
         <SheetFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSave} disabled={save.isPending}>Save</Button>
+          <Button onClick={handleSave} disabled={save.isPending || !available}>Save</Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>

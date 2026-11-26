@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react';
+import React, { useId, useMemo, useState } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Mail, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { StatusPill } from '@/shared/components/status';
 import { CadenceBadge } from '../components/CadenceBadge';
 import { EditSubscriptionDrawer } from '../components/EditSubscriptionDrawer';
 import {
@@ -12,12 +13,21 @@ import {
   useNotificationSubscriptions,
   type NotificationType,
 } from '../hooks/useNotificationData';
+import { isNotificationTypeAvailable, NOT_AVAILABLE_COPY, NOT_AVAILABLE_DESCRIPTION } from '../lib/notificationEmitters';
+
+/** Visible focus and a 44 px target on coarse pointers (D-35). */
+const INTERACTIVE =
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background [@media(pointer:coarse)]:min-h-11';
 
 const NotificationManagementPage: React.FC = () => {
   const { data: types = [] } = useNotificationTypes();
   const { data: subs = [] } = useNotificationSubscriptions();
   const [filter, setFilter] = useState<string>('all');
   const [editing, setEditing] = useState<NotificationType | null>(null);
+
+  // A seeded engine type with no emitter yet (D-238) takes no subscriptions
+  // and is left out of the recipient stats: it is not a gap an admin can fill.
+  const availableTypes = useMemo(() => types.filter((t) => isNotificationTypeAvailable(t.key)), [types]);
 
   const subsByType = useMemo(() => {
     const map = new Map<string, typeof subs>();
@@ -30,11 +40,13 @@ const NotificationManagementPage: React.FC = () => {
   }, [subs]);
 
   const stats = useMemo(() => {
-    const configured = types.filter((t) => (subsByType.get(t.key)?.length ?? 0) > 0).length;
-    const noRecipients = types.length - configured;
-    const uniqueEmails = new Set(subs.map((s) => s.email).filter(Boolean)).size;
-    return { total: types.length, configured, noRecipients, uniqueEmails };
-  }, [types, subs, subsByType]);
+    const configured = availableTypes.filter((t) => (subsByType.get(t.key)?.length ?? 0) > 0).length;
+    const noRecipients = availableTypes.length - configured;
+    const uniqueEmails = new Set(
+      subs.filter((s) => isNotificationTypeAvailable(s.notification_type_key)).map((s) => s.email).filter(Boolean),
+    ).size;
+    return { total: availableTypes.length, configured, noRecipients, uniqueEmails };
+  }, [availableTypes, subs, subsByType]);
 
   const categories = useMemo(() => {
     const map = new Map<string, number>();
@@ -44,9 +56,9 @@ const NotificationManagementPage: React.FC = () => {
 
   const filtered = useMemo(() => {
     if (filter === 'all') return types;
-    if (filter === 'no_recipients') return types.filter((t) => (subsByType.get(t.key)?.length ?? 0) === 0);
+    if (filter === 'no_recipients') return availableTypes.filter((t) => (subsByType.get(t.key)?.length ?? 0) === 0);
     return types.filter((t) => t.category === filter);
-  }, [types, filter, subsByType]);
+  }, [types, availableTypes, filter, subsByType]);
 
   const grouped = useMemo(() => {
     const m = new Map<string, NotificationType[]>();
@@ -89,7 +101,11 @@ const NotificationManagementPage: React.FC = () => {
               </Chip>
             ))}
           </div>
-          <Button onClick={() => setEditing(types[0] ?? null)}>
+          <Button
+            className="[@media(pointer:coarse)]:h-11"
+            disabled={availableTypes.length === 0}
+            onClick={() => setEditing(availableTypes[0] ?? null)}
+          >
             <UserPlus className="w-4 h-4 mr-1.5" /> Subscribe Email
           </Button>
         </div>
@@ -101,12 +117,18 @@ const NotificationManagementPage: React.FC = () => {
                 {cat}
               </div>
               {items.map((t) => {
+                if (!isNotificationTypeAvailable(t.key)) return <DeferredTypeRow key={t.key} type={t} />;
                 const recipients = subsByType.get(t.key) ?? [];
                 return (
                   <button
                     key={t.key}
+                    type="button"
+                    data-notification-type={t.key}
                     onClick={() => setEditing(t)}
-                    className="w-full text-left bg-card border rounded-md px-3 py-2.5 hover:border-primary/40 hover:bg-muted/30 transition-colors flex items-center gap-3"
+                    className={cn(
+                      'w-full text-left bg-card border rounded-md px-3 py-2.5 hover:border-primary/40 hover:bg-muted/30 transition-colors flex items-center gap-3',
+                      INTERACTIVE,
+                    )}
                   >
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -138,10 +160,37 @@ const NotificationManagementPage: React.FC = () => {
       <EditSubscriptionDrawer
         type={editing}
         existing={editing ? subsByType.get(editing.key) ?? [] : []}
-        open={!!editing}
+        open={!!editing && isNotificationTypeAvailable(editing.key)}
         onClose={() => setEditing(null)}
       />
     </DashboardLayout>
+  );
+};
+
+/**
+ * A seeded engine type STORM cannot send yet (D-238): a plain row, not a
+ * button, so it opens no drawer and takes no subscription (non-negotiable 9).
+ */
+const DeferredTypeRow: React.FC<{ type: NotificationType }> = ({ type }) => {
+  const descriptionId = useId();
+  return (
+    <div
+      data-notification-type={type.key}
+      className="w-full bg-card border rounded-md px-3 py-2.5 flex items-center gap-3"
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm">{type.name}</span>
+          <CadenceBadge cadence={type.cadence} />
+        </div>
+        <div id={descriptionId} className="text-xs mt-0.5 text-muted-foreground">
+          {NOT_AVAILABLE_DESCRIPTION}
+        </div>
+      </div>
+      <StatusPill tone="neutral" icon={null} aria-describedby={descriptionId}>
+        {NOT_AVAILABLE_COPY}
+      </StatusPill>
+    </div>
   );
 };
 
@@ -156,9 +205,12 @@ const StatCard: React.FC<{ label: string; value: number; tone?: 'destructive' }>
 
 const Chip: React.FC<{ active?: boolean; tone?: 'destructive'; onClick: () => void; children: React.ReactNode }> = ({ active, tone, onClick, children }) => (
   <button
+    type="button"
+    aria-pressed={active ?? false}
     onClick={onClick}
     className={cn(
       'px-3 py-1 text-xs rounded-full border transition-colors',
+      INTERACTIVE,
       active
         ? tone === 'destructive'
           ? 'bg-destructive text-destructive-foreground border-destructive'

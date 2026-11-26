@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useId, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,31 @@ import {
   useToggleMyPreference,
   type NotificationType,
 } from '@/modules/notifications-admin/hooks/useNotificationData';
+import {
+  isNotificationTypeAvailable,
+  NOT_AVAILABLE_COPY,
+  NOT_AVAILABLE_DESCRIPTION,
+} from '@/modules/notifications-admin/lib/notificationEmitters';
+import { StatusPill } from '@/shared/components/status';
 import { useToast } from '@/shared/hooks/use-toast';
+
+/**
+ * A seeded engine type with no emitter yet (D-238): a plain pill, never a
+ * switch, so no preference write is reachable for it (non-negotiable 9).
+ */
+const NotAvailablePill: React.FC = () => {
+  const descriptionId = useId();
+  return (
+    <>
+      <StatusPill tone="neutral" icon={null} aria-describedby={descriptionId} title={NOT_AVAILABLE_DESCRIPTION}>
+        {NOT_AVAILABLE_COPY}
+      </StatusPill>
+      <span id={descriptionId} className="sr-only">
+        {NOT_AVAILABLE_DESCRIPTION}
+      </span>
+    </>
+  );
+};
 
 const NotificationsPage: React.FC = () => {
   const { data: types = [] } = useNotificationTypes();
@@ -69,6 +93,7 @@ const NotificationsPage: React.FC = () => {
               <div>
                 Every notification type you're eligible to receive is listed below. Use the toggles to control whether each one appears in your in-app inbox. Changes take effect immediately.
                 <div className="mt-1 opacity-80">Email delivery is configured separately by your administrator in Notification Management.</div>
+                <div className="mt-1 opacity-80">A type marked “{NOT_AVAILABLE_COPY}” is listed for completeness: STORM does not send it yet, so it has no toggle.</div>
               </div>
             </div>
 
@@ -79,7 +104,7 @@ const NotificationsPage: React.FC = () => {
                   {items.map((t) => {
                     const enabled = prefMap.get(t.key) ?? true;
                     return (
-                      <div key={t.key} className="bg-card border rounded-md px-3 py-2.5 flex items-center gap-3">
+                      <div key={t.key} data-notification-type={t.key} className="bg-card border rounded-md px-3 py-2.5 flex items-center gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm">{t.name}</span>
@@ -89,17 +114,21 @@ const NotificationsPage: React.FC = () => {
                             <p className="text-xs text-muted-foreground mt-0.5">{t.description}</p>
                           )}
                         </div>
-                        <Switch
-                          aria-label={`${enabled ? 'Hide' : 'Show'} ${t.name}`}
-                          checked={enabled}
-                          disabled={toggle.isPending}
-                          onCheckedChange={(v) =>
-                            toggle.mutate(
-                              { typeKey: t.key, enabled: v },
-                              { onError: (e: unknown) => toast({ title: 'Failed', description: e instanceof Error ? e.message : 'The preference was not saved.', variant: 'destructive' }) }
-                            )
-                          }
-                        />
+                        {isNotificationTypeAvailable(t.key) ? (
+                          <Switch
+                            aria-label={`${enabled ? 'Hide' : 'Show'} ${t.name}`}
+                            checked={enabled}
+                            disabled={toggle.isPending}
+                            onCheckedChange={(v) =>
+                              toggle.mutate(
+                                { typeKey: t.key, enabled: v },
+                                { onError: (e: unknown) => toast({ title: 'Failed', description: e instanceof Error ? e.message : 'The preference was not saved.', variant: 'destructive' }) }
+                              )
+                            }
+                          />
+                        ) : (
+                          <NotAvailablePill />
+                        )}
                       </div>
                     );
                   })}
