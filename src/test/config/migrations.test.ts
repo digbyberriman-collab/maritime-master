@@ -9,6 +9,16 @@
  * - is listed in supabase/MIGRATIONS-LEDGER.md with a known status, unless it
  *   is a Lovable UUID-named copy (Lovable ran it).
  *
+ * Per-stream ledger fragments (Phase 3 wave 1, platform prep PP1): every
+ * supabase/MIGRATIONS-LEDGER.d/*.md has the main ledger's "## Ledger" and
+ * "## Apply queue" tables and declares its block (`**Block:** \`<10
+ * digits>\``) and queue prefix (`**Queue prefix:** \`<letters>\``). Each
+ * hand-written file is listed exactly once across the main ledger and the
+ * fragments; a fragment lists only files of its block, blocks never
+ * overlap, and every fragment row has exactly one Apply queue row in that
+ * fragment, ordered <prefix>1, <prefix>2, … (no file of a fragment is in
+ * the main queue). The integrator folds the fragments back at the wave merge.
+ *
  * Every file from the build-out (version >= 20261123000000) is also
  * idempotent and safe, because the owner applies it by hand and Lovable may
  * re-run a pasted copy (D-01, D-12). The check is an allow-list: a top-level
@@ -75,6 +85,7 @@ import { join } from 'node:path';
 const ROOT = process.cwd();
 const MIGRATIONS = join(ROOT, 'supabase/migrations');
 const LEDGER = join(ROOT, 'supabase/MIGRATIONS-LEDGER.md');
+const LEDGER_FRAGMENTS = join(ROOT, 'supabase/MIGRATIONS-LEDGER.d');
 
 /** The first build-out version (D-12): files from here on must be idempotent. */
 export const BUILD_OUT_FROM = '20261123000000';
@@ -486,20 +497,111 @@ interface LedgerRow {
   status: string;
 }
 
-/** The rows of the ledger table (the "## Ledger" section only). */
-export function ledgerRows(markdown: string): LedgerRow[] {
-  const start = markdown.indexOf('\n## Ledger');
-  if (start === -1) return [];
+/** The text of one "## <heading>" section (up to the next "## "), or '' when absent. */
+function section(markdown: string, heading: string): string {
+  const start = markdown.indexOf(`\n## ${heading}`);
+  if (start === -1) return '';
   const rest = markdown.slice(start + 1);
   const end = rest.indexOf('\n## ', 3);
-  const section = end === -1 ? rest : rest.slice(0, end);
-  const rows: LedgerRow[] = [];
-  for (const line of section.split('\n')) {
+  return end === -1 ? rest : rest.slice(0, end);
+}
+
+/** Table rows of a section whose second cell is a backticked .sql file: [first cell, file, third cell]. */
+function fileRows(text: string): Array<[string, string, string]> {
+  const rows: Array<[string, string, string]> = [];
+  for (const line of text.split('\n')) {
     const cells = line.split('|').map((c) => c.trim());
     const file = cells[2]?.match(/^`([^`]+\.sql)`$/)?.[1];
-    if (file) rows.push({ file, status: cells[3] ?? '' });
+    if (file) rows.push([cells[1] ?? '', file, cells[3] ?? '']);
   }
   return rows;
+}
+
+/** The rows of the ledger table (the "## Ledger" section only). */
+export function ledgerRows(markdown: string): LedgerRow[] {
+  return fileRows(section(markdown, 'Ledger')).map(([, file, status]) => ({ file, status }));
+}
+
+interface QueueRow {
+  order: string;
+  file: string;
+}
+
+/** The rows of the Apply queue table (the "## Apply queue" section only). */
+export function queueRows(markdown: string): QueueRow[] {
+  return fileRows(section(markdown, 'Apply queue')).map(([order, file]) => ({ order, file }));
+}
+
+export interface LedgerFragment {
+  name: string;
+  /** The 10-digit version prefix (date + hour) whose files the fragment holds. */
+  block: string | null;
+  /** The Apply queue order prefix (`F` -> F1, F2, …). */
+  queuePrefix: string | null;
+  rows: LedgerRow[];
+  queue: QueueRow[];
+}
+
+/** One ledger fragment (supabase/MIGRATIONS-LEDGER.d/<name>.md), parsed. */
+export function parseLedgerFragment(name: string, markdown: string): LedgerFragment {
+  return {
+    name,
+    block: markdown.match(/\*\*Block:\*\* `(\d{10})`/)?.[1] ?? null,
+    queuePrefix: markdown.match(/\*\*Queue prefix:\*\* `([A-Z]+)`/)?.[1] ?? null,
+    rows: ledgerRows(markdown),
+    queue: queueRows(markdown),
+  };
+}
+
+/** What is wrong with the fragments, given the main ledger's rows and queue (the rules above). */
+export function fragmentProblems(main: { rows: LedgerRow[]; queue: QueueRow[] }, fragments: LedgerFragment[]): string[] {
+  const problems: string[] = [];
+  const blocks = new Map<string, string>();
+  const prefixes = new Map<string, string>();
+  const mainQueued = new Set(main.queue.map((q) => q.file));
+  for (const f of fragments) {
+    if (!f.block) problems.push(`${f.name}: no **Block:** \`<10-digit version prefix>\` line`);
+    else if (blocks.has(f.block)) problems.push(`${f.name}: block ${f.block} is also ${blocks.get(f.block)}'s`);
+    else blocks.set(f.block, f.name);
+    if (!f.queuePrefix) problems.push(`${f.name}: no **Queue prefix:** \`<letters>\` line`);
+    else if (prefixes.has(f.queuePrefix)) problems.push(`${f.name}: queue prefix ${f.queuePrefix} is also ${prefixes.get(f.queuePrefix)}'s`);
+    else prefixes.set(f.queuePrefix, f.name);
+    for (const r of f.rows) {
+      if (f.block && !r.file.startsWith(f.block)) problems.push(`${f.name}: ${r.file} is outside its block ${f.block}`);
+      if (mainQueued.has(r.file)) problems.push(`${f.name}: ${r.file} is also in the main Apply queue`);
+    }
+    const listed = new Set(f.rows.map((r) => r.file));
+    const queued = f.queue.map((q) => q.file);
+    for (const q of f.queue) if (!listed.has(q.file)) problems.push(`${f.name}: Apply queue row ${q.file} has no ledger row in this fragment`);
+    for (const file of listed) {
+      const n = queued.filter((q) => q === file).length;
+      if (n !== 1) problems.push(`${f.name}: ${file} has ${n} Apply queue rows (exactly one expected)`);
+    }
+    f.queue.forEach((q, i) => {
+      const want = `${f.queuePrefix ?? '?'}${i + 1}`;
+      if (q.order !== want) problems.push(`${f.name}: Apply queue order ${q.order} for ${q.file} (expected ${want})`);
+    });
+  }
+  // A block file outside its fragment is in the main ledger or another fragment.
+  for (const [block, name] of blocks) {
+    for (const r of main.rows) if (r.file.startsWith(block)) problems.push(`main ledger: ${r.file} belongs to ${name} (block ${block})`);
+    for (const f of fragments) {
+      if (f.name === name) continue;
+      for (const r of f.rows) if (r.file.startsWith(block)) problems.push(`${f.name}: ${r.file} belongs to ${name} (block ${block})`);
+    }
+  }
+  return problems;
+}
+
+/** The fragments on disk, in name order. */
+function readLedgerFragments(): LedgerFragment[] {
+  let names: string[] = [];
+  try {
+    names = readdirSync(LEDGER_FRAGMENTS).filter((n) => n.endsWith('.md')).sort();
+  } catch {
+    names = [];
+  }
+  return names.map((n) => parseLedgerFragment(n, readFileSync(join(LEDGER_FRAGMENTS, n), 'utf8')));
 }
 
 const files = readdirSync(MIGRATIONS).filter((f) => f.endsWith('.sql')).sort();
@@ -534,11 +636,25 @@ describe('migration files (gap/00 E1)', () => {
 });
 
 describe('migrations ledger (gap/00 E2, D-01)', () => {
-  const rows = ledgerRows(readFileSync(LEDGER, 'utf8'));
+  const mainText = readFileSync(LEDGER, 'utf8');
+  const mainRows = ledgerRows(mainText);
+  const fragments = readLedgerFragments();
+  // The main ledger and every fragment (PP1): each file exactly once across all of them.
+  const rows = [...mainRows, ...fragments.flatMap((f) => f.rows)];
   const handWritten = files.filter((f) => !LOVABLE_COPY.test(f));
 
   it('reads the ledger table', () => {
-    expect(rows.length).toBeGreaterThanOrEqual(27);
+    expect(mainRows.length).toBeGreaterThanOrEqual(27);
+  });
+
+  it('reads the per-stream fragments (crew and fleet in Phase 3 wave 1)', () => {
+    expect(fragments.map((f) => f.name)).toEqual(expect.arrayContaining(['crew.md', 'fleet.md']));
+    expect(fragments.find((f) => f.name === 'crew.md')).toMatchObject({ block: '2026112406', queuePrefix: 'C' });
+    expect(fragments.find((f) => f.name === 'fleet.md')).toMatchObject({ block: '2026112404', queuePrefix: 'F' });
+  });
+
+  it('keeps each fragment to its block, with one Apply queue row per file in prefix order', () => {
+    expect(fragmentProblems({ rows: mainRows, queue: queueRows(mainText) }, fragments)).toEqual([]);
   });
 
   it('lists every hand-written migration exactly once', () => {
@@ -867,5 +983,57 @@ CREATE SEQUENCE public.s;
       '| 1 | `20260101000000_a.sql` | Query A | Apply |',
     ].join('\n');
     expect(ledgerRows(`# Title\n\n${md}`)).toEqual([{ file: '20260101000000_a.sql', status: 'applied' }]);
+    expect(queueRows(`# Title\n\n${md}`)).toEqual([{ order: '1', file: '20260101000000_a.sql' }]);
+  });
+
+  it('checks ledger fragments: block, prefix, queue rows and their order, overlaps (PP1)', () => {
+    const fragment = (name: string, block: string, prefix: string, rows: string[], queue: Array<[string, string]>) =>
+      parseLedgerFragment(
+        name,
+        [
+          `# Fragment ${name}`,
+          `**Block:** \`${block}\``,
+          `**Queue prefix:** \`${prefix}\``,
+          '## Ledger',
+          '| # | File | Status | Evidence | Lovable copy | Notes |',
+          '|---|---|---|---|---|---|',
+          ...rows.map((f, i) => `| ${i + 1} | \`${f}\` | written, not applied | x | — | |`),
+          '',
+          '## Apply queue',
+          '| Order | File | Check first | If not live |',
+          '|---|---|---|---|',
+          ...queue.map(([o, f]) => `| ${o} | \`${f}\` | Query | Apply |`),
+        ].join('\n'),
+      );
+    const fleet = fragment('fleet.md', '2026112404', 'F', ['20261124040000_fleet_a.sql', '20261124040100_fleet_b.sql'], [['F1', '20261124040000_fleet_a.sql'], ['F2', '20261124040100_fleet_b.sql']]);
+    const crew = fragment('crew.md', '2026112406', 'C', ['20261124060100_crew_a.sql'], [['C1', '20261124060100_crew_a.sql']]);
+    const main = { rows: [{ file: '20261123000100_platform_x.sql', status: 'written, not applied' }], queue: [{ order: '23', file: '20261123000100_platform_x.sql' }] };
+    expect(fragmentProblems(main, [crew, fleet])).toEqual([]);
+    expect(parseLedgerFragment('x.md', '## Ledger\n')).toMatchObject({ block: null, queuePrefix: null, rows: [], queue: [] });
+
+    const bad = fragment('crew.md', '2026112406', 'C', ['20261124060100_crew_a.sql', '20261124040100_fleet_b.sql', '20261124060200_crew_b.sql'], [
+      ['C2', '20261124060100_crew_a.sql'],
+      ['C2', '20261124060100_crew_a.sql'],
+      ['C3', '20261124069900_crew_ghost.sql'],
+    ]);
+    expect(fragmentProblems({ rows: [...main.rows, { file: '20261124040000_fleet_a.sql', status: 'applied' }], queue: [] }, [bad, fleet])).toEqual([
+      'crew.md: 20261124040100_fleet_b.sql is outside its block 2026112406',
+      'crew.md: Apply queue row 20261124069900_crew_ghost.sql has no ledger row in this fragment',
+      'crew.md: 20261124060100_crew_a.sql has 2 Apply queue rows (exactly one expected)',
+      'crew.md: 20261124040100_fleet_b.sql has 0 Apply queue rows (exactly one expected)',
+      'crew.md: 20261124060200_crew_b.sql has 0 Apply queue rows (exactly one expected)',
+      'crew.md: Apply queue order C2 for 20261124060100_crew_a.sql (expected C1)',
+      'main ledger: 20261124040000_fleet_a.sql belongs to fleet.md (block 2026112404)',
+      'crew.md: 20261124040100_fleet_b.sql belongs to fleet.md (block 2026112404)',
+    ]);
+    const twin = fragment('other.md', '2026112404', 'F', [], []);
+    const anonymous = parseLedgerFragment('anon.md', '## Ledger\n');
+    expect(fragmentProblems({ rows: [], queue: [{ order: '24', file: '20261124040000_fleet_a.sql' }] }, [fleet, twin, anonymous])).toEqual([
+      'fleet.md: 20261124040000_fleet_a.sql is also in the main Apply queue',
+      'other.md: block 2026112404 is also fleet.md\'s',
+      'other.md: queue prefix F is also fleet.md\'s',
+      'anon.md: no **Block:** `<10-digit version prefix>` line',
+      'anon.md: no **Queue prefix:** `<letters>` line',
+    ]);
   });
 });

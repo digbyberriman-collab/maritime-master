@@ -141,14 +141,27 @@ const SUBCATEGORY_RULES: Readonly<Record<string, CapabilityRule | ActionOverride
   'fleet.operations.fleet_reports': rbac('reports', 'reports'),
   'fleet.operations.fleet_calendar': rbac('fleet', 'itinerary'),
   'fleet.operations.fleet_documents': rbac('documents', 'documents'),
+  'fleet.operations.fleet_training': rbac('training', 'development'),
+  // Fitness status reads like the vessel Crew Medical page; thresholds are clinical settings.
+  'fleet.operations.fleet_medical': { default: domain('fitness'), actions: { admin: domain('medical') } },
   'fleet.operations.fleet_checklists': rbac('ism', 'ism'),
   'fleet.operations.vessels': rbac('vessels', 'vessels'),
   'fleet.administration.notification_center': SIGNED_IN,
   'fleet.administration.support_tickets': { actions: { view_own: SIGNED_IN, create: SIGNED_IN } },
   'admin.system.feedback': { actions: { view_own: SIGNED_IN, create: SIGNED_IN } },
 
-  'vessel.crew.crew_certificates': rbac('crew_certificates', 'crew'),
-  'vessel.crew.familiarisation': rbac('training', 'development'),
+  // Own records (D-04; PP1): every signed-in crew member sees their own profile,
+  // documents, hours of rest and familiarisation. The server's view_own is an
+  // active member who reaches the vessel, and its definers check the subject.
+  'vessel.crew.crew_profiles': { default: rbac('crew_roster', 'crew'), actions: { view_own: SIGNED_IN } },
+  'vessel.crew.crew_certificates': { default: rbac('crew_certificates', 'crew'), actions: { view_own: SIGNED_IN } },
+  'vessel.crew.hours_of_rest': { default: rbac('crew_roster', 'crew'), actions: { view_own: SIGNED_IN } },
+  'vessel.crew.familiarisation': { default: rbac('training', 'development'), actions: { view_own: SIGNED_IN } },
+  'vessel.crew.crew_compliance': rbac('crew_certificates', 'crew'),
+  // Turning expiry alerts off is a certificates edit (T-160).
+  'vessel.crew.expiry_alerts': rbac('crew_certificates', 'crew'),
+  'vessel.crew.crew_medical': domain('fitness'),
+  'vessel.crew.crew_training': rbac('training', 'development'),
 
   'vessel.safety.drills': rbac('drills', 'ism'),
   'vessel.safety.permit_to_work': rbac('ptw', 'ism'),
@@ -160,6 +173,11 @@ const SUBCATEGORY_RULES: Readonly<Record<string, CapabilityRule | ActionOverride
   'vessel.safety.observations': rbac('observations', 'ism'),
   'vessel.safety.audits_surveys': rbac('audits_surveys', 'ism'),
   'vessel.safety.safety_meetings': rbac('meetings', 'ism'),
+  // Every crew member reads and acknowledges the fleet documents sent to them.
+  'vessel.safety.fleet_documents': {
+    default: rbac('documents', 'documents'),
+    actions: { view_own: SIGNED_IN, sign: SIGNED_IN },
+  },
   'vessel.safety.emergency_response': rbac('erm', 'ism'),
   'vessel.safety.sops_bridge': rbac('sops', 'ism'),
   'vessel.safety.sops_deck': rbac('sops', 'ism'),

@@ -23,7 +23,14 @@
 --     takes a uuid first is probed as each inactive persona (IS FALSE) or
 --     allow-listed with a reason, and no definer compares with
 --     "<> my_profile_id() / get_user_company_id() /
---     current_user_company_id()" unless allow-listed.
+--     current_user_company_id()" unless allow-listed. Phase 3 wave 1
+--     (PP1): the streams add their probes and allow-list entries in
+--     supabase/tests/fixtures/inactive-probes.d/*.json (entries
+--     {"probe": {"callee", "expr"}} or {"allow": {"callee", "reason"}};
+--     in an expr the tokens {company:A}, {vessel:A.dra}, {user:A.crew_hyd}
+--     and {profile:...} become the quoted ids of tests.company_id(),
+--     tests.vessel_id(), tests.user_id() and tests.profile_id()), merged by
+--     scripts/db/lib/fragments.mjs (a callee listed twice fails).
 -- Adapted from scratchpad verify-null-gates/v1_null_gates.sql and v2_legal.sql.
 
 SELECT tests.seed_two_tenants();
@@ -341,21 +348,61 @@ CREATE TEMP TABLE inv_probe (callee text PRIMARY KEY, expr text) ON COMMIT DROP;
 INSERT INTO inv_probe VALUES
   ('user_belongs_to_company', format('public.user_belongs_to_company(auth.uid(), %L)', tests.company_id('A'))),
   ('has_any_role', 'public.has_any_role(auth.uid(), enum_range(NULL::public.app_role))'),
-  ('has_capability_for', format('public.has_capability_for(auth.uid(), %L, %L, NULL)', 'users_access.admin', tests.company_id('A'))),
-  ('has_capability', format('public.has_capability(%L, %L, NULL)', 'users_access.admin', tests.company_id('A'))),
+  -- view_own is the widest crew key (any active member who reaches the vessel, PP1)
+  ('has_capability_for', format('public.has_capability_for(auth.uid(), %L, %L, NULL)', 'vessel.crew.crew_profiles.view_own', tests.company_id('A'))),
+  ('has_capability', format('public.has_capability(%L, %L, NULL)', 'vessel.crew.crew_profiles.view_own', tests.company_id('A'))),
   ('is_company_actor', 'public.is_company_actor(auth.uid(), NULL)'),
   ('admin_scope_all', format('public.admin_scope_all(auth.uid(), %L)', tests.company_id('A'))),
   ('admin_may_act_on_user', format('public.admin_may_act_on_user(auth.uid(), %L, %L, NULL)', tests.user_id('A.crew_hyd'), tests.company_id('A'))),
   ('record_readable', format('public.record_readable(%L, %L)', tests.company_id('A'), tests.vessel_id('A.dra'))),
   ('record_caller_may_write', format('public.record_caller_may_write(auth.uid(), %L, %L)', tests.company_id('A'), tests.vessel_id('A.dra')));
-INSERT INTO inv_probe
-SELECT r.callee, format('public.%I(auth.uid())', r.callee) FROM inv_required AS r
-WHERE r.one_arg AND NOT EXISTS (SELECT 1 FROM inv_probe AS x WHERE x.callee = r.callee);
 
 -- Callees that decide on something other than the caller, with the reason.
 CREATE TEMP TABLE inv_allow (callee text PRIMARY KEY, reason text NOT NULL) ON COMMIT DROP;
 INSERT INTO inv_allow VALUES
   ('record_slot_eligible', 'decides on a signature slot and the signing profile, not on the caller; record_sign_slot() and record_pass_slot() ask record_readable() / record_caller_may_write() about the active caller first (probed here)');
+
+-- The streams' fragments (PP1): probes and allow-list entries, with the
+-- id tokens substituted through the tests.* helpers. A callee the list
+-- above already has is a primary-key error (the file fails).
+\set probes_merge `node scripts/db/lib/fragments.mjs probes >/dev/null 2>&1 && echo ok || echo failed`
+SELECT tests.is(:'probes_merge', 'ok', 'inventory: the inactive-probes.d fragments merge without a callee listed twice');
+\set probe_fragments `node scripts/db/lib/fragments.mjs probes`
+CREATE TEMP TABLE inv_fragment ON COMMIT DROP AS
+SELECT e ->> 'kind' AS kind, e ->> 'callee' AS callee, e ->> 'expr' AS expr, e ->> 'reason' AS reason, e ->> 'source' AS source
+FROM jsonb_array_elements(:'probe_fragments'::jsonb) AS e;
+DO $$
+DECLARE
+  f record;
+  m text[];
+  v_expr text;
+BEGIN
+  FOR f IN SELECT * FROM inv_fragment ORDER BY source, callee LOOP
+    IF f.kind = 'allow' THEN
+      INSERT INTO inv_allow VALUES (f.callee, f.reason || ' (' || f.source || ')');
+      CONTINUE;
+    END IF;
+    v_expr := f.expr;
+    FOR m IN SELECT regexp_matches(f.expr, '\{(company|vessel|user|profile):([A-Za-z0-9_.]+)\}', 'g') LOOP
+      v_expr := replace(v_expr, '{' || m[1] || ':' || m[2] || '}', quote_literal(CASE m[1]
+        WHEN 'company' THEN tests.company_id(m[2])
+        WHEN 'vessel' THEN tests.vessel_id(m[2])
+        WHEN 'user' THEN tests.user_id(m[2])
+        ELSE tests.profile_id(m[2])
+      END));
+    END LOOP;
+    IF v_expr ~ '\{[a-z]+:' THEN
+      RAISE EXCEPTION 'inactive-probes fragment %: unknown token in "%"', f.source, f.expr;
+    END IF;
+    INSERT INTO inv_probe VALUES (f.callee, v_expr);
+  END LOOP;
+END
+$$;
+
+INSERT INTO inv_probe
+SELECT r.callee, format('public.%I(auth.uid())', r.callee) FROM inv_required AS r
+WHERE r.one_arg AND NOT EXISTS (SELECT 1 FROM inv_probe AS x WHERE x.callee = r.callee)
+  AND NOT EXISTS (SELECT 1 FROM inv_allow AS a WHERE a.callee = r.callee);
 -- Definers that may compare with "<> my_profile_id() / get_user_company_id()
 -- / current_user_company_id()", with the reason (none today).
 CREATE TEMP TABLE inv_ne_allow (ident text PRIMARY KEY, reason text NOT NULL) ON COMMIT DROP;

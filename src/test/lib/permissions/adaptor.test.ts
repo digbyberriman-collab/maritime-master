@@ -333,7 +333,147 @@ describe('adaptor coverage', () => {
         // legal_can_*: everyone may raise and follow their own legal requests.
         'vessel.management.legal.view_own',
         'vessel.management.legal.create',
+        // Every crew member reads and acknowledges the fleet documents sent to them.
+        'vessel.safety.fleet_documents.view_own',
+        'vessel.safety.fleet_documents.sign',
+        // Own crew records (the server adds vessel reach; definers check the subject).
+        'vessel.crew.crew_profiles.view_own',
+        'vessel.crew.crew_certificates.view_own',
+        'vessel.crew.hours_of_rest.view_own',
+        'vessel.crew.familiarisation.view_own',
       ].sort(),
     );
+  });
+});
+
+const crewNavOnly = { canAccessModule: (id: string) => id === 'crew' };
+
+describe('Phase 3 wave 1 keys (platform prep PP1)', () => {
+  it.each([
+    'vessel.crew.crew_profiles.view_own',
+    'vessel.crew.crew_certificates.view_own',
+    'vessel.crew.hours_of_rest.view_own',
+    'vessel.crew.familiarisation.view_own',
+  ])('%s: any signed-in crew member, own record only', (key) => {
+    expect(can(key, { legacyRole: 'crew' }).allowed).toBe(true);
+    expect(can(key, { rbacInitialized: false }).allowed).toBe(true);
+    expect(can(key, { legacyRole: 'crew' }, { subjectProfileId: 'p-other' }).allowed).toBe(false);
+    expect(can(key, { signedIn: false }).status).toBe('signed_out');
+  });
+
+  it('own-record rules leave the other crew actions on their modules', () => {
+    expect(can('vessel.crew.crew_profiles.view', { legacyRole: 'crew' }).allowed).toBe(false);
+    expect(can('vessel.crew.crew_profiles.view', crewNavOnly).allowed).toBe(true);
+    expect(can('vessel.crew.crew_certificates.edit', { permissions: [perm('crew_certificates', 'edit')] }).allowed).toBe(true);
+    expect(can('vessel.crew.hours_of_rest.create', crewNavOnly).allowed).toBe(true); // crewCreates
+    expect(can('vessel.crew.hours_of_rest.edit', crewNavOnly).allowed).toBe(false);
+    expect(can('vessel.crew.familiarisation.sign', { canAccessModule: (id: string) => id === 'development' }).allowed).toBe(true); // crewSigns
+    expect(can('vessel.crew.familiarisation.sign', { legacyRole: 'crew' }).allowed).toBe(false);
+  });
+
+  const crewNav = { canAccessModule: (id: string) => id === 'crew' };
+  const devNav = { canAccessModule: (id: string) => id === 'development' };
+  const docsNav = { canAccessModule: (id: string) => id === 'documents' };
+
+  it('vessel.crew.crew_compliance: crew certificates view sees it, admin configures it', () => {
+    expect(can('vessel.crew.crew_compliance.view', { permissions: [perm('crew_certificates', 'view')] }).allowed).toBe(true);
+    expect(can('vessel.crew.crew_compliance.view', crewNav).allowed).toBe(true);
+    expect(can('vessel.crew.crew_compliance.view', { permissions: [perm('crew_roster', 'admin')] }).allowed).toBe(false);
+    expect(can('vessel.crew.crew_compliance.admin', { permissions: [perm('crew_certificates', 'edit')] }).allowed).toBe(false);
+    expect(can('vessel.crew.crew_compliance.admin', { permissions: [perm('crew_certificates', 'admin')] }).allowed).toBe(true);
+    expect(can('vessel.crew.crew_compliance.admin', crewNav).allowed).toBe(false);
+    expect(can('vessel.crew.crew_compliance.admin', { legacyRole: 'shore_management' }).allowed).toBe(true);
+  });
+
+  it('vessel.crew.expiry_alerts.edit is a crew certificates edit (T-160)', () => {
+    const key = 'vessel.crew.expiry_alerts.edit';
+    expect(ruleForCapability('vessel.crew.expiry_alerts', 'vessel.crew', 'edit')).toEqual({ kind: 'rbac', module: 'crew_certificates', nav: 'crew' });
+    expect(can(key, { permissions: [perm('crew_certificates', 'view')] }).allowed).toBe(false);
+    expect(can(key, crewNav).allowed).toBe(false);
+    expect(can(key, { permissions: [perm('crew_certificates', 'edit')] }).allowed).toBe(true);
+    expect(can(key, { rbacRoles: ['superadmin'] }).allowed).toBe(true);
+  });
+
+  it.each(['vessel.crew.crew_medical.view', 'vessel.crew.crew_medical.export'])('%s follows fitness to work', (key) => {
+    expect(can(key, { rbacRoles: ['captain'] }).allowed).toBe(true);
+    expect(can(key, { legacyRole: 'chief_officer' }).allowed).toBe(true); // HR view
+    expect(can(key, { practitionerDisciplines: ['medical'] }).allowed).toBe(true);
+    expect(can(key, { legacyRole: 'crew' }).allowed).toBe(false);
+    expect(can(key, crewNav).allowed).toBe(false);
+    expect(can(key, { practitionerDisciplinesLoaded: false, rbacRoles: ['captain'] }).status).toBe('loading');
+  });
+
+  it('vessel.crew.crew_training follows the training module (crewCreates)', () => {
+    expect(getCatalogueEntry('vessel.crew.crew_training')?.crewCreates).toBe(true);
+    expect(can('vessel.crew.crew_training.view_own', devNav).allowed).toBe(true);
+    expect(can('vessel.crew.crew_training.view_own', devNav, { subjectProfileId: 'p-other' }).allowed).toBe(false);
+    expect(can('vessel.crew.crew_training.view', devNav).allowed).toBe(true);
+    expect(can('vessel.crew.crew_training.export', { permissions: [perm('training', 'view')] }).allowed).toBe(true);
+    expect(can('vessel.crew.crew_training.create', devNav).allowed).toBe(true); // crewCreates
+    expect(can('vessel.crew.crew_training.edit', devNav).allowed).toBe(false);
+    expect(can('vessel.crew.crew_training.edit', { permissions: [perm('training', 'edit')] }).allowed).toBe(true);
+    expect(can('vessel.crew.crew_training.approve', { permissions: [perm('training', 'edit')] }).allowed).toBe(true);
+    expect(can('vessel.crew.crew_training.final_approve', { permissions: [perm('training', 'edit')] }).allowed).toBe(false);
+    expect(can('vessel.crew.crew_training.final_approve', { permissions: [perm('training', 'admin')] }).allowed).toBe(true);
+    expect(can('vessel.crew.crew_training.view', crewNav).allowed).toBe(false);
+  });
+
+  it('vessel.safety.fleet_documents: any crew member reads and acknowledges; the documents module manages', () => {
+    expect(getCatalogueEntry('vessel.safety.fleet_documents')?.crewSigns).toBe(true);
+    expect(can('vessel.safety.fleet_documents.view_own').allowed).toBe(true);
+    expect(can('vessel.safety.fleet_documents.sign').allowed).toBe(true);
+    expect(can('vessel.safety.fleet_documents.sign', { rbacInitialized: false }).allowed).toBe(true);
+    expect(can('vessel.safety.fleet_documents.sign', { signedIn: false }).status).toBe('signed_out');
+    expect(can('vessel.safety.fleet_documents.view').allowed).toBe(false);
+    expect(can('vessel.safety.fleet_documents.view', docsNav).allowed).toBe(true);
+    expect(can('vessel.safety.fleet_documents.view', { canAccessModule: (id: string) => id === 'ism' }).allowed).toBe(false);
+    expect(can('vessel.safety.fleet_documents.assign', docsNav).allowed).toBe(false);
+    expect(can('vessel.safety.fleet_documents.assign', { permissions: [perm('documents', 'edit')] }).allowed).toBe(true);
+    expect(can('vessel.safety.fleet_documents.admin', { permissions: [perm('documents', 'edit')] }).allowed).toBe(false);
+    expect(can('vessel.safety.fleet_documents.admin', { permissions: [perm('documents', 'admin')] }).allowed).toBe(true);
+  });
+
+  it('fleet.operations.fleet_training follows the training module', () => {
+    const viewer = { permissions: [perm('training', 'view')] };
+    const editor = { permissions: [perm('training', 'edit')] };
+    const admin = { permissions: [perm('training', 'admin')] };
+    expect(can('fleet.operations.fleet_training.view', devNav).allowed).toBe(true);
+    expect(can('fleet.operations.fleet_training.export', viewer).allowed).toBe(true);
+    expect(can('fleet.operations.fleet_training.create', viewer).allowed).toBe(false);
+    expect(can('fleet.operations.fleet_training.create', editor).allowed).toBe(true);
+    expect(can('fleet.operations.fleet_training.edit', editor).allowed).toBe(true);
+    expect(can('fleet.operations.fleet_training.approve', editor).allowed).toBe(true);
+    expect(can('fleet.operations.fleet_training.final_approve', editor).allowed).toBe(false);
+    expect(can('fleet.operations.fleet_training.final_approve', admin).allowed).toBe(true);
+    expect(can('fleet.operations.fleet_training.admin', editor).allowed).toBe(false);
+    expect(can('fleet.operations.fleet_training.admin', admin).allowed).toBe(true);
+    expect(can('fleet.operations.fleet_training.view', { canAccessModule: (id: string) => id === 'fleet' }).allowed).toBe(false);
+  });
+
+  it('fleet.operations.fleet_medical: fitness viewers read and export; medical admins set thresholds', () => {
+    for (const key of ['fleet.operations.fleet_medical.view', 'fleet.operations.fleet_medical.export']) {
+      expect(can(key, { rbacRoles: ['fleet_master'] }).allowed).toBe(true);
+      expect(can(key, { legacyRole: 'master' }).allowed).toBe(true); // HR edit includes view
+      expect(can(key, { legacyRole: 'crew' }).allowed).toBe(false);
+    }
+    expect(ruleForCapability('fleet.operations.fleet_medical', 'fleet.operations', 'admin')).toEqual({ kind: 'domain', domain: 'medical' });
+    expect(can('fleet.operations.fleet_medical.admin', { rbacRoles: ['captain'] }).allowed).toBe(false);
+    expect(can('fleet.operations.fleet_medical.admin', { practitionerDisciplines: ['medical'] }).allowed).toBe(false); // edit, not admin
+    expect(can('fleet.operations.fleet_medical.admin', { permissions: [perm('medical', 'admin')] }).allowed).toBe(true);
+    expect(can('fleet.operations.fleet_medical.admin', { legacyRole: 'dpa' }).allowed).toBe(true);
+  });
+
+  it('fleet.operations.fleet_documents gains assign and admin on the documents module', () => {
+    expect(can('fleet.operations.fleet_documents.assign', docsNav).allowed).toBe(false);
+    expect(can('fleet.operations.fleet_documents.assign', { permissions: [perm('documents', 'edit')] }).allowed).toBe(true);
+    expect(can('fleet.operations.fleet_documents.admin', { permissions: [perm('documents', 'edit')] }).allowed).toBe(false);
+    expect(can('fleet.operations.fleet_documents.admin', { permissions: [perm('documents', 'admin')] }).allowed).toBe(true);
+  });
+
+  it('fleet.operations.fleet_reports gains admin on the reports module', () => {
+    expect(can('fleet.operations.fleet_reports.admin', { canAccessModule: (id: string) => id === 'reports' }).allowed).toBe(false);
+    expect(can('fleet.operations.fleet_reports.admin', { permissions: [perm('reports', 'edit')] }).allowed).toBe(false);
+    expect(can('fleet.operations.fleet_reports.admin', { permissions: [perm('reports', 'admin')] }).allowed).toBe(true);
+    expect(can('fleet.operations.fleet_reports.admin', { rbacRoles: ['dpa'] }).allowed).toBe(true);
   });
 });

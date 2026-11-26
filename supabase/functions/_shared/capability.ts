@@ -27,8 +27,8 @@ import type { AuthContext } from './auth.ts';
 import { asRow, bool, isMissingFunction, type Row, rowsOf, text } from './db.ts';
 import { HttpError } from './http.ts';
 
-/** Every key `has_capability` answers in Phase 2 (spec §A.4). Anything else is false. */
-export const CAPABILITY_KEYS = [
+/** The Phase 2 admin keys (spec §A.4): the ones `legacyCapability` can evaluate without the RPC. */
+export const ADMIN_CAPABILITY_KEYS = [
   'admin.access.users_access.view',
   'admin.access.users_access.assign',
   'admin.access.users_access.admin',
@@ -37,7 +37,55 @@ export const CAPABILITY_KEYS = [
   'fleet.operations.vessels.view',
   'fleet.operations.vessels.admin',
 ] as const;
+
+/**
+ * The crew keys `has_capability` answers from Phase 3 wave 1 (platform prep
+ * PP1; X1 spec §5), mirroring the client adaptor. They have no legacy rule
+ * here: while the RPC is missing (D-01) they are refused (fail closed).
+ */
+export const CREW_CAPABILITY_KEYS = [
+  'vessel.crew.crew_list.view',
+  'vessel.crew.crew_list.export',
+  'vessel.crew.crew_profiles.view',
+  'vessel.crew.crew_profiles.view_own',
+  'vessel.crew.crew_profiles.create',
+  'vessel.crew.crew_profiles.edit',
+  'vessel.crew.crew_certificates.view',
+  'vessel.crew.crew_certificates.view_own',
+  'vessel.crew.crew_certificates.create',
+  'vessel.crew.crew_certificates.edit',
+  'vessel.crew.crew_certificates.approve',
+  'vessel.crew.expiry_alerts.edit',
+  'vessel.crew.crew_compliance.view',
+  'vessel.crew.crew_compliance.admin',
+  'vessel.crew.crew_assignments.view',
+  'vessel.crew.crew_assignments.assign',
+  'vessel.crew.crew_assignments.approve',
+  'vessel.crew.crew_scheduling.view',
+  'vessel.crew.crew_scheduling.edit',
+  'vessel.crew.hours_of_rest.view_own',
+  'vessel.crew.hours_of_rest.view',
+  'vessel.crew.hours_of_rest.create',
+  'vessel.crew.hours_of_rest.edit',
+  'vessel.crew.hours_of_rest.approve',
+  'vessel.crew.hours_of_rest.final_approve',
+  'vessel.crew.hours_of_rest.export',
+  'vessel.crew.familiarisation.view_own',
+  'vessel.crew.familiarisation.view',
+  'vessel.crew.familiarisation.create',
+  'vessel.crew.familiarisation.edit',
+  'vessel.crew.familiarisation.sign',
+  'vessel.crew.familiarisation.approve',
+  'hris.leave_rotation.leave_requests.approve',
+  'hris.employee_records.contracts_employment.view',
+  'hris.employee_records.contracts_employment.edit',
+  'health.personnel_medical.crew_medical_records.view',
+] as const;
+
+/** Every key `has_capability` answers (SQL 20261123000400). Anything else is false. */
+export const CAPABILITY_KEYS = [...ADMIN_CAPABILITY_KEYS, ...CREW_CAPABILITY_KEYS] as const;
 export type CapabilityKey = (typeof CAPABILITY_KEYS)[number];
+type AdminCapabilityKey = (typeof ADMIN_CAPABILITY_KEYS)[number];
 
 export interface CapabilityScope {
   /**
@@ -60,6 +108,10 @@ export function isCapabilityKey(key: string): key is CapabilityKey {
   return (CAPABILITY_KEYS as readonly string[]).includes(key);
 }
 
+function isAdminCapabilityKey(key: string): key is AdminCapabilityKey {
+  return (ADMIN_CAPABILITY_KEYS as readonly string[]).includes(key);
+}
+
 function scopeCompany(ctx: AuthContext, scope: CapabilityScope): string | null {
   return scope.companyId === undefined ? ctx.companyId : scope.companyId;
 }
@@ -76,6 +128,8 @@ export async function hasCapability(ctx: AuthContext, key: CapabilityKey, scope:
   });
   if (!error) return data === true;
   if (!isMissingFunction(error)) throw UNAVAILABLE();
+  // The crew keys have no legacy rule (D-01): refused until the RPC is applied.
+  if (!isAdminCapabilityKey(key)) return false;
   return legacyCapability(ctx, key, { companyId, vesselId: scope.vesselId ?? null });
 }
 
@@ -135,11 +189,12 @@ async function legacyVesselReach(ctx: AuthContext, vesselId: string): Promise<bo
  * admin. That is today's admin-actions gate. `assign` also admits a legacy
  * master for a vessel in their reach; `fleet.operations.vessels.view` admits
  * D-26 fleet reach or reach of the given vessel; `roles_permissions.admin`
- * is never granted to a tenant. Callers have already checked that the scope
- * company is the caller's own.
+ * is never granted to a tenant; a crew key (no legacy rule) is never
+ * granted. Callers have already checked that the scope company is the
+ * caller's own.
  */
 export async function legacyCapability(ctx: AuthContext, key: CapabilityKey, scope: CapabilityScope): Promise<boolean> {
-  if (!isCapabilityKey(key) || key === 'admin.access.roles_permissions.admin') return false;
+  if (!isAdminCapabilityKey(key) || key === 'admin.access.roles_permissions.admin') return false;
   const companyId = scopeCompany(ctx, scope);
   if (!companyId || !ctx.companyId || companyId !== ctx.companyId) return false;
 

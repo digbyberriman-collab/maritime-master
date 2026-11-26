@@ -1,6 +1,15 @@
 import { assert, assertEquals, assertFalse, assertRejects } from 'jsr:@std/assert@1.0.13';
 import { getAuthContext } from './auth.ts';
-import { assertCapability, assertCapabilityForVessels, assertMayActOnUser, type CapabilityKey, hasCapability, legacyCapability } from './capability.ts';
+import {
+  assertCapability,
+  assertCapabilityForVessels,
+  assertMayActOnUser,
+  CAPABILITY_KEYS,
+  type CapabilityKey,
+  CREW_CAPABILITY_KEYS,
+  hasCapability,
+  legacyCapability,
+} from './capability.ts';
 import { HttpError } from './http.ts';
 import { callsOf, fail, fakeClientFactory, type FakeWorld, ok } from './testing/fakeSupabase.ts';
 import { buildWorld, CO_A, CO_B, P, type Persona, profileRow, request, TEST_ENV, V_A1, V_A2, V_A_SOLD, V_B1 } from './testing/world.ts';
@@ -126,6 +135,39 @@ Deno.test('legacy: a read error while checking → 503 (fail closed)', async () 
   world.hooks.query = (q) => (q.table === 'user_roles' ? fail('XX000', 'boom') : undefined);
   const err = await assertRejects(() => hasCapability(ctx, 'admin.access.users_access.admin', { companyId: CO_A }), HttpError);
   assertEquals(err.code, 'status_unavailable');
+});
+
+// ---- crew keys (Phase 3 wave 1, platform prep PP1) ----------------------------------------------
+
+Deno.test('crew keys: the list matches the SQL crew keys, and every one is a capability key', () => {
+  assertEquals(CREW_CAPABILITY_KEYS.length, 36);
+  assertEquals(new Set(CAPABILITY_KEYS).size, CAPABILITY_KEYS.length, 'no key listed twice');
+  for (const key of CREW_CAPABILITY_KEYS) assert(CAPABILITY_KEYS.includes(key), key);
+  assertFalse((CAPABILITY_KEYS as readonly string[]).includes('health.personnel_medical.fitness_to_work.view'), 'fitness to work stays unanswered');
+});
+
+Deno.test('crew keys: asked of has_capability as the caller with the scope', async () => {
+  const world = buildWorld({ p3: true });
+  world.rpcs.has_capability = (args) => ok(args.p_key === 'vessel.crew.hours_of_rest.approve' && args.p_vessel_id === V_A1);
+  const ctx = await ctxFor(world, P.masterA);
+  assert(await hasCapability(ctx, 'vessel.crew.hours_of_rest.approve', { companyId: CO_A, vesselId: V_A1 }));
+  assertFalse(await hasCapability(ctx, 'vessel.crew.hours_of_rest.approve', { companyId: CO_A, vesselId: V_A2 }));
+  const call = callsOf(world, 'rpc').find((c) => c.fn === 'has_capability');
+  assert(call);
+  assertEquals(call.caller.role, 'user');
+  assertEquals(call.args, { p_key: 'vessel.crew.hours_of_rest.approve', p_company_id: CO_A, p_vessel_id: V_A1 });
+});
+
+Deno.test('crew keys (D-01, has_capability missing): refused without a legacy read, even for a full legacy admin', async () => {
+  const world = buildWorld({ p3: false });
+  const ctx = await ctxFor(world, P.adminA);
+  const before = callsOf(world, 'query').length;
+  assertFalse(await hasCapability(ctx, 'vessel.crew.crew_list.view', { companyId: CO_A, vesselId: V_A1 }));
+  assertFalse(await legacyCapability(ctx, 'vessel.crew.crew_profiles.edit', { companyId: CO_A }));
+  assertEquals(callsOf(world, 'query').length, before, 'no legacy table read');
+  const err = await assertRejects(() => assertCapability(ctx, 'vessel.crew.crew_compliance.admin', { companyId: CO_A }), HttpError);
+  assertEquals([err.status, err.code], [403, 'forbidden']);
+  assert(await hasCapability(ctx, 'admin.access.users_access.admin', { companyId: CO_A }), 'the admin keys keep their legacy rule');
 });
 
 // ---- assertMayActOnUser (D-194, D-195, D-207) ---------------------------------------------------

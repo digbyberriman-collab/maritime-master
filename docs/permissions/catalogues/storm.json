@@ -726,7 +726,14 @@
             {
               "key": "fleet_reports",
               "label": "Fleet Reports",
-              "actions": "dash"
+              "actions": [
+                "view",
+                "export",
+                "admin"
+              ],
+              "labels": {
+                "admin": "Set expiry alert windows"
+              }
             },
             {
               "key": "fleet_calendar",
@@ -739,9 +746,68 @@
               "key": "fleet_documents",
               "label": "Fleet Documents",
               "route": "/documents",
-              "actions": "doc",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "delete",
+                "export",
+                "assign",
+                "admin"
+              ],
               "crewVisible": true,
-              "auditVisible": true
+              "auditVisible": true,
+              "labels": {
+                "assign": "Target documents at vessels",
+                "admin": "Manage document sections and types"
+              }
+            },
+            {
+              "key": "fleet_training",
+              "label": "Fleet Training",
+              "route": "/fleet/training",
+              "actions": [
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "final_approve",
+                "admin",
+                "export"
+              ],
+              "tier": "T2",
+              "owners": [
+                "shore_hr"
+              ],
+              "hodApproves": true,
+              "labels": {
+                "view": "View fleet training",
+                "create": "Add training courses",
+                "approve": "Approve training applications",
+                "final_approve": "Final approval of training applications",
+                "admin": "Configure the training programme"
+              },
+              "navLabels": [
+                "Training"
+              ]
+            },
+            {
+              "key": "fleet_medical",
+              "label": "Fleet Medical",
+              "route": "/fleet/medical",
+              "actions": [
+                "view",
+                "export",
+                "admin"
+              ],
+              "tier": "T3",
+              "owners": [
+                "medical"
+              ],
+              "labels": {
+                "view": "See crew medical status across the fleet",
+                "admin": "Set medical thresholds"
+              }
             },
             {
               "key": "fleet_checklists",
@@ -980,6 +1046,73 @@
               "auditVisible": true,
               "labels": {
                 "sign": "Acknowledge familiarisation"
+              }
+            },
+            {
+              "key": "crew_compliance",
+              "label": "Crew Compliance",
+              "route": "/crew/compliance",
+              "actions": [
+                "view",
+                "admin"
+              ],
+              "deptScoped": false,
+              "auditVisible": true,
+              "labels": {
+                "view": "See crew compliance",
+                "admin": "Configure crew requirements"
+              }
+            },
+            {
+              "key": "expiry_alerts",
+              "label": "Expiry Alerts",
+              "actions": [
+                "edit"
+              ],
+              "labels": {
+                "edit": "Turn expiry alerts on or off"
+              },
+              "notes": "Edit-level control over crew document expiry alerts (T-160)."
+            },
+            {
+              "key": "crew_medical",
+              "label": "Crew Medical",
+              "route": "/crew/medical",
+              "actions": [
+                "view",
+                "export"
+              ],
+              "tier": "T3",
+              "owners": [
+                "medical",
+                "purser_office"
+              ],
+              "labels": {
+                "view": "See crew fitness status"
+              },
+              "notes": "Fitness status and dates only; clinical detail stays under health.personnel_medical."
+            },
+            {
+              "key": "crew_training",
+              "label": "Crew Training",
+              "route": "/crew/training",
+              "actions": [
+                "view_own",
+                "view",
+                "create",
+                "edit",
+                "approve",
+                "final_approve",
+                "export"
+              ],
+              "tier": "T2",
+              "crewCreates": "self",
+              "hodApproves": true,
+              "labels": {
+                "view": "See vessel training",
+                "create": "Apply for training",
+                "approve": "Approve training (HOD)",
+                "final_approve": "Final training approval (Master)"
               }
             }
           ]
@@ -1320,6 +1453,26 @@
               "crewSigns": true,
               "labels": {
                 "sign": "Sign meeting attendance"
+              }
+            },
+            {
+              "key": "fleet_documents",
+              "label": "Fleet Documents",
+              "route": "/safety/fleet-documents",
+              "actions": [
+                "view_own",
+                "view",
+                "sign",
+                "assign",
+                "admin"
+              ],
+              "crewSigns": true,
+              "labels": {
+                "view_own": "Read fleet documents sent to me",
+                "view": "See acknowledgements on this vessel",
+                "sign": "Acknowledge a fleet document",
+                "assign": "Ask crew to acknowledge",
+                "admin": "Manage fleet documents on this vessel"
               }
             }
           ]

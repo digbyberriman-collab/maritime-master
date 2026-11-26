@@ -12,6 +12,8 @@ Which hand-written migrations in `supabase/migrations/` are live, which are not,
 - Rows name roles, never people (D-08).
 - There is one database today, the live one. No staging project exists yet (gap/00 open question 2), so "applied" means applied live.
 
+**Per-stream fragments (Phase 3 wave 1).** While two streams build in one tree, each records its own migrations in a fragment, never in this file: X5 Fleet operations in [`MIGRATIONS-LEDGER.d/fleet.md`](MIGRATIONS-LEDGER.d/fleet.md) (block `2026112404`, queue orders `F1`, `F2`, …) and X1 Crew in [`MIGRATIONS-LEDGER.d/crew.md`](MIGRATIONS-LEDGER.d/crew.md) (block `2026112406`, orders `C1`, `C2`, …). A fragment has this file's *Ledger* and *Apply queue* tables, with the same columns and statuses, and lists only files of its own block. Each hand-written file has exactly one row across this file and the fragments, and every fragment row has exactly one queue row in its fragment; `src/test/config/migrations.test.ts` checks all of it. Fleet rows apply after order 23 and the wave-1 platform files listed after it here; crew rows apply after the fleet rows, except `20261124061200_crew_import_tenancy.sql`, which may apply any time after order 23. At the wave-1 merge the integrator folds both fragments into this file (rows, queue orders and check queries) and deletes them.
+
 ## Status vocabulary
 
 | Status | Meaning | Evidence that counts |

@@ -29,13 +29,21 @@
  * reported but do not fail. It never edits a TS file: fixes are Lane 2
  * followups.
  *
- * Library: loadPending, compareContract, classifyColumnText (tests).
+ * Per-stream fragments (Phase 3 wave 1, PP1): the *.json files of
+ * contract-map.d/ beside the map are merged into it in file-name order by
+ * scripts/db/lib/fragments.mjs (files[] concatenated, a file named twice is
+ * an error; notMirrored merged, a key twice is an error; knownMismatches
+ * concatenated). Every check, the stale ones included, runs on the merged
+ * map, and a stale entry names the file that holds it.
+ *
+ * Library: loadPending, compareContract, classifyColumnText, loadMergedMap (tests).
  * Exit 0 green; 1 mismatches; 3 usage or input error.
  */
 import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import ts from 'typescript';
+import { FragmentError, mergeContractMap, readFragments } from './lib/fragments.mjs';
 import { sqlTypeClass } from './schema-export.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -335,6 +343,8 @@ export function compareContract(exportDoc, pending, map, { typesFunctions = new 
   const all = [];
   const warnings = [];
   const notMirrored = map.notMirrored ?? {};
+  // The file that holds a map entry (a fragment, or the main map).
+  const src = (key) => map.sources?.[key] ?? 'contract-map.json';
   const relationColumns = (name) => exportDoc.tables[name]?.columns ?? exportDoc.views[name]?.columns ?? null;
   const seen = { tables: new Map(), views: new Map(), columns: new Map(), functions: new Map() };
 
@@ -476,17 +486,17 @@ export function compareContract(exportDoc, pending, map, { typesFunctions = new 
     if (seen.functions.has(name) && (notMirrored.functions ?? {})[name]) all.push({ key: `map:function:${name}:both`, message: `${name} is declared in a pending file and also listed in notMirrored.functions` });
   }
   for (const name of Object.keys(notMirrored.functions ?? {})) {
-    if (!newCallable.has(name)) all.push({ key: `map:function:${name}:stale`, message: `contract-map.json notMirrored.functions.${name}: no new authenticated-executable function by that name (remove the entry)` });
+    if (!newCallable.has(name)) all.push({ key: `map:function:${name}:stale`, message: `${src(`notMirrored.functions.${name}`)} notMirrored.functions.${name}: no new authenticated-executable function by that name (remove the entry)` });
   }
   for (const name of Object.keys(notMirrored.tables ?? {})) {
-    if (!exportDoc.tables[name]) all.push({ key: `map:table:${name}:stale`, message: `contract-map.json notMirrored.tables.${name}: no new table by that name (remove the entry)` });
+    if (!exportDoc.tables[name]) all.push({ key: `map:table:${name}:stale`, message: `${src(`notMirrored.tables.${name}`)} notMirrored.tables.${name}: no new table by that name (remove the entry)` });
   }
   for (const name of Object.keys(notMirrored.views ?? {})) {
-    if (!exportDoc.views[name]) all.push({ key: `map:view:${name}:stale`, message: `contract-map.json notMirrored.views.${name}: no new view by that name (remove the entry)` });
+    if (!exportDoc.views[name]) all.push({ key: `map:view:${name}:stale`, message: `${src(`notMirrored.views.${name}`)} notMirrored.views.${name}: no new view by that name (remove the entry)` });
   }
   for (const key of Object.keys(notMirrored.columns ?? {})) {
     const [table, col] = key.split('.');
-    if (!exportDoc.legacyColumns[table]?.[col]) all.push({ key: `map:column:${key}:stale`, message: `contract-map.json notMirrored.columns.${key}: no new legacy column by that name (remove the entry)` });
+    if (!exportDoc.legacyColumns[table]?.[col]) all.push({ key: `map:column:${key}:stale`, message: `${src(`notMirrored.columns.${key}`)} notMirrored.columns.${key}: no new legacy column by that name (remove the entry)` });
   }
 
   // Legacy functions (in types.ts) the build-out made non-executable for the browser.
@@ -508,7 +518,7 @@ export function compareContract(exportDoc, pending, map, { typesFunctions = new 
     } else mismatches.push(m);
   }
   for (const key of knownKeys.keys()) {
-    if (!hit.has(key)) mismatches.push({ key: `map:known:${key}:stale`, message: `contract-map.json knownMismatches ${key}: no longer occurs (Lane 2 fixed it): remove the entry` });
+    if (!hit.has(key)) mismatches.push({ key: `map:known:${key}:stale`, message: `${src(`known:${key}`)} knownMismatches ${key}: no longer occurs (Lane 2 fixed it): remove the entry` });
   }
   const counts = {
     tables: [...declaredTables.keys()].length,
@@ -520,6 +530,20 @@ export function compareContract(exportDoc, pending, map, { typesFunctions = new 
     exportFunctions: Object.keys(exportDoc.functions).length,
   };
   return { mismatches, known, warnings, counts };
+}
+
+// ------------------------------------------------------------------ fragments
+
+/**
+ * The main map at `mapPath` merged with the fragments of the
+ * `<map name>.d/` directory beside it (contract-map.json + contract-map.d/).
+ * Throws a FragmentError on a duplicate or an invalid fragment.
+ */
+export function loadMergedMap(mapPath, { root = ROOT } = {}) {
+  const abs = resolve(mapPath);
+  const main = { file: relative(root, abs).split('\\').join('/') || basename(abs), doc: JSON.parse(readFileSync(abs, 'utf8')) };
+  const fragDir = relative(root, join(dirname(abs), `${basename(abs, '.json')}.d`)).split('\\').join('/');
+  return mergeContractMap(main, readFragments(fragDir, { root }));
 }
 
 // ------------------------------------------------------------------ CLI
@@ -552,9 +576,16 @@ async function main() {
   try {
     opts = parseCli(process.argv.slice(2));
     exportDoc = JSON.parse(readFileSync(opts.export, 'utf8'));
-    map = JSON.parse(readFileSync(opts.map, 'utf8'));
+    map = loadMergedMap(opts.map, { root: opts.root });
     if (exportDoc.kind !== 'buildout-export') throw new Error(`${opts.export} is not a build-out export (run schema-export.mjs with --baseline)`);
   } catch (err) {
+    if (err instanceof FragmentError) {
+      // A duplicate or invalid fragment is a contract failure, reported like any mismatch.
+      const mismatches = err.problems.map((p) => ({ key: 'map:fragment', message: `contract-map fragments: ${p}` }));
+      if (opts?.json) process.stdout.write(`${JSON.stringify({ mismatches, known: [], warnings: [], counts: null }, null, 2)}\n`);
+      else for (const m of mismatches) process.stdout.write(`MISMATCH ${m.message} [${m.key}]\n`);
+      return 1;
+    }
     process.stderr.write(`check-pending-contract: ${err.message}\nUsage: node scripts/db/check-pending-contract.mjs --export <export.json> [--map <contract-map.json>] [--root <repo>] [--json]\n`);
     return 3;
   }

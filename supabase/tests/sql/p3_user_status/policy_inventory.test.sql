@@ -40,9 +40,14 @@
 --                  id): reference data or a legacy hole
 --   other          anything else (must stay empty)                                residual
 
--- The policies and tables the build-out files create (parsed from the files).
-\set bo_policies `grep -hoE 'CREATE POLICY ("[^"]+"|[a-z0-9_]+) ON ([a-z_]+\.)?[a-z0-9_]+' supabase/migrations/20261123*.sql | sort -u`
-\set bo_tables `grep -hoE 'CREATE TABLE IF NOT EXISTS ([a-z_]+\.)?[a-z0-9_]+' supabase/migrations/20261123*.sql | sort -u`
+-- The policies and tables the build-out files create (parsed from the
+-- files): the platform files (20261123*) and, from Phase 3 wave 1 (PP1),
+-- the stream files (20261124*), to which the same build-out rules apply.
+-- The counts below are lower bounds for sanity and upper bounds for the
+-- residual ratchet, so a stream that drops a legacy residual policy stays
+-- green.
+\set bo_policies `grep -hoE 'CREATE POLICY ("[^"]+"|[a-z0-9_]+) ON ([a-z_]+\.)?[a-z0-9_]+' supabase/migrations/2026112[34]*.sql | sort -u`
+\set bo_tables `grep -hoE 'CREATE TABLE IF NOT EXISTS ([a-z_]+\.)?[a-z0-9_]+' supabase/migrations/2026112[34]*.sql | sort -u`
 
 CREATE TEMP TABLE bo_policy ON COMMIT DROP AS
 SELECT DISTINCT btrim(m[1], '"') AS policyname, coalesce(nullif(rtrim(m[2], '.'), ''), 'public') AS schemaname, m[3] AS tablename

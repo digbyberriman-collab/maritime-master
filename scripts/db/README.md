@@ -194,6 +194,18 @@ The two snapshots are `$TMPDIR/storm-schema-legacy-<pid>.json` and `$TMPDIR/stor
 
 `contract-map.json` governs it: `files` (= spec §B.1: each pending file, its type names and the names it must declare), `notMirrored` (new objects the browser never calls, each with a reason: the service-only outbox, RLS predicates, pure helpers) and `knownMismatches` (`{ key, followup }`: a reported mismatch whose fix is a Lane 2 followup; listed, not failed). A `notMirrored` or `knownMismatches` entry that no longer matches anything fails the run ("remove the entry"), so the map cannot rot. The checker never edits a TS file. Warnings (never failures) name view unions and legacy functions in `types.ts` that the browser can no longer execute.
 
+#### Per-stream fragments (Phase 3 wave 1)
+
+Two streams build in one tree and commit by explicit path, so the shared inventories take one fragment per stream beside the main file, and the main files stay platform-only. `scripts/db/lib/fragments.mjs` merges them in file-name order; a name two files claim is an error, never a silent override. The integrator folds the fragments into the main files at the wave merge.
+
+| Main file | Fragments (X1: `crew.json`, X5: `fleet.json`) | Merge rule | Read by |
+|---|---|---|---|
+| `scripts/db/contract-map.json` | `scripts/db/contract-map.d/*.json`, `{ "version": 1, "files": [], "notMirrored": {}, "knownMismatches"?: [] }` | `files[]` concatenated (a `file` named twice fails); `notMirrored.{tables, views, functions, columns}` merged (a key twice fails); `knownMismatches` concatenated (a key twice fails) | `check-pending-contract.mjs` (the `<map>.d/` directory beside `--map`). Every check, the stale ones included, runs on the merged map; a stale entry names the fragment that holds it; a duplicate is a `map:fragment` mismatch (exit 1) |
+| `supabase/tests/fixtures/function-grants.json` | `supabase/tests/fixtures/function-grants.d/*.json`, `{ "functions"?: {…}, "relations"?: {…} }` (seeded `{}`) | merged by key (a key twice fails) | `zz_platform/acl.test.sql` through `node scripts/db/lib/fragments.mjs grants` |
+| the probe list of `p3_user_status/inactive_gates.test.sql` | `supabase/tests/fixtures/inactive-probes.d/*.json`, an array of `{ "probe": { "callee", "expr" } }` or `{ "allow": { "callee", "reason" } }` (seeded `[]`) | concatenated (a callee twice fails; a callee the test already lists is a primary-key error) | `inactive_gates.test.sql` through `node scripts/db/lib/fragments.mjs probes`. In an `expr`, `{company:A}`, `{vessel:A.dra}`, `{user:A.crew_hyd}` and `{profile:…}` become the quoted ids of `tests.company_id()`, `tests.vessel_id()`, `tests.user_id()`, `tests.profile_id()` (the `seed_two_tenants()` world); any other `{word:` token fails the file |
+
+`node scripts/db/lib/fragments.mjs grants|probes|contract-map [--root <repo>]` prints the merged JSON and exits 0, or prints nothing on stdout, the problems on stderr, and exits 1. The ACL and inventory tests also glob the stream files: `supabase/migrations/2026112[34]*.sql` (functions, relations and policies of `20261124*` files are held to the same rules as the platform's).
+
 Run it alone on a kept cluster:
 
 ```bash
@@ -314,7 +326,8 @@ The kept database holds the replay, the build-out and the test library (each tes
 | `scripts/db/harness.mjs` | the CLI and the phases |
 | `scripts/db/fidelity.mjs` | the `types.ts` comparison (library and CLI) |
 | `scripts/db/schema-export.mjs` | schema snapshot and build-out export (library and CLI) |
-| `scripts/db/check-pending-contract.mjs`, `contract-map.json` | the pending-type contract check and its map |
+| `scripts/db/check-pending-contract.mjs`, `contract-map.json`, `contract-map.d/*.json` | the pending-type contract check, its map and the per-stream map fragments |
+| `scripts/db/lib/fragments.mjs` | the per-stream fragment merge (contract map, function grants, inactive-gate probes; library and CLI) |
 | `scripts/db/lib/cli.mjs` | flags and usage |
 | `scripts/db/lib/pg.mjs` | binary discovery, cluster start / stop |
 | `scripts/db/lib/psql.mjs` | psql runner, error extraction |
@@ -327,8 +340,8 @@ The kept database holds the replay, the build-out and the test library (each tes
 | `supabase/tests/harness/testlib.sql` | the `tests` schema |
 | `supabase/tests/harness/replay.json`, `drift/*.sql` | replay governance and drift patches |
 | `supabase/tests/sql/**/*.test.sql` | SQL tests |
-| `supabase/tests/fixtures/*.json` | fixtures shared with the TS tests; `function-grants.json` is the ACL inventory asserted by `zz_platform/acl.test.sql` |
-| `scripts/db/gen-*.mjs` | fixture generators from the frozen TS engines (`--check` exits 1 when a fixture is out of date): `gen-vessel-code-corpus.mjs`, `gen-reference-fixture.mjs`, `gen-module-settings-fixture.mjs`, `gen-record-fixtures.mjs` (record-transitions, record-vessel-lock, record-signature-scenarios, record-thread-scenarios) |
+| `supabase/tests/fixtures/*.json` | fixtures shared with the TS tests; `function-grants.json` (plus `function-grants.d/*.json`) is the ACL inventory asserted by `zz_platform/acl.test.sql`; `inactive-probes.d/*.json` are the streams' inactive-gate probes |
+| `scripts/db/gen-*.mjs` | fixture generators from the frozen TS engines (`--check` exits 1 when a fixture is out of date): `gen-vessel-code-corpus.mjs`, `gen-reference-fixture.mjs`, `gen-module-settings-fixture.mjs`, `gen-record-fixtures.mjs` (record-transitions, record-vessel-lock, record-signature-scenarios, record-thread-scenarios), `gen-capability-cases.mjs` (`capability-cases.json`: the client adaptor `resolveCapability()` over a persona matrix for every crew key `has_capability_for` answers; `p2_capabilities/crew_keys.test.sql` seeds the personas, asserts parity and runs the generator with `--check`, so the fixture must be regenerated whenever the adaptor, the catalogue, `canAccessModule`'s tables in `AuthContext.tsx` or `CREW_CAPABILITY_KEYS` change) |
 
 `STORM_DB_MIGRATIONS_DIR=<dir>` points the harness at another migrations directory; it exists only for testing the harness itself (a scratch copy of the migrations plus synthetic build-out files).
 

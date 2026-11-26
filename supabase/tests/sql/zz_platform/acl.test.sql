@@ -6,10 +6,18 @@
 -- create grants anon nothing, authenticated exactly the fixture's
 -- privileges, and the service role full access; nothing the build-out
 -- creates is missing from the fixture, and nothing in the fixture is gone.
+--
+-- Phase 3 wave 1 (PP1): the build-out is the platform files (20261123*)
+-- and the stream files (20261124*), and the fixture is
+-- function-grants.json merged with the per-stream fragments
+-- function-grants.d/*.json (scripts/db/lib/fragments.mjs, which exits
+-- non-zero and prints nothing on a key two files list).
 
-\set grants `cat supabase/tests/fixtures/function-grants.json`
-\set bo_functions `grep -hoE 'CREATE OR REPLACE FUNCTION public\.[a-z0-9_]+' supabase/migrations/20261123*.sql | sort -u`
-\set bo_relations `grep -hoE 'CREATE (TABLE IF NOT EXISTS|OR REPLACE VIEW) public\.[a-z0-9_]+' supabase/migrations/20261123*.sql | sort -u`
+\set grants_merge `node scripts/db/lib/fragments.mjs grants >/dev/null 2>&1 && echo ok || echo failed`
+SELECT tests.is(:'grants_merge', 'ok', 'function-grants.json and function-grants.d/*.json merge without a key listed twice');
+\set grants `node scripts/db/lib/fragments.mjs grants`
+\set bo_functions `grep -hoE 'CREATE OR REPLACE FUNCTION public\.[a-z0-9_]+' supabase/migrations/2026112[34]*.sql | sort -u`
+\set bo_relations `grep -hoE 'CREATE (TABLE IF NOT EXISTS|OR REPLACE VIEW) public\.[a-z0-9_]+' supabase/migrations/2026112[34]*.sql | sort -u`
 
 -- The functions and relations the build-out files name (parsed from the files).
 CREATE TEMP TABLE bo_function_name ON COMMIT DROP AS
