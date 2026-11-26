@@ -20,9 +20,14 @@ export const MY_DOCUMENTS_PATH = 'documents';
  * X1-03 adds the routed crew profile: crew/people/:profileId redirects to
  * its Personal tab and crew/people/:profileId/:tab is the page (guard: the
  * scope; the page gates on the person's own profile or
- * vessel.crew.crew_profiles.view, and the server again). The static
- * crew/people/:crewId/hours-of-rest (the month page) outranks the :tab
- * route until X1-07B makes Hours of rest a profile tab.
+ * vessel.crew.crew_profiles.view, and the server again).
+ * X1-07B made Hours of rest a profile tab: the static
+ * crew/people/:crewId/hours-of-rest route (the old month page) is gone, so
+ * the profile's :tab route serves that URL, and a legacy login id in it
+ * (the board's and the crew list's links, the legacy /crew/work-rest/:crewId
+ * redirect) is resolved by the profile page. The Hours of Rest leaf keeps
+ * covering crew/people/<person>/hours-of-rest, so the vessel's crew_hor
+ * setting still closes it.
  * X1-03B adds Add crew member at crew/new (guard
  * vessel.crew.crew_profiles.create; the page checks the key for the route
  * vessel again, and Save also needs users-access administration because
@@ -81,8 +86,6 @@ export const CREW_ROUTES: readonly RouteDef[] = [
   vesselRedirect(CREW_PATHS.compliance, 'status'),
   vesselCapabilityPage(`${CREW_PATHS.compliance}/:tab`, CREW_CAPS.complianceView, () => import('@/modules/crew/pages/CrewCompliancePage')),
   vesselPage(CREW_PATHS.hoursOfRest, () => import('@/modules/work-rest/pages/WorkRestOverview')),
-  // One crew member's month: the target of the legacy /crew/work-rest/:crewId.
-  vesselPage(CREW_PATHS.personHoursOfRest, () => import('@/modules/work-rest/pages/MyWorkRestMonth')),
   vesselRedirect(CREW_PATHS.planner, 'timeline'),
   vesselPage(CREW_PATHS.plannerTimeline, () => import('@/modules/rotation-planner/pages/RotationPlannerPage')),
   vesselPage(CREW_PATHS.plannerManning, () => import('@/modules/crew/pages/LeavePlannerPage')),

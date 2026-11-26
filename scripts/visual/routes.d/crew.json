@@ -437,5 +437,69 @@
         "wait": 400
       }
     ]
+  },
+  {
+    "path": "/me/hours-of-rest?view=week",
+    "slug": "hor-me-week",
+    "waitFor": "[data-week-view]",
+    "note": "X1-07B: the Week view: the week's days, each with its state and a timeline that edits in place"
+  },
+  {
+    "path": "/me/hours-of-rest?view=day",
+    "slug": "hor-me-day-keyboard",
+    "waitFor": "[data-day-editor]",
+    "note": "X1-07B: the day editor with its periods list and Add period; the timeline focused from the keyboard (cursor and ring), one quarter hour switched with Space, the unsaved-changes bar",
+    "actions": [
+      {
+        "click": "[data-day-editor] [role=\"slider\"]"
+      },
+      {
+        "press": "PageUp"
+      },
+      {
+        "press": "Shift+ArrowRight"
+      },
+      {
+        "press": "Shift+ArrowRight"
+      },
+      {
+        "wait": 200
+      }
+    ]
+  },
+  {
+    "path": "/me/hours-of-rest",
+    "slug": "hor-me-fill",
+    "waitFor": "[data-hor-fill]",
+    "note": "X1-07B: Fill days: copy the day before, a day of the month or a watch pattern onto a range of days, with what it will fill",
+    "actions": [
+      {
+        "click": "[data-hor-fill]"
+      },
+      {
+        "waitFor": "[data-fill-preview]"
+      },
+      {
+        "wait": 200
+      }
+    ]
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/hours-of-rest?month=2026-11",
+    "slug": "crew-profile-hours-of-rest",
+    "waitFor": "[data-hor-scope=\"profile\"]",
+    "note": "X1-07B: the profile's Hours of rest tab (replaces the crew/people/:crewId/hours-of-rest page): the crew member's month on DRAAK with the sign-off panel as an approver sees it (HoD nudge, approval blocked by an unreviewed breach)"
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/hours-of-rest?month=2026-10",
+    "slug": "crew-profile-hours-of-rest-reopened",
+    "waitFor": "[data-hor-scope=\"profile\"]",
+    "note": "X1-07B: a reopened month: the reason, the stale crew signature kept out of the steps, days open again"
+  },
+  {
+    "path": "/v/dra/crew/people/a0000000-0000-4000-8000-000000000015/hours-of-rest?year=2026&month=10",
+    "slug": "crew-profile-hours-of-rest-legacy-id",
+    "expectRedirect": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/hours-of-rest",
+    "note": "X1-07B: an old link with the login id and ?year=&month= (the board, the crew list, /crew/work-rest/:crewId) lands on the profile's tab, month kept"
   }
 ]

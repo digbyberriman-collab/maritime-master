@@ -21,7 +21,7 @@ import {
 } from '@/modules/crew/lib/profileTabs';
 
 describe('the registry', () => {
-  it('lists Personal and Contact (X1-03), Documents, STCW and Qualifications (X1-04B), Training, Medical and Activity (X1-03B), Personal first (the default)', () => {
+  it('lists Personal and Contact (X1-03), Documents, STCW and Qualifications (X1-04B), Training, Medical and Activity (X1-03B), Hours of rest (X1-07B), Personal first (the default)', () => {
     expect(PROFILE_TABS.map((t) => [t.key, t.label])).toEqual([
       ['personal', 'Personal'],
       ['contact', 'Contact'],
@@ -29,6 +29,7 @@ describe('the registry', () => {
       ['stcw', 'STCW'],
       ['qualifications', 'Qualifications'],
       ['training', 'Training'],
+      ['hours-of-rest', 'Hours of rest'],
       ['medical', 'Medical'],
       ['activity', 'Activity'],
     ]);
@@ -49,10 +50,15 @@ describe('the registry', () => {
     for (const tab of PROFILE_TABS) {
       expect(isCapabilityKey(tab.capability), tab.key).toBe(true);
       expect(catalogue.has(tab.capability), tab.key).toBe(true);
-      // X1 spec §4: every tab but Medical needs crew profile view (own always); Medical needs the medical capability, own included.
+      // X1 spec §4: Medical needs the medical capability, own included; Hours of rest needs hours of rest view
+      // (own always: view_own); every other tab crew profile view (own always).
       if (tab.key === 'medical') {
         expect(tab.capability).toBe(CREW_CAPS.medicalRecordsView);
         expect(tab.ownAlways).toBe(false);
+      } else if (tab.key === 'hours-of-rest') {
+        expect(tab.capability).toBe(CREW_CAPS.horView);
+        expect(tab.ownAlways).toBe(true);
+        expect(tab.moduleSetting).toBe('crew_hor');
       } else {
         expect(tab.capability).toBe(CREW_CAPS.profilesView);
         expect(tab.ownAlways).toBe(true);
@@ -69,6 +75,7 @@ describe('the registry', () => {
     expect(profileTabFor('contact')?.label).toBe('Contact');
     expect(profileTabFor('medical')?.label).toBe('Medical');
     expect(profileTabFor('stcw')?.label).toBe('STCW');
+    expect(profileTabFor('hours-of-rest')?.label).toBe('Hours of rest');
     expect(profileTabFor('employment')).toBeNull();
     expect(profileTabFor('nonsense')).toBeNull();
     expect(profileTabFor(null)).toBeNull();
@@ -95,18 +102,25 @@ describe('visibleProfileTabs', () => {
 
   it('without it (D-01): the own profile always, else the capability', () => {
     const docs = ['documents', 'stcw', 'qualifications'];
-    expect(visibleProfileTabs({ serverTabs: null, own: true, can: none }).map((t) => t.key)).toEqual(['personal', 'contact', ...docs, 'training', 'activity']);
+    expect(visibleProfileTabs({ serverTabs: null, own: true, can: none }).map((t) => t.key)).toEqual(['personal', 'contact', ...docs, 'training', 'hours-of-rest', 'activity']);
     expect(visibleProfileTabs({ serverTabs: null, own: false, can: (k) => k === CREW_CAPS.profilesView }).map((t) => t.key)).toEqual(['personal', 'contact', ...docs, 'training', 'activity']);
+    // Hours of rest of others needs hours of rest view (X1-07B).
+    expect(visibleProfileTabs({ serverTabs: null, own: false, can: (k) => k === CREW_CAPS.profilesView || k === CREW_CAPS.horView }).map((t) => t.key)).toEqual([
+      'personal', 'contact', ...docs, 'training', 'hours-of-rest', 'activity',
+    ]);
     // Medical opens only with the medical capability, own profile included (X1-03B).
-    expect(visibleProfileTabs({ serverTabs: null, own: true, can: (k) => k === CREW_CAPS.medicalRecordsView }).map((t) => t.key)).toEqual(['personal', 'contact', ...docs, 'training', 'medical', 'activity']);
-    expect(PROFILE_TAB_CAPABILITIES).toEqual([CREW_CAPS.profilesView, CREW_CAPS.medicalRecordsView]);
+    expect(visibleProfileTabs({ serverTabs: null, own: true, can: (k) => k === CREW_CAPS.medicalRecordsView }).map((t) => t.key)).toEqual(['personal', 'contact', ...docs, 'training', 'hours-of-rest', 'medical', 'activity']);
+    expect(PROFILE_TAB_CAPABILITIES).toEqual([CREW_CAPS.profilesView, CREW_CAPS.horView, CREW_CAPS.medicalRecordsView]);
     expect(visibleProfileTabs({ serverTabs: null, own: false, can: none })).toEqual([]);
   });
 
-  it('a module setting that is off closes a tab that names it', () => {
-    const tabs = visibleProfileTabs({ serverTabs: null, own: true, can: all, moduleOn: () => false });
-    // No built tab names a module setting, so all stay.
-    expect(tabs.map((t) => t.key)).toEqual(['personal', 'contact', 'documents', 'stcw', 'qualifications', 'training', 'medical', 'activity']);
+  it('a module setting that is off closes a tab that names it (Hours of rest: crew_hor)', () => {
+    const off = visibleProfileTabs({ serverTabs: null, own: true, can: all, moduleOn: (key) => key !== 'crew_hor' });
+    expect(off.map((t) => t.key)).toEqual(['personal', 'contact', 'documents', 'stcw', 'qualifications', 'training', 'medical', 'activity']);
+    // Also over the server's list.
+    expect(visibleProfileTabs({ serverTabs: ['personal', 'hours-of-rest'], own: true, can: all, moduleOn: () => false }).map((t) => t.key)).toEqual(['personal']);
+    const on = visibleProfileTabs({ serverTabs: null, own: true, can: all, moduleOn: () => true });
+    expect(on.map((t) => t.key)).toContain('hours-of-rest');
   });
 });
 

@@ -1,14 +1,20 @@
 /**
  * Moving within the vessel scope never leaves it (D-13; gap/00 B4): the
- * Hours of Rest crew switch, toolbar and board links keep the one shell and
- * the month. Moved unchanged from src/test/router/logbookScope.test.tsx by
- * platform-prep PP2; the hours-of-rest pages are the work-rest module's (X1).
+ * Hours of Rest links keep the one shell and the month. Moved from
+ * src/test/router/logbookScope.test.tsx by platform-prep PP2; the
+ * hours-of-rest pages are the work-rest module's (X1).
+ *
+ * X1-07B: one crew member's month is the crew profile's Hours of rest tab
+ * (crew/people/:profileId/hours-of-rest). The old links carry a login id
+ * and ?year=&month= (the board, the crew list, the legacy
+ * /crew/work-rest/:crewId redirect): they land on the profile's tab in the
+ * scope, the id replaced by the profile's and the month kept.
  *
  * The real route tree (routeHarness), the real VesselScopeRoute, LegacyRoute
- * and DashboardLayout; auth, RBAC and VesselContext are in-memory fakes and
- * the shell's heavy children are stubbed (as in scopes.test.tsx). The
- * hours-of-rest pages are the real ones, with their data hooks and panels
- * stubbed.
+ * and DashboardLayout; auth, RBAC, capabilities and VesselContext are
+ * in-memory fakes and the shell's heavy children are stubbed (as in
+ * scopes.test.tsx). The pages are the real ones (the board, the crew
+ * profile, the Hours of rest tab), with the month's data and panels stubbed.
  */
 import React, { useMemo, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -20,19 +26,22 @@ import type { Vessel } from '@/modules/vessels/contexts/VesselContext';
 
 const mocks = vi.hoisted(() => ({
   auth: {
-    user: { id: 'u1' },
-    profile: { id: 'p1', role: 'master', company_id: 'c1', user_id: 'u1', first_name: 'Me', last_name: 'Master' },
+    user: { id: 'a0000000-0000-4000-8000-0000000000a1' },
+    profile: { id: 'b0000000-0000-4000-8000-0000000000a1', role: 'master', company_id: 'c1', user_id: 'a0000000-0000-4000-8000-0000000000a1', first_name: 'Me', last_name: 'Master' },
     loading: false,
     userRole: 'master',
     // Read by the nav filter (the vessel nav runs in the scope since S4).
     practitionerDisciplines: [] as string[],
     practitionerDisciplinesLoaded: true,
+    canAccessModule: () => true,
   },
+  // The capabilities the pages ask useCan for (granted keys).
+  caps: new Set<string>(),
   perm: {
     isInitialized: true,
     isLoading: false,
     // Whose roles these are; the scope routes count them only for that user.
-    loadedFor: 'u1' as string | null,
+    loadedFor: 'a0000000-0000-4000-8000-0000000000a1' as string | null,
     hasFleetAccess: false,
     userRoles: [] as { role_name: string }[],
     setCurrentVessel: () => undefined,
@@ -49,13 +58,18 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@/integrations/supabase/client', () => {
   type Row = Record<string, unknown>;
-  const crew: Row[] = [
-    { user_id: 'u1', vessel_id: 'v-draak', is_current: true, profiles: { user_id: 'u1', first_name: 'Me', last_name: 'Master', rank: 'Master' } },
-    { user_id: 'other', vessel_id: 'v-draak', is_current: true, profiles: { user_id: 'other', first_name: 'Ann', last_name: 'Deck', rank: 'Bosun' } },
+  const profiles: Row[] = [
+    { id: 'b0000000-0000-4000-8000-0000000000a1', user_id: 'a0000000-0000-4000-8000-0000000000a1', first_name: 'Me', last_name: 'Master', preferred_name: null, avatar_url: null, position: 'Master', rank: 'Master', department: 'Deck', account_status: 'active' },
+    { id: 'b0000000-0000-4000-8000-0000000000a2', user_id: 'a0000000-0000-4000-8000-0000000000a2', first_name: 'Ann', last_name: 'Deck', preferred_name: null, avatar_url: null, position: 'Bosun', rank: 'Bosun', department: 'Deck', account_status: 'active' },
   ];
+  const assignment = (user: string, position: string): Row => ({
+    id: `a-${user.slice(-2)}`, user_id: user, vessel_id: 'v-draak', is_current: true, department: 'Deck', position, rank: position,
+    join_date: '2026-01-01', start_date: null, leave_date: null, end_date: null,
+    profiles: profiles.find((p) => p.user_id === user),
+  });
   const tables: Record<string, Row[]> = {
-    crew_assignments: crew,
-    profiles: crew.map((r) => r.profiles as Row),
+    crew_assignments: [assignment('a0000000-0000-4000-8000-0000000000a1', 'Master'), assignment('a0000000-0000-4000-8000-0000000000a2', 'Bosun')],
+    profiles,
   };
   const from = (table: string) => {
     const filters: ((r: Row) => boolean)[] = [];
@@ -63,11 +77,22 @@ vi.mock('@/integrations/supabase/client', () => {
     const builder = {
       select: () => builder,
       order: () => builder,
+      limit: () => builder,
+      // The profile lookup by id or login id (D-01 fallback of crew_profile_resolve); kept as all rows.
+      or: () => builder,
+      gte: () => builder,
+      lte: () => builder,
+      in: () => builder,
+      is: () => builder,
       eq: (k: string, v: unknown) => {
         filters.push((r) => r[k] === undefined || r[k] === v);
         return builder;
       },
       maybeSingle: () => {
+        single = true;
+        return builder;
+      },
+      single: () => {
         single = true;
         return builder;
       },
@@ -78,7 +103,17 @@ vi.mock('@/integrations/supabase/client', () => {
     };
     return builder;
   };
-  return { supabase: { from } };
+  // No crew or engine RPC is applied (D-01): every page takes its documented fallback.
+  const rpc = async () => ({ data: null, error: { code: 'PGRST202', message: 'Could not find the function in the schema cache' } });
+  return { supabase: { from, rpc } };
+});
+vi.mock('@/lib/permissions/useCan', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/permissions/useCan')>();
+  return {
+    ...actual,
+    useCan: (key: string) => mocks.caps.has(key),
+    useCapability: (key: string) => ({ allowed: mocks.caps.has(key), status: mocks.caps.has(key) ? 'granted' : 'denied', reason: 'test' }),
+  };
 });
 // The vessel's module settings: the table is not live (D-01), so every module is on.
 vi.mock('@/modules/vessels/hooks/useVesselModuleSettings', async (importOriginal) => {
@@ -130,40 +165,41 @@ vi.mock('@/shared/components/layout/SidebarNavigation', async () => {
   };
 });
 
-// A native select, so a test can pick from it.
-vi.mock('@/components/ui/select', async () => {
-  const react = await import('react');
+// Hours of rest: the month data stubbed (the views and the tab are real), the side panels stubbed.
+vi.mock('@/modules/work-rest/hooks/useMonthlyWorkRest', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/modules/work-rest/hooks/useMonthlyWorkRest')>();
+  const { calculateCompliance } = await import('@/modules/work-rest/lib/complianceEngine');
+  const { DEFAULT_RULE_SET } = await import('@/modules/work-rest/types');
+  const submission = (o: { crewId: string; vesselId: string; year: number; month: number }) => ({
+    id: 'sub-1', crew_id: o.crewId, vessel_id: o.vesselId, period_year: o.year, period_month: o.month, status: 'draft',
+  });
   return {
-    Select: ({ value, onValueChange, children }: { value?: string; onValueChange?: (v: string) => void; children: React.ReactNode }) =>
-      react.createElement('select', { 'aria-label': 'Picker', value: value ?? '', onChange: (e: { target: { value: string } }) => onValueChange?.(e.target.value) }, children),
-    SelectTrigger: () => null,
-    SelectValue: () => null,
-    SelectContent: ({ children }: { children: React.ReactNode }) => react.createElement(react.Fragment, null, children),
-    SelectItem: ({ value, children }: { value: string; children: React.ReactNode }) => react.createElement('option', { value }, children),
+    ...actual,
+    loadMonthlyWorkRest: async (o: { crewId: string; vesselId: string; year: number; month: number }) => ({
+      submission: submission(o), ruleSet: DEFAULT_RULE_SET, records: [], context: [], nonConformities: [], signatures: [],
+    }),
+    useMonthlyWorkRest: (o: { crewId: string; vesselId: string; year: number; month: number }) => ({
+      submission: submission(o), records: [], compliance: calculateCompliance([], DEFAULT_RULE_SET), ruleSet: DEFAULT_RULE_SET,
+      nonConformities: [], signatures: [], loading: false, saving: false, error: null, isLocked: false, isOpen: true, isDirty: false,
+      savePath: 'unknown', save: async () => undefined, refresh: async () => undefined, setDayBlocks: () => undefined,
+    }),
   };
 });
-
-// Hours of rest: the month data and its panels stubbed.
-vi.mock('@/modules/work-rest/hooks/useMonthlyWorkRest', () => ({
-  useMonthlyWorkRest: () => ({
-    records: [], compliance: { is_compliant: true }, ruleSet: null, signatures: [], submission: null, isLocked: false,
-    loading: false, saving: false, nonConformities: [], save: async () => undefined, refresh: () => undefined, setDayBlocks: () => undefined,
-  }),
-}));
-vi.mock('@/modules/work-rest/components/CompliancePanel', () => ({ CompliancePanel: () => null }));
-vi.mock('@/modules/work-rest/components/MonthCalendar', () => ({ MonthCalendar: () => null }));
-vi.mock('@/modules/work-rest/components/NonConformityList', () => ({ NonConformityList: () => null }));
 vi.mock('@/modules/work-rest/components/SignOffPanel', () => ({ SignOffPanel: () => null }));
+vi.mock('@/modules/work-rest/components/NonConformityList', () => ({ NonConformityList: () => null }));
 vi.mock('@/modules/work-rest/components/AuditLogPanel', () => ({ AuditLogPanel: () => null }));
-vi.mock('@/modules/auth/hooks/useUserRoles', () => ({ useActiveRoles: () => ({ roles: ['captain'], isLoading: false }) }));
-vi.mock('@/modules/work-rest/services/workRestService', () => ({
-  listVesselMonthMatrix: async () => [
-    {
-      crew_id: 'other', crew_name: 'Ann Deck', rank: 'Bosun', department: 'DECK', rest_by_day: {}, compliant_by_day: {},
-      avg_rest: null, logged_pct: 0, status: 'no_data',
-    },
-  ],
-}));
+vi.mock('@/modules/work-rest/services/workRestService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/modules/work-rest/services/workRestService')>();
+  return {
+    ...actual,
+    listVesselMonthMatrix: async () => [
+      {
+        crew_id: 'a0000000-0000-4000-8000-0000000000a2', crew_name: 'Ann Deck', rank: 'Bosun', department: 'DECK', rest_by_day: {}, compliant_by_day: {},
+        avg_rest: null, logged_pct: 0, status: 'no_data',
+      },
+    ],
+  };
+});
 
 import { appRouteObjects } from '@/test/router/routeHarness';
 
@@ -195,7 +231,7 @@ const FakeVesselProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     vesselCodes: codes,
     getVesselCodeById: (id: string | null | undefined) => (id ? codes.get(id) ?? null : null),
     findVesselByCode: (code: string | null | undefined) => resolveVesselByCode(code, COMPANY, COMPANY),
-    loadedForUserId: 'u1',
+    loadedForUserId: 'a0000000-0000-4000-8000-0000000000a1',
   };
   const Ctx = mocks.vesselCtx;
   if (!Ctx) throw new Error('VesselContext mock not loaded');
@@ -236,78 +272,94 @@ const shells = () => document.querySelectorAll('[data-shell-scope]').length;
 
 beforeEach(() => {
   mocks.perm.userRoles = [];
+  mocks.caps = new Set(['vessel.crew.crew_profiles.view', 'vessel.crew.hours_of_rest.view', 'vessel.crew.hours_of_rest.view_own', 'vessel.crew.hours_of_rest.create']);
   mocks.shellMounts = 0;
   visited.length = 0;
   sessionStorage.clear();
   localStorage.clear();
 });
 
-describe('the Hours of Rest crew switch inside the vessel scope', () => {
-  it("opens another crew member's month in the scope, keeping the month, with the one shell", async () => {
-    renderApp('/v/dra/crew/people/u1/hours-of-rest?year=2026&month=11');
-    const picker = await screen.findByLabelText('Picker');
-    await waitFor(() => expect(picker.querySelectorAll('option').length).toBe(2));
-    act(() => {
-      fireEvent.change(picker, { target: { value: 'other' } });
-    });
-    await waitFor(() => expect(location()).toBe('/v/dra/crew/people/other/hours-of-rest?year=2026&month=11'));
+const params = () => new URLSearchParams(location().split('?')[1] ?? '');
+
+describe("a crew member's month is the profile's Hours of rest tab", () => {
+  it('an old link (login id, ?year=&month=) lands on the tab in the scope: the profile id in the URL, the month kept, one shell', async () => {
+    renderApp('/v/dra/crew/people/a0000000-0000-4000-8000-0000000000a2/hours-of-rest?year=2026&month=11');
+    await waitFor(() => expect(location()).toBe('/v/dra/crew/people/b0000000-0000-4000-8000-0000000000a2/hours-of-rest?year=2026&month=11'));
+    expect(await screen.findByRole('link', { name: 'Hours of rest', current: 'page' })).toBeInTheDocument();
+    expect(await screen.findByText('November 2026')).toBeInTheDocument();
+    expect(document.querySelector('[data-hor-scope="profile"]')).not.toBeNull();
     expect(visited.filter((u) => u.startsWith('/crew/'))).toEqual([]);
     expect(mocks.shellMounts).toBe(1);
     expect(shells()).toBe(1);
   });
 
-  it("goes to the personal area for one's own month", async () => {
-    renderApp('/v/dra/crew/people/other/hours-of-rest?year=2026&month=11');
-    const picker = await screen.findByLabelText('Picker');
-    await waitFor(() => expect(picker.querySelectorAll('option').length).toBe(2));
+  it('moving to the next month stays on the tab, in the scope', async () => {
+    renderApp('/v/dra/crew/people/b0000000-0000-4000-8000-0000000000a2/hours-of-rest?month=2026-11');
+    const next = await screen.findByRole('button', { name: 'Next month' });
     act(() => {
-      fireEvent.change(picker, { target: { value: 'u1' } });
+      fireEvent.click(next);
     });
-    await waitFor(() => expect(location()).toBe('/me/hours-of-rest?year=2026&month=11'));
-    expect(visited.filter((u) => u.startsWith('/crew/'))).toEqual([]);
+    await waitFor(() => expect(params().get('month')).toBe('2026-12'));
+    expect(location().startsWith('/v/dra/crew/people/b0000000-0000-4000-8000-0000000000a2/hours-of-rest?')).toBe(true);
+    expect(mocks.shellMounts).toBe(1);
+  });
+
+  it('without hours of rest view the tab is not offered, and the URL lands on Personal', async () => {
+    mocks.caps.delete('vessel.crew.hours_of_rest.view');
+    renderApp('/v/dra/crew/people/b0000000-0000-4000-8000-0000000000a2/hours-of-rest?month=2026-11');
+    await waitFor(() => expect(location()).toBe('/v/dra/crew/people/b0000000-0000-4000-8000-0000000000a2/personal?month=2026-11'));
+    expect(screen.queryByRole('link', { name: 'Hours of rest' })).toBeNull();
+  });
+
+  it('one’s own profile opens the tab without hours of rest view (view_own), and offers My hours of rest', async () => {
+    mocks.caps.delete('vessel.crew.hours_of_rest.view');
+    renderApp('/v/dra/crew/people/a0000000-0000-4000-8000-0000000000a1/hours-of-rest?month=2026-11');
+    await waitFor(() => expect(location()).toBe('/v/dra/crew/people/b0000000-0000-4000-8000-0000000000a1/hours-of-rest?month=2026-11'));
+    const more = await screen.findByRole('button', { name: 'More' });
+    act(() => {
+      more.focus();
+      fireEvent.keyDown(more, { key: 'Enter' });
+    });
+    expect(await screen.findByRole('menuitem', { name: 'Open in My hours of rest' })).toHaveAttribute('href', '/me/hours-of-rest?month=2026-11&vessel=dra');
   });
 });
 
-describe('the Hours of Rest toolbar and links', () => {
-  it('wraps, keeps the month and Save in view, and moves the exports into More below md', async () => {
-    renderApp('/v/dra/crew/people/u1/hours-of-rest?year=2026&month=11');
-    const save = await screen.findByRole('button', { name: 'Save' });
-    const row = save.parentElement as HTMLElement;
-    expect(row.className).toContain('flex-wrap');
-    expect(row).toContainElement(screen.getByRole('button', { name: 'Previous month' }));
-    expect(row).toContainElement(screen.getByRole('button', { name: 'Next month' }));
-    expect(screen.getByRole('button', { name: 'More' }).closest('.md\\:hidden')).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'PDF' }).closest('.hidden')).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'CSV' }).closest('.hidden')).not.toBeNull();
-  });
-
-  it('hides Fleet Overview from a user without fleet reach', async () => {
-    renderApp('/v/dra/crew/people/u1/hours-of-rest?year=2026&month=11');
-    await screen.findByRole('button', { name: 'Save' });
-    expect(screen.queryByRole('button', { name: 'Fleet Overview' })).toBeNull();
-  });
-
-  it("opens the vessel's HoR board in the scope for a fleet user", async () => {
-    mocks.perm.userRoles = [{ role_name: 'fleet_master' }];
-    renderApp('/v/dra/crew/people/u1/hours-of-rest?year=2026&month=11');
-    const overview = await screen.findByRole('button', { name: 'Fleet Overview' });
+describe('the Hours of Rest board and links', () => {
+  it("an approver opens the vessel's board from a crew member's month, in the scope", async () => {
+    mocks.caps.add('vessel.crew.hours_of_rest.approve');
+    renderApp('/v/dra/crew/people/b0000000-0000-4000-8000-0000000000a2/hours-of-rest?month=2026-11');
+    const more = await screen.findByRole('button', { name: 'More' });
     act(() => {
-      fireEvent.click(overview);
+      more.focus();
+      fireEvent.keyDown(more, { key: 'Enter' });
     });
-    await waitFor(() => expect(location()).toBe('/v/dra/crew/hours-of-rest'));
+    const board = await screen.findByRole('menuitem', { name: 'Vessel hours of rest' });
+    expect(board).toHaveAttribute('href', '/v/dra/crew/hours-of-rest?month=2026-11');
+    act(() => {
+      fireEvent.click(board);
+    });
+    await waitFor(() => expect(location()).toBe('/v/dra/crew/hours-of-rest?month=2026-11'));
     expect(visited.filter((u) => u.startsWith('/crew/'))).toEqual([]);
     expect(mocks.shellMounts).toBe(1);
   });
 
-  it("the board links one's own hours and each crew member's month in the scope", async () => {
+  it('without the approve capability the board is not offered (nor, without export, the menu)', async () => {
+    renderApp('/v/dra/crew/people/b0000000-0000-4000-8000-0000000000a2/hours-of-rest?month=2026-11');
+    expect(await screen.findByText('November 2026')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Vessel hours of rest' })).toBeNull();
+  });
+
+  it("the board links one's own hours and each crew member's month, which opens on the profile tab in the scope", async () => {
     renderApp('/v/dra/crew/hours-of-rest?year=2026&month=11');
     expect(await screen.findByRole('link', { name: 'My hours' })).toHaveAttribute('href', '/me/hours-of-rest');
     const row = await screen.findByRole('link', { name: /Ann Deck/ });
-    expect(row).toHaveAttribute('href', '/v/dra/crew/people/other/hours-of-rest?year=2026&month=11');
+    expect(row).toHaveAttribute('href', '/v/dra/crew/people/a0000000-0000-4000-8000-0000000000a2/hours-of-rest?year=2026&month=11');
     act(() => {
       fireEvent.click(row);
     });
-    await waitFor(() => expect(location()).toBe('/v/dra/crew/people/other/hours-of-rest?year=2026&month=11'));
+    await waitFor(() => expect(location()).toBe('/v/dra/crew/people/b0000000-0000-4000-8000-0000000000a2/hours-of-rest?year=2026&month=11'));
+    expect(await screen.findByText('November 2026')).toBeInTheDocument();
     expect(mocks.shellMounts).toBe(1);
   });
 });

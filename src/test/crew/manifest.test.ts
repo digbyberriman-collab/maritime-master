@@ -49,7 +49,7 @@ const TODAY: Record<string, string> = {
   // X1-06B: Crew Compliance (status and configuration) replaces the legacy crew documents page.
   [`vessel ${COMPLIANCE_TAB_PATH}`]: '/src/modules/crew/pages/CrewCompliancePage.tsx',
   [`vessel ${CREW_PATHS.hoursOfRest}`]: '/src/modules/work-rest/pages/WorkRestOverview.tsx',
-  [`vessel ${CREW_PATHS.personHoursOfRest}`]: '/src/modules/work-rest/pages/MyWorkRestMonth.tsx',
+  // X1-07B: one crew member's month is the profile's Hours of rest tab (crew/people/:profileId/:tab); no route of its own.
   [`vessel ${CREW_PATHS.plannerTimeline}`]: '/src/modules/rotation-planner/pages/RotationPlannerPage.tsx',
   [`vessel ${CREW_PATHS.plannerManning}`]: '/src/modules/crew/pages/LeavePlannerPage.tsx',
   [`vessel ${CREW_PATHS.plannerRequests}`]: '/src/modules/crew/pages/LeaveRequestsPage.tsx',
@@ -146,7 +146,8 @@ describe('every vessel crew URL of today resolves to its page', () => {
     ['/v/dra/crew/compliance/status', 'crew/pages/CrewCompliancePage.tsx'],
     ['/v/dra/crew/compliance/configuration', 'crew/pages/CrewCompliancePage.tsx'],
     ['/v/dra/crew/hours-of-rest', 'work-rest/pages/WorkRestOverview.tsx'],
-    ['/v/dra/crew/people/a0000000-0000-4000-8000-000000000011/hours-of-rest', 'work-rest/pages/MyWorkRestMonth.tsx'],
+    // X1-07B: one crew member's month is the profile's Hours of rest tab (a login id there is resolved by the page).
+    ['/v/dra/crew/people/a0000000-0000-4000-8000-000000000011/hours-of-rest', 'crew/pages/CrewProfilePage.tsx'],
     ['/v/dra/crew/planner', 'rotation-planner/pages/RotationPlannerPage.tsx'],
     ['/v/dra/crew/planner/timeline', 'rotation-planner/pages/RotationPlannerPage.tsx'],
     ['/v/dra/crew/planner/manning', 'crew/pages/LeavePlannerPage.tsx'],
@@ -154,7 +155,7 @@ describe('every vessel crew URL of today resolves to its page', () => {
     ['/v/dra/crew/training', 'development/pages/CrewTraining.tsx'],
     ['/v/dra/crew/familiarisation', 'training/pages/Training.tsx'],
     ['/fleet/planner', 'rotation-planner/pages/RotationPlannerPage.tsx'],
-    // X1-03: the routed profile; the static hours-of-rest month still outranks the :tab route.
+    // X1-03: the routed profile.
     ['/v/dra/crew/people/b0000000-0000-4000-8000-000000000015', 'crew/pages/CrewProfilePage.tsx'],
     ['/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/contact', 'crew/pages/CrewProfilePage.tsx'],
     // X1-03B: Add crew member, also prefilled for a re-hire.

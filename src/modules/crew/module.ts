@@ -65,8 +65,9 @@ const manifest: ModuleManifest = {
       order: 30,
       node: L('Crew Compliance', CREW_ROOT, { slug: 'compliance', icon: ShieldCheck, status: 'beta', capability: CREW_CAPS.complianceView }),
     },
-    // One crew member's month (`crew/people/:crewId/hours-of-rest`, the target
-    // of the legacy /crew/work-rest/:crewId) is an Hours of Rest page too: the
+    // One crew member's month is the crew profile's Hours of rest tab
+    // (`crew/people/:profileId/hours-of-rest`, X1-07B; also the target of the
+    // legacy /crew/work-rest/:crewId). It is an Hours of Rest page too: the
     // crew_hor setting closes it with the overview (gap/10 W4, D-63).
     {
       slot: 'vessel.crew',

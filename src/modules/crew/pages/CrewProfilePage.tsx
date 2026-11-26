@@ -27,6 +27,8 @@ import {
   type ProfileTabDef,
 } from '@/modules/crew/lib/profileTabs';
 import { SAVE_UNAVAILABLE } from '@/modules/crew/lib/personalDetailsSchema';
+import { useVesselModuleSettings } from '@/modules/vessels/hooks/useVesselModuleSettings';
+import { localIsoDate, resolveModuleSettings } from '@/modules/vessels/lib/moduleSettings';
 import { ProfileHeader } from '@/modules/crew/components/profile/ProfileHeader';
 
 interface RouteVessel extends ProfileVessel {
@@ -107,6 +109,13 @@ const ProfileView: React.FC<{ vessel: RouteVessel; profileId: string; tab: strin
   const ctx = { vesselId: vessel.id };
   const canViewProfiles = useCan(CREW_CAPS.profilesView, ctx);
   const canEditProfiles = useCan(CREW_CAPS.profilesEdit, ctx);
+  // The other keys a tab names (PROFILE_TAB_CAPABILITIES), for the D-01 fallback's tab list.
+  const canViewHours = useCan(CREW_CAPS.horView, ctx);
+  const canViewMedical = useCan(CREW_CAPS.medicalRecordsView, ctx);
+  // A tab's vessel module setting (Hours of rest: crew_hor) closes it once the settings are known;
+  // the vessel route gate holds the tab's own URL while they load or fail.
+  const moduleSettings = useVesselModuleSettings(vessel.id);
+  const modules = useMemo(() => resolveModuleSettings(moduleSettings.state, localIsoDate()), [moduleSettings.state]);
   const summary = useCrewProfileSummary(vessel, profileId, { ownProfileId });
 
   if (summary.status === 'idle' || summary.status === 'loading') return <PageLoading variant="detail" label="Loading profile…" />;
@@ -117,11 +126,16 @@ const ProfileView: React.FC<{ vessel: RouteVessel; profileId: string; tab: strin
     return <AccessDenied title={NOT_SHOWN_TITLE} detail={NOT_SHOWN_DETAIL} backTo={{ to: scopedPath(CREW_PATHS.list), label: 'Back to the crew list' }} />;
   }
 
-  const capabilities: Partial<Record<CapabilityKey, boolean>> = { [CREW_CAPS.profilesView]: canViewProfiles };
+  const capabilities: Partial<Record<CapabilityKey, boolean>> = {
+    [CREW_CAPS.profilesView]: canViewProfiles,
+    [CREW_CAPS.horView]: canViewHours,
+    [CREW_CAPS.medicalRecordsView]: canViewMedical,
+  };
   const visible = visibleProfileTabs({
     serverTabs: summary.summary.tabs,
     own: summary.summary.isOwn,
     can: (key) => capabilities[key] ?? false,
+    moduleOn: modules.status === 'ready' ? (key) => modules.isModuleOn(key) : undefined,
   });
   const active = resolveProfileTab(tab, visible);
   if (!active) {

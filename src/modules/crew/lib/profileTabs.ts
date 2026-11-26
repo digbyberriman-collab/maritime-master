@@ -5,9 +5,10 @@
  *   personal, contact                        X1-03
  *   training, medical, activity              X1-03B
  *   documents, stcw, qualifications          X1-04B (one body, components/documents/DocumentsTab)
- *   hours-of-rest                            X1-07B (until then the route
+ *   hours-of-rest                            X1-07B (the work-rest month view;
+ *                                            it replaced the old
  *                                            crew/people/:crewId/hours-of-rest
- *                                            keeps the month page)
+ *                                            page, so this tab serves that URL)
  *   employment                               X1-11B
  *
  * A tab names the capability it needs on the vessel, whether the person's
@@ -112,6 +113,18 @@ export const PROFILE_TABS: readonly ProfileTabDef[] = [
     capability: CREW_CAPS.profilesView,
     ownAlways: true,
     load: () => import('@/modules/crew/components/profile/TrainingTab'),
+  },
+  // X1-07B: the person's hours of rest month on the route vessel (gap/04
+  // C37-C39). Hours of rest view on the vessel, or the person's own profile
+  // (view_own, which every active crew member holds; the server's tab list
+  // says the same). Closed with the vessel's Hours of Rest module (crew_hor).
+  {
+    key: 'hours-of-rest',
+    label: 'Hours of rest',
+    capability: CREW_CAPS.horView,
+    ownAlways: true,
+    moduleSetting: 'crew_hor',
+    load: () => import('@/modules/crew/components/profile/HoursOfRestTab'),
   },
   // X1-03B: the Health summary. Medical clearance on the vessel, own profile
   // included (D-X1-3; the person reads their own record in Health).
