@@ -359,8 +359,8 @@ any ──new review cycle / revert to draft / Return to vessel──▶ superse
 **Who can act**
 - *Sign*: an eligible signer — `slot_eligible(slot, user)` = holds the slot's office on **this** vessel at signing time (`vessel_office_holders`) **or** is one of the slot's named people (e.g. HESS secretary and chairman named in the header), **and** has `sign` on the module, **and** passes the kind's separation-of-duty rules (e.g. AO ≠ CP ≠ permit creator; an approver cannot approve their own submission). Company slots: `is_company_actor()`.
 - *Someone else signing?*: any user with write access on the record may start a witnessed ceremony; the person signing must themselves be eligible for the slot (crew picked from the list) **or** the slot must allow visitors / contractors (e.g. PTW competent person from a contractor; never Master, AO, HoD or company slots). Never on company slots: a company slot takes only a verified signature by a company actor (D-215).
-- *Pass to*: anyone with read access may pass an open slot to an eligible person.
-- *Remove*: the signer; the Master for vessel slots on their vessel; the company actor for company slots, and for vessel slots only after Return to vessel; never the witness (D-216).
+- *Pass to*: anyone with write access to the record (an external viewer may not, D-214) may pass an open slot to an eligible person, and cancel that pass.
+- *Remove*: the signer; the Master for vessel slots on their vessel; the company actor for company slots, and for vessel slots only after Return to vessel; never the witness (D-216); and only with write access to the record (an external viewer never removes, even with a Master crew row; D-214).
 - *Remind*: anyone with write access; once per person per slot per 24 h.
 
 **Signing ceremony (UI)**
