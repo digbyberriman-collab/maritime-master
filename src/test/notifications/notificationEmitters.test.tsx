@@ -5,8 +5,13 @@
  * a live emitter (LIVE_ENGINE_NOTIFICATION_TYPES) or deferred with a named
  * future emitter (DEFERRED_NOTIFICATION_TYPES), so a new seed cannot silently
  * go unwired. A deferred type shows "Not available yet" in place of the
- * preference switch (/me/notifications) and is not a subscription row in
- * Notification Management (no drawer, no save, not a "No recipients" gap).
+ * preference switch (/me/notifications).
+ *
+ * Engine types, live or deferred, are in-app only (D-249): Notification
+ * Management shows them as plain rows (no drawer, no save, not a
+ * "No recipients" gap), and no email is sent to any subscriber until the
+ * gap/03 C3 dispatcher lands (EMAIL_DELIVERY_LIVE), so the page says so and
+ * the save toast does not promise delivery.
  */
 import React from 'react';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -39,6 +44,7 @@ const h = vi.hoisted(() => ({
   subs: [] as SubRow[],
   toggleMutate: vi.fn(),
   saveMutate: vi.fn(),
+  toast: vi.fn(),
 }));
 
 vi.mock('@/modules/notifications-admin/hooks/useNotificationData', () => ({
@@ -51,14 +57,21 @@ vi.mock('@/modules/notifications-admin/hooks/useNotificationData', () => ({
 vi.mock('@/shared/components/layout/DashboardLayout', () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
-vi.mock('@/shared/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
+vi.mock('@/shared/hooks/use-toast', () => ({ useToast: () => ({ toast: h.toast }) }));
 
 import {
   DEFERRED_NOTIFICATION_TYPES,
+  EMAIL_DELIVERY_LIVE,
+  EMAIL_NOT_LIVE_DESCRIPTION,
+  EMAIL_NOT_LIVE_TITLE,
+  IN_APP_ONLY_COPY,
+  IN_APP_ONLY_DESCRIPTION,
   LIVE_ENGINE_NOTIFICATION_TYPES,
   NOT_AVAILABLE_COPY,
   NOT_AVAILABLE_DESCRIPTION,
+  isEngineNotificationType,
   isNotificationTypeAvailable,
+  takesSubscriptions,
 } from '@/modules/notifications-admin/lib/notificationEmitters';
 import NotificationsPage from '@/modules/notifications/pages/NotificationsPage';
 import NotificationManagementPage from '@/modules/notifications-admin/pages/NotificationManagementPage';
@@ -123,6 +136,21 @@ describe('engine notification types: live or deferred (D-238)', () => {
     expect(isNotificationTypeAvailable('certificate_expiring')).toBe(true);
     expect(NOT_AVAILABLE_COPY).toBe('Not available yet');
   });
+
+  it('isEngineNotificationType: true for every live and deferred key; only legacy types take subscriptions (D-249)', () => {
+    for (const k of [...LIVE, ...DEFERRED]) {
+      expect(isEngineNotificationType(k), k).toBe(true);
+      expect(takesSubscriptions(k), k).toBe(false);
+    }
+    expect(isEngineNotificationType('certificate_expiring')).toBe(false);
+    expect(takesSubscriptions('certificate_expiring')).toBe(true);
+  });
+
+  it('email delivery is not live until the C3 dispatcher reads notification_subscriptions (D-249)', () => {
+    expect(EMAIL_DELIVERY_LIVE).toBe(false);
+    expect(IN_APP_ONLY_COPY).toBe('In-app only');
+    expect(EMAIL_NOT_LIVE_TITLE).toBe('Email delivery is not live yet');
+  });
 });
 
 const LIVE_TYPE: TypeRow = {
@@ -132,6 +160,15 @@ const LIVE_TYPE: TypeRow = {
   cadence: 'realtime',
   description: 'A record is waiting for your signature',
   sort_order: 300,
+};
+/** A legacy (non-engine) type: the only kind that takes recipient subscriptions (D-249). */
+const LEGACY_TYPE: TypeRow = {
+  key: 'certificate_expiring',
+  name: 'Certificate expiring',
+  category: 'Certificates',
+  cadence: 'daily',
+  description: 'A vessel certificate is close to its expiry date',
+  sort_order: 10,
 };
 const DEFERRED_TYPE: TypeRow = {
   key: 'signature_reminder',
@@ -158,8 +195,27 @@ afterEach(() => {
   cleanup();
   h.toggleMutate.mockReset();
   h.saveMutate.mockReset();
+  h.toast.mockReset();
   h.subs = [];
 });
+
+const subOn = (typeKey: string, id = 's1'): SubRow => ({
+  id,
+  company_id: 'c1',
+  notification_type_key: typeKey,
+  user_id: null,
+  email: 'fleet-manager@example.test',
+  vessel_scope: 'all',
+  vessel_ids: [],
+  channels: { in_app: true, email: true },
+});
+
+/** The value under a stat card's label (the label is a div; a row's "No recipients" is a span). */
+const statValue = (label: string): HTMLElement => {
+  const value = screen.getByText(label, { selector: 'div' }).nextElementSibling;
+  if (!(value instanceof HTMLElement)) throw new Error(`no value for ${label}`);
+  return value;
+};
 
 describe('NotificationsPage: deferred types have no switch', () => {
   const renderPage = () =>
@@ -197,9 +253,9 @@ describe('NotificationsPage: deferred types have no switch', () => {
   });
 });
 
-describe('NotificationManagementPage: deferred types take no subscription', () => {
+describe('NotificationManagementPage: engine types take no subscription (D-238, D-249)', () => {
   it('the deferred row is not a button, opens no drawer and is not counted as "No recipients"', () => {
-    h.types = [DEFERRED_TYPE, LIVE_TYPE];
+    h.types = [DEFERRED_TYPE, LIVE_TYPE, LEGACY_TYPE];
     render(<NotificationManagementPage />);
 
     const deferred = rowOf(DEFERRED_TYPE.key);
@@ -214,54 +270,166 @@ describe('NotificationManagementPage: deferred types take no subscription', () =
     fireEvent.click(deferred);
     fireEvent.click(pill);
     expect(screen.queryByRole('dialog')).toBeNull();
-
-    // Only the live type is a gap an admin can fill.
-    expect(screen.getByRole('button', { name: 'No recipients (1)' })).toBeInTheDocument();
-    expect(screen.getByText('Total types').parentElement).toHaveTextContent('1');
-    expect(screen.getByText('Configured').parentElement).toHaveTextContent('0');
-
-    // The "No recipients" filter lists the live type only.
-    fireEvent.click(screen.getByRole('button', { name: 'No recipients (1)' }));
-    expect(document.querySelector(`[data-notification-type="${DEFERRED_TYPE.key}"]`)).toBeNull();
-    expect(rowOf(LIVE_TYPE.key).tagName).toBe('BUTTON');
   });
 
-  it('a live row opens the drawer; "Subscribe Email" skips a deferred first type', () => {
-    h.types = [DEFERRED_TYPE, LIVE_TYPE];
+  it('the live engine row is in-app only: not a button, no recipients label, opens no drawer', () => {
+    h.types = [DEFERRED_TYPE, LIVE_TYPE, LEGACY_TYPE];
+    render(<NotificationManagementPage />);
+
+    const live = rowOf(LIVE_TYPE.key);
+    expect(live.tagName).not.toBe('BUTTON');
+    expect(live.closest('button')).toBeNull();
+    expect(within(live).queryByRole('button')).toBeNull();
+    const pill = within(live).getByText(IN_APP_ONLY_COPY);
+    expect(pill.closest('[data-tone]')).toHaveAttribute('data-tone', 'neutral');
+    expect(pill.closest('[data-tone]')).toHaveAccessibleDescription(IN_APP_ONLY_DESCRIPTION);
+    expect(within(live).queryByText('No recipients')).toBeNull();
+    expect(within(live).queryByText(NOT_AVAILABLE_COPY)).toBeNull();
+
+    fireEvent.click(live);
+    fireEvent.click(pill);
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('only the legacy type counts: Total 1, Configured 0, "No recipients (1)", and the filter lists the legacy row only', () => {
+    h.types = [DEFERRED_TYPE, LIVE_TYPE, LEGACY_TYPE];
+    render(<NotificationManagementPage />);
+
+    expect(statValue('Total types')).toHaveTextContent('1');
+    expect(statValue('Configured')).toHaveTextContent('0');
+    expect(screen.getByRole('button', { name: 'No recipients (1)' })).toBeInTheDocument();
+    expect(rowOf(LEGACY_TYPE.key).tagName).toBe('BUTTON');
+
+    fireEvent.click(screen.getByRole('button', { name: 'No recipients (1)' }));
+    expect(document.querySelector(`[data-notification-type="${DEFERRED_TYPE.key}"]`)).toBeNull();
+    expect(document.querySelector(`[data-notification-type="${LIVE_TYPE.key}"]`)).toBeNull();
+    expect(rowOf(LEGACY_TYPE.key).tagName).toBe('BUTTON');
+  });
+
+  it('a legacy row opens the drawer; "Subscribe Email" skips engine types listed first', () => {
+    h.types = [DEFERRED_TYPE, LIVE_TYPE, LEGACY_TYPE];
     render(<NotificationManagementPage />);
 
     fireEvent.click(screen.getByRole('button', { name: /Subscribe Email/ }));
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).getByText(LIVE_TYPE.name)).toBeInTheDocument();
+    expect(within(dialog).getByText(LEGACY_TYPE.name)).toBeInTheDocument();
+    expect(within(dialog).queryByText(LIVE_TYPE.name)).toBeNull();
     expect(within(dialog).queryByText(DEFERRED_TYPE.name)).toBeNull();
+    cleanup();
+
+    render(<NotificationManagementPage />);
+    fireEvent.click(rowOf(LEGACY_TYPE.key));
+    expect(within(screen.getByRole('dialog')).getByText(LEGACY_TYPE.name)).toBeInTheDocument();
+  });
+
+  it('"Subscribe Email" is disabled when only engine types exist', () => {
+    h.types = [DEFERRED_TYPE, LIVE_TYPE];
+    render(<NotificationManagementPage />);
+    expect(screen.getByRole('button', { name: /Subscribe Email/ })).toBeDisabled();
+    expect(statValue('Total types')).toHaveTextContent('0');
+    expect(screen.getByRole('button', { name: 'No recipients (0)' })).toBeInTheDocument();
   });
 
   it('a subscription on a deferred type counts toward nothing', () => {
-    h.types = [DEFERRED_TYPE, LIVE_TYPE];
-    h.subs = [
-      {
-        id: 's1',
-        company_id: 'c1',
-        notification_type_key: DEFERRED_TYPE.key,
-        user_id: null,
-        email: 'fleet-manager@example.test',
-        vessel_scope: 'all',
-        vessel_ids: [],
-        channels: { in_app: true, email: true },
-      },
-    ];
+    h.types = [DEFERRED_TYPE, LIVE_TYPE, LEGACY_TYPE];
+    h.subs = [subOn(DEFERRED_TYPE.key)];
     render(<NotificationManagementPage />);
-    expect(screen.getByText('Configured').parentElement).toHaveTextContent('0');
-    expect(screen.getByText('Unique emails').parentElement).toHaveTextContent('0');
+    expect(statValue('Configured')).toHaveTextContent('0');
+    expect(statValue('Unique emails')).toHaveTextContent('0');
     expect(screen.getByRole('button', { name: 'No recipients (1)' })).toBeInTheDocument();
     expect(within(rowOf(DEFERRED_TYPE.key)).queryByText('fleet-manager@example.test')).toBeNull();
   });
 
+  it('a subscription on the live engine type counts toward nothing', () => {
+    h.types = [DEFERRED_TYPE, LIVE_TYPE, LEGACY_TYPE];
+    h.subs = [subOn(LIVE_TYPE.key)];
+    render(<NotificationManagementPage />);
+    expect(statValue('Configured')).toHaveTextContent('0');
+    expect(statValue('Unique emails')).toHaveTextContent('0');
+    expect(screen.getByRole('button', { name: 'No recipients (1)' })).toBeInTheDocument();
+    expect(within(rowOf(LIVE_TYPE.key)).queryByText('fleet-manager@example.test')).toBeNull();
+  });
+
+  it('a subscription on the legacy type counts as Configured and as a unique email', () => {
+    h.types = [DEFERRED_TYPE, LIVE_TYPE, LEGACY_TYPE];
+    h.subs = [subOn(LEGACY_TYPE.key)];
+    render(<NotificationManagementPage />);
+    expect(statValue('Configured')).toHaveTextContent('1');
+    expect(statValue('Unique emails')).toHaveTextContent('1');
+    expect(screen.getByRole('button', { name: 'No recipients (0)' })).toBeInTheDocument();
+    expect(within(rowOf(LEGACY_TYPE.key)).getByText(/fleet-manager@example\.test/)).toBeInTheDocument();
+  });
+
+  it('while email is not live the page says so, as a status (not an alert)', () => {
+    h.types = [DEFERRED_TYPE, LIVE_TYPE, LEGACY_TYPE];
+    render(<NotificationManagementPage />);
+    const notice = screen.getByRole('status');
+    expect(notice).toHaveTextContent(EMAIL_NOT_LIVE_TITLE);
+    expect(notice).toHaveTextContent(EMAIL_NOT_LIVE_DESCRIPTION);
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('while email is not live a missing recipient carries no destructive tone', () => {
+    h.types = [DEFERRED_TYPE, LIVE_TYPE, LEGACY_TYPE];
+    render(<NotificationManagementPage />);
+    const chip = screen.getByRole('button', { name: 'No recipients (1)' });
+    expect(chip.className).not.toMatch(/destructive/);
+    expect(statValue('No recipients').className).not.toMatch(/destructive/);
+    const label = within(rowOf(LEGACY_TYPE.key)).getByText('No recipients');
+    expect(label.className).not.toMatch(/destructive/);
+    expect(label).toHaveClass('text-muted-foreground');
+
+    // Still not destructive when the filter is active.
+    fireEvent.click(chip);
+    expect(screen.getByRole('button', { name: 'No recipients (1)' }).className).not.toMatch(/destructive/);
+  });
+});
+
+describe('EditSubscriptionDrawer: engine types refused, honest toast (D-249)', () => {
   it('the drawer refuses to save a deferred type even if opened for one', () => {
     render(<EditSubscriptionDrawer type={DEFERRED_TYPE} existing={[]} open onClose={() => undefined} />);
     const save = screen.getByRole('button', { name: 'Save' });
     expect(save).toBeDisabled();
     fireEvent.click(save);
     expect(h.saveMutate).not.toHaveBeenCalled();
+  });
+
+  it('the drawer refuses to save the live engine type even if opened for one', () => {
+    render(<EditSubscriptionDrawer type={LIVE_TYPE} existing={[]} open onClose={() => undefined} />);
+    const save = screen.getByRole('button', { name: 'Save' });
+    expect(save).toBeDisabled();
+    fireEvent.click(save);
+    expect(h.saveMutate).not.toHaveBeenCalled();
+  });
+
+  it('a legacy save says the recipients were saved and that email is not live yet', () => {
+    h.saveMutate.mockImplementation((_vars: unknown, opts?: { onSuccess?: () => void }) => opts?.onSuccess?.());
+    const onClose = vi.fn();
+    render(<EditSubscriptionDrawer type={LEGACY_TYPE} existing={[]} open onClose={onClose} />);
+
+    fireEvent.change(screen.getByPlaceholderText('email@company.com'), {
+      target: { value: 'fleet-manager@example.test' },
+    });
+    fireEvent.keyDown(screen.getByPlaceholderText('email@company.com'), { key: 'Enter' });
+    const save = screen.getByRole('button', { name: 'Save' });
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+
+    expect(h.saveMutate).toHaveBeenCalledTimes(1);
+    expect(h.saveMutate.mock.calls[0][0]).toEqual({
+      typeKey: LEGACY_TYPE.key,
+      subscriptions: [
+        {
+          user_id: null,
+          email: 'fleet-manager@example.test',
+          vessel_scope: 'all',
+          vessel_ids: [],
+          channels: { in_app: true, email: true },
+        },
+      ],
+    });
+    expect(h.toast).toHaveBeenCalledTimes(1);
+    expect(h.toast).toHaveBeenCalledWith({ title: 'Recipients saved', description: 'Email delivery is not live yet.' });
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

@@ -9,7 +9,7 @@ import { useToast } from '@/shared/hooks/use-toast';
 import { errorMessage } from '@/shared/lib/notify';
 import { CadenceBadge } from './CadenceBadge';
 import { type NotificationType, type NotificationSubscription, useSaveSubscriptions } from '../hooks/useNotificationData';
-import { isNotificationTypeAvailable } from '../lib/notificationEmitters';
+import { EMAIL_DELIVERY_LIVE, takesSubscriptions } from '../lib/notificationEmitters';
 
 interface Props {
   type: NotificationType | null;
@@ -23,9 +23,10 @@ export const EditSubscriptionDrawer: React.FC<Props> = ({ type, existing, open, 
   const [input, setInput] = useState('');
   const save = useSaveSubscriptions();
   const { toast } = useToast();
-  // A deferred engine type (D-238) never takes a subscription, even if the
-  // drawer were opened for one: Save stays disabled and handleSave refuses.
-  const available = !!type && isNotificationTypeAvailable(type.key);
+  // An engine type, live or deferred, is in-app only and never takes a
+  // subscription (D-249), even if the drawer were opened for one: Save stays
+  // disabled and handleSave refuses.
+  const available = !!type && takesSubscriptions(type.key);
 
   useEffect(() => {
     if (open) {
@@ -56,7 +57,13 @@ export const EditSubscriptionDrawer: React.FC<Props> = ({ type, existing, open, 
       },
       {
         onSuccess: () => {
-          toast({ title: 'Recipients updated' });
+          // Until the gap/03 C3 dispatcher lands nothing emails these
+          // recipients (D-249): say they were saved, not that they will hear.
+          toast(
+            EMAIL_DELIVERY_LIVE
+              ? { title: 'Recipients updated' }
+              : { title: 'Recipients saved', description: 'Email delivery is not live yet.' },
+          );
           onClose();
         },
         onError: (e: unknown) =>

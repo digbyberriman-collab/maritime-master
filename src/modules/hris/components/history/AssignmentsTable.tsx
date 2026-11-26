@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { Check, Loader2, Pencil, Ship, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { useCan } from '@/lib/permissions/useCan';
+import { crewRefusalMessage, isMasterOffice, MASTER_OFFICE_MESSAGE } from '@/modules/crew/lib/crewUpdateErrors';
 import { formatDate, humanise } from '@/modules/hris/lib/format';
 import { assignmentDays, END_REASONS, isoDay, type AssignmentPatch, type AssignmentRecord } from '@/modules/hris/lib/employmentHistory';
 
@@ -51,13 +53,43 @@ const reasonLabel = (value: string | null): string => {
 };
 
 /**
+ * A current Master / Captain row. Mirrors crew_assignment_is_current (not
+ * ended by the flag, no leave date or one still ahead) plus the guard's
+ * office test on position or rank. A null is_current counts as current, so
+ * the lock fails closed (D-04).
+ */
+const isCurrentMasterRow = (a: AssignmentRecord, today: Date): boolean =>
+  a.is_current !== false &&
+  (!a.leave_date || a.leave_date.slice(0, 10) > isoDay(today)) &&
+  (isMasterOffice(a.position) || isMasterOffice(a.rank));
+
+/**
  * One row per crew_assignments record, newest first, with inline editing
  * for HR editors. Dates use native date inputs so the row stays compact.
+ *
+ * The editor mirrors the crew-assignment guard (D-198, D-237, D-244), so a
+ * locked change reads as locked before Save instead of as a refusal after
+ * it. On a current Master / Captain row the office's bounds (join and leave
+ * date) and its title (position, rank) are locked for anyone without
+ * users_access.admin of the vessel: those inputs are disabled with the
+ * guard's sentence and always go out at their stored values. Appointing a
+ * Master or Captain on any other row is stopped in the form for the same
+ * people (guard rule e). A refusal from the server shows the guard's DETAIL
+ * sentence (D-225), never its code.
  */
 export const AssignmentsTable: React.FC<AssignmentsTableProps> = ({ assignments, today, canEdit, isLoading, isSaving, onSave, actions }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const lockId = useId();
+
+  // Hooks stay at the top level: the capability is read for the row being
+  // edited. useCan is false while it loads, so the row stays locked until it
+  // resolves (D-04).
+  const editingRow = assignments.find((a) => a.id === editingId) ?? null;
+  const canAdminEditingVessel = useCan('admin.access.users_access.admin', { vesselId: editingRow?.vessel_id ?? null });
+  const officeLock: string | null =
+    editingRow && isCurrentMasterRow(editingRow, today) && !canAdminEditingVessel ? MASTER_OFFICE_MESSAGE : null;
 
   const startEdit = (a: AssignmentRecord) => {
     setEditingId(a.id);
@@ -73,31 +105,49 @@ export const AssignmentsTable: React.FC<AssignmentsTableProps> = ({ assignments,
 
   const save = async (a: AssignmentRecord) => {
     if (!draft) return;
-    if (!draft.join_date) {
+    // Locked office fields always go out at their stored values, so Save
+    // sends no office change (even if the row was refetched mid-edit).
+    const stored = toDraft(a);
+    const d: Draft = officeLock
+      ? { ...draft, join_date: stored.join_date, leave_date: stored.leave_date, position: stored.position, rank: stored.rank }
+      : draft;
+    if (!d.join_date) {
       setError('Join date is required.');
       return;
     }
-    if (!draft.position.trim()) {
+    if (!d.position.trim()) {
       setError('Position is required.');
       return;
     }
-    if (draft.leave_date && draft.leave_date < draft.join_date) {
+    if (d.leave_date && d.leave_date < d.join_date) {
       setError('Leave date cannot be before the join date.');
       return;
     }
+    // Guard rule e: making a row a current Master / Captain appoints one.
+    const draftIsCurrent = !d.leave_date || d.leave_date > isoDay(today);
+    if (
+      !officeLock &&
+      !isCurrentMasterRow(a, today) &&
+      draftIsCurrent &&
+      (isMasterOffice(d.position) || isMasterOffice(d.rank)) &&
+      !canAdminEditingVessel
+    ) {
+      setError(MASTER_OFFICE_MESSAGE);
+      return;
+    }
     const patch: AssignmentPatch = {
-      join_date: draft.join_date,
-      leave_date: draft.leave_date || null,
-      position: draft.position.trim(),
-      rank: draft.rank.trim() || null,
-      end_reason: draft.leave_date ? (draft.end_reason === NONE ? null : draft.end_reason) : null,
-      notes: draft.notes.trim() || null,
+      join_date: d.join_date,
+      leave_date: d.leave_date || null,
+      position: d.position.trim(),
+      rank: d.rank.trim() || null,
+      end_reason: d.leave_date ? (d.end_reason === NONE ? null : d.end_reason) : null,
+      notes: d.notes.trim() || null,
     };
     try {
       await onSave(a, patch);
       cancel();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save changes.');
+      setError(crewRefusalMessage(e));
     }
   };
 
@@ -153,16 +203,47 @@ export const AssignmentsTable: React.FC<AssignmentsTableProps> = ({ assignments,
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Input value={draft.position} onChange={(e) => update('position', e.target.value)} className="h-8" aria-label="Position" />
+                            <Input
+                              value={draft.position}
+                              onChange={(e) => update('position', e.target.value)}
+                              className="h-8"
+                              aria-label="Position"
+                              disabled={Boolean(officeLock)}
+                              aria-describedby={officeLock ? lockId : undefined}
+                            />
                           </TableCell>
                           <TableCell>
-                            <Input value={draft.rank} onChange={(e) => update('rank', e.target.value)} className="h-8" placeholder="—" aria-label="Rank" />
+                            <Input
+                              value={draft.rank}
+                              onChange={(e) => update('rank', e.target.value)}
+                              className="h-8"
+                              placeholder="—"
+                              aria-label="Rank"
+                              disabled={Boolean(officeLock)}
+                              aria-describedby={officeLock ? lockId : undefined}
+                            />
                           </TableCell>
                           <TableCell>
-                            <Input type="date" value={draft.join_date} onChange={(e) => update('join_date', e.target.value)} className="h-8" aria-label="Join date" />
+                            <Input
+                              type="date"
+                              value={draft.join_date}
+                              onChange={(e) => update('join_date', e.target.value)}
+                              className="h-8"
+                              aria-label="Join date"
+                              disabled={Boolean(officeLock)}
+                              aria-describedby={officeLock ? lockId : undefined}
+                            />
                           </TableCell>
                           <TableCell>
-                            <Input type="date" value={draft.leave_date} onChange={(e) => update('leave_date', e.target.value)} className="h-8" aria-label="Leave date" />
+                            <Input
+                              type="date"
+                              value={draft.leave_date}
+                              onChange={(e) => update('leave_date', e.target.value)}
+                              className="h-8"
+                              aria-label="Leave date"
+                              disabled={Boolean(officeLock)}
+                              aria-describedby={officeLock ? lockId : undefined}
+                            />
                           </TableCell>
                           <TableCell className="text-right tabular-nums text-muted-foreground">
                             {assignmentDays({ join_date: draft.join_date, leave_date: draft.leave_date || null }, today)}
@@ -200,10 +281,18 @@ export const AssignmentsTable: React.FC<AssignmentsTableProps> = ({ assignments,
                             </div>
                           </TableCell>
                         </TableRow>
+                        {officeLock && (
+                          <TableRow className="bg-muted/30 hover:bg-muted/30">
+                            <TableCell id={lockId} colSpan={9} className="py-2 text-xs text-muted-foreground">
+                              {/* Pinned to the scrollport's left edge: the row is often scrolled right to reach Save. */}
+                              <div className="sticky left-4 max-w-xl">{officeLock}</div>
+                            </TableCell>
+                          </TableRow>
+                        )}
                         {error && (
                           <TableRow className="bg-muted/30 hover:bg-muted/30">
                             <TableCell colSpan={9} className="py-2 text-xs text-destructive">
-                              {error}
+                              <div className="sticky left-4 max-w-xl">{error}</div>
                             </TableCell>
                           </TableRow>
                         )}
