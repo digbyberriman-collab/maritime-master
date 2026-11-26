@@ -1,0 +1,6 @@
+[
+  {"id": "d5000000-0000-4000-8000-000000000001", "company_id": "c0000000-0000-4000-8000-000000000001", "name": "Safety management", "sort_order": 1, "created_by": null, "updated_by": null, "created_at": "$ts:-200d", "updated_at": "$ts:-30d"},
+  {"id": "d5000000-0000-4000-8000-000000000002", "company_id": "c0000000-0000-4000-8000-000000000001", "name": "Operations", "sort_order": 2, "created_by": null, "updated_by": null, "created_at": "$ts:-200d", "updated_at": "$ts:-30d"},
+  {"id": "d5000000-0000-4000-8000-000000000003", "company_id": "c0000000-0000-4000-8000-000000000001", "name": "Security", "sort_order": 3, "created_by": null, "updated_by": null, "created_at": "$ts:-200d", "updated_at": "$ts:-30d"},
+  {"id": "d5000000-0000-4000-8000-000000000004", "company_id": "c0000000-0000-4000-8000-000000000001", "name": "Environment", "sort_order": 4, "created_by": null, "updated_by": null, "created_at": "$ts:-200d", "updated_at": "$ts:-30d"}
+]

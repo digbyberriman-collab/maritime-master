@@ -39,6 +39,38 @@
         "type": "ReportsPendingFunctions",
         "expect": ["fleet_report_trends", "fleet_vessel_list"]
       }
+    },
+    {
+      "file": "src/modules/documents/types/db.pending.ts",
+      "mirrors": "X5 spec §2 X5-04A (20261124040300_fleet_documents_library.sql)",
+      "tables": {
+        "type": "DocumentsPendingTables",
+        "expect": [
+          "fleet_document_sections",
+          "fleet_document_types",
+          "fleet_documents",
+          "fleet_document_versions",
+          "fleet_document_vessel_targets",
+          "fleet_document_events"
+        ]
+      },
+      "functions": {
+        "type": "DocumentsPendingFunctions",
+        "expect": [
+          "fleet_document_section_save",
+          "fleet_document_sections_reorder",
+          "fleet_document_section_delete",
+          "fleet_document_type_save",
+          "fleet_document_type_delete",
+          "fleet_document_create",
+          "fleet_document_update",
+          "fleet_document_add_version",
+          "fleet_document_set_targets",
+          "fleet_document_publish",
+          "fleet_document_withdraw",
+          "fleet_document_delete_draft"
+        ]
+      }
     }
   ],
   "notMirrored": {
@@ -54,6 +86,9 @@
       "expiry_src_training_records": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant",
       "expiry_src_medical_fitness": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant",
       "expiry_src_crew_contracts": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant"
+    },
+    "functions": {
+      "fleet_document_visible": "RLS helper of the fleet document library policies (the reader must be able to execute it); the client never calls it"
     }
   }
 }
