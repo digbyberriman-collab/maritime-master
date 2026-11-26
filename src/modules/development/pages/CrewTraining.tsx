@@ -19,6 +19,7 @@ import {
   type ApplicationStatus,
 } from '@/modules/development/constants';
 import ApplicationDetailModal from '@/modules/development/components/ApplicationDetailModal';
+import { developmentKeys } from '@/modules/development/hooks/keys';
 
 type Phase = 'upcoming' | 'current' | 'completed' | 'unscheduled';
 
@@ -43,7 +44,7 @@ const ALLOWED_ROLES = [
 ];
 
 function derivePhase(row: any): Phase {
-  if (row.status === 'completed') return 'completed';
+  if (row.status === 'completed' || row.status === 'reimbursed' || row.status === 'closed') return 'completed';
   const start = row.course_start_date ? parseISO(row.course_start_date) : null;
   const end = row.course_end_date ? parseISO(row.course_end_date) : start;
   const now = new Date();
@@ -78,7 +79,7 @@ export default function CrewTraining() {
   const hasAccess = ALLOWED_ROLES.some((r) => hasRole(r));
 
   const { data: rows = [], isLoading } = useQuery({
-    queryKey: ['crew-training-all', companyId],
+    queryKey: developmentKeys.crewTraining(companyId),
     enabled: !!companyId && hasAccess,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -89,6 +90,8 @@ export default function CrewTraining() {
           vessel:vessels!development_applications_vessel_id_fkey(name)
         `)
         .eq('company_id', companyId)
+        // Voided applications were entered in error: hidden from registers and totals (TR6).
+        .neq('status', 'voided')
         .order('course_start_date', { ascending: false, nullsFirst: false });
       if (error) throw error;
       return data || [];

@@ -3,36 +3,16 @@
 // All policy values come from `program_settings` (admin-editable) with sensible fallbacks.
 
 import type { DevCategory, DevFormat } from '@/modules/development/constants';
-import {
-  ACCOMMODATION_CAP_PER_NIGHT,
-  FOOD_PER_DIEM_FLEET_ORGANISED,
-  PROFESSIONAL_THRESHOLD,
-  ELIGIBILITY_MONTHS,
-} from '@/modules/development/constants';
+import { PROGRAM_SETTINGS_DEFAULTS, type ProgramPolicy } from '@/modules/development/lib/settingsSchema';
 
-export interface ProgramSettings {
-  accommodation_cap_per_night_usd: number;
-  food_per_diem_usd: number;
-  professional_split_threshold_usd: number;
-  clawback_months: number;
-  eligibility_service_days: number;
-  probation_default_days: number;
-  online_neutral_threshold_hours: number;
-  anniversary_window_days: number;
-  business_class_flights_allowed: boolean;
-}
+export type ProgramSettings = ProgramPolicy;
 
-export const DEFAULT_SETTINGS: ProgramSettings = {
-  accommodation_cap_per_night_usd: ACCOMMODATION_CAP_PER_NIGHT,
-  food_per_diem_usd: FOOD_PER_DIEM_FLEET_ORGANISED,
-  professional_split_threshold_usd: PROFESSIONAL_THRESHOLD,
-  clawback_months: 12,
-  eligibility_service_days: 90,
-  probation_default_days: 90,
-  online_neutral_threshold_hours: 4,
-  anniversary_window_days: 30,
-  business_class_flights_allowed: false,
-};
+/**
+ * Used only before the company has a program_settings row: the row's own
+ * column defaults (lib/settingsSchema.ts), so the fallback never differs
+ * from what the database would store (TR10).
+ */
+export const DEFAULT_SETTINGS: ProgramSettings = { ...PROGRAM_SETTINGS_DEFAULTS };
 
 // ---------- Category Matrix ----------
 
@@ -66,7 +46,7 @@ export interface CostBreakdown {
 
 /**
  * Category reimbursement matrix:
- *  - Inkfish Required (fleet_organised) → 100% tuition/travel/accom/food
+ *  - Company required (fleet_organised) → 100% tuition/travel/accom/food
  *  - Mandatory          → 100% tuition + travel/accom/food
  *  - Professional       → 100% tuition (with split-payment if > threshold), travel/accom/food
  *  - Extracurricular    → tuition not reimbursed; travel/accom/food only if vessel approves
@@ -212,5 +192,3 @@ export function checkEligibility(
   return warnings;
 }
 
-// Re-export legacy constant for any caller still importing the old name
-export { ELIGIBILITY_MONTHS };

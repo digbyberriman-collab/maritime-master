@@ -12,7 +12,9 @@
  *     end (platform-prep plan §1, contract 2).
  *
  * - notificationTypes: the training application notification types and
- *   their emitters (platform-prep PP4; deferred until each emitter lands, D-238).
+ *   their emitters (platform-prep PP4; live once the emitter lands, D-238:
+ *   the two transition types are live from X5-07A, the stale digest waits
+ *   for X5-09).
  *
  * Platform-prep PP3 moved the routes from src/routes/index.tsx and the leaves
  * from src/config/sitemap.ts unchanged.
@@ -50,10 +52,12 @@ const manifest: ModuleManifest = {
     },
   ],
   // Seeded by 20261124030100 (category Training; X5 PR-08). Each flips to
-  // 'live' in the slice that lands its emitter, whose SQL test proves it (D-238).
+  // 'live' in the slice that lands its emitter, whose SQL test proves it (D-238):
+  // development_transition() emits both through development_application_notify()
+  // (20261124040600; supabase/tests/sql/fleet/training_transitions.test.sql).
   notificationTypes: [
-    { key: 'training_application_action_needed', status: 'deferred', emitter: 'development_transition() (X5-07A)' },
-    { key: 'training_application_updated', status: 'deferred', emitter: 'development_transition() (X5-07A)' },
+    { key: 'training_application_action_needed', status: 'live', emitter: 'development_transition() (X5-07A)' },
+    { key: 'training_application_updated', status: 'live', emitter: 'development_transition() (X5-07A)' },
     { key: 'training_applications_stale', status: 'deferred', emitter: 'fleet_ops_daily_sweep() on Mondays (X5-09)' },
   ],
 };

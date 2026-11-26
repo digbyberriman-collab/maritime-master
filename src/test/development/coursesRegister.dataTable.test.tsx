@@ -3,7 +3,8 @@
  * keeps its behaviour on the shared table: search over course, crew,
  * provider and number; phase filter (now count chips); start date newest
  * first; sortable columns; CSV export of the rows as shown; row opens the
- * application. Errors are shown, not swallowed.
+ * application. Errors are shown, not swallowed. Voided applications are
+ * left out by the query (X5-07A).
  */
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -18,6 +19,7 @@ vi.mock('@/integrations/supabase/client', () => {
   const chain = {
     select: () => chain,
     eq: () => chain,
+    neq: () => chain,
     order: () => Promise.resolve(state.result),
   };
   return { supabase: { from: () => chain } };

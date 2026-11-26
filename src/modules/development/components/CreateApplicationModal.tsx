@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { AlertTriangle, DollarSign, Calendar, MapPin, Info } from 'lucide-react';
 import { useCreateApplication, useSubmitApplication } from '@/modules/development/hooks/useDevelopmentMutations';
 import { type DevelopmentCourse } from '@/modules/development/hooks/useDevelopment';
-import { useProgramSettings } from '@/modules/development/hooks/useProgramSettings';
+import { useCategoryLabels, useProgramSettings } from '@/modules/development/hooks/useProgramSettings';
 import { useEligibilityContext } from '@/modules/development/hooks/useEligibility';
 import { calculateCosts, checkEligibility, DEFAULT_SETTINGS } from '@/modules/development/services/rulesEngine';
 import {
@@ -25,9 +25,18 @@ interface Props {
   course?: DevelopmentCourse | null;
 }
 
+/**
+ * A new training application (gap/02 W3): saved as a draft, or saved and
+ * submitted in two steps (the draft insert, then development_transition
+ * 'submit', which falls back to today's write only while that RPC is
+ * missing, D-X5-20). The figures come from the company's programme
+ * settings (TR10).
+ */
 export default function CreateApplicationModal({ open, onOpenChange, course }: Props) {
   const createApp = useCreateApplication();
+  const createQuietly = useCreateApplication({ quiet: true });
   const submitApp = useSubmitApplication();
+  const labels = useCategoryLabels();
   const { data: settings = DEFAULT_SETTINGS } = useProgramSettings();
   const { data: eligibilityCtx } = useEligibilityContext();
   const isCustom = !course;
@@ -128,77 +137,88 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
 
   const handleSaveDraft = async () => {
     if (!courseName.trim()) return;
-    await createApp.mutateAsync({
-      course_id: isCustom ? undefined : course?.id,
-      course_name: courseName,
-      category: courseCategory,
-      course_description: form.course_description || (course?.notes ?? undefined),
-      course_provider: form.course_provider || undefined,
-      course_url: form.course_url || undefined,
-      course_location: form.course_location || undefined,
-      course_start_date: form.course_start_date || undefined,
-      course_end_date: form.course_end_date || undefined,
-      course_duration_days: durationDays || undefined,
-      course_duration_hours: durationHours,
-      estimated_tuition_usd: tuition || undefined,
-      estimated_travel_usd: travel || undefined,
-      estimated_travel_route: form.estimated_travel_route || undefined,
-      estimated_accommodation_usd: accommodation || undefined,
-      estimated_accommodation_nights: nights || undefined,
-      estimated_accommodation_nightly_rate: nightlyRate || undefined,
-      estimated_food_per_diem_usd: foodPerDiem || undefined,
-      is_custom_course: isCustom,
-      leave_days_accrued: parseInt(form.leave_days_accrued) || 0,
-      neutral_days_accrued: parseInt(form.neutral_days_accrued) || 0,
-      application_currency: form.application_currency,
-      exchange_rate_to_usd: fx,
-      tuition_local_amount: parseFloat(form.tuition_local_amount) || undefined,
-      travel_local_amount: parseFloat(form.travel_local_amount) || undefined,
-      accommodation_local_amount: parseFloat(form.accommodation_local_amount) || undefined,
-      is_online_short: breakdown.isOnlineShort,
-    });
+    try {
+      await createApp.mutateAsync({
+        course_id: isCustom ? undefined : course?.id,
+        course_name: courseName,
+        category: courseCategory,
+        course_description: form.course_description || (course?.notes ?? undefined),
+        course_provider: form.course_provider || undefined,
+        course_url: form.course_url || undefined,
+        course_location: form.course_location || undefined,
+        course_start_date: form.course_start_date || undefined,
+        course_end_date: form.course_end_date || undefined,
+        course_duration_days: durationDays || undefined,
+        course_duration_hours: durationHours,
+        estimated_tuition_usd: tuition || undefined,
+        estimated_travel_usd: travel || undefined,
+        estimated_travel_route: form.estimated_travel_route || undefined,
+        estimated_accommodation_usd: accommodation || undefined,
+        estimated_accommodation_nights: nights || undefined,
+        estimated_accommodation_nightly_rate: nightlyRate || undefined,
+        estimated_food_per_diem_usd: foodPerDiem || undefined,
+        is_custom_course: isCustom,
+        leave_days_accrued: parseInt(form.leave_days_accrued) || 0,
+        neutral_days_accrued: parseInt(form.neutral_days_accrued) || 0,
+        application_currency: form.application_currency,
+        exchange_rate_to_usd: fx,
+        tuition_local_amount: parseFloat(form.tuition_local_amount) || undefined,
+        travel_local_amount: parseFloat(form.travel_local_amount) || undefined,
+        accommodation_local_amount: parseFloat(form.accommodation_local_amount) || undefined,
+        is_online_short: breakdown.isOnlineShort,
+      });
+    } catch {
+      return; // the hook said why
+    }
     onOpenChange(false);
   };
 
   const handleSubmit = async () => {
     if (!courseName.trim()) return;
-    const result = await createApp.mutateAsync({
-      course_id: isCustom ? undefined : course?.id,
-      course_name: courseName,
-      category: courseCategory,
-      course_description: form.course_description || undefined,
-      course_provider: form.course_provider || undefined,
-      course_url: form.course_url || undefined,
-      course_location: form.course_location || undefined,
-      course_start_date: form.course_start_date || undefined,
-      course_end_date: form.course_end_date || undefined,
-      course_duration_days: durationDays || undefined,
-      course_duration_hours: durationHours,
-      estimated_tuition_usd: tuition || undefined,
-      estimated_travel_usd: travel || undefined,
-      estimated_travel_route: form.estimated_travel_route || undefined,
-      estimated_accommodation_usd: accommodation || undefined,
-      estimated_accommodation_nights: nights || undefined,
-      estimated_accommodation_nightly_rate: nightlyRate || undefined,
-      estimated_food_per_diem_usd: foodPerDiem || undefined,
-      is_custom_course: isCustom,
-      leave_days_accrued: parseInt(form.leave_days_accrued) || 0,
-      neutral_days_accrued: parseInt(form.neutral_days_accrued) || 0,
-      application_currency: form.application_currency,
-      exchange_rate_to_usd: fx,
-      tuition_local_amount: parseFloat(form.tuition_local_amount) || undefined,
-      travel_local_amount: parseFloat(form.travel_local_amount) || undefined,
-      accommodation_local_amount: parseFloat(form.accommodation_local_amount) || undefined,
-      is_online_short: breakdown.isOnlineShort,
-    });
-    if (result?.id) {
-      await submitApp.mutateAsync(result.id);
+    let result;
+    try {
+      result = await createQuietly.mutateAsync({
+        course_id: isCustom ? undefined : course?.id,
+        course_name: courseName,
+        category: courseCategory,
+        course_description: form.course_description || undefined,
+        course_provider: form.course_provider || undefined,
+        course_url: form.course_url || undefined,
+        course_location: form.course_location || undefined,
+        course_start_date: form.course_start_date || undefined,
+        course_end_date: form.course_end_date || undefined,
+        course_duration_days: durationDays || undefined,
+        course_duration_hours: durationHours,
+        estimated_tuition_usd: tuition || undefined,
+        estimated_travel_usd: travel || undefined,
+        estimated_travel_route: form.estimated_travel_route || undefined,
+        estimated_accommodation_usd: accommodation || undefined,
+        estimated_accommodation_nights: nights || undefined,
+        estimated_accommodation_nightly_rate: nightlyRate || undefined,
+        estimated_food_per_diem_usd: foodPerDiem || undefined,
+        is_custom_course: isCustom,
+        leave_days_accrued: parseInt(form.leave_days_accrued) || 0,
+        neutral_days_accrued: parseInt(form.neutral_days_accrued) || 0,
+        application_currency: form.application_currency,
+        exchange_rate_to_usd: fx,
+        tuition_local_amount: parseFloat(form.tuition_local_amount) || undefined,
+        travel_local_amount: parseFloat(form.travel_local_amount) || undefined,
+        accommodation_local_amount: parseFloat(form.accommodation_local_amount) || undefined,
+        is_online_short: breakdown.isOnlineShort,
+      });
+    } catch {
+      return; // the hook said why; nothing was saved
+    }
+    try {
+      await submitApp.mutateAsync(result.id, 'draft');
+    } catch {
+      // Saved as a draft but not submitted: the hook said why; the draft waits in My training.
     }
     onOpenChange(false);
   };
 
   const catConfig = CATEGORY_CONFIG[courseCategory];
-  const isPending = createApp.isPending || submitApp.isPending;
+  const isPending = createApp.isPending || createQuietly.isPending || submitApp.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -227,7 +247,7 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
               >
                 {(Object.entries(CATEGORY_CONFIG) as [DevCategory, typeof CATEGORY_CONFIG[DevCategory]][]).map(
                   ([key, config]) => (
-                    <option key={key} value={key}>{config.label}</option>
+                    <option key={key} value={key}>{labels[key] ?? config.label}</option>
                   )
                 )}
               </select>
@@ -244,7 +264,7 @@ export default function CreateApplicationModal({ open, onOpenChange, course }: P
             <div className="flex items-center gap-2">
               <h3 className="font-medium">{course.name}</h3>
               <Badge variant="outline" className={`${catConfig.bgClass} ${catConfig.textClass} border-0 text-xs`}>
-                {catConfig.label}
+                {labels[courseCategory] ?? catConfig.label}
               </Badge>
             </div>
             <div className="flex gap-3 text-sm text-muted-foreground flex-wrap">

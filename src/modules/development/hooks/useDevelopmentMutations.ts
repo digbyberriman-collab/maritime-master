@@ -1,8 +1,47 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+/**
+ * Training application writes (gap/02 TR4–TR6, W3; X5 spec §2 X5-07A,
+ * D-X5-20). Every status change goes through `development_transition()`
+ * (`20261124040600_fleet_training_core.sql`): the server checks the
+ * machine, the caller's part on the application and the payload, writes
+ * one event row and notifies the next actor. A new application is a draft
+ * (the column default; the server's guard refuses anything else).
+ *
+ * D-X5-20: while development_transition is missing (the file not applied,
+ * D-01), the applicant's submit of their draft or returned application and
+ * cancel of their draft keep today's direct writes; nothing else falls
+ * back: every other action raises TransitionNotSetUpError ("not set up
+ * yet"). The fallback runs only on a missing RPC, never after a refusal,
+ * so it can never bypass the guard that ships in the same file.
+ *
+ * Expense claims are their own entity (useDevelopmentExpenses.ts); they are
+ * re-exported here for the module's public API.
+ */
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useVessel } from '@/modules/vessels/contexts/VesselContext';
-import { toast } from 'sonner';
+import { notify } from '@/shared/lib/notify';
+import {
+  ACTION_DONE,
+  AWAITING_APPROVAL_STATUSES,
+  hasLegacyFallback,
+  type ApplicationAction,
+  type ApplicationActor,
+} from '../lib/applicationMachine';
+import { developmentDb } from './developmentDb';
+import { developmentKeys, invalidateApplicationQueries } from './keys';
+import {
+  TransitionNotSetUpError,
+  TransitionUnconfirmedError,
+  isTransitionMissing,
+  parseTransitionResult,
+  transitionErrorMessage,
+  type TransitionResult,
+} from './applicationTransition';
+
+export { useSubmitExpense, useFleetExpenses } from './useDevelopmentExpenses';
+export { TransitionNotSetUpError, TransitionUnconfirmedError, parseTransitionResult, transitionErrorMessage, type TransitionResult } from './applicationTransition';
 
 interface CreateApplicationInput {
   course_id?: string;
@@ -34,17 +73,24 @@ interface CreateApplicationInput {
   is_online_short?: boolean;
 }
 
-export function useCreateApplication() {
+/** The new draft as the insert returned it. */
+export interface CreatedApplication {
+  id: string;
+  application_number: string;
+  crew_member_id: string;
+}
+
+/** Creates a draft application (the default status; the guard refuses anything else). */
+export function useCreateApplication(options: { quiet?: boolean } = {}) {
   const { user, profile } = useAuth();
   const { selectedVesselId, vessels } = useVessel();
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: CreateApplicationInput) => {
+    mutationFn: async (input: CreateApplicationInput): Promise<CreatedApplication> => {
       if (!user?.id || !profile?.company_id) throw new Error('Not authenticated');
 
       let vesselId = selectedVesselId;
-
       if (!vesselId) {
         const { data: assignment, error: assignmentError } = await supabase
           .from('crew_assignments')
@@ -53,207 +99,158 @@ export function useCreateApplication() {
           .eq('is_current', true)
           .limit(1)
           .maybeSingle();
-
         if (assignmentError) throw assignmentError;
         vesselId = assignment?.vessel_id ?? null;
       }
-
       if (!vesselId) {
         const fallbackVessel = vessels.find((v) => v.name !== 'Fleet-Wide' && v.status !== 'Sold') ?? vessels[0];
         vesselId = fallbackVessel?.id ?? null;
       }
-
       if (!vesselId) throw new Error('Select a vessel before creating an application');
 
-      const { estimated_total_usd: _ignoredTotal, ...applicationInput } = input as CreateApplicationInput & {
-        estimated_total_usd?: never;
-      };
-
+      const { estimated_total_usd: _ignoredTotal, ...applicationInput } = input as CreateApplicationInput & { estimated_total_usd?: never };
       const { data, error } = await supabase
         .from('development_applications')
-        .insert({
-          crew_member_id: user.id,
-          company_id: profile.company_id,
-          vessel_id: vesselId,
-          status: 'draft',
-          ...applicationInput,
-        })
-        .select()
+        .insert({ ...applicationInput, crew_member_id: user.id, company_id: profile.company_id, vessel_id: vesselId })
+        .select('id, application_number, crew_member_id')
         .single();
-
       if (error) throw error;
+      if (!data?.id || data.crew_member_id !== user.id) throw new Error('The application was not saved. Try again.');
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-development-applications'] });
-      queryClient.invalidateQueries({ queryKey: ['my-development-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['development-applications-review'] });
-      queryClient.invalidateQueries({ queryKey: ['fleet-development-applications'] });
-      toast.success('Application created');
+      void invalidateApplicationQueries(queryClient);
+      if (!options.quiet) notify.success('Draft saved');
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: unknown) => notify.error(err, { title: 'The application was not saved' }),
   });
 }
 
-export function useSubmitApplication() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (applicationId: string) => {
-      const { error } = await supabase
-        .from('development_applications')
-        .update({ status: 'hod_review', submitted_at: new Date().toISOString() })
-        .eq('id', applicationId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-development-applications'] });
-      queryClient.invalidateQueries({ queryKey: ['my-development-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['development-applications-review'] });
-      queryClient.invalidateQueries({ queryKey: ['fleet-development-applications'] });
-      toast.success('Application submitted for review');
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
-}
-
-interface ReviewInput {
+/** What a transition needs: the action, its payload and what the caller last saw. */
+export interface TransitionInput {
   applicationId: string;
-  stage: 'hod' | 'purser' | 'captain';
-  decision: 'approved' | 'returned';
-  comments?: string;
-  isDiscretionary?: boolean;
-  discretionaryJustification?: string;
+  action: ApplicationAction;
+  payload?: Record<string, unknown>;
+  /** The application's updated_at as loaded: a change in between is refused as stale. */
+  expectedUpdatedAt?: string | null;
+  /** The status as loaded, for the D-X5-20 fallback. */
+  currentStatus?: string;
+  /** The part the caller acts in, as far as the page knows (the server decides). */
+  actingAs?: ApplicationActor | null;
 }
 
-export function useReviewApplication() {
-  const { user } = useAuth();
-  const queryClient = useQueryClient();
+/** The outcome: confirmed by the definer, or written by the D-X5-20 fallback. */
+export type TransitionOutcome = { mode: 'rpc'; result: TransitionResult } | { mode: 'fallback'; applicationId: string; action: ApplicationAction };
 
-  return useMutation({
-    mutationFn: async (input: ReviewInput) => {
-      if (!user?.id) throw new Error('Not authenticated');
+/**
+ * Runs one transition. The definer's answer is checked (the same
+ * application, a known status); a missing definer takes the D-X5-20
+ * fallback for the applicant's submit / cancel of a draft and raises
+ * TransitionNotSetUpError for everything else.
+ */
+export async function runApplicationTransition(input: TransitionInput, userId: string): Promise<TransitionOutcome> {
+  const { data, error } = await developmentDb.rpc('development_transition', {
+    p_application_id: input.applicationId,
+    p_action: input.action,
+    p_payload: (input.payload ?? {}) as Json,
+    p_expected_updated_at: input.expectedUpdatedAt ?? null,
+  });
+  if (error) {
+    if (!isTransitionMissing(error)) throw error;
+    const status = input.currentStatus ?? '';
+    if (!hasLegacyFallback(input.action, status, input.actingAs ?? null)) throw new TransitionNotSetUpError();
+    return runLegacyFallback(input, userId);
+  }
+  const result = parseTransitionResult(data, input.applicationId);
+  if (!result) throw new TransitionUnconfirmedError();
+  return { mode: 'rpc', result };
+}
 
-      // Always record the reviewer's decision on their own field
-      const updateFields: Record<string, unknown> = {
-        [`${input.stage}_reviewer_id`]: user.id,
-        [`${input.stage}_reviewed_at`]: new Date().toISOString(),
-        [`${input.stage}_decision`]: input.decision,
-        [`${input.stage}_comments`]: input.comments || null,
-      };
-
-      // Any returned decision short-circuits to 'returned'
-      if (input.decision === 'returned') {
-        updateFields.status = 'returned';
-      } else if (input.stage === 'hod') {
-        // HOD approval moves to parallel Captain + Purser review
-        updateFields.status = 'captain_purser_review';
-      } else {
-        // Captain or Purser approval — need to check if BOTH have approved
-        const { data: current, error: fetchErr } = await supabase
+/**
+ * D-X5-20: today's direct writes, only for the applicant's own row and only
+ * from the statuses today's policy lets them write. The affected row is
+ * checked; nothing changed means nothing is reported as done.
+ */
+async function runLegacyFallback(input: TransitionInput, userId: string): Promise<TransitionOutcome> {
+  const query =
+    input.action === 'submit'
+      ? supabase
           .from('development_applications')
-          .select('captain_decision, purser_decision')
+          .update({ status: 'hod_review', submitted_at: new Date().toISOString() })
           .eq('id', input.applicationId)
-          .single();
-        if (fetchErr) throw fetchErr;
+          .eq('crew_member_id', userId)
+          .in('status', ['draft', 'returned'])
+      : supabase
+          .from('development_applications')
+          .update({ status: 'cancelled' })
+          .eq('id', input.applicationId)
+          .eq('crew_member_id', userId)
+          .eq('status', 'draft');
+  const { data, error } = await query.select('id');
+  if (error) throw error;
+  if (!data || data.length !== 1) throw new TransitionUnconfirmedError();
+  return { mode: 'fallback', applicationId: input.applicationId, action: input.action };
+}
 
-        const captainOk =
-          input.stage === 'captain' ? true : current?.captain_decision === 'approved';
-        const pursorOk =
-          input.stage === 'purser' ? true : current?.purser_decision === 'approved';
+/** Whether development_transition answered in this session: 'unknown', 'available' or 'missing'. */
+export type TransitionSupport = 'unknown' | 'available' | 'missing';
 
-        if (captainOk && pursorOk) {
-          updateFields.status =
-            input.isDiscretionary && input.stage === 'captain'
-              ? 'discretionary_approved'
-              : 'approved';
-          if (input.isDiscretionary && input.stage === 'captain') {
-            updateFields.is_discretionary = true;
-            updateFields.discretionary_justification = input.discretionaryJustification;
-          }
-        } else {
-          updateFields.status = 'captain_purser_review';
-          if (input.isDiscretionary && input.stage === 'captain') {
-            updateFields.is_discretionary = true;
-            updateFields.discretionary_justification = input.discretionaryJustification;
-          }
-        }
-      }
-
-      const { error } = await supabase
-        .from('development_applications')
-        .update(updateFields)
-        .eq('id', input.applicationId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-development-applications'] });
-      queryClient.invalidateQueries({ queryKey: ['development-applications-review'] });
-      queryClient.invalidateQueries({ queryKey: ['fleet-development-applications'] });
-      toast.success('Review submitted');
-    },
-    onError: (err: Error) => toast.error(err.message),
+/** The cached answer of the last transition call (no request of its own). */
+export function useTransitionSupport(): TransitionSupport {
+  const { profile } = useAuth();
+  const { data } = useQuery({
+    queryKey: developmentKeys.transitionSupport(profile?.company_id),
+    queryFn: (): TransitionSupport => 'unknown',
+    initialData: 'unknown' as TransitionSupport,
+    staleTime: Infinity,
+    gcTime: Infinity,
   });
+  return data;
 }
 
-interface SubmitExpenseInput {
-  application_id: string;
-  actual_tuition_usd?: number;
-  actual_travel_usd?: number;
-  actual_accommodation_usd?: number;
-  actual_accommodation_nights?: number;
-  actual_accommodation_nightly_rate?: number;
-  actual_food_per_diem_usd?: number;
-  actual_food_days?: number;
-  is_split_payment?: boolean;
-}
-
-export function useSubmitExpense() {
+/** One transition with its toasts: success only once the server (or the fallback's checked write) confirmed it. */
+export function useApplicationTransition() {
   const { user, profile } = useAuth();
   const queryClient = useQueryClient();
+  const supportKey = developmentKeys.transitionSupport(profile?.company_id);
 
   return useMutation({
-    mutationFn: async (input: SubmitExpenseInput) => {
-      if (!user?.id || !profile?.company_id) throw new Error('Not authenticated');
-
-      const { actual_total_usd: _ignoredTotal, ...expenseInput } = input as SubmitExpenseInput & {
-        actual_total_usd?: never;
-      };
-
-      const { data, error } = await supabase
-        .from('development_expenses')
-        .insert({
-          ...expenseInput,
-          crew_member_id: user.id,
-          company_id: profile.company_id,
-          status: 'submitted',
-          submitted_at: new Date().toISOString(),
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+    mutationFn: async (input: TransitionInput): Promise<TransitionOutcome> => {
+      if (!user?.id) throw new Error('Not authenticated');
+      return runApplicationTransition(input, user.id);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['my-development-applications'] });
-      queryClient.invalidateQueries({ queryKey: ['my-development-stats'] });
-      toast.success('Expense claim submitted');
+    onSuccess: (outcome, input) => {
+      queryClient.setQueryData<TransitionSupport>(supportKey, outcome.mode === 'rpc' ? 'available' : 'missing');
+      void invalidateApplicationQueries(queryClient);
+      notify.success(ACTION_DONE[input.action]);
     },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: unknown) => {
+      if (err instanceof TransitionNotSetUpError) queryClient.setQueryData<TransitionSupport>(supportKey, 'missing');
+      notify.error(new Error(transitionErrorMessage(err)), { title: 'Nothing was changed' });
+    },
   });
 }
 
-// Hooks for admin/reviewers
-export function useApplicationsForReview() {
-  const { user, profile } = useAuth();
-
+/** Submits the applicant's draft or returned application for approval. */
+export function useSubmitApplication() {
+  const { user } = useAuth();
+  const transition = useApplicationTransition();
   return {
-    queryKey: ['development-applications-review', profile?.company_id],
+    ...transition,
+    mutateAsync: (applicationId: string, currentStatus: string = 'draft') =>
+      transition.mutateAsync({ applicationId, action: 'submit', currentStatus, actingAs: user?.id ? 'applicant' : null }),
+  };
+}
+
+// Query configs for admin / reviewer pages (useQuery(config)).
+
+/** Applications waiting for an approval in the caller's company (RLS narrows them to the ones the caller reviews). */
+export function useApplicationsForReview() {
+  const { profile } = useAuth();
+  return {
+    queryKey: developmentKeys.review(profile?.company_id),
     queryFn: async () => {
       if (!profile?.company_id) return [];
-
       const { data, error } = await supabase
         .from('development_applications')
         .select(`
@@ -261,15 +258,8 @@ export function useApplicationsForReview() {
           crew_member:profiles!development_applications_crew_member_id_fkey(first_name, last_name, email)
         `)
         .eq('company_id', profile.company_id)
-        .in('status', [
-          'submitted',
-          'hod_review',
-          'purser_review',
-          'captain_review',
-          'captain_purser_review',
-        ])
+        .in('status', [...AWAITING_APPROVAL_STATUSES])
         .order('submitted_at', { ascending: true });
-
       if (error) throw error;
       return data || [];
     },
@@ -277,14 +267,13 @@ export function useApplicationsForReview() {
   };
 }
 
+/** The company's applications for the fleet pages; voided ones are left out of registers and totals (TR6). */
 export function useFleetApplications() {
   const { profile } = useAuth();
-
   return {
-    queryKey: ['fleet-development-applications', profile?.company_id],
+    queryKey: developmentKeys.fleet(profile?.company_id),
     queryFn: async () => {
       if (!profile?.company_id) return [];
-
       const { data, error } = await supabase
         .from('development_applications')
         .select(`
@@ -293,33 +282,8 @@ export function useFleetApplications() {
           vessel:vessels!development_applications_vessel_id_fkey(name)
         `)
         .eq('company_id', profile.company_id)
+        .neq('status', 'voided')
         .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: !!profile?.company_id,
-  };
-}
-
-export function useFleetExpenses() {
-  const { profile } = useAuth();
-
-  return {
-    queryKey: ['fleet-development-expenses', profile?.company_id],
-    queryFn: async () => {
-      if (!profile?.company_id) return [];
-
-      const { data, error } = await supabase
-        .from('development_expenses')
-        .select(`
-          *,
-          crew_member:profiles!development_expenses_crew_member_id_fkey(first_name, last_name),
-          application:development_applications!development_expenses_application_id_fkey(course_name, category)
-        `)
-        .eq('company_id', profile.company_id)
-        .order('created_at', { ascending: false });
-
       if (error) throw error;
       return data || [];
     },

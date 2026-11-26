@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import type { DevCategory, DevFormat } from '@/modules/development/constants';
+import { ACTIVE_STATUSES } from '@/modules/development/lib/applicationMachine';
+import { developmentKeys } from './keys';
 
 export interface DevelopmentCourse {
   id: string;
@@ -23,9 +25,32 @@ export interface DevelopmentCourse {
 export interface DevelopmentApplication {
   id: string;
   application_number: string;
+  crew_member_id: string;
   course_name: string;
   category: DevCategory;
   status: string;
+  course_provider?: string | null;
+  course_location?: string | null;
+  course_description?: string | null;
+  course_duration_days?: number | null;
+  estimated_tuition_usd?: number | null;
+  estimated_travel_usd?: number | null;
+  estimated_accommodation_usd?: number | null;
+  estimated_accommodation_nights?: number | null;
+  estimated_accommodation_nightly_rate?: number | null;
+  estimated_food_per_diem_usd?: number | null;
+  hod_decision?: string | null;
+  hod_comments?: string | null;
+  purser_decision?: string | null;
+  purser_comments?: string | null;
+  captain_decision?: string | null;
+  captain_comments?: string | null;
+  is_discretionary?: boolean | null;
+  discretionary_justification?: string | null;
+  denial_reason?: string | null;
+  updated_at?: string | null;
+  vessel?: { name?: string | null } | null;
+  crew_member?: { first_name?: string | null; last_name?: string | null } | null;
   estimated_total_usd: number | null;
   submitted_at: string | null;
   created_at: string;
@@ -100,7 +125,7 @@ export function useMyApplications() {
   const companyId = profile?.company_id;
 
   return useQuery({
-    queryKey: ['my-development-applications', user?.id],
+    queryKey: developmentKeys.myApplications(user?.id),
     queryFn: async () => {
       if (!user?.id) return [];
 
@@ -125,7 +150,7 @@ export function useMyRepayments() {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['my-development-repayments', user?.id],
+    queryKey: developmentKeys.myRepayments(user?.id),
     queryFn: async () => {
       if (!user?.id) return [];
 
@@ -150,32 +175,27 @@ export function useDevelopmentStats() {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['my-development-stats', user?.id],
+    queryKey: developmentKeys.myStats(user?.id),
     queryFn: async () => {
       if (!user?.id) return { activeApps: 0, completedCourses: 0, totalReimbursed: 0, pendingReimbursement: 0 };
 
-      // Active applications
-      const { count: activeApps } = await supabase
-        .from('development_applications')
-        .select('id', { count: 'exact', head: true })
-        .eq('crew_member_id', user.id)
-        .in('status', ['submitted', 'hod_review', 'purser_review', 'captain_review', 'approved', 'enrolled']);
-
-      // Completed courses
-      const { count: completedCourses } = await supabase
-        .from('development_applications')
-        .select('id', { count: 'exact', head: true })
-        .eq('crew_member_id', user.id)
-        .eq('status', 'completed');
-
-      // Total reimbursed
-      const { data: expenses } = await supabase
-        .from('development_expenses')
-        .select('approved_reimbursement_usd')
-        .eq('crew_member_id', user.id)
-        .eq('status', 'paid');
-
-      const totalReimbursed = expenses?.reduce((sum, e) => sum + (e.approved_reimbursement_usd || 0), 0) || 0;
+      // Active applications (submitted through enrolled), completed courses
+      // (completed, reimbursed or closed) and the paid reimbursements; a
+      // failed count is an error, never a zero.
+      const [active, completed, paid] = await Promise.all([
+        supabase.from('development_applications').select('id', { count: 'exact', head: true })
+          .eq('crew_member_id', user.id).in('status', [...ACTIVE_STATUSES]),
+        supabase.from('development_applications').select('id', { count: 'exact', head: true })
+          .eq('crew_member_id', user.id).in('status', ['completed', 'reimbursed', 'closed']),
+        supabase.from('development_expenses').select('approved_reimbursement_usd')
+          .eq('crew_member_id', user.id).eq('status', 'paid'),
+      ]);
+      if (active.error) throw active.error;
+      if (completed.error) throw completed.error;
+      if (paid.error) throw paid.error;
+      const activeApps = active.count;
+      const completedCourses = completed.count;
+      const totalReimbursed = (paid.data ?? []).reduce((sum, e) => sum + (e.approved_reimbursement_usd || 0), 0);
 
       return {
         activeApps: activeApps || 0,

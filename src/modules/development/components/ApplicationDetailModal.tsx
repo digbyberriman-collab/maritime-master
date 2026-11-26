@@ -1,236 +1,417 @@
-import { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+/**
+ * One training application: its details, the review history, and the
+ * steps the viewer may take now (gap/02 W3, TR4–TR6; X5-07A). Every step
+ * goes through development_transition (useApplicationTransition); the
+ * steps offered come from the machine (lib/applicationMachine.ts) and the
+ * viewer's part as far as the page knows it: the applicant on their own
+ * application, the review stage a reviewer page opened it for, training
+ * admins. The server re-checks every one and refuses in words.
+ *
+ * While development_transition is missing (D-01), only the applicant's
+ * submit and cancel of a draft still work (D-X5-20); every other step is
+ * shown disabled with "Not set up yet". Reject and Return are distinct:
+ * a return goes back to the applicant with a comment, a rejection is final
+ * with a reason.
+ */
+import { useEffect, useMemo, useState } from 'react';
+import { format } from 'date-fns';
+import { CheckCircle, XCircle, DollarSign, User, Calendar, Info } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
-import { Checkbox } from '@/components/ui/checkbox';
-import { CheckCircle, XCircle, Clock, DollarSign, User, Calendar } from 'lucide-react';
-import { useReviewApplication } from '@/modules/development/hooks/useDevelopmentMutations';
+import { StatusPill } from '@/shared/components/status';
+import { useAuth } from '@/modules/auth/contexts/AuthContext';
+import { useCan } from '@/lib/permissions/useCan';
+import { todayDateOnly } from '@/shared/lib/form';
+import { useApplicationTransition, useTransitionSupport } from '@/modules/development/hooks/useDevelopmentMutations';
+import { useCategoryLabels, usePolicyExtras } from '@/modules/development/hooks/useProgramSettings';
+import { useApplicationLifecycle } from '@/modules/development/hooks/useApplicationLifecycle';
+import { CATEGORY_CONFIG, APPLICATION_STATUS_CONFIG, APPROVAL_STEPS, type DevCategory, type ApplicationStatus } from '@/modules/development/constants';
 import {
-  CATEGORY_CONFIG,
-  APPLICATION_STATUS_CONFIG,
-  APPROVAL_STEPS,
-  type DevCategory,
-  type ApplicationStatus,
-} from '@/modules/development/constants';
-import { format } from 'date-fns';
+  ACTION_LABELS,
+  actionActors,
+  actionRequirement,
+  availableActions,
+  hasLegacyFallback,
+  isApplicationStatus,
+  nextActor,
+  isStale,
+  TRANSITION_NOT_SET_UP,
+  type ApplicationAction,
+  type ApplicationActor,
+  type FinalApproverRole,
+} from '@/modules/development/lib/applicationMachine';
+
+/** The application fields the modal reads (a row of development_applications with its joins). */
+export interface DetailApplication {
+  id: string;
+  status: string;
+  crew_member_id?: string | null;
+  application_number?: string | null;
+  course_name: string;
+  category?: string | null;
+  course_provider?: string | null;
+  course_location?: string | null;
+  course_start_date?: string | null;
+  course_end_date?: string | null;
+  course_duration_days?: number | null;
+  course_description?: string | null;
+  estimated_tuition_usd?: number | null;
+  estimated_travel_usd?: number | null;
+  estimated_accommodation_usd?: number | null;
+  estimated_food_per_diem_usd?: number | null;
+  estimated_total_usd?: number | null;
+  hod_reviewer_id?: string | null;
+  hod_reviewed_at?: string | null;
+  hod_decision?: string | null;
+  hod_comments?: string | null;
+  purser_reviewer_id?: string | null;
+  purser_reviewed_at?: string | null;
+  purser_decision?: string | null;
+  purser_comments?: string | null;
+  captain_reviewer_id?: string | null;
+  captain_reviewed_at?: string | null;
+  captain_decision?: string | null;
+  captain_comments?: string | null;
+  is_discretionary?: boolean | null;
+  discretionary_justification?: string | null;
+  denial_reason?: string | null;
+  submitted_at?: string | null;
+  updated_at?: string | null;
+  created_at?: string | null;
+  crew_member?: { first_name?: string | null; last_name?: string | null } | null;
+  vessel?: { name?: string | null } | null;
+}
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  application: any;
+  application: DetailApplication | null;
+  /** A reviewer page opened it: the steps of `reviewStage` are offered. */
   canReview?: boolean;
   reviewStage?: 'hod' | 'purser' | 'captain' | null;
+  /** The viewer's parts when the page knows them (wins over reviewStage). */
+  viewerRoles?: readonly ApplicationActor[];
 }
 
-export default function ApplicationDetailModal({ open, onOpenChange, application, canReview, reviewStage }: Props) {
-  const reviewMutation = useReviewApplication();
-  const [comments, setComments] = useState('');
-  const [isDiscretionary, setIsDiscretionary] = useState(false);
-  const [discretionaryJustification, setDiscretionaryJustification] = useState('');
+const money = (v: number | null | undefined) => `$${(v ?? 0).toLocaleString('en-GB')}`;
+const day = (v: string | null | undefined) => (v ? format(new Date(v), 'dd MMM yyyy') : null);
+
+const ACTION_VARIANT: Partial<Record<ApplicationAction, 'default' | 'outline' | 'destructive'>> = {
+  reject: 'destructive',
+  void: 'destructive',
+  hod_return: 'outline',
+  return: 'outline',
+  cancel: 'outline',
+  edit_fields: 'outline',
+};
+
+/** Steps that need the text box, and what it is called for them. */
+const TEXT_WORDS: Record<'comment' | 'reason' | 'justification', string> = {
+  comment: 'What needs to change',
+  reason: 'Reason',
+  justification: 'Why this is approved outside the standard policy',
+};
+
+export default function ApplicationDetailModal({ open, onOpenChange, application, canReview, reviewStage, viewerRoles }: Props) {
+  const { user } = useAuth();
+  const transition = useApplicationTransition();
+  const support = useTransitionSupport();
+  const { data: extras } = usePolicyExtras();
+  const labels = useCategoryLabels();
+  const lifecycle = useApplicationLifecycle(open ? application?.id : null);
+  const isTrainingAdmin = useCan('fleet.operations.fleet_training.admin');
+  const [text, setText] = useState('');
+  const [completedOn, setCompletedOn] = useState(todayDateOnly());
+  const [certificateNumber, setCertificateNumber] = useState('');
+  const [actAs, setActAs] = useState<FinalApproverRole>('captain');
+
+  useEffect(() => {
+    if (!open) {
+      setText('');
+      setCertificateNumber('');
+      setCompletedOn(todayDateOnly());
+    }
+  }, [open, application?.id]);
+
+  const mode = extras?.final_approval_mode ?? 'both';
+
+  const roles = useMemo<ApplicationActor[]>(() => {
+    if (!application) return [];
+    if (user?.id && application.crew_member_id === user.id) return ['applicant'];
+    if (viewerRoles) return [...viewerRoles];
+    const out: ApplicationActor[] = [];
+    if (canReview && reviewStage) out.push(reviewStage);
+    if (isTrainingAdmin) out.push('training_admin');
+    return out;
+  }, [application, user?.id, viewerRoles, canReview, reviewStage, isTrainingAdmin]);
+
+  const actions = useMemo(
+    () => (application ? availableActions(application, roles, mode).filter((a) => a !== 'edit_fields') : []),
+    [application, roles, mode],
+  );
 
   if (!application) return null;
 
+  const status = application.status;
+  const knownStatus = isApplicationStatus(status) ? status : null;
   const catConfig = CATEGORY_CONFIG[application.category as DevCategory];
-  const statusConfig = APPLICATION_STATUS_CONFIG[application.status as ApplicationStatus];
-  const currentStep = statusConfig?.step || 0;
+  const statusConfig = APPLICATION_STATUS_CONFIG[status as ApplicationStatus];
+  const currentStep = statusConfig?.step ?? 0;
   const crewName = application.crew_member
-    ? `${application.crew_member.first_name} ${application.crew_member.last_name}`
-    : 'Unknown';
+    ? `${application.crew_member.first_name ?? ''} ${application.crew_member.last_name ?? ''}`.trim() || 'Name not available'
+    : 'Name not available';
+  const actor = roles[0] ?? null;
+  const next = nextActor({ ...application, stage_entered_at: lifecycle.data?.stage_entered_at }, mode);
+  const stale = isStale({ ...application, stage_entered_at: lifecycle.data?.stage_entered_at });
+  const bothFinal = roles.includes('captain') && roles.includes('purser');
 
-  const handleReview = async (decision: 'approved' | 'returned') => {
-    if (!reviewStage) return;
-    await reviewMutation.mutateAsync({
-      applicationId: application.id,
-      stage: reviewStage,
-      decision,
-      comments,
-      isDiscretionary: isDiscretionary && reviewStage === 'captain',
-      discretionaryJustification: isDiscretionary ? discretionaryJustification : undefined,
-    });
-    onOpenChange(false);
+  const disabledReason = (action: ApplicationAction): string | null => {
+    if (support === 'missing' && !hasLegacyFallback(action, status, actor)) return 'Not set up yet';
+    const need = actionRequirement(action, actionActors(action, knownStatus ?? 'draft').find((a) => roles.includes(a)) ?? null);
+    if ((need === 'comment' || need === 'reason' || need === 'justification') && !text.trim()) return `${TEXT_WORDS[need]} is needed`;
+    if (need === 'completion' && !completedOn) return 'Enter the completion day';
+    return null;
   };
+
+  const run = async (action: ApplicationAction) => {
+    const acting = actionActors(action, knownStatus ?? 'draft').find((a) => roles.includes(a)) ?? null;
+    const need = actionRequirement(action, acting);
+    const payload: Record<string, unknown> = {};
+    if (need === 'comment') payload.comment = text.trim();
+    if (need === 'reason') payload.reason = text.trim();
+    if (need === 'justification') payload.justification = text.trim();
+    if (need === null && text.trim()) payload.comment = text.trim();
+    if (need === 'completion') {
+      payload.completed_on = completedOn;
+      if (certificateNumber.trim()) payload.certificate_number = certificateNumber.trim();
+    }
+    if ((action === 'final_approve' || action === 'return' || action === 'reject') && bothFinal) payload.role = actAs;
+    try {
+      await transition.mutateAsync({
+        applicationId: application.id,
+        action,
+        payload,
+        expectedUpdatedAt: application.updated_at ?? null,
+        currentStatus: status,
+        actingAs: acting,
+      });
+      onOpenChange(false);
+    } catch {
+      // The hook has said why; the dialog stays open.
+    }
+  };
+
+  const reviews = [
+    { stage: 'hod', label: 'Head of department', reviewer: application.hod_reviewer_id, date: application.hod_reviewed_at, decision: application.hod_decision, comments: application.hod_comments },
+    { stage: 'purser', label: 'Purser', reviewer: application.purser_reviewer_id, date: application.purser_reviewed_at, decision: application.purser_decision, comments: application.purser_comments },
+    { stage: 'captain', label: 'Captain', reviewer: application.captain_reviewer_id, date: application.captain_reviewed_at, decision: application.captain_decision, comments: application.captain_comments },
+  ].filter((r) => r.reviewer);
+
+  const outcome =
+    status === 'rejected'
+      ? { title: 'Rejected', body: application.denial_reason }
+      : status === 'voided'
+        ? { title: 'Voided', body: lifecycle.data?.void_reason ?? null }
+        : status === 'cancelled'
+          ? { title: 'Cancelled', body: lifecycle.data?.cancel_reason ?? null }
+          : null;
+
+  const needsText = actions.some((a) => {
+    const need = actionRequirement(a, actionActors(a, knownStatus ?? 'draft').find((r) => roles.includes(r)) ?? null);
+    return need === 'comment' || need === 'reason' || need === 'justification';
+  });
+  const canComplete = actions.includes('complete');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            {application.course_name}
-            <Badge variant="outline" className={`${statusConfig?.color || ''} text-xs`}>
-              {statusConfig?.label || application.status}
-            </Badge>
+          <DialogTitle className="flex flex-wrap items-center gap-2 pr-6">
+            <span className="min-w-0 break-words">{application.course_name}</span>
+            <StatusPill domain="training_application" status={status} size="sm" />
           </DialogTitle>
+          <DialogDescription>{next.label}{stale ? ' · waiting more than 7 days' : ''}</DialogDescription>
         </DialogHeader>
 
-        {/* Applicant Info */}
-        <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
-          <User className="h-5 w-5 text-muted-foreground" />
-          <div>
-            <p className="font-medium text-sm">{crewName}</p>
-            <p className="text-xs text-muted-foreground">{application.application_number}</p>
+        <div className="flex flex-wrap items-center gap-3 rounded-lg bg-muted/50 p-3">
+          <User className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="type-body font-medium">{crewName}</p>
+            {application.application_number ? <p className="type-mono text-muted-foreground">{application.application_number}</p> : null}
           </div>
-          {catConfig && (
-            <Badge variant="outline" className={`${catConfig.bgClass} ${catConfig.textClass} border-0 text-xs ml-auto`}>
-              {catConfig.label}
+          {catConfig ? (
+            <Badge variant="outline" className={`${catConfig.bgClass} ${catConfig.textClass} ml-auto border-0 text-xs`}>
+              {labels[application.category as DevCategory] ?? catConfig.label}
             </Badge>
-          )}
+          ) : null}
         </div>
 
-        {/* Approval Progress */}
-        {currentStep >= 0 && (
-          <div className="flex items-center gap-1">
+        {currentStep >= 0 ? (
+          <ol className="flex items-center gap-1" aria-label="Approval progress">
             {APPROVAL_STEPS.map((step, i) => {
               const stepIndex = i + 1;
               const isDone = currentStep > stepIndex;
               const isCurrent = currentStep === stepIndex;
               return (
-                <div key={step} className="flex-1">
+                <li key={step} className="flex-1" aria-current={isCurrent ? 'step' : undefined}>
                   <div className={`h-2 rounded-full ${isDone ? 'bg-success' : isCurrent ? 'bg-amber' : 'bg-muted'}`} />
-                  <p className={`text-[10px] mt-1 text-center ${isCurrent ? 'text-amber font-medium' : 'text-muted-foreground'}`}>
-                    {step}
-                  </p>
-                </div>
+                  <p className={`type-caption mt-1 text-center ${isCurrent ? 'font-medium text-amber' : 'text-muted-foreground'}`}>{step}</p>
+                </li>
               );
             })}
+          </ol>
+        ) : null}
+
+        {outcome ? (
+          <div className="rounded-lg border border-input p-3" role="note">
+            <p className="type-body font-medium">{outcome.title}</p>
+            <p className="type-body text-muted-foreground">{outcome.body || 'No reason recorded.'}</p>
           </div>
-        )}
+        ) : null}
 
         <Separator />
 
-        {/* Course Details */}
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-          {application.course_provider && (
-            <div><span className="text-muted-foreground">Provider:</span> {application.course_provider}</div>
-          )}
-          {application.course_location && (
-            <div><span className="text-muted-foreground">Location:</span> {application.course_location}</div>
-          )}
-          {application.course_start_date && (
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+          {application.course_provider ? (
+            <div><dt className="inline text-muted-foreground">Provider: </dt><dd className="inline">{application.course_provider}</dd></div>
+          ) : null}
+          {application.course_location ? (
+            <div><dt className="inline text-muted-foreground">Location: </dt><dd className="inline">{application.course_location}</dd></div>
+          ) : null}
+          {application.course_start_date ? (
             <div className="flex items-center gap-1">
-              <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-              {format(new Date(application.course_start_date), 'dd MMM yyyy')}
-              {application.course_end_date && ` — ${format(new Date(application.course_end_date), 'dd MMM yyyy')}`}
+              <Calendar className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+              <span>
+                {day(application.course_start_date)}
+                {application.course_end_date ? ` – ${day(application.course_end_date)}` : ''}
+              </span>
             </div>
-          )}
-          {application.course_duration_days && (
-            <div><span className="text-muted-foreground">Duration:</span> {application.course_duration_days} days</div>
-          )}
-          {application.vessel?.name && (
-            <div><span className="text-muted-foreground">Vessel:</span> {application.vessel.name}</div>
-          )}
-        </div>
+          ) : null}
+          {application.course_duration_days ? (
+            <div><dt className="inline text-muted-foreground">Duration: </dt><dd className="inline">{application.course_duration_days} days</dd></div>
+          ) : null}
+          {application.vessel?.name ? (
+            <div><dt className="inline text-muted-foreground">Vessel: </dt><dd className="inline">{application.vessel.name}</dd></div>
+          ) : null}
+        </dl>
 
-        {application.course_description && (
+        {application.course_description ? (
           <div>
-            <Label className="text-muted-foreground text-xs">Description / Justification</Label>
-            <p className="text-sm mt-1">{application.course_description}</p>
+            <Label className="text-xs text-muted-foreground">Description / justification</Label>
+            <p className="mt-1 text-sm">{application.course_description}</p>
           </div>
-        )}
+        ) : null}
 
         <Separator />
 
-        {/* Cost Breakdown */}
-        <div className="space-y-2">
-          <h3 className="text-sm font-semibold flex items-center gap-2">
-            <DollarSign className="h-4 w-4" /> Cost Estimate
+        <section className="space-y-2" aria-labelledby="dev-app-costs">
+          <h3 id="dev-app-costs" className="flex items-center gap-2 text-sm font-semibold">
+            <DollarSign className="h-4 w-4" aria-hidden="true" /> Cost estimate
           </h3>
-          <div className="rounded-lg bg-muted/50 p-3 space-y-1 text-sm">
-            {application.estimated_tuition_usd > 0 && (
-              <div className="flex justify-between"><span>Tuition</span><span>${application.estimated_tuition_usd?.toLocaleString()}</span></div>
-            )}
-            {application.estimated_travel_usd > 0 && (
-              <div className="flex justify-between"><span>Travel</span><span>${application.estimated_travel_usd?.toLocaleString()}</span></div>
-            )}
-            {application.estimated_accommodation_usd > 0 && (
-              <div className="flex justify-between"><span>Accommodation</span><span>${application.estimated_accommodation_usd?.toLocaleString()}</span></div>
-            )}
-            {application.estimated_food_per_diem_usd > 0 && (
-              <div className="flex justify-between"><span>Food per diem</span><span>${application.estimated_food_per_diem_usd?.toLocaleString()}/day</span></div>
-            )}
+          <div className="space-y-1 rounded-lg bg-muted/50 p-3 text-sm">
+            {(application.estimated_tuition_usd ?? 0) > 0 ? <div className="flex justify-between"><span>Tuition</span><span>{money(application.estimated_tuition_usd)}</span></div> : null}
+            {(application.estimated_travel_usd ?? 0) > 0 ? <div className="flex justify-between"><span>Travel</span><span>{money(application.estimated_travel_usd)}</span></div> : null}
+            {(application.estimated_accommodation_usd ?? 0) > 0 ? <div className="flex justify-between"><span>Accommodation</span><span>{money(application.estimated_accommodation_usd)}</span></div> : null}
+            {(application.estimated_food_per_diem_usd ?? 0) > 0 ? <div className="flex justify-between"><span>Food per diem</span><span>{money(application.estimated_food_per_diem_usd)}/day</span></div> : null}
             <Separator />
-            <div className="flex justify-between font-semibold">
-              <span>Total</span><span>${application.estimated_total_usd?.toLocaleString() || '0'}</span>
-            </div>
+            <div className="flex justify-between font-semibold"><span>Total</span><span>{money(application.estimated_total_usd)}</span></div>
           </div>
-        </div>
+        </section>
 
-        {/* Previous Reviews */}
-        {[
-          { stage: 'hod', label: 'HOD Review', reviewer: application.hod_reviewer_id, date: application.hod_reviewed_at, decision: application.hod_decision, comments: application.hod_comments },
-          { stage: 'purser', label: 'Purser Review', reviewer: application.purser_reviewer_id, date: application.purser_reviewed_at, decision: application.purser_decision, comments: application.purser_comments },
-          { stage: 'captain', label: 'Captain Review', reviewer: application.captain_reviewer_id, date: application.captain_reviewed_at, decision: application.captain_decision, comments: application.captain_comments },
-        ].filter((r) => r.reviewer).map((review) => (
-          <div key={review.stage} className="rounded-lg border p-3 space-y-1">
-            <div className="flex items-center gap-2">
-              {review.decision === 'approved' ? (
-                <CheckCircle className="h-4 w-4 text-success" />
+        {reviews.map((review) => (
+          <div key={review.stage} className="space-y-1 rounded-lg border border-input p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              {review.decision === 'approved' || review.decision === 'discretionary_approved' ? (
+                <CheckCircle className="h-4 w-4 text-success" aria-hidden="true" />
               ) : (
-                <XCircle className="h-4 w-4 text-destructive" />
+                <XCircle className="h-4 w-4 text-destructive" aria-hidden="true" />
               )}
-              <span className="text-sm font-medium">{review.label}</span>
-              {review.date && (
-                <span className="text-xs text-muted-foreground ml-auto">
-                  {format(new Date(review.date), 'dd MMM yyyy HH:mm')}
-                </span>
-              )}
+              <span className="text-sm font-medium">
+                {review.label}: {review.decision === 'returned' ? 'returned' : review.decision === 'discretionary_approved' ? 'approved (discretionary)' : 'approved'}
+              </span>
+              {review.date ? <span className="ml-auto text-xs text-muted-foreground">{format(new Date(review.date), 'dd MMM yyyy HH:mm')}</span> : null}
             </div>
-            {review.comments && <p className="text-sm text-muted-foreground">{review.comments}</p>}
+            {review.comments ? <p className="text-sm text-muted-foreground">{review.comments}</p> : null}
           </div>
         ))}
+        {application.is_discretionary && application.discretionary_justification ? (
+          <p className="text-sm text-muted-foreground">Discretionary: {application.discretionary_justification}</p>
+        ) : null}
 
-        {/* Review Actions */}
-        {canReview && reviewStage && (
+        {actions.length > 0 ? (
           <>
             <Separator />
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold">Your Review</h3>
-              <div className="space-y-2">
-                <Label>Comments</Label>
-                <Textarea value={comments} onChange={(e) => setComments(e.target.value)} rows={3} placeholder="Add review comments..." />
-              </div>
-
-              {reviewStage === 'captain' && (
+            <section className="space-y-3" aria-labelledby="dev-app-actions">
+              <h3 id="dev-app-actions" className="text-sm font-semibold">Next step</h3>
+              {support === 'missing' ? (
+                <p className="flex items-start gap-2 text-sm text-muted-foreground" role="status">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /> {TRANSITION_NOT_SET_UP}
+                </p>
+              ) : null}
+              {bothFinal && actions.some((a) => a === 'final_approve' || a === 'return' || a === 'reject') ? (
+                <fieldset className="flex flex-wrap items-center gap-4 text-sm">
+                  <legend className="sr-only">Act as</legend>
+                  {(['captain', 'purser'] as const).map((r) => (
+                    <label key={r} className="flex min-h-11 cursor-pointer items-center gap-2">
+                      <input type="radio" name="dev-act-as" value={r} checked={actAs === r} onChange={() => setActAs(r)} />
+                      Act as the {r === 'captain' ? 'Captain' : 'Purser'}
+                    </label>
+                  ))}
+                </fieldset>
+              ) : null}
+              {needsText ? (
                 <div className="space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <Checkbox checked={isDiscretionary} onCheckedChange={(v) => setIsDiscretionary(!!v)} />
-                    <span className="text-sm">Approve as discretionary (outside standard policy)</span>
-                  </label>
-                  {isDiscretionary && (
-                    <div className="space-y-2">
-                      <Label>Justification (required)</Label>
-                      <Textarea
-                        value={discretionaryJustification}
-                        onChange={(e) => setDiscretionaryJustification(e.target.value)}
-                        rows={2}
-                        placeholder="Explain why this is approved outside standard policy..."
-                      />
-                    </div>
-                  )}
+                  <Label htmlFor="dev-app-text">Comment or reason</Label>
+                  <Textarea
+                    id="dev-app-text"
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    rows={3}
+                    maxLength={2000}
+                    placeholder="Needed to return, reject, void or cancel; optional otherwise"
+                  />
                 </div>
-              )}
-
-              <div className="flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  className="text-destructive border-destructive/30"
-                  onClick={() => handleReview('returned')}
-                  disabled={reviewMutation.isPending}
-                >
-                  <XCircle className="h-4 w-4 mr-1" /> Return
-                </Button>
-                <Button
-                  onClick={() => handleReview('approved')}
-                  disabled={reviewMutation.isPending || (isDiscretionary && !discretionaryJustification)}
-                >
-                  <CheckCircle className="h-4 w-4 mr-1" /> Approve
-                </Button>
+              ) : null}
+              {canComplete ? (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <Label htmlFor="dev-app-completed-on">Completed on</Label>
+                    <Input id="dev-app-completed-on" type="date" value={completedOn} max={todayDateOnly()} onChange={(e) => setCompletedOn(e.target.value)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="dev-app-certificate">Certificate number (optional)</Label>
+                    <Input id="dev-app-certificate" value={certificateNumber} maxLength={120} onChange={(e) => setCertificateNumber(e.target.value)} />
+                  </div>
+                </div>
+              ) : null}
+              <div className="flex flex-wrap justify-end gap-2">
+                {actions.map((action) => {
+                  const reason = disabledReason(action);
+                  return (
+                    <Button
+                      key={action}
+                      type="button"
+                      variant={ACTION_VARIANT[action] ?? 'default'}
+                      className="min-h-11"
+                      disabled={transition.isPending || reason !== null}
+                      title={reason ?? undefined}
+                      aria-describedby={reason ? `dev-app-reason-${action}` : undefined}
+                      onClick={() => void run(action)}
+                    >
+                      {ACTION_LABELS[action]}
+                      {reason ? <span id={`dev-app-reason-${action}`} className="sr-only">: {reason}</span> : null}
+                    </Button>
+                  );
+                })}
               </div>
-            </div>
+            </section>
           </>
-        )}
+        ) : null}
       </DialogContent>
     </Dialog>
   );

@@ -6,23 +6,48 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { DollarSign, AlertTriangle, Upload } from 'lucide-react';
-import { useSubmitExpense } from '@/modules/development/hooks/useDevelopmentMutations';
-import { ACCOMMODATION_CAP_PER_NIGHT, PROFESSIONAL_THRESHOLD, CATEGORY_CONFIG, type DevCategory } from '@/modules/development/constants';
+import { useSubmitExpense } from '@/modules/development/hooks/useDevelopmentExpenses';
+import { useCategoryLabels, useProgramSettings } from '@/modules/development/hooks/useProgramSettings';
+import { DEFAULT_SETTINGS } from '@/modules/development/services/rulesEngine';
+import { CATEGORY_CONFIG, type DevCategory } from '@/modules/development/constants';
+
+/** The application fields an expense claim starts from. */
+export interface ExpenseClaimApplication {
+  id: string;
+  course_name: string;
+  category?: string | null;
+  application_number?: string | null;
+  course_duration_days?: number | null;
+  estimated_tuition_usd?: number | null;
+  estimated_travel_usd?: number | null;
+  estimated_accommodation_nights?: number | null;
+  estimated_accommodation_nightly_rate?: number | null;
+  estimated_food_per_diem_usd?: number | null;
+}
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  application: any;
+  application: ExpenseClaimApplication | null;
 }
 
+/**
+ * An expense claim against an approved application. The accommodation cap
+ * and the split-payment threshold are the company's programme settings
+ * (TR10), not numbers in the code.
+ */
 export default function ExpenseClaimModal({ open, onOpenChange, application }: Props) {
   const submitExpense = useSubmitExpense();
+  const labels = useCategoryLabels();
+  const { data: settings = DEFAULT_SETTINGS } = useProgramSettings();
+  const accommodationCap = settings.accommodation_cap_per_night_usd;
+  const splitThreshold = settings.professional_split_threshold_usd;
 
   const [form, setForm] = useState({
     actual_tuition_usd: String(application?.estimated_tuition_usd || ''),
     actual_travel_usd: String(application?.estimated_travel_usd || ''),
     actual_accommodation_nights: String(application?.estimated_accommodation_nights || ''),
-    actual_accommodation_nightly_rate: String(application?.estimated_accommodation_nightly_rate || ACCOMMODATION_CAP_PER_NIGHT),
+    actual_accommodation_nightly_rate: String(application?.estimated_accommodation_nightly_rate || accommodationCap),
     actual_food_per_diem_usd: String(application?.estimated_food_per_diem_usd || ''),
   });
 
@@ -31,26 +56,30 @@ export default function ExpenseClaimModal({ open, onOpenChange, application }: P
   const tuition = parseFloat(form.actual_tuition_usd) || 0;
   const travel = parseFloat(form.actual_travel_usd) || 0;
   const nights = parseInt(form.actual_accommodation_nights) || 0;
-  const nightlyRate = Math.min(parseFloat(form.actual_accommodation_nightly_rate) || 0, ACCOMMODATION_CAP_PER_NIGHT);
+  const nightlyRate = Math.min(parseFloat(form.actual_accommodation_nightly_rate) || 0, accommodationCap);
   const accommodation = nights * nightlyRate;
   const durationDays = application?.course_duration_days || 0;
   const food = durationDays * (parseFloat(form.actual_food_per_diem_usd) || 0);
   const total = tuition + travel + accommodation + food;
-  const isSplitPayment = total > PROFESSIONAL_THRESHOLD && application?.category === 'professional';
+  const isSplitPayment = total > splitThreshold && application?.category === 'professional';
 
   const handleSubmit = async () => {
     if (!application) return;
-    await submitExpense.mutateAsync({
-      application_id: application.id,
-      actual_tuition_usd: tuition || undefined,
-      actual_travel_usd: travel || undefined,
-      actual_accommodation_usd: accommodation || undefined,
-      actual_accommodation_nights: nights || undefined,
-      actual_accommodation_nightly_rate: nightlyRate || undefined,
-      actual_food_per_diem_usd: parseFloat(form.actual_food_per_diem_usd) || undefined,
-      actual_food_days: durationDays || undefined,
-      is_split_payment: isSplitPayment,
-    });
+    try {
+      await submitExpense.mutateAsync({
+        application_id: application.id,
+        actual_tuition_usd: tuition || undefined,
+        actual_travel_usd: travel || undefined,
+        actual_accommodation_usd: accommodation || undefined,
+        actual_accommodation_nights: nights || undefined,
+        actual_accommodation_nightly_rate: nightlyRate || undefined,
+        actual_food_per_diem_usd: parseFloat(form.actual_food_per_diem_usd) || undefined,
+        actual_food_days: durationDays || undefined,
+        is_split_payment: isSplitPayment,
+      });
+    } catch {
+      return; // the hook said why; the claim stays open
+    }
     onOpenChange(false);
   };
 
@@ -70,7 +99,7 @@ export default function ExpenseClaimModal({ open, onOpenChange, application }: P
           <div className="flex items-center gap-2 mt-1">
             {catConfig && (
               <Badge variant="outline" className={`${catConfig.bgClass} ${catConfig.textClass} border-0 text-xs`}>
-                {catConfig.label}
+                {labels[application.category as DevCategory] ?? catConfig.label}
               </Badge>
             )}
             <span className="text-xs text-muted-foreground">{application.application_number}</span>
@@ -97,8 +126,8 @@ export default function ExpenseClaimModal({ open, onOpenChange, application }: P
             <Input type="number" value={form.actual_accommodation_nights} onChange={(e) => update('actual_accommodation_nights', e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>Nightly Rate (max ${ACCOMMODATION_CAP_PER_NIGHT})</Label>
-            <Input type="number" value={form.actual_accommodation_nightly_rate} onChange={(e) => update('actual_accommodation_nightly_rate', e.target.value)} max={ACCOMMODATION_CAP_PER_NIGHT} />
+            <Label>Nightly Rate (max ${accommodationCap})</Label>
+            <Input type="number" value={form.actual_accommodation_nightly_rate} onChange={(e) => update('actual_accommodation_nightly_rate', e.target.value)} max={accommodationCap} />
           </div>
           <div className="space-y-2 col-span-2">
             <Label>Food Per Diem</Label>

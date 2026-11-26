@@ -8,5 +8,7 @@
   { "probe": { "callee": "fleet_document_ack_reader_for", "expr": "public.fleet_document_ack_reader_for(auth.uid(), {vessel:A.dra}, NULL)" } },
   { "probe": { "callee": "fleet_document_file_readable", "expr": "public.fleet_document_file_readable(auth.uid(), gen_random_uuid())" } },
   { "probe": { "callee": "fleet_document_hod_on_vessel", "expr": "public.fleet_document_hod_on_vessel(auth.uid(), {vessel:A.dra})" } },
-  { "probe": { "callee": "form_template_vessel_manager_for", "expr": "public.form_template_vessel_manager_for(auth.uid(), {company:A}, {vessel:A.dra})" } }
+  { "probe": { "callee": "form_template_vessel_manager_for", "expr": "public.form_template_vessel_manager_for(auth.uid(), {company:A}, {vessel:A.dra})" } },
+  { "probe": { "callee": "development_reviewer_for", "expr": "public.development_reviewer_for(auth.uid(), {vessel:A.dra}, gen_random_uuid())" } },
+  { "probe": { "callee": "development_vessel_role_for", "expr": "public.development_vessel_role_for(auth.uid(), {vessel:A.dra}, 'captain')" } }
 ]

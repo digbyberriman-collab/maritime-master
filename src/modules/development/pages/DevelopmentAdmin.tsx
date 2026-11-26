@@ -14,6 +14,14 @@ import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useFleetApplications, useFleetExpenses } from '@/modules/development/hooks/useDevelopmentMutations';
 import ApplicationDetailModal from '@/modules/development/components/ApplicationDetailModal';
+import { usePolicyExtras } from '@/modules/development/hooks/useProgramSettings';
+import {
+  APPROVED_OR_LATER_STATUSES,
+  isAwaitingApproval,
+  isFinalStage,
+  isHodStage,
+  pendingFinalApprovers,
+} from '@/modules/development/lib/applicationMachine';
 import {
   CATEGORY_CONFIG,
   APPLICATION_STATUS_CONFIG,
@@ -47,28 +55,23 @@ export default function DevelopmentAdmin() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
 
-  // Determine review capability
-  const canReview = true; // Admin can review
+  // The review stage a reviewer acts in, from the machine
+  // (lib/applicationMachine.ts): the HOD stage, else the final approver
+  // still to decide under the company's final-approval rule. The server
+  // decides who may act (development_transition).
+  const { data: extras } = usePolicyExtras();
+  const mode = extras?.final_approval_mode ?? 'both';
+  const canReview = true;
   const getReviewStage = (app: any): 'hod' | 'purser' | 'captain' | null => {
-    const status = app?.status;
-    if (status === 'submitted' || status === 'hod_review') return 'hod';
-    if (status === 'purser_review') return 'purser';
-    if (status === 'captain_review') return 'captain';
-    if (status === 'captain_purser_review') {
-      if (app?.captain_decision !== 'approved') return 'captain';
-      if (app?.purser_decision !== 'approved') return 'purser';
-    }
+    if (isHodStage(app?.status)) return 'hod';
+    if (isFinalStage(app?.status)) return pendingFinalApprovers(mode, app ?? {})[0] ?? null;
     return null;
   };
 
   // Stats
   const stats = useMemo(() => {
-    const pending = applications.filter((a: any) =>
-      ['submitted', 'hod_review', 'purser_review', 'captain_review', 'captain_purser_review'].includes(a.status)
-    ).length;
-    const approved = applications.filter((a: any) =>
-      ['approved', 'enrolled', 'completed', 'discretionary_approved'].includes(a.status)
-    ).length;
+    const pending = applications.filter((a: any) => isAwaitingApproval(a.status)).length;
+    const approved = applications.filter((a: any) => (APPROVED_OR_LATER_STATUSES as readonly string[]).includes(a.status)).length;
     const totalSpend = expenses
       .filter((e: any) => ['approved', 'paid', 'partially_paid'].includes(e.status))
       .reduce((sum: number, e: any) => sum + (e.approved_reimbursement_usd || e.actual_total_usd || 0), 0);

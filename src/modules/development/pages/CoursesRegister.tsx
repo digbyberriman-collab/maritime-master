@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { CATEGORY_CONFIG, APPLICATION_STATUS_CONFIG, type DevCategory, type ApplicationStatus } from '@/modules/development/constants';
 import ApplicationDetailModal from '@/modules/development/components/ApplicationDetailModal';
+import { developmentKeys } from '@/modules/development/hooks/keys';
 import { DataTable, showingSummary, type DataTableColumn, type DataTableFilter } from '@/shared/components/data';
 import { StatusPill } from '@/shared/components/status';
 
@@ -35,6 +36,8 @@ async function fetchCoursesRegister(companyId: string) {
       vessel:vessels!development_applications_vessel_id_fkey(name)
     `)
     .eq('company_id', companyId)
+    // Voided applications were entered in error: hidden from registers and totals (TR6).
+    .neq('status', 'voided')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return data ?? [];
@@ -44,7 +47,7 @@ type ApplicationRow = Awaited<ReturnType<typeof fetchCoursesRegister>>[number];
 type RegisterRow = ApplicationRow & { _phase: Phase };
 
 function derivePhase(row: Pick<ApplicationRow, 'status' | 'course_start_date' | 'course_end_date'>): Phase {
-  if (row.status === 'completed') return 'completed';
+  if (row.status === 'completed' || row.status === 'reimbursed' || row.status === 'closed') return 'completed';
   const start = row.course_start_date ? parseISO(row.course_start_date) : null;
   const end = row.course_end_date ? parseISO(row.course_end_date) : start;
   const now = new Date();
@@ -219,7 +222,7 @@ export default function CoursesRegister() {
   const companyId = profile?.company_id;
 
   const { data: rows = [], isLoading, error, refetch } = useQuery({
-    queryKey: ['courses-register', companyId],
+    queryKey: developmentKeys.coursesRegister(companyId),
     enabled: !!companyId,
     queryFn: () => fetchCoursesRegister(companyId!),
   });

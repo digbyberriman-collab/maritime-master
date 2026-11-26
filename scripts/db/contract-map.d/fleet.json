@@ -108,6 +108,28 @@
           "form_template_run_stats"
         ]
       }
+    },
+    {
+      "file": "src/modules/development/types/db.pending.ts",
+      "mirrors": "X5 spec §2 X5-07A (20261124040600_fleet_training_core.sql)",
+      "tables": {
+        "type": "DevelopmentPendingTables",
+        "expect": ["development_application_events"]
+      },
+      "columns": {
+        "type": "DevelopmentPendingColumns",
+        "expect": ["development_courses", "development_applications", "program_settings"]
+      },
+      "functions": {
+        "type": "DevelopmentPendingFunctions",
+        "expect": [
+          "development_transition",
+          "development_course_save",
+          "development_course_archive",
+          "development_settings_save",
+          "development_course_promote"
+        ]
+      }
     }
   ],
   "notMirrored": {
@@ -126,7 +148,9 @@
     },
     "functions": {
       "fleet_document_visible": "RLS helper of the fleet document library policies (the reader must be able to execute it); the client never calls it",
-      "fleet_document_ack_reader_for": "RLS helper of the fleet document acknowledgement, signer-rule and reminder policies (the reader must be able to execute it); the client never calls it"
+      "fleet_document_ack_reader_for": "RLS helper of the fleet document acknowledgement, signer-rule and reminder policies (the reader must be able to execute it); the client never calls it",
+      "development_reviewer_for": "RLS helper of the development_applications SELECT policy (the reader must be able to execute it; caller-only); the client never calls it",
+      "development_application_company": "RLS helper of the fleet_training_participants policies (the reader must be able to execute it; answers only the caller's own company); the client never calls it"
     }
   }
 }

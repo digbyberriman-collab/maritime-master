@@ -1,0 +1,12 @@
+{
+  "id": "7a000000-0000-4000-8000-000000000001",
+  "status": "hod_review",
+  "from_status": "draft",
+  "action": "submit",
+  "actor_role": "applicant",
+  "event_id": "7e000000-0000-4000-8000-000000000016",
+  "updated_at": "$now",
+  "stage_entered_at": "$now",
+  "qualification_record_id": null,
+  "notified": true
+}

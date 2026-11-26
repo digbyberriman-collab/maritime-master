@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMyApplications } from '@/modules/development/hooks/useDevelopment';
 import { CATEGORY_CONFIG, APPLICATION_STATUS_CONFIG, type DevCategory, type ApplicationStatus } from '@/modules/development/constants';
+import { ACTIVE_STATUSES, APPROVED_OR_LATER_STATUSES } from '@/modules/development/lib/applicationMachine';
+import { useCategoryLabels } from '@/modules/development/hooks/useProgramSettings';
 import { format } from 'date-fns';
 import ApplicationDetailModal from '@/modules/development/components/ApplicationDetailModal';
 import ExpenseClaimModal from '@/modules/development/components/ExpenseClaimModal';
@@ -17,26 +19,18 @@ export default function DevelopmentApplications() {
   const [selectedApp, setSelectedApp] = useState<any>(null);
   const [expenseApp, setExpenseApp] = useState<any>(null);
 
-  const activeApps = applications.filter((a) =>
-    [
-      'draft',
-      'submitted',
-      'hod_review',
-      'purser_review',
-      'captain_review',
-      'captain_purser_review',
-      'approved',
-      'enrolled',
-      'discretionary_approved',
-    ].includes(a.status)
-  );
-  const completedApps = applications.filter((a) => a.status === 'completed');
-  const returnedApps = applications.filter((a) => ['returned', 'cancelled'].includes(a.status));
+  const labels = useCategoryLabels();
+  // The machine's groups (lib/applicationMachine.ts): in progress, finished
+  // with a course, and returned or ended without one. Voided applications
+  // are hidden from the applicant's lists (TR6).
+  const activeApps = applications.filter((a) => a.status === 'draft' || (ACTIVE_STATUSES as readonly string[]).includes(a.status));
+  const completedApps = applications.filter((a) => ['completed', 'reimbursed', 'closed'].includes(a.status));
+  const returnedApps = applications.filter((a) => ['returned', 'rejected', 'cancelled'].includes(a.status));
 
   const renderApp = (app: any) => {
     const catConfig = CATEGORY_CONFIG[app.category as DevCategory];
     const statusConfig = APPLICATION_STATUS_CONFIG[app.status as ApplicationStatus];
-    const canExpense = ['approved', 'enrolled', 'completed', 'discretionary_approved'].includes(app.status);
+    const canExpense = (APPROVED_OR_LATER_STATUSES as readonly string[]).includes(app.status) && app.status !== 'closed';
 
     return (
       <Card key={app.id} className="hover:border-primary/30 transition-colors">
@@ -46,7 +40,7 @@ export default function DevelopmentApplications() {
               <h3 className="font-medium">{app.course_name}</h3>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <Badge variant="outline" className={`${catConfig.bgClass} ${catConfig.textClass} border-0 text-xs`}>
-                  {catConfig.label}
+                  {labels[app.category as DevCategory] ?? catConfig.label}
                 </Badge>
                 <Badge variant="outline" className={`text-xs ${statusConfig?.color || ''}`}>
                   {statusConfig?.label || app.status}
@@ -117,7 +111,7 @@ export default function DevelopmentApplications() {
             <TabsList>
               <TabsTrigger value="active">Active ({activeApps.length})</TabsTrigger>
               <TabsTrigger value="completed">Completed ({completedApps.length})</TabsTrigger>
-              <TabsTrigger value="returned">Returned ({returnedApps.length})</TabsTrigger>
+              <TabsTrigger value="returned">Returned or ended ({returnedApps.length})</TabsTrigger>
             </TabsList>
             <TabsContent value="active" className="space-y-3 mt-4">
               {activeApps.length === 0 ? (
@@ -131,7 +125,7 @@ export default function DevelopmentApplications() {
             </TabsContent>
             <TabsContent value="returned" className="space-y-3 mt-4">
               {returnedApps.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">No returned applications</p>
+                <p className="text-muted-foreground text-center py-8">No returned, rejected or cancelled applications</p>
               ) : returnedApps.map(renderApp)}
             </TabsContent>
           </Tabs>

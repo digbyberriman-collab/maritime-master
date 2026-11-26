@@ -1,0 +1,26 @@
+[
+  {
+    "id": "7d000000-0000-4000-8000-000000000001",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "accommodation_cap_per_night_usd": 250,
+    "food_per_diem_usd": 50,
+    "professional_split_threshold_usd": 4000,
+    "clawback_months": 12,
+    "eligibility_service_days": 90,
+    "probation_default_days": 180,
+    "online_neutral_threshold_hours": 24,
+    "anniversary_window_days": 30,
+    "business_class_flights_allowed": true,
+    "created_at": "$ts:-300d",
+    "updated_at": "$ts:-30d",
+    "final_approval_mode": "both",
+    "mileage_rate_per_mile": 0.67,
+    "mileage_rate_per_km": null,
+    "fx_overrides": {
+      "EUR": 1.08,
+      "GBP": 1.27
+    },
+    "category_labels": {},
+    "updated_by": null
+  }
+]
