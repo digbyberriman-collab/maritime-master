@@ -257,7 +257,7 @@ SELECT tests.ok((SELECT bool_and(l.lanname = 'plpgsql') FROM pg_proc AS p JOIN p
                    AND p.proname IN ('user_is_active', 'user_belongs_to_company', 'get_user_company_id', 'has_role_in_company', 'vessel_company_of',
                                      'profile_company_of', 'user_company_for_admin', 'has_capability', 'admin_may_view_user', 'record_readable',
                                      'has_role', 'has_any_role', 'my_profile_id', 'current_user_company_id', 'legacy_profile_role',
-                                     'role_vessel_ids', 'role_company_user_ids')),
+                                     'role_vessel_ids', 'role_company_user_ids', 'has_role_on_vessel_in_company')),
                 'D-229: the policy helpers are LANGUAGE plpgsql');
 
 -- ------------------------------------------------------------ (i) equivalence: the shipped policies
@@ -499,3 +499,66 @@ SELECT tests.ok((SELECT n FROM rp_counts WHERE phase = 'shipped' AND caller = 'P
 SELECT tests.ok((SELECT n FROM rp_counts WHERE phase = 'shipped' AND caller = 'P.dpa' AND tbl = 'leave_requests')
                 > (SELECT count(*) FROM public.leave_requests AS l JOIN public.vessels AS v ON v.id = l.vessel_id WHERE v.company_id = tests.company_id('P')),
                 'the DPA also reads P''s vessel-less leave requests (the crew branch)');
+
+-- ------------------------------------------------------------ (iii) the vessel role set (D-234; review round 6)
+
+-- The seed's callers hold company-wide user_roles rows only, so the frozen
+-- round-4 counts above need no D-234 update; a vessel-scoped caller is
+-- added after them for the set equality:
+--   role_vessel_ids(R) = {v : has_role_on_vessel_in_company(uid, R, v)}
+-- (evaluated as postgres with the caller's claims, over every vessel).
+SELECT tests.is((SELECT count(*) FROM public.user_roles WHERE vessel_id IS NOT NULL AND user_id IN (SELECT tests.user_id(key) FROM rp_callers)), 0::bigint,
+                'seed: the equivalence callers hold no vessel-scoped user_roles row (the round-4 oracle stands as frozen)');
+SELECT tests.seed_user('P', 'P.vcapt', 'crew');
+SELECT tests.seed_assignment('P.vcapt', 'rp:none', true, 'Deckhand', jsonb_build_object('vessel_id', tests.id('rp:vessel:7')));
+SELECT tests.seed_user_role('P.vcapt', 'captain', 'P');
+UPDATE public.user_roles SET vessel_id = tests.id('rp:vessel:7') WHERE user_id = tests.user_id('P.vcapt') AND role = 'captain';
+SELECT tests.seed_user_role('P.vcapt', 'purser', 'P');
+SELECT tests.seed_user_role('P.vcapt', 'hod', 'P');
+UPDATE public.user_roles SET vessel_id = tests.id('rp:qvessel:1') WHERE user_id = tests.user_id('P.vcapt') AND role = 'hod';
+SELECT tests.seed_user('P', 'P.vdpa', 'crew');
+SELECT tests.seed_user_role('P.vdpa', 'dpa', 'P');
+UPDATE public.user_roles SET vessel_id = tests.id('rp:vessel:9') WHERE user_id = tests.user_id('P.vdpa');
+
+CREATE FUNCTION tests.rp_role_set_diff(p_caller text, p_roles public.app_role[]) RETURNS bigint LANGUAGE plpgsql AS $$
+DECLARE
+  v_uid uuid := tests.user_id(p_caller);
+  v_n bigint;
+BEGIN
+  PERFORM tests.reset_role();
+  PERFORM tests._set_claims(jsonb_build_object('sub', v_uid, 'role', 'authenticated', 'aud', 'authenticated'));
+  SELECT count(*) INTO v_n FROM (
+    (SELECT r FROM public.role_vessel_ids(p_roles) AS r
+     EXCEPT SELECT v.id FROM public.vessels AS v WHERE public.has_role_on_vessel_in_company(v_uid, p_roles, v.id))
+    UNION ALL
+    (SELECT v.id FROM public.vessels AS v WHERE public.has_role_on_vessel_in_company(v_uid, p_roles, v.id)
+     EXCEPT SELECT r FROM public.role_vessel_ids(p_roles) AS r)
+  ) AS d;
+  PERFORM tests.reset_role();
+  RETURN v_n;
+END;
+$$;
+CREATE FUNCTION tests.rp_role_set_size(p_caller text, p_roles public.app_role[]) RETURNS bigint LANGUAGE plpgsql AS $$
+DECLARE v_n bigint;
+BEGIN
+  PERFORM tests.reset_role();
+  PERFORM tests._set_claims(jsonb_build_object('sub', tests.user_id(p_caller), 'role', 'authenticated', 'aud', 'authenticated'));
+  SELECT count(*) INTO v_n FROM public.role_vessel_ids(p_roles);
+  PERFORM tests.reset_role();
+  RETURN v_n;
+END;
+$$;
+
+SELECT tests.is(tests.rp_role_set_diff(c.key, r.roles), 0::bigint,
+                format('D-234: role_vessel_ids(%s) = {v : has_role_on_vessel_in_company} as %s', r.roles, c.key))
+FROM (SELECT key FROM rp_callers UNION ALL VALUES ('P.vcapt'), ('P.vdpa')) AS c(key)
+CROSS JOIN (VALUES (ARRAY['captain']::public.app_role[]), (ARRAY['superadmin', 'dpa', 'captain']::public.app_role[]), (ARRAY['purser']::public.app_role[]),
+                   (ARRAY['hod']::public.app_role[]), (ARRAY['dpa']::public.app_role[]), (ARRAY['superadmin']::public.app_role[]),
+                   (enum_range(NULL::public.app_role))) AS r(roles)
+ORDER BY c.key, r.roles::text;
+SELECT tests.is(tests.rp_role_set_size('P.vcapt', ARRAY['captain']::public.app_role[]), 1::bigint, 'D-234: a vessel-scoped captain row gives its one vessel');
+SELECT tests.is(tests.rp_role_set_size('P.vcapt', ARRAY['purser']::public.app_role[]), 40::bigint, 'and the same caller''s company-wide purser row every vessel of P');
+SELECT tests.is(tests.rp_role_set_size('P.vcapt', ARRAY['hod']::public.app_role[]), 0::bigint, 'a P row naming Q''s vessel gives nothing');
+SELECT tests.is(tests.rp_role_set_size('P.vdpa', ARRAY['dpa']::public.app_role[]), 40::bigint, 'a vessel-scoped dpa row stays company-wide');
+SELECT tests.is(tests.rp_role_set_size('P.disabled', enum_range(NULL::public.app_role)), 0::bigint, 'an inactive caller gets no vessel');
+SELECT tests.is(tests.rp_role_set_size('X.super', ARRAY['superadmin']::public.app_role[]), (SELECT count(*) FROM public.vessels WHERE company_id IS NOT NULL), 'a company-less superadmin gets every vessel');

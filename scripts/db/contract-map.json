@@ -70,6 +70,7 @@
       "permission_override_write_allowed": "RLS predicate (rule 11): policies call it, the browser does not",
       "rbac_user_roles_write_allowed": "RLS predicate (rule 11): policies call it, the browser does not",
       "has_role_in_company": "RLS predicate (rule 11) of the company-scoped legacy role policies (20261123010500): policies call it, the browser does not",
+      "has_role_on_vessel_in_company": "RLS predicate (rule 11, D-234) of the role-scoped legacy policies (20261123010500): a user_roles row with a vessel_id confers its role on that vessel only; the write policies call it per vessel row, the browser does not",
       "role_vessel_ids": "RLS helper (rule 11, D-229) of the company-scoped legacy role policies (20261123010500): the caller's role set of vessels, computed once per statement in the read policies; the browser does not call it",
       "role_company_user_ids": "RLS helper (rule 11, D-229) of the company-scoped legacy role policies (20261123010500): the users of the caller's company when the caller holds the role there, computed once per statement in the read policies; the browser does not call it",
       "vessel_company_of": "RLS helper (rule 11) of the company-scoped legacy role policies (20261123010500): resolves a vessel's company without the caller's RLS, and answers only a caller of that company (or a superadmin there; NULL for anyone else, a disabled caller included); policies call it, the browser does not",

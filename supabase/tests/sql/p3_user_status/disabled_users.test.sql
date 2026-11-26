@@ -107,7 +107,8 @@ BEGIN
     PERFORM tests.ok(NOT public.has_any_role(auth.uid(), ARRAY['superadmin', 'dpa']::public.app_role[]), p || ': has_any_role is false');
     PERFORM tests.is(public.legacy_profile_role(auth.uid()), NULL::text, p || ': legacy_profile_role is NULL');
     PERFORM tests.ok(NOT public.user_belongs_to_company(auth.uid(), tests.company_id('A')), p || ': user_belongs_to_company is false');
-    PERFORM tests.ok(NOT coalesce(public.hr_can_view(auth.uid()), false), p || ': hr_can_view (built on the helpers) is not true');
+    PERFORM tests.is(public.hr_can_view(auth.uid()), false, p || ': hr_can_view (built on the helpers) IS FALSE, never NULL (D-233)');
+    PERFORM tests.is(public.payroll_can_admin(auth.uid()), false, p || ': payroll_can_admin IS FALSE, never NULL (D-233)');
   END LOOP;
 END
 $$;

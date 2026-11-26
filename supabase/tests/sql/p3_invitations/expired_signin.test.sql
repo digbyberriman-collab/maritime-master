@@ -9,6 +9,11 @@
 -- whose re-invite expired keeps access; revoke still works on a past-expiry
 -- live row; a live, unexpired invitation is accepted as before; a resend
 -- works again. Ports scratchpad verify-expired/expired_invite.sql.
+-- Review round 6: the cut-off applies to every withdrawal (D-235: the
+-- daily sweep and Revoke after a late sign-in; verify-withdraw/repro.sql),
+-- and a sent invitation stamps 'invited' unless the person has joined
+-- (D-236: a profile left at the 'active' column default;
+-- verify-active-expired/probe.sql).
 
 SELECT tests.seed_two_tenants();
 
@@ -152,3 +157,182 @@ SELECT tests.ok(NOT has_function_privilege('authenticated', 'public.invitation_w
                 'and stays internal (no grant)');
 SELECT tests.ok(EXISTS (SELECT 1 FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'user_invitations' AND indexname = 'idx_user_invitations_profile_newest'),
                 'the newest-invitation lookup has its index');
+
+-- ------------------------------------------------------------ 6. the cut-off applies to every withdrawal (D-235; review round 6)
+
+-- expire_invitations() (run daily by hr-daily-sweeper) and revoke_invitation()
+-- called invitation_withdraw_access() without the cut-off, so a sign-in made
+-- after the expiry (a password-reset session that never called
+-- record_session_start) kept the membership and turned user_is_active back
+-- to true. invitation_withdraw_access() now applies the invitation's own
+-- expiry itself. Ports scratchpad verify-withdraw/repro.sql.
+
+-- (a) a sign-in after the expiry, then the daily sweep
+SELECT tests.seed_profile('A', 'A.sweep', 'crew', 'not_invited');
+SELECT tests.seed_auth_user('A.sweep', jsonb_build_object('invited_at', now() - interval '20 days', 'email_confirmed_at', NULL));
+SELECT tests.as_service();
+SELECT tests.ok((public.record_invitation_send(tests.profile_id('A.sweep'), 'sent', NULL, 'msg-sweep', tests.user_id('A.fleet_manager'), 'crew', NULL, tests.user_id('A.sweep'))).id IS NOT NULL,
+                '(a) setup: a sent invitation that links the login');
+SELECT tests.reset_role();
+SELECT tests.seed_assignment('A.sweep', 'A.dra');
+UPDATE public.user_invitations SET expires_at = now() - interval '13 days', last_sent_at = now() - interval '20 days' WHERE profile_id = tests.profile_id('A.sweep');
+UPDATE auth.users SET last_sign_in_at = now() WHERE id = tests.user_id('A.sweep');
+SELECT tests.ok(NOT public.user_is_active(tests.user_id('A.sweep')), '(a) before the sweep the late signer is not active');
+SELECT tests.as_service();
+SELECT tests.is(public.expire_invitations(), 1, '(a) the sweep expires the invitation');
+SELECT tests.reset_role();
+SELECT tests.is(public.user_is_active(tests.user_id('A.sweep')), false, '(a) after the sweep user_is_active stays false');
+SELECT tests.results_eq(
+  format($q$SELECT ui.status, p.account_status, m.status
+            FROM public.profiles AS p
+            JOIN public.account_memberships AS m ON m.user_id = p.user_id AND m.company_id = p.company_id
+            JOIN public.user_invitations AS ui ON ui.profile_id = p.id
+            WHERE p.id = %L$q$, tests.profile_id('A.sweep')),
+  $q$VALUES ('expired'::text, 'not_invited'::text, 'removed'::text)$q$,
+  '(a) the invitation is expired, the profile not_invited, the legacy membership removed');
+SELECT tests.as_user(tests.user_id('A.sweep'));
+SELECT tests.is((SELECT count(*) FROM public.vessels), 0::bigint, '(a) the late signer sees no vessel');
+SELECT tests.is(public.record_session_start(), 'disabled', '(a) and record_session_start answers disabled');
+SELECT tests.reset_role();
+
+-- (b) a sign-in after the expiry, then an admin's Revoke on the past-expiry live row
+SELECT tests.seed_profile('A', 'A.revoke_late', 'crew', 'not_invited');
+SELECT tests.seed_auth_user('A.revoke_late', jsonb_build_object('invited_at', now() - interval '20 days', 'email_confirmed_at', NULL));
+SELECT tests.as_service();
+SELECT tests.ok((public.record_invitation_send(tests.profile_id('A.revoke_late'), 'sent', NULL, 'msg-revoke-late', tests.user_id('A.fleet_manager'), 'crew', NULL, tests.user_id('A.revoke_late'))).id IS NOT NULL,
+                '(b) setup: a sent invitation that links the login');
+SELECT tests.reset_role();
+SELECT tests.seed_assignment('A.revoke_late', 'A.dra');
+UPDATE public.user_invitations SET expires_at = now() - interval '13 days', last_sent_at = now() - interval '20 days' WHERE profile_id = tests.profile_id('A.revoke_late');
+UPDATE auth.users SET last_sign_in_at = now() WHERE id = tests.user_id('A.revoke_late');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.is((public.revoke_invitation((SELECT id FROM public.user_invitations WHERE profile_id = tests.profile_id('A.revoke_late')))).status, 'revoked',
+                '(b) the admin revokes the past-expiry live row');
+SELECT tests.reset_role();
+SELECT tests.is(public.user_is_active(tests.user_id('A.revoke_late')), false, '(b) user_is_active stays false');
+SELECT tests.results_eq(
+  format($q$SELECT ui.status, p.account_status, m.status
+            FROM public.profiles AS p
+            JOIN public.account_memberships AS m ON m.user_id = p.user_id AND m.company_id = p.company_id
+            JOIN public.user_invitations AS ui ON ui.profile_id = p.id
+            WHERE p.id = %L$q$, tests.profile_id('A.revoke_late')),
+  $q$VALUES ('revoked'::text, 'not_invited'::text, 'removed'::text)$q$,
+  '(b) the invitation is revoked, the profile not_invited, the legacy membership removed');
+SELECT tests.as_user(tests.user_id('A.revoke_late'));
+SELECT tests.is(public.record_session_start(), 'disabled', '(b) record_session_start answers disabled');
+SELECT tests.reset_role();
+
+-- (c) controls: a sign-in before the expiry survives the sweep; revoking an
+-- unexpired live invitation after a sign-in keeps the access (gap/01 W2 row 8).
+SELECT tests.seed_profile('A', 'A.early', 'crew', 'not_invited');
+SELECT tests.seed_auth_user('A.early', jsonb_build_object('invited_at', now() - interval '20 days', 'email_confirmed_at', NULL));
+SELECT tests.as_service();
+SELECT tests.ok((public.record_invitation_send(tests.profile_id('A.early'), 'sent', NULL, 'msg-early', tests.user_id('A.fleet_manager'), 'crew', NULL, tests.user_id('A.early'))).id IS NOT NULL,
+                '(c) setup: a sent invitation that links the login');
+SELECT tests.reset_role();
+UPDATE public.user_invitations SET expires_at = now() - interval '13 days' WHERE profile_id = tests.profile_id('A.early');
+UPDATE auth.users SET last_sign_in_at = now() - interval '15 days' WHERE id = tests.user_id('A.early');
+SELECT tests.as_service();
+SELECT tests.is(public.expire_invitations(), 1, '(c) the sweep expires the early signer''s invitation');
+SELECT tests.reset_role();
+SELECT tests.is(public.user_is_active(tests.user_id('A.early')), true, '(c) a sign-in from before the expiry keeps the access');
+SELECT tests.is((SELECT m.status FROM public.account_memberships AS m WHERE m.user_id = tests.user_id('A.early')), 'active', '(c) and the membership');
+
+SELECT tests.seed_profile('A', 'A.revoke_live', 'crew', 'not_invited');
+SELECT tests.seed_auth_user('A.revoke_live', jsonb_build_object('invited_at', now() - interval '1 day', 'email_confirmed_at', NULL));
+SELECT tests.as_service();
+SELECT tests.ok((public.record_invitation_send(tests.profile_id('A.revoke_live'), 'sent', NULL, 'msg-revoke-live', tests.user_id('A.fleet_manager'), 'crew', NULL, tests.user_id('A.revoke_live'))).id IS NOT NULL,
+                '(c) setup: a fresh invitation that links the login');
+SELECT tests.reset_role();
+UPDATE auth.users SET last_sign_in_at = now() WHERE id = tests.user_id('A.revoke_live');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.is((public.revoke_invitation((SELECT id FROM public.user_invitations WHERE profile_id = tests.profile_id('A.revoke_live')))).status, 'revoked',
+                '(c) the admin revokes the unexpired live invitation after the sign-in');
+SELECT tests.reset_role();
+SELECT tests.is(public.user_is_active(tests.user_id('A.revoke_live')), true, '(c) the signed-in invitee keeps the access (W2 row 8)');
+SELECT tests.is((SELECT m.status FROM public.account_memberships AS m WHERE m.user_id = tests.user_id('A.revoke_live')), 'active', '(c) and the membership');
+
+-- ------------------------------------------------------------ 7. a profile at the column default reads active (D-236; review round 6)
+
+-- profiles.account_status defaults to 'active', so an importer- or
+-- webhook-created profile reads active without ever signing in; the sent
+-- invitation kept it active and D-228 (scoped to a profile still invited)
+-- never applied. A sent invitation now stamps 'invited' unless the person
+-- has joined. Ports scratchpad verify-active-expired/probe.sql.
+DO $$
+DECLARE v_saved jsonb := tests._suspend_claims();
+BEGIN
+  INSERT INTO public.profiles (id, user_id, email, first_name, last_name, company_id, role)
+  VALUES (tests.profile_id('A.dflt'), NULL, tests.email('A.dflt'), 'Crew', 'A.dflt', tests.company_id('A'), 'crew'),
+         (tests.profile_id('A.dflt2'), NULL, tests.email('A.dflt2'), 'Crew', 'A.dflt2', tests.company_id('A'), 'crew');
+  PERFORM tests._restore_claims(v_saved);
+END
+$$;
+SELECT tests.seed_auth_user(k, jsonb_build_object('invited_at', now() - interval '20 days', 'email_confirmed_at', NULL)) FROM unnest(ARRAY['A.dflt', 'A.dflt2']) AS k;
+SELECT tests.is((SELECT string_agg(account_status, ',') FROM public.profiles WHERE id IN (tests.profile_id('A.dflt'), tests.profile_id('A.dflt2'))), 'active,active',
+                'setup: two profiles inserted without account_status read active');
+SELECT tests.as_service();
+SELECT tests.ok((public.record_invitation_send(tests.profile_id(k), 'sent', NULL, 'msg-' || k, tests.user_id('A.fleet_manager'), 'crew', NULL, tests.user_id(k))).id IS NOT NULL,
+                'setup: ' || k || ' is invited and its login linked')
+FROM unnest(ARRAY['A.dflt', 'A.dflt2']) AS k;
+SELECT tests.reset_role();
+SELECT tests.is((SELECT account_status FROM public.profiles WHERE id = tests.profile_id('A.dflt')), 'invited', 'the sent invitation stamps invited: the person never joined (D-236)');
+SELECT tests.seed_assignment(k, 'A.dra') FROM unnest(ARRAY['A.dflt', 'A.dflt2']) AS k;
+UPDATE public.user_invitations SET expires_at = now() - interval '13 days', last_sent_at = now() - interval '20 days'
+ WHERE profile_id IN (tests.profile_id('A.dflt'), tests.profile_id('A.dflt2'));
+
+-- A.dflt signs in now.
+UPDATE auth.users SET last_sign_in_at = now() WHERE id = tests.user_id('A.dflt');
+SELECT tests.is(public.user_is_active(tests.user_id('A.dflt')), false, 'default-active invitee past its expiry: user_is_active is false');
+SELECT tests.as_user(tests.user_id('A.dflt'));
+SELECT tests.is((SELECT count(*) FROM public.vessels), 0::bigint, 'and sees no vessel');
+SELECT tests.is(public.record_session_start(), 'disabled', 'record_session_start answers disabled');
+SELECT tests.reset_role();
+SELECT tests.results_eq(
+  format($q$SELECT ui.status, p.account_status, m.status, p.last_login_at IS NULL
+            FROM public.profiles AS p
+            JOIN public.account_memberships AS m ON m.user_id = p.user_id AND m.company_id = p.company_id
+            JOIN public.user_invitations AS ui ON ui.profile_id = p.id
+            WHERE p.id = %L$q$, tests.profile_id('A.dflt')),
+  $q$VALUES ('expired'::text, 'not_invited'::text, 'removed'::text, true)$q$,
+  'the invitation expired, the profile not_invited, the membership removed, no sign-in recorded');
+
+-- A.dflt2: the daily sweep alone withdraws it.
+SELECT tests.as_service();
+SELECT tests.is(public.expire_invitations(), 1, 'the sweep expires the second default-active invitation');
+SELECT tests.reset_role();
+SELECT tests.results_eq(
+  format($q$SELECT ui.status, p.account_status, m.status
+            FROM public.profiles AS p
+            JOIN public.account_memberships AS m ON m.user_id = p.user_id AND m.company_id = p.company_id
+            JOIN public.user_invitations AS ui ON ui.profile_id = p.id
+            WHERE p.id = %L$q$, tests.profile_id('A.dflt2')),
+  $q$VALUES ('expired'::text, 'not_invited'::text, 'removed'::text)$q$,
+  'expire_invitations() alone withdraws it: not_invited, membership removed');
+UPDATE auth.users SET last_sign_in_at = now() WHERE id = tests.user_id('A.dflt2');
+SELECT tests.is(public.user_is_active(tests.user_id('A.dflt2')), false, 'a later sign-in finds nothing');
+SELECT tests.as_user(tests.user_id('A.dflt2'));
+SELECT tests.is(public.record_session_start(), 'disabled', 'and record_session_start answers disabled');
+SELECT tests.reset_role();
+
+-- Joined people stay active on a re-send: a sign-in on the profile, a
+-- sign-in on the login, or an accepted membership.
+SELECT tests.seed_user('A', 'A.joined_profile');
+SELECT tests.seed_user('A', 'A.joined_login');
+SELECT tests.seed_user('A', 'A.joined_member');
+UPDATE public.profiles SET last_login_at = now() - interval '30 days' WHERE id = tests.profile_id('A.joined_profile');
+UPDATE auth.users SET last_sign_in_at = now() - interval '30 days' WHERE id = tests.user_id('A.joined_login');
+UPDATE public.account_memberships SET accepted_at = now() - interval '30 days' WHERE user_id = tests.user_id('A.joined_member');
+SELECT tests.as_service();
+SELECT tests.ok((public.record_invitation_send(tests.profile_id(k), 'sent', NULL, 'msg-' || k, tests.user_id('A.fleet_manager'), 'crew')).id IS NOT NULL, 'setup: a re-send to ' || k)
+FROM unnest(ARRAY['A.joined_profile', 'A.joined_login', 'A.joined_member']) AS k;
+SELECT tests.reset_role();
+SELECT tests.is((SELECT account_status FROM public.profiles WHERE id = tests.profile_id(k)), 'active', k || ' stays active on a re-send (D-236)')
+FROM unnest(ARRAY['A.joined_profile', 'A.joined_login', 'A.joined_member']) AS k;
+-- A disabled profile keeps its status.
+SELECT tests.seed_profile('A', 'A.off_invitee', 'crew', 'disabled');
+SELECT tests.as_service();
+SELECT tests.ok((public.record_invitation_send(tests.profile_id('A.off_invitee'), 'send_failed', 'smtp_down', NULL, tests.user_id('A.fleet_manager'), 'crew')).id IS NOT NULL,
+                'setup: a failed send to a disabled profile');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT account_status FROM public.profiles WHERE id = tests.profile_id('A.off_invitee')), 'disabled', 'a disabled profile is never stamped invited');

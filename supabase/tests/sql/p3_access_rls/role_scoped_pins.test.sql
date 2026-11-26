@@ -203,3 +203,134 @@ SELECT tests.throws(format($q$INSERT INTO public.work_rest_blocks (record_id, cr
 SELECT tests.throws(format($q$INSERT INTO public.work_rest_non_conformities (crew_id, submission_id, rule_code, rule_description, window_start, window_end) VALUES (%L, %L, 'X', 'mismatched', now(), now())$q$, tests.user_id('A.master_dra'), tests.id('ws:a-hyd')),
                     '42501', 'nor another crew member''s NC on that submission');
 SELECT tests.reset_role();
+
+-- ------------------------------------------------------------ a vessel-scoped role row confers the role on that vessel only (D-234)
+
+-- Review round 6 (vessel-scoped-user-role-company-wide; scratchpad
+-- verify-vsr/repro.sql): A.capt_dra is crew on DRAAK and holds a captain
+-- user_roles row with vessel_id = DRAAK. Before D-234 role_vessel_ids()
+-- gave every vessel of A and has_any_role(captain) was true, so the
+-- captain read, updated, inserted and deleted HYDRA's medical reports and
+-- rest records. A company-wide captain row (no vessel) and vessel-scoped
+-- dpa / fleet_master rows stay company-wide.
+SELECT tests.seed_user('A', 'A.capt_dra', 'crew');
+SELECT tests.seed_assignment('A.capt_dra', 'A.dra', true, 'Deckhand');
+SELECT tests.seed_user_role('A.capt_dra', 'captain', 'A');
+UPDATE public.user_roles SET vessel_id = tests.vessel_id('A.dra') WHERE user_id = tests.user_id('A.capt_dra');
+SELECT tests.seed_user('A', 'A.capt_all', 'crew');                  -- a company-wide captain row
+SELECT tests.seed_assignment('A.capt_all', 'A.dra', true, 'Deckhand');
+SELECT tests.seed_user_role('A.capt_all', 'captain', 'A');
+SELECT tests.seed_user('A', 'A.dpa_dra', 'crew');                   -- a vessel-scoped dpa row
+SELECT tests.seed_assignment('A.dpa_dra', 'A.dra', true, 'Deckhand');
+SELECT tests.seed_user_role('A.dpa_dra', 'dpa', 'A');
+UPDATE public.user_roles SET vessel_id = tests.vessel_id('A.dra') WHERE user_id = tests.user_id('A.dpa_dra');
+SELECT tests.seed_user('A', 'A.fm_dra', 'crew');                    -- a vessel-scoped fleet_master row
+SELECT tests.seed_assignment('A.fm_dra', 'A.dra', true, 'Deckhand');
+SELECT tests.seed_user_role('A.fm_dra', 'fleet_master', 'A');
+UPDATE public.user_roles SET vessel_id = tests.vessel_id('A.dra') WHERE user_id = tests.user_id('A.fm_dra');
+SELECT tests.seed_user('A', 'A.capt_foreign', 'crew');              -- a captain row of A naming B's vessel
+SELECT tests.seed_assignment('A.capt_foreign', 'A.dra', true, 'Deckhand');
+SELECT tests.seed_user_role('A.capt_foreign', 'captain', 'A');
+UPDATE public.user_roles SET vessel_id = tests.vessel_id('B.lev') WHERE user_id = tests.user_id('A.capt_foreign');
+
+INSERT INTO public.medical_reports (id, report_number, crew_id, vessel_id) VALUES
+  (tests.id('vsr:mr:hyd'), 'MR-V-HYD', tests.user_id('A.crew_hyd'), tests.vessel_id('A.hyd')),
+  (tests.id('vsr:mr:dra'), 'MR-V-DRA', tests.user_id('A.master_dra'), tests.vessel_id('A.dra'));
+INSERT INTO public.hours_of_rest_records (id, crew_id, vessel_id, record_date, rest_periods) VALUES
+  (tests.id('vsr:hr:hyd'), tests.user_id('A.crew_hyd'), tests.vessel_id('A.hyd'), current_date - 3, '[]'),
+  (tests.id('vsr:hr:dra'), tests.user_id('A.master_dra'), tests.vessel_id('A.dra'), current_date - 3, '[]');
+INSERT INTO public.leave_requests (id, crew_id, vessel_id, leave_type, start_date, end_date) VALUES
+  (tests.id('vsr:lr:hyd'), tests.user_id('A.crew_hyd'), tests.vessel_id('A.hyd'), 'annual', current_date + 30, current_date + 35),
+  (tests.id('vsr:lr:dra'), tests.user_id('A.master_dra'), tests.vessel_id('A.dra'), 'annual', current_date + 30, current_date + 35);
+INSERT INTO public.flight_requests (id, crew_id, company_id, vessel_id, request_number, request_type, depart_from, arrive_to, earliest_departure_date) VALUES
+  (tests.id('vsr:fr:hyd'), tests.user_id('A.crew_hyd'), tests.company_id('A'), tests.vessel_id('A.hyd'), 'FR-V-HYD', 'crew_change', 'NCE', 'PMI', current_date + 7),
+  (tests.id('vsr:fr:dra'), tests.user_id('A.master_dra'), tests.company_id('A'), tests.vessel_id('A.dra'), 'FR-V-DRA', 'crew_change', 'NCE', 'PMI', current_date + 7),
+  (tests.id('vsr:fr:none'), tests.user_id('A.master_dra'), tests.company_id('A'), NULL, 'FR-V-NONE', 'crew_change', 'NCE', 'PMI', current_date + 7);
+
+CREATE TEMP TABLE vsr_names ON COMMIT DROP AS
+SELECT * FROM (VALUES (tests.vessel_id('A.dra'), 'DRA'), (tests.vessel_id('A.hyd'), 'HYD'), (tests.vessel_id('A.gam'), 'GAM'), (tests.vessel_id('B.lev'), 'LEV')) AS t(id, name);
+GRANT SELECT ON vsr_names TO authenticated;
+
+SELECT tests.as_user(tests.user_id('A.capt_dra'));
+SELECT tests.is((SELECT string_agg(n.name, ',' ORDER BY n.name) FROM public.role_vessel_ids(ARRAY['captain']::public.app_role[]) AS r JOIN vsr_names AS n ON n.id = r),
+                'DRA', 'vessel-scoped captain: role_vessel_ids(captain) = {DRA}');
+SELECT tests.is(public.has_role_on_vessel_in_company(auth.uid(), ARRAY['captain']::public.app_role[], tests.vessel_id('A.dra')), true, 'has_role_on_vessel_in_company: DRA');
+SELECT tests.is(public.has_role_on_vessel_in_company(auth.uid(), ARRAY['captain']::public.app_role[], tests.vessel_id('A.hyd')), false, 'has_role_on_vessel_in_company: not HYD');
+SELECT tests.is(public.has_role_on_vessel_in_company(auth.uid(), ARRAY['captain']::public.app_role[], tests.vessel_id('B.lev')), false, 'has_role_on_vessel_in_company: not B''s vessel');
+SELECT tests.is(public.has_role_on_vessel_in_company(auth.uid(), ARRAY['captain']::public.app_role[], NULL), false, 'has_role_on_vessel_in_company: NULL vessel -> false');
+SELECT tests.is(public.has_role_on_vessel_in_company(auth.uid(), ARRAY['captain']::public.app_role[], tests.id('vsr:no-such-vessel')), false, 'has_role_on_vessel_in_company: unknown vessel -> false');
+SELECT tests.is(public.has_role_on_vessel_in_company(tests.user_id('A.capt_all'), ARRAY['captain']::public.app_role[], tests.vessel_id('A.dra')), false, 'has_role_on_vessel_in_company: no probing of another user');
+SELECT tests.is(public.has_role_in_company(auth.uid(), ARRAY['captain']::public.app_role[], tests.company_id('A')), false, 'has_role_in_company(captain, A) is false: the row is vessel-scoped');
+SELECT tests.is(public.has_any_role(auth.uid(), ARRAY['captain']::public.app_role[]), false, 'has_any_role(captain) is false (company-wide rows only)');
+SELECT tests.is(public.hr_can_edit(auth.uid()), false, 'so hr_can_edit is false (a vessel-scoped captain loses legacy HRIS edit, fail closed)');
+SELECT tests.is((SELECT count(*) FROM public.role_company_user_ids(ARRAY['captain']::public.app_role[])), 0::bigint, 'role_company_user_ids(captain) is empty');
+-- HYDRA: nothing.
+SELECT tests.is_empty(format('SELECT 1 FROM public.medical_reports WHERE id = %L', tests.id('vsr:mr:hyd')), 'vessel-scoped captain reads no HYDRA medical report');
+SELECT tests.denied(format($q$UPDATE public.medical_reports SET report_number = 'MR-V-HYD-X' WHERE id = %L RETURNING id$q$, tests.id('vsr:mr:hyd')), 'nor updates it');
+SELECT tests.denied(format($q$DELETE FROM public.medical_reports WHERE id = %L RETURNING id$q$, tests.id('vsr:mr:hyd')), 'nor deletes it');
+SELECT tests.throws(format($q$INSERT INTO public.medical_reports (crew_id, vessel_id, report_number) VALUES (%L, %L, 'MR-V-HYD-NEW')$q$, tests.user_id('A.crew_hyd'), tests.vessel_id('A.hyd')), '42501', 'nor inserts a HYDRA medical report');
+SELECT tests.is_empty(format('SELECT 1 FROM public.hours_of_rest_records WHERE id = %L', tests.id('vsr:hr:hyd')), 'reads no HYDRA rest record');
+SELECT tests.denied(format($q$UPDATE public.hours_of_rest_records SET rest_periods = '[{}]' WHERE id = %L RETURNING id$q$, tests.id('vsr:hr:hyd')), 'nor updates it');
+SELECT tests.denied(format($q$DELETE FROM public.hours_of_rest_records WHERE id = %L RETURNING id$q$, tests.id('vsr:hr:hyd')), 'nor deletes it');
+SELECT tests.throws(format($q$INSERT INTO public.hours_of_rest_records (crew_id, vessel_id, record_date, rest_periods) VALUES (%L, %L, current_date, '[]')$q$, tests.user_id('A.crew_hyd'), tests.vessel_id('A.hyd')), '42501', 'nor inserts one');
+SELECT tests.is_empty(format('SELECT 1 FROM public.leave_requests WHERE id = %L', tests.id('vsr:lr:hyd')), 'reads no HYDRA leave request');
+SELECT tests.denied(format($q$UPDATE public.leave_requests SET end_date = end_date + 1 WHERE id = %L RETURNING id$q$, tests.id('vsr:lr:hyd')), 'nor updates it');
+SELECT tests.denied(format($q$DELETE FROM public.leave_requests WHERE id = %L RETURNING id$q$, tests.id('vsr:lr:hyd')), 'nor deletes it');
+SELECT tests.throws(format($q$INSERT INTO public.leave_requests (crew_id, vessel_id, leave_type, start_date, end_date) VALUES (%L, %L, 'annual', current_date, current_date + 1)$q$, tests.user_id('A.crew_hyd'), tests.vessel_id('A.hyd')), '42501', 'nor inserts one');
+SELECT tests.is_empty(format('SELECT 1 FROM public.flight_requests WHERE id = %L', tests.id('vsr:fr:hyd')), 'reads no HYDRA flight request');
+SELECT tests.is_empty(format('SELECT 1 FROM public.flight_requests WHERE id = %L', tests.id('vsr:fr:none')), 'nor a vessel-less flight request of the company (company-level)');
+SELECT tests.denied(format($q$UPDATE public.flight_requests SET arrive_to = 'LHR' WHERE id = %L RETURNING id$q$, tests.id('vsr:fr:hyd')), 'nor updates the HYDRA flight request');
+SELECT tests.denied(format($q$DELETE FROM public.flight_requests WHERE id = %L RETURNING id$q$, tests.id('vsr:fr:hyd')), 'nor deletes it');
+SELECT tests.throws(format($q$INSERT INTO public.flight_requests (crew_id, company_id, vessel_id, request_number, request_type, depart_from, arrive_to, earliest_departure_date) VALUES (%L, %L, %L, 'FR-V-HYD2', 'crew_change', 'NCE', 'PMI', current_date)$q$, tests.user_id('A.crew_hyd'), tests.company_id('A'), tests.vessel_id('A.hyd')),
+                    '42501', 'nor inserts a HYDRA flight request');
+SELECT tests.throws(format($q$INSERT INTO public.flight_requests (crew_id, company_id, request_number, request_type, depart_from, arrive_to, earliest_departure_date) VALUES (%L, %L, 'FR-V-NONE2', 'crew_change', 'NCE', 'PMI', current_date)$q$, tests.user_id('A.crew_hyd'), tests.company_id('A')),
+                    '42501', 'nor a vessel-less one for someone else');
+-- DRAAK: the captain's own vessel works.
+SELECT tests.is((SELECT count(*) FROM public.medical_reports WHERE id = tests.id('vsr:mr:dra')), 1::bigint, 'vessel-scoped captain reads the DRAAK medical report');
+SELECT tests.lives(format($q$UPDATE public.medical_reports SET report_number = 'MR-V-DRA-X' WHERE id = %L$q$, tests.id('vsr:mr:dra')), 'updates it');
+SELECT tests.lives(format($q$INSERT INTO public.medical_reports (id, crew_id, vessel_id, report_number) VALUES (%L, %L, %L, 'MR-V-DRA-NEW')$q$, tests.id('vsr:mr:dra-new'), tests.user_id('A.master_dra'), tests.vessel_id('A.dra')), 'inserts one on DRAAK');
+SELECT tests.lives(format($q$DELETE FROM public.medical_reports WHERE id = %L$q$, tests.id('vsr:mr:dra-new')), 'deletes it');
+SELECT tests.is((SELECT count(*) FROM public.hours_of_rest_records WHERE id = tests.id('vsr:hr:dra')), 1::bigint, 'reads the DRAAK rest record');
+SELECT tests.lives(format($q$UPDATE public.hours_of_rest_records SET rest_periods = '[{}]' WHERE id = %L$q$, tests.id('vsr:hr:dra')), 'updates it');
+SELECT tests.lives(format($q$INSERT INTO public.hours_of_rest_records (id, crew_id, vessel_id, record_date, rest_periods) VALUES (%L, %L, %L, current_date, '[]')$q$, tests.id('vsr:hr:dra-new'), tests.user_id('A.master_dra'), tests.vessel_id('A.dra')), 'inserts one on DRAAK');
+SELECT tests.lives(format($q$DELETE FROM public.hours_of_rest_records WHERE id = %L$q$, tests.id('vsr:hr:dra-new')), 'deletes it');
+SELECT tests.is((SELECT count(*) FROM public.leave_requests WHERE id = tests.id('vsr:lr:dra')), 1::bigint, 'reads the DRAAK leave request');
+SELECT tests.lives(format($q$UPDATE public.leave_requests SET end_date = end_date + 1 WHERE id = %L$q$, tests.id('vsr:lr:dra')), 'updates it');
+SELECT tests.is((SELECT count(*) FROM public.flight_requests WHERE id = tests.id('vsr:fr:dra')), 1::bigint, 'reads the DRAAK flight request');
+SELECT tests.lives(format($q$UPDATE public.flight_requests SET arrive_to = 'LHR' WHERE id = %L$q$, tests.id('vsr:fr:dra')), 'updates it');
+SELECT tests.lives(format($q$INSERT INTO public.flight_requests (id, crew_id, company_id, vessel_id, request_number, request_type, depart_from, arrive_to, earliest_departure_date) VALUES (%L, %L, %L, %L, 'FR-V-DRA2', 'crew_change', 'NCE', 'PMI', current_date)$q$, tests.id('vsr:fr:dra-new'), tests.user_id('A.master_dra'), tests.company_id('A'), tests.vessel_id('A.dra')),
+                   'inserts one on DRAAK');
+SELECT tests.lives(format($q$DELETE FROM public.flight_requests WHERE id = %L$q$, tests.id('vsr:fr:dra-new')), 'deletes it');
+SELECT tests.throws(format($q$INSERT INTO public.flight_requests (crew_id, company_id, vessel_id, request_number, request_type, depart_from, arrive_to, earliest_departure_date) VALUES (%L, %L, %L, 'FR-V-X', 'crew_change', 'NCE', 'PMI', current_date)$q$, tests.user_id('A.master_dra'), tests.company_id('B'), tests.vessel_id('A.dra')),
+                    '42501', 'but never a DRAAK flight request filed under company B');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT report_number FROM public.medical_reports WHERE id = tests.id('vsr:mr:hyd')), 'MR-V-HYD', 'the HYDRA medical report is unchanged');
+SELECT tests.is((SELECT count(*) FROM public.hours_of_rest_records WHERE id = tests.id('vsr:hr:hyd')), 1::bigint, 'the HYDRA rest record is still there');
+SELECT tests.is((SELECT end_date FROM public.leave_requests WHERE id = tests.id('vsr:lr:hyd')), current_date + 35, 'the HYDRA leave request is unchanged');
+SELECT tests.is((SELECT arrive_to FROM public.flight_requests WHERE id = tests.id('vsr:fr:hyd')), 'PMI', 'the HYDRA flight request is unchanged');
+
+-- Controls: a company-wide captain row reaches every vessel of A; a
+-- vessel-scoped dpa or fleet_master row stays company-wide; a row naming
+-- another company's vessel gives nothing.
+SELECT tests.as_user(tests.user_id('A.capt_all'));
+SELECT tests.is((SELECT string_agg(n.name, ',' ORDER BY n.name) FROM public.role_vessel_ids(ARRAY['captain']::public.app_role[]) AS r JOIN vsr_names AS n ON n.id = r),
+                'DRA,GAM,HYD', 'company-wide captain: role_vessel_ids(captain) = {DRA, GAM, HYD}');
+SELECT tests.is((SELECT count(*) FROM public.medical_reports WHERE id = tests.id('vsr:mr:hyd')), 1::bigint, 'company-wide captain reads the HYDRA medical report');
+SELECT tests.is((SELECT count(*) FROM public.flight_requests WHERE id = tests.id('vsr:fr:none')), 1::bigint, 'and the vessel-less flight request');
+SELECT tests.is(public.has_any_role(auth.uid(), ARRAY['captain']::public.app_role[]), true, 'company-wide captain: has_any_role(captain)');
+SELECT tests.is(public.hr_can_edit(auth.uid()), true, 'company-wide captain: hr_can_edit');
+SELECT tests.as_user(tests.user_id('A.dpa_dra'));
+SELECT tests.is((SELECT string_agg(n.name, ',' ORDER BY n.name) FROM public.role_vessel_ids(ARRAY['dpa']::public.app_role[]) AS r JOIN vsr_names AS n ON n.id = r),
+                'DRA,GAM,HYD', 'a vessel-scoped dpa row stays company-wide');
+SELECT tests.is(public.has_role_in_company(auth.uid(), ARRAY['dpa']::public.app_role[], tests.company_id('A')), true, 'and has_role_in_company(dpa, A)');
+SELECT tests.is(public.has_any_role(auth.uid(), ARRAY['dpa']::public.app_role[]), true, 'and has_any_role(dpa)');
+SELECT tests.is((SELECT count(*) FROM public.medical_reports WHERE id = tests.id('vsr:mr:hyd')), 1::bigint, 'and reads the HYDRA medical report');
+SELECT tests.as_user(tests.user_id('A.fm_dra'));
+SELECT tests.is((SELECT string_agg(n.name, ',' ORDER BY n.name) FROM public.role_vessel_ids(ARRAY['fleet_master']::public.app_role[]) AS r JOIN vsr_names AS n ON n.id = r),
+                'DRA,GAM,HYD', 'a vessel-scoped fleet_master row stays company-wide');
+SELECT tests.is(public.has_any_role(auth.uid(), ARRAY['fleet_master']::public.app_role[]), true, 'and has_any_role(fleet_master)');
+SELECT tests.as_user(tests.user_id('A.capt_foreign'));
+SELECT tests.is((SELECT count(*) FROM public.role_vessel_ids(ARRAY['captain']::public.app_role[])), 0::bigint, 'a captain row of A naming B''s vessel gives no vessel');
+SELECT tests.is(public.has_role_on_vessel_in_company(auth.uid(), ARRAY['captain']::public.app_role[], tests.vessel_id('B.lev')), false, 'nor the vessel itself');
+SELECT tests.is(public.has_any_role(auth.uid(), ARRAY['captain']::public.app_role[]), false, 'nor has_any_role(captain)');
+SELECT tests.reset_role();

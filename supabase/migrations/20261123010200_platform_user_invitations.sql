@@ -363,7 +363,9 @@ $$;
 -- invitation_login_state() other than storm_invited: a login STORM did not
 -- create is never adopted). Nothing is written on a refusal. Upserts the profile's
 -- live row; a sent invitation also stamps the legacy profile columns
--- (account_status 'invited' unless active / disabled / deactivated,
+-- (account_status 'invited' unless disabled / deactivated, or active and
+-- the person has joined: a sign-in on the profile or the login, or an
+-- accepted membership of the login in the profile's company, D-236;
 -- last_invited_at, invited_at, invitation_count) and brings back a
 -- legacy-managed membership a revoke or expiry removed, under
 -- storm.access_engine; a failed one never does (it only links the login
@@ -496,9 +498,24 @@ BEGIN
   PERFORM set_config('storm.fulfil_actor', coalesce(p_invited_by::text, ''), true);
 
   IF v_sent THEN
+    -- D-236 (review round 6, expired-invite-active-default-profile): a sent
+    -- invitation stamps 'invited' unless the person has joined, whatever
+    -- the stored status ('active' is the column default, so an importer- or
+    -- webhook-created profile reads active without ever signing in).
+    -- Joined: a sign-in on the profile or the login, or an accepted
+    -- membership of the login in the profile's company. Disabled and
+    -- deactivated profiles keep their status. The D-228 machinery
+    -- (user_is_active, invitation_withdrawn_for, invitation_withdraw_access,
+    -- record_session_start, expire_invitations) then covers the invitee.
     UPDATE public.profiles
     SET account_status = CASE
-          WHEN lower(coalesce(account_status, '')) IN ('active', 'disabled', 'deactivated') THEN account_status
+          WHEN lower(coalesce(account_status, '')) IN ('disabled', 'deactivated') THEN account_status
+          WHEN lower(coalesce(account_status, '')) = 'active'
+               AND (v_profile.last_login_at IS NOT NULL
+                    OR EXISTS (SELECT 1 FROM auth.users AS u WHERE u.id = v_user AND u.last_sign_in_at IS NOT NULL)
+                    OR EXISTS (SELECT 1 FROM public.account_memberships AS m
+                                WHERE m.user_id = v_user AND m.company_id = v_profile.company_id AND m.accepted_at IS NOT NULL))
+            THEN account_status
           ELSE 'invited'
         END,
         last_invited_at = now(),
@@ -710,14 +727,23 @@ $$;
 --     accepted is removed. A user with sign-in evidence keeps their
 --     membership (gap/01 W2 row 8): the withdrawal only undoes access the
 --     invitation itself opened.
---   - with _evidence_before (D-228; review round 5,
+--   - with a cut-off (D-228; review round 5,
 --     expired-invitation-still-accepted: record_session_start passes the
 --     invitation's expires_at, because auth.users.last_sign_in_at already
 --     holds the sign-in being refused), only evidence from before it
---     counts: coalesce(last_login_at, auth last_sign_in_at) <
---     _evidence_before, or an accepted membership of that login.
--- Internal to revoke_invitation(), expire_invitations() (one argument,
--- unchanged) and record_session_start() (two).
+--     counts: coalesce(last_login_at, auth last_sign_in_at) < the cut-off,
+--     or an accepted membership of that login.
+--   - the cut-off is _evidence_before when given, else the invitation's
+--     own expires_at when that has passed (D-235; review round 6,
+--     expire-revoke-withdraw-no-cutoff): every caller, the daily sweep
+--     (expire_invitations, hr-daily-sweeper) and an admin's Revoke on a
+--     past-expiry live row included, gets the D-228 cut-off, so a sign-in
+--     made after the expiry (a password-reset session that skipped
+--     record_session_start) never keeps the access. An invitation revoked
+--     before its expiry keeps the plain rule: any sign-in evidence keeps
+--     the membership (gap/01 W2 row 8).
+-- Internal to revoke_invitation(), expire_invitations() (one argument)
+-- and record_session_start() (two).
 DROP FUNCTION IF EXISTS public.invitation_withdraw_access(uuid);
 CREATE OR REPLACE FUNCTION public.invitation_withdraw_access(p_invitation_id uuid, _evidence_before timestamptz DEFAULT NULL)
 RETURNS void
@@ -735,10 +761,16 @@ DECLARE
   v_engine text := current_setting('storm.access_engine', true);
   v_claims text;
   v_sub text;
+  v_cutoff timestamptz := _evidence_before;
 BEGIN
   SELECT * INTO v_inv FROM public.user_invitations WHERE id = p_invitation_id;
   IF NOT FOUND OR v_inv.accepted_at IS NOT NULL OR v_inv.status NOT IN ('revoked', 'expired') THEN
     RETURN;
+  END IF;
+  -- D-235: an invitation past its expiry counts only evidence from before
+  -- the expiry, whoever ends it (the sweep, Revoke, a later caller).
+  IF v_cutoff IS NULL AND v_inv.expires_at IS NOT NULL AND v_inv.expires_at < now() THEN
+    v_cutoff := v_inv.expires_at;
   END IF;
   SELECT * INTO v_profile FROM public.profiles WHERE id = v_inv.profile_id FOR UPDATE;
   IF NOT FOUND THEN
@@ -751,10 +783,10 @@ BEGIN
   v_signed_in := coalesce(v_profile.last_login_at,
                           (SELECT u.last_sign_in_at FROM auth.users AS u WHERE u.id = v_profile.user_id));
   v_user := coalesce(v_inv.user_id, v_profile.user_id);
-  IF _evidence_before IS NOT NULL THEN
-    -- Only evidence from before the cut-off (D-228), or an accepted
+  IF v_cutoff IS NOT NULL THEN
+    -- Only evidence from before the cut-off (D-228, D-235), or an accepted
     -- membership of that login.
-    IF NOT coalesce(v_signed_in < _evidence_before, false) THEN
+    IF NOT coalesce(v_signed_in < v_cutoff, false) THEN
       v_signed_in := NULL;
     END IF;
     IF v_signed_in IS NULL AND v_user IS NOT NULL THEN
@@ -845,8 +877,10 @@ END;
 $$;
 
 -- Live invitations past expires_at become expired, and the access each
--- opened is withdrawn when it was never accepted; returns the count. For a
--- later cron (owner action, spec §G 6; not scheduled in Phase 2).
+-- opened is withdrawn when it was never accepted, counting only sign-in
+-- evidence from before each invitation's expiry (D-228, D-235:
+-- invitation_withdraw_access applies the cut-off itself); returns the
+-- count. Run daily by hr-daily-sweeper (service role).
 CREATE OR REPLACE FUNCTION public.expire_invitations()
 RETURNS integer
 LANGUAGE plpgsql
@@ -924,11 +958,11 @@ GRANT EXECUTE ON FUNCTION public.invitation_login_state(uuid, uuid) TO service_r
 
 COMMENT ON TABLE public.user_invitations IS 'Honest invitations (gap/01 F46; D-121): one live row (pending | sent | send_failed) per profile, then accepted | expired | revoked. send_attempts, last_attempt_at, last_sent_at, last_error_code (stable codes only, never provider text or addresses). No email column (the profile holds it). Read: users-access viewers of the company. Writes: record_invitation_send (service role), revoke_invitation, expire_invitations, record_session_start.';
 COMMENT ON COLUMN public.user_invitations.last_error_code IS 'Stable snake_case code of the last failed attempt (e.g. provider_rejected, not_configured, legacy_unverified); NULL after a successful send.';
-COMMENT ON FUNCTION public.record_invitation_send(uuid, text, text, text, uuid, text, timestamptz, uuid) IS 'Records one invitation send outcome (sent | send_failed with a code) on the profile''s live row for the reserved attempt (not counted again); only a sent invitation stamps profiles.account_status invited and restores a removed legacy membership (under storm.access_engine); provider_duplicate never downgrades a sent row. A given p_invited_by must be a member who may act on the invitee (42501 inviter_not_member, inviter_out_of_reach; D-207) and manage admins for an administrator target (42501 manages_admins_required), and be a users-access admin of the pending vessel of a Master / Captain placement (42501 master_needs_admin, DETAIL Only a users-access administrator of this vessel can invite a Master.; review round 4, D-198, D-204); a login linked to a profile without one must be one STORM created for it (invitation_login_state storm_invited; 42501 login_email_mismatch, login_not_invited; D-205). Nothing is written on a refusal. Service role only (send-invitation, bulk-invite, admin-actions).';
+COMMENT ON FUNCTION public.record_invitation_send(uuid, text, text, text, uuid, text, timestamptz, uuid) IS 'Records one invitation send outcome (sent | send_failed with a code) on the profile''s live row for the reserved attempt (not counted again); only a sent invitation stamps profiles.account_status invited (unless disabled / deactivated, or active and the person has joined: a sign-in on the profile or the login, or an accepted membership in the profile''s company; D-236) and restores a removed legacy membership (under storm.access_engine); provider_duplicate never downgrades a sent row. A given p_invited_by must be a member who may act on the invitee (42501 inviter_not_member, inviter_out_of_reach; D-207) and manage admins for an administrator target (42501 manages_admins_required), and be a users-access admin of the pending vessel of a Master / Captain placement (42501 master_needs_admin, DETAIL Only a users-access administrator of this vessel can invite a Master.; review round 4, D-198, D-204); a login linked to a profile without one must be one STORM created for it (invitation_login_state storm_invited; 42501 login_email_mismatch, login_not_invited; D-205). Nothing is written on a refusal. Service role only (send-invitation, bulk-invite, admin-actions).';
 COMMENT ON FUNCTION public.reserve_invitation_attempt(uuid, uuid, text) IS 'D-146: reserves the next invitation attempt number before a link is generated, under the profile and live-row locks: {ok, invitation_id, attempt} or {ok: false, code: not_found | disabled | forbidden (a given p_invited_by may not act on the person, D-207) | manages_admins_required (an administrator target and an inviter who does not manage admins, W7) | master_needs_admin (a pending Master / Captain placement and an inviter who is no users-access admin of the pending vessel; review round 4) | counter_exhausted (the next number would pass 2147483647; computed in bigint, never raises) | cooldown (retry_after_seconds)}. Cooldown 5 min after a send, 30 s after a failed attempt. Service role only.';
 COMMENT ON FUNCTION public.invitation_login_state(uuid, uuid) IS 'D-205: whether a login may be adopted by the profile, first match wins: unknown (NULL id, no profile, no auth user) | linked | linked_elsewhere | email_mismatch (lower(btrim) addresses differ; NULL counts as a mismatch) | storm_invited (an invitation row of the profile carries the login, or invited_at set, never signed in, no password, no non-email identity) | unused_orphan (never confirmed, never signed in) | foreign. Only storm_invited is adoptable. Service role only.';
-COMMENT ON FUNCTION public.invitation_withdraw_access(uuid, timestamptz) IS 'Internal to revoke / expire / record_session_start: for an ended, never-accepted invitation of a still invited / not_invited profile, the legacy invitation_token / invitation_token_expires are cleared (whatever the sign-in evidence); without sign-in evidence the still-invited profile -> not_invited and the never-accepted legacy membership -> removed (under storm.access_engine, JWT claims suspended). With _evidence_before (D-228: record_session_start passes expires_at) only sign-in evidence older than it, or an accepted membership, keeps the access. Active / disabled profiles untouched.';
-COMMENT ON FUNCTION public.revoke_invitation(uuid) IS 'A users-access admin of the invitation''s company who may act on the invitee (vessel reach, gap/01 F23) revokes a live invitation and withdraws the access it opened when never accepted (42501 not_permitted; 42501 manages_admins_required for an admin / owner invitation, an administrator target or a dpa / shore_management profile, W7; P0002 invitation_not_found / invitation_not_live).';
+COMMENT ON FUNCTION public.invitation_withdraw_access(uuid, timestamptz) IS 'Internal to revoke / expire / record_session_start: for an ended, never-accepted invitation of a still invited / not_invited profile, the legacy invitation_token / invitation_token_expires are cleared (whatever the sign-in evidence); without sign-in evidence the still-invited profile -> not_invited and the never-accepted legacy membership -> removed (under storm.access_engine, JWT claims suspended). With a cut-off only sign-in evidence older than it, or an accepted membership, keeps the access (D-228); the cut-off is _evidence_before (record_session_start passes expires_at), else the invitation''s own expires_at once it has passed (D-235: the daily sweep and Revoke get it too). Active / disabled profiles untouched.';
+COMMENT ON FUNCTION public.revoke_invitation(uuid) IS 'A users-access admin of the invitation''s company who may act on the invitee (vessel reach, gap/01 F23) revokes a live invitation and withdraws the access it opened when never accepted; on a row already past its expiry only sign-in evidence from before the expiry keeps the access (D-228, D-235) (42501 not_permitted; 42501 manages_admins_required for an admin / owner invitation, an administrator target or a dpa / shore_management profile, W7; P0002 invitation_not_found / invitation_not_live).';
 COMMENT ON FUNCTION public.fulfil_imported_assignment(uuid, uuid) IS 'D-184: once a login is linked, an imported profile''s imported_vessel_id becomes one current crew_assignments row (position, else rank, else Crew; join_date = joining_date, else today) under storm.access_engine, then imported_vessel_id is cleared and is_imported set false. Returns created | exists | none (not imported, no login, or already a current crew member: nothing changes) | not_eligible (a vessel of another company, Sold or archived; or a Master / Captain position without p_actor being a users-access admin of the vessel, D-198: nothing written, profile untouched and still pending). Service role only (record_invitation_send, the profile trigger, the edge).';
 COMMENT ON FUNCTION public.profiles_fulfil_imported_assignment() IS 'Trigger trg_profiles_fulfil_imported_assignment (AFTER UPDATE OF user_id, a login newly linked to an imported profile with an imported vessel): fulfil_imported_assignment(NEW.id, the inviter named in storm.fulfil_actor).';
-COMMENT ON FUNCTION public.expire_invitations() IS 'Live invitations past expires_at -> expired, access withdrawn when never accepted; returns the count. Service role (a later cron).';
+COMMENT ON FUNCTION public.expire_invitations() IS 'Live invitations past expires_at -> expired, access withdrawn when never accepted, counting only sign-in evidence from before each expiry (D-228, D-235); returns the count. Service role (hr-daily-sweeper, daily).';

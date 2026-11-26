@@ -268,3 +268,82 @@ SELECT tests.is((SELECT count(*) FROM public.crew_assignments WHERE user_id = te
 SELECT tests.ok((SELECT (tgtype & 8) <> 0 FROM pg_trigger WHERE tgrelid = 'public.crew_assignments'::regclass AND tgname = 'trg_crew_assignments_guard'), 'the guard fires on DELETE');
 SELECT tests.ok((SELECT (tgtype & 2) <> 0 FROM pg_trigger WHERE tgrelid = 'public.crew_assignments'::regclass AND tgname = 'trg_crew_assignments_guard'), 'the guard is a BEFORE trigger (review round 4)');
 SELECT tests.ok(position('v_new_current' IN pg_get_functiondef('public.crew_assignments_guard()'::regprocedure)) > 0, 'the guard decides on the stored is_current (review round 4)');
+
+-- ------------------------------------------------------------ the Master office moves with the join date (D-237; review round 6)
+
+-- record_is_master() and the office slots read crew_assignment_holds_office()
+-- (D-227: the join date, else the start date, must have come), but the
+-- guard decided Master before / after on crew_assignment_is_current() only,
+-- so an HR editor who is no users-access admin moved the office by editing
+-- join_date / start_date: a planned relief Master's join date brought to
+-- today, the sitting Master's pushed out. Rule f: on a row that is a
+-- current Master / Captain row before or after the update, a changed
+-- coalesce(join_date, start_date) needs users-access admin of the vessel,
+-- the caller's own row included. Ports scratchpad verify-mojd/repro.sql
+-- and repro2.sql (on GAME CHANGER, which the rows above leave alone).
+SELECT tests.seed_user('A', 'A.sitting_gam', 'crew');
+SELECT tests.seed_assignment('A.sitting_gam', 'A.gam', true, 'Master', jsonb_build_object('join_date', current_date - 30));
+SELECT tests.seed_user('A', 'A.relief_gam', 'crew');
+SELECT tests.seed_assignment('A.relief_gam', 'A.gam', true, 'Master', jsonb_build_object('join_date', current_date + 30));
+SELECT tests.seed_user('A', 'A.capt_plan_gam', 'crew');
+SELECT tests.seed_assignment('A.capt_plan_gam', 'A.gam', true, 'Chief Officer', jsonb_build_object('rank', 'Captain', 'join_date', NULL, 'start_date', current_date + 30));
+SELECT tests.seed_user('A', 'A.relief_self_gam', 'master');
+SELECT tests.seed_assignment('A.relief_self_gam', 'A.gam', true, 'Master', jsonb_build_object('join_date', current_date + 30));
+SELECT tests.seed_user('A', 'A.purser_gam', 'crew');
+SELECT tests.seed_rbac_role('A.purser_gam', 'purser', 'A.gam');
+SELECT tests.seed_assignment('A.purser_gam', 'A.gam', true, 'Purser');
+SELECT tests.seed_user('A', 'A.cook_gam', 'crew');
+SELECT tests.seed_assignment('A.cook_gam', 'A.gam', true, 'Cook', jsonb_build_object('join_date', current_date - 10));
+SELECT tests.seed_user('A', 'A.old_master_gam', 'crew');
+SELECT tests.seed_assignment('A.old_master_gam', 'A.gam', false, 'Master', jsonb_build_object('join_date', current_date - 400));
+SELECT tests.ok(public.record_is_master(tests.user_id('A.sitting_gam'), tests.vessel_id('A.gam'))
+                AND NOT public.record_is_master(tests.user_id('A.relief_gam'), tests.vessel_id('A.gam'))
+                AND NOT public.record_is_master(tests.user_id('A.capt_plan_gam'), tests.vessel_id('A.gam'))
+                AND NOT public.record_is_master(tests.user_id('A.relief_self_gam'), tests.vessel_id('A.gam')),
+                'setup: the sitting GAME CHANGER Master holds the office; the planned reliefs do not yet');
+
+SELECT tests.as_user(tests.user_id('A.purser_gam'));
+SELECT tests.ok(public.hr_can_edit(auth.uid()) AND NOT public.has_capability('admin.access.users_access.admin', tests.company_id('A'), tests.vessel_id('A.gam')),
+                'setup: the GAME CHANGER purser is an HR editor, not a users-access admin');
+SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET %s WHERE id = %L$q$, v.set_clause, tests.id(v.row_key)), '42501', 'master_office_change_refused',
+                         'the purser cannot ' || v.what)
+FROM (VALUES ('join_date = current_date', 'assignment:A.relief_gam@A.gam', 'bring the planned relief Master''s join date to today'),
+             ('join_date = current_date + 60', 'assignment:A.sitting_gam@A.gam', 'push the sitting Master''s join date out'),
+             ('join_date = NULL, start_date = current_date', 'assignment:A.capt_plan_gam@A.gam', 'start a planned Captain-rank row today through the start date'),
+             ('start_date = current_date, join_date = current_date', 'assignment:A.capt_plan_gam@A.gam', 'set both dates to today on the planned Captain-rank row')) AS v(set_clause, row_key, what);
+SELECT tests.lives(format($q$UPDATE public.crew_assignments SET join_date = current_date - 5 WHERE id = %L$q$, tests.id('assignment:A.cook_gam@A.gam')),
+                   'a join date edit on a non-Master row stays open to HR');
+SELECT tests.lives(format($q$UPDATE public.crew_assignments SET join_date = current_date - 500 WHERE id = %L$q$, tests.id('assignment:A.old_master_gam@A.gam')),
+                   'and on an ended Master row (history)');
+SELECT tests.as_user(tests.user_id('A.relief_self_gam'));
+SELECT tests.ok(public.hr_can_edit(auth.uid()) AND NOT public.has_capability('admin.access.users_access.admin', tests.company_id('A'), tests.vessel_id('A.gam')),
+                'setup: the planned relief Master is an HR editor (legacy master role), not a users-access admin');
+SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET join_date = current_date WHERE id = %L$q$, tests.id('assignment:A.relief_self_gam@A.gam')), '42501', 'master_office_change_refused',
+                         'a planned relief Master cannot bring their own join date forward');
+SELECT tests.reset_role();
+SELECT tests.ok(public.record_is_master(tests.user_id('A.sitting_gam'), tests.vessel_id('A.gam'))
+                AND NOT public.record_is_master(tests.user_id('A.relief_gam'), tests.vessel_id('A.gam'))
+                AND NOT public.record_is_master(tests.user_id('A.capt_plan_gam'), tests.vessel_id('A.gam'))
+                AND NOT public.record_is_master(tests.user_id('A.relief_self_gam'), tests.vessel_id('A.gam')),
+                'record_is_master is unchanged after the refusals');
+SELECT tests.results_eq(
+  format($q$SELECT id, coalesce(join_date, start_date) FROM public.crew_assignments WHERE id IN (%L, %L, %L)$q$,
+         tests.id('assignment:A.relief_gam@A.gam'), tests.id('assignment:A.sitting_gam@A.gam'), tests.id('assignment:A.relief_self_gam@A.gam')),
+  format($q$VALUES (%L::uuid, current_date + 30), (%L::uuid, current_date - 30), (%L::uuid, current_date + 30)$q$,
+         tests.id('assignment:A.relief_gam@A.gam'), tests.id('assignment:A.sitting_gam@A.gam'), tests.id('assignment:A.relief_self_gam@A.gam')),
+  'the Master rows keep their join dates');
+-- A users-access admin of the vessel may make each of these edits.
+SAVEPOINT master_join;
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.lives(format($q$UPDATE public.crew_assignments SET %s WHERE id = %L$q$, v.set_clause, tests.id(v.row_key)), 'a users-access admin may ' || v.what)
+FROM (VALUES ('join_date = current_date', 'assignment:A.relief_gam@A.gam', 'bring the relief Master''s join date to today'),
+             ('join_date = current_date + 60', 'assignment:A.sitting_gam@A.gam', 'push the sitting Master''s join date out'),
+             ('join_date = NULL, start_date = current_date', 'assignment:A.capt_plan_gam@A.gam', 'start the planned Captain-rank row today'),
+             ('join_date = current_date', 'assignment:A.relief_self_gam@A.gam', 'bring the other relief''s join date to today')) AS v(set_clause, row_key, what);
+SELECT tests.reset_role();
+SELECT tests.ok(public.record_is_master(tests.user_id('A.relief_gam'), tests.vessel_id('A.gam'))
+                AND NOT public.record_is_master(tests.user_id('A.sitting_gam'), tests.vessel_id('A.gam'))
+                AND public.record_is_master(tests.user_id('A.capt_plan_gam'), tests.vessel_id('A.gam')),
+                'the admin''s date edits moved the office');
+ROLLBACK TO SAVEPOINT master_join;
+SELECT tests.ok(position('join_date' IN pg_get_functiondef('public.crew_assignments_guard()'::regprocedure)) > 0, 'the guard reads the join date (D-237)');

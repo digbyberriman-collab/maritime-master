@@ -42,6 +42,19 @@
 --      Master row, needs users-access admin for the company and the vessel
 --      (and the old vessel on a move)
 --                                                   master_office_change_refused
+--   f. the Master office starts at the join date (D-227; review round 6,
+--      master-office-via-join-date, D-237): on an UPDATE of a row that is a
+--      current Master / Captain row before or after the change, a changed
+--      effective join date, coalesce(join_date, start_date) (the legacy
+--      normaliser fills join_date from start_date), moves the office (a
+--      relief Master's join date brought forward makes them Master today;
+--      the sitting Master's pushed out ends their office), so it needs
+--      users-access admin for the vessel too, the caller's own row
+--      included. Ended Master rows (history) and non-Master rows stay open
+--      to HR editors. The Master-row notion stays crew_assignment_is_current
+--      (not crew_assignment_holds_office): appointing a planned Master
+--      with a future join date already needs admin under rule e.
+--                                                   master_office_change_refused
 --
 -- The row as stored (review round 4, master-guard-bypass-via-leave-date):
 -- BEFORE triggers fire in name order, so this guard runs before the legacy
@@ -226,6 +239,14 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'self_office_change_refused',
       DETAIL = 'Only a users-access administrator can change their own position or rank.';
   END IF;
+  -- f. A join-date (else start-date) change on a current Master / Captain
+  -- row moves the office (D-227, D-237).
+  IF TG_OP = 'UPDATE' AND (v_master_before OR v_master_after)
+     AND coalesce(NEW.join_date, NEW.start_date) IS DISTINCT FROM coalesce(OLD.join_date, OLD.start_date)
+     AND NOT v_admin THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'master_office_change_refused',
+      DETAIL = 'Only a users-access administrator of the vessel can appoint or remove a Master.';
+  END IF;
   IF (v_master_before IS DISTINCT FROM v_master_after
       OR (v_master_after AND TG_OP = 'UPDATE' AND (NEW.user_id IS DISTINCT FROM OLD.user_id OR NEW.vessel_id IS DISTINCT FROM OLD.vessel_id)))
      AND NOT v_admin THEN
@@ -281,5 +302,5 @@ GRANT EXECUTE ON FUNCTION public.crew_assignments_end_stale() TO service_role;
 
 -- ---------------------------------------------------------------- comments
 
-COMMENT ON FUNCTION public.crew_assignments_guard() IS 'Trigger trg_crew_assignments_guard (no self-escalation): decides on the row as stored (review round 4: is_current as the legacy date normaliser leaves it, so ending a Master row through leave_date or end_date is a Master office change; review round 5: OLD by crew_assignment_is_current() too, D-217, so touching a stale Master row is no office change); for a signed-in caller without storm.access_engine, an assignment of your own that grants reach needs users-access admin for the vessel (self_assignment_refused); the caller must already reach the new (and old) vessel or hold fleet reach / users-access admin for it (assignment_vessel_out_of_reach); an own-row change of the normalised position or rank needs users-access admin for the vessel (self_office_change_refused); appointing, removing or moving a Master / Captain row needs users-access admin for the vessel (and the old one on a move) (master_office_change_refused). DELETE (review round 3): the caller must reach the row''s vessel or hold fleet reach / users-access admin for it (assignment_vessel_out_of_reach), and deleting a current Master / Captain row needs users-access admin for the vessel (master_office_change_refused); an FK cascade of a vessel or profile delete passes. Service role, migrations and the engine definers unaffected.';
+COMMENT ON FUNCTION public.crew_assignments_guard() IS 'Trigger trg_crew_assignments_guard (no self-escalation): decides on the row as stored (review round 4: is_current as the legacy date normaliser leaves it, so ending a Master row through leave_date or end_date is a Master office change; review round 5: OLD by crew_assignment_is_current() too, D-217, so touching a stale Master row is no office change); for a signed-in caller without storm.access_engine, an assignment of your own that grants reach needs users-access admin for the vessel (self_assignment_refused); the caller must already reach the new (and old) vessel or hold fleet reach / users-access admin for it (assignment_vessel_out_of_reach); an own-row change of the normalised position or rank needs users-access admin for the vessel (self_office_change_refused); appointing, removing or moving a Master / Captain row needs users-access admin for the vessel (and the old one on a move) (master_office_change_refused), and so does changing the effective join date, coalesce(join_date, start_date), of a row that is a current Master / Captain row before or after the update, your own included (review round 6, D-237: the office starts at the join date, D-227) (master_office_change_refused). DELETE (review round 3): the caller must reach the row''s vessel or hold fleet reach / users-access admin for it (assignment_vessel_out_of_reach), and deleting a current Master / Captain row needs users-access admin for the vessel (master_office_change_refused); an FK cascade of a vessel or profile delete passes. Service role, migrations and the engine definers unaffected.';
 COMMENT ON FUNCTION public.crew_assignments_end_stale() IS 'D-217 daily sweep (service role only; 42501 under a JWT): is_current = false on every crew_assignments row whose coalesce(leave_date, end_date) has come; returns the number of rows ended. hr-daily-sweeper calls it.';

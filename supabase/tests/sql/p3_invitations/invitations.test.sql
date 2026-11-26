@@ -90,11 +90,19 @@ SELECT tests.is((SELECT account_status FROM public.profiles WHERE id = tests.pro
 SELECT tests.is((SELECT count(*) FROM public.user_invitations WHERE profile_id = tests.profile_id('A.newbie')), 1::bigint, 'one row per profile while it is live');
 SELECT tests.throws(format($q$INSERT INTO public.user_invitations (company_id, profile_id, status) VALUES (%L, %L, 'pending')$q$, tests.company_id('A'), tests.profile_id('A.newbie')), '23505', 'a second live row is impossible (user_invitations_live_key)');
 
--- An active user re-invited stays active.
+-- An active user who has joined (signed in) and is re-invited stays active
+-- (D-236: 'active' alone, the column default, is no proof of joining).
+UPDATE auth.users SET last_sign_in_at = now() - interval '10 days' WHERE id = tests.user_id('A.active_crew');
 SELECT tests.as_service();
 SELECT tests.lives(format($q$SELECT public.record_invitation_send(%L, 'sent')$q$, tests.profile_id('A.active_crew')), 'sent to an active user');
 SELECT tests.reset_role();
-SELECT tests.is((SELECT account_status FROM public.profiles WHERE id = tests.profile_id('A.active_crew')), 'active', 'an active profile is never set back to invited');
+SELECT tests.is((SELECT account_status FROM public.profiles WHERE id = tests.profile_id('A.active_crew')), 'active', 'an active profile of a person who has joined is never set back to invited');
+-- An 'active' profile whose person never joined is stamped invited (D-236).
+SELECT tests.seed_user('A', 'A.active_never', 'crew', 'active');
+SELECT tests.as_service();
+SELECT tests.lives(format($q$SELECT public.record_invitation_send(%L, 'sent')$q$, tests.profile_id('A.active_never')), 'sent to an active profile that never signed in');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT account_status FROM public.profiles WHERE id = tests.profile_id('A.active_never')), 'invited', 'it reads invited (the person has not joined)');
 
 -- ------------------------------------------------------------ reserve_invitation_attempt (D-146)
 

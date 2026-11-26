@@ -403,7 +403,9 @@ $$;
 
 -- log_client_export (EX4): a browser-generated export is logged before the
 -- download (generated_by 'client', status ready, completed now). Event
--- export.logged (no notification: the requester has the file).
+-- export.logged: the requester gets no notification (they have the file);
+-- the DPA is notified when the export contains personal data (D-238:
+-- trg_record_events_personal_data, 20261123030000).
 CREATE OR REPLACE FUNCTION public.log_client_export(
   p_kind text,
   p_source_key text,
@@ -503,5 +505,5 @@ COMMENT ON FUNCTION public.export_job_log(public.export_jobs, text, text, text, 
 COMMENT ON FUNCTION public.export_scope_check(text, text, jsonb, uuid) IS 'Internal: the caller''s company for an export, after the reach (vessel or fleet) and input checks.';
 COMMENT ON FUNCTION public.export_job_transition(uuid, text, jsonb) IS 'The export machine (service role): requested -> running | failed | cancelled; running -> ready | failed; ready -> expired; expired -> purged. Event export.<status>; ready / failed notify the requester.';
 COMMENT ON FUNCTION public.request_export(text, text, jsonb, boolean, uuid) IS 'Requests a server export (stays requested until a builder exists). Vessel exports need reach, fleet exports fleet reach.';
-COMMENT ON FUNCTION public.log_client_export(text, text, jsonb, boolean, integer, uuid) IS 'Logs a browser-generated export before its download (EX4): generated_by client, ready.';
+COMMENT ON FUNCTION public.log_client_export(text, text, jsonb, boolean, integer, uuid) IS 'Logs a browser-generated export before its download (EX4): generated_by client, ready. The requester gets no notification; the DPA is notified when the export contains personal data (D-238).';
 COMMENT ON FUNCTION public.cancel_export_job(uuid) IS 'Cancels the caller''s own queued (requested) export; nobody cancels an orphaned job (requested_by NULL).';

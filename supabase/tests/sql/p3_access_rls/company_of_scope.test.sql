@@ -69,8 +69,8 @@ SELECT tests.is_empty(
   'no role-scoped policy coalesces the vessel''s company with the crew member''s');
 SELECT tests.is((SELECT count(DISTINCT tablename) FROM pg_policies WHERE schemaname = 'public'
                    AND tablename IN ('hours_of_rest_records', 'leave_requests', 'medical_reports', 'work_rest_monthly_submissions', 'work_rest_records')
-                   AND (coalesce(qual, '') || coalesce(with_check, '')) ~ 'CASE\s+WHEN \((\w+\.)?vessel_id IS NOT NULL\) THEN vessel_company_of'),
-                5::bigint, 'all five vessel-else-crew tables resolve the company by CASE on the vessel');
+                   AND (coalesce(qual, '') || coalesce(with_check, '')) ~ 'CASE\s+WHEN \((\w+\.)?vessel_id IS NOT NULL\) THEN has_role_on_vessel_in_company'),
+                5::bigint, 'all five vessel-else-crew tables decide a vessel row by CASE on the vessel (the vessel role check, D-234)');
 SELECT tests.ok(has_function_privilege('authenticated', f, 'EXECUTE') AND has_function_privilege('service_role', f, 'EXECUTE') AND NOT has_function_privilege('anon', f, 'EXECUTE'),
                 f || ': grants unchanged (authenticated + service_role, not anon)')
 FROM unnest(ARRAY['public.vessel_company_of(uuid)', 'public.profile_company_of(uuid)']) AS f;

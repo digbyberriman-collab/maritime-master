@@ -10,7 +10,9 @@
 --   process_notification_outbox() (service role; retry processor for a
 --   later cron), notification_inbox_mark_all_read() (authenticated);
 --   triggers notification_outbox_guard(), record_event_notify()
---   (trg_record_events_emit on record_events)
+--   (trg_record_events_emit on record_events),
+--   record_event_notify_personal_data() (trg_record_events_personal_data on
+--   record_events: the DPA notice of a personal-data export, D-238)
 -- Seed: the engine notification types in the live notification_types
 -- TS mirror: src/modules/notifications/types/db.pending.ts
 --   (NotificationsPendingTables notification_inbox,
@@ -654,6 +656,72 @@ CREATE TRIGGER trg_record_events_emit
   WHEN (NEW.notification_type IS NOT NULL)
   EXECUTE FUNCTION public.record_event_notify();
 
+-- record_event_notify_personal_data (D-238; review round 6,
+-- seeded-notification-types-no-emitter; gap/08 §N: personal_data_exported
+-- is immediate to the DPA for any export flagged personal): a second
+-- AFTER INSERT trigger on record_events, for an export_job event logged
+-- (a browser export, log_client_export) or made ready (a server export,
+-- export_job_transition) whose payload says contains_personal_data. It
+-- does not overload export_job_log's single notification type: an
+-- export.ready row still notifies its requester with export_ready
+-- (trg_record_events_emit), and this one adds the DPA notice. Audience
+-- 'dpa' (notification_recipients: an active membership with is_dpa, or a
+-- legacy-managed one whose profile role is dpa), link_scope 'fleet' with
+-- no vessel, so no vessel's module-off rule suppresses it; never the actor
+-- (the DPA who exports gets no notice of their own export). For a fleet
+-- link notification_recipients also asks fleet reach or a company actor:
+-- a legacy dpa has fleet reach, but a non-legacy is_dpa membership without
+-- fleet_access that is neither admin nor owner is dropped (D-238; such a
+-- DPA should hold fleet access). Title without names, body the export kind
+-- (as export_ready labels it) and the source key, ids-only payload, dedupe
+-- 'pde:<event id>'. Never rolls back the export (CC-16): a failure is a
+-- WARNING, and the WHEN clause compares jsonb (payload ->
+-- 'contains_personal_data' = 'true'), so an odd payload value never raises
+-- a cast error into the export. No grant (a trigger function).
+CREATE OR REPLACE FUNCTION public.record_event_notify_personal_data()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_kind text := NEW.payload ->> 'kind';
+  v_body text;
+BEGIN
+  BEGIN
+    v_body := CASE v_kind
+      WHEN 'record_pdf' THEN 'Record PDF' WHEN 'register_pdf' THEN 'Register PDF' WHEN 'csv' THEN 'CSV file'
+      WHEN 'xlsx' THEN 'Excel file' WHEN 'zip' THEN 'ZIP archive' WHEN 'compliance_pack' THEN 'Compliance pack'
+      WHEN 'gdpr_subject' THEN 'Personal data export' WHEN 'ics' THEN 'Calendar file' ELSE 'Export' END
+      || coalesce(' · ' || (NEW.payload ->> 'source_key'), '');
+    PERFORM public.emit_notification_event(
+      p_type_key := 'personal_data_exported',
+      p_company_id := NEW.company_id,
+      p_title := 'Personal data exported',
+      p_link_scope := 'fleet',
+      p_vessel_id := NULL,
+      p_body := left(v_body, 280),
+      p_severity := 'info',
+      p_audience := ARRAY['dpa'],
+      p_payload := jsonb_strip_nulls(jsonb_build_object(
+        'event_id', NEW.id, 'export_job_id', NEW.entity_id, 'kind', v_kind, 'generated_by', NEW.payload ->> 'generated_by')),
+      p_dedupe_key := 'pde:' || NEW.id::text,
+      p_module_key := NULL);
+  EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'notification_emit_failed: %', SQLSTATE;
+  END;
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_record_events_personal_data ON public.record_events;
+CREATE TRIGGER trg_record_events_personal_data
+  AFTER INSERT ON public.record_events
+  FOR EACH ROW
+  WHEN (NEW.entity_type = 'export_job' AND NEW.action IN ('export.logged', 'export.ready')
+        AND coalesce(NEW.payload -> 'contains_personal_data' = 'true'::jsonb, false))
+  EXECUTE FUNCTION public.record_event_notify_personal_data();
+
 -- ---------------------------------------------------------------- engine notification types (gap/08 §N, gap/03 catalogue)
 
 INSERT INTO public.notification_types (key, name, category, cadence, description, default_enabled, sort_order) VALUES
@@ -687,6 +755,7 @@ REVOKE ALL ON FUNCTION public.emit_notification_event(text, uuid, text, text, uu
 REVOKE ALL ON FUNCTION public.process_notification_outbox(integer) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.notification_inbox_mark_all_read(timestamptz) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.record_event_notify() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.record_event_notify_personal_data() FROM PUBLIC, anon, authenticated, service_role;
 
 GRANT EXECUTE ON FUNCTION public.notification_recipients(uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION public.notification_fan_out(uuid) TO service_role;
@@ -705,3 +774,4 @@ COMMENT ON FUNCTION public.emit_notification_event(text, uuid, text, text, uuid,
 COMMENT ON FUNCTION public.process_notification_outbox(integer) IS 'Retry processor (service role; for a later cron): fans out unprocessed outbox rows with fewer than 5 attempts (FOR UPDATE SKIP LOCKED).';
 COMMENT ON FUNCTION public.notification_inbox_mark_all_read(timestamptz) IS 'Marks the caller''s own unread, unarchived inbox rows up to p_before as read; returns the count (0 for a disabled user).';
 COMMENT ON FUNCTION public.record_event_notify() IS 'Trigger on record_events: emits the event''s notification (title, link, audience, severity of spec §A.15); never rolls back the engine action (WARNING on failure, CC-16).';
+COMMENT ON FUNCTION public.record_event_notify_personal_data() IS 'Trigger trg_record_events_personal_data on record_events (D-238; gap/08 §N): an export_job event export.logged or export.ready whose payload has contains_personal_data true emits personal_data_exported to the company''s DPA (audience dpa: an active is_dpa membership or a legacy dpa profile; link_scope fleet, no vessel, so no module-off rule suppresses it; never the actor; a fleet link also needs fleet reach or a company actor, so a non-legacy is_dpa membership without fleet_access that is neither admin nor owner is not notified). Title Personal data exported, body the export kind and source key, ids-only payload, dedupe pde:<event id>. Never rolls back the export (WARNING notification_emit_failed, CC-16). No grant.';
