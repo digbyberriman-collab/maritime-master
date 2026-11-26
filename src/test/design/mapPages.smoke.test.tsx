@@ -1,8 +1,9 @@
 /**
- * The three themed map surfaces (BUILD-PLAN A9) render on the shared map
- * theme: Fleet Map, the dashboard region card and the itinerary heat map.
- * Each draws its basemap from the theme, token-classed markers, escaped
- * popups and a legend built from tokens.
+ * The themed map surfaces (BUILD-PLAN A9) render on the shared map theme:
+ * Fleet Map and the itinerary heat map. Each draws its basemap from the
+ * theme, token-classed markers, escaped popups and a legend built from
+ * tokens. The dashboard region card's test moved to
+ * src/test/dashboard/regionMapCard.smoke.test.tsx (platform-prep PP2).
  */
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
@@ -77,9 +78,7 @@ vi.mock('@/modules/itinerary/hooks/useTripSuggestions', () => ({
 vi.mock('@/modules/itinerary/components/AIRoutePlanner', () => ({ default: () => <div data-testid="route-planner" /> }));
 
 import FleetMap from '@/modules/dashboard/pages/FleetMap';
-import RegionMapCard from '@/modules/dashboard/components/fleet/RegionMapCard';
 import HeatMapTab from '@/modules/itinerary/components/HeatMapTab';
-import { FLEET_REGIONS } from '@/modules/dashboard/components/fleet/regionUtils';
 
 beforeAll(() => {
   if (typeof globalThis.ResizeObserver === 'undefined') {
@@ -132,19 +131,6 @@ describe('Fleet Map', () => {
     expect(popup?.innerHTML).toContain('Draak &lt;b&gt;');
     expect(popup?.querySelector('b')).toBeNull();
     expect(popup?.querySelector('.storm-map-popup__title')).not.toBeNull();
-  });
-});
-
-describe('Region map card', () => {
-  it('follows the theme and pins escaped name chips', () => {
-    const { container } = withProviders(
-      <RegionMapCard region={FLEET_REGIONS[0]} vessels={[{ id: 'v-1', name: '<i>Draak</i>' }]} />,
-    );
-    expect(container.querySelector('.leaflet-container')).toHaveAttribute('data-map-theme', 'dark');
-    expect(tileClassNames(container).some((c) => c.includes('storm-map-basemap--dark'))).toBe(true);
-    const chip = container.querySelector('.storm-map-label')!;
-    expect(chip.textContent).toBe('<i>Draak</i>');
-    expect(chip.querySelector('i')).toBeNull();
   });
 });
 

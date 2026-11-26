@@ -1,14 +1,16 @@
 /**
  * Moving within a scope never leaves it (D-13; gap/00 B4): the Logbooks tab
- * and a book switch, the Hours of Rest crew switch, and a planned workspace
- * leaf opened from a workspace page all keep the one shell and the query.
+ * and a book switch, and a planned workspace leaf opened from a workspace
+ * page, keep the one shell and the query. (The Hours of Rest crew switch and
+ * board links moved to src/test/work-rest/horScopeNavigation.test.tsx,
+ * platform-prep PP2.)
  *
  * The real route tree (routeHarness), the real VesselScopeRoute,
  * WorkspaceScope, LegacyRoute and DashboardLayout; auth, RBAC and
  * VesselContext are in-memory fakes and the shell's heavy children are
- * stubbed (as in scopes.test.tsx). The logbook and hours-of-rest pages are
- * the real ones, with their data hooks and editing surfaces stubbed; the
- * workspace page is a stand-in for the Refit dashboard.
+ * stubbed (as in scopes.test.tsx). The logbook pages are the real ones,
+ * with their data hooks and editing surfaces stubbed; the workspace page is
+ * a stand-in for the Refit dashboard.
  */
 import React, { useMemo, useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -189,28 +191,6 @@ vi.mock('@/modules/logbooks/components/CloseVolumeDialog', () => ({ default: () 
 vi.mock('@/modules/logbooks/components/PrintBook', () => ({ default: () => null }));
 vi.mock('@/modules/logbooks/components/LogbookExportDialog', () => ({ default: () => null }));
 
-// Hours of rest: the month data and its panels stubbed.
-vi.mock('@/modules/work-rest/hooks/useMonthlyWorkRest', () => ({
-  useMonthlyWorkRest: () => ({
-    records: [], compliance: { is_compliant: true }, ruleSet: null, signatures: [], submission: null, isLocked: false,
-    loading: false, saving: false, nonConformities: [], save: async () => undefined, refresh: () => undefined, setDayBlocks: () => undefined,
-  }),
-}));
-vi.mock('@/modules/work-rest/components/CompliancePanel', () => ({ CompliancePanel: () => null }));
-vi.mock('@/modules/work-rest/components/MonthCalendar', () => ({ MonthCalendar: () => null }));
-vi.mock('@/modules/work-rest/components/NonConformityList', () => ({ NonConformityList: () => null }));
-vi.mock('@/modules/work-rest/components/SignOffPanel', () => ({ SignOffPanel: () => null }));
-vi.mock('@/modules/work-rest/components/AuditLogPanel', () => ({ AuditLogPanel: () => null }));
-vi.mock('@/modules/auth/hooks/useUserRoles', () => ({ useActiveRoles: () => ({ roles: ['captain'], isLoading: false }) }));
-vi.mock('@/modules/work-rest/services/workRestService', () => ({
-  listVesselMonthMatrix: async () => [
-    {
-      crew_id: 'other', crew_name: 'Ann Deck', rank: 'Bosun', department: 'DECK', rest_by_day: {}, compliant_by_day: {},
-      avg_rest: null, logged_pct: 0, status: 'no_data',
-    },
-  ],
-}));
-
 // A Yard workspace page: a stand-in for the Refit dashboard, linking a planned Refit leaf.
 vi.mock('@/modules/refit/components/layout/RefitShell', () => ({
   default: ({ children }: { children: React.ReactNode }) => children,
@@ -325,76 +305,6 @@ describe('the Logbooks tab inside the vessel scope', () => {
     expect(visited.filter((u) => u.startsWith('/vessel/'))).toEqual([]);
     expect(mocks.shellMounts).toBe(1);
     expect(document.querySelector('[data-shell-scope]')).toBe(aside);
-  });
-});
-
-describe('the Hours of Rest crew switch inside the vessel scope', () => {
-  it("opens another crew member's month in the scope, keeping the month, with the one shell", async () => {
-    renderApp('/v/dra/crew/people/u1/hours-of-rest?year=2026&month=11');
-    const picker = await screen.findByLabelText('Picker');
-    await waitFor(() => expect(picker.querySelectorAll('option').length).toBe(2));
-    act(() => {
-      fireEvent.change(picker, { target: { value: 'other' } });
-    });
-    await waitFor(() => expect(location()).toBe('/v/dra/crew/people/other/hours-of-rest?year=2026&month=11'));
-    expect(visited.filter((u) => u.startsWith('/crew/'))).toEqual([]);
-    expect(mocks.shellMounts).toBe(1);
-    expect(shells()).toBe(1);
-  });
-
-  it("goes to the personal area for one's own month", async () => {
-    renderApp('/v/dra/crew/people/other/hours-of-rest?year=2026&month=11');
-    const picker = await screen.findByLabelText('Picker');
-    await waitFor(() => expect(picker.querySelectorAll('option').length).toBe(2));
-    act(() => {
-      fireEvent.change(picker, { target: { value: 'u1' } });
-    });
-    await waitFor(() => expect(location()).toBe('/me/hours-of-rest?year=2026&month=11'));
-    expect(visited.filter((u) => u.startsWith('/crew/'))).toEqual([]);
-  });
-});
-
-describe('the Hours of Rest toolbar and links', () => {
-  it('wraps, keeps the month and Save in view, and moves the exports into More below md', async () => {
-    renderApp('/v/dra/crew/people/u1/hours-of-rest?year=2026&month=11');
-    const save = await screen.findByRole('button', { name: 'Save' });
-    const row = save.parentElement as HTMLElement;
-    expect(row.className).toContain('flex-wrap');
-    expect(row).toContainElement(screen.getByRole('button', { name: 'Previous month' }));
-    expect(row).toContainElement(screen.getByRole('button', { name: 'Next month' }));
-    expect(screen.getByRole('button', { name: 'More' }).closest('.md\\:hidden')).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'PDF' }).closest('.hidden')).not.toBeNull();
-    expect(screen.getByRole('button', { name: 'CSV' }).closest('.hidden')).not.toBeNull();
-  });
-
-  it('hides Fleet Overview from a user without fleet reach', async () => {
-    renderApp('/v/dra/crew/people/u1/hours-of-rest?year=2026&month=11');
-    await screen.findByRole('button', { name: 'Save' });
-    expect(screen.queryByRole('button', { name: 'Fleet Overview' })).toBeNull();
-  });
-
-  it("opens the vessel's HoR board in the scope for a fleet user", async () => {
-    mocks.perm.userRoles = [{ role_name: 'fleet_master' }];
-    renderApp('/v/dra/crew/people/u1/hours-of-rest?year=2026&month=11');
-    const overview = await screen.findByRole('button', { name: 'Fleet Overview' });
-    act(() => {
-      fireEvent.click(overview);
-    });
-    await waitFor(() => expect(location()).toBe('/v/dra/crew/hours-of-rest'));
-    expect(visited.filter((u) => u.startsWith('/crew/'))).toEqual([]);
-    expect(mocks.shellMounts).toBe(1);
-  });
-
-  it("the board links one's own hours and each crew member's month in the scope", async () => {
-    renderApp('/v/dra/crew/hours-of-rest?year=2026&month=11');
-    expect(await screen.findByRole('link', { name: 'My hours' })).toHaveAttribute('href', '/me/hours-of-rest');
-    const row = await screen.findByRole('link', { name: /Ann Deck/ });
-    expect(row).toHaveAttribute('href', '/v/dra/crew/people/other/hours-of-rest?year=2026&month=11');
-    act(() => {
-      fireEvent.click(row);
-    });
-    await waitFor(() => expect(location()).toBe('/v/dra/crew/people/other/hours-of-rest?year=2026&month=11'));
-    expect(mocks.shellMounts).toBe(1);
   });
 });
 

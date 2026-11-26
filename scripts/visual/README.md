@@ -26,8 +26,12 @@ node scripts/visual/capture.mjs --routes palette-open,palette-query --widths 144
 # Any route as another user or data state (a persona)
 node scripts/visual/capture.mjs --routes /v/dra --persona vessel-master
 
-# List the routes and their slugs
+# List the routes, their slugs and the file each comes from
 node scripts/visual/capture.mjs --list
+
+# Without the fixture overlays (fixtures.d), or with another overlays folder
+node scripts/visual/capture.mjs --routes /v/dra/crew/list --no-overlays
+node scripts/visual/capture.mjs --routes /v/dra/crew/list --overlays /path/to/overlays
 ```
 
 Output goes to `.visual/` (git-ignored; never commit screenshots):
@@ -50,7 +54,7 @@ A full run (16 routes × 2 themes × 2 widths) takes a minute or two.
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--routes a,b` | all | Slugs or paths from `routes.json`; an unknown `/path` is captured ad hoc |
+| `--routes a,b` | all | Slugs or paths from `routes.json` and `routes.d/`; an unknown `/path` is captured ad hoc |
 | `--themes dark,light` | both | Sets `localStorage['storm-theme']` and `prefers-color-scheme` |
 | `--widths 1440,390` | both | 1440→900 and 390→844 tall; other common widths have device heights. Widths under 768 emulate a touch phone |
 | `--no-server` | off | Use a server that is already running at `--base-url` |
@@ -64,7 +68,10 @@ A full run (16 routes × 2 themes × 2 widths) takes a minute or two.
 | `--settle MS` | 400 | Pause before each screenshot |
 | `--strict` | off | Exit 1 when any capture fails (still not a CI gate) |
 | `--persona NAME` | none | Capture every selected route as this persona (see "Personas"); wins over a route's own `persona` |
-| `--routes-file`, `--fixtures` | `scripts/visual/…` | Use another routes file or fixtures folder |
+| `--routes-file`, `--fixtures` | `scripts/visual/…` | Use another routes file (its sibling `routes.d/` is read too) or fixtures folder |
+| `--overlays DIR` | `<fixtures>/../fixtures.d` | Fixture overlays: a folder of overlay folders, or one overlay folder (see "Overlays"). A named folder must exist |
+| `--no-overlays` | off | Base fixtures only |
+| `--list` | off | Print the selected routes with the file each comes from (`[routes.json]`, `[routes.d/crew.json]`) and exit |
 
 ### Using a server you started yourself
 
@@ -178,7 +185,7 @@ Tables listed in `missingTables` answer with the PostgREST "table not found" err
 - No reference-product names or copy.
 - These screenshots are of STORM itself. Keep them out of the repo.
 
-`test/harness.test.mjs` checks the identity and no-personal-data rules on the shipped fixtures.
+`test/harness.test.mjs` checks the identity and no-personal-data rules on the shipped fixtures, and `test/overlays.test.mjs` the same rules on every shipped overlay.
 
 **Adding data for a page:**
 
@@ -187,6 +194,25 @@ Tables listed in `missingTables` answer with the PostgREST "table not found" err
 3. Add `fixtures/<table>.json`, with the columns from `src/integrations/supabase/types.ts` and the status values the module's `constants.ts` uses.
 
 The vessel fixtures have no `code` column, which matches the live database before migration P1. The client derives codes (D-03): DRA, GAM, LEV, ROC, XIP, DAG, HYD.
+
+### Overlays (fixtures.d)
+
+Two streams building at once cannot both edit `profiles.json`, `_personas.json` or `rpc/has_capability.json` (platform-prep PP2). So a stream's additions to shared fixtures live in an **overlay**, `fixtures.d/<overlay>/`, laid out like `fixtures/`. The harness loads the base, then every overlay folder in name order:
+
+| Overlay file | Effect |
+|---|---|
+| `<table>.json` | Rows are appended; a row with the `id` of a base row replaces it in place; a new table is added |
+| `rpc/<fn>.json` | Replaces the base answer |
+| `_personas.json` | Personas are added by name |
+| `_config.json` | `missingTables` and `missingRpcs` are added to the base lists |
+
+Load errors, each naming both sources: one table's row `id` in two overlays, two overlays answering one RPC, a persona name defined twice (in the base or another overlay). An overlay cannot replace `_auth.json`; other `_*.json` files, folders other than `rpc/` and malformed rows are refused too. Non-JSON files are ignored. The terminal and `report.json` (`overlays`) say which overlays a run used.
+
+- Default folder: `fixtures.d` next to the fixtures folder, so `--fixtures <copy>` reads `<copy>/../fixtures.d`, never the repo's by accident.
+- `--overlays DIR`: a folder of overlay folders, or a single overlay folder (one holding `*.json` or `rpc/` itself). Handy for a scratch overlay: `--overlays /tmp/my-overlay`.
+- `--no-overlays`: the base only.
+
+Phase 3 wave 1 owners: `fixtures.d/crew/` (X1 Crew) and `fixtures.d/fleet/` (X5 Fleet operations). A stream's *new* tables still get their own `fixtures/<table>.json`. The integrator folds overlays into the base at the wave merge. `fixtures.d/README.md` repeats the rules.
 
 ## Routes
 
@@ -215,6 +241,14 @@ The vessel fixtures have no `code` column, which matches the live database befor
 | `widths` | Only these of the run's widths, e.g. `[390, 768]` for the navigation drawer, which exists below 1024 px |
 
 New scopes (`/fleet/…`, `/v/:vesselCode/…`) are added here as they land.
+
+### Route files (routes.d)
+
+Besides `routes.json`, every `routes.d/*.json` (an array in the same format) is read, in name order, so each stream adds its captures in a file of its own: `routes.d/crew.json` (X1) and `routes.d/fleet.json` (X5), seeded empty by platform-prep PP2.
+
+- Slugs are unique across all the files; a duplicate is an error naming both files.
+- No two entries may capture the same thing: the same path with the same `auth`, `persona`, `actions`, `localStorage`, `widths` and `reducedMotion`. The same path with another persona or other actions is fine (`/v/dra/crew/list` as the master and as a head of department).
+- `--list` shows the file each route comes from; `--routes` selects from all of them.
 
 ### Actions
 
@@ -311,6 +345,7 @@ The tests cover:
 
 - the PostgREST look-alike
 - the fixture loader, tokens and shipped fixtures
+- fixture overlays and route files: merge order, replacement by id, the collision errors, `--overlays` / `--no-overlays`, and the shipped `fixtures.d/` and `routes.d/` (`overlays.test.mjs`)
 - options and routes
 - scripted actions (validation, order, a failing step as a warning) and personas (`actions.test.mjs`, no browser)
 - report grading, including top-bar collisions

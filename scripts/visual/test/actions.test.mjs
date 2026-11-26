@@ -10,10 +10,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { validateActions, runActions, describeAction, ACTION_KINDS, MAX_WAIT_MS } from '../lib/actions.mjs';
-import { normaliseRoutes, parseArgs } from '../lib/options.mjs';
+import { loadRoutes, normaliseRoutes, parseArgs } from '../lib/options.mjs';
 import { captureWarnings } from '../lib/inspect.mjs';
-import { loadFixtures } from '../lib/fixtures.mjs';
-import { applyPersona, captureName, loadPersonas, personaFor, validatePersonas } from '../lib/personas.mjs';
+import { applyOverlays, findOverlays, loadFixtures, loadOverlay } from '../lib/fixtures.mjs';
+import { applyPersona, captureName, loadPersonas, mergePersonas, personaFor, validatePersonas } from '../lib/personas.mjs';
 import { createMockState, handleSupabaseRequest } from '../lib/supabase-mock.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -151,7 +151,8 @@ const testIdValues = () => {
 };
 
 test('the shipped interaction captures use the contract test ids and known personas', () => {
-  const routes = normaliseRoutes(JSON.parse(fs.readFileSync(path.join(VISUAL, 'routes.json'), 'utf8')));
+  // routes.json and every routes.d file; personas from the base and every fixtures.d overlay.
+  const routes = loadRoutes(path.join(VISUAL, 'routes.json'));
   const ids = testIdValues();
   const bySlug = new Map(routes.map((r) => [r.slug, r]));
   for (const slug of ['palette-open', 'palette-query', 'shell-vessel-switcher-open', 'shell-account-menu-open', 'shell-bell-open', 'shell-apps-open']) {
@@ -169,7 +170,9 @@ test('the shipped interaction captures use the contract test ids and known perso
       }
     }
   }
-  const personas = loadPersonas(path.join(VISUAL, 'fixtures'), NOW);
+  const overlays = findOverlays(path.join(VISUAL, 'fixtures.d')).map((dir) => loadOverlay(dir, NOW));
+  const layered = applyOverlays(loadFixtures(path.join(VISUAL, 'fixtures'), NOW), overlays);
+  const personas = mergePersonas(loadPersonas(path.join(VISUAL, 'fixtures'), NOW), layered.personas);
   for (const route of routes) personaFor(route, null, personas);
   assert.equal(bySlug.get('vessel-master-dra').persona, 'vessel-master');
   assert.equal(bySlug.get('module-settings-hyd-technical').persona, 'module-settings');

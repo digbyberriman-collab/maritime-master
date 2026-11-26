@@ -1,8 +1,11 @@
 /**
  * Command-line options, routes.json normalisation and viewport sizes for the
- * visual harness. Pure; tested in scripts/visual/test/options.test.mjs.
+ * visual harness. Pure apart from `loadRoutes`, which reads routes.json and
+ * routes.d/; tested in scripts/visual/test/harness.test.mjs and
+ * scripts/visual/test/overlays.test.mjs.
  */
 
+import fs from 'node:fs';
 import path from 'node:path';
 import { validateActions } from './actions.mjs';
 
@@ -24,8 +27,12 @@ export const HELP = `STORM visual + route-smoke harness
   --timeout MS          per-navigation timeout (default: 45000)
   --settle MS           pause before each screenshot (default: 400)
   --persona NAME        capture every selected route as this persona (fixtures/_personas.json)
+  --fixtures DIR        base fixtures (default: scripts/visual/fixtures)
+  --overlays DIR        fixture overlays, one folder each (default: <fixtures>/../fixtures.d);
+                        a folder holding fixture files itself is one overlay
+  --no-overlays         base fixtures only
   --strict              exit 1 when any capture fails
-  --list                print the selected routes and exit
+  --list                print the selected routes, with the file each comes from, and exit
   --help                this text`;
 
 const DEFAULTS = {
@@ -44,6 +51,7 @@ const DEFAULTS = {
   serverTimeout: 180_000,
   strict: false,
   persona: null,
+  overlays: true,
   list: false,
   help: false,
 };
@@ -61,6 +69,7 @@ export function parseArgs(argv, root) {
   const o = { ...DEFAULTS, themes: [...DEFAULTS.themes], widths: [...DEFAULTS.widths] };
   let routesFile = null;
   let fixturesDir = null;
+  let overlaysDir = null;
   for (let i = 0; i < argv.length; i += 1) {
     const raw = argv[i];
     const eq = raw.indexOf('=');
@@ -98,6 +107,8 @@ export function parseArgs(argv, root) {
       case '--settle': o.settle = Number(value()) || 0; break;
       case '--routes-file': routesFile = value(); break;
       case '--fixtures': fixturesDir = value(); break;
+      case '--overlays': overlaysDir = value(); break;
+      case '--no-overlays': o.overlays = false; break;
       case '--persona': o.persona = value(); break;
       case '--strict': o.strict = true; break;
       case '--list': o.list = true; break;
@@ -111,6 +122,11 @@ export function parseArgs(argv, root) {
   o.out = path.resolve(root, o.out);
   o.routesFile = path.resolve(root, routesFile ?? 'scripts/visual/routes.json');
   o.fixturesDir = path.resolve(root, fixturesDir ?? 'scripts/visual/fixtures');
+  if (overlaysDir !== null && !o.overlays) throw new Error('--overlays and --no-overlays together: pick one');
+  // An explicit folder must exist; the default may be absent (no overlays).
+  o.overlaysExplicit = overlaysDir !== null;
+  o.overlaysDir = overlaysDir !== null ? path.resolve(root, overlaysDir) : path.join(path.dirname(o.fixturesDir), 'fixtures.d');
+  o.routesDir = path.join(path.dirname(o.routesFile), 'routes.d');
   return o;
 }
 
@@ -128,26 +144,75 @@ export function slugFor(routePath) {
  *     "actions": [{ "press": "Control+k" }, { "waitFor": "[data-testid=\"command-palette\"]" }] }
  * `actions` are checked here (lib/actions.mjs) into `steps`, so a typo fails before the run.
  */
-export function normaliseRoutes(raw) {
-  const entries = Array.isArray(raw) ? raw : raw?.routes;
-  if (!Array.isArray(entries)) throw new Error('routes.json must be an array (or { "routes": [...] })');
-  const seen = new Set();
-  return entries.map((entry) => {
-    const r = typeof entry === 'string' ? { path: entry } : { ...entry };
-    if (typeof r.path !== 'string' || !r.path.startsWith('/')) throw new Error(`Route path must start with "/": ${JSON.stringify(entry)}`);
-    r.slug = r.slug ?? slugFor(r.path);
-    if (seen.has(r.slug)) throw new Error(`Duplicate route slug "${r.slug}"`);
-    seen.add(r.slug);
-    const where = `Route "${r.slug}"`;
-    // `steps` is the checked form capture.mjs plays; `actions` stays as written.
-    r.steps = validateActions(r.actions, where);
-    if (r.reducedMotion !== undefined && typeof r.reducedMotion !== 'boolean') throw new Error(`${where}: "reducedMotion" must be true or false`);
-    if (r.persona !== undefined && (typeof r.persona !== 'string' || !r.persona)) throw new Error(`${where}: "persona" must be a persona name`);
-    if (r.widths !== undefined && (!Array.isArray(r.widths) || r.widths.length === 0 || !r.widths.every((w) => Number.isInteger(w) && w > 0))) {
-      throw new Error(`${where}: "widths" must be a non-empty array of viewport widths`);
+export function normaliseRoutes(raw, source = 'routes.json') {
+  return normaliseRouteSources([{ source, raw }]);
+}
+
+/** What a capture does, apart from its name and notes: two entries with the same key capture the same thing. */
+const captureKey = (r) => JSON.stringify([r.path, r.auth ?? true, r.persona ?? null, r.actions ?? null, r.localStorage ?? null, r.widths ?? null, r.reducedMotion ?? null]);
+
+/**
+ * Normalise routes from several files (routes.json, then routes.d/*.json),
+ * each route tagged with its `source`. Slugs are unique across all files,
+ * and no two entries capture the same thing (same path with the same auth,
+ * persona, actions, localStorage, widths and reduced motion); either is an
+ * error naming both files.
+ * @param {{ source: string, raw: unknown }[]} sources
+ */
+export function normaliseRouteSources(sources) {
+  const slugs = new Map();
+  const captures = new Map();
+  const out = [];
+  for (const { source, raw } of sources) {
+    const entries = Array.isArray(raw) ? raw : raw?.routes;
+    if (!Array.isArray(entries)) throw new Error(`${source} must be an array (or { "routes": [...] })`);
+    for (const entry of entries) {
+      const r = typeof entry === 'string' ? { path: entry } : { ...entry };
+      if (typeof r.path !== 'string' || !r.path.startsWith('/')) throw new Error(`${source}: route path must start with "/": ${JSON.stringify(entry)}`);
+      r.slug = r.slug ?? slugFor(r.path);
+      const where = `Route "${r.slug}"`;
+      const twin = slugs.get(r.slug);
+      if (twin) throw new Error(`Duplicate route slug "${r.slug}" in ${source}${twin === source ? '' : ` (also in ${twin})`}`);
+      slugs.set(r.slug, source);
+      // `steps` is the checked form capture.mjs plays; `actions` stays as written.
+      r.steps = validateActions(r.actions, where);
+      if (r.reducedMotion !== undefined && typeof r.reducedMotion !== 'boolean') throw new Error(`${where}: "reducedMotion" must be true or false`);
+      if (r.persona !== undefined && (typeof r.persona !== 'string' || !r.persona)) throw new Error(`${where}: "persona" must be a persona name`);
+      if (r.widths !== undefined && (!Array.isArray(r.widths) || r.widths.length === 0 || !r.widths.every((w) => Number.isInteger(w) && w > 0))) {
+        throw new Error(`${where}: "widths" must be a non-empty array of viewport widths`);
+      }
+      const key = captureKey(r);
+      const same = captures.get(key);
+      if (same) throw new Error(`${where} in ${source} captures the same page as "${same.slug}" in ${same.source} (same path and settings); give it a persona, actions or other settings, or drop it`);
+      captures.set(key, { slug: r.slug, source });
+      r.source = source;
+      out.push(r);
     }
-    return r;
-  });
+  }
+  return out;
+}
+
+const readRoutesJson = (file) => {
+  try {
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch (error) {
+    throw new Error(`${file} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
+  }
+};
+
+/**
+ * routes.json plus every `routes.d/*.json` next to it (in name order), so a
+ * stream adds its captures in its own file. Each route carries `source`
+ * (`routes.json`, `routes.d/crew.json`).
+ */
+export function loadRoutes(routesFile, routesDir = path.join(path.dirname(routesFile), 'routes.d')) {
+  const sources = [{ source: path.basename(routesFile), raw: readRoutesJson(routesFile) }];
+  if (fs.existsSync(routesDir)) {
+    for (const name of fs.readdirSync(routesDir).filter((n) => n.endsWith('.json')).sort()) {
+      sources.push({ source: `${path.basename(routesDir)}/${name}`, raw: readRoutesJson(path.join(routesDir, name)) });
+    }
+  }
+  return normaliseRouteSources(sources);
 }
 
 /** Pick routes by slug or path; an unknown value that is a path becomes an ad-hoc route. */

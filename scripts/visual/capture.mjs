@@ -15,12 +15,16 @@
  *                                   [--no-server] [--base-url URL] [--supabase-url URL]
  *                                   [--out DIR] [--full-page] [--concurrency N]
  *                                   [--external fonts|block|live] [--timeout MS] [--strict] [--list]
- *                                   [--persona NAME]
+ *                                   [--persona NAME] [--fixtures DIR] [--overlays DIR | --no-overlays]
  *
  * A route may script the page before its screenshot ("actions": press a key,
  * click, type, wait for a selector; lib/actions.mjs), capture as a persona
  * ("persona": fixtures/_personas.json; lib/personas.mjs) and choose
  * prefers-reduced-motion ("reducedMotion").
+ *
+ * Routes come from routes.json plus routes.d/*.json, fixtures from
+ * fixtures/ plus each fixtures.d/<overlay>/ (lib/fixtures.mjs), so a stream
+ * adds its captures and data in files of its own.
  */
 
 import { spawn, execFile } from 'node:child_process';
@@ -30,12 +34,12 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { loadFixtures } from './lib/fixtures.mjs';
-import { loadPersonas, applyPersona, personaFor, captureName } from './lib/personas.mjs';
+import { applyOverlays, findOverlays, loadFixtures, loadOverlay } from './lib/fixtures.mjs';
+import { loadPersonas, mergePersonas, applyPersona, personaFor, captureName } from './lib/personas.mjs';
 import { runActions, DEFAULT_ACTION_TIMEOUT_MS } from './lib/actions.mjs';
 import { createMockState, installSupabaseMock, FAKE_PUBLISHABLE_KEY } from './lib/supabase-mock.mjs';
 import { inspectPage, classify, captureWarnings, isHarnessNoise, isReactDevWarning, formatConsoleArgs } from './lib/inspect.mjs';
-import { parseArgs, normaliseRoutes, selectRoutes, viewportFor, HELP } from './lib/options.mjs';
+import { parseArgs, loadRoutes, selectRoutes, viewportFor, HELP } from './lib/options.mjs';
 import { loadPlaywright } from './lib/playwright.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -384,19 +388,23 @@ async function main() {
     console.log(HELP);
     return 0;
   }
-  const allRoutes = normaliseRoutes(JSON.parse(fs.readFileSync(options.routesFile, 'utf8')));
+  const allRoutes = loadRoutes(options.routesFile, options.routesDir);
   const routes = selectRoutes(allRoutes, options.routes);
   if (options.list) {
     routes.forEach((r) => {
       const extras = [r.auth === false ? 'signed out' : null, r.persona ? `persona ${r.persona}` : null, r.steps?.length ? `${r.steps.length} actions` : null].filter(Boolean);
-      console.log(`${r.slug.padEnd(32)} ${r.path}${extras.length ? `  (${extras.join(', ')})` : ''}`);
+      console.log(`${r.slug.padEnd(32)} ${r.path}${extras.length ? `  (${extras.join(', ')})` : ''}  [${r.source ?? 'ad hoc'}]`);
     });
     return 0;
   }
   if (routes.length === 0) throw new Error('No routes selected.');
 
-  const fixtures = loadFixtures(options.fixturesDir);
-  const personas = loadPersonas(options.fixturesDir);
+  // Base fixtures, then each overlay folder in name order (fixtures.d).
+  const overlayDirs = options.overlays ? findOverlays(options.overlaysDir, { required: options.overlaysExplicit }) : [];
+  const layered = applyOverlays(loadFixtures(options.fixturesDir), overlayDirs.map((dir) => loadOverlay(dir)));
+  const fixtures = layered.fixtures;
+  const personas = mergePersonas(loadPersonas(options.fixturesDir), layered.personas);
+  console.log(`Fixtures: ${path.relative(ROOT, options.fixturesDir) || '.'}; overlays: ${layered.applied.length ? layered.applied.join(', ') : 'none'}${options.overlays ? '' : ' (--no-overlays)'}`);
   // Unknown personas fail before the server starts.
   for (const route of routes) personaFor(route, options.persona, personas);
   fs.mkdirSync(options.out, { recursive: true });
@@ -456,6 +464,7 @@ async function main() {
         fullPage: options.fullPage,
         external: options.external,
         persona: options.persona,
+        overlays: layered.applied,
         summary: {
           total: results.length,
           ok: results.filter((r) => r.status === 'ok').length,

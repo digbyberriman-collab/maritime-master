@@ -9,8 +9,12 @@
  * - no route path is declared twice anywhere in the app;
  * - every live nav leaf a manifest contributes reaches a real page, and no
  *   planned leaf anywhere has a registered route (W3);
- * - every nav fragment lands in its slot of the assembled site map;
- * - manifests stay data: no static import of a page, shell or component.
+ * - every nav fragment lands in its slot of the assembled site map, and no
+ *   two fragments share an order in one slot;
+ * - no module registers a record kind in Phase 3 wave 1 (D-X1-6, D-X5-15;
+ *   the D-214 per-kind evaluation comes first);
+ * - manifests stay data: every module.ts (and its routes.tsx) imports no
+ *   page, shell or component.
  *
  * And against fixture manifests, the mechanism itself: vessel routes mount
  * relative to /v/:vesselCode, slots merge by order, a leaf goes live by
@@ -45,7 +49,12 @@ import {
 } from '@/test/router/routeHarness';
 
 const ROOT = process.cwd();
+/** The modules converted in Phase 0 (B8); their route counts stay pinned. */
 const CONVERTED = ['health', 'hris', 'legal', 'new-build', 'refit'];
+/** Every manifest folder: src/modules/<m>/module.ts. */
+const MANIFEST_FOLDERS = readdirSync(join(ROOT, 'src/modules'))
+  .filter((d) => existsSync(join(ROOT, 'src/modules', d, 'module.ts')))
+  .sort();
 
 const appRoutes = appRouteObjects();
 const appLines = describeRouteTree(appRoutes);
@@ -71,8 +80,19 @@ describe('module registry', () => {
   });
 
   it('has one manifest per src/modules/<m>/module.ts, named after its folder', () => {
-    const folders = readdirSync(join(ROOT, 'src/modules')).filter((d) => existsSync(join(ROOT, 'src/modules', d, 'module.ts')));
-    expect(MODULE_REGISTRY.manifests.map((m) => m.id).sort()).toEqual(folders.sort());
+    expect(MODULE_REGISTRY.manifests.map((m) => m.id).sort()).toEqual(MANIFEST_FOLDERS);
+  });
+
+  it('no module registers a record kind in Phase 3 wave 1 (D-X1-6, D-X5-15)', () => {
+    // A record kind is gated by its capability_path, which the record engine
+    // does not evaluate per kind yet (D-214; BUILD-PLAN open item (1) after
+    // review round 4). Until a platform step lands that evaluation and lifts
+    // this pin, a kind would act through the fleet-wide fallback.
+    const declared = MODULE_REGISTRY.manifests.flatMap((m) => (m.recordKinds ?? []).map((k) => `${m.id}: ${k.key}`));
+    const registered = MODULE_REGISTRY.recordKinds.map((k) => `${k.moduleId}: ${k.key}`);
+    const message = 'record kinds wait for the D-214 per-kind capability_path evaluation (no kinds in wave 1)';
+    expect(declared, message).toEqual([]);
+    expect(registered, message).toEqual([]);
   });
 
   it('the five converted modules register every one of their routes', () => {
@@ -188,6 +208,18 @@ describe('nav invariants', () => {
     expect(missing).toEqual([]);
   });
 
+  it('no two nav fragments share an order in one slot, across all modules', () => {
+    const bySlotOrder = new Map<string, string[]>();
+    for (const f of MODULE_REGISTRY.nav) {
+      const key = `${f.slot} @ ${f.order}`;
+      bySlotOrder.set(key, [...(bySlotOrder.get(key) ?? []), `${f.moduleId}:${f.node.id}`]);
+    }
+    const clashes = Array.from(bySlotOrder)
+      .filter(([, nodes]) => nodes.length > 1)
+      .map(([key, nodes]) => `${key}: ${nodes.join(', ')}`);
+    expect(clashes).toEqual([]);
+  });
+
   it('the slots match the shell: one vessel slot per tab, one tree per workspace module', () => {
     expect(VESSEL_SLOTS.map((s) => s.slice('vessel.'.length))).toEqual(VESSEL_MODULES.map((m) => m.id));
     // Fleet, Vessel, the workspace trees, then the personal tree (spec §8).
@@ -204,9 +236,15 @@ describe('manifests are data', () => {
 
   const ALLOWED = [/^lucide-react$/, /^@\/config\/navBuilders$/, /^@\/config\/navSlots$/, /^\.\/(paths|routes)$/, /^@\/modules\/[\w-]+\/paths$/];
 
-  it.each(CONVERTED)('%s: module.ts and routes.tsx import no page, shell or component', (id) => {
+  it('checks every manifest folder, the converted modules among them', () => {
+    for (const id of CONVERTED) expect(MANIFEST_FOLDERS, id).toContain(id);
+  });
+
+  it.each(MANIFEST_FOLDERS)('%s: module.ts (and routes.tsx when present) import no page, shell or component', (id) => {
     for (const file of ['module.ts', 'routes.tsx']) {
-      const source = readFileSync(join(ROOT, 'src/modules', id, file), 'utf8');
+      const path = join(ROOT, 'src/modules', id, file);
+      if (file !== 'module.ts' && !existsSync(path)) continue;
+      const source = readFileSync(path, 'utf8');
       const stray = runtimeImports(source).filter((spec) => !ALLOWED.some((re) => re.test(spec)));
       expect(stray, `${id}/${file}`).toEqual([]);
       expect(source, `${id}/${file} holds JSX`).not.toMatch(/<[A-Z][\w.]*[\s/>]/);

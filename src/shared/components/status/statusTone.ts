@@ -17,8 +17,10 @@
  * to `neutral` with a readable label; nothing here throws.
  *
  * The vocabularies are the ones stored today (module constants, generated
- * types and gap docs). A stream that adds a status adds it here in the same
- * PR; `statusTone.test.ts` pins the meaning of each.
+ * types and gap docs) plus the ones Phase 3 wave 1 writes (X1 Crew, X5 Fleet
+ * operations; landed together in platform-prep PP2 so neither stream edits
+ * this shared file). A later stream that adds a status adds it here through
+ * a platform step; `statusTone.test.ts` pins the meaning of each.
  */
 import { isTone, type Tone } from '@/components/ui/tones';
 import { EXPIRY_BUCKET_LABELS } from '@/lib/records/expiry';
@@ -152,9 +154,17 @@ export const STATUS_REGISTRY = {
     expired: ['danger', 'Expired'],
     suspended: ['neutral', 'Suspended'],
   }),
+  /**
+   * Familiarisation records (gap/04 W11): Open → In progress → Awaiting
+   * signatures → Completed; Overdue is a computed flag. Signatures are the
+   * crew member's and the supervisor's, both on board, so the wait is the
+   * vessel's (info). `not_started` stays for legacy rows.
+   */
   familiarization: vocab({
     not_started: ['neutral', 'Not started'],
+    open: ['info', 'Open'],
     in_progress: ['signal', 'In progress'],
+    awaiting_signatures: ['info', 'Awaiting signatures'],
     completed: ['ok', 'Completed'],
     overdue: ['danger', 'Overdue'],
   }),
@@ -174,6 +184,11 @@ export const STATUS_REGISTRY = {
     returned: ['warn', 'Returned for changes'],
     declined: ['danger', 'Declined'],
     cancelled: ['neutral', 'Cancelled'],
+    // Terminal states of the application workflow (gap/02 W3; X5 PR-06).
+    rejected: ['danger', 'Rejected'],
+    voided: ['neutral', 'Voided'],
+    reimbursed: ['ok', 'Reimbursed'],
+    closed: ['neutral', 'Closed'],
   }),
 
   // ── Hours of work and rest ──
@@ -184,6 +199,8 @@ export const STATUS_REGISTRY = {
     hod_reviewed: ['signal', 'Reviewed by HoD'],
     hod_signed: ['signal', 'Signed by HoD'],
     captain_reviewed: ['signal', 'Reviewed by Master'],
+    // X1 month approval (gap/04 W6); the legacy review states above stay for old rows.
+    approved: ['ok', 'Approved'],
     locked: ['ok', 'Locked'],
     reopened: ['warn', 'Reopened'],
   }),
@@ -195,6 +212,12 @@ export const STATUS_REGISTRY = {
     corrected: ['ok', 'Corrected'],
     accepted_by_captain: ['ok', 'Accepted by Master'],
     dismissed: ['neutral', 'Dismissed'],
+    // X1 breach review (gap/04 W6): accepted with a justification, sent back
+    // to the crew member to correct the record (reopened, like `returned`),
+    // or included in a sent breach report (the last step).
+    accepted: ['ok', 'Accepted'],
+    correction_requested: ['warn', 'Correction requested'],
+    reported: ['ok', 'Reported'],
   }),
   work_rest_compliance: vocab({
     compliant: ['ok', 'Compliant'],
@@ -244,6 +267,27 @@ export const STATUS_REGISTRY = {
     approved: ['ok', 'Verified'],
     rejected: ['danger', 'Rejected'],
   }),
+  /**
+   * Verification of a crew document (gap/04 W4, X1). Conditionally approved
+   * satisfies a requirement but shows amber; rejected never satisfies.
+   */
+  crew_document_verification: vocab({
+    unverified: ['info', 'Not yet verified'],
+    verified: ['ok', 'Verified'],
+    conditionally_approved: ['warn', 'Conditionally approved'],
+    rejected: ['danger', 'Rejected'],
+  }),
+  /**
+   * The non-bucket states of a crew document (X1). The expiry bucket itself
+   * renders through `<ExpiryPill>` (domain `expiry`), never here.
+   */
+  crew_document_state: vocab({
+    missing_date: ['warn', 'Expiry date missing'],
+    not_uploaded: ['warn', 'No file attached'],
+    alerts_off: ['neutral', 'Alerts off'],
+    endorsement_due: ['warn', 'Endorsement due'],
+    endorsement_overdue: ['danger', 'Endorsement overdue'],
+  }),
 
   // ── Crew ──
   crew: vocab({
@@ -260,6 +304,119 @@ export const STATUS_REGISTRY = {
     disabled: ['danger', 'Disabled'],
     /** Users & Access: no login in use yet (invited or not); the invitation column says which. */
     not_joined: ['neutral', 'Not joined'],
+  }),
+  /**
+   * A crew member's status on a vessel on a day (gap/04 W2; X1
+   * `crew_status_decide`, first match wins: on_transfer > pending > on_leave
+   * > ashore > on_board).
+   * `pending_login` is the login state of a person added without a sign-in
+   * (D-199): inactive, like `crew_account.not_joined`, never a warning.
+   */
+  crew_status: vocab({
+    on_board: ['ok', 'On board'],
+    ashore: ['neutral', 'Ashore'],
+    on_leave: ['info', 'On leave'],
+    pending: ['info', 'Pending'],
+    on_transfer: ['signal', 'On transfer'],
+    pending_login: ['neutral', 'Pending login'],
+  }),
+  /**
+   * One requirement row for one person (gap/04 W5). Severity reads
+   * expired (danger) > missing (orange, attention now) > expiring (warn).
+   */
+  crew_requirement: vocab({
+    met: ['ok', 'Met'],
+    expiring: ['warn', 'Expiring'],
+    expired: ['danger', 'Expired'],
+    missing: ['orange', 'Missing'],
+  }),
+  /** A person's compliance summary (gap/04 W5 §4): the worst of their rows. */
+  crew_compliance: vocab({
+    complete: ['ok', 'Complete'],
+    expiring: ['warn', 'Expiring'],
+    missing: ['orange', 'Missing'],
+    expired: ['danger', 'Expired'],
+  }),
+  /**
+   * A day on the hours-of-rest month (X1 `lib/horDay.ts`). `breach` and
+   * `warning` are overlays and use the `work_rest_compliance` meanings.
+   */
+  hor_day: vocab({
+    not_expected: ['neutral', 'Not expected'],
+    not_entered: ['warn', 'Not entered'],
+    entered: ['signal', 'Entered'],
+    submitted: ['info', 'Submitted'],
+    approved: ['ok', 'Approved'],
+    leave: ['neutral', 'Leave'],
+    breach: ['danger', 'Breach'],
+    warning: ['warn', 'Near limit'],
+  }),
+  /**
+   * The On board total of a manning day (gap/04 C48, `vessel_manning_by_day`):
+   * qualified below the minimum is critical; at the minimum, one departure
+   * away; above the maximum is a planning note, not a fault.
+   */
+  manning_band: vocab({
+    critical: ['danger', 'Below minimum'],
+    at_minimum: ['warn', 'At minimum'],
+    normal: ['ok', 'Within range'],
+    overmanned: ['info', 'Above maximum'],
+  }),
+  /** Leave requests (X1 planner): the approver is on board or in the HR office. */
+  leave_request: vocab({
+    pending: ['info', 'Awaiting decision'],
+    approved: ['ok', 'Approved'],
+    declined: ['danger', 'Declined'],
+    cancelled: ['neutral', 'Cancelled'],
+  }),
+  /**
+   * Crew transfers (gap/04 W9): Draft → Review → Pending approval (only when
+   * the vessel needs fleet approval, so the wait is the company's) →
+   * Scheduled → Completed; Cancelled from any state before Completed.
+   */
+  crew_transfer: vocab({
+    draft: ['neutral', 'Draft'],
+    review: ['info', 'Checking gaps'],
+    pending_approval: ['purple', 'Awaiting fleet approval'],
+    scheduled: ['signal', 'Scheduled'],
+    completed: ['ok', 'Completed'],
+    cancelled: ['neutral', 'Cancelled'],
+  }),
+
+  // ── Fleet documents, forms and medical (X5) ──
+  /** Fleet documents (gap/02 W1; D-X5-03): published to vessels, replaced by a new version, or withdrawn. */
+  fleet_document: vocab({
+    draft: ['neutral', 'Draft'],
+    published: ['ok', 'Published'],
+    superseded: ['neutral', 'Superseded'],
+    withdrawn: ['neutral', 'Withdrawn'],
+  }),
+  /** One person's acknowledgement of a fleet document version (X5 `fleet_document_ack_rows`). */
+  document_ack: vocab({
+    pending: ['info', 'To acknowledge'],
+    overdue: ['danger', 'Overdue'],
+    blocked: ['warn', 'Unable to acknowledge'],
+    acknowledged: ['ok', 'Acknowledged'],
+    not_required: ['neutral', 'Not required'],
+  }),
+  /**
+   * Form templates (`form_templates.status`, stored upper case: DRAFT,
+   * PUBLISHED, SUPERSEDED, ARCHIVED; matching folds case). `hidden` is the
+   * per-vessel setting (`form_template_vessel_settings`), not a stored status.
+   */
+  form_template: vocab({
+    draft: ['neutral', 'Draft'],
+    published: ['ok', 'Published'],
+    superseded: ['neutral', 'Superseded'],
+    archived: ['neutral', 'Archived'],
+    hidden: ['warn', 'Hidden on vessel'],
+  }),
+  /** Crew medical status (gap/02 W8; X5 `fleet_crew_medical_status`), most severe first. */
+  medical_status: vocab({
+    critical: ['danger', 'Critical'],
+    at_risk: ['warn', 'At risk'],
+    incomplete: ['info', 'Incomplete'],
+    ok: ['ok', 'Up to date'],
   }),
   /**
    * Invitations (`user_invitations.status`, Phase 2 honest vocabulary,

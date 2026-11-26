@@ -116,6 +116,7 @@ test('routes: slugs, normalisation and selection', () => {
 
 test('the shipped routes.json is valid', () => {
   const routes = normaliseRoutes(JSON.parse(fs.readFileSync(path.join(VISUAL, 'routes.json'), 'utf8')));
+  assert.ok(routes.every((r) => r.source === 'routes.json'));
   assert.ok(routes.length >= 10);
   assert.ok(routes.some((r) => r.path === '/auth' && r.auth === false));
   assert.ok(routes.some((r) => r.path === '/dashboard'));

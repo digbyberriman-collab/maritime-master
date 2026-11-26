@@ -1007,6 +1007,15 @@
     "departments/dive/tools/spares Spares",
     "reports Reports"
   ],
+  "PERSONAL_PLACEHOLDER_LEAVES": [
+    "signature Signature",
+    "documents Documents",
+    "leave Leave",
+    "templates Email templates",
+    "compliance Compliance",
+    "billing Billing",
+    "logs System logs"
+  ],
   "VESSEL_ROOT_REDIRECTS": [
     "crew -> list",
     "safety -> drills",

@@ -11,11 +11,8 @@ import { join } from 'node:path';
 
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 
-import { render, screen } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { NAVIGATION_ITEMS, navLeaves } from '@/config/sitemap';
 import { legacyEntryFor } from '@/app/router/legacyResolve';
-import FleetReportsIndex, { FLEET_REPORT_PATHS } from '@/modules/dashboard/pages/FleetReportsIndex';
 import {
   appRouteObjects,
   flatRoutes,
@@ -29,6 +26,14 @@ const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
 const routes = appRouteObjects();
+
+/**
+ * The four legacy report pages (static routes in src/routes/index.tsx), which
+ * the Reports page links. A local list since platform-prep PP2: the page is
+ * the dashboard module's, and its own links are pinned in
+ * src/test/dashboard/fleetReportsIndex.test.tsx.
+ */
+const LEGACY_REPORT_PATHS: readonly string[] = ['incident-analytics', 'capa-tracker', 'drill-analytics', 'risk-overview'];
 const fleetModule = NAVIGATION_ITEMS.filter((m) => m.id === 'fleet');
 
 /** The Fleet scope's page routes: no redirects, placeholders or not-found. */
@@ -67,7 +72,7 @@ describe('Fleet scope reachability', () => {
     if (leaf.status === 'planned' || leaf.crossLink) continue;
     reachable.add(resolveUrl(routes, leaf.path).pattern);
   }
-  for (const rel of FLEET_REPORT_PATHS) reachable.add(resolveUrl(routes, `/fleet/reports/${rel}`).pattern);
+  for (const rel of LEGACY_REPORT_PATHS) reachable.add(resolveUrl(routes, `/fleet/reports/${rel}`).pattern);
   for (const [from, file, needle, opens] of IN_PAGE_LINKS) {
     if (!reachable.has(from) || !read(file).includes(needle)) continue;
     const entry = legacyEntryFor(opens);
@@ -91,32 +96,11 @@ describe('Fleet scope reachability', () => {
     }
   });
 
-  it('the Reports leaf opens the reports index, which links every report', () => {
+  it('the Reports leaf opens the reports page, and the legacy report pages are these four', () => {
     const leaf = navLeaves(fleetModule).find((l) => l.label === 'Reports');
     expect(leaf?.path).toBe('/fleet/reports');
     expect(resolveUrl(routes, '/fleet/reports')).toMatchObject({ pattern: '/fleet/reports', hops: [] });
     const reports = fleetPages.filter((p) => p.startsWith('/fleet/reports/'));
-    expect(reports.map((p) => p.slice('/fleet/reports/'.length)).sort()).toEqual([...FLEET_REPORT_PATHS].sort());
-  });
-
-  it('the reports index renders relative links that stay in the Fleet scope', () => {
-    render(
-      <MemoryRouter initialEntries={['/fleet/reports']}>
-        <Routes>
-          <Route path="/fleet/reports" element={<FleetReportsIndex />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-    expect(screen.getByRole('heading', { level: 1, name: 'Fleet Reports' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Risk overview/ })).toHaveAttribute('href', '/fleet/reports/risk-overview');
-    expect(screen.getByRole('link', { name: /CAPA tracker/ })).toHaveAttribute('href', '/fleet/reports/capa-tracker');
-    expect(screen.getAllByRole('link')).toHaveLength(FLEET_REPORT_PATHS.length);
-  });
-
-  it('the reports index uses design tokens only', () => {
-    const source = read('src/modules/dashboard/pages/FleetReportsIndex.tsx');
-    expect(source).not.toMatch(/(?<![\w-])(?:bg|text|border|ring|from|to)-(?:white|black|(?:slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d{2,3})/);
-    expect(source).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
-    expect(source).not.toMatch(/\bdark:/);
+    expect(reports.map((p) => p.slice('/fleet/reports/'.length)).sort()).toEqual([...LEGACY_REPORT_PATHS].sort());
   });
 });

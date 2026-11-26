@@ -5,8 +5,15 @@
  * Shape only. src/test/router/navStatus.test.tsx checks the same trees
  * against the real router (live leaves open pages, planned ones open their
  * placeholder).
+ *
+ * Leaves that a Phase 3 stream owns (moved into its manifest by
+ * platform-prep PP3, then flipped to beta by the stream) are held
+ * structurally here: their presence and position, not their status. Each
+ * owner pins its own leaves in src/test/<module>/ (registry baselines and
+ * manifest tests). The platform's own nodes stay pinned exactly.
  */
 import { describe, expect, it } from 'vitest';
+import { MODULE_REGISTRY } from '@/app/registry/modules';
 import {
   FLEET_PLACEHOLDER_LEAVES,
   NAVIGATION_ITEMS,
@@ -34,6 +41,18 @@ const walk = (items: NavChild[], visit: (n: NavChild) => void) => {
   }
 };
 
+/** Node ids that module fragments contribute (any slot). */
+const fragmentIds = new Set<string>();
+for (const f of MODULE_REGISTRY.nav) walk([f.node], (n) => fragmentIds.add(n.id));
+const fromFragment = (node: NavChild | undefined) => !!node && fragmentIds.has(node.id);
+
+/**
+ * Fleet leaves the streams take over (PP3 moves them into the dashboard,
+ * reports, documents, forms, development and fleet manifests; X5 flips them
+ * to beta). Their status is the owner's to pin.
+ */
+const STREAM_FLEET_LEAVES = ['/fleet/dashboard', '/fleet/reports', '/fleet/documents', '/fleet/forms', '/fleet/training', '/fleet/medical'];
+
 describe('Fleet tree (gap/10 IA7, R1)', () => {
   it('is six section headings, in the order gap/10 gives', () => {
     expect(fleetSections.map((s) => [s.label, s.kind])).toEqual([
@@ -50,7 +69,6 @@ describe('Fleet tree (gap/10 IA7, R1)', () => {
     const labels = (section: string) => (sectionNamed(section).children ?? []).map((c) => c.label);
     expect(labels('Overview')).toEqual(['Dashboard', 'Tracker', 'Reports', 'Calendar', 'Planner', 'Safety queue']);
     expect(labels('Compliance')).toEqual(['Documents', 'Forms & Checklists']);
-    expect(labels('People')).toEqual(['Training', 'Medical', 'Visits', 'Employment']);
     expect(labels('Workspaces')).toEqual(['HRIS', 'Health & Wellness', 'Yard', 'Legal', 'Shoreside']);
     expect(labels('Administration')).toEqual([
       'Users & Access', 'Notifications', 'Support', 'Company FAQs', 'Data protection', 'Account', 'Security',
@@ -58,6 +76,26 @@ describe('Fleet tree (gap/10 IA7, R1)', () => {
     expect(labels('Configuration')).toEqual([
       'Vessels', 'Vessel Settings', 'Fleet Groups', 'Add-ons', 'Certificate catalogue', 'Job library', 'Suppliers', 'Integrations',
     ]);
+  });
+
+  it("People keeps the platform's Visits and Employment; Training and Medical sit before them, from fragments once moved", () => {
+    const people = sectionNamed('People').children ?? [];
+    const named = (label: string) => people.find((n) => n.label === label);
+    const labels = people.map((n) => n.label);
+    // The platform's own People leaves: planned, in this order, never a fragment.
+    for (const label of ['Visits', 'Employment']) {
+      expect(named(label), label).toBeDefined();
+      expect(fromFragment(named(label)), `${label} is a platform node`).toBe(false);
+      expect(named(label)?.status, label).toBe('planned');
+    }
+    expect(labels.indexOf('Visits')).toBeLessThan(labels.indexOf('Employment'));
+    // The stream leaves (development's Training, fleet's Medical), ahead of the platform's.
+    expect(named('Training')?.path).toBe('/fleet/training');
+    expect(named('Medical')?.path).toBe('/fleet/medical');
+    expect(labels.slice(0, 2)).toEqual(['Training', 'Medical']);
+    // Anything else in People is a module fragment, never a new platform node.
+    const stray = people.filter((n) => !['Training', 'Medical', 'Visits', 'Employment'].includes(n.label) && !fromFragment(n));
+    expect(stray.map((n) => n.label)).toEqual([]);
   });
 
   it('keeps every list to eight entries or fewer', () => {
@@ -100,13 +138,21 @@ describe('Fleet tree (gap/10 IA7, R1)', () => {
     expect(shoreside?.status).toBe('planned');
   });
 
-  it('marks as live exactly the leaves whose page the Fleet scope mounts', () => {
-    const live = navLeaves(fleetSections).filter((l) => !l.crossLink && l.status === 'live').map((l) => l.path);
+  it("marks as live exactly the platform's leaves whose page the Fleet scope mounts", () => {
+    // Platform nodes only: fragment leaves are checked against the registry
+    // (registry.test.tsx), and the stream leaves by their owners.
+    const live = navLeaves(fleetSections)
+      .filter((l) => !l.crossLink && l.status === 'live' && !fromFragment(l) && !STREAM_FLEET_LEAVES.includes(l.path))
+      .map((l) => l.path);
     expect(live).toEqual([
-      '/fleet/dashboard', '/fleet/tracker', '/fleet/reports', '/fleet/calendar', '/fleet/planner',
-      '/fleet/documents', '/fleet/training',
+      '/fleet/tracker', '/fleet/calendar', '/fleet/planner',
       '/fleet/admin/users', '/fleet/admin/notifications', '/fleet/admin/vessels',
     ]);
+  });
+
+  it('every stream fleet leaf is in the tree, once', () => {
+    const paths = navLeaves(fleetSections).map((l) => l.path);
+    for (const path of STREAM_FLEET_LEAVES) expect(paths.filter((p) => p === path), path).toHaveLength(1);
   });
 
   it('gates the administration leaves on PMS keys the catalogue has', () => {
@@ -211,7 +257,10 @@ describe('Vessel modules (gap/10 "Vessel view")', () => {
 
   it('send module roots and groups without a page to their first leaf, preferring a real page', () => {
     const to = Object.fromEntries(VESSEL_ROOT_REDIRECTS.map((r) => [r.from, r.to]));
-    expect(to.crew).toBe('list');
+    // Crew's root is X1's once its manifest routes `crew` (X1-10B); until then it opens the list.
+    const crewRouted = MODULE_REGISTRY.routes.some((r) => r.fullPath === `${VESSEL_SCOPE_PATTERN}/crew`);
+    if (crewRouted) expect(to.crew).toBeUndefined();
+    else expect(to.crew).toBe('list');
     expect(to.safety).toBe('drills');
     expect(to.vessel).toBe('emergency');
     expect(to.departments).toBe('bridge/handover-notes');

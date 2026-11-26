@@ -20,6 +20,10 @@
  * tables and RPCs add to `_config.json`'s. Date tokens ("$date:+30", "$ts:-3h",
  * "{year}") resolve as in the other fixtures. Pick one per route
  * (`"persona": "<name>"` in routes.json) or for the whole run (`--persona`).
+ *
+ * A fixture overlay (fixtures.d/<overlay>/_personas.json, lib/fixtures.mjs)
+ * adds personas by name with `mergePersonas`; a name defined twice is an
+ * error naming both files.
  */
 
 import fs from 'node:fs';
@@ -34,14 +38,16 @@ const isPlainObject = (v) => Boolean(v) && typeof v === 'object' && !Array.isArr
 const isStringList = (v) => Array.isArray(v) && v.every((s) => typeof s === 'string' && s.length > 0);
 
 /**
- * Check a parsed `_personas.json`. Throws with the persona and field named.
+ * Check a parsed `_personas.json`. Throws with the persona and field named;
+ * `file` names the file in the messages (an overlay's, for example).
  * @param {unknown} raw
+ * @param {string} [file]
  * @returns {Record<string, { note?: string, auth?: Record<string, unknown>, tables?: Record<string, Record<string, unknown>[]>, rpc?: Record<string, unknown>, missingTables?: string[], missingRpcs?: string[] }>}
  */
-export function validatePersonas(raw) {
-  if (!isPlainObject(raw)) throw new Error(`${PERSONAS_FILE} must be an object of personas: { "<name>": { "tables": { … } } }`);
+export function validatePersonas(raw, file = PERSONAS_FILE) {
+  if (!isPlainObject(raw)) throw new Error(`${file} must be an object of personas: { "<name>": { "tables": { … } } }`);
   for (const [name, persona] of Object.entries(raw)) {
-    const at = `${PERSONAS_FILE}: persona "${name}"`;
+    const at = `${file}: persona "${name}"`;
     if (!NAME.test(name)) throw new Error(`${at}: names are lower case letters, digits and dashes`);
     if (!isPlainObject(persona)) throw new Error(`${at} must be an object`);
     const unknown = Object.keys(persona).filter((k) => !PERSONA_KEYS.includes(k));
@@ -75,6 +81,27 @@ export function loadPersonas(dir, now = new Date()) {
     throw new Error(`${file} is not valid JSON: ${error instanceof Error ? error.message : String(error)}`);
   }
   return validatePersonas(resolveTokens(raw, now));
+}
+
+/**
+ * The base personas plus each overlay's (`applyOverlays(…).personas`, in
+ * overlay order), validated. A name already defined, in the base or an
+ * earlier overlay, is an error naming both files.
+ * @param {ReturnType<typeof validatePersonas>} base
+ * @param {{ source: string, personas: unknown }[]} extras
+ */
+export function mergePersonas(base, extras = []) {
+  const out = { ...base };
+  const owner = new Map(Object.keys(base).map((name) => [name, PERSONAS_FILE]));
+  for (const { source, personas } of extras) {
+    const file = `fixtures.d/${source}/${PERSONAS_FILE}`;
+    for (const [name, persona] of Object.entries(validatePersonas(personas, file))) {
+      if (owner.has(name)) throw new Error(`Persona "${name}" is defined in both ${owner.get(name)} and ${file}`);
+      owner.set(name, file);
+      out[name] = persona;
+    }
+  }
+  return out;
 }
 
 /**
