@@ -149,6 +149,94 @@ SELECT tests.as_user(tests.user_id('A.crew_dra'));
 SELECT tests.ok((public.record_open_envelope('test.note', tests.vessel_id('A.dra'), NULL, 'third note')).id IS NOT NULL, 'and opens a new record');
 SELECT tests.reset_role();
 
+-- ------------------------------------------------------------ signature removal is a write path too (review round 5)
+
+-- record-signature-write-gate-incomplete (D-214): record_remove_signature
+-- asks record_caller_may_write() or a company actor right after the
+-- impersonation check, so an external viewer removes nothing: (i) not as
+-- "the Master" through a current Master crew_assignments row (and
+-- record_is_master() is false for an external, defence in depth), (ii) not
+-- their own signature after they became an external. The signature stays
+-- live, the envelope status and version are unchanged and no
+-- signature.removed / signature.status_stepped_back event is logged. Ports
+-- scratchpad r4sec/a1_external_remove_signature.sql and
+-- a1b_external_signer_removes.sql.
+SELECT tests.seed_user('A', 'A.ext_master', 'crew');
+SELECT tests.seed_assignment('A.ext_master', 'A.dra', true, 'Master');
+SELECT tests.seed_user('A', 'A.crew2_dra', 'crew');
+SELECT tests.seed_assignment('A.crew2_dra', 'A.dra', true, 'Deckhand');
+SELECT tests.seed_user('A', 'A.signer_dra', 'crew');
+SELECT tests.seed_assignment('A.signer_dra', 'A.dra', true, 'Deckhand');
+INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, capability_path, company_step, edit_after_sign, delete_rule, slot_template)
+VALUES ('test.ext', 'test', 'External test', 'EXT', 'vessel', 'vessel.test.ext', 'acknowledge', 'lock', 'draft_only', jsonb_build_array(
+          jsonb_build_object('key', 'crew', 'label', 'Crew', 'order', 1, 'party', 'vessel'),
+          jsonb_build_object('key', 'crew2', 'label', 'Crew 2', 'order', 2, 'party', 'vessel'))),
+       ('test.ext2', 'test', 'External test 2', 'EXU', 'vessel', 'vessel.test.ext', 'acknowledge', 'lock', 'draft_only', jsonb_build_array(
+          jsonb_build_object('key', 'crew', 'label', 'Crew', 'order', 1, 'party', 'vessel')));
+
+-- (i) Two crew signatures on a test.ext record: awaiting the company.
+SELECT tests.as_user(tests.user_id('A.crew_dra'));
+SELECT (public.record_open_envelope('test.ext', tests.vessel_id('A.dra'), NULL, 'two-slot record')).id AS env_i \gset
+SELECT tests.is(public.record_sign_slot(tests.id('sig:xw:i1'), tests.xw_slot(:'env_i', 'crew'), 'verified') ->> 'ok', 'true', 'setup (i): the crew member signs the first slot');
+SELECT tests.as_user(tests.user_id('A.crew2_dra'));
+SELECT tests.is(public.record_sign_slot(tests.id('sig:xw:i2'), tests.xw_slot(:'env_i', 'crew2'), 'verified') ->> 'ok', 'true', 'setup (i): a second crew member signs the second slot');
+SELECT tests.reset_role();
+SELECT status AS env_i_status, version AS env_i_version FROM public.record_envelopes WHERE id = :'env_i' \gset
+SELECT tests.is(:'env_i_status'::text, 'awaiting_company_close', 'setup (i): the record awaits the company');
+
+-- (ii) The signer of a test.ext2 record ...
+SELECT tests.as_user(tests.user_id('A.signer_dra'));
+SELECT (public.record_open_envelope('test.ext2', tests.vessel_id('A.dra'), NULL, 'one-slot record')).id AS env_ii \gset
+SELECT tests.is(public.record_sign_slot(tests.id('sig:xw:ii'), tests.xw_slot(:'env_ii', 'crew'), 'verified') ->> 'ok', 'true', 'setup (ii): the crew member signs');
+SELECT tests.reset_role();
+SELECT status AS env_ii_status, version AS env_ii_version FROM public.record_envelopes WHERE id = :'env_ii' \gset
+
+-- ... leaves the vessel and is kept on as an external viewer of DRAAK; the
+-- Master-row external is an in-window external of DRAAK too.
+UPDATE public.crew_assignments SET is_current = false, leave_date = current_date WHERE user_id = tests.user_id('A.signer_dra');
+UPDATE public.account_memberships
+SET legacy_managed = false, kind = 'external', vessel_scope = 'assigned', fleet_access = false, source = 'admin',
+    valid_from = now() - interval '1 day', valid_until = now() + interval '30 days'
+WHERE user_id IN (tests.user_id('A.ext_master'), tests.user_id('A.signer_dra'));
+INSERT INTO public.account_membership_vessels (membership_id, company_id, vessel_id)
+SELECT id, company_id, tests.vessel_id('A.dra') FROM public.account_memberships WHERE user_id IN (tests.user_id('A.ext_master'), tests.user_id('A.signer_dra'));
+SELECT tests.ok(EXISTS (SELECT 1 FROM public.crew_assignments WHERE user_id = tests.user_id('A.ext_master') AND vessel_id = tests.vessel_id('A.dra') AND is_current AND position = 'Master'),
+                'setup (i): the external still has a current Master crew_assignments row on DRAAK');
+SELECT tests.ok(NOT public.record_is_master(tests.user_id('A.ext_master'), tests.vessel_id('A.dra')),
+                'record_is_master: false for an external, whatever their crew_assignments row says (defence in depth)');
+SELECT tests.ok(public.record_is_master(tests.user_id('A.master_dra'), tests.vessel_id('A.dra')), 'control: the DRAAK Master is still the Master');
+
+SELECT tests.as_user(tests.user_id('A.ext_master'));
+SELECT tests.ok(public.record_readable(tests.company_id('A'), tests.vessel_id('A.dra')), '(i) the Master-row external may read the record');
+SELECT tests.is(public.record_transition(:'env_i', 'submit') #>> '{error,code}', 'no_write_access', '(i) record_transition: no_write_access');
+SELECT tests.is(public.record_remove_signature(tests.id('sig:xw:i2'), 'external removes') #>> '{error,code}', 'no_write_access',
+                '(i) record_remove_signature of the later crew signature: no_write_access');
+SELECT tests.is(public.record_remove_signature(tests.id('sig:xw:i2'), 'external removes') #>> '{error,message}', 'You can view this record but not change it.', '(i) with the view-only copy');
+SELECT tests.is(public.record_remove_signature(tests.id('sig:xw:i1'), 'external removes') #>> '{error,code}', 'no_write_access',
+                '(i) record_remove_signature of the first crew signature: no_write_access');
+SELECT tests.reset_role();
+
+SELECT tests.as_user(tests.user_id('A.signer_dra'));
+SELECT tests.ok(public.record_readable(tests.company_id('A'), tests.vessel_id('A.dra')), '(ii) the converted signer may read the record');
+SELECT tests.is(public.record_remove_signature(tests.id('sig:xw:ii'), 'gone') #>> '{error,code}', 'no_write_access',
+                '(ii) record_remove_signature of their own signature: no_write_access');
+SELECT tests.reset_role();
+
+SELECT tests.is((SELECT count(*) FROM public.record_signatures WHERE id IN (tests.id('sig:xw:i1'), tests.id('sig:xw:i2'), tests.id('sig:xw:ii')) AND removed_at IS NULL AND superseded_at IS NULL),
+                3::bigint, 'every signature is still live (removed_at NULL)');
+SELECT tests.results_eq(format($q$SELECT status, version FROM public.record_envelopes WHERE id = %L$q$, :'env_i'),
+                        format($q$VALUES (%L::text, %s::integer)$q$, :'env_i_status', :'env_i_version'), '(i) the envelope status and version are unchanged');
+SELECT tests.results_eq(format($q$SELECT status, version FROM public.record_envelopes WHERE id = %L$q$, :'env_ii'),
+                        format($q$VALUES (%L::text, %s::integer)$q$, :'env_ii_status', :'env_ii_version'), '(ii) the envelope status and version are unchanged');
+SELECT tests.is((SELECT count(*) FROM public.record_events WHERE envelope_id IN (:'env_i', :'env_ii') AND action IN ('signature.removed', 'signature.status_stepped_back')),
+                0::bigint, 'no signature.removed or signature.status_stepped_back event');
+
+-- Control: the crew signer (write access) still removes their signature.
+SELECT tests.as_user(tests.user_id('A.crew2_dra'));
+SELECT tests.is(public.record_remove_signature(tests.id('sig:xw:i2'), 'signed too early') ->> 'ok', 'true', 'control: the crew signer removes their own signature');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT status FROM public.record_envelopes WHERE id = :'env_i'), 'in_review', 'control: the status steps back to in_review');
+
 -- ------------------------------------------------------------ every kind names its capability path
 
 SELECT tests.throws_like($q$INSERT INTO public.record_kinds (key, module_key, label, ref_prefix, scope, company_step, edit_after_sign, delete_rule)

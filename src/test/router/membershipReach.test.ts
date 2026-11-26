@@ -54,6 +54,7 @@ vi.mock('@/integrations/supabase/client', () => {
 });
 
 import {
+  assignmentIsCurrent,
   legacyReach,
   membershipIsLive,
   membershipReach,
@@ -102,7 +103,7 @@ interface FixtureUser {
   profileRole: string | null;
   accountStatus: string | null;
   rbacRoles: FixtureRole[];
-  assignments: { vessel: string; isCurrent: boolean }[];
+  assignments: { vessel: string; isCurrent: boolean; leaveDate?: string; endDate?: string }[];
   membership: FixtureMembership | null;
   expected: { legacy: Expected; membership: Expected };
 }
@@ -149,8 +150,9 @@ const legacyInput = (u: FixtureUser) => ({
   companyId: u.company,
   profileRole: u.profileRole,
   rbacRoles: rbacRolesOf(u, fixture.now),
-  assignments: u.assignments.map((a) => ({ vesselId: a.vessel, isCurrent: a.isCurrent })),
+  assignments: u.assignments.map((a) => ({ vesselId: a.vessel, isCurrent: a.isCurrent, leaveDate: a.leaveDate ?? null, endDate: a.endDate ?? null })),
   companyVessels: companyVessels(u.company),
+  now: fixture.now,
 });
 
 const membershipOf = (u: FixtureUser): ReachMembership =>
@@ -159,8 +161,8 @@ const membershipOf = (u: FixtureUser): ReachMembership =>
     : backfilled(u);
 
 describe('reach-cases.json parity (D-26 and memberships)', () => {
-  it('reads the shared fixture: 22 users over two companies', () => {
-    expect(fixture.users).toHaveLength(22);
+  it('reads the shared fixture: 25 users over two companies', () => {
+    expect(fixture.users).toHaveLength(25);
     expect(new Set(fixture.users.map((u) => u.company))).toEqual(new Set(['A', 'B']));
     expect(fixture.users.filter((u) => u.membership).length).toBeGreaterThan(0);
   });
@@ -175,7 +177,7 @@ describe('reach-cases.json parity (D-26 and memberships)', () => {
     expect({ fleetReach: reach.fleetReach, vessels: reach.vesselIds }).toEqual(u.expected.membership);
   });
 
-  it('the client path gives the same answers: reachModeFor + the legacy rules or the row (22/22)', () => {
+  it('the client path gives the same answers: reachModeFor + the legacy rules or the row (25/25)', () => {
     const mismatches: string[] = [];
     for (const u of fixture.users) {
       // A disabled user reads no row (the own-row policy checks user_is_active).
@@ -194,7 +196,7 @@ describe('reach-cases.json parity (D-26 and memberships)', () => {
     expect(mismatches).toEqual([]);
   });
 
-  it('with the table missing every user gets expected.legacy (22/22)', () => {
+  it('with the table missing every user gets expected.legacy (25/25)', () => {
     const mismatches = fixture.users.filter((u) => {
       const mode = reachModeFor({ kind: 'table-missing' }, fixture.now);
       expect(mode.source).toBe('legacy');
@@ -206,6 +208,25 @@ describe('reach-cases.json parity (D-26 and memberships)', () => {
 });
 
 describe('reach rules, unit', () => {
+  it('a crew assignment counts only while is_current and its leave (else end) date has not come (D-217)', () => {
+    const now = '2026-11-23T12:00:00Z';
+    expect(assignmentIsCurrent({ vesselId: 'v', isCurrent: true }, now)).toBe(true);
+    expect(assignmentIsCurrent({ vesselId: 'v', isCurrent: false }, now)).toBe(false);
+    // A stale row: still says is_current, its leave date has passed.
+    expect(assignmentIsCurrent({ vesselId: 'v', isCurrent: true, leaveDate: '2026-01-15' }, now)).toBe(false);
+    // The leave date itself no longer counts (<= today), the day before does.
+    expect(assignmentIsCurrent({ vesselId: 'v', isCurrent: true, leaveDate: '2026-11-23' }, now)).toBe(false);
+    expect(assignmentIsCurrent({ vesselId: 'v', isCurrent: true, leaveDate: '2026-11-24' }, now)).toBe(true);
+    // No leave date: the end date decides; a leave date wins over the end date.
+    expect(assignmentIsCurrent({ vesselId: 'v', isCurrent: true, endDate: '2026-02-28' }, now)).toBe(false);
+    expect(assignmentIsCurrent({ vesselId: 'v', isCurrent: true, leaveDate: '2099-12-31', endDate: '2026-02-28' }, now)).toBe(true);
+    expect(assignmentIsCurrent({ vesselId: 'v', isCurrent: true, leaveDate: null, endDate: null }, now)).toBe(true);
+    // The UTC date of now: 23:30 at UTC-2 is already the 24th in UTC.
+    expect(assignmentIsCurrent({ vesselId: 'v', isCurrent: true, leaveDate: '2026-11-24' }, '2026-11-23T23:30:00-02:00')).toBe(false);
+    // An unreadable instant counts nothing (fail closed).
+    expect(assignmentIsCurrent({ vesselId: 'v', isCurrent: true }, 'not a date')).toBe(false);
+  });
+
   it('a vessel is reachable only with a set status that is not Sold, and never archived', () => {
     expect(vesselInReachableState({ status: 'Active' })).toBe(true);
     expect(vesselInReachableState({ status: 'Active', lifecycleStatus: 'inactive' })).toBe(true);

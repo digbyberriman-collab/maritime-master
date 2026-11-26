@@ -3,7 +3,8 @@
 -- (Phase 2 security rules: no self-escalation; spec rule 7; proposed D-125;
 -- gap/04 T-96)
 -- Tables: none new. Trigger: trg_crew_assignments_guard
---   (crew_assignments_guard())
+--   (crew_assignments_guard()); crew_assignments_end_stale() (service
+--   role: the daily sweep of rows whose leave date has come; D-217)
 -- TS mirror: none (the legacy writers keep their API; a refusal is a 42501
 --   with a stable MESSAGE)
 -- =================================================================
@@ -47,12 +48,22 @@
 -- trg_crew_assignments_normalise_dates (20260917110000), which copies
 -- end_date and leave_date into each other and sets is_current false once
 -- the leave date has come. The guard decides on the row as it will be
--- stored: v_new_current is the normaliser's is_current
--- (coalesce(NEW.is_current, false) AND NOT coalesce(NEW.leave_date,
--- NEW.end_date) <= current_date), used for the Master office after the
--- change and for "is_current turns true" in rule a. So ending a Master row
--- through leave_date or end_date is a Master office change (e), and an
+-- stored: v_new_current is the normaliser's is_current,
+-- crew_assignment_is_current(NEW.is_current, NEW.leave_date, NEW.end_date)
+-- (D-217: is_current AND NOT coalesce(leave_date, end_date) <=
+-- current_date), used for the Master office after the change and for
+-- "is_current turns true" in rule a. So ending a Master row through
+-- leave_date or end_date is a Master office change (e), and an
 -- already-ended Master row (an INSERT of history) is not an appointment.
+-- The OLD row is read the same way (review round 5,
+-- stale-is-current-keeps-reach): a row whose leave date passed after it
+-- was written still says is_current, but it is not current, so updating
+-- or deleting it is no Master office change.
+--
+-- crew_assignments_end_stale() (service role; a daily sweep, e.g.
+-- hr-daily-sweeper): is_current = false on every row whose leave date
+-- (else end date) has come, so the legacy readers that filter
+-- .eq('is_current', true) stop seeing stale rows too.
 -- The guard stays BEFORE on purpose: in an AFTER trigger the caller's own
 -- new or moved row would already count toward reach_vessel_for() and the
 -- vessel-scoped users_access.admin capability (reach-based), so rules a
@@ -81,6 +92,7 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010300_platform_crew_assignment_guard needs public.crew_assignments';
   END IF;
   IF to_regprocedure('public.has_capability_for(uuid,text,uuid,uuid)') IS NULL
+     OR to_regprocedure('public.crew_assignment_is_current(boolean,date,date)') IS NULL
      OR to_regprocedure('public.reach_vessel_for(uuid,uuid)') IS NULL
      OR to_regprocedure('public.fleet_reach_for(uuid,uuid)') IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010300_platform_crew_assignment_guard needs the reach and capability helpers: apply 20261123000300 and 20261123000400 first';
@@ -108,7 +120,6 @@ DECLARE
   v_master_before boolean := false;
   v_master_after boolean;
   v_admin boolean;
-  v_new_leave date;
   v_new_current boolean;
 BEGIN
   IF v_uid IS NULL OR current_setting('storm.access_engine', true) = 'on' THEN
@@ -139,7 +150,7 @@ BEGIN
     -- e. Removing a current Master / Captain row.
     v_old_pos := nullif(btrim(regexp_replace(translate(btrim(coalesce(OLD.position, '')), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '[^a-z0-9]+', '_', 'g'), '_'), '');
     v_old_rank := nullif(btrim(regexp_replace(translate(btrim(coalesce(OLD.rank, '')), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '[^a-z0-9]+', '_', 'g'), '_'), '');
-    IF coalesce(OLD.is_current, false)
+    IF public.crew_assignment_is_current(OLD.is_current, OLD.leave_date, OLD.end_date)
        AND (coalesce(v_old_pos IN ('master', 'captain'), false) OR coalesce(v_old_rank IN ('master', 'captain'), false))
        AND NOT public.has_capability_for(v_uid, 'admin.access.users_access.admin', v_old_company, OLD.vessel_id) THEN
       RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'master_office_change_refused',
@@ -156,15 +167,17 @@ BEGIN
   -- The row as stored (review round 4): the legacy normaliser
   -- (trg_crew_assignments_normalise_dates, which fires after this guard)
   -- takes leave_date, else end_date, and ends the row once that date has
-  -- come. Decide on that is_current, never on the one the caller sent.
-  v_new_leave := coalesce(NEW.leave_date, NEW.end_date);
-  v_new_current := coalesce(NEW.is_current, false) AND NOT coalesce(v_new_leave <= current_date, false);
+  -- come. Decide on that is_current, never on the one the caller sent:
+  -- crew_assignment_is_current() (D-217), for OLD as well (review round 5):
+  -- a stale row whose leave date already passed is no longer current, so
+  -- touching it is no office change and no new reach.
+  v_new_current := public.crew_assignment_is_current(NEW.is_current, NEW.leave_date, NEW.end_date);
 
   -- a / c. A row of your own that grants reach.
   v_grants_reach := TG_OP = 'INSERT'
     OR NEW.user_id IS DISTINCT FROM OLD.user_id
     OR NEW.vessel_id IS DISTINCT FROM OLD.vessel_id
-    OR (v_new_current AND NOT coalesce(OLD.is_current, false));
+    OR (v_new_current AND NOT public.crew_assignment_is_current(OLD.is_current, OLD.leave_date, OLD.end_date));
   IF NEW.user_id = v_uid AND v_grants_reach
      AND NOT (v_company IS NOT NULL AND public.has_capability_for(v_uid, 'admin.access.users_access.admin', v_company, NEW.vessel_id)) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'self_assignment_refused',
@@ -197,7 +210,7 @@ BEGIN
   IF TG_OP = 'UPDATE' THEN
     v_old_pos := nullif(btrim(regexp_replace(translate(btrim(coalesce(OLD.position, '')), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '[^a-z0-9]+', '_', 'g'), '_'), '');
     v_old_rank := nullif(btrim(regexp_replace(translate(btrim(coalesce(OLD.rank, '')), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '[^a-z0-9]+', '_', 'g'), '_'), '');
-    v_master_before := coalesce(OLD.is_current, false)
+    v_master_before := public.crew_assignment_is_current(OLD.is_current, OLD.leave_date, OLD.end_date)
       AND (coalesce(v_old_pos IN ('master', 'captain'), false) OR coalesce(v_old_rank IN ('master', 'captain'), false));
   END IF;
   v_master_after := v_new_current
@@ -223,6 +236,38 @@ BEGIN
 END;
 $$;
 
+-- ---------------------------------------------------------------- crew_assignments_end_stale() (service role)
+
+-- The daily sweep (D-217; review round 5, stale-is-current-keeps-reach):
+-- is_current = false on every row that still says current although its
+-- leave date (else end date) has come; returns how many rows it ended.
+-- Service role only, and never under a JWT (42501): the guard exempts
+-- no-JWT callers, so the sweep passes it, and the legacy normaliser agrees
+-- with the write. The build-out readers already ignore such rows
+-- (crew_assignment_is_current()); this keeps the stored flag honest for the
+-- legacy readers.
+CREATE OR REPLACE FUNCTION public.crew_assignments_end_stale()
+RETURNS integer
+LANGUAGE plpgsql
+VOLATILE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_count integer;
+BEGIN
+  IF auth.uid() IS NOT NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'service_role_only',
+      DETAIL = 'crew_assignments_end_stale runs without a user session (the daily sweep).';
+  END IF;
+  UPDATE public.crew_assignments
+  SET is_current = false
+  WHERE is_current AND coalesce(leave_date, end_date) <= current_date;
+  GET DIAGNOSTICS v_count = ROW_COUNT;
+  RETURN v_count;
+END;
+$$;
+
 DROP TRIGGER IF EXISTS trg_crew_assignments_guard ON public.crew_assignments;
 CREATE TRIGGER trg_crew_assignments_guard
   BEFORE INSERT OR UPDATE OR DELETE ON public.crew_assignments
@@ -231,7 +276,10 @@ CREATE TRIGGER trg_crew_assignments_guard
 -- ---------------------------------------------------------------- privileges (rule 5)
 
 REVOKE ALL ON FUNCTION public.crew_assignments_guard() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.crew_assignments_end_stale() FROM PUBLIC, anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.crew_assignments_end_stale() TO service_role;
 
 -- ---------------------------------------------------------------- comments
 
-COMMENT ON FUNCTION public.crew_assignments_guard() IS 'Trigger trg_crew_assignments_guard (no self-escalation): decides on the row as stored (review round 4: is_current as the legacy date normaliser leaves it, so ending a Master row through leave_date or end_date is a Master office change); for a signed-in caller without storm.access_engine, an assignment of your own that grants reach needs users-access admin for the vessel (self_assignment_refused); the caller must already reach the new (and old) vessel or hold fleet reach / users-access admin for it (assignment_vessel_out_of_reach); an own-row change of the normalised position or rank needs users-access admin for the vessel (self_office_change_refused); appointing, removing or moving a Master / Captain row needs users-access admin for the vessel (and the old one on a move) (master_office_change_refused). DELETE (review round 3): the caller must reach the row''s vessel or hold fleet reach / users-access admin for it (assignment_vessel_out_of_reach), and deleting a current Master / Captain row needs users-access admin for the vessel (master_office_change_refused); an FK cascade of a vessel or profile delete passes. Service role, migrations and the engine definers unaffected.';
+COMMENT ON FUNCTION public.crew_assignments_guard() IS 'Trigger trg_crew_assignments_guard (no self-escalation): decides on the row as stored (review round 4: is_current as the legacy date normaliser leaves it, so ending a Master row through leave_date or end_date is a Master office change; review round 5: OLD by crew_assignment_is_current() too, D-217, so touching a stale Master row is no office change); for a signed-in caller without storm.access_engine, an assignment of your own that grants reach needs users-access admin for the vessel (self_assignment_refused); the caller must already reach the new (and old) vessel or hold fleet reach / users-access admin for it (assignment_vessel_out_of_reach); an own-row change of the normalised position or rank needs users-access admin for the vessel (self_office_change_refused); appointing, removing or moving a Master / Captain row needs users-access admin for the vessel (and the old one on a move) (master_office_change_refused). DELETE (review round 3): the caller must reach the row''s vessel or hold fleet reach / users-access admin for it (assignment_vessel_out_of_reach), and deleting a current Master / Captain row needs users-access admin for the vessel (master_office_change_refused); an FK cascade of a vessel or profile delete passes. Service role, migrations and the engine definers unaffected.';
+COMMENT ON FUNCTION public.crew_assignments_end_stale() IS 'D-217 daily sweep (service role only; 42501 under a JWT): is_current = false on every crew_assignments row whose coalesce(leave_date, end_date) has come; returns the number of rows ended. hr-daily-sweeper calls it.';

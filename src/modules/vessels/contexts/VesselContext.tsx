@@ -112,6 +112,13 @@ const toReachVessel = (v: Vessel): ReachVessel => ({
   lifecycleStatus: v.lifecycle_status ?? null,
 });
 
+/** A current crew_assignments row as the reach rules read it (D-217: the leave and end dates decide). */
+interface AssignmentRow {
+  vessel_id: string;
+  leave_date: string | null;
+  end_date: string | null;
+}
+
 const STORAGE_KEY_VESSEL_ID = 'storm_selectedVesselId';
 const STORAGE_KEY_ALL_VESSELS = 'storm_isAllVessels';
 
@@ -222,25 +229,31 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         .select('*')
         .eq('company_id', companyId)
         .order('name');
+      // With the leave and end dates: a row whose leave date has come no
+      // longer counts, even while it still says is_current (D-217; the
+      // server's crew_assignment_is_current, mirrored by assignmentIsCurrent).
       const assignmentsRequest = () =>
         supabase
           .from('crew_assignments')
-          .select('vessel_id')
+          .select('vessel_id, leave_date, end_date')
           .eq('user_id', userId)
           .eq('is_current', true);
+      const toReachAssignment = (a: AssignmentRow) => ({ vesselId: a.vessel_id, isCurrent: true, leaveDate: a.leave_date, endDate: a.end_date });
+      const now = new Date().toISOString();
       // The legacy rules (D-26) are legacyReach's, the function the shared
       // fixture (reach-cases.json) checks against the SQL: the vessel ids it
       // reaches among `rows`, given the current assignments. Fleet reach is
       // not decided here: useMembershipReach applies reach.ts hasFleetReach,
       // which legacyReach shares, with the RBAC roles this context never holds.
-      const legacyVesselIds = (rows: readonly Vessel[], assigned: readonly { vessel_id: string }[]) =>
+      const legacyVesselIds = (rows: readonly Vessel[], assigned: readonly AssignmentRow[]) =>
         new Set(
           legacyReach({
             companyId,
             profileRole: profile.role ?? null,
             rbacRoles: [],
-            assignments: assigned.map((a) => ({ vesselId: a.vessel_id, isCurrent: true })),
+            assignments: assigned.map(toReachAssignment),
             companyVessels: rows.map(toReachVessel),
+            now,
           }).vesselIds,
         );
 
@@ -256,7 +269,7 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         legacyAllVessels ? Promise.resolve(null) : assignmentsRequest(),
       ]);
       if (!current()) return;
-      const mode = reachModeFor(membershipRead, new Date().toISOString());
+      const mode = reachModeFor(membershipRead, now);
       // Known as soon as the read lands, so fleet reach holds (a fleet user
       // still reaches the fleet) even if a vessel read below fails.
       setReach(
@@ -314,7 +327,7 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         const m = mode.membership;
         if (directoryRes.error) throw directoryRes.error;
         const directory: Vessel[] = directoryRes.data || [];
-        let assignments: { vessel_id: string }[] = [];
+        let assignments: AssignmentRow[] = [];
         if (m.vesselScope === 'assigned' && m.kind !== 'external') {
           const { data, error } = legacyAssignmentRes ?? (await assignmentsRequest());
           if (!current()) return;
@@ -326,13 +339,13 @@ export const VesselProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             companyId,
             profileRole: profile.role ?? null,
             rbacRoles: [],
-            assignments: assignments.map((a) => ({ vesselId: a.vessel_id, isCurrent: true })),
+            assignments: assignments.map(toReachAssignment),
             companyVessels: directory.map(toReachVessel),
             membership: m,
             // The own-row policy hides the row from a disabled user, so a row
             // read here belongs to an active user.
             userActive: true,
-            now: new Date().toISOString(),
+            now,
           }).vesselIds,
         );
         setCompanyVessels(directory);

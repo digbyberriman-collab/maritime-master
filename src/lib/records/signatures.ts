@@ -130,7 +130,13 @@ export interface SignatureActor {
   name: string;
   /** May `profileId` sign `slot` (office on this vessel / named person / company actor + sign capability)? */
   isEligible: (slot: SlotDefinition, profileId: string) => boolean;
-  /** Write access on the record. Required (true) to witness a signature or sign on behalf; absent = no. */
+  /**
+   * Write access on the record (server: `record_caller_may_write`; an
+   * external viewer has none, D-214). Required (true), unless the actor is a
+   * company actor, to pass a slot, cancel a pass, re-sign or remove a
+   * signature, and always to witness a signature or sign on behalf. Absent =
+   * no (fail closed).
+   */
   canWrite?: boolean;
   /**
    * May `profileId` sign `slot` on the office holder's behalf (the module's
@@ -425,6 +431,14 @@ function idReuse(sheet: SignatureSheet, id: string, slotKey: string): 'replay' |
 }
 const ID_CONFLICT = 'That signature id is already used on this record.';
 
+/**
+ * The vessel-party write gate of pass, cancel-pass, re-sign and remove
+ * (SQL: `is_company_actor(...) OR record_caller_may_write(...)`; D-214): a
+ * reader who may view the record (an external viewer) changes nothing.
+ */
+const NO_WRITE_ACCESS = 'You can view this record but not change it.';
+const mayWrite = (actor: SignatureActor): boolean => actor.canWrite === true || actor.isCompanyActor === true;
+
 /** Sign a slot. Re-sending the same id for the same slot is a no-op. */
 export function signSlot(sheet: SignatureSheet, input: SignInput, actor: SignatureActor): SignatureResult {
   const reuse = idReuse(sheet, input.id, input.slotKey);
@@ -455,7 +469,11 @@ export function signSlot(sheet: SignatureSheet, input: SignInput, actor: Signatu
   return ok({ ...sheet, signatures: [...sheet.signatures, signature], passes: withPassCleared(sheet.passes, [slot.key]) });
 }
 
-/** Pass an open slot to an eligible person (creates a sign request). */
+/**
+ * Pass an open slot to an eligible person (creates a sign request). Mirrors
+ * `record_pass_slot()`: impersonation, then write access (a company actor
+ * or `canWrite`; D-214), then an open slot and an eligible person.
+ */
 export function passSlotTo(
   sheet: SignatureSheet,
   input: { slotKey: string; toProfileId: string; at: string },
@@ -463,6 +481,8 @@ export function passSlotTo(
 ): SignatureResult {
   const slot = getSlot(sheet, input.slotKey);
   if (!slot) return fail('unknown_slot', 'That signature slot does not exist on this record.');
+  if (actor.impersonating) return fail('impersonating', 'Signature requests cannot be made while acting as another user.');
+  if (!mayWrite(actor)) return fail('no_write_access', NO_WRITE_ACCESS);
   const state = slotState(sheet, slot.key);
   if (state === 'requested') return fail('not_open', `The ${slot.label} slot is already passed to someone. Cancel that first.`);
   if (state !== 'open') return fail('not_open', `The ${slot.label} slot can't be passed on yet.`);
@@ -470,15 +490,27 @@ export function passSlotTo(
   return ok({ ...sheet, passes: { ...sheet.passes, [slot.key]: { profileId: input.toProfileId, at: input.at } } });
 }
 
-/** Cancel a pass (or the person declined): requested → open. */
-export function cancelPass(sheet: SignatureSheet, slotKey: string): SignatureResult {
+/**
+ * Cancel a pass (or the person declined): requested → open. Mirrors
+ * `record_cancel_pass()`: impersonation, then write access (a company actor
+ * or `canWrite`; D-214), then a requested slot.
+ */
+export function cancelPass(sheet: SignatureSheet, slotKey: string, actor: SignatureActor): SignatureResult {
   const slot = getSlot(sheet, slotKey);
   if (!slot) return fail('unknown_slot', 'That signature slot does not exist on this record.');
+  if (actor.impersonating) return fail('impersonating', 'Signature requests cannot be changed while acting as another user.');
+  if (!mayWrite(actor)) return fail('no_write_access', NO_WRITE_ACCESS);
   if (slotState(sheet, slotKey) !== 'requested') return fail('not_requested', `The ${slot.label} slot has not been passed to anyone.`);
   return ok({ ...sheet, passes: withPassCleared(sheet.passes, [slotKey]) });
 }
 
-/** Why `actor` may not remove the signature on `slotKey`, or null. Mirrors `remove_signature()`. */
+/**
+ * Why `actor` may not remove the signature on `slotKey`, or null. Mirrors
+ * `record_remove_signature()`: impersonation, then write access (a company
+ * actor or `canWrite`; D-214: an external viewer never removes, not even
+ * their own signature or as the Master), then the live signature, the D-51
+ * lock, reverse order, who may remove and the reason.
+ */
 export function removeBlocker(
   sheet: SignatureSheet,
   input: { slotKey: string; reason?: string | null },
@@ -487,6 +519,7 @@ export function removeBlocker(
   const slot = getSlot(sheet, input.slotKey);
   if (!slot) return { code: 'unknown_slot', message: 'That signature slot does not exist on this record.' };
   if (actor.impersonating) return { code: 'impersonating', message: 'Signatures cannot be removed while acting as another user.' };
+  if (!mayWrite(actor)) return { code: 'no_write_access', message: NO_WRITE_ACCESS };
   const sig = activeSignature(sheet, slot.key);
   if (!sig) return { code: 'not_signed', message: `The ${slot.label} slot is not signed.` };
   if (sheet.vesselLocked && slot.party === 'vessel') {
@@ -536,7 +569,8 @@ export function removeSignature(
 /**
  * Re-sign a stale signature in one tap: same signer, new row with the
  * current digest, old row superseded. Witnessed signatures need a new
- * ceremony instead.
+ * ceremony instead. Mirrors `record_resign_slot()`: id reuse, impersonation,
+ * then write access (a company actor or `canWrite`; D-214) for every method.
  */
 export function reSignSlot(
   sheet: SignatureSheet,
@@ -549,6 +583,9 @@ export function reSignSlot(
   const slot = getSlot(sheet, input.slotKey);
   if (!slot) return fail('unknown_slot', 'That signature slot does not exist on this record.');
   if (actor.impersonating) return fail('impersonating', 'Signatures cannot be made while acting as another user.');
+  // Write access before anything about the signature, for every method
+  // (record_resign_slot's order; D-214).
+  if (!mayWrite(actor)) return fail('no_write_access', NO_WRITE_ACCESS);
   const sig = activeSignature(sheet, slot.key);
   if (!sig) return fail('not_signed', `The ${slot.label} slot is not signed.`);
   if (sig.recordDigest === input.recordDigest) return fail('not_stale', 'This signature already covers the current content.');
@@ -556,9 +593,8 @@ export function reSignSlot(
   if (sig.method === 'verified' && sig.signerProfileId !== actor.profileId) return fail('different_signer', 'Only the person who signed can re-sign.');
   if (sig.method === 'on_behalf' && sig.signerProfileId !== actor.profileId) return fail('different_signer', 'Only the person who signed can re-sign.');
   if (sig.method === 'verified' && !actor.isEligible(slot, actor.profileId)) return fail('not_eligible', `You can no longer sign as ${slot.label} on this record.`);
-  if (sig.method === 'on_behalf') {
-    if (!actor.canWrite) return fail('no_write_access', 'You need write access to this record to sign on behalf.');
-    if (!actor.canSignOnBehalf?.(slot, actor.profileId)) return fail('not_eligible', `You can no longer sign on the ${slot.label}'s behalf on this record.`);
+  if (sig.method === 'on_behalf' && !actor.canSignOnBehalf?.(slot, actor.profileId)) {
+    return fail('not_eligible', `You can no longer sign on the ${slot.label}'s behalf on this record.`);
   }
 
   // By identity, not id: exactly this row is superseded.
@@ -611,12 +647,15 @@ export function slotActions(sheet: SignatureSheet, slotKey: string, actor: Signa
   const someoneElse = signable && !actor.impersonating && allowsWitnessed(slot) && Boolean(actor.canWrite);
   // The office holder signs as themselves, never on their own behalf.
   const signOnBehalf = signable && !signAsMe && canSign(sheet, { ...probe('on_behalf'), reason: 'probe' }, actor);
-  const passTo = state === 'open' && !actor.impersonating;
+  // Pass and cancel need write access (or a company actor), as the server
+  // asks (D-214): a reader is never offered a control the server refuses.
+  const writes = !actor.impersonating && mayWrite(actor);
+  const passTo = state === 'open' && writes;
   return {
     signAsMe,
     someoneElse,
     passTo,
-    cancelPass: state === 'requested',
+    cancelPass: state === 'requested' && writes,
     signOnBehalf,
     remove: state === 'signed' && removeBlocker(sheet, { slotKey, reason: 'probe' }, actor) === null,
     primary: signAsMe ? 'sign_as_me' : passTo ? 'pass_to' : null,

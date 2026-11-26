@@ -25,7 +25,8 @@
 --   active_aware   calls user_is_active, one of the seven redefined helpers
 --                  or a phase 2 helper (reach, capability, record_readable,
 --                  the *_write_allowed predicates, storage_path_allowed,
---                  has_role_in_company, admin_may_view_user), or
+--                  has_role_in_company, admin_may_view_user, the role sets
+--                  role_vessel_ids / role_company_user_ids), or
 --                  reads profiles in a subquery (a disabled user reads no
 --                  profile row)
 --   via_helper     calls a function whose body reaches one of those
@@ -58,7 +59,9 @@ INSERT INTO aware_base VALUES
   ('has_role'), ('has_any_role'), ('legacy_profile_role'),
   ('user_can_reach_vessel'), ('user_has_fleet_reach'), ('user_vessel_reach'), ('has_capability'), ('user_company_for_admin'),
   ('is_company_actor'), ('record_readable'), ('rbac_user_roles_write_allowed'), ('permission_override_write_allowed'),
-  ('storage_path_allowed'), ('has_role_in_company'), ('admin_may_view_user');
+  ('storage_path_allowed'), ('has_role_in_company'), ('admin_may_view_user'),
+  -- the caller-only role sets of the read policies (review round 5, D-229): empty for an inactive caller
+  ('role_vessel_ids'), ('role_company_user_ids');
 
 CREATE TEMP TABLE aware_via ON COMMIT DROP AS
 WITH RECURSIVE reach(name, depth) AS (

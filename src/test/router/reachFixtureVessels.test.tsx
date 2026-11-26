@@ -157,7 +157,7 @@ interface FixtureUser {
   profileRole: string | null;
   accountStatus: string | null;
   rbacRoles: FixtureRole[];
-  assignments: { vessel: string; isCurrent: boolean }[];
+  assignments: { vessel: string; isCurrent: boolean; leaveDate?: string; endDate?: string }[];
   membership: FixtureMembership | null;
   expected: { legacy: Expected; membership: Expected };
 }
@@ -221,7 +221,15 @@ beforeAll(() => {
     created_at: v.createdAt,
   }));
   h.tables.crew_assignments = fixture.users.flatMap((u) =>
-    u.assignments.map((a) => ({ user_id: userId(u), vessel_id: a.vessel, is_current: a.isCurrent })),
+    // With the leave and end dates VesselContext now selects (D-217): a stale
+    // row still says is_current, and its dates make it not count.
+    u.assignments.map((a) => ({
+      user_id: userId(u),
+      vessel_id: a.vessel,
+      is_current: a.isCurrent,
+      leave_date: a.leaveDate ?? null,
+      end_date: a.endDate ?? null,
+    })),
   );
   // get_user_roles_full: active, in-date rows only; fleet-wide = no vessel and a fleet default scope.
   for (const u of fixture.users) {
@@ -314,9 +322,9 @@ const withoutMembership = fixture.users.filter((u) => !u.membership).map((u) => 
 const withMembership = fixture.users.filter((u) => u.membership).map((u) => [u.key, u] as const);
 
 describe('reach-cases.json through VesselProvider (the app path)', () => {
-  it('covers every fixture user: 22 users, some with an explicit membership', () => {
-    expect(fixture.users).toHaveLength(22);
-    expect(withoutMembership.length + withMembership.length).toBe(22);
+  it('covers every fixture user: 25 users, some with an explicit membership', () => {
+    expect(fixture.users).toHaveLength(25);
+    expect(withoutMembership.length + withMembership.length).toBe(25);
     expect(withMembership.length).toBeGreaterThan(0);
   });
 

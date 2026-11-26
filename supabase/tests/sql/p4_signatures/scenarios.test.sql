@@ -15,12 +15,32 @@ CREATE TEMP TABLE sig_fx ON COMMIT DROP AS SELECT :'fx'::jsonb AS j;
 GRANT SELECT ON sig_fx TO PUBLIC;
 
 -- The world: company SG, vessel SG.v, crew 1-3 and the Master on board,
--- two company actors (legacy DPA).
+-- two company actors (legacy DPA), and SG.reader, an in-window external
+-- viewer of SG.v (D-214: reads the record, never writes). The reader is a
+-- crew profile whose profile-synced membership becomes kind external,
+-- vessel_scope assigned, an open window and one membership vessel row for
+-- SG.v (as p4_registry/external_writes.test.sql), so record_readable() is
+-- true and record_caller_may_write() false.
 SELECT tests.seed_vessel('SG', 'SG.v', 'M/Y SIGNAL', 'Active', NULL, '2026-01-01T00:00:00Z');
-SELECT tests.seed_user('SG', k, CASE (sig.j #>> ARRAY['world', 'people', k, 'role']) WHEN 'admin' THEN 'dpa' WHEN 'master' THEN 'master' ELSE 'crew' END::public.user_role)
+SELECT tests.seed_user('SG', k, CASE (sig.j #>> ARRAY['world', 'people', k, 'role']) WHEN 'admin' THEN 'dpa' WHEN 'master' THEN 'master' WHEN 'external' THEN 'crew' ELSE 'crew' END::public.user_role)
 FROM sig_fx AS sig, jsonb_object_keys(sig.j #> '{world,people}') AS k;
 SELECT tests.seed_assignment(k, 'SG.v', true, CASE WHEN k = 'SG.master' THEN 'Master' ELSE 'Deckhand' END)
 FROM unnest(ARRAY['SG.crew1', 'SG.crew2', 'SG.crew3', 'SG.master']) AS k;
+UPDATE public.account_memberships AS m
+SET legacy_managed = false, kind = 'external', vessel_scope = 'assigned', fleet_access = false, source = 'admin',
+    valid_from = now() - interval '1 day', valid_until = now() + interval '30 days'
+FROM sig_fx AS sig, jsonb_object_keys(sig.j #> '{world,people}') AS k
+WHERE sig.j #>> ARRAY['world', 'people', k, 'role'] = 'external' AND m.user_id = tests.user_id(k);
+INSERT INTO public.account_membership_vessels (membership_id, company_id, vessel_id)
+SELECT m.id, m.company_id, tests.vessel_id('SG.v') FROM public.account_memberships AS m WHERE m.kind = 'external' AND m.user_id = tests.user_id('SG.reader');
+SELECT tests.ok(public.record_user_is_external(tests.user_id('SG.reader'), tests.company_id('SG'))
+                AND public.reach_vessel_for(tests.user_id('SG.reader'), tests.vessel_id('SG.v'))
+                AND NOT public.record_caller_may_write(tests.user_id('SG.reader'), tests.company_id('SG'), tests.vessel_id('SG.v'))
+                AND NOT public.is_company_actor(tests.user_id('SG.reader'), tests.vessel_id('SG.v')),
+                'setup: SG.reader is an in-window external of SG.v: reaches it, may not write, is no company actor');
+SELECT tests.as_user(tests.user_id('SG.reader'));
+SELECT tests.ok(public.record_readable(tests.company_id('SG'), tests.vessel_id('SG.v')), 'setup: SG.reader may read SG.v records');
+SELECT tests.reset_role();
 
 -- One kind per scenario (snake_case slot template from the TS slots).
 CREATE TEMP TABLE sig_scenarios ON COMMIT DROP AS
@@ -120,6 +140,15 @@ BEGIN
   END LOOP;
 END
 $$;
+
+-- The external reader changed nothing (D-214): no signature, pass, removal
+-- or step-back by SG.reader.
+SELECT tests.is((SELECT count(*) FROM public.record_signatures AS s JOIN sig_envelopes AS e ON e.envelope_id = s.envelope_id
+                 WHERE e.name = 'external_reader_changes_nothing' AND (tests.user_id('SG.reader') IN (s.signer_user_id, s.witness_user_id) OR s.removed_by = tests.user_id('SG.reader'))),
+                0::bigint, 'external_reader_changes_nothing: no signature signed, witnessed or removed by the reader');
+SELECT tests.is((SELECT count(*) FROM public.record_events AS ev JOIN sig_envelopes AS e ON e.envelope_id = ev.envelope_id
+                 WHERE e.name = 'external_reader_changes_nothing' AND ev.actor_user_id = tests.user_id('SG.reader')),
+                0::bigint, 'external_reader_changes_nothing: no record event by the reader');
 
 -- Composition checks the scenarios rely on.
 SELECT tests.is((SELECT count(*) FROM public.record_signatures AS s JOIN sig_envelopes AS e ON e.envelope_id = s.envelope_id

@@ -7,10 +7,12 @@
 --   role_permissions frozen to service_role; rbac_user_roles_*,
 --   user_permission_overrides_*, user_roles_select_admin (user_roles is
 --   written by the service role only), permission_audit_log_select
--- Helpers: rbac_user_roles_write_allowed(), permission_override_write_allowed()
+-- Helpers: rbac_user_roles_write_allowed(), permission_override_write_allowed(),
+--   rbac_user_roles_stamp() (trigger)
 --   (caller-scoped predicates for policies, rule 11); log_permission_change()
 --   (live, exact signature, service role);
---   triggers trg_user_permission_overrides_stamp and the audit triggers
+--   triggers trg_user_permission_overrides_stamp, trg_rbac_user_roles_stamp
+--   (D-230: assigned_by / assigned_at stamped by the server) and the audit triggers
 --   trg_rbac_user_roles_audit, trg_user_permission_overrides_audit,
 --   trg_user_roles_audit
 -- TS mirror: src/modules/auth/types/db.pending.ts (AuthPendingColumns
@@ -363,6 +365,39 @@ CREATE TRIGGER trg_user_permission_overrides_stamp
   BEFORE INSERT OR UPDATE ON public.user_permission_overrides
   FOR EACH ROW EXECUTE FUNCTION public.user_permission_overrides_stamp();
 
+-- trg_rbac_user_roles_stamp (D-230; review round 5,
+-- actor-columns-client-forgeable): the who-did-it columns of an RBAC role
+-- assignment are the server's, as created_by on overrides is. On INSERT
+-- under a JWT, assigned_by is the signed-in caller and assigned_at now()
+-- (whatever the client sent); on UPDATE both always keep the stored
+-- values. Without a JWT (service role, maintenance, migrations) the given
+-- values are kept. Definer write paths that run under the caller's JWT
+-- record that caller.
+CREATE OR REPLACE FUNCTION public.rbac_user_roles_stamp()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    IF auth.uid() IS NOT NULL THEN
+      NEW.assigned_by := auth.uid();
+      NEW.assigned_at := now();
+    END IF;
+  ELSE
+    NEW.assigned_by := OLD.assigned_by;
+    NEW.assigned_at := OLD.assigned_at;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_rbac_user_roles_stamp ON public.rbac_user_roles;
+CREATE TRIGGER trg_rbac_user_roles_stamp
+  BEFORE INSERT OR UPDATE ON public.rbac_user_roles
+  FOR EACH ROW EXECUTE FUNCTION public.rbac_user_roles_stamp();
+
 DROP POLICY IF EXISTS "Overrides writable by admin" ON public.user_permission_overrides;
 DROP POLICY IF EXISTS "Only admins can modify permission overrides" ON public.user_permission_overrides;
 DROP POLICY IF EXISTS "Users can view their own permission overrides" ON public.user_permission_overrides;
@@ -633,6 +668,7 @@ $$;
 REVOKE ALL ON FUNCTION public.rbac_user_roles_write_allowed(uuid, uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.permission_override_write_allowed(uuid, uuid, text, public.permission_level) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.user_permission_overrides_stamp() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.rbac_user_roles_stamp() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.access_change_audit() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.log_permission_change(uuid, text, public.audit_action_type, uuid, uuid, text, jsonb, jsonb, text, uuid, inet, text) FROM PUBLIC, anon, authenticated, service_role;
 
@@ -645,6 +681,9 @@ GRANT EXECUTE ON FUNCTION public.log_permission_change(uuid, text, public.audit_
 COMMENT ON FUNCTION public.rbac_user_roles_write_allowed(uuid, uuid, uuid) IS 'Policy predicate (rule 11) for rbac_user_roles writes, for auth.uid() only: not on yourself, users-access admin of the target''s company (and vessel), vessel of that company, role not superadmin; no vessel: an all-vessels admin, a vessel: a caller who may act on the target (gap/01 F23); a fleet-conferring role (no vessel and default scope fleet, or dpa / fleet_master) needs the caller''s fleet reach and an all-vessels admin; an administrator target needs a manager of admins (W7); unless a full legacy admin, the caller holds every module right of the role; ranked strictly below the caller (equal only for a manager of admins of that company). Rank 0 is harmless only for roles with no fleet scope and no module rights.';
 COMMENT ON FUNCTION public.permission_override_write_allowed(uuid, uuid, text, public.permission_level) IS 'Policy predicate (rule 11) for user_permission_overrides writes, for auth.uid() only: not on yourself, the target''s company, users-access admin there who may act on the target (gap/01 F23), a manager of admins for a settings override or an administrator target (W7), and the caller holds the module level (full admin or rbac_company_permission).';
 COMMENT ON FUNCTION public.user_permission_overrides_stamp() IS 'Trigger: company_id = the target''s profile company (client value overwritten), created_by = the signed-in caller on insert (kept on update), vessel of that company only.';
+COMMENT ON FUNCTION public.rbac_user_roles_stamp() IS 'Trigger trg_rbac_user_roles_stamp (D-230): on INSERT under a JWT assigned_by = auth.uid() and assigned_at = now() (client values overwritten); on UPDATE both keep the stored values; without a JWT the given values are kept.';
+COMMENT ON COLUMN public.rbac_user_roles.assigned_by IS 'Who assigned the role: the signed-in caller, stamped by trg_rbac_user_roles_stamp (D-230); never changed by an update. Service-role inserts keep the given value.';
+COMMENT ON COLUMN public.rbac_user_roles.assigned_at IS 'When the role was assigned: now() at a signed-in insert, stamped by trg_rbac_user_roles_stamp (D-230); never changed by an update.';
 COMMENT ON FUNCTION public.access_change_audit() IS 'Trigger (gap/01 F53): one permission_audit_log row per change of rbac_user_roles, user_permission_overrides or user_roles, actor = auth.uid(), ids / keys / levels only. Skipped without a JWT (service-role maintenance).';
 COMMENT ON FUNCTION public.log_permission_change(uuid, text, public.audit_action_type, uuid, uuid, text, jsonb, jsonb, text, uuid, inet, text) IS 'CC-4: the live signature, one overload. With a JWT the actor, role and company are the caller''s (users-access admin required; target and vessel of that company); without, the parameters are used. Service role only.';
 COMMENT ON COLUMN public.user_permission_overrides.company_id IS 'The target user''s company (stamped by trg_user_permission_overrides_stamp); scopes reads and writes.';

@@ -2,7 +2,8 @@
 -- PLATFORM P2: per-vessel and per-company module settings (gap/01 F11,
 -- F12; DECISIONS C13, G3, D-63, D-86; Phase 2 spec §A.5; proposed D-137)
 -- Tables: vessel_module_settings, company_module_settings
--- Helpers: module_enabled(); triggers trg_vessel_module_settings_stamp,
+-- Helpers: module_enabled(), vessel_module_on_internal() (definers);
+--   triggers trg_vessel_module_settings_stamp,
 --   trg_company_module_settings_stamp
 -- TS mirror: src/modules/vessels/types/db.pending.ts
 --   (VesselModuleSettingRow, CompanyModuleSettingRow, VesselsPendingTables),
@@ -201,48 +202,72 @@ CREATE POLICY company_module_settings_delete ON public.company_module_settings
 -- every prefix of the key (parentModuleKeys: split on '.', empty segments
 -- dropped, so '' and '.' have none and are on) must be on, and a prefix is
 -- on without a row, or with enabled = true and enabled_from NULL or not
--- after _on. Unknown vessel, NULL key or NULL date → false; a signed-in
--- caller who neither reaches the vessel nor has fleet reach in its company
--- → false. Company rows are not read in Phase 2 (D-63, CC-9).
-CREATE OR REPLACE FUNCTION public.module_enabled(_vessel_id uuid, _module_key text, _on date DEFAULT current_date)
+-- after _on. Unknown vessel, NULL key or NULL date → false. Company rows
+-- are not read in Phase 2 (D-63, CC-9).
+--
+-- vessel_module_on_internal() is that rule for any caller (review round 5,
+-- notify-ignores-module-off; D-162): definers that act for someone else
+-- (the notification fan-out runs in the actor's transaction for every
+-- recipient) ask it, so a module switched off on a vessel removes its
+-- notifications there for everyone (gap/01 W6). Internal: nothing is
+-- granted. plpgsql (D-229).
+CREATE OR REPLACE FUNCTION public.vessel_module_on_internal(_vessel_id uuid, _module_key text, _on date DEFAULT current_date)
 RETURNS boolean
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  WITH vessel AS (
-    SELECT v.id, v.company_id FROM public.vessels AS v WHERE v.id = _vessel_id
-  ), parts AS (
-    SELECT part, ord
-    FROM regexp_split_to_table(coalesce(_module_key, ''), '[.]') WITH ORDINALITY AS t(part, ord)
-    WHERE part <> ''
-  ), prefixes AS (
-    SELECT string_agg(p2.part, '.' ORDER BY p2.ord) AS key
-    FROM parts AS p1
-    JOIN parts AS p2 ON p2.ord <= p1.ord
-    GROUP BY p1.ord
-  )
-  SELECT CASE
-    WHEN _module_key IS NULL OR _on IS NULL THEN false
-    WHEN NOT EXISTS (SELECT 1 FROM vessel) THEN false
-    WHEN auth.uid() IS NOT NULL AND NOT EXISTS (
-      SELECT 1 FROM vessel
-      WHERE public.reach_vessel_for(auth.uid(), vessel.id) OR public.fleet_reach_for(auth.uid(), vessel.company_id)
-    ) THEN false
-    ELSE NOT EXISTS (
-      SELECT 1
-      FROM prefixes AS k
-      JOIN public.vessel_module_settings AS s ON s.vessel_id = _vessel_id AND s.module_key = k.key
-      WHERE NOT s.enabled OR (s.enabled_from IS NOT NULL AND s.enabled_from > _on)
+BEGIN
+  IF _vessel_id IS NULL OR _module_key IS NULL OR _on IS NULL
+     OR NOT EXISTS (SELECT 1 FROM public.vessels AS v WHERE v.id = _vessel_id) THEN
+    RETURN false;
+  END IF;
+  RETURN NOT EXISTS (
+    WITH parts AS (
+      SELECT part, ord
+      FROM regexp_split_to_table(_module_key, '[.]') WITH ORDINALITY AS t(part, ord)
+      WHERE part <> ''
+    ), prefixes AS (
+      SELECT string_agg(p2.part, '.' ORDER BY p2.ord) AS key
+      FROM parts AS p1
+      JOIN parts AS p2 ON p2.ord <= p1.ord
+      GROUP BY p1.ord
     )
-  END
+    SELECT 1
+    FROM prefixes AS k
+    JOIN public.vessel_module_settings AS s ON s.vessel_id = _vessel_id AND s.module_key = k.key
+    WHERE NOT s.enabled OR (s.enabled_from IS NOT NULL AND s.enabled_from > _on)
+  );
+END;
 $$;
 
+-- module_enabled(): the caller rule (a signed-in caller who neither
+-- reaches the vessel nor has fleet reach in its company → false) AND
+-- vessel_module_on_internal(), so the two can never drift (review round 5).
+CREATE OR REPLACE FUNCTION public.module_enabled(_vessel_id uuid, _module_key text, _on date DEFAULT current_date)
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NOT NULL AND NOT EXISTS (
+    SELECT 1 FROM public.vessels AS v
+    WHERE v.id = _vessel_id
+      AND (public.reach_vessel_for(auth.uid(), v.id) OR public.fleet_reach_for(auth.uid(), v.company_id))
+  ) THEN
+    RETURN false;
+  END IF;
+  RETURN public.vessel_module_on_internal(_vessel_id, _module_key, _on);
+END;
+$$;
 -- ---------------------------------------------------------------- privileges (rule 5)
 
 REVOKE ALL ON FUNCTION public.vessel_module_settings_stamp() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.company_module_settings_stamp() FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.vessel_module_on_internal(uuid, text, date) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.module_enabled(uuid, text, date) FROM PUBLIC, anon, authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.module_enabled(uuid, text, date) TO authenticated, service_role;
 
@@ -255,4 +280,5 @@ COMMENT ON COLUMN public.vessel_module_settings.enabled_from IS 'The module is o
 COMMENT ON COLUMN public.vessel_module_settings.label_override IS 'The vessel''s own label for the module (1-40 characters); display only, slugs never change.';
 COMMENT ON FUNCTION public.vessel_module_settings_stamp() IS 'Trigger trg_vessel_module_settings_stamp: company_id from the vessel (client value overwritten), updated_by = auth.uid(), updated_at = now().';
 COMMENT ON FUNCTION public.company_module_settings_stamp() IS 'Trigger trg_company_module_settings_stamp: updated_by = auth.uid(), updated_at = now().';
-COMMENT ON FUNCTION public.module_enabled(uuid, text, date) IS 'Exact SQL mirror of resolveModuleSettings(...).isModuleOn(key) over the vessel''s rows (CC-9): every dotted prefix on (no row, or enabled and enabled_from not after _on). Unknown vessel or a caller without reach: false. For server-side checks (calendar, notifications, reports); the client does not call it.';
+COMMENT ON FUNCTION public.module_enabled(uuid, text, date) IS 'Exact SQL mirror of resolveModuleSettings(...).isModuleOn(key) over the vessel''s rows (CC-9): every dotted prefix on (no row, or enabled and enabled_from not after _on). Unknown vessel or a caller without reach: false. The caller rule AND vessel_module_on_internal(). For server-side checks (calendar, reports); the client does not call it.';
+COMMENT ON FUNCTION public.vessel_module_on_internal(uuid, text, date) IS 'Internal (definers; nothing granted): module_enabled()''s dotted-prefix rule without the caller''s reach clause (unknown vessel, NULL key or NULL date: false; any prefix with enabled = false or enabled_from after _on: false). The notification fan-out asks it for every recipient (review round 5, notify-ignores-module-off; gap/01 W6, D-162). plpgsql (D-229).';

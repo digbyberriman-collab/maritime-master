@@ -2,7 +2,8 @@
 -- PLATFORM P3: disabled users get nothing (gap/01 F47, W7; Phase 2 spec
 -- §A.7, CC-6, CC-7, CC-10; proposed D-122, D-138)
 -- Tables: none new. Policies (redefined on public.profiles):
---   "Users can view their own profile", "Users can update their own profile"
+--   "Users can view their own profile", "Users can update their own profile",
+--   "Users can view profiles in their company" (review round 5: initplans)
 -- Helpers (live, redefined with the same signatures): user_belongs_to_company(),
 --   get_user_company_id(), my_profile_id(), current_user_company_id(),
 --   has_role(), has_any_role(), legacy_profile_role()
@@ -85,40 +86,60 @@ $$;
 
 -- ---------------------------------------------------------------- the seven live helpers (rule 6)
 
+-- Each is LANGUAGE plpgsql with its SQL body unchanged inside
+-- RETURN (...) (D-229; review round 5, rls-helper-per-row-slowdown):
+-- about 680 policies call them per row, PostgreSQL 17 and earlier never
+-- inline a SECURITY DEFINER SQL function and plan a nested SQL function
+-- again on every call, while PL/pgSQL keeps its plans for the session.
+-- profiles.user_id is unique, so every scalar subquery returns at most the
+-- one row the SQL body returned.
+
 -- 20260125160927_7551738f-…: the profile check, plus the active check.
 CREATE OR REPLACE FUNCTION public.user_belongs_to_company(_user_id uuid, _company_id uuid)
 RETURNS boolean
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT EXISTS (
-    SELECT 1 FROM public.profiles
-    WHERE user_id = _user_id AND company_id = _company_id
-  ) AND public.user_is_active(_user_id)
+BEGIN
+  RETURN (
+    SELECT EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE user_id = _user_id AND company_id = _company_id
+    ) AND public.user_is_active(_user_id)
+  );
+END;
 $$;
 
 -- 20260125160927_7551738f-…: the profile's company only for an active user.
 CREATE OR REPLACE FUNCTION public.get_user_company_id(_user_id uuid)
 RETURNS uuid
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT company_id FROM public.profiles WHERE user_id = _user_id AND public.user_is_active(_user_id) LIMIT 1
+BEGIN
+  RETURN (
+    SELECT company_id FROM public.profiles WHERE user_id = _user_id AND public.user_is_active(_user_id) LIMIT 1
+  );
+END;
 $$;
 
 -- 20260917175040_22d84f6b-…: the caller's profile id only while active.
 CREATE OR REPLACE FUNCTION public.my_profile_id()
 RETURNS uuid
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT id FROM public.profiles WHERE user_id = auth.uid() AND public.user_is_active(auth.uid()) LIMIT 1
+BEGIN
+  RETURN (
+    SELECT id FROM public.profiles WHERE user_id = auth.uid() AND public.user_is_active(auth.uid()) LIMIT 1
+  );
+END;
 $$;
 
 -- 20260501203014_9658bc16-…: the user_roles-based company, only while
@@ -127,32 +148,40 @@ $$;
 -- frp_* and storage policies compare it with the row's company).
 CREATE OR REPLACE FUNCTION public.current_user_company_id()
 RETURNS uuid
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT ur.company_id
-  FROM public.user_roles AS ur
-  JOIN public.profiles AS p ON p.user_id = ur.user_id
-  WHERE ur.user_id = auth.uid()
-    AND ur.is_active = true
-    AND ur.company_id IS NOT NULL
-    AND ur.company_id = p.company_id
-    AND public.user_is_active(auth.uid())
-  LIMIT 1
+BEGIN
+  RETURN (
+    SELECT ur.company_id
+    FROM public.user_roles AS ur
+    JOIN public.profiles AS p ON p.user_id = ur.user_id
+    WHERE ur.user_id = auth.uid()
+      AND ur.is_active = true
+      AND ur.company_id IS NOT NULL
+      AND ur.company_id = p.company_id
+      AND public.user_is_active(auth.uid())
+    LIMIT 1
+  );
+END;
 $$;
 
 -- 20260127170354_8cbfc11b-…: the user_roles check (own company, CC-5 /
 -- D-181), plus the active check: has_any_role with one role.
 CREATE OR REPLACE FUNCTION public.has_role(_user_id uuid, _role public.app_role)
 RETURNS boolean
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT public.has_any_role(_user_id, ARRAY[_role]::public.app_role[])
+BEGIN
+  RETURN (
+    SELECT public.has_any_role(_user_id, ARRAY[_role]::public.app_role[])
+  );
+END;
 $$;
 
 -- 20260127170354_8cbfc11b-…: the user_roles check, plus the active check.
@@ -169,39 +198,47 @@ $$;
 -- arbitrary ids.
 CREATE OR REPLACE FUNCTION public.has_any_role(_user_id uuid, _roles public.app_role[])
 RETURNS boolean
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT _user_id IS NOT NULL
-     AND _roles IS NOT NULL
-     AND EXISTS (
-       SELECT 1
-       FROM public.user_roles AS ur
-       JOIN public.profiles AS p ON p.user_id = ur.user_id
-       WHERE ur.user_id = _user_id
-         AND ur.role = ANY (_roles)
-         AND ur.is_active = true
-         AND (ur.expires_at IS NULL OR ur.expires_at > now())
-         AND (
-           (ur.company_id IS NOT NULL AND p.company_id IS NOT NULL AND ur.company_id = p.company_id)
-           OR (ur.company_id IS NULL AND (ur.role = 'superadmin' OR p.company_id IS NOT NULL))
-         )
-     )
-     AND public.user_is_active(_user_id)
+BEGIN
+  RETURN (
+    SELECT _user_id IS NOT NULL
+       AND _roles IS NOT NULL
+       AND EXISTS (
+         SELECT 1
+         FROM public.user_roles AS ur
+         JOIN public.profiles AS p ON p.user_id = ur.user_id
+         WHERE ur.user_id = _user_id
+           AND ur.role = ANY (_roles)
+           AND ur.is_active = true
+           AND (ur.expires_at IS NULL OR ur.expires_at > now())
+           AND (
+             (ur.company_id IS NOT NULL AND p.company_id IS NOT NULL AND ur.company_id = p.company_id)
+             OR (ur.company_id IS NULL AND (ur.role = 'superadmin' OR p.company_id IS NOT NULL))
+           )
+       )
+       AND public.user_is_active(_user_id)
+  );
+END;
 $$;
 
 -- 20260917174601_92aaeda7-…: the legacy profile role, NULL for an inactive
 -- user, so the HR / legal / health helpers built on it deny too.
 CREATE OR REPLACE FUNCTION public.legacy_profile_role(_user_id uuid)
 RETURNS text
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT role::text FROM public.profiles WHERE user_id = _user_id AND public.user_is_active(_user_id) LIMIT 1
+BEGIN
+  RETURN (
+    SELECT role::text FROM public.profiles WHERE user_id = _user_id AND public.user_is_active(_user_id) LIMIT 1
+  );
+END;
 $$;
 
 -- ---------------------------------------------------------------- own-row profile policies (CC-7)
@@ -209,16 +246,34 @@ $$;
 -- A disabled user reads no profile row, so every inline
 -- "(SELECT company_id FROM profiles WHERE user_id = auth.uid())" in a policy
 -- denies too.
+--
+-- The caller-only parts are initplans, computed once per statement
+-- (D-229; review round 5): (SELECT auth.uid()) and
+-- (SELECT public.user_is_active(auth.uid())). Same rows as the per-row
+-- form (p3_access_rls/rls_perf.test.sql proves it on a seeded fleet).
 DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles;
 CREATE POLICY "Users can view their own profile" ON public.profiles
   FOR SELECT TO authenticated
-  USING (user_id = auth.uid() AND public.user_is_active(auth.uid()));
+  USING (user_id = (SELECT auth.uid()) AND (SELECT public.user_is_active(auth.uid())));
 
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 CREATE POLICY "Users can update their own profile" ON public.profiles
   FOR UPDATE TO authenticated
-  USING (user_id = auth.uid() AND public.user_is_active(auth.uid()))
-  WITH CHECK (user_id = auth.uid() AND public.user_is_active(auth.uid()));
+  USING (user_id = (SELECT auth.uid()) AND (SELECT public.user_is_active(auth.uid())))
+  WITH CHECK (user_id = (SELECT auth.uid()) AND (SELECT public.user_is_active(auth.uid())));
+
+-- The legacy company read (20260125160927_7551738f-…, "Users can view
+-- profiles in their company": user_belongs_to_company(auth.uid(),
+-- company_id), evaluated per row), redefined here with the caller's
+-- company as an initplan (D-229; review round 5): company_id =
+-- get_user_company_id(auth.uid()) holds exactly when
+-- user_belongs_to_company(auth.uid(), company_id) does (profiles.user_id is
+-- unique; a NULL company matches neither; an inactive caller gets NULL, so
+-- nothing). Command and roles as live (FOR SELECT, no TO list).
+DROP POLICY IF EXISTS "Users can view profiles in their company" ON public.profiles;
+CREATE POLICY "Users can view profiles in their company" ON public.profiles
+  FOR SELECT
+  USING (company_id = (SELECT public.get_user_company_id(auth.uid())));
 
 -- ---------------------------------------------------------------- privileged profile columns (CC-6)
 
@@ -832,7 +887,8 @@ BEGIN
      OR NOT public.admin_may_act_on_user(auth.uid(), p.user_id, p.company_id, p.id) THEN
     RAISE EXCEPTION USING ERRCODE = '42501', MESSAGE = 'not_permitted';
   END IF;
-  IF p.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM public.crew_assignments ca WHERE ca.user_id = p.user_id AND ca.is_current) THEN
+  IF p.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM public.crew_assignments ca
+                                       WHERE ca.user_id = p.user_id AND ca.is_current AND public.crew_assignment_is_current(ca.is_current, ca.leave_date, ca.end_date)) THEN
     RAISE EXCEPTION 'Crew member still has a current assignment';
   END IF;
   -- Imported crew have no login and therefore no crew_assignments row; an

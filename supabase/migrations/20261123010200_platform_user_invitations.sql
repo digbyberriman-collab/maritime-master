@@ -7,7 +7,8 @@
 --   record_invitation_send() (service role; the edge functions record every
 --   send outcome), revoke_invitation() (users-access admins),
 --   expire_invitations() (service role; for a later cron),
---   invitation_withdraw_access() (internal to revoke / expire),
+--   invitation_withdraw_access() (internal to revoke / expire and, with an
+--   evidence cut-off, record_session_start; D-228),
 --   fulfil_imported_assignment() (service role; D-184) and its profile
 --   trigger trg_profiles_fulfil_imported_assignment,
 --   invitation_login_state() (service role; D-205)
@@ -129,6 +130,9 @@ CREATE TABLE IF NOT EXISTS public.user_invitations (
 CREATE UNIQUE INDEX IF NOT EXISTS user_invitations_live_key ON public.user_invitations (profile_id) WHERE status IN ('pending', 'sent', 'send_failed');
 CREATE INDEX IF NOT EXISTS idx_user_invitations_company_status ON public.user_invitations (company_id, status);
 CREATE INDEX IF NOT EXISTS idx_user_invitations_user ON public.user_invitations (user_id) WHERE user_id IS NOT NULL;
+-- The newest invitation of a profile (user_is_active(), D-228: by login or
+-- by profile, newest first).
+CREATE INDEX IF NOT EXISTS idx_user_invitations_profile_newest ON public.user_invitations (profile_id, created_at DESC, id DESC);
 
 ALTER TABLE public.user_invitations ENABLE ROW LEVEL SECURITY;
 
@@ -156,8 +160,10 @@ CREATE POLICY user_invitations_select ON public.user_invitations
 -- for every other link path), under the profile row lock:
 --   'none'          nothing changes: no profile, no login, not imported, no
 --                   imported vessel, or the user already has a current
---                   assignment (an existing crew member is never re-pointed
---                   from a stale imported_vessel_id)
+--                   assignment (crew_assignment_is_current(), D-217: a row
+--                   whose leave date has come no longer counts; an existing
+--                   crew member is never re-pointed from a stale
+--                   imported_vessel_id)
 --   'not_eligible'  the imported vessel is not a vessel of the profile's
 --                   company, or it is Sold or archived; or the position
 --                   (normalised as crew_assignments_guard does) is Master
@@ -197,7 +203,8 @@ BEGIN
   IF NOT FOUND OR v_profile.user_id IS NULL OR NOT coalesce(v_profile.is_imported, false) OR v_profile.imported_vessel_id IS NULL THEN
     RETURN 'none';
   END IF;
-  IF EXISTS (SELECT 1 FROM public.crew_assignments AS ca WHERE ca.user_id = v_profile.user_id AND ca.is_current) THEN
+  IF EXISTS (SELECT 1 FROM public.crew_assignments AS ca
+             WHERE ca.user_id = v_profile.user_id AND ca.is_current AND public.crew_assignment_is_current(ca.is_current, ca.leave_date, ca.end_date)) THEN
     RETURN 'none';
   END IF;
   SELECT * INTO v_vessel FROM public.vessels WHERE id = v_profile.imported_vessel_id;
@@ -224,7 +231,8 @@ BEGIN
          coalesce(v_profile.joining_date, current_date), true, v_actor
   WHERE NOT EXISTS (
     SELECT 1 FROM public.crew_assignments AS ca
-    WHERE ca.user_id = v_profile.user_id AND ca.vessel_id = v_vessel.id AND ca.is_current
+    WHERE ca.user_id = v_profile.user_id AND ca.vessel_id = v_vessel.id
+      AND ca.is_current AND public.crew_assignment_is_current(ca.is_current, ca.leave_date, ca.end_date)
   );
   GET DIAGNOSTICS v_inserted = ROW_COUNT;
   UPDATE public.profiles SET imported_vessel_id = NULL, is_imported = false WHERE id = v_profile.id;
@@ -451,7 +459,8 @@ BEGIN
     -- Crew). Before any write.
     IF coalesce(v_profile.is_imported, false) AND v_profile.imported_vessel_id IS NOT NULL
        AND NOT EXISTS (SELECT 1 FROM public.crew_assignments AS ca
-                       WHERE ca.user_id = coalesce(v_profile.user_id, p_user_id) AND ca.is_current) THEN
+                       WHERE ca.user_id = coalesce(v_profile.user_id, p_user_id)
+                         AND ca.is_current AND public.crew_assignment_is_current(ca.is_current, ca.leave_date, ca.end_date)) THEN
       v_office := btrim(regexp_replace(translate(btrim(coalesce(nullif(btrim(v_profile.position), ''), nullif(btrim(v_profile.rank), ''), 'Crew')),
                                                  'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '[^a-z0-9]+', '_', 'g'), '_');
       IF v_office IN ('master', 'captain')
@@ -626,7 +635,8 @@ BEGIN
     -- A pending Master / Captain placement needs a users-access admin of the
     -- pending vessel (review round 4; record_invitation_send's rule).
     IF coalesce(v_profile.is_imported, false) AND v_profile.imported_vessel_id IS NOT NULL
-       AND NOT EXISTS (SELECT 1 FROM public.crew_assignments AS ca WHERE ca.user_id = v_profile.user_id AND ca.is_current) THEN
+       AND NOT EXISTS (SELECT 1 FROM public.crew_assignments AS ca
+                       WHERE ca.user_id = v_profile.user_id AND ca.is_current AND public.crew_assignment_is_current(ca.is_current, ca.leave_date, ca.end_date)) THEN
       v_office := btrim(regexp_replace(translate(btrim(coalesce(nullif(btrim(v_profile.position), ''), nullif(btrim(v_profile.rank), ''), 'Crew')),
                                                  'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), '[^a-z0-9]+', '_', 'g'), '_');
       IF v_office IN ('master', 'captain')
@@ -700,8 +710,16 @@ $$;
 --     accepted is removed. A user with sign-in evidence keeps their
 --     membership (gap/01 W2 row 8): the withdrawal only undoes access the
 --     invitation itself opened.
--- Internal to revoke_invitation() and expire_invitations().
-CREATE OR REPLACE FUNCTION public.invitation_withdraw_access(p_invitation_id uuid)
+--   - with _evidence_before (D-228; review round 5,
+--     expired-invitation-still-accepted: record_session_start passes the
+--     invitation's expires_at, because auth.users.last_sign_in_at already
+--     holds the sign-in being refused), only evidence from before it
+--     counts: coalesce(last_login_at, auth last_sign_in_at) <
+--     _evidence_before, or an accepted membership of that login.
+-- Internal to revoke_invitation(), expire_invitations() (one argument,
+-- unchanged) and record_session_start() (two).
+DROP FUNCTION IF EXISTS public.invitation_withdraw_access(uuid);
+CREATE OR REPLACE FUNCTION public.invitation_withdraw_access(p_invitation_id uuid, _evidence_before timestamptz DEFAULT NULL)
 RETURNS void
 LANGUAGE plpgsql
 VOLATILE
@@ -733,6 +751,20 @@ BEGIN
   v_signed_in := coalesce(v_profile.last_login_at,
                           (SELECT u.last_sign_in_at FROM auth.users AS u WHERE u.id = v_profile.user_id));
   v_user := coalesce(v_inv.user_id, v_profile.user_id);
+  IF _evidence_before IS NOT NULL THEN
+    -- Only evidence from before the cut-off (D-228), or an accepted
+    -- membership of that login.
+    IF NOT coalesce(v_signed_in < _evidence_before, false) THEN
+      v_signed_in := NULL;
+    END IF;
+    IF v_signed_in IS NULL AND v_user IS NOT NULL THEN
+      SELECT m.accepted_at INTO v_signed_in
+      FROM public.account_memberships AS m
+      WHERE m.company_id = v_inv.company_id AND m.user_id = v_user AND m.accepted_at IS NOT NULL
+      ORDER BY m.accepted_at
+      LIMIT 1;
+    END IF;
+  END IF;
 
   PERFORM set_config('storm.access_engine', 'on', true);
   v_claims := current_setting('request.jwt.claims', true);
@@ -874,7 +906,7 @@ WHERE p.account_status = 'invited'
 
 REVOKE ALL ON FUNCTION public.record_invitation_send(uuid, text, text, text, uuid, text, timestamptz, uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.reserve_invitation_attempt(uuid, uuid, text) FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON FUNCTION public.invitation_withdraw_access(uuid) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.invitation_withdraw_access(uuid, timestamptz) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.revoke_invitation(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.expire_invitations() FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.fulfil_imported_assignment(uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
@@ -895,7 +927,7 @@ COMMENT ON COLUMN public.user_invitations.last_error_code IS 'Stable snake_case 
 COMMENT ON FUNCTION public.record_invitation_send(uuid, text, text, text, uuid, text, timestamptz, uuid) IS 'Records one invitation send outcome (sent | send_failed with a code) on the profile''s live row for the reserved attempt (not counted again); only a sent invitation stamps profiles.account_status invited and restores a removed legacy membership (under storm.access_engine); provider_duplicate never downgrades a sent row. A given p_invited_by must be a member who may act on the invitee (42501 inviter_not_member, inviter_out_of_reach; D-207) and manage admins for an administrator target (42501 manages_admins_required), and be a users-access admin of the pending vessel of a Master / Captain placement (42501 master_needs_admin, DETAIL Only a users-access administrator of this vessel can invite a Master.; review round 4, D-198, D-204); a login linked to a profile without one must be one STORM created for it (invitation_login_state storm_invited; 42501 login_email_mismatch, login_not_invited; D-205). Nothing is written on a refusal. Service role only (send-invitation, bulk-invite, admin-actions).';
 COMMENT ON FUNCTION public.reserve_invitation_attempt(uuid, uuid, text) IS 'D-146: reserves the next invitation attempt number before a link is generated, under the profile and live-row locks: {ok, invitation_id, attempt} or {ok: false, code: not_found | disabled | forbidden (a given p_invited_by may not act on the person, D-207) | manages_admins_required (an administrator target and an inviter who does not manage admins, W7) | master_needs_admin (a pending Master / Captain placement and an inviter who is no users-access admin of the pending vessel; review round 4) | counter_exhausted (the next number would pass 2147483647; computed in bigint, never raises) | cooldown (retry_after_seconds)}. Cooldown 5 min after a send, 30 s after a failed attempt. Service role only.';
 COMMENT ON FUNCTION public.invitation_login_state(uuid, uuid) IS 'D-205: whether a login may be adopted by the profile, first match wins: unknown (NULL id, no profile, no auth user) | linked | linked_elsewhere | email_mismatch (lower(btrim) addresses differ; NULL counts as a mismatch) | storm_invited (an invitation row of the profile carries the login, or invited_at set, never signed in, no password, no non-email identity) | unused_orphan (never confirmed, never signed in) | foreign. Only storm_invited is adoptable. Service role only.';
-COMMENT ON FUNCTION public.invitation_withdraw_access(uuid) IS 'Internal to revoke / expire: for an ended, never-accepted invitation of a still invited / not_invited profile, the legacy invitation_token / invitation_token_expires are cleared (whatever the sign-in evidence); without sign-in evidence the still-invited profile -> not_invited and the never-accepted legacy membership -> removed (under storm.access_engine, JWT claims suspended). Active / disabled profiles untouched.';
+COMMENT ON FUNCTION public.invitation_withdraw_access(uuid, timestamptz) IS 'Internal to revoke / expire / record_session_start: for an ended, never-accepted invitation of a still invited / not_invited profile, the legacy invitation_token / invitation_token_expires are cleared (whatever the sign-in evidence); without sign-in evidence the still-invited profile -> not_invited and the never-accepted legacy membership -> removed (under storm.access_engine, JWT claims suspended). With _evidence_before (D-228: record_session_start passes expires_at) only sign-in evidence older than it, or an accepted membership, keeps the access. Active / disabled profiles untouched.';
 COMMENT ON FUNCTION public.revoke_invitation(uuid) IS 'A users-access admin of the invitation''s company who may act on the invitee (vessel reach, gap/01 F23) revokes a live invitation and withdraws the access it opened when never accepted (42501 not_permitted; 42501 manages_admins_required for an admin / owner invitation, an administrator target or a dpa / shore_management profile, W7; P0002 invitation_not_found / invitation_not_live).';
 COMMENT ON FUNCTION public.fulfil_imported_assignment(uuid, uuid) IS 'D-184: once a login is linked, an imported profile''s imported_vessel_id becomes one current crew_assignments row (position, else rank, else Crew; join_date = joining_date, else today) under storm.access_engine, then imported_vessel_id is cleared and is_imported set false. Returns created | exists | none (not imported, no login, or already a current crew member: nothing changes) | not_eligible (a vessel of another company, Sold or archived; or a Master / Captain position without p_actor being a users-access admin of the vessel, D-198: nothing written, profile untouched and still pending). Service role only (record_invitation_send, the profile trigger, the edge).';
 COMMENT ON FUNCTION public.profiles_fulfil_imported_assignment() IS 'Trigger trg_profiles_fulfil_imported_assignment (AFTER UPDATE OF user_id, a login newly linked to an imported profile with an imported vessel): fulfil_imported_assignment(NEW.id, the inviter named in storm.fulfil_actor).';

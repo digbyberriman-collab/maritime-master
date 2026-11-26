@@ -346,7 +346,7 @@ describe('pass to', () => {
     s = must(passSlotTo(s, { slotKey: 'hod', toProfileId: 'p-hod2', at: 't1' }, CREW));
     expect(slotState(s, 'hod')).toBe('requested');
     expect(s.passes.hod).toEqual({ profileId: 'p-hod2', at: 't1' });
-    s = must(cancelPass(s, 'hod'));
+    s = must(cancelPass(s, 'hod', CREW));
     expect(slotState(s, 'hod')).toBe('open');
   });
 
@@ -365,8 +365,8 @@ describe('pass to', () => {
     expect(code(passSlotTo(requested, { slotKey: 'hod', toProfileId: 'p-hod2', at: 't' }, CREW))).toBe('not_open');
     const signed = must(sign(s, 'hod', HOD));
     expect(code(passSlotTo(signed, { slotKey: 'hod', toProfileId: 'p-hod2', at: 't' }, CREW))).toBe('not_open');
-    expect(code(cancelPass(s, 'hod'))).toBe('not_requested');
-    expect(code(cancelPass(s, 'nope'))).toBe('unknown_slot');
+    expect(code(cancelPass(s, 'hod', CREW))).toBe('not_requested');
+    expect(code(cancelPass(s, 'nope', CREW))).toBe('unknown_slot');
   });
 });
 
@@ -606,6 +606,73 @@ describe('cycles', () => {
     s = startNextCycle(s, 't');
     s = must(sign(s, 'hod', HOD));
     expect(activeSignature(s, 'hod')?.cycle).toBe(2);
+  });
+});
+
+describe('write access (D-214: a reader who may view the record changes nothing)', () => {
+  // An external viewer: may read, may not write; eligibility would admit them.
+  const READER = actor('p-hod', { canWrite: false });
+  const READER_UNSET = actor('p-hod', { canWrite: undefined });
+  const COMPANY_READER = actor('p-shore', { canWrite: false, isCompanyActor: true });
+  const WRITE_MESSAGE = 'You can view this record but not change it.';
+
+  it('pass: no_write_access after impersonation, before the slot state', () => {
+    expect(passSlotTo(fresh(), { slotKey: 'hod', toProfileId: 'p-hod2', at: 't' }, READER)).toEqual({
+      ok: false,
+      error: { code: 'no_write_access', message: WRITE_MESSAGE },
+    });
+    expect(code(passSlotTo(fresh(), { slotKey: 'hod', toProfileId: 'p-hod2', at: 't' }, READER_UNSET))).toBe('no_write_access');
+    // A waiting slot: the write check comes first, as in record_pass_slot.
+    expect(code(passSlotTo(fresh(), { slotKey: 'master', toProfileId: 'p-master', at: 't' }, READER))).toBe('no_write_access');
+    expect(code(passSlotTo(fresh(), { slotKey: 'hod', toProfileId: 'p-hod2', at: 't' }, actor('p-hod', { canWrite: false, impersonating: true })))).toBe('impersonating');
+  });
+
+  it('cancel a pass: no_write_access, the pass stays', () => {
+    const requested = must(passSlotTo(fresh(), { slotKey: 'hod', toProfileId: 'p-hod2', at: 't' }, CREW));
+    const r = cancelPass(requested, 'hod', READER);
+    expect(code(r)).toBe('no_write_access');
+    expect(slotState(requested, 'hod')).toBe('requested');
+    expect(code(cancelPass(requested, 'hod', READER_UNSET))).toBe('no_write_access');
+    expect(code(cancelPass(requested, 'hod', actor('p-hod', { canWrite: false, impersonating: true })))).toBe('impersonating');
+  });
+
+  it('re-sign (verified, own signature): no_write_access before not_signed', () => {
+    const s = must(sign(fresh(), 'hod', HOD));
+    expect(code(reSignSlot(s, { slotKey: 'hod', id: 're-reader', recordDigest: 'd2', at: 't2' }, READER))).toBe('no_write_access');
+    expect(code(reSignSlot(s, { slotKey: 'master', id: 're-reader-2', recordDigest: 'd2', at: 't2' }, READER))).toBe('no_write_access');
+    expect(activeSignature(s, 'hod')?.recordDigest).toBe('d1');
+  });
+
+  it('remove (own signature): no_write_access before not_signed, the signature stays', () => {
+    const s = must(sign(fresh(), 'hod', HOD));
+    expect(code(removeSignature(s, { slotKey: 'hod', at: 't2' }, READER))).toBe('no_write_access');
+    expect(code(removeSignature(s, { slotKey: 'master', at: 't2' }, READER))).toBe('no_write_access');
+    // A reader who also holds the Master office removes nothing either.
+    expect(code(removeSignature(s, { slotKey: 'hod', at: 't2' }, actor('p-master', { canWrite: false, isMaster: true })))).toBe('no_write_access');
+    expect(activeSignature(s, 'hod')?.removedAt).toBeNull();
+  });
+
+  it('slotActions offers a reader no pass, cancel or remove', () => {
+    expect(slotActions(fresh(), 'hod', READER)).toMatchObject({ passTo: false, cancelPass: false, remove: false, someoneElse: false });
+    const requested = must(passSlotTo(fresh(), { slotKey: 'hod', toProfileId: 'p-hod2', at: 't' }, CREW));
+    expect(slotActions(requested, 'hod', READER)).toMatchObject({ passTo: false, cancelPass: false });
+    const signed = must(sign(fresh(), 'hod', HOD));
+    expect(slotActions(signed, 'hod', READER).remove).toBe(false);
+    expect(slotActions(signed, 'hod', READER_UNSET).remove).toBe(false);
+  });
+
+  it('a company actor without canWrite still acts', () => {
+    let s = must(sign(fresh(), 'hod', HOD));
+    s = must(sign(s, 'master', MASTER));
+    expect(slotActions(s, 'company', COMPANY_READER)).toMatchObject({ signAsMe: true, passTo: true });
+    const requested = must(passSlotTo(s, { slotKey: 'company', toProfileId: 'p-shore', at: 't' }, COMPANY_READER));
+    expect(slotActions(requested, 'company', COMPANY_READER).cancelPass).toBe(true);
+    const back = must(cancelPass(requested, 'company', COMPANY_READER));
+    expect(slotState(back, 'company')).toBe('open');
+    const signed = must(sign(s, 'company', COMPANY_READER));
+    expect(code(reSignSlot(signed, { slotKey: 'company', id: 're-company', recordDigest: 'd2', at: 't3' }, COMPANY_READER))).toBe('ok');
+    expect(code(removeSignature(signed, { slotKey: 'company', at: 't3' }, COMPANY_READER))).toBe('ok');
+    expect(slotActions(signed, 'company', COMPANY_READER).remove).toBe(true);
   });
 });
 

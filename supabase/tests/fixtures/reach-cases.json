@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Shared reach fixture (Phase 2 spec §E). One world of two companies, their vessels and users. 'legacy' is the D-26 rule set (account_memberships missing, or a legacy-managed membership); 'membership' is what user_vessel_reach()/user_has_fleet_reach() and membershipReach() return once memberships exist (backfilled legacy rows for users whose membership is null). Read by the SQL tests (supabase/tests/sql/p2_reach) and by the TS parity test (src/test/router/membershipReach.test.ts). RBAC roles are listed raw: the TS side keeps only isActive && (validUntil null or > now), and isFleetWide = vessel === null && defaultScope === 'fleet', as get_user_roles_full does. Emails, when a seeder needs one, are '<key with dots as dashes>@example.test'.",
+  "description": "Shared reach fixture (Phase 2 spec §E). One world of two companies, their vessels and users. 'legacy' is the D-26 rule set (account_memberships missing, or a legacy-managed membership); 'membership' is what user_vessel_reach()/user_has_fleet_reach() and membershipReach() return once memberships exist (backfilled legacy rows for users whose membership is null). Read by the SQL tests (supabase/tests/sql/p2_reach) and by the TS parity test (src/test/router/membershipReach.test.ts). RBAC roles are listed raw: the TS side keeps only isActive && (validUntil null or > now), and isFleetWide = vessel === null && defaultScope === 'fleet', as get_user_roles_full does. Emails, when a seeder needs one, are '<key with dots as dashes>@example.test'. An assignment may carry leaveDate / endDate (YYYY-MM-DD): it counts as current only while isCurrent and coalesce(leaveDate, endDate) is after today (D-217, review round 5: SQL crew_assignment_is_current, TS assignmentIsCurrent). The dates are far from both 'now' and the real current_date, so the answer does not depend on when the test runs; the SQL seeder stores an isCurrent row whose date has passed with the legacy normaliser off, as a row written before its leave date came.",
   "now": "2026-11-23T12:00:00Z",
   "companies": ["A", "B"],
   "roles": [
@@ -95,6 +95,21 @@
       "key": "B.crew_cross", "company": "B", "profileRole": "crew", "accountStatus": "active",
       "rbacRoles": [], "assignments": [{ "vessel": "A.dra", "isCurrent": true }], "membership": null,
       "expected": { "legacy": { "fleetReach": false, "vessels": [] }, "membership": { "fleetReach": false, "vessels": [] } }
+    },
+    {
+      "key": "A.master_stale", "company": "A", "profileRole": "master", "accountStatus": "active",
+      "rbacRoles": [], "assignments": [{ "vessel": "A.dra", "isCurrent": true, "leaveDate": "2026-01-15" }], "membership": null,
+      "expected": { "legacy": { "fleetReach": false, "vessels": [] }, "membership": { "fleetReach": false, "vessels": [] } }
+    },
+    {
+      "key": "A.crew_ended", "company": "A", "profileRole": "crew", "accountStatus": "active",
+      "rbacRoles": [], "assignments": [{ "vessel": "A.hyd", "isCurrent": true, "endDate": "2026-02-28" }], "membership": null,
+      "expected": { "legacy": { "fleetReach": false, "vessels": [] }, "membership": { "fleetReach": false, "vessels": [] } }
+    },
+    {
+      "key": "A.crew_signing_off", "company": "A", "profileRole": "crew", "accountStatus": "active",
+      "rbacRoles": [], "assignments": [{ "vessel": "A.gam", "isCurrent": true, "leaveDate": "2099-12-31" }], "membership": null,
+      "expected": { "legacy": { "fleetReach": false, "vessels": ["A.gam"] }, "membership": { "fleetReach": false, "vessels": ["A.gam"] } }
     },
     {
       "key": "A.external_hyd", "company": "A", "profileRole": "crew", "accountStatus": "active",

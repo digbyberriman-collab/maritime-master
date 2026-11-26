@@ -5,7 +5,8 @@
 -- Tables: account_memberships, account_membership_vessels
 -- Helpers: user_is_active(), my_account_status(), record_session_start(),
 --   invitation_withdrawn_for(), legacy_all_vessels(), legacy_fleet_reach(),
---   vessel_in_reachable_state(),
+--   vessel_in_reachable_state(), crew_assignment_is_current(),
+--   crew_assignment_holds_office() (D-217, D-227),
 --   internal reach_vessels_for() / reach_vessel_for() / fleet_reach_for(),
 --   public user_vessel_reach() / user_can_reach_vessel() /
 --   user_has_fleet_reach(); triggers trg_profiles_sync_membership,
@@ -38,8 +39,23 @@
 -- Two layers of reach helpers (CC-3, D-136): the internal reach_*_for
 -- functions (service role only) answer for any user, for definers that
 -- evaluate someone other than the caller; the public user_* helpers add
--- the caller rule (no JWT, yourself, or a users-access viewer of the
--- target's company).
+-- the caller rule (no JWT, yourself, or a users-access viewer who may view
+-- the target: admin_may_view_user(), gap/01 F23 / D-194; review round 5,
+-- reach-helpers-ignore-f23-scope).
+--
+-- A crew assignment counts as current only while is_current is set and
+-- its leave date (else end date) has not come (crew_assignment_is_current,
+-- the D-217 rule the guard already used; review round 5,
+-- stale-is-current-keeps-reach): the legacy normaliser flips is_current
+-- only when a row is written, and crew_assignments_end_stale()
+-- (20261123010300) sweeps the rest. The Master office also waits for the
+-- join date (crew_assignment_holds_office, D-227); reach of a planned
+-- assignment stays as legacy.
+--
+-- Helpers that policies call are LANGUAGE plpgsql (D-229): PostgreSQL 17
+-- and earlier never inline a SECURITY DEFINER SQL function and re-plan a
+-- nested non-inlined SQL function on every call, while PL/pgSQL keeps its
+-- plans for the session (review round 5, rls-helper-per-row-slowdown).
 --
 -- Idempotent (D-12).
 
@@ -162,55 +178,109 @@ GRANT ALL ON TABLE public.account_membership_vessels TO service_role;
 -- ban in force and no soft delete (auth.users.deleted_at: a GoTrue soft
 -- delete leaves issued tokens valid until they expire; review round 4,
 -- user-is-active-ignores-soft-delete). Legacy-managed rows have no window, so nobody's access
--- changes when this file is applied. NULL → false. Asked about another
+-- changes when this file is applied. An invitation past its expiry grants
+-- nothing (D-228; review round 5, expired-invitation-still-accepted): a
+-- profile still 'invited' whose membership was never accepted and whose
+-- newest invitation (by login or by profile) is still live (pending,
+-- sent, send_failed), never accepted and past expires_at is not active,
+-- whether or not an expiry job has run (a resend writes a new expiry, so
+-- it works again). NULL → false. Asked about another
 -- user, a signed-in caller gets the truth only for an active member of
 -- their own company (no cross-tenant probing); without a JWT (SQL editor,
 -- cron, the service-role client) it answers for anyone.
+--
+-- LANGUAGE plpgsql (D-229): every policy and helper calls it, often per
+-- row, and PL/pgSQL caches its plans for the session where a nested SQL
+-- function is planned again on every call. The first statement is the
+-- original SQL body unchanged; the invitation lookup is static SQL behind
+-- to_regclass (planned only once user_invitations exists, then cached;
+-- 20261123010200_platform_user_invitations.sql creates the table and its
+-- (profile_id, created_at) index) and runs only for an 'invited' profile.
 CREATE OR REPLACE FUNCTION public.user_is_active(_user_id uuid)
 RETURNS boolean
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  WITH state AS (
-    SELECT p.user_id,
-           p.company_id,
-           (lower(coalesce(p.account_status, 'active')) NOT IN ('disabled', 'deactivated')
-            AND NOT EXISTS (
-              SELECT 1 FROM public.account_memberships AS m
-              WHERE m.user_id = p.user_id AND m.company_id = p.company_id
-                AND (m.status IN ('disabled', 'removed')
-                     OR (NOT m.legacy_managed AND (
-                           (m.valid_from IS NOT NULL AND m.valid_from > now())
-                        OR (m.valid_until IS NOT NULL AND m.valid_until <= now())))))
-            AND NOT EXISTS (
-              SELECT 1 FROM auth.users AS u
-              WHERE u.id = p.user_id
-                AND (u.deleted_at IS NOT NULL
-                     OR (u.banned_until IS NOT NULL AND u.banned_until > now())))
-           ) AS active
-    FROM public.profiles AS p
-    WHERE p.user_id = _user_id OR p.user_id = auth.uid()
-  )
-  SELECT coalesce((
-    SELECT t.active AND (
-      auth.uid() IS NULL
-      OR t.user_id = auth.uid()
-      OR EXISTS (SELECT 1 FROM state AS c WHERE c.user_id = auth.uid() AND c.active AND c.company_id = t.company_id)
+DECLARE
+  v_uid uuid := auth.uid();
+  v_active boolean;
+  v_expired boolean;
+BEGIN
+  v_active := (
+    WITH state AS (
+      SELECT p.user_id,
+             p.company_id,
+             (lower(coalesce(p.account_status, 'active')) NOT IN ('disabled', 'deactivated')
+              AND NOT EXISTS (
+                SELECT 1 FROM public.account_memberships AS m
+                WHERE m.user_id = p.user_id AND m.company_id = p.company_id
+                  AND (m.status IN ('disabled', 'removed')
+                       OR (NOT m.legacy_managed AND (
+                             (m.valid_from IS NOT NULL AND m.valid_from > now())
+                          OR (m.valid_until IS NOT NULL AND m.valid_until <= now())))))
+              AND NOT EXISTS (
+                SELECT 1 FROM auth.users AS u
+                WHERE u.id = p.user_id
+                  AND (u.deleted_at IS NOT NULL
+                       OR (u.banned_until IS NOT NULL AND u.banned_until > now())))
+             ) AS active
+      FROM public.profiles AS p
+      WHERE p.user_id = _user_id OR p.user_id = auth.uid()
     )
-    FROM state AS t
-    WHERE t.user_id = _user_id
-  ), false)
+    SELECT coalesce((
+      SELECT t.active AND (
+        auth.uid() IS NULL
+        OR t.user_id = auth.uid()
+        OR EXISTS (SELECT 1 FROM state AS c WHERE c.user_id = auth.uid() AND c.active AND c.company_id = t.company_id)
+      )
+      FROM state AS t
+      WHERE t.user_id = _user_id
+    ), false)
+  );
+  IF NOT v_active OR to_regclass('public.user_invitations') IS NULL THEN
+    RETURN v_active;
+  END IF;
+  -- D-228: the target, and a signed-in caller asking about someone else
+  -- (their own activity is part of the answer above), with an expired,
+  -- never-accepted invitation get nothing.
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.profiles AS p
+    WHERE p.user_id IN (_user_id, v_uid)
+      AND lower(coalesce(p.account_status, 'active')) = 'invited'
+      AND NOT EXISTS (
+        SELECT 1 FROM public.account_memberships AS m
+        WHERE m.user_id = p.user_id AND m.company_id = p.company_id AND m.accepted_at IS NOT NULL)
+      AND EXISTS (
+        SELECT 1
+        FROM (SELECT ui.status, ui.accepted_at, ui.expires_at
+                FROM public.user_invitations AS ui
+               WHERE ui.user_id = p.user_id OR ui.profile_id = p.id
+               ORDER BY ui.created_at DESC, ui.id DESC
+               LIMIT 1) AS newest
+        WHERE newest.status IN ('pending', 'sent', 'send_failed')
+          AND newest.accepted_at IS NULL
+          AND newest.expires_at < now())
+  ) INTO v_expired;
+  RETURN NOT coalesce(v_expired, false);
+END;
 $$;
 
--- Whether the user's access was withdrawn with their invitation: the
--- profile is neither invited nor active (e.g. not_invited after a revoke)
--- and the newest invitation of the user (by login or by profile) is revoked
--- or expired and was never accepted. False until
--- 20261123010200_platform_user_invitations.sql creates the table (read
--- through EXECUTE behind to_regclass). Internal: my_account_status() and
--- record_session_start() answer 'disabled' for it (D-141 vocabulary).
+-- Whether the user's access was withdrawn with their invitation:
+--   - the profile is neither invited nor active (e.g. not_invited after a
+--     revoke) and the newest invitation of the user (by login or by
+--     profile) is revoked or expired and was never accepted; or
+--   - (D-228; review round 5) the profile is still 'invited', its
+--     membership was never accepted, and the newest invitation is still
+--     live (pending, sent, send_failed), never accepted and past
+--     expires_at: an expiry no job has recorded yet withdraws the access
+--     too (user_is_active() says the same).
+-- False until 20261123010200_platform_user_invitations.sql creates the
+-- table (read through EXECUTE behind to_regclass). Internal:
+-- my_account_status() and record_session_start() answer 'disabled' for it
+-- (D-141 vocabulary).
 CREATE OR REPLACE FUNCTION public.invitation_withdrawn_for(_user_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
@@ -220,16 +290,31 @@ SET search_path = public
 AS $$
 DECLARE
   v_profile_id uuid;
+  v_company uuid;
   v_status text;
   v_withdrawn boolean := false;
 BEGIN
   IF _user_id IS NULL THEN
     RETURN false;
   END IF;
-  SELECT p.id, lower(coalesce(p.account_status, 'active')) INTO v_profile_id, v_status
+  SELECT p.id, p.company_id, lower(coalesce(p.account_status, 'active')) INTO v_profile_id, v_company, v_status
   FROM public.profiles AS p WHERE p.user_id = _user_id;
-  IF NOT FOUND OR v_status IN ('invited', 'active') OR to_regclass('public.user_invitations') IS NULL THEN
+  IF NOT FOUND OR v_status = 'active' OR to_regclass('public.user_invitations') IS NULL THEN
     RETURN false;
+  END IF;
+  IF v_status = 'invited' THEN
+    IF EXISTS (SELECT 1 FROM public.account_memberships AS m
+               WHERE m.user_id = _user_id AND m.company_id = v_company AND m.accepted_at IS NOT NULL) THEN
+      RETURN false;
+    END IF;
+    EXECUTE 'SELECT ui.status IN (''pending'', ''sent'', ''send_failed'') AND ui.accepted_at IS NULL AND ui.expires_at < now()
+               FROM public.user_invitations AS ui
+              WHERE ui.user_id = $1 OR ui.profile_id = $2
+              ORDER BY ui.created_at DESC, ui.id DESC
+              LIMIT 1'
+      INTO v_withdrawn
+      USING _user_id, v_profile_id;
+    RETURN coalesce(v_withdrawn, false);
   END IF;
   EXECUTE 'SELECT ui.status IN (''revoked'', ''expired'') AND ui.accepted_at IS NULL
              FROM public.user_invitations AS ui
@@ -310,11 +395,55 @@ AS $$
   SELECT _lifecycle_status IS DISTINCT FROM 'archived' AND _status IS NOT NULL AND _status <> 'Sold'
 $$;
 
+-- ---------------------------------------------------------------- current crew assignments (D-217, D-227)
+
+-- Whether a crew_assignments row counts as current (D-217; review round 5,
+-- stale-is-current-keeps-reach): is_current is set and the leave date
+-- (else the end date) has not come. The legacy normaliser
+-- (trg_crew_assignments_normalise_dates) applies the same rule, but only
+-- when a row is written, so a row whose leave date passed later still
+-- says is_current until crew_assignments_end_stale() (20261123010300)
+-- sweeps it. Every reader of "current" in the build-out asks this; the
+-- callers keep a plain is_current conjunct beside it so the planner can
+-- use idx_crew_assignments_user_current. LANGUAGE plpgsql: the ACL rule's
+-- SET search_path blocks SQL inlining, and a nested SQL function would be
+-- planned again on every call (D-229). STABLE (current_date). Internal:
+-- definers call it, nothing is granted.
+CREATE OR REPLACE FUNCTION public.crew_assignment_is_current(_is_current boolean, _leave date, _end date)
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SET search_path = public
+AS $$
+BEGIN
+  RETURN coalesce(_is_current, false) AND NOT coalesce(coalesce(_leave, _end) <= current_date, false);
+END;
+$$;
+
+-- Whether a crew_assignments row holds its office now (D-227): current
+-- (crew_assignment_is_current) and joined: the join date (else the start
+-- date) has come. The Master office (record_is_master, the office slots of
+-- record_slot_eligible) starts on the join date; vessel reach of a planned
+-- assignment stays as legacy (VesselAccessSection allows a future start).
+-- Internal: definers call it, nothing is granted.
+CREATE OR REPLACE FUNCTION public.crew_assignment_holds_office(_is_current boolean, _join date, _start date, _leave date, _end date)
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SET search_path = public
+AS $$
+BEGIN
+  RETURN public.crew_assignment_is_current(_is_current, _leave, _end)
+     AND NOT coalesce(coalesce(_join, _start) > current_date, false);
+END;
+$$;
+
 -- ---------------------------------------------------------------- internal reach (service role; definers)
 
 -- The vessels the user reaches, for any user (no caller rule, CC-3).
 -- Empty unless user_is_active(); only the membership in the profile's
 -- company, active and inside its window, counts (no membership → empty).
+-- A crew assignment counts while crew_assignment_is_current() (D-217).
 CREATE OR REPLACE FUNCTION public.reach_vessels_for(_user_id uuid)
 RETURNS SETOF uuid
 LANGUAGE sql
@@ -346,7 +475,8 @@ AS $$
               AND (mv.valid_until IS NULL OR mv.valid_until > now())))
       OR ((me.legacy_managed OR me.kind <> 'external') AND EXISTS (
             SELECT 1 FROM public.crew_assignments AS ca
-            WHERE ca.user_id = _user_id AND ca.vessel_id = v.id AND ca.is_current))
+            WHERE ca.user_id = _user_id AND ca.vessel_id = v.id
+              AND ca.is_current AND public.crew_assignment_is_current(ca.is_current, ca.leave_date, ca.end_date)))
     )
   ORDER BY v.created_at, v.id
 $$;
@@ -381,7 +511,8 @@ AS $$
                 AND (mv.valid_until IS NULL OR mv.valid_until > now())))
         OR ((m.legacy_managed OR m.kind <> 'external') AND EXISTS (
               SELECT 1 FROM public.crew_assignments AS ca
-              WHERE ca.user_id = _user_id AND ca.vessel_id = v.id AND ca.is_current))
+              WHERE ca.user_id = _user_id AND ca.vessel_id = v.id
+                AND ca.is_current AND public.crew_assignment_is_current(ca.is_current, ca.leave_date, ca.end_date)))
       )
   )
 $$;
@@ -414,11 +545,17 @@ $$;
 
 -- Caller rule, shared by the three public helpers: no JWT (SQL editor,
 -- cron, the service-role client), the caller asking about themselves, or a
--- caller who passes has_capability('admin.access.users_access.view', <the
--- target's profile company>). has_capability arrives with
+-- users-access viewer who may view the target: admin_may_view_user(<the
+-- target>, <the target's profile company>) (gap/01 F23 / D-194; review
+-- round 5, reach-helpers-ignore-f23-scope), which asks
+-- has_capability('admin.access.users_access.view', company) and
+-- admin_may_act_on_user(), so a vessel-scoped viewer gets answers only for
+-- the users of the vessels they reach. admin_may_view_user arrives with
 -- 20261123000400_platform_capabilities.sql and is called through EXECUTE
 -- behind to_regprocedure, so before that file only self and no-JWT callers
--- get an answer. Anyone else gets nothing.
+-- get an answer. It reads the internal reach_vessels_for(), never these
+-- helpers, so nothing recurses. Anyone else gets nothing; unknown ids get
+-- nothing (false or empty).
 
 CREATE OR REPLACE FUNCTION public.user_vessel_reach(_user_id uuid)
 RETURNS SETOF uuid
@@ -435,10 +572,10 @@ BEGIN
   IF _user_id IS NULL THEN RETURN; END IF;
   IF v_caller IS NULL OR v_caller = _user_id THEN
     v_allowed := true;
-  ELSIF to_regprocedure('public.has_capability(text,uuid,uuid)') IS NOT NULL THEN
+  ELSIF to_regprocedure('public.admin_may_view_user(uuid,uuid,uuid)') IS NOT NULL THEN
     SELECT p.company_id INTO v_company FROM public.profiles AS p WHERE p.user_id = _user_id;
     IF v_company IS NOT NULL THEN
-      EXECUTE 'SELECT public.has_capability($1, $2, NULL)' INTO v_allowed USING 'admin.access.users_access.view', v_company;
+      EXECUTE 'SELECT public.admin_may_view_user($1, $2, NULL)' INTO v_allowed USING _user_id, v_company;
     END IF;
   END IF;
   IF coalesce(v_allowed, false) THEN
@@ -462,10 +599,10 @@ BEGIN
   IF _user_id IS NULL OR _vessel_id IS NULL THEN RETURN false; END IF;
   IF v_caller IS NULL OR v_caller = _user_id THEN
     v_allowed := true;
-  ELSIF to_regprocedure('public.has_capability(text,uuid,uuid)') IS NOT NULL THEN
+  ELSIF to_regprocedure('public.admin_may_view_user(uuid,uuid,uuid)') IS NOT NULL THEN
     SELECT p.company_id INTO v_company FROM public.profiles AS p WHERE p.user_id = _user_id;
     IF v_company IS NOT NULL THEN
-      EXECUTE 'SELECT public.has_capability($1, $2, NULL)' INTO v_allowed USING 'admin.access.users_access.view', v_company;
+      EXECUTE 'SELECT public.admin_may_view_user($1, $2, NULL)' INTO v_allowed USING _user_id, v_company;
     END IF;
   END IF;
   RETURN coalesce(v_allowed, false) AND public.reach_vessel_for(_user_id, _vessel_id);
@@ -487,10 +624,10 @@ BEGIN
   IF _user_id IS NULL THEN RETURN false; END IF;
   IF v_caller IS NULL OR v_caller = _user_id THEN
     v_allowed := true;
-  ELSIF to_regprocedure('public.has_capability(text,uuid,uuid)') IS NOT NULL THEN
+  ELSIF to_regprocedure('public.admin_may_view_user(uuid,uuid,uuid)') IS NOT NULL THEN
     SELECT p.company_id INTO v_company FROM public.profiles AS p WHERE p.user_id = _user_id;
     IF v_company IS NOT NULL THEN
-      EXECUTE 'SELECT public.has_capability($1, $2, NULL)' INTO v_allowed USING 'admin.access.users_access.view', v_company;
+      EXECUTE 'SELECT public.admin_may_view_user($1, $2, NULL)' INTO v_allowed USING _user_id, v_company;
     END IF;
   END IF;
   RETURN coalesce(v_allowed, false) AND public.fleet_reach_for(_user_id, _company_id);
@@ -505,11 +642,23 @@ $$;
 -- 'active' (the first sign-in after an invitation, CC-19), the membership's
 -- accepted_at (once) and last_active_at, and, once
 -- 20261123010200_platform_user_invitations.sql exists, the caller's live
--- invitations (by user id or by profile) → accepted. A disabled user, a user
+-- invitations (by user id or by profile) that are not past expires_at →
+-- accepted. A disabled user, a user
 -- whose access was withdrawn with a revoked or expired invitation
 -- (invitation_withdrawn_for()) or a user without a profile writes nothing. The bookkeeping sits in its own
 -- block: if it fails, the status is still answered (with a WARNING), so a
 -- bookkeeping problem never blocks a sign-in.
+--
+-- An invitation past its expiry is never accepted (D-228; review round 5,
+-- expired-invitation-still-accepted): before the active check, once
+-- user_invitations exists, the caller's live (pending, sent, send_failed),
+-- never-accepted rows past expires_at become 'expired' under
+-- storm.access_engine, and invitation_withdraw_access(id, expires_at)
+-- withdraws the access each opened, counting only sign-in evidence from
+-- before the expiry (this sign-in is already in auth.users
+-- last_sign_in_at) or an accepted membership. The answer is then
+-- 'disabled' for an invitee whose access that withdrew; an accepted member
+-- whose re-invite expired keeps their access.
 CREATE OR REPLACE FUNCTION public.record_session_start()
 RETURNS text
 LANGUAGE plpgsql
@@ -525,6 +674,8 @@ DECLARE
   v_last_login timestamptz;
   v_claims text;
   v_sub text;
+  v_engine text;
+  v_expired record;
 BEGIN
   IF v_uid IS NULL THEN
     RETURN 'no_profile';
@@ -536,6 +687,32 @@ BEGIN
   IF NOT FOUND THEN
     RETURN 'no_profile';
   END IF;
+
+  -- D-228: expire the caller's live invitations past expires_at and
+  -- withdraw the access they opened (evidence before the expiry only).
+  -- If this fails, nothing of it is kept and the answer still fails
+  -- closed: user_is_active() denies a live invitation past its expiry.
+  IF to_regclass('public.user_invitations') IS NOT NULL THEN
+    BEGIN
+      v_engine := current_setting('storm.access_engine', true);
+      PERFORM set_config('storm.access_engine', 'on', true);
+      FOR v_expired IN EXECUTE
+        'UPDATE public.user_invitations SET status = ''expired''
+          WHERE status IN (''pending'', ''sent'', ''send_failed'') AND accepted_at IS NULL
+            AND expires_at IS NOT NULL AND expires_at < now() AND (user_id = $1 OR profile_id = $2)
+          RETURNING id, expires_at'
+        USING v_uid, v_profile_id
+      LOOP
+        IF to_regprocedure('public.invitation_withdraw_access(uuid,timestamptz)') IS NOT NULL THEN
+          EXECUTE 'SELECT public.invitation_withdraw_access($1, $2)' USING v_expired.id, v_expired.expires_at;
+        END IF;
+      END LOOP;
+      PERFORM set_config('storm.access_engine', coalesce(v_engine, ''), true);
+    EXCEPTION WHEN OTHERS THEN
+      RAISE WARNING 'record_session_start_expiry_failed' USING DETAIL = 'SQLSTATE ' || SQLSTATE;
+    END;
+  END IF;
+
   IF NOT public.user_is_active(v_uid) OR public.invitation_withdrawn_for(v_uid) THEN
     RETURN 'disabled';
   END IF;
@@ -571,8 +748,10 @@ BEGIN
       AND (accepted_at IS NULL OR last_active_at IS NULL OR last_active_at < now() - interval '5 minutes');
 
     IF to_regclass('public.user_invitations') IS NOT NULL THEN
+      -- Never a row past its expiry (D-228): those were expired above.
       EXECUTE 'UPDATE public.user_invitations SET status = ''accepted'', accepted_at = now()
-               WHERE status IN (''pending'', ''sent'', ''send_failed'') AND (user_id = $1 OR profile_id = $2)'
+               WHERE status IN (''pending'', ''sent'', ''send_failed'') AND (user_id = $1 OR profile_id = $2)
+                 AND (expires_at IS NULL OR expires_at >= now())'
         USING v_uid, v_profile_id;
     END IF;
 
@@ -773,6 +952,8 @@ REVOKE ALL ON FUNCTION public.record_session_start() FROM PUBLIC, anon, authenti
 REVOKE ALL ON FUNCTION public.legacy_all_vessels(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.legacy_fleet_reach(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.vessel_in_reachable_state(text, text) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.crew_assignment_is_current(boolean, date, date) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.crew_assignment_holds_office(boolean, date, date, date, date) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.reach_vessels_for(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.reach_vessel_for(uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.fleet_reach_for(uuid, uuid) FROM PUBLIC, anon, authenticated, service_role;
@@ -806,18 +987,20 @@ COMMENT ON COLUMN public.account_memberships.vessel_scope IS 'all = every reacha
 COMMENT ON COLUMN public.account_memberships.is_dpa IS 'DECISIONS C19: DPA is a flag on the membership (legacy dpa profiles).';
 COMMENT ON COLUMN public.account_memberships.valid_until IS 'End of the membership window; required for external viewers (C17).';
 
-COMMENT ON FUNCTION public.user_is_active(uuid) IS 'D-122: profile not disabled / deactivated, no disabled / removed membership in the profile''s company and no non-legacy membership outside its valid_from / valid_until window (C17), no auth ban in force and no auth soft delete (auth.users.deleted_at). Signed-in callers get the truth about themselves and active members of their own company only; no JWT: anyone. Reads the tables directly (file 7 builds the legacy helpers on it).';
+COMMENT ON FUNCTION public.user_is_active(uuid) IS 'D-122: profile not disabled / deactivated, no disabled / removed membership in the profile''s company and no non-legacy membership outside its valid_from / valid_until window (C17), no auth ban in force and no auth soft delete (auth.users.deleted_at); and (D-228) not a still-invited profile with a never-accepted membership whose newest invitation is live, never accepted and past expires_at. Signed-in callers get the truth about themselves and active members of their own company only; no JWT: anyone. Reads the tables directly (file 7 builds the legacy helpers on it). plpgsql (D-229): policies call it per row.';
 COMMENT ON FUNCTION public.my_account_status() IS 'The caller''s status: active | disabled | no_profile (D-141). disabled also when the access was withdrawn with a revoked or expired invitation that was never accepted. Works for a disabled user (the sign-in screen uses it).';
-COMMENT ON FUNCTION public.invitation_withdrawn_for(uuid) IS 'Internal (service role; definers): the profile is neither invited nor active and the user''s newest invitation is revoked or expired and was never accepted. False before user_invitations exists.';
-COMMENT ON FUNCTION public.record_session_start() IS 'Called by the client after sign-in: same answer as my_account_status(); for an active user records last_login_at (5-minute throttle), invited -> active, membership accepted_at / last_active_at and accepted invitations (once user_invitations exists), under storm.access_engine.';
+COMMENT ON FUNCTION public.invitation_withdrawn_for(uuid) IS 'Internal (service role; definers): the profile is neither invited nor active and the user''s newest invitation is revoked or expired and was never accepted; or (D-228) the profile is still invited, its membership never accepted, and the newest invitation is live, never accepted and past expires_at. False before user_invitations exists.';
+COMMENT ON FUNCTION public.record_session_start() IS 'Called by the client after sign-in: first (D-228) the caller''s live invitations past expires_at become expired and invitation_withdraw_access(id, expires_at) withdraws the access they opened (sign-in evidence from before the expiry, or an accepted membership, keeps it); then the same answer as my_account_status(); for an active user records last_login_at (5-minute throttle), invited -> active, membership accepted_at / last_active_at and accepted invitations not past their expiry (once user_invitations exists), under storm.access_engine.';
 COMMENT ON FUNCTION public.legacy_all_vessels(uuid) IS 'D-26: legacy profiles.role dpa / shore_management reach every vessel of the company. Internal (service role; definers).';
 COMMENT ON FUNCTION public.legacy_fleet_reach(uuid) IS 'D-26 fleet reach: legacy dpa / shore_management, or an active in-date RBAC role that is fleet-wide or named superadmin / dpa / fleet_master. Internal (service role; definers).';
 COMMENT ON FUNCTION public.vessel_in_reachable_state(text, text) IS 'A vessel counts for reach while lifecycle_status is not archived and status is set and not Sold (legacy parity).';
-COMMENT ON FUNCTION public.reach_vessels_for(uuid) IS 'Internal reach (CC-3, D-136): the vessels the user reaches, for any user; no caller rule. Service role only; definers evaluating other users call it.';
-COMMENT ON FUNCTION public.reach_vessel_for(uuid, uuid) IS 'Internal reach of one vessel (same predicates as reach_vessels_for, as an EXISTS). Service role only.';
+COMMENT ON FUNCTION public.reach_vessels_for(uuid) IS 'Internal reach (CC-3, D-136): the vessels the user reaches, for any user; no caller rule. A crew assignment counts while crew_assignment_is_current() (is_current and the leave date, else end date, not come; D-217). Service role only; definers evaluating other users call it.';
+COMMENT ON FUNCTION public.reach_vessel_for(uuid, uuid) IS 'Internal reach of one vessel (same predicates as reach_vessels_for, as an EXISTS; crew assignments by crew_assignment_is_current(), D-217). Service role only.';
+COMMENT ON FUNCTION public.crew_assignment_is_current(boolean, date, date) IS 'D-217: a crew_assignments row counts as current while is_current is set and coalesce(leave_date, end_date) has not come (the legacy normaliser''s rule, applied on read; crew_assignments_end_stale() sweeps the stored flag). plpgsql STABLE (D-229). Internal: no grant.';
+COMMENT ON FUNCTION public.crew_assignment_holds_office(boolean, date, date, date, date) IS 'D-227: a crew_assignments row holds its office (the Master office, slot offices) while crew_assignment_is_current() and coalesce(join_date, start_date) has come. Reach of a planned assignment stays as legacy. plpgsql STABLE (D-229). Internal: no grant.';
 COMMENT ON FUNCTION public.fleet_reach_for(uuid, uuid) IS 'Internal fleet reach for any user (in _company_id when given): legacy rows by D-26, others by fleet_access. Service role only.';
-COMMENT ON FUNCTION public.user_vessel_reach(uuid) IS 'The vessels a user reaches, for the user themselves, a users-access viewer of their company, or a caller without a JWT; nothing for anyone else.';
-COMMENT ON FUNCTION public.user_can_reach_vessel(uuid, uuid) IS 'Whether a user reaches a vessel; caller rule as user_vessel_reach. RLS calls it with auth.uid().';
-COMMENT ON FUNCTION public.user_has_fleet_reach(uuid, uuid) IS 'Whether a user has fleet reach (in _company_id when given); caller rule as user_vessel_reach.';
+COMMENT ON FUNCTION public.user_vessel_reach(uuid) IS 'The vessels a user reaches, for the user themselves, a users-access viewer who may view the target (admin_may_view_user, gap/01 F23 / D-194: a vessel-scoped viewer only for the users of the vessels they reach), or a caller without a JWT; nothing for anyone else or an unknown id.';
+COMMENT ON FUNCTION public.user_can_reach_vessel(uuid, uuid) IS 'Whether a user reaches a vessel; caller rule as user_vessel_reach (yourself, no JWT, or a users-access viewer who may view the target: admin_may_view_user, gap/01 F23 / D-194). RLS calls it with auth.uid().';
+COMMENT ON FUNCTION public.user_has_fleet_reach(uuid, uuid) IS 'Whether a user has fleet reach (in _company_id when given); caller rule as user_vessel_reach (yourself, no JWT, or a users-access viewer who may view the target: admin_may_view_user, gap/01 F23 / D-194).';
 COMMENT ON FUNCTION public.account_membership_vessels_company() IS 'Trigger: stamps company_id from the membership and refuses a vessel of another company (membership_vessel_company_mismatch).';
 COMMENT ON FUNCTION public.account_memberships_sync_from_profile() IS 'Trigger trg_profiles_sync_membership: upserts the legacy-managed membership of a profile with a login; never touches a non-legacy row; a company or login change removes the old legacy row; a removed row is not set active again by a later profile update (record_invitation_send sent, set_membership_status or a move back into the company restore it).';

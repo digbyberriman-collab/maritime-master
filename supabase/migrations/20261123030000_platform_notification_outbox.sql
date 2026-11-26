@@ -32,7 +32,14 @@
 -- (vessel_members, owner_admins, fleet_reach, dpa), then only active users
 -- of the event's company who reach the vessel (fleet reach counts) or are a
 -- company actor, never the actor, never a user who switched the type off
--- in-app (user_notification_preferences; else the type's default).
+-- in-app (user_notification_preferences; else the type's default), and
+-- nobody at all when the event's module is switched off on its vessel
+-- (vessel_module_on_internal(), the module_enabled() rule without the
+-- caller clause; gap/01 W6, D-162; review round 5,
+-- notify-ignores-module-off), except a personal-scope link (export_ready /
+-- export_failed reach their requester). An off module fans out zero rows
+-- and the outbox row is still marked processed, so nothing is claimed as
+-- delivered.
 --
 -- Record-engine wiring: trg_record_events_emit (AFTER INSERT ON
 -- record_events, rows with a notification_type) -> record_event_notify(),
@@ -65,6 +72,9 @@ BEGIN
   END IF;
   IF to_regprocedure('public.is_company_actor(uuid,uuid)') IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123030000_platform_notification_outbox needs is_company_actor(): apply 20261123000400_platform_capabilities.sql first';
+  END IF;
+  IF to_regprocedure('public.vessel_module_on_internal(uuid,text,date)') IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123030000_platform_notification_outbox needs vessel_module_on_internal(): apply 20261123000500_platform_module_settings.sql first';
   END IF;
   IF to_regclass('public.notification_types') IS NULL OR to_regclass('public.user_notification_preferences') IS NULL THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123030000_platform_notification_outbox needs the live notification_types and user_notification_preferences tables';
@@ -234,8 +244,11 @@ CREATE TRIGGER trg_notification_outbox_guard
 -- row, de-duplicated, then filtered: active, a profile in the event's
 -- company, reach to the event's vessel (or fleet reach, or a company actor)
 -- / fleet reach (or a company actor) for a fleet link, never the actor, the
--- in-app preference (else the type's default) respected. Internal reach
--- functions throughout (rule 12): it runs inside the actor's transaction.
+-- in-app preference (else the type's default) respected, and the event's
+-- module on for its vessel (vessel_module_on_internal; a personal-scope
+-- link, a fleet event or one without a module key is not gated; review
+-- round 5). Internal reach and module functions throughout (rule 12): it
+-- runs inside the actor's transaction.
 CREATE OR REPLACE FUNCTION public.notification_recipients(p_outbox_id uuid)
 RETURNS SETOF uuid
 LANGUAGE sql
@@ -276,6 +289,7 @@ AS $$
         END
     AND coalesce((SELECT up.in_app_enabled FROM public.user_notification_preferences AS up
                   WHERE up.user_id = c.user_id AND up.notification_type_key = o.type_key), t.default_enabled)
+    AND (o.vessel_id IS NULL OR o.module_key IS NULL OR o.link_scope = 'personal' OR public.vessel_module_on_internal(o.vessel_id, o.module_key))
 $$;
 
 -- notification_fan_out: one inbox row per recipient (title, body, severity
@@ -685,7 +699,7 @@ GRANT EXECUTE ON FUNCTION public.notification_inbox_mark_all_read(timestamptz) T
 COMMENT ON TABLE public.notification_outbox IS 'One row per notification event (gap/08 NO6; gap/03 C1; proposed D-127): type, company, vessel, title, link, must-act users, audience, ids-only payload, dedupe key, processing state. Service role only (the browser never reads it). Append-only except processed_at / attempts / last_error (no updated_at: rule 3 exception).';
 COMMENT ON TABLE public.notification_inbox IS 'One row per recipient of an outbox event (gap/03 C9, C11; D-62): what the bell and /inbox show. A user reads and updates only their own rows, and only read_at / archived_at (column grants); rows are written by notification_fan_out only. No updated_at (rule 3 exception: the two timestamps are the history). In the supabase_realtime publication (RLS applies).';
 COMMENT ON FUNCTION public.notification_outbox_guard() IS 'Trigger: an outbox row never changes except its processing state (and referential set-null).';
-COMMENT ON FUNCTION public.notification_recipients(uuid) IS 'Internal: the recipients of an outbox row (must-act + audience), filtered to active users of the company with reach (or company actors), without the actor, preferences respected. Uses the internal reach functions (rule 12).';
+COMMENT ON FUNCTION public.notification_recipients(uuid) IS 'Internal: the recipients of an outbox row (must-act + audience), filtered to active users of the company with reach (or company actors), without the actor, preferences respected; nobody when the event''s module is off on its vessel (vessel_module_on_internal; personal-scope links exempt; gap/01 W6, D-162). Uses the internal reach and module functions (rule 12).';
 COMMENT ON FUNCTION public.notification_fan_out(uuid) IS 'Internal: one inbox row per recipient of an outbox row, then processed_at. Returns the count.';
 COMMENT ON FUNCTION public.emit_notification_event(text, uuid, text, text, uuid, text, text, text, text, text, uuid, text, uuid, uuid[], text[], jsonb, text, text) IS 'Emits one notification event (service role; definers call it): validates type, company, vessel, envelope and the caller, stores the vessel code, dedupes, fans out inline in an exception block (D-128). Returns the outbox id.';
 COMMENT ON FUNCTION public.process_notification_outbox(integer) IS 'Retry processor (service role; for a later cron): fans out unprocessed outbox rows with fewer than 5 attempts (FOR UPDATE SKIP LOCKED).';

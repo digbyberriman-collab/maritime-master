@@ -104,6 +104,9 @@ describe('sign_off kind: the lock belongs to the acknowledged cycle', () => {
     expect(sheet.vesselLocked).toBe(true);
     expect(removeMaster(sheet)).toMatchObject({ code: 'company_acknowledged' });
     expect(removeBlocker(sheet, { slotKey: 'hod', reason: REASON }, HOD)).toMatchObject({ code: 'company_acknowledged' });
+    // A reader (no write access, D-214) is refused before the lock, as
+    // record_remove_signature checks write access first.
+    expect(removeBlocker(sheet, { slotKey: 'master', reason: REASON }, actor('p-master', { isMaster: true, canWrite: false }))).toMatchObject({ code: 'no_write_access' });
     return { sheet, env };
   }
 

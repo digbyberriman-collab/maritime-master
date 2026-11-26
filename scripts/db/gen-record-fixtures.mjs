@@ -324,8 +324,9 @@ writeFixture(
 /**
  * The scenario world (the SQL test seeds the same): company SG, vessel
  * SG.v, crew SG.crew1–3 on board, SG.master (the Master, on board),
- * SG.admin1–2 (company actors: legacy DPA). Profile ids are
- * keyUuid('profile:<key>') = tests.profile_id(key).
+ * SG.admin1–2 (company actors: legacy DPA), SG.reader (an in-window
+ * external viewer of SG.v: reads the record, never writes; canWrite false,
+ * D-214). Profile ids are keyUuid('profile:<key>') = tests.profile_id(key).
  */
 const PEOPLE = {
   'SG.crew1': { role: 'crew', name: 'Crew one' },
@@ -334,6 +335,7 @@ const PEOPLE = {
   'SG.master': { role: 'master', name: 'Master' },
   'SG.admin1': { role: 'admin', name: 'Admin one' },
   'SG.admin2': { role: 'admin', name: 'Admin two' },
+  'SG.reader': { role: 'external', name: 'Reader', canWrite: false },
 };
 const pid = (key) => keyUuid(`profile:${key}`);
 const sigId = (scenario, ref) => keyUuid(`signature:${scenario}:${ref}`);
@@ -344,11 +346,12 @@ function slotDigest(digests, covers) {
   const pairs = keys.filter((k) => Object.prototype.hasOwnProperty.call(digests, k)).map((k) => `${k}:${digests[k]}`).sort();
   return pairs.length ? sha256(pairs.join('\n')) : '';
 }
-const actorFor = (key, { impersonating = false } = {}) => ({
+/** The TS actor of a world person; canWrite defaults to true (the person's own flag first: SG.reader has none). */
+const actorFor = (key, { impersonating = false, canWrite = PEOPLE[key].canWrite ?? true } = {}) => ({
   profileId: pid(key),
   name: PEOPLE[key].name,
   isEligible: (slot, profileId) => (slot.namedProfileIds ?? []).includes(profileId),
-  canWrite: true,
+  canWrite,
   isMaster: PEOPLE[key].role === 'master',
   isCompanyActor: PEOPLE[key].role === 'admin',
   impersonating,
@@ -442,7 +445,7 @@ function runSignatureScenario(def) {
       Object.assign(rec, { slot: step.slot, to: step.to });
       if (result.ok) sheet = result.value;
     } else if (step.op === 'cancel') {
-      result = SIG.cancelPass(sheet, step.slot);
+      result = SIG.cancelPass(sheet, step.slot, actorFor(step.actor, step));
       rec.slot = step.slot;
       if (result.ok) sheet = result.value;
     } else if (step.op === 'transition') {
@@ -580,6 +583,26 @@ const SCENARIOS = [
       { op: 'sign', actor: 'SG.crew2', slot: 'prepared_by', ref: 's1' },
       { op: 'pass', actor: 'SG.crew1', slot: 'prepared_by', to: 'SG.crew1' },
       { op: 'cancel', actor: 'SG.crew1', slot: 'checked_by' },
+    ],
+  },
+  {
+    name: 'external_reader_changes_nothing',
+    description: 'D-214: an external viewer (SG.reader, named on the slot so eligibility is not what refuses) reads the record but changes nothing: witnessing a sign, passing, cancelling a crew pass, re-signing and removing are each refused with no_write_access and the sheet unchanged; the crew still sign and remove.',
+    creator: 'SG.crew1',
+    slots: [slot('prepared_by', 1, 'vessel', ['SG.crew1', 'SG.crew2', 'SG.reader']), slot('checked_by', 2, 'vessel', ['SG.crew3']), slot('master', 3, 'vessel', ['SG.master'])],
+    steps: [
+      { op: 'set_digests', digests: D1 },
+      { op: 'sign', actor: 'SG.reader', slot: 'prepared_by', ref: 's1', method: 'witnessed', signer: { profile: 'SG.crew1' } },
+      { op: 'pass', actor: 'SG.reader', slot: 'prepared_by', to: 'SG.reader' },
+      { op: 'pass', actor: 'SG.crew1', slot: 'prepared_by', to: 'SG.crew2' },
+      { op: 'cancel', actor: 'SG.reader', slot: 'prepared_by' },
+      { op: 'sign', actor: 'SG.crew2', slot: 'prepared_by', ref: 's2' },
+      { op: 'set_digests', digests: D2 },
+      { op: 'resign', actor: 'SG.reader', slot: 'prepared_by', ref: 's3' },
+      { op: 'remove', actor: 'SG.reader', slot: 'prepared_by' },
+      { op: 'resign', actor: 'SG.crew2', slot: 'prepared_by', ref: 's4' },
+      { op: 'remove', actor: 'SG.reader', slot: 'prepared_by' },
+      { op: 'remove', actor: 'SG.crew2', slot: 'prepared_by' },
     ],
   },
   {
@@ -803,7 +826,7 @@ writeFixture(
     generator: GENERATOR,
     sourceSha256: shaOf(['src/lib/records/signatures.ts', 'src/lib/records/companyStep.ts', 'src/lib/records/types.ts']),
     description:
-      'Signature-sheet scenarios replayed by supabase/tests/sql/p4_signatures through record_sign_slot / record_pass_slot / record_cancel_pass / record_remove_signature / record_resign_slot / record_transition / record_set_section_digests. Expected values come from signatures.ts (signSlot, passSlotTo, cancelPass, removeSignature, reSignSlot, startNextCycle, slotState, isSignatureStale) composed with companyStep.ts as the SQL engine composes them (see the generator header). World: company SG, vessel SG.v, SG.crew1-3, SG.master (on board), SG.admin1-2 (company actors). Eligibility is by namedProfileIds only. Signature ids are keyUuid("signature:<scenario>:<ref>"), profile ids keyUuid("profile:<key>"). Regenerate with node scripts/db/gen-record-fixtures.mjs; never edit by hand.',
+      'Signature-sheet scenarios replayed by supabase/tests/sql/p4_signatures through record_sign_slot / record_pass_slot / record_cancel_pass / record_remove_signature / record_resign_slot / record_transition / record_set_section_digests. Expected values come from signatures.ts (signSlot, passSlotTo, cancelPass, removeSignature, reSignSlot, startNextCycle, slotState, isSignatureStale) composed with companyStep.ts as the SQL engine composes them (see the generator header). World: company SG, vessel SG.v, SG.crew1-3, SG.master (on board), SG.admin1-2 (company actors), SG.reader (an in-window external viewer of SG.v: canWrite false, never eligible in SQL, so it is only ever refused by the write gate first, D-214). Eligibility is by namedProfileIds only. Signature ids are keyUuid("signature:<scenario>:<ref>"), profile ids keyUuid("profile:<key>"). Regenerate with node scripts/db/gen-record-fixtures.mjs; never edit by hand.',
     world: { company: 'SG', vessel: 'SG.v', people: PEOPLE },
     counts: { scenarios: signatureScenarios.length, steps: signatureScenarios.reduce((n, s) => n + s.steps.length, 0) },
     scenarios: signatureScenarios,

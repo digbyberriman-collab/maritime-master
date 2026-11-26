@@ -65,8 +65,9 @@ BEGIN
      OR to_regprocedure('public.reach_vessels_for(uuid)') IS NULL
      OR to_regprocedure('public.fleet_reach_for(uuid,uuid)') IS NULL
      OR to_regprocedure('public.legacy_fleet_reach(uuid)') IS NULL
-     OR to_regprocedure('public.vessel_in_reachable_state(text,text)') IS NULL THEN
-    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123000400_platform_capabilities needs account_memberships, user_is_active(), the reach helpers and legacy_fleet_reach(): apply 20261123000300_platform_account_memberships.sql first';
+     OR to_regprocedure('public.vessel_in_reachable_state(text,text)') IS NULL
+     OR to_regprocedure('public.crew_assignment_is_current(boolean,date,date)') IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123000400_platform_capabilities needs account_memberships, user_is_active(), the reach helpers, crew_assignment_is_current() and legacy_fleet_reach(): apply 20261123000300_platform_account_memberships.sql first';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'profiles' AND column_name = 'imported_vessel_id') THEN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123000400_platform_capabilities needs the live profiles.imported_vessel_id';
@@ -255,15 +256,17 @@ END;
 $$;
 
 -- The caller's capability (policies, RPCs, the edge assertCapability).
--- False without a caller.
+-- False without a caller. plpgsql (D-229): policies call it per row.
 CREATE OR REPLACE FUNCTION public.has_capability(p_key text, p_company_id uuid, p_vessel_id uuid DEFAULT NULL)
 RETURNS boolean
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT auth.uid() IS NOT NULL AND public.has_capability_for(auth.uid(), p_key, p_company_id, p_vessel_id)
+BEGIN
+  RETURN (SELECT auth.uid() IS NOT NULL AND public.has_capability_for(auth.uid(), p_key, p_company_id, p_vessel_id));
+END;
 $$;
 
 -- The target user's profile company, only when the (active) caller is in
@@ -271,22 +274,28 @@ $$;
 -- get_user_company_id (which file 7 makes NULL for a disabled user) it
 -- ignores the target's own state, so admins still see and fix a disabled
 -- user's roles. Used by the rbac_user_roles policies of file 8.
+-- plpgsql (D-229): policies call it per row; profiles.user_id is unique,
+-- so the scalar subquery returns the same single row the SQL body did.
 CREATE OR REPLACE FUNCTION public.user_company_for_admin(_user_id uuid)
 RETURNS uuid
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT t.company_id
-  FROM public.profiles AS t
-  WHERE t.user_id = _user_id
-    AND t.company_id IS NOT NULL
-    AND (
-      auth.uid() IS NULL
-      OR (EXISTS (SELECT 1 FROM public.profiles AS c WHERE c.user_id = auth.uid() AND c.company_id = t.company_id)
-          AND public.user_is_active(auth.uid()))
-    )
+BEGIN
+  RETURN (
+    SELECT t.company_id
+    FROM public.profiles AS t
+    WHERE t.user_id = _user_id
+      AND t.company_id IS NOT NULL
+      AND (
+        auth.uid() IS NULL
+        OR (EXISTS (SELECT 1 FROM public.profiles AS c WHERE c.user_id = auth.uid() AND c.company_id = t.company_id)
+            AND public.user_is_active(auth.uid()))
+      )
+  );
+END;
 $$;
 
 -- gap/01 W10 interim "is this user the company" for company-side record
@@ -456,7 +465,8 @@ BEGIN
            WHERE mv.membership_id = v_membership.id AND mv.vessel_id = v.id))
         OR (v_user IS NOT NULL AND EXISTS (
            SELECT 1 FROM public.crew_assignments AS ca
-           WHERE ca.user_id = v_user AND ca.vessel_id = v.id AND ca.is_current))
+           WHERE ca.user_id = v_user AND ca.vessel_id = v.id
+             AND ca.is_current AND public.crew_assignment_is_current(ca.is_current, ca.leave_date, ca.end_date)))
       )
   );
   -- The pending vessel counts only for a profile with no login yet (D-204):
@@ -482,17 +492,23 @@ $$;
 -- RLS predicate of the admin read policies (rule 11): the caller (active,
 -- with admin.access.users_access.view in _company) may see this user's
 -- access rows: admin_may_act_on_user(auth.uid(), ...). False without a
--- caller.
+-- caller. plpgsql (D-229): policies call it per row. The public reach
+-- helpers of file 3 call it for their caller rule (gap/01 F23); it reads
+-- only the internal reach functions, so nothing recurses.
 CREATE OR REPLACE FUNCTION public.admin_may_view_user(_target_user uuid, _company uuid, _target_profile uuid DEFAULT NULL)
 RETURNS boolean
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT auth.uid() IS NOT NULL
-     AND public.has_capability('admin.access.users_access.view', _company)
-     AND public.admin_may_act_on_user(auth.uid(), _target_user, _company, _target_profile)
+BEGIN
+  RETURN (
+    SELECT auth.uid() IS NOT NULL
+       AND public.has_capability('admin.access.users_access.view', _company)
+       AND public.admin_may_act_on_user(auth.uid(), _target_user, _company, _target_profile)
+  );
+END;
 $$;
 
 -- ---------------------------------------------------------------- admin read policies (file 3 has the own-row ones)
@@ -543,9 +559,9 @@ COMMENT ON FUNCTION public.legacy_user_admin(uuid) IS 'Today''s admin rule for a
 COMMENT ON FUNCTION public.role_rank(text) IS 'Rank of a role name (superadmin 100 ... crew 10, anything else 0) for the no-self-escalation rules. Internal.';
 COMMENT ON FUNCTION public.user_role_rank(uuid) IS 'The highest rank an active user holds (RBAC roles and the legacy profile role). Internal.';
 COMMENT ON FUNCTION public.has_capability_for(uuid, text, uuid, uuid) IS 'The seven Phase 2 capability keys for any user in a company (and vessel); unknown key, inactive user, other company or foreign vessel: false. Service role only; definers call it.';
-COMMENT ON FUNCTION public.has_capability(text, uuid, uuid) IS 'has_capability_for(auth.uid(), ...): the caller''s capability; false without a caller. Policies and RPCs use it.';
-COMMENT ON FUNCTION public.user_company_for_admin(uuid) IS 'The target user''s company when the active caller is in it (service role: always); ignores the target''s own active state. Used by RBAC policies.';
+COMMENT ON FUNCTION public.has_capability(text, uuid, uuid) IS 'has_capability_for(auth.uid(), ...): the caller''s capability; false without a caller. Policies and RPCs use it. plpgsql (D-229).';
+COMMENT ON FUNCTION public.user_company_for_admin(uuid) IS 'The target user''s company when the active caller is in it (service role: always); ignores the target''s own active state. Used by RBAC policies. plpgsql (D-229).';
 COMMENT ON FUNCTION public.is_company_actor(uuid, uuid) IS 'gap/01 W10 interim: whether the user acts as the company for a vessel (or, with no vessel, a fleet record): full admin, or a non-legacy admin membership reaching the vessel. Never shore staff or crew.';
 COMMENT ON FUNCTION public.admin_scope_all(uuid, uuid) IS 'gap/01 F23: the active actor (profile in the company) is a full legacy admin, or holds a non-legacy owner membership or a non-legacy admin membership with vessel_scope all there. Internal (service role; definers).';
-COMMENT ON FUNCTION public.admin_may_act_on_user(uuid, uuid, uuid, uuid) IS 'gap/01 F23: whether the actor may act on the target user / profile of the company: admin_scope_all(), or every vessel of the target''s structural set (membership vessel rows, current crew assignments, else imported_vessel_id per D-125 / D-204 only for a target with no login; Sold / archived excluded; whatever the target''s active state) is in the actor''s reach. A signed-in target without a membership vessel or a current assignment has an empty set. Empty set, vessel_scope all, fleet access or legacy fleet reach need admin_scope_all(). Unknown ids, an inactive actor or another company: false. Internal (service role; definers).';
-COMMENT ON FUNCTION public.admin_may_view_user(uuid, uuid, uuid) IS 'RLS predicate (rule 11) of the admin read policies on memberships, membership vessels, user_roles, rbac_user_roles, overrides and invitations: the caller has admin.access.users_access.view in the company and admin_may_act_on_user(auth.uid(), ...). False without a caller.';
+COMMENT ON FUNCTION public.admin_may_act_on_user(uuid, uuid, uuid, uuid) IS 'gap/01 F23: whether the actor may act on the target user / profile of the company: admin_scope_all(), or every vessel of the target''s structural set (membership vessel rows, current crew assignments by crew_assignment_is_current() (D-217), else imported_vessel_id per D-125 / D-204 only for a target with no login; Sold / archived excluded; whatever the target''s active state) is in the actor''s reach. A signed-in target without a membership vessel or a current assignment has an empty set. Empty set, vessel_scope all, fleet access or legacy fleet reach need admin_scope_all(). Unknown ids, an inactive actor or another company: false. Internal (service role; definers).';
+COMMENT ON FUNCTION public.admin_may_view_user(uuid, uuid, uuid) IS 'RLS predicate (rule 11) of the admin read policies on memberships, membership vessels, user_roles, rbac_user_roles, overrides and invitations: the caller has admin.access.users_access.view in the company and admin_may_act_on_user(auth.uid(), ...). False without a caller. Also the caller rule of the public reach helpers (user_vessel_reach, user_can_reach_vessel, user_has_fleet_reach; gap/01 F23, D-194). plpgsql (D-229).';

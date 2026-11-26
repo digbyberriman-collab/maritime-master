@@ -516,19 +516,24 @@ CREATE TRIGGER trg_record_snapshots_append_only
 -- The read predicate of every record table, for auth.uid(): an active
 -- member of the company with fleet reach there, or with reach to the
 -- record's vessel. Module capabilities per kind are not evaluated in
--- Phase 2 (D-132).
+-- Phase 2 (D-132). plpgsql (D-229; review round 5): every engine table's
+-- SELECT policy calls it per row.
 CREATE OR REPLACE FUNCTION public.record_readable(_company_id uuid, _vessel_id uuid)
 RETURNS boolean
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT auth.uid() IS NOT NULL
-     AND _company_id IS NOT NULL
-     AND public.user_belongs_to_company(auth.uid(), _company_id)
-     AND (public.user_has_fleet_reach(auth.uid(), _company_id)
-          OR (_vessel_id IS NOT NULL AND public.user_can_reach_vessel(auth.uid(), _vessel_id)))
+BEGIN
+  RETURN (
+    SELECT auth.uid() IS NOT NULL
+       AND _company_id IS NOT NULL
+       AND public.user_belongs_to_company(auth.uid(), _company_id)
+       AND (public.user_has_fleet_reach(auth.uid(), _company_id)
+            OR (_vessel_id IS NOT NULL AND public.user_can_reach_vessel(auth.uid(), _vessel_id)))
+  );
+END;
 $$;
 
 DROP POLICY IF EXISTS record_envelopes_select ON public.record_envelopes;
@@ -1570,7 +1575,7 @@ COMMENT ON FUNCTION public.record_slot_template_valid(jsonb, text) IS 'validateS
 COMMENT ON FUNCTION public.record_digest_of(jsonb, text[]) IS 'sha256 hex of the sorted key:digest lines of the covered sections (* when none named); empty when none known. Pure.';
 COMMENT ON FUNCTION public.record_envelopes_guard() IS 'Trigger: status columns and deletes only under storm.record_engine (every role); a record created outside the engine starts open.';
 COMMENT ON FUNCTION public.record_append_only_guard() IS 'Trigger: append-only history (UPDATE / DELETE refused) except storm.record_purge and referential set-null of the named columns.';
-COMMENT ON FUNCTION public.record_readable(uuid, uuid) IS 'The read predicate of the record tables for auth.uid(): active company member with fleet reach, or reach to the vessel.';
+COMMENT ON FUNCTION public.record_readable(uuid, uuid) IS 'The read predicate of the record tables for auth.uid(): active company member with fleet reach, or reach to the vessel. plpgsql (D-229).';
 COMMENT ON FUNCTION public.record_transition_decide(jsonb, jsonb) IS 'Pure SQL mirror of transitionEnvelope() (companyStep.ts): same check order, error codes and outcome value. Parity: record-transitions.json.';
 COMMENT ON FUNCTION public.record_vessel_signatures_locked(jsonb, integer) IS 'Pure SQL mirror of vesselSignaturesLocked() (D-51). Parity: record-vessel-lock.json.';
 COMMENT ON FUNCTION public.record_state_of(uuid) IS 'Internal: the TS EnvelopeState of an envelope and its kind.';

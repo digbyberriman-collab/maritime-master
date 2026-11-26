@@ -18,6 +18,9 @@
  *     of the company whose `status` is set and is not 'Sold'; anyone else →
  *     the vessels of their current crew assignments with the same status rule;
  *     always only the company's own vessels (RLS);
+ *   - a crew assignment is current while `is_current` is set and its leave
+ *     date (else end date) has not come (`assignmentIsCurrent`, D-217: the
+ *     server's `crew_assignment_is_current`);
  *   - fleet reach: legacy dpa / shore_management, or an active RBAC role that
  *     is fleet-wide (no vessel and the role's default scope is fleet), or
  *     whose name is superadmin / dpa / fleet_master (`FLEET_RBAC_ROLES`).
@@ -56,6 +59,10 @@ export interface ReachVessel {
 export interface ReachAssignment {
   vesselId: string;
   isCurrent: boolean;
+  /** `crew_assignments.leave_date` (YYYY-MM-DD); the row stops counting on that date. */
+  leaveDate?: string | null;
+  /** `crew_assignments.end_date` (YYYY-MM-DD), used when there is no leave date. */
+  endDate?: string | null;
 }
 
 /** An RBAC role as `get_user_roles_full` returns it (already active and in date). */
@@ -90,14 +97,14 @@ export interface LegacyReachInput {
   assignments: readonly ReachAssignment[];
   /** Every vessel the user's company has (the directory), Sold included. */
   companyVessels: readonly ReachVessel[];
+  /** ISO instant the assignments' leave dates (and the validity windows) are checked against. */
+  now: string;
 }
 
 export interface MembershipReachInput extends LegacyReachInput {
   membership: ReachMembership;
   /** `user_is_active()` / the account status: a disabled user reaches nothing. */
   userActive: boolean;
-  /** ISO instant the validity windows are checked against. */
-  now: string;
 }
 
 export interface Reach {
@@ -112,6 +119,25 @@ export const LEGACY_ALL_VESSEL_ROLES: readonly string[] = ['dpa', 'shore_managem
 export function vesselInReachableState(v: Pick<ReachVessel, 'status' | 'lifecycleStatus'>): boolean {
   if (v.lifecycleStatus === 'archived') return false;
   return v.status !== null && v.status !== undefined && v.status !== 'Sold';
+}
+
+/**
+ * A crew assignment counts as current (D-217; review round 5,
+ * stale-is-current-keeps-reach; SQL `crew_assignment_is_current`):
+ * `is_current` is set and its leave date, else its end date, has not come
+ * by the UTC date of `now` (the server compares with `current_date`, which
+ * is UTC on the project). A row whose leave date passed after it was
+ * written still says `is_current` until the daily sweep ends it; it never
+ * counts. An invalid `now` counts nothing (fail closed).
+ */
+export function assignmentIsCurrent(a: ReachAssignment, now: string): boolean {
+  if (!a.isCurrent) return false;
+  const at = Date.parse(now);
+  if (Number.isNaN(at)) return false;
+  const ends = a.leaveDate ?? a.endDate ?? null;
+  if (!ends) return true;
+  const today = new Date(at).toISOString().slice(0, 10);
+  return !(ends.slice(0, 10) <= today);
 }
 
 function inWindow(from: string | null, until: string | null, now: number): boolean {
@@ -151,7 +177,7 @@ function ownVessels(input: LegacyReachInput): ReachVessel[] {
 export function legacyReach(input: LegacyReachInput): Reach {
   const own = ownVessels(input);
   const allVessels = !!input.profileRole && LEGACY_ALL_VESSEL_ROLES.includes(input.profileRole);
-  const assigned = new Set(input.assignments.filter((a) => a.isCurrent).map((a) => a.vesselId));
+  const assigned = new Set(input.assignments.filter((a) => assignmentIsCurrent(a, input.now)).map((a) => a.vesselId));
   return {
     fleetReach: legacyFleetReach(input),
     vesselIds: own.filter((v) => allVessels || assigned.has(v.id)).map((v) => v.id),
@@ -175,6 +201,6 @@ export function membershipReach(input: MembershipReachInput): Reach {
   const own = ownVessels(input);
   if (m.vesselScope === 'all') return { fleetReach: m.fleetAccess, vesselIds: own.map((v) => v.id) };
   const ids = new Set(m.vessels.filter((v) => inWindow(v.validFrom, v.validUntil, now)).map((v) => v.vesselId));
-  if (m.kind !== 'external') for (const a of input.assignments) if (a.isCurrent) ids.add(a.vesselId);
+  if (m.kind !== 'external') for (const a of input.assignments) if (assignmentIsCurrent(a, input.now)) ids.add(a.vesselId);
   return { fleetReach: m.fleetAccess, vesselIds: own.filter((v) => ids.has(v.id)).map((v) => v.id) };
 }

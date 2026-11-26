@@ -100,8 +100,10 @@ ON CONFLICT (id) DO UPDATE SET public = false, file_size_limit = EXCLUDED.file_s
 -- being a company actor); a vessel must belong to the company and be
 -- reached (fleet reach passes). Writing is the same rule, except that an
 -- external viewer of the company (record_user_is_external) never writes
--- (review round 4; company actors keep their fleet path); module write
--- capabilities come with the streams. No caller, another bucket or
+-- (review round 4; company actors keep their fleet path); module read and
+-- write capabilities come with the streams (BUILD-PLAN open item (1);
+-- D-132, D-214; review round 5, record-read-module-gate-untracked). No
+-- caller, another bucket or
 -- anything unknown -> false (fail closed).
 CREATE OR REPLACE FUNCTION public.storage_path_allowed(p_bucket text, p_name text, p_for_write boolean)
 RETURNS boolean
@@ -829,7 +831,7 @@ GRANT EXECUTE ON FUNCTION public.unlink_records(uuid) TO authenticated;
 COMMENT ON TABLE public.file_objects IS 'One stored file of the private records bucket (gap/08 UP1-UP3; C7): its path <company>/<vessel|fleet>/<module>/<entity_type>/<entity_id>/<uuid>-<name>, type, size and hash. Read: record_readable (company + reach). No client writes: register_file_object only. Removed softly; legal hold blocks removal.';
 COMMENT ON TABLE public.record_attachments IS 'A file attached to a record (envelope) or to an entity (gap/08 UP2): section, caption, versions, order. Read: record_readable. No client writes: attach_record_file / remove_record_attachment only (soft remove).';
 COMMENT ON TABLE public.record_links IS 'Generic links between records, or from a record to an item (C8): related, duplicate_of, follow_up, caused_by, parent. company_id / vessel_id are stamped from the from-record by trg_record_links_scope (CC-12) and read through record_readable. No client writes: link_records / unlink_records only (soft remove).';
-COMMENT ON FUNCTION public.storage_path_allowed(text, text, boolean) IS 'The C7 path rule of the records bucket for auth.uid(): six segments, an active member of the company, fleet reach (or a company actor) for fleet paths, reach to the vessel otherwise; for a write, never an external viewer of the company (record_user_is_external; review round 4; company actors keep the fleet path). Unknown anything -> false.';
+COMMENT ON FUNCTION public.storage_path_allowed(text, text, boolean) IS 'The C7 path rule of the records bucket for auth.uid(): six segments, an active member of the company, fleet reach (or a company actor) for fleet paths, reach to the vessel otherwise; for a write, never an external viewer of the company (record_user_is_external; review round 4; company actors keep the fleet path). Module read and write capabilities come with the streams (BUILD-PLAN open item (1); D-132, D-214). Unknown anything -> false.';
 COMMENT ON FUNCTION public.record_links_scope() IS 'Trigger: a link''s company and vessel are its from-record''s (a client value is overwritten).';
 COMMENT ON FUNCTION public.register_file_object(text, text, text, text, bigint, text) IS 'Registers an uploaded object of the records bucket (path allowed, object stored by the caller, size and type checked, a given sha256 64 lower-case hex). Idempotent on (bucket, path); the uploader registering again with a sha256 fills a missing hash (a stored hash is never overwritten). The hash is client-asserted.';
 COMMENT ON FUNCTION public.attach_record_file(uuid, uuid, text, text, uuid) IS 'Attaches a registered file to a record (or its entity); the caller may write the file and the record (record_caller_may_write) or is a company actor (42501 otherwise); refuses closed / void records unless the kind allows late evidence. Event attachment.added.';

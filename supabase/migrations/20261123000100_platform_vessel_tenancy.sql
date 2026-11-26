@@ -246,6 +246,8 @@ $$;
 -- later one is dropped), then every other vessel takes its first free
 -- candidate. created_at must be an ISO-8601 timestamp or null. STABLE, not
 -- IMMUTABLE: a timestamp without an offset is read in the session time zone.
+-- More than 2000 elements: 22023 vessel_codes_too_many. Service role and
+-- definers only (D-231).
 CREATE OR REPLACE FUNCTION public.vessel_codes_assign(p_vessels jsonb)
 RETURNS TABLE (vessel_id uuid, code text)
 LANGUAGE plpgsql
@@ -264,6 +266,12 @@ DECLARE
   v_n integer;
   i integer;
 BEGIN
+  -- A bounded input (review round 5, D-231): the derivation is quadratic
+  -- in the fleet size, and no fleet comes near 2000 vessels.
+  IF jsonb_typeof(p_vessels) = 'array' AND jsonb_array_length(p_vessels) > 2000 THEN
+    RAISE EXCEPTION USING ERRCODE = '22023', MESSAGE = 'vessel_codes_too_many',
+      DETAIL = 'At most 2000 vessels can be coded in one call.';
+  END IF;
   WITH input AS (
     SELECT (e ->> 'id')::uuid AS id,
            e ->> 'name' AS name,
@@ -417,18 +425,28 @@ BEGIN
 END;
 $$;
 
--- BEFORE INSERT OR UPDATE OF status, lifecycle_status: Sold ⇔ archived.
+-- BEFORE INSERT OR UPDATE OF status, lifecycle_status, archived_at,
+-- archived_by: Sold ⇔ archived.
 -- status set to 'Sold' → archived; status moved away from 'Sold' while
 -- archived → active; lifecycle set to archived → status 'Sold'; lifecycle
--- moved away from archived → status 'Active' when it was 'Sold'. Archiving
--- stamps archived_at (kept when given); leaving archived clears
--- archived_at / archived_by / archive_reason. No other column is touched.
+-- moved away from archived → status 'Active' when it was 'Sold'.
+-- The archive stamp is the server's (D-230; review round 5,
+-- actor-columns-client-forgeable): a row that becomes archived under a
+-- JWT gets archived_by = the caller and archived_at = now(); without a JWT
+-- (the backfill, the service role) a given archived_at is kept, else
+-- now(). While it stays archived, a JWT caller cannot rewrite the stamp
+-- (the stored values are kept); without a JWT the given values are kept.
+-- While it is not archived, archived_at and archived_by are NULL; leaving
+-- archived also clears archive_reason. No other column is touched.
 CREATE OR REPLACE FUNCTION public.vessels_sync_lifecycle()
 RETURNS trigger
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_becomes boolean;
 BEGIN
   IF TG_OP = 'INSERT' THEN
     IF NEW.status = 'Sold' THEN
@@ -454,11 +472,24 @@ BEGIN
   END IF;
 
   IF NEW.lifecycle_status = 'archived' THEN
-    NEW.archived_at := coalesce(NEW.archived_at, now());
-  ELSIF TG_OP = 'UPDATE' AND OLD.lifecycle_status = 'archived' THEN
+    v_becomes := TG_OP = 'INSERT' OR OLD.lifecycle_status IS DISTINCT FROM 'archived';
+    IF v_becomes AND v_uid IS NOT NULL THEN
+      NEW.archived_by := v_uid;
+      NEW.archived_at := now();
+    ELSIF v_becomes THEN
+      NEW.archived_at := coalesce(NEW.archived_at, now());
+    ELSIF v_uid IS NOT NULL THEN
+      NEW.archived_by := OLD.archived_by;
+      NEW.archived_at := OLD.archived_at;
+    ELSE
+      NEW.archived_at := coalesce(NEW.archived_at, now());
+    END IF;
+  ELSE
     NEW.archived_at := NULL;
     NEW.archived_by := NULL;
-    NEW.archive_reason := NULL;
+    IF TG_OP = 'UPDATE' AND OLD.lifecycle_status = 'archived' THEN
+      NEW.archive_reason := NULL;
+    END IF;
   END IF;
   RETURN NEW;
 END;
@@ -499,7 +530,7 @@ CREATE TRIGGER trg_vessels_set_code
 
 DROP TRIGGER IF EXISTS trg_vessels_sync_lifecycle ON public.vessels;
 CREATE TRIGGER trg_vessels_sync_lifecycle
-  BEFORE INSERT OR UPDATE OF status, lifecycle_status ON public.vessels
+  BEFORE INSERT OR UPDATE OF status, lifecycle_status, archived_at, archived_by ON public.vessels
   FOR EACH ROW EXECUTE FUNCTION public.vessels_sync_lifecycle();
 
 -- ---------------------------------------------------------------- privileges (rule 5)
@@ -514,10 +545,15 @@ REVOKE ALL ON FUNCTION public.vessels_set_code() FROM PUBLIC, anon, authenticate
 REVOKE ALL ON FUNCTION public.vessels_sync_lifecycle() FROM PUBLIC, anon, authenticated, service_role;
 
 GRANT EXECUTE ON FUNCTION public.normalise_code_text(text) TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.vessel_code_letters(text) TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.vessel_code_candidates(text, integer) TO authenticated, service_role;
+-- The code derivation helpers are for the service role and definers only
+-- (D-231; review round 5, vessel-code-helpers-cpu-grant): no client or
+-- edge path calls them (the client has the TS mirror), and a signed-in
+-- call of vessel_codes_assign could burn seconds of CPU. vessels_set_code
+-- is SECURITY DEFINER, so vessel inserts and code edits keep working.
+GRANT EXECUTE ON FUNCTION public.vessel_code_letters(text) TO service_role;
+GRANT EXECUTE ON FUNCTION public.vessel_code_candidates(text, integer) TO service_role;
 GRANT EXECUTE ON FUNCTION public.vessel_code_stored(text) TO authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.vessel_codes_assign(jsonb) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.vessel_codes_assign(jsonb) TO service_role;
 GRANT EXECUTE ON FUNCTION public.vessel_codes_for_company(uuid) TO service_role;
 
 -- ---------------------------------------------------------------- comments
@@ -527,15 +563,15 @@ COMMENT ON COLUMN public.vessels.short_code IS 'Optional two-character template 
 COMMENT ON COLUMN public.vessels.lifecycle_status IS 'active | inactive | archived (C2; gap/01 W5). Kept in step with the legacy status by trg_vessels_sync_lifecycle: Sold <=> archived.';
 COMMENT ON COLUMN public.vessels.is_counted IS 'Counted in fleet KPIs and "n vessels" labels (with lifecycle_status = active). False for organisational pseudo-vessels.';
 COMMENT ON COLUMN public.vessels.vessel_purpose IS 'operational | demo | training (C2: replaces is_demo / is_training).';
-COMMENT ON COLUMN public.vessels.archived_at IS 'When the vessel was archived; set by trg_vessels_sync_lifecycle when not given, cleared when it leaves archived.';
-COMMENT ON COLUMN public.vessels.archived_by IS 'Who archived the vessel (auth user), when known.';
+COMMENT ON COLUMN public.vessels.archived_at IS 'When the vessel was archived: now() when a signed-in caller archives it (trg_vessels_sync_lifecycle, D-230; a later update cannot rewrite it); without a JWT a given value is kept, else now(); NULL while not archived.';
+COMMENT ON COLUMN public.vessels.archived_by IS 'Who archived the vessel: the signed-in caller, stamped by trg_vessels_sync_lifecycle (D-230; a later update cannot rewrite it); without a JWT the given value (NULL when unknown); NULL while not archived.';
 COMMENT ON COLUMN public.vessels.archive_reason IS 'Why the vessel was archived (500 characters at most).';
 
 COMMENT ON FUNCTION public.normalise_code_text(text) IS 'JS String(text).trim().toUpperCase() for code-like text (JS whitespace set, ASCII a-z, the JS expansions whose result is ASCII). Pure helper of vessel_code_stored() and the reference formatters.';
-COMMENT ON FUNCTION public.vessel_code_letters(text) IS 'Mirror of vesselCodeLetters() (src/modules/vessels/lib/vesselCode.ts): prefix stripped, NFD, marks dropped, JS upper case, A-Z only; VSL when empty. Parity: vessel-code-corpus.json.';
-COMMENT ON FUNCTION public.vessel_code_candidates(text, integer) IS 'Mirror of vesselCodeCandidates(name, limit): plain, first + two consonants (Y a vowel), first two + 1-9,0, first + [A-Z0-9]{2}; no repeats. Parity: vessel-code-corpus.json.';
+COMMENT ON FUNCTION public.vessel_code_letters(text) IS 'Mirror of vesselCodeLetters() (src/modules/vessels/lib/vesselCode.ts): prefix stripped, NFD, marks dropped, JS upper case, A-Z only; VSL when empty. Service role and definers only (D-231). Parity: vessel-code-corpus.json.';
+COMMENT ON FUNCTION public.vessel_code_candidates(text, integer) IS 'Mirror of vesselCodeCandidates(name, limit): plain, first + two consonants (Y a vowel), first two + 1-9,0, first + [A-Z0-9]{2}; no repeats. Service role and definers only (D-231). Parity: vessel-code-corpus.json.';
 COMMENT ON FUNCTION public.vessel_code_stored(text) IS 'Mirror of storedVesselCode(): the code trimmed and upper-cased as JS does when it matches ^[A-Z][A-Z0-9]{2}$, else NULL.';
-COMMENT ON FUNCTION public.vessel_codes_assign(jsonb) IS 'Mirror of assignVesselCodes() over a jsonb array of {id, name, created_at, code}: collision order created_at (milliseconds) then id, stored codes reserved first. Parity: vessel-code-corpus.json fleets.';
+COMMENT ON FUNCTION public.vessel_codes_assign(jsonb) IS 'Mirror of assignVesselCodes() over a jsonb array of {id, name, created_at, code}: collision order created_at (milliseconds) then id, stored codes reserved first; at most 2000 elements (22023 vessel_codes_too_many). Service role and definers only (D-231). Parity: vessel-code-corpus.json fleets.';
 COMMENT ON FUNCTION public.vessel_codes_for_company(uuid) IS 'Every vessel code of a company (sold vessels included) as the client derives it. Service role only: used by the P1 backfill and the tests.';
 COMMENT ON FUNCTION public.vessels_set_code() IS 'Trigger trg_vessels_set_code: normalises a given code, derives a free one under a per-company advisory lock when none is given, refuses a change once records are numbered with the vessel (vessel_code_locked).';
-COMMENT ON FUNCTION public.vessels_sync_lifecycle() IS 'Trigger trg_vessels_sync_lifecycle: keeps the legacy status and lifecycle_status consistent (Sold <=> archived) and stamps or clears the archive columns.';
+COMMENT ON FUNCTION public.vessels_sync_lifecycle() IS 'Trigger trg_vessels_sync_lifecycle: keeps the legacy status and lifecycle_status consistent (Sold <=> archived) and stamps or clears the archive columns: archiving under a JWT stamps the caller and now(), a JWT update of an archived row keeps the stored stamp, no JWT keeps a given archived_at (D-230); not archived: both NULL.';

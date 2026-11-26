@@ -43,6 +43,23 @@ SELECT tests.is_empty(
   $q$SELECT ord, name, key, today, expected FROM ms_cases
      WHERE storable AND public.module_enabled(tests.id('ms-vessel:' || ord), key, today::date) IS DISTINCT FROM expected$q$,
   'module_enabled = resolveModuleSettings(...).isModuleOn(key) for every storable case (missing row, enabled false, enabled_from past / today / future, dotted parents, odd keys)');
+-- vessel_module_on_internal() (review round 5, notify-ignores-module-off;
+-- D-162) is the same rule without the caller clause: with no JWT it equals
+-- module_enabled() and the resolver on every storable case, so the two can
+-- never drift.
+SELECT tests.is_empty(
+  $q$SELECT ord, name, key, today, expected FROM ms_cases
+     WHERE storable AND (public.vessel_module_on_internal(tests.id('ms-vessel:' || ord), key, today::date) IS DISTINCT FROM expected
+                         OR public.vessel_module_on_internal(tests.id('ms-vessel:' || ord), key, today::date)
+                            IS DISTINCT FROM public.module_enabled(tests.id('ms-vessel:' || ord), key, today::date))$q$,
+  'vessel_module_on_internal = module_enabled = the resolver for every storable case (no JWT)');
+SELECT tests.ok(NOT public.vessel_module_on_internal(NULL, 'crew_hor') AND NOT public.vessel_module_on_internal(tests.id('ms-vessel:nobody'), 'crew_hor')
+                AND NOT public.vessel_module_on_internal(tests.id('ms-vessel:1'), NULL) AND NOT public.vessel_module_on_internal(tests.id('ms-vessel:1'), 'crew_hor', NULL),
+                'vessel_module_on_internal: an unknown vessel, a NULL key or a NULL date is false');
+SELECT tests.ok(NOT has_function_privilege('authenticated', 'public.vessel_module_on_internal(uuid,text,date)', 'EXECUTE')
+                AND NOT has_function_privilege('service_role', 'public.vessel_module_on_internal(uuid,text,date)', 'EXECUTE')
+                AND NOT has_function_privilege('anon', 'public.vessel_module_on_internal(uuid,text,date)', 'EXECUTE'),
+                'vessel_module_on_internal is granted to nobody (definers call it)');
 -- The other cases hold strings a date column never returns: the TS branch for them is unreachable from server data.
 -- pg_temp.is_date is pg_input_is_valid(v, 'date') for PostgreSQL 15 too (that function is 16+; the harness floor
 -- is 15). The file runs in a transaction that is rolled back, so the helper never outlives it. The casts sit in a

@@ -734,6 +734,13 @@ $$;
 -- for the seeding and put back (NOT VALID, same definition) afterwards:
 -- harness only, inside the test's rolled-back transaction.
 --
+-- Crew assignments keep the fixture's leaveDate / endDate (D-217; review
+-- round 5). An isCurrent row whose date has already passed models a row
+-- written before its leave date came, which the legacy normaliser
+-- (trg_crew_assignments_normalise_dates) would end on insert: that trigger
+-- is disabled for that one insert and enabled again right after, inside
+-- the test's rolled-back transaction.
+--
 -- Returns {companies, vessels, users, profiles, skipped} as jsonb of ids.
 CREATE OR REPLACE FUNCTION tests.seed_reach_world(p_fixture jsonb)
 RETURNS jsonb
@@ -750,6 +757,7 @@ DECLARE
   v_companies jsonb := '{}'::jsonb;
   v_skipped jsonb := '[]'::jsonb;
   v_membership uuid;
+  v_stale boolean;
   c text;
   r jsonb;
   x jsonb;
@@ -800,7 +808,26 @@ BEGIN
       PERFORM tests.seed_rbac_role(r ->> 'key', x ->> 'roleName', x ->> 'vessel', (x ->> 'isActive')::boolean, (x ->> 'validUntil')::timestamptz + v_shift);
     END LOOP;
     FOR x IN SELECT e2 FROM jsonb_array_elements(coalesce(r -> 'assignments', '[]'::jsonb)) AS e2 LOOP
-      PERFORM tests.seed_assignment(r ->> 'key', x ->> 'vessel', (x ->> 'isCurrent')::boolean);
+      IF x ? 'leaveDate' OR x ? 'endDate' THEN
+        -- The fixture's dates (D-217), stored as given. A row that still says
+        -- is_current although its leave (else end) date has passed is a row
+        -- written before that date came: the legacy normaliser
+        -- (trg_crew_assignments_normalise_dates) would end it on this
+        -- insert, so it is off for this one insert (inside the test's
+        -- transaction, which rolls back).
+        v_stale := (x ->> 'isCurrent')::boolean
+          AND coalesce((x ->> 'leaveDate')::date, (x ->> 'endDate')::date) <= current_date;
+        IF v_stale THEN
+          ALTER TABLE public.crew_assignments DISABLE TRIGGER trg_crew_assignments_normalise_dates;
+        END IF;
+        PERFORM tests.seed_assignment(r ->> 'key', x ->> 'vessel', (x ->> 'isCurrent')::boolean, 'Crew',
+          jsonb_build_object('leave_date', x ->> 'leaveDate', 'end_date', x ->> 'endDate'));
+        IF v_stale THEN
+          ALTER TABLE public.crew_assignments ENABLE TRIGGER trg_crew_assignments_normalise_dates;
+        END IF;
+      ELSE
+        PERFORM tests.seed_assignment(r ->> 'key', x ->> 'vessel', (x ->> 'isCurrent')::boolean);
+      END IF;
     END LOOP;
 
     m := r -> 'membership';

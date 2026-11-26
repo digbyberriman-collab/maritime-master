@@ -20,7 +20,7 @@ SELECT u ->> 'key' AS user_key,
 FROM jsonb_array_elements(:'fixture'::jsonb -> 'users') AS u;
 GRANT SELECT ON expected_reads TO authenticated;
 
-SELECT tests.is((SELECT count(*) FROM expected_reads), 22::bigint, 'the fixture has 22 users');
+SELECT tests.is((SELECT count(*) FROM expected_reads), 25::bigint, 'the fixture has 25 users');
 SELECT tests.ok((SELECT count(*) FROM expected_reads WHERE hr_view AND NOT fleet AND active) >= 1, 'at least one persona reads the fleet through the HR exception only');
 SELECT tests.ok((SELECT count(*) FROM expected_reads WHERE NOT active) >= 2, 'inactive personas are covered');
 
