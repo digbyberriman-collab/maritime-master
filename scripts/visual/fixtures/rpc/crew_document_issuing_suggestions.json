@@ -1,0 +1,14 @@
+[
+  {
+    "issuing_office": "Training centre",
+    "uses": 4
+  },
+  {
+    "issuing_office": "Maritime academy",
+    "uses": 2
+  },
+  {
+    "issuing_office": "Passport office",
+    "uses": 1
+  }
+]

@@ -1,0 +1,3 @@
+[
+  {"vessel_id": "e0000000-0000-4000-8000-000000000001", "company_id": "c0000000-0000-4000-8000-000000000001", "is_passenger_ship": false, "crew_uploads_enabled": true, "transfer_requires_fleet_approval": false, "created_at": "$ts:-30d", "updated_at": "$ts:-30d"}
+]

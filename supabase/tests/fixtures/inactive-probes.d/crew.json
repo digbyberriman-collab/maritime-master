@@ -1,4 +1,6 @@
 [
-  { "probe": { "callee": "crew_profile_visible", "expr": "public.crew_profile_visible({profile:A.crew_hyd})" } },
-  { "probe": { "callee": "crew_profile_can_edit", "expr": "public.crew_profile_can_edit({profile:A.crew_hyd})" } }
+  {"probe": {"callee": "crew_profile_visible", "expr": "public.crew_profile_visible({profile:A.crew_hyd})"}},
+  {"probe": {"callee": "crew_profile_can_edit", "expr": "public.crew_profile_can_edit({profile:A.crew_hyd})"}},
+  {"probe": {"callee": "crew_document_file_readable", "expr": "public.crew_document_file_readable(auth.uid(), {profile:A.crew_hyd})"}},
+  {"probe": {"callee": "crew_document_may_write", "expr": "public.crew_document_may_write(auth.uid(), {profile:A.crew_hyd}, 'create')"}}
 ]

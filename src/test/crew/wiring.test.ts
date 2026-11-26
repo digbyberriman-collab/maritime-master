@@ -49,21 +49,24 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 describe('pending types and the migrations', () => {
-  it('declares the tables and RPCs of 060100, 060200 and 060300 (X1-03: details, languages, terms, the profile RPCs)', () => {
+  it('declares the tables and RPCs of 060100, 060200, 060300 and 060400 (X1-04: the document catalogue and RPCs)', () => {
     expect(pendingTables).toEqual([
       'ref_countries', 'ref_languages', 'departments', 'contract_types', 'positions', 'position_aliases', 'position_manning',
       'crew_movements', 'crew_transfers',
       'crew_personal_details', 'crew_languages', 'crew_assignment_terms',
+      'crew_document_categories', 'crew_document_types', 'crew_document_type_satisfies', 'vessel_crew_settings',
     ]);
     expect(pendingFunctions).toEqual([
       'crew_positions_for_vessel', 'crew_vessel_unmatched_titles', 'crew_position_create', 'crew_vessel_positions_save', 'crew_position_alias_set',
       'crew_vessel_list', 'crew_vessel_movements',
       'crew_profile_resolve', 'crew_profile_summary', 'crew_personal_details_save', 'crew_languages_save', 'crew_onboarding_save', 'crew_find_duplicates',
+      'crew_documents_for_profile', 'crew_document_rights', 'crew_document_save', 'crew_document_delete', 'crew_document_issuing_suggestions',
     ]);
     expect(crewMigrationFiles).toEqual([
       '20261124060100_crew_reference_positions.sql',
       '20261124060200_crew_vessel_list.sql',
       '20261124060300_crew_profile_details.sql',
+      '20261124060400_crew_document_catalogue.sql',
     ]);
   });
 
@@ -81,16 +84,16 @@ describe('pending types and the migrations', () => {
     expect(entry?.tables).toEqual({ type: 'CrewPendingTables', expect: pendingTables });
     expect(entry?.functions).toEqual({ type: 'CrewPendingFunctions', expect: pendingFunctions });
     expect(Object.keys(contractMap.notMirrored.functions).sort()).toEqual([
-      'crew_caller_is_external', 'crew_cap_vessel_ids', 'crew_profile_visible', 'crew_vessel_cap', 'crew_visible_profile_ids',
+      'crew_caller_is_external', 'crew_cap_vessel_ids', 'crew_document_visible_profile_ids', 'crew_profile_visible', 'crew_vessel_cap', 'crew_visible_profile_ids',
     ]);
-    expect(entry?.columns).toEqual({ type: 'CrewPendingColumns', expect: ['crew_next_of_kin'] });
+    expect(entry?.columns).toEqual({ type: 'CrewPendingColumns', expect: ['crew_next_of_kin', 'crew_certificates'] });
   });
 
-  it('every function the crew migrations create has a grants entry, and every table its relation entry', () => {
+  it('every function the crew migrations create has a grants entry, and every table and view its relation entry', () => {
     const fns = Array.from(new Set(Array.from(crewMigrations.matchAll(/CREATE OR REPLACE FUNCTION public\.([a-z0-9_]+)\(/g)).map((m) => m[1]))).sort();
     const granted = Object.keys(grants.functions).map((k) => k.replace(/^public\.([a-z0-9_]+)\(.*$/, '$1')).sort();
     expect(granted).toEqual(fns);
-    const tables = Array.from(crewMigrations.matchAll(/CREATE TABLE IF NOT EXISTS public\.([a-z0-9_]+) \(/g)).map((m) => `public.${m[1]}`).sort();
+    const tables = Array.from(crewMigrations.matchAll(/CREATE (?:TABLE IF NOT EXISTS|OR REPLACE VIEW) public\.([a-z0-9_]+)[ (]/g)).map((m) => `public.${m[1]}`).sort();
     expect(Object.keys(grants.relations).sort()).toEqual(tables);
     for (const key of Object.keys(grants.functions)) expect(grants.functions[key], key).not.toContain('anon');
   });
@@ -105,6 +108,9 @@ describe('pending types and the migrations', () => {
     expect(ledger).toContain('| 3 | `20261124060300_crew_profile_details.sql` | written, not applied |');
     expect(ledger).toContain('| C3 | `20261124060300_crew_profile_details.sql` | Query C3 |');
     expect(ledger).toMatch(/-- C3\. crew_profile_details/);
+    expect(ledger).toContain('| 4 | `20261124060400_crew_document_catalogue.sql` | written, not applied |');
+    expect(ledger).toContain('| C4 | `20261124060400_crew_document_catalogue.sql` | Query C4 |');
+    expect(ledger).toMatch(/-- C4\. crew_document_catalogue/);
   });
 
   it('the status parity fixture is the one both test suites read (X1-02)', () => {
