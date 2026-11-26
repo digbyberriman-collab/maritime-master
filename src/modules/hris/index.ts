@@ -12,3 +12,10 @@ export { useHrCompanySettings, useHrCompanySettingsMutations, usePayGrades, useP
 export { NextOfKinCard } from './components/next-of-kin/NextOfKinCard';
 export { NextOfKinFormDialog } from './components/next-of-kin/NextOfKinFormDialog';
 export { useCrewNextOfKin, NEXT_OF_KIN_RELATIONSHIPS, type NextOfKin, type NextOfKinFormData } from './hooks/useCrewNextOfKin';
+// Shared with the vessel crew profile (X1-03B, X1-11B): the HR audit trail
+// (the Activity tab merges its rows with the crew log), the contract card and
+// the employment timeline and service summary (the Employment tab).
+export { ProfileAuditTrail } from './components/personal/ProfileAuditTrail';
+export { ContractCard } from './components/contracts/ContractCard';
+export { Timeline } from './components/history/Timeline';
+export { ServiceSummary } from './components/history/ServiceSummary';

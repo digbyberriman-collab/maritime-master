@@ -11,6 +11,7 @@ import { CREW_CAPS } from '@/modules/crew/paths';
 import {
   DEFAULT_PROFILE_TAB,
   PROFILE_TABS,
+  PROFILE_TAB_CAPABILITIES,
   PROFILE_TAB_COMPONENTS,
   PROFILE_TAB_KEYS,
   profilePath,
@@ -20,10 +21,13 @@ import {
 } from '@/modules/crew/lib/profileTabs';
 
 describe('the registry', () => {
-  it('lists Personal and Contact in this slice, Personal first (the default)', () => {
+  it('lists Personal and Contact (X1-03), Training, Medical and Activity (X1-03B), Personal first (the default)', () => {
     expect(PROFILE_TABS.map((t) => [t.key, t.label])).toEqual([
       ['personal', 'Personal'],
       ['contact', 'Contact'],
+      ['training', 'Training'],
+      ['medical', 'Medical'],
+      ['activity', 'Activity'],
     ]);
     expect(DEFAULT_PROFILE_TAB).toBe('personal');
     expect(PROFILE_TABS[0].key).toBe(DEFAULT_PROFILE_TAB);
@@ -42,8 +46,14 @@ describe('the registry', () => {
     for (const tab of PROFILE_TABS) {
       expect(isCapabilityKey(tab.capability), tab.key).toBe(true);
       expect(catalogue.has(tab.capability), tab.key).toBe(true);
-      expect(tab.capability).toBe(CREW_CAPS.profilesView);
-      expect(tab.ownAlways).toBe(true);
+      // X1 spec §4: every tab but Medical needs crew profile view (own always); Medical needs the medical capability, own included.
+      if (tab.key === 'medical') {
+        expect(tab.capability).toBe(CREW_CAPS.medicalRecordsView);
+        expect(tab.ownAlways).toBe(false);
+      } else {
+        expect(tab.capability).toBe(CREW_CAPS.profilesView);
+        expect(tab.ownAlways).toBe(true);
+      }
       expect(typeof tab.load).toBe('function');
       expect(tab.load.length).toBe(0);
       // A dynamic import of the tab body under components/profile (one lazy chunk per tab).
@@ -54,6 +64,7 @@ describe('the registry', () => {
 
   it('profileTabFor answers built tabs only', () => {
     expect(profileTabFor('contact')?.label).toBe('Contact');
+    expect(profileTabFor('medical')?.label).toBe('Medical');
     expect(profileTabFor('documents')).toBeNull();
     expect(profileTabFor('nonsense')).toBeNull();
     expect(profileTabFor(null)).toBeNull();
@@ -79,15 +90,18 @@ describe('visibleProfileTabs', () => {
   });
 
   it('without it (D-01): the own profile always, else the capability', () => {
-    expect(visibleProfileTabs({ serverTabs: null, own: true, can: none }).map((t) => t.key)).toEqual(['personal', 'contact']);
-    expect(visibleProfileTabs({ serverTabs: null, own: false, can: (k) => k === CREW_CAPS.profilesView }).map((t) => t.key)).toEqual(['personal', 'contact']);
+    expect(visibleProfileTabs({ serverTabs: null, own: true, can: none }).map((t) => t.key)).toEqual(['personal', 'contact', 'training', 'activity']);
+    expect(visibleProfileTabs({ serverTabs: null, own: false, can: (k) => k === CREW_CAPS.profilesView }).map((t) => t.key)).toEqual(['personal', 'contact', 'training', 'activity']);
+    // Medical opens only with the medical capability, own profile included (X1-03B).
+    expect(visibleProfileTabs({ serverTabs: null, own: true, can: (k) => k === CREW_CAPS.medicalRecordsView }).map((t) => t.key)).toEqual(['personal', 'contact', 'training', 'medical', 'activity']);
+    expect(PROFILE_TAB_CAPABILITIES).toEqual([CREW_CAPS.profilesView, CREW_CAPS.medicalRecordsView]);
     expect(visibleProfileTabs({ serverTabs: null, own: false, can: none })).toEqual([]);
   });
 
   it('a module setting that is off closes a tab that names it', () => {
     const tabs = visibleProfileTabs({ serverTabs: null, own: true, can: all, moduleOn: () => false });
-    // Neither built tab names a module setting, so both stay.
-    expect(tabs.map((t) => t.key)).toEqual(['personal', 'contact']);
+    // No built tab names a module setting, so all stay.
+    expect(tabs.map((t) => t.key)).toEqual(['personal', 'contact', 'training', 'medical', 'activity']);
   });
 });
 

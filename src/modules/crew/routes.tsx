@@ -20,6 +20,11 @@ import { CREW_CAPS, CREW_FLEET_PATHS, CREW_PATHS, CREW_ROOT } from './paths';
  * vessel.crew.crew_profiles.view, and the server again). The static
  * crew/people/:crewId/hours-of-rest (the month page) outranks the :tab
  * route until X1-07B makes Hours of rest a profile tab.
+ * X1-03B adds Add crew member at crew/new (guard
+ * vessel.crew.crew_profiles.create; the page checks the key for the route
+ * vessel again, and Save also needs users-access administration because
+ * create-crew-member makes the person's account). The crew list's Add crew
+ * opens it.
  */
 const vesselPage = (path: string, loader: ManifestPageLoader): RouteDef => ({
   scope: 'vessel',
@@ -57,6 +62,8 @@ export const CREW_ROUTES: readonly RouteDef[] = [
   // The routed crew profile (X1-03; D-X1-19: a legacy login id in :profileId is resolved and replaced).
   vesselRedirect(`${CREW_ROOT}/people/:profileId`, 'personal'),
   vesselScopePage(`${CREW_ROOT}/people/:profileId/:tab`, () => import('@/modules/crew/pages/CrewProfilePage')),
+  // Add crew member (X1-03B; gap/04 C14, W1): `?rehire=<profileId>` prefills a returning crew member (X1-11B).
+  vesselCapabilityPage(`${CREW_ROOT}/new`, CREW_CAPS.profilesCreate, () => import('@/modules/crew/pages/AddCrewPage')),
   vesselRedirect(CREW_PATHS.compliance, 'status'),
   vesselPage(CREW_PATHS.complianceStatus, () => import('@/modules/crew/pages/CrewDocuments')),
   vesselPage(CREW_PATHS.hoursOfRest, () => import('@/modules/work-rest/pages/WorkRestOverview')),

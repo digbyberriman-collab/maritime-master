@@ -1,5 +1,5 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Download, FileText, ListOrdered, Loader2, MoreHorizontal, RefreshCw, Upload, UserPlus } from 'lucide-react';
 import PageHeader from '@/shared/components/layout/PageHeader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -23,7 +23,7 @@ import { notify } from '@/shared/lib/notify';
 import { runExport, notifyExportResult, type ExportColumn } from '@/lib/export';
 import { statusLabel } from '@/shared/components/status';
 import { useQueryClient } from '@tanstack/react-query';
-import { CREW_CAPS } from '@/modules/crew/paths';
+import { CREW_CAPS, CREW_ROOT } from '@/modules/crew/paths';
 import { useCrew, type CrewMember } from '@/modules/crew/hooks/useCrew';
 import { crewKeys } from '@/modules/crew/hooks/crewKeys';
 import {
@@ -55,7 +55,6 @@ import { CrewBulkBar } from '@/modules/crew/components/crew-list/CrewBulkBar';
 const PositionsDrawer = lazy(() => import('@/modules/crew/components/PositionsDrawer'));
 const MovementsTab = lazy(() => import('@/modules/crew/components/crew-list/MovementsTab'));
 const CrewListReportDialog = lazy(() => import('@/modules/crew/components/crew-list/CrewListReportDialog'));
-const CrewFormModal = lazy(() => import('@/modules/crew/components/CrewFormModal'));
 const ImportCrewCSVModal = lazy(() => import('@/modules/crew/components/ImportCrewCSVModal'));
 const FullCrewEditModal = lazy(() => import('@/modules/crew/components/FullCrewEditModal'));
 const TransferCrewModal = lazy(() => import('@/modules/crew/components/TransferCrewModal'));
@@ -269,7 +268,10 @@ const CrewListBody: React.FC<{ vessel: RouteVessel }> = ({ vessel }) => {
   };
 
   // ---------------------------------------------------------------- dialogs
-  const [addOpen, setAddOpen] = useState(false);
+  // Add crew opens its own page (X1-03B; lib/addCrewSchema ADD_CREW_PATH, kept as a literal so the
+  // list's chunk does not carry the form). CrewFormModal stays only for callers outside this list.
+  const navigate = useNavigate();
+  const openAddCrew = () => navigate(scopedPath(`${CREW_ROOT}/new`));
   const [importOpen, setImportOpen] = useState(false);
   const [report, setReport] = useState<{ only: string[] | null } | null>(null);
   const [rowDialog, setRowDialog] = useState<RowDialog>(null);
@@ -358,7 +360,7 @@ const CrewListBody: React.FC<{ vessel: RouteVessel }> = ({ vessel }) => {
             </Button>
           ) : null}
           {canCreate ? (
-            <Button variant="signal" onClick={() => setAddOpen(true)}>
+            <Button variant="signal" onClick={openAddCrew}>
               <UserPlus aria-hidden="true" />
               Add crew
             </Button>
@@ -471,7 +473,7 @@ const CrewListBody: React.FC<{ vessel: RouteVessel }> = ({ vessel }) => {
               title: `No crew on ${vessel.name} yet`,
               body: 'People appear here once they are assigned to this vessel or added to its crew.',
               action: canCreate ? (
-                <Button size="sm" onClick={() => setAddOpen(true)}>
+                <Button size="sm" onClick={openAddCrew}>
                   <UserPlus aria-hidden="true" />
                   Add crew
                 </Button>
@@ -493,18 +495,6 @@ const CrewListBody: React.FC<{ vessel: RouteVessel }> = ({ vessel }) => {
             today={today}
             basicRows={basic ? rows : null}
             onlyProfileIds={report.only}
-          />
-        ) : null}
-        {addOpen ? (
-          <CrewFormModal
-            isOpen
-            onClose={() => setAddOpen(false)}
-            onSubmit={async (data) => {
-              const outcome = await crew.addCrewMember.mutateAsync(data);
-              refreshList();
-              return outcome;
-            }}
-            isLoading={crew.addCrewMember.isPending}
           />
         ) : null}
         {importOpen ? <ImportCrewCSVModal isOpen onClose={() => setImportOpen(false)} onSuccess={refreshList} /> : null}

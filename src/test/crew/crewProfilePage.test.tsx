@@ -308,7 +308,8 @@ describe('populated', () => {
     renderAt(`/v/dra/crew/people/${P_BOSUN}/personal`);
     const nav = await screen.findByRole('navigation', { name: 'Profile sections' });
     const links = within(nav).getAllByRole('link');
-    expect(links.map((l) => l.textContent)).toEqual(['Personal', 'Contact']);
+    // The server opens training and activity, not medical (no medical capability): X1-03B's tabs follow it.
+    expect(links.map((l) => l.textContent)).toEqual(['Personal', 'Contact', 'Training', 'Activity']);
     expect(links[0]).toHaveAttribute('aria-current', 'page');
     expect(links[1]).toHaveAttribute('href', `/v/dra/crew/people/${P_BOSUN}/contact`);
     expect(nav.querySelector('ul')?.className).toMatch(/overflow-x-auto/);

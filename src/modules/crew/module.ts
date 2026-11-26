@@ -5,7 +5,8 @@
  *
  * - routes: ./routes.tsx, the vessel Crew pages (relative to `/v/:vesselCode`)
  *   and the fleet planner. The routed crew profile (crew/people/:profileId,
- *   X1-03) has no nav leaf: it opens from the crew list's View profile.
+ *   X1-03) has no nav leaf: it opens from the crew list's View profile. Nor
+ *   has Add crew member (crew/new, X1-03B): it opens from the list's Add crew.
  * - nav:
  *   - `vessel.crew`: the Crew tab's sidebar, at the X1 spec §4 orders (Crew
  *     List 10, Planner 20, Crew Compliance 30, Hours of Rest 40,

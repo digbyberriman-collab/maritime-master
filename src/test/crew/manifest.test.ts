@@ -27,6 +27,7 @@ vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 
 import manifest from '@/modules/crew/module';
 import { CREW_ROUTES } from '@/modules/crew/routes';
+import { ADD_CREW_PATH } from '@/modules/crew/lib/addCrewSchema';
 import { CREW_CAPABILITIES, CREW_CAPS, CREW_FLEET_PATHS, CREW_PATHS } from '@/modules/crew/paths';
 import { MODULE_REGISTRY } from '@/app/registry/modules';
 import { isRedirectDef, type PageRouteDef } from '@/app/registry/types';
@@ -53,6 +54,8 @@ const TODAY: Record<string, string> = {
   [`fleet ${CREW_FLEET_PATHS.planner}`]: '/src/modules/rotation-planner/pages/RotationPlannerPage.tsx',
   // X1-03: the routed crew profile (new; gated in the page and on the server).
   [`vessel ${PROFILE_TAB_PATH}`]: '/src/modules/crew/pages/CrewProfilePage.tsx',
+  // X1-03B: Add crew member (new; behind crew profile creation).
+  [`vessel ${ADD_CREW_PATH}`]: '/src/modules/crew/pages/AddCrewPage.tsx',
 };
 
 describe('crew routes', () => {
@@ -74,6 +77,7 @@ describe('crew routes', () => {
     for (const r of pages) {
       if (r.path === CREW_PATHS.list) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.crewListView });
       else if (r.path === PROFILE_TAB_PATH) expect(r.guard, r.path).toEqual({ kind: 'scope' });
+      else if (r.path === ADD_CREW_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.profilesCreate });
       else expect(r.guard, r.path).toEqual({ kind: 'login' });
     }
   });
@@ -145,6 +149,9 @@ describe('every vessel crew URL of today resolves to its page', () => {
     // X1-03: the routed profile; the static hours-of-rest month still outranks the :tab route.
     ['/v/dra/crew/people/b0000000-0000-4000-8000-000000000015', 'crew/pages/CrewProfilePage.tsx'],
     ['/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/contact', 'crew/pages/CrewProfilePage.tsx'],
+    // X1-03B: Add crew member, also prefilled for a re-hire.
+    ['/v/dra/crew/new', 'crew/pages/AddCrewPage.tsx'],
+    ['/v/dra/crew/new?rehire=b0000000-0000-4000-8000-000000000015', 'crew/pages/AddCrewPage.tsx'],
   ])('%s -> %s', (url, page) => {
     const resolved = resolveUrl(routes, url);
     expect(describeElement(resolved.element)).toContain(`page(/src/modules/${page})`);

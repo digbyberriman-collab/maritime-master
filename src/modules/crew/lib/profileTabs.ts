@@ -2,7 +2,7 @@
  * The crew profile's tabs (X1-03; gap/04 C16; X1 spec §4): one registry the
  * page renders from, so each later slice adds its tab here and nowhere else.
  *
- *   personal, contact                        X1-03 (this slice)
+ *   personal, contact                        X1-03
  *   training, medical, activity              X1-03B
  *   documents, stcw, qualifications          X1-04B
  *   hours-of-rest                            X1-07B (until then the route
@@ -59,7 +59,11 @@ export const PROFILE_TAB_KEYS: readonly CrewProfileTabKey[] = [
 
 export const DEFAULT_PROFILE_TAB: CrewProfileTabKey = 'personal';
 
-/** The tabs built so far, in display order. */
+/**
+ * The tabs built so far, in display order. Medical is the one tab the
+ * person's own profile does not open by itself: it needs the medical
+ * capability on the vessel, as the server's tab list says (crew_profile_summary).
+ */
 export const PROFILE_TABS: readonly ProfileTabDef[] = [
   {
     key: 'personal',
@@ -75,7 +79,39 @@ export const PROFILE_TABS: readonly ProfileTabDef[] = [
     ownAlways: true,
     load: () => import('@/modules/crew/components/profile/ContactTab'),
   },
+  // X1-03B: the person's courses and training applications (read-only).
+  {
+    key: 'training',
+    label: 'Training',
+    capability: CREW_CAPS.profilesView,
+    ownAlways: true,
+    load: () => import('@/modules/crew/components/profile/TrainingTab'),
+  },
+  // X1-03B: the Health summary. Medical clearance on the vessel, own profile
+  // included (D-X1-3; the person reads their own record in Health).
+  {
+    key: 'medical',
+    label: 'Medical',
+    capability: CREW_CAPS.medicalRecordsView,
+    ownAlways: false,
+    load: () => import('@/modules/crew/components/profile/MedicalTab'),
+  },
+  // X1-03B: one timeline of the recorded changes (the tab reads them only with the HR history gate).
+  {
+    key: 'activity',
+    label: 'Activity',
+    capability: CREW_CAPS.profilesView,
+    ownAlways: true,
+    load: () => import('@/modules/crew/components/profile/ActivityTab'),
+  },
 ];
+
+/**
+ * Every capability a built tab names, once. In the D-01 fallback (no
+ * server tab list) the page asks useCan for each of these; a key it does
+ * not ask reads as no, so a tab behind it stays closed (fail closed).
+ */
+export const PROFILE_TAB_CAPABILITIES: readonly CapabilityKey[] = [...new Set(PROFILE_TABS.map((tab) => tab.capability))];
 
 /** One lazy component per built tab, made once. */
 export const PROFILE_TAB_COMPONENTS: Readonly<Record<string, LazyExoticComponent<ComponentType<ProfileTabProps>>>> = Object.fromEntries(

@@ -92,5 +92,90 @@
     "slug": "crew-profile-redirect",
     "expectRedirect": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/personal",
     "note": "X1-03: the bare profile URL lands on the Personal tab"
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/medical",
+    "slug": "crew-profile-medical",
+    "waitFor": "[data-crew-profile] [data-medical-state]",
+    "note": "X1-03B: the profile's Medical tab: blood group, allergies, conditions, medication, STORM's 17 standard vaccinations with booster status, the latest medical reports, links into Health. Needs the crew_profile_summary fixture's tabs to list medical, and Health rows for the person (scratch fixtures until PR-X1-G)"
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/training",
+    "slug": "crew-profile-training",
+    "waitFor": "[data-crew-profile] [data-training-state]",
+    "note": "X1-03B: the profile's Training tab: courses and certificates, training applications, See courses for fleet reach. Needs the summary fixture's tabs to list training (scratch fixtures until PR-X1-G)"
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/activity",
+    "slug": "crew-profile-activity",
+    "waitFor": "[data-crew-profile] [data-activity-state], [data-crew-profile] h2",
+    "note": "X1-03B: the profile's Activity tab: the crew log and the HR trail merged by time, field names only. Needs the summary fixture's tabs to list activity (scratch fixtures until PR-X1-G)"
+  },
+  {
+    "path": "/v/dra/crew/new",
+    "slug": "crew-add",
+    "waitFor": "[data-add-crew] [data-add-crew-summary]",
+    "note": "X1-03B: Add crew member: the W1 sections (basic, position and department, employment with the derived status and leave allowance, embarkation from the home port, permissions with the role and the access-set preview) and the summary with Save"
+  },
+  {
+    "path": "/v/dra/crew/new",
+    "slug": "crew-add-invalid",
+    "waitFor": "[data-add-crew] [data-add-crew-summary]",
+    "note": "X1-03B: Add crew member saved empty: each required field says what it needs, nothing is sent",
+    "actions": [
+      {
+        "click": "[data-add-crew-summary] button[type=\"submit\"]"
+      },
+      {
+        "wait": 300
+      }
+    ]
+  },
+  {
+    "path": "/v/dra/crew/new",
+    "slug": "crew-add-duplicates",
+    "waitFor": "[data-add-crew] [data-add-crew-summary]",
+    "note": "X1-03B: Add crew member, Save with a possible duplicate (crew_find_duplicates fixture: a name match): the match is listed and Save waits for a confirmation",
+    "actions": [
+      {
+        "type": {
+          "selector": "[data-add-crew-section=\"basic\"] input[name=\"firstName\"]",
+          "text": "Demo"
+        }
+      },
+      {
+        "type": {
+          "selector": "[data-add-crew-section=\"basic\"] input[name=\"lastName\"]",
+          "text": "Deckhand"
+        }
+      },
+      {
+        "type": {
+          "selector": "[data-add-crew-section=\"basic\"] input[name=\"email\"]",
+          "text": "deckhand.two@example.test"
+        }
+      },
+      {
+        "click": "[data-add-crew-section=\"position\"] button[role=\"combobox\"]"
+      },
+      {
+        "click": "[cmdk-item][data-value^=\"Deckhand \"]"
+      },
+      {
+        "type": {
+          "selector": "[data-add-crew-section=\"employment\"] input[name=\"startDate\"]",
+          "text": "12012026"
+        }
+      },
+      {
+        "click": "[data-add-crew-summary] button[type=\"submit\"]"
+      },
+      {
+        "waitFor": "[data-add-crew-duplicates=\"matches\"]"
+      },
+      {
+        "wait": 300
+      }
+    ]
   }
 ]

@@ -11,6 +11,7 @@
     "/v/:vesselCode/crew/familiarisation :: page(/src/modules/training/pages/Training.tsx) guard=ProtectedRoute layout=-",
     "/v/:vesselCode/crew/hours-of-rest :: page(/src/modules/work-rest/pages/WorkRestOverview.tsx) guard=ProtectedRoute layout=-",
     "/v/:vesselCode/crew/list :: <ModuleRoute{capability=\"vessel.crew.crew_list.view\"}> > page(/src/modules/crew/pages/CrewListPage.tsx) guard=- layout=-",
+    "/v/:vesselCode/crew/new :: <ModuleRoute{capability=\"vessel.crew.crew_profiles.create\"}> > page(/src/modules/crew/pages/AddCrewPage.tsx) guard=- layout=-",
     "/v/:vesselCode/crew/people/:crewId/hours-of-rest :: page(/src/modules/work-rest/pages/MyWorkRestMonth.tsx) guard=ProtectedRoute layout=-",
     "/v/:vesselCode/crew/people/:profileId :: redirect(personal)",
     "/v/:vesselCode/crew/people/:profileId/:tab :: page(/src/modules/crew/pages/CrewProfilePage.tsx) guard=- layout=-",
