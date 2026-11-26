@@ -9,6 +9,10 @@
  * offending entry is skipped, and src/test/config/registry.test.tsx fails
  * while any problem is left.
  *
+ * Notification types (platform-prep PP4): each declaration needs a
+ * snake_case key, a status (deferred or live) and a named emitter, and a
+ * key may be declared by one manifest only.
+ *
  * Record kinds are validated by registering them into a record-kind
  * registry built here (gap/08 REG1; DECISIONS G7): an invalid definition or
  * a reference prefix used twice becomes a problem. `./modules.ts` then seeds
@@ -21,6 +25,7 @@ import {
   isRedirectDef,
   type AlertRoute,
   type BadgeProvider,
+  type ManifestNotificationType,
   type ModuleManifest,
   type NavFragment,
   type RecordKindRef,
@@ -37,6 +42,8 @@ export const SCOPE_ROOTS: Readonly<Record<Exclude<RouteScope, 'workspace'>, stri
 };
 
 const ROUTE_SCOPES: readonly RouteScope[] = ['fleet', 'vessel', 'personal', 'workspace'];
+const NOTIFICATION_KEY = /^[a-z][a-z0-9_]{0,62}$/;
+const NOTIFICATION_STATUSES: readonly string[] = ['deferred', 'live'];
 const GUARD_KINDS: readonly RouteGuardKind[] = ['login', 'scope', 'module', 'capability'];
 
 export interface RegisteredRoute {
@@ -58,6 +65,8 @@ export interface ModuleRegistry {
   alertRoutes: readonly (AlertRoute & { moduleId: string })[];
   badges: readonly (BadgeProvider & { moduleId: string })[];
   recordKinds: readonly (RecordKindRef & { moduleId: string })[];
+  /** Every declared notification type, with its owner (keys unique across manifests). */
+  notificationTypes: readonly (ManifestNotificationType & { moduleId: string })[];
   /** Everything wrong with the manifests; empty when they are sound. */
   problems: readonly string[];
   /** Routes of one scope, in manifest order. */
@@ -161,6 +170,8 @@ export function buildRegistry(
   const alertRoutes: (AlertRoute & { moduleId: string })[] = [];
   const badges: (BadgeProvider & { moduleId: string })[] = [];
   const recordKinds: (RecordKindRef & { moduleId: string })[] = [];
+  const notificationTypes: (ManifestNotificationType & { moduleId: string })[] = [];
+  const notificationKeys = new Map<string, string>();
   const alertTypes = new Map<string, string>();
   const badgeKeys = new Map<string, string>();
   const kindKeys = new Map<string, string>();
@@ -230,6 +241,28 @@ export function buildRegistry(
       kindKeys.set(kind.key, manifest.id);
       recordKinds.push({ ...kind, moduleId: manifest.id });
     }
+    for (const type of manifest.notificationTypes ?? []) {
+      const where = `${manifest.id}: notification type ${JSON.stringify(type?.key ?? '?')}`;
+      if (!type || typeof type.key !== 'string' || !NOTIFICATION_KEY.test(type.key)) {
+        problems.push(`${where} has no snake_case key`);
+        continue;
+      }
+      if (!NOTIFICATION_STATUSES.includes(type.status)) {
+        problems.push(`${where} has status ${JSON.stringify(type.status)} (deferred or live)`);
+        continue;
+      }
+      if (typeof type.emitter !== 'string' || !type.emitter.trim()) {
+        problems.push(`${where} names no emitter`);
+        continue;
+      }
+      const owner = notificationKeys.get(type.key);
+      if (owner) {
+        problems.push(`${where} is already declared by ${owner}`);
+        continue;
+      }
+      notificationKeys.set(type.key, manifest.id);
+      notificationTypes.push({ ...type, moduleId: manifest.id });
+    }
   }
 
   const pagePatterns = routes.filter((r) => !isRedirectDef(r.def)).map((r) => r.fullPath);
@@ -243,6 +276,7 @@ export function buildRegistry(
     alertRoutes,
     badges,
     recordKinds,
+    notificationTypes,
     problems,
     routesFor: (scope) => routes.filter((r) => r.def.scope === scope),
     fragmentsFor: (slot) => nav.filter((f) => f.slot === slot),

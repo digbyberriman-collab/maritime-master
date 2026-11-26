@@ -154,6 +154,29 @@ export interface BadgeProvider {
  */
 export type RecordKindRef = RecordKindDefinition;
 
+/**
+ * Whether a notification type the module owns has a live emitter yet
+ * (D-238). `deferred` types show "Not available yet" in place of a switch;
+ * `live` ones are real in-app switches. Both are engine types: in-app only,
+ * no email subscription (D-249).
+ */
+export type NotificationTypeStatus = 'deferred' | 'live';
+
+/**
+ * A notification type the module owns (platform-prep PP4). The row itself
+ * is seeded by a platform migration (20261124030100 for Phase 3 wave 1);
+ * the module declares whether its emitter exists, naming it. A stream
+ * flips `status` to `live` in the slice that lands the emitter, and that
+ * slice's SQL test proves the emitter sends the key (D-238).
+ */
+export interface ManifestNotificationType {
+  /** The `notification_types.key`, snake_case. */
+  key: string;
+  status: NotificationTypeStatus;
+  /** The SQL function or trigger that sends it (today, or once it is built). */
+  emitter: string;
+}
+
 export interface ModuleManifest {
   /** The module folder name (`src/modules/<id>/module.ts`). */
   id: string;
@@ -167,4 +190,6 @@ export interface ModuleManifest {
   recordKinds?: readonly RecordKindRef[];
   /** PMS keys the module's pages and actions use (gap/00 W6 "proposed"). */
   capabilities?: readonly CapabilityKey[];
+  /** Notification types the module sends, live or deferred (D-238; keys unique across manifests). */
+  notificationTypes?: readonly ManifestNotificationType[];
 }

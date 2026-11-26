@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "ACL inventory of the Phase 2 build-out (spec §D.7, CC-1, CC-26; proposed D-135): every function the build-out migrations (supabase/migrations/20261123*.sql) create or redefine in public, by identity (name and argument types), with exactly the roles that may EXECUTE it ([] = nobody: trigger functions), from the grant columns of spec §A; and every table and view they create with the privileges authenticated holds (table level, plus column-level grants). anon holds nothing on any of them and no function is executable by PUBLIC or anon. Asserted after build-out pass 2 by supabase/tests/sql/zz_platform/acl.test.sql, which also fails when a build-out function or relation is missing here. Hand-maintained: a new function or grant changes this file in the same commit, reviewed against the spec.",
+  "description": "ACL inventory of the Phase 2 build-out (spec §D.7, CC-1, CC-26; proposed D-135): every function the build-out migrations (supabase/migrations/20261123*.sql, and the platform-prep files 20261124000000-20261124035959) create or redefine in public, by identity (name and argument types), with exactly the roles that may EXECUTE it ([] = nobody: trigger functions), from the grant columns of spec §A; and every table and view they create with the privileges authenticated holds (table level, plus column-level grants). anon holds nothing on any of them and no function is executable by PUBLIC or anon. Asserted after build-out pass 2 by supabase/tests/sql/zz_platform/acl.test.sql, which also fails when a build-out function or relation is missing here. Hand-maintained: a new function or grant changes this file in the same commit, reviewed against the spec.",
   "functions": {
     "public.access_change_audit()": [],
     "public.account_membership_vessels_company()": [],
@@ -154,7 +154,11 @@
     "public.role_rank(text)": ["service_role"],
     "public.role_vessel_ids(app_role[])": ["authenticated", "service_role"],
     "public.set_membership_status(uuid, text, uuid, text)": ["service_role"],
+    "public.storage_crew_document_allowed(text, boolean)": ["authenticated", "service_role"],
+    "public.storage_crew_document_path(text)": ["authenticated", "service_role"],
+    "public.storage_object_company(text)": ["authenticated", "service_role"],
     "public.storage_path_allowed(text, text, boolean)": ["authenticated", "service_role"],
+    "public.storage_path_read_hooks()": [],
     "public.unlink_records(uuid)": ["authenticated"],
     "public.user_belongs_to_company(uuid, uuid)": ["authenticated", "service_role"],
     "public.user_can_reach_vessel(uuid, uuid)": ["authenticated", "service_role"],

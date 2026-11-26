@@ -11,6 +11,9 @@
  *     `crew_training` module setting. This module owns the vessel page end to
  *     end (platform-prep plan §1, contract 2).
  *
+ * - notificationTypes: the training application notification types and
+ *   their emitters (platform-prep PP4; deferred until each emitter lands, D-238).
+ *
  * Platform-prep PP3 moved the routes from src/routes/index.tsx and the leaves
  * from src/config/sitemap.ts unchanged.
  */
@@ -45,6 +48,13 @@ const manifest: ModuleManifest = {
       order: 70,
       node: L('Crew Training', VESSEL_CREW_ROOT, { slug: 'training', icon: GraduationCap, moduleSetting: 'crew_training', ...LIVE }),
     },
+  ],
+  // Seeded by 20261124030100 (category Training; X5 PR-08). Each flips to
+  // 'live' in the slice that lands its emitter, whose SQL test proves it (D-238).
+  notificationTypes: [
+    { key: 'training_application_action_needed', status: 'deferred', emitter: 'development_transition() (X5-07A)' },
+    { key: 'training_application_updated', status: 'deferred', emitter: 'development_transition() (X5-07A)' },
+    { key: 'training_applications_stale', status: 'deferred', emitter: 'fleet_ops_daily_sweep() on Mondays (X5-09)' },
   ],
 };
 

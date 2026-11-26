@@ -11,6 +11,9 @@
  *     (platform-prep plan §1), so this module never uses those two orders.
  *   - `personal.my_work`: the user's own documents (planned until /me/documents is built).
  *
+ * - notificationTypes: the crew notification types and their emitters
+ *   (platform-prep PP4; deferred until each emitter lands, D-238).
+ *
  * Platform-prep PP3 moved these from src/config/sitemap.ts and
  * src/routes/index.tsx unchanged: same nodes, same orders, same pages.
  */
@@ -51,6 +54,21 @@ const manifest: ModuleManifest = {
     { slot: 'vessel.crew', order: 110, node: L('Visitors & Occasional Workers', CREW_ROOT, { slug: 'visitors', icon: UserCheck }) },
     { slot: 'vessel.crew', order: 120, node: L('Employment History', CREW_ROOT, { icon: Briefcase }) },
     { slot: 'personal.my_work', order: 40, node: L('Documents', PERSONAL_ROOT, { icon: FileText, status: 'planned' }) },
+  ],
+  // Seeded by 20261124030100 (category Crew; PR-X1-E). Each flips to 'live'
+  // in the slice that lands its emitter, whose SQL test proves it (D-238).
+  notificationTypes: [
+    { key: 'crew_document_review_needed', status: 'deferred', emitter: 'crew_certificates_review_notify() trigger (X1-05)' },
+    { key: 'crew_document_decided', status: 'deferred', emitter: 'crew_document_verify() (X1-05)' },
+    { key: 'crew_document_expiring', status: 'deferred', emitter: 'crew_document_expiry_sweep() through hr-daily-sweeper (X1-05)' },
+    { key: 'hor_reminder', status: 'deferred', emitter: 'work_rest_remind() and work_rest_send_due_reminders() (X1-08)' },
+    { key: 'hor_serious_breach', status: 'deferred', emitter: 'work_rest_serious_breach_notify() trigger (X1-08)' },
+    { key: 'hor_breach_report', status: 'deferred', emitter: 'work_rest_breach_report_create() (X1-08)' },
+    { key: 'hor_correction_requested', status: 'deferred', emitter: 'work_rest_review_breach() (X1-08)' },
+    { key: 'familiarisation_assigned', status: 'deferred', emitter: 'familiarisation_open_required() (X1-10)' },
+    { key: 'crew_transfer_submitted', status: 'deferred', emitter: 'transfer_crew_submit() (X1-11)' },
+    { key: 'crew_transfer_completed', status: 'deferred', emitter: 'transfer_crew() (X1-11)' },
+    { key: 'crew_employment_ended', status: 'deferred', emitter: 'crew_end_employment() (X1-11)' },
   ],
 };
 

@@ -7,6 +7,12 @@
  * go unwired. A deferred type shows "Not available yet" in place of the
  * preference switch (/me/notifications).
  *
+ * Platform-prep PP4: the Phase 3 wave 1 stream types are seeded by
+ * 20261124030100 (Crew, Documents, Training) and declared, with their status
+ * and emitter, in the owning manifest; both seed files are checked against
+ * the platform lists plus the manifests (each seeded engine type in exactly
+ * one place), and the registry validates the declarations.
+ *
  * Engine types, live or deferred, are in-app only (D-249): Notification
  * Management shows them as plain rows (no drawer, no save, not a
  * "No recipients" gap), and no email is sent to any subscriber until the
@@ -18,6 +24,8 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { readRepoFile } from '../design/cssTokens';
+import { buildRegistry } from '@/app/registry/registry';
+import type { ModuleManifest } from '@/app/registry/types';
 
 type Cadence = 'realtime' | 'daily' | 'weekly';
 interface TypeRow {
@@ -61,6 +69,9 @@ vi.mock('@/shared/hooks/use-toast', () => ({ useToast: () => ({ toast: h.toast }
 
 import {
   DEFERRED_NOTIFICATION_TYPES,
+  MODULE_NOTIFICATION_TYPES,
+  NOTIFICATION_TYPE_SETS,
+  foldNotificationTypes,
   EMAIL_DELIVERY_LIVE,
   EMAIL_NOT_LIVE_DESCRIPTION,
   EMAIL_NOT_LIVE_TITLE,
@@ -78,20 +89,32 @@ import NotificationManagementPage from '@/modules/notifications-admin/pages/Noti
 import { EditSubscriptionDrawer } from '@/modules/notifications-admin/components/EditSubscriptionDrawer';
 
 const SEED_FILE = 'supabase/migrations/20261123030000_platform_notification_outbox.sql';
+/** The Phase 3 wave 1 stream types (platform-prep PP4): declared in the owning manifests. */
+const STREAM_SEED_FILE = 'supabase/migrations/20261124030100_platform_stream_notification_types.sql';
 
-/** The (key, name, category) tuples of the notification_types seed. */
-function seededTypes(): Array<{ key: string; name: string; category: string }> {
-  const sql = readRepoFile(SEED_FILE);
+interface SeedRow {
+  key: string;
+  name: string;
+  category: string;
+  description: string;
+}
+
+/** The (key, name, category, cadence, description) tuples of a notification_types seed. */
+function seededTypesIn(file: string): SeedRow[] {
+  const sql = readRepoFile(file);
   const start = sql.indexOf('INSERT INTO public.notification_types');
-  expect(start, 'the notification_types seed is in file 15').toBeGreaterThan(-1);
+  expect(start, `the notification_types seed is in ${file}`).toBeGreaterThan(-1);
   const end = sql.indexOf('ON CONFLICT', start);
   expect(end).toBeGreaterThan(start);
   const block = sql.slice(start, end);
-  const rows: Array<{ key: string; name: string; category: string }> = [];
-  const tuple = /\(\s*'([a-z0-9_]+)'\s*,\s*'((?:[^']|'')*)'\s*,\s*'((?:[^']|'')*)'/g;
-  for (const m of block.matchAll(tuple)) rows.push({ key: m[1], name: m[2], category: m[3] });
+  const rows: SeedRow[] = [];
+  const text = "'((?:[^']|'')*)'";
+  const tuple = new RegExp(`\\(\\s*'([a-z0-9_]+)'\\s*,\\s*${text}\\s*,\\s*${text}\\s*,\\s*${text}\\s*,\\s*${text}`, 'g');
+  for (const m of block.matchAll(tuple)) rows.push({ key: m[1], name: m[2], category: m[3], description: m[5] });
   return rows;
 }
+
+const seededTypes = () => seededTypesIn(SEED_FILE);
 
 const LIVE: readonly string[] = LIVE_ENGINE_NOTIFICATION_TYPES;
 const DEFERRED: readonly string[] = DEFERRED_NOTIFICATION_TYPES;
@@ -150,6 +173,149 @@ describe('engine notification types: live or deferred (D-238)', () => {
     expect(EMAIL_DELIVERY_LIVE).toBe(false);
     expect(IN_APP_ONLY_COPY).toBe('In-app only');
     expect(EMAIL_NOT_LIVE_TITLE).toBe('Email delivery is not live yet');
+  });
+});
+
+// ─── Module-owned types (platform-prep PP4): manifest-declared liveness ────
+
+/** The owner of each stream category (platform-prep plan §2). */
+const CATEGORY_OWNER: Readonly<Record<string, string>> = { Crew: 'crew', Documents: 'documents', Training: 'development' };
+
+const WAVE1_STREAM_TYPES = [
+  'crew_document_review_needed',
+  'crew_document_decided',
+  'crew_document_expiring',
+  'hor_reminder',
+  'hor_serious_breach',
+  'hor_breach_report',
+  'hor_correction_requested',
+  'familiarisation_assigned',
+  'crew_transfer_submitted',
+  'crew_transfer_completed',
+  'crew_employment_ended',
+  'fleet_document_published',
+  'fleet_document_ack_reminder',
+  'fleet_document_ack_due_soon',
+  'fleet_document_ack_overdue',
+  'fleet_document_ack_digest',
+  'training_application_action_needed',
+  'training_application_updated',
+  'training_applications_stale',
+];
+
+describe('module-owned notification types (PP4; D-238, D-249)', () => {
+  const stream = () => seededTypesIn(STREAM_SEED_FILE);
+  const declared = MODULE_NOTIFICATION_TYPES;
+
+  it('20261124030100 seeds exactly the wave 1 stream types, in the Crew, Documents and Training categories', () => {
+    expect(stream().map((r) => r.key)).toEqual(WAVE1_STREAM_TYPES);
+    expect(new Set(stream().map((r) => r.category))).toEqual(new Set(['Crew', 'Documents', 'Training']));
+    expect(stream().filter((r) => r.category === 'Crew')).toHaveLength(11);
+  });
+
+  it('every stream seed is declared in exactly one manifest, the one that owns its category', () => {
+    for (const row of stream()) {
+      const owners = declared.filter((t) => t.key === row.key).map((t) => t.moduleId);
+      expect(owners, row.key).toEqual([CATEGORY_OWNER[row.category]]);
+    }
+  });
+
+  it('every manifest declaration is a stream seed (never a Records type, never unseeded), with a named emitter', () => {
+    const streamKeys = stream().map((r) => r.key);
+    const records = seededTypes().map((r) => r.key);
+    for (const t of declared) {
+      expect(streamKeys, `${t.moduleId}: ${t.key} is seeded by 20261124030100`).toContain(t.key);
+      expect(records, `${t.key} is not also an engine Records seed`).not.toContain(t.key);
+      expect(t.emitter.trim().length, t.key).toBeGreaterThan(5);
+      expect(['deferred', 'live']).toContain(t.status);
+    }
+    expect(declared.map((t) => t.key).sort()).toEqual([...WAVE1_STREAM_TYPES].sort());
+  });
+
+  it('each seeded engine type is in exactly one place: the platform live list, the platform deferred list or one manifest', () => {
+    const places = new Map<string, string[]>();
+    const add = (key: string, where: string) => places.set(key, [...(places.get(key) ?? []), where]);
+    for (const k of LIVE) add(k, 'platform live');
+    for (const k of DEFERRED) add(k, 'platform deferred');
+    for (const t of declared) add(t.key, `manifest ${t.moduleId}`);
+    for (const row of [...seededTypes().filter((r) => r.category === 'Records'), ...stream()]) {
+      expect(places.get(row.key), row.key).toHaveLength(1);
+    }
+    expect([...places.keys()].sort()).toEqual([...seededTypes().filter((r) => r.category === 'Records'), ...stream()].map((r) => r.key).sort());
+  });
+
+  it('the stream seeds are in-app only: no copy mentions email, and they are seeded nowhere else', () => {
+    for (const row of stream()) expect(`${row.name} ${row.description}`, row.key).not.toMatch(/e-?mail/i);
+    for (const file of ['supabase/migrations/20260522163528_da5bbfde-7251-4d89-9c3d-fc2360137af6.sql', SEED_FILE]) {
+      const sql = readRepoFile(file);
+      for (const key of WAVE1_STREAM_TYPES) expect(sql.includes(`'${key}'`), `${key} in ${file}`).toBe(false);
+    }
+  });
+
+  it('crew_document_expiring is adopted from HRIS phase 1 (already live, category Crew): the only stream key seeded before', () => {
+    const hris = seededTypesIn('supabase/migrations/20260917110000_hris_phase1_employee_records.sql');
+    const named = hris.filter((r) => WAVE1_STREAM_TYPES.includes(r.key));
+    expect(named.map((r) => [r.key, r.category])).toEqual([['crew_document_expiring', 'Crew']]);
+    expect(declared.find((t) => t.key === 'crew_document_expiring')?.moduleId).toBe('crew');
+    expect(readRepoFile(STREAM_SEED_FILE)).toContain('One key is adopted, not new: crew_document_expiring');
+  });
+
+  it('the folded sets: a declared deferred type is "Not available yet", a declared live one is available; both are engine types without subscriptions', () => {
+    for (const t of declared) {
+      expect(NOTIFICATION_TYPE_SETS.engine.has(t.key), t.key).toBe(true);
+      expect(isEngineNotificationType(t.key), t.key).toBe(true);
+      expect(takesSubscriptions(t.key), t.key).toBe(false);
+      expect(isNotificationTypeAvailable(t.key), t.key).toBe(t.status === 'live');
+    }
+    const folded = foldNotificationTypes(['a_deferred'], ['a_live'], [
+      { key: 'm_deferred', status: 'deferred' },
+      { key: 'm_live', status: 'live' },
+    ]);
+    expect([...folded.deferred].sort()).toEqual(['a_deferred', 'm_deferred']);
+    expect([...folded.live].sort()).toEqual(['a_live', 'm_live']);
+    expect([...folded.engine].sort()).toEqual(['a_deferred', 'a_live', 'm_deferred', 'm_live']);
+  });
+
+  it('the legacy Crew types keep their subscriptions', () => {
+    for (const legacy of ['crew_changes', 'crew_certificate_expiries', 'leave_requests']) {
+      expect(isEngineNotificationType(legacy), legacy).toBe(false);
+      expect(takesSubscriptions(legacy), legacy).toBe(true);
+    }
+  });
+});
+
+describe('registry: manifest notification types are validated (PP4)', () => {
+  const manifest = (id: string, notificationTypes: ModuleManifest['notificationTypes']): ModuleManifest => ({
+    id,
+    label: id,
+    scopes: ['vessel'],
+    notificationTypes,
+  });
+
+  it('a key declared by two manifests is a problem and only the first (id order) keeps it', () => {
+    const registry = buildRegistry([
+      manifest('beta', [{ key: 'shared_type', status: 'live', emitter: 'beta_emit()' }]),
+      manifest('alpha', [{ key: 'shared_type', status: 'deferred', emitter: 'alpha_emit()' }]),
+    ]);
+    expect(registry.problems).toEqual(['beta: notification type "shared_type" is already declared by alpha']);
+    expect(registry.notificationTypes).toEqual([{ key: 'shared_type', status: 'deferred', emitter: 'alpha_emit()', moduleId: 'alpha' }]);
+  });
+
+  it('a bad key, an unknown status and a missing emitter are problems, not throws', () => {
+    const registry = buildRegistry([
+      manifest('gamma', [
+        { key: 'Bad Key', status: 'deferred', emitter: 'x()' },
+        { key: 'ok_type', status: 'maybe' as never, emitter: 'x()' },
+        { key: 'no_emitter', status: 'deferred', emitter: ' ' },
+        { key: 'fine_type', status: 'deferred', emitter: 'fine_emit()' },
+      ]),
+    ]);
+    expect(registry.problems).toEqual([
+      'gamma: notification type "Bad Key" has no snake_case key',
+      'gamma: notification type "ok_type" has status "maybe" (deferred or live)',
+      'gamma: notification type "no_emitter" names no emitter',
+    ]);
+    expect(registry.notificationTypes.map((t) => t.key)).toEqual(['fine_type']);
   });
 });
 

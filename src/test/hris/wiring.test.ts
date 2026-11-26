@@ -119,7 +119,11 @@ describe('HRIS wiring', () => {
     expect(list, 'the sweeper keeps its RPCs in `const SWEEPS = [...] as const;`').not.toBeNull();
     const called = Array.from((list?.[1] ?? '').matchAll(/'([a-z_]+)'/g)).map((m) => m[1]);
     expect(called.length).toBeGreaterThan(0);
-    expect(called.filter((fn) => !createdFunctions.has(fn))).toEqual([]);
+    // The Phase 3 wave 1 stream sweeps (platform-prep PP4, contract 10) are listed before their
+    // stream files exist; they read 'not applied' until then (D-01), and run after the hr_* sweeps.
+    const streamSweeps = ['crew_document_expiry_sweep', 'work_rest_send_due_reminders', 'frp_periods_extend_open', 'crew_transfers_complete_due', 'fleet_ops_daily_sweep'];
+    expect(called.slice(-streamSweeps.length)).toEqual(streamSweeps);
+    expect(called.filter((fn) => !createdFunctions.has(fn) && !streamSweeps.includes(fn))).toEqual([]);
     // The stale-assignment sweep (D-227) and the invitation expiry (D-228) run, before the hr_* sweeps.
     expect(called).toEqual(expect.arrayContaining(['crew_assignments_end_stale', 'expire_invitations']));
     const firstHr = called.findIndex((fn) => fn.startsWith('hr_'));

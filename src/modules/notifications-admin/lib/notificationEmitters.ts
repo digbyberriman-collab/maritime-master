@@ -20,7 +20,20 @@
  * Legacy notification types (anything not in either list) keep their
  * recipient subscriptions, but no code path emails them yet:
  * EMAIL_DELIVERY_LIVE stays false until the gap/03 C3 dispatcher lands.
+ *
+ * Module-owned types (platform-prep PP4). The stream types seeded by
+ * 20261124030100 (categories Crew, Documents, Training) are declared in the
+ * owning module's manifest (`notificationTypes` in src/modules/<module>/
+ * module.ts) with their status and future emitter, not in the two lists
+ * below: a stream flips its own type to `live` in the slice that lands the
+ * emitter, without editing this platform file. They are folded in here as
+ * engine types (in-app only, no subscriptions), deferred or live as
+ * declared. src/test/notifications/notificationEmitters.test.tsx checks
+ * that every seeded engine type is in exactly one place: the platform live
+ * list, the platform deferred list or one manifest.
  */
+import { MODULE_REGISTRY } from '@/app/registry/modules';
+import type { ManifestNotificationType } from '@/app/registry/types';
 
 /** Seeded engine types with no emitter yet, each with its future emitter (D-238). */
 export const DEFERRED_NOTIFICATION_TYPES = [
@@ -58,7 +71,36 @@ export const LIVE_ENGINE_NOTIFICATION_TYPES = [
 export type DeferredNotificationType = (typeof DEFERRED_NOTIFICATION_TYPES)[number];
 export type LiveEngineNotificationType = (typeof LIVE_ENGINE_NOTIFICATION_TYPES)[number];
 
-const DEFERRED: ReadonlySet<string> = new Set(DEFERRED_NOTIFICATION_TYPES);
+export interface NotificationTypeSets {
+  /** Engine types with no emitter yet: "Not available yet". */
+  deferred: ReadonlySet<string>;
+  /** Engine types a live emitter sends. */
+  live: ReadonlySet<string>;
+  /** Every engine type, live or deferred: in-app only, no subscriptions (D-249). */
+  engine: ReadonlySet<string>;
+}
+
+/** The platform lists plus the manifest declarations, as one set of each (pure). */
+export function foldNotificationTypes(
+  platformDeferred: readonly string[],
+  platformLive: readonly string[],
+  declared: readonly Pick<ManifestNotificationType, 'key' | 'status'>[],
+): NotificationTypeSets {
+  const deferred = new Set([...platformDeferred, ...declared.filter((t) => t.status === 'deferred').map((t) => t.key)]);
+  const live = new Set([...platformLive, ...declared.filter((t) => t.status === 'live').map((t) => t.key)]);
+  return { deferred, live, engine: new Set([...deferred, ...live]) };
+}
+
+/** The module-owned types, from the manifests (`notificationTypes`). */
+export const MODULE_NOTIFICATION_TYPES: readonly (ManifestNotificationType & { moduleId: string })[] = MODULE_REGISTRY.notificationTypes;
+
+export const NOTIFICATION_TYPE_SETS: NotificationTypeSets = foldNotificationTypes(
+  DEFERRED_NOTIFICATION_TYPES,
+  LIVE_ENGINE_NOTIFICATION_TYPES,
+  MODULE_NOTIFICATION_TYPES,
+);
+
+const DEFERRED: ReadonlySet<string> = NOTIFICATION_TYPE_SETS.deferred;
 
 /** False only for a deferred engine type; live engine and legacy types are available. */
 export function isNotificationTypeAvailable(key: string): boolean {
@@ -78,7 +120,7 @@ export const NOT_AVAILABLE_DESCRIPTION = 'STORM does not send this notification 
  */
 export const EMAIL_DELIVERY_LIVE = false;
 
-const ENGINE: ReadonlySet<string> = new Set([...LIVE_ENGINE_NOTIFICATION_TYPES, ...DEFERRED_NOTIFICATION_TYPES]);
+const ENGINE: ReadonlySet<string> = NOTIFICATION_TYPE_SETS.engine;
 
 /** True for any seeded engine type, live or deferred (D-238, D-249). */
 export function isEngineNotificationType(key: string): boolean {
