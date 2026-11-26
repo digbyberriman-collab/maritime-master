@@ -114,8 +114,19 @@ describe('HRIS wiring', () => {
 
   it('the daily sweeper calls only functions the migrations define', () => {
     const sweeper = read('supabase/functions/hr-daily-sweeper/index.ts');
-    const called = Array.from(sweeper.matchAll(/'(hr_[a-z_]+)'/g)).map((m) => m[1]);
+    // Every quoted RPC name in the sweeper's run list, not only the hr_* ones.
+    const list = /const SWEEPS = \[([\s\S]*?)\] as const;/.exec(sweeper);
+    expect(list, 'the sweeper keeps its RPCs in `const SWEEPS = [...] as const;`').not.toBeNull();
+    const called = Array.from((list?.[1] ?? '').matchAll(/'([a-z_]+)'/g)).map((m) => m[1]);
     expect(called.length).toBeGreaterThan(0);
     expect(called.filter((fn) => !createdFunctions.has(fn))).toEqual([]);
+    // The stale-assignment sweep (D-227) and the invitation expiry (D-228) run, before the hr_* sweeps.
+    expect(called).toEqual(expect.arrayContaining(['crew_assignments_end_stale', 'expire_invitations']));
+    const firstHr = called.findIndex((fn) => fn.startsWith('hr_'));
+    expect(called.indexOf('crew_assignments_end_stale')).toBeLessThan(firstHr);
+    expect(called.indexOf('expire_invitations')).toBeLessThan(firstHr);
+    // And the sweeper calls nothing outside that list.
+    const rpcCalls = Array.from(sweeper.matchAll(/\.rpc\(\s*([^)\s,]+)/g)).map((m) => m[1]);
+    expect(rpcCalls).toEqual(['fn']);
   });
 });
