@@ -22,12 +22,27 @@
  *
  * The item types and the `expiry_bucket` / `expiry_window_for` signatures
  * are frozen at the X5-01A merge (X1 builds on them).
+ *
+ * The crew medical status (gap/02 M1, W8; gap/04 C61; D-X5-08; X5-08,
+ * `20261124040700_fleet_medical_status.sql`), written, not applied:
+ *
+ * - `fleet_medical_settings`: the company's ENG1 types, accepted
+ *   equivalents and required vaccines (read by its fitness and medical
+ *   viewers; no row = the defaults; written only through
+ *   `fleet_medical_settings_save`, medical admins with fleet reach).
+ * - `fleet_crew_medical_status`: one row per current crew member of the
+ *   vessels the caller may read medical fitness on, most severe first, with
+ *   the reasons (../lib/medicalStatus.ts mirrors the rules). Dates and
+ *   states only; the condition / allergy flags are NULL unless the caller is
+ *   a clinical viewer on that vessel or the person shares safety flags.
  */
 import type { PendingTable } from '@/integrations/supabase/pending';
 import type { ExpiryBucket } from '@/lib/records/expiry';
 import type { ExpiryItemType } from '../lib/expiryWindows';
 import type { EndorsementState } from '../lib/endorsement';
 import type { FleetOpsArea, FleetOpsLevel } from '../lib/fleetOpsAccess';
+import type { Eng1State, MedicalReason, MedicalStatus, OccHealthState } from '../lib/medicalStatus';
+import type { Json } from '@/integrations/supabase/types';
 
 export type ExpiryWindowRuleRow = {
   id: string;
@@ -79,8 +94,62 @@ export type FleetExpirySummaryRow = {
   muted_count: number;
 };
 
+/** One row of `fleet_medical_settings` (one per company). */
+export type FleetMedicalSettingsRow = {
+  company_id: string;
+  eng1_assessment_types: string[];
+  eng1_equivalent_types: string[];
+  required_vaccines: string[];
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** What `fleet_medical_settings_save` takes (as jsonb): any of the three lists, and the `updated_at` read (null = no row yet). */
+export type FleetMedicalSettingsPayload = {
+  eng1_assessment_types?: string[];
+  eng1_equivalent_types?: string[];
+  required_vaccines?: string[];
+  expected_updated_at?: string | null;
+};
+
+/** One row of `fleet_crew_medical_status` (most severe first). */
+export type FleetCrewMedicalStatusRow = {
+  profile_id: string;
+  person_name: string;
+  vessel_id: string;
+  vessel_name: string;
+  vessel_code: string | null;
+  position: string | null;
+  department: string | null;
+  is_planned: boolean;
+  join_date: string | null;
+  has_health_record: boolean;
+  eng1_state: Eng1State;
+  eng1_expires_on: string | null;
+  eng1_is_equivalent: boolean | null;
+  /** NULL without a Health record (not known). */
+  vaccines_valid: number | null;
+  vaccines_expired: number | null;
+  vaccines_missing: number | null;
+  boosters_due: number | null;
+  rest_tracked: boolean;
+  /** NULL when rest is not tracked (no login, or Hours of Rest off on the vessel). */
+  rest_noncompliant_30d: number | null;
+  serious_rest_breach_30d: number | null;
+  /** NULL without a Health record. */
+  occ_health_state: OccHealthState | null;
+  occ_health_due_on: string | null;
+  /** NULL when the caller may not see the flag. */
+  condition_flag: boolean | null;
+  allergy_flag: boolean | null;
+  status: MedicalStatus;
+  reasons: MedicalReason[];
+};
+
 export type FleetPendingTables = {
   expiry_window_rules: PendingTable<ExpiryWindowRuleRow, 'company_id' | 'item_type' | 'warn_days'>;
+  fleet_medical_settings: PendingTable<FleetMedicalSettingsRow, 'company_id'>;
 };
 
 export type FleetPendingFunctions = {
@@ -123,5 +192,13 @@ export type FleetPendingFunctions = {
   fleet_expiry_summary: {
     Args: { p_vessel_ids?: string[] | null; p_by_vessel?: boolean; p_today?: string };
     Returns: FleetExpirySummaryRow[];
+  };
+  fleet_medical_settings_save: {
+    Args: { p_settings: Json };
+    Returns: FleetMedicalSettingsRow;
+  };
+  fleet_crew_medical_status: {
+    Args: { p_vessel_ids?: string[] | null; p_status?: MedicalStatus[] | null; p_today?: string };
+    Returns: FleetCrewMedicalStatusRow[];
   };
 };

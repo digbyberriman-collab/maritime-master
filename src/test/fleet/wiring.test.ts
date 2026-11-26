@@ -2,8 +2,9 @@
  * Wiring of the Fleet operations module (X5-01B; gap/02; gap/00 A2):
  *
  * - the manifest registers with no problems, data only (it imports no page,
- *   hook, component or heavy library), with its two planned leaves gated by
- *   the capability their page will need, and no route yet;
+ *   hook, component or heavy library); X5-08 registers its two lazy pages
+ *   (Fleet › Medical, the vessel Crew Medical page), each guarded by its
+ *   capability, and makes their two leaves beta;
  * - every capability key the module declares or gates with is in the
  *   catalogue;
  * - every RPC and table the module calls is defined in an hour-04 migration
@@ -61,13 +62,17 @@ const leaves = (items: readonly NavChild[], acc: NavChild[] = []): NavChild[] =>
 };
 
 describe('fleet manifest', () => {
-  it('registers with no problems, in both scopes, with no route yet', () => {
+  it('registers with no problems, in both scopes, with its two medical pages (X5-08)', () => {
     expect(MODULE_REGISTRY.problems).toEqual([]);
     expect(MODULE_REGISTRY.manifests.find((m) => m.id === 'fleet')).toBe(manifest);
-    expect(MODULE_REGISTRY.routes.filter((r) => r.moduleId === 'fleet')).toEqual([]);
     expect(MODULE_REGISTRY.nav.filter((f) => f.moduleId === 'fleet').map((f) => f.slot)).toEqual(['fleet.people', 'vessel.crew']);
     expect(manifest).toMatchObject({ id: 'fleet', label: 'Fleet operations', scopes: ['fleet', 'vessel'] });
-    expect(manifest.routes ?? []).toEqual([]);
+    expect((manifest.routes ?? []).map((r) => [r.scope, r.path, r.guard])).toEqual([
+      ['fleet', 'medical', { kind: 'capability', capability: FLEET_CAPS.medicalView }],
+      ['vessel', 'crew/medical', { kind: 'capability', capability: FLEET_CAPS.crewMedicalView }],
+    ]);
+    for (const route of manifest.routes ?? []) expect(typeof route.page, route.path).toBe('function');
+    expect(MODULE_REGISTRY.routes.filter((r) => r.moduleId === 'fleet')).toHaveLength(2);
   });
 
   it('is data only: icons, nav builders, types and its own paths', () => {
@@ -77,15 +82,15 @@ describe('fleet manifest', () => {
     expect(pathsImports).toEqual([['type ', '@/lib/permissions/types']]);
   });
 
-  it('contributes the two planned leaves, each gated by the capability its page will need', () => {
+  it('contributes the two beta leaves, each gated by the capability its page needs', () => {
     expect(manifest.nav?.map((f) => [f.slot, f.order, f.node.label, f.node.path, f.node.capability, f.node.status ?? null])).toEqual([
-      ['fleet.people', 20, 'Medical', '/fleet/medical', FLEET_CAPS.medicalView, null],
-      ['vessel.crew', 60, 'Crew Medical', 'crew/medical', FLEET_CAPS.crewMedicalView, null],
+      ['fleet.people', 20, 'Medical', '/fleet/medical', FLEET_CAPS.medicalView, 'beta'],
+      ['vessel.crew', 60, 'Crew Medical', 'crew/medical', FLEET_CAPS.crewMedicalView, 'beta'],
     ]);
     const fleetLeaf = leaves(NAVIGATION_ITEMS).find((l) => l.path === '/fleet/medical');
-    expect(fleetLeaf).toMatchObject({ status: 'planned', capability: 'fleet.operations.fleet_medical.view' });
+    expect(fleetLeaf).toMatchObject({ status: 'beta', capability: 'fleet.operations.fleet_medical.view' });
     const vesselLeaf = leaves(VESSEL_MODULES.flatMap((m) => m.children)).find((l) => l.path === 'crew/medical');
-    expect(vesselLeaf).toMatchObject({ status: 'planned', capability: 'vessel.crew.crew_medical.view' });
+    expect(vesselLeaf).toMatchObject({ status: 'beta', capability: 'vessel.crew.crew_medical.view' });
   });
 });
 
@@ -111,9 +116,16 @@ describe('database objects', () => {
   const rpcs = new Set(Array.from(allSource.matchAll(/\.rpc\(\s*'([a-z_]+)'/g)).map((m) => m[1]));
   const tables = new Set(Array.from(allSource.matchAll(/\.from\(\s*'([a-z_]+)'/g)).map((m) => m[1]));
 
-  it('calls the expiry RPCs and reads the window rules', () => {
-    expect([...rpcs].sort()).toEqual(['clear_expiry_window_rule', 'fleet_expiry_items', 'fleet_expiry_summary', 'set_expiry_window_rule']);
-    expect([...tables].sort()).toEqual(['expiry_window_rules']);
+  it('calls the expiry and medical RPCs and reads the window rules and medical settings', () => {
+    expect([...rpcs].sort()).toEqual([
+      'clear_expiry_window_rule',
+      'fleet_crew_medical_status',
+      'fleet_expiry_items',
+      'fleet_expiry_summary',
+      'fleet_medical_settings_save',
+      'set_expiry_window_rule',
+    ]);
+    expect([...tables].sort()).toEqual(['expiry_window_rules', 'fleet_medical_settings']);
   });
 
   it('every RPC it calls is defined in a 2026112404 migration and declared pending', () => {
@@ -138,8 +150,9 @@ describe('database objects', () => {
     }
   });
 
-  it('never writes a status or a window rule directly (definers only)', () => {
+  it('never writes a status, a window rule or the medical settings directly (definers only)', () => {
     expect(allSource).not.toMatch(/\.from\('expiry_window_rules'\)[\s\S]{0,80}\.(insert|update|upsert|delete)\(/);
+    expect(allSource).not.toMatch(/\.from\('fleet_medical_settings'\)[\s\S]{0,120}\.(insert|update|upsert|delete)\(/);
   });
 });
 
@@ -158,6 +171,9 @@ describe('public API', () => {
       'ExpiryBucketSummary',
       'fleetKeys',
       'tallyExpirySummary',
+      'CrewMedicalGrid',
+      'useFleetMedicalStatus',
+      'fleetMedicalKeys',
     ]) {
       expect(fleet, name).toHaveProperty(name);
     }

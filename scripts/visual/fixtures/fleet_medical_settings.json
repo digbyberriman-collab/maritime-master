@@ -1,0 +1,19 @@
+[
+  {
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "eng1_assessment_types": [
+      "eng1"
+    ],
+    "eng1_equivalent_types": [
+      "ml5"
+    ],
+    "required_vaccines": [
+      "Tetanus",
+      "Hepatitis A",
+      "Yellow fever"
+    ],
+    "updated_by": "a0000000-0000-4000-8000-000000000001",
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-2d"
+  }
+]

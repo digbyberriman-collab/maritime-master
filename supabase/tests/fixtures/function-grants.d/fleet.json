@@ -28,6 +28,7 @@
     "public.expiry_endorsement_state(date, date, integer)": ["authenticated", "service_role"],
     "public.expiry_window_for(uuid, text, uuid)": ["authenticated", "service_role"],
     "public.fleet_counted_vessels_for(uuid, uuid, uuid[])": ["service_role"],
+    "public.fleet_crew_medical_status(uuid[], text[], date)": ["authenticated"],
     "public.fleet_current_crew(uuid[])": ["service_role"],
     "public.fleet_dashboard_counts_for(uuid, uuid, uuid[], date)": ["service_role"],
     "public.fleet_dashboard_drill_overdue(text, timestamp with time zone, date, date)": ["service_role"],
@@ -84,6 +85,10 @@
     "public.fleet_expiry_rows_for(uuid, uuid, uuid[], text[], boolean, date)": ["service_role"],
     "public.fleet_expiry_summary(uuid[], boolean, date)": ["authenticated"],
     "public.fleet_hod_covers(uuid, uuid, text)": ["service_role"],
+    "public.fleet_medical_reasons(boolean, text, integer, integer, integer, integer, integer, integer, integer, text)": ["service_role"],
+    "public.fleet_medical_settings_save(jsonb)": ["authenticated"],
+    "public.fleet_medical_status_of(text[])": ["service_role"],
+    "public.fleet_medical_vaccine_key(text)": ["service_role"],
     "public.fleet_ops_can(uuid, uuid, text, text)": ["authenticated", "service_role"],
     "public.fleet_ops_can_for(uuid, uuid, uuid, text, text)": ["service_role"],
     "public.fleet_report_corrective_actions(uuid)": ["service_role"],
@@ -137,6 +142,7 @@
     "public.fleet_document_versions": { "kind": "table", "authenticated": ["SELECT"], "authenticatedColumns": {} },
     "public.fleet_document_vessel_targets": { "kind": "table", "authenticated": ["SELECT"], "authenticatedColumns": {} },
     "public.fleet_documents": { "kind": "table", "authenticated": ["SELECT"], "authenticatedColumns": {} },
+    "public.fleet_medical_settings": { "kind": "table", "authenticated": ["SELECT"], "authenticatedColumns": {} },
     "public.form_template_events": { "kind": "table", "authenticated": ["SELECT"], "authenticatedColumns": {} },
     "public.form_template_vessel_settings": { "kind": "table", "authenticated": ["SELECT"], "authenticatedColumns": {} }
   }

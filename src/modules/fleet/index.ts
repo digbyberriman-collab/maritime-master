@@ -8,7 +8,8 @@
  *   reusable `VesselTickHelpers` / `VesselChecklist` and the pure helpers).
  * - Expiry: `useFleetExpiryItems`, `useFleetExpirySummary`,
  *   `ExpiryBucketSummary`, and the window rules.
- * - Later: `CrewMedicalGrid` (X5-08).
+ * - Medical (X5-08): `CrewMedicalGrid` (the fleet grid, or one vessel's
+ *   with `vesselId`), `useFleetMedicalStatus` and the W8 rules.
  */
 export { fleetKeys, type FleetExpiryItemsFilters } from './hooks/keys';
 export {
@@ -65,3 +66,23 @@ export {
 export { EXPIRY_ITEM_TYPES, EXPIRY_ITEM_TYPE_LABELS, expiryWindowFor, type ExpiryItemType } from './lib/expiryWindows';
 export { ENDORSEMENT_STATE_LABELS, type EndorsementState } from './lib/endorsement';
 export { FLEET_CAPS, FLEET_PATHS, FLEET_VESSEL_PATHS } from './paths';
+export { CrewMedicalGrid, type CrewMedicalGridProps } from './components/CrewMedicalGrid';
+export {
+  FleetMedicalError,
+  fleetMedicalKeys,
+  useFleetMedicalSettings,
+  useFleetMedicalStatus,
+  type CrewMedicalRow,
+  type FleetMedicalScope,
+  type FleetMedicalState,
+} from './hooks/useFleetMedicalStatus';
+export {
+  MEDICAL_REASONS,
+  MEDICAL_REASON_LABELS,
+  MEDICAL_REASON_LEVEL,
+  MEDICAL_STATUSES,
+  medicalStatusOf,
+  tallyMedicalStatus,
+  type MedicalReason,
+  type MedicalStatus,
+} from './lib/medicalStatus';

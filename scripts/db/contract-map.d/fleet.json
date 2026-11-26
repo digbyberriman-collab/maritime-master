@@ -3,10 +3,10 @@
   "files": [
     {
       "file": "src/modules/fleet/types/db.pending.ts",
-      "mirrors": "X5 spec §2 X5-01A (20261124040000_fleet_expiry_engine.sql)",
+      "mirrors": "X5 spec §2 X5-01A (20261124040000_fleet_expiry_engine.sql) and X5-08 (20261124040700_fleet_medical_status.sql)",
       "tables": {
         "type": "FleetPendingTables",
-        "expect": ["expiry_window_rules"]
+        "expect": ["expiry_window_rules", "fleet_medical_settings"]
       },
       "functions": {
         "type": "FleetPendingFunctions",
@@ -20,7 +20,9 @@
           "clear_expiry_window_rule",
           "fleet_ops_can",
           "fleet_expiry_items",
-          "fleet_expiry_summary"
+          "fleet_expiry_summary",
+          "fleet_medical_settings_save",
+          "fleet_crew_medical_status"
         ]
       }
     },
