@@ -7,7 +7,9 @@
  *   - `/fleet/documents`: the fleet document library (FleetDocumentsPage,
  *     X5-04A; gap/02 FD1, FD2, FD4, FD5, FD10), a lazy chunk. Guard: the
  *     capability `fleet.operations.fleet_documents.view` (ModuleRoute, fails
- *     closed; the page checks the same key before it reads anything).
+ *     closed; the page checks the same key before it reads anything). Its
+ *     `?tab=acknowledgements` (X5-05B; gap/02 FD6, FD7) is the target of the
+ *     legacy `/acknowledgments` redirect for readers with fleet reach.
  *   - `/fleet/documents/register`: the controlled register, today's
  *     Documents page unchanged. Guard `scope` (the Fleet scope's own check:
  *     signed in with fleet reach), so nobody who opens it today loses it
@@ -19,18 +21,22 @@
  *     `vessel.safety.fleet_documents.view_own` (signed in; the server
  *     answers only for vessels the caller reaches). Registering it
  *     activates the armed legacy redirects of `/acknowledgments` and
- *     `/crew/acknowledgements` (pendingTarget).
+ *     `/crew/acknowledgements` (pendingTarget). Its `?view=crew` (X5-05B;
+ *     gap/02 FD6, FD7, FD8) is the Master's and heads of department's crew
+ *     view: witnessed acknowledgements, reminders, who can sign.
  * - nav:
  *   - `fleet.compliance` Documents at order 10, beta, with the library's key;
  *   - `vessel.safety` Fleet Documents at order 110, beta, with the vessel
  *     page's key.
- * - capabilities: the library's keys and the vessel page's
- *   (./paths.ts DOCUMENTS_CAPS, VESSEL_FLEET_DOCUMENTS_CAPS).
+ * - capabilities: the library's keys (admin chooses who can sign on any
+ *   vessel, X5-05B) and the vessel page's (./paths.ts DOCUMENTS_CAPS,
+ *   VESSEL_FLEET_DOCUMENTS_CAPS).
  * - notificationTypes: the fleet document notification types and their
  *   emitters (platform-prep PP4; D-238): fleet_document_published and
- *   fleet_document_ack_reminder are live from X5-05A (their emitters are in
- *   20261124040400, proved by fleet/documents_acks.test.sql); the sweep's
- *   types stay deferred until X5-09.
+ *   fleet_document_ack_reminder are live (their emitters are in
+ *   20261124040400, proved by fleet/documents_acks.test.sql; the manual
+ *   reminder is sent from the Remind dialogs of X5-05B); the sweep's types
+ *   stay deferred until X5-09.
  *
  * Platform-prep PP3 moved the routes from src/routes/index.tsx and the
  * leaves from src/config/sitemap.ts; X5-04A swapped in the library.
@@ -92,7 +98,7 @@ const manifest: ModuleManifest = {
   // 'live' in the slice that lands its emitter, whose SQL test proves it (D-238).
   notificationTypes: [
     { key: 'fleet_document_published', status: 'live', emitter: 'fleet_documents_after_publish() on fleet_document_publish() (X5-05A)' },
-    { key: 'fleet_document_ack_reminder', status: 'live', emitter: 'fleet_document_remind() (X5-05A; its page is X5-05B)' },
+    { key: 'fleet_document_ack_reminder', status: 'live', emitter: 'fleet_document_remind() from the Remind dialogs of the Acknowledgements tab and the vessel crew view (X5-05B)' },
     { key: 'fleet_document_ack_due_soon', status: 'deferred', emitter: 'fleet_ops_daily_sweep() through hr-daily-sweeper (X5-09)' },
     { key: 'fleet_document_ack_overdue', status: 'deferred', emitter: 'fleet_ops_daily_sweep() through hr-daily-sweeper (X5-09)' },
     { key: 'fleet_document_ack_digest', status: 'deferred', emitter: 'fleet_ops_daily_sweep() on Mondays (X5-09)' },

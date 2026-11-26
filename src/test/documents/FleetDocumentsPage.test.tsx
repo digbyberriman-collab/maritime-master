@@ -15,7 +15,9 @@
  *   types with nothing published (FD5);
  * - one freshness stamp; "Controlled register" always; "Library settings"
  *   only for editors, opening `?settings=1`;
- * - the Acknowledgements tab says it is not set up yet;
+ * - while the acknowledgement RPCs are missing, the Acknowledged column is
+ *   an explained dash and the Acknowledgements tab says it is not set up
+ *   yet (the tab itself: AcknowledgementsTab.test.tsx);
  * - below 768 px the table folds into cards.
  */
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -44,7 +46,8 @@ vi.mock('@/integrations/supabase/client', () => {
     chain.then = (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) => Promise.resolve(result()).then(resolve, reject);
     return chain;
   };
-  return { supabase: { from, rpc: vi.fn(() => Promise.resolve({ data: null, error: { message: 'not used' } })) } };
+  // The acknowledgement RPCs (X5-05B) are not in this database: "not set up yet" (D-01); AcknowledgementsTab.test.tsx covers them.
+  return { supabase: { from, rpc: vi.fn(() => Promise.resolve({ data: null, error: { code: 'PGRST202', message: 'Could not find the function' } })) } };
 });
 vi.mock('@/lib/permissions/useCan', () => ({
   useCapability: (key: string) => state.decide(key),

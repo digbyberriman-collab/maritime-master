@@ -28,6 +28,11 @@
  *   reminder notification types are live with their emitters in the SQL
  *   (D-238), the sweep's stay deferred; the vessel home and the fleet
  *   dashboard stop calling the legacy acknowledgement hooks.
+ * - X5-05B: the Acknowledgements tab, the crew view and its three dialogs
+ *   call the readers' RPCs (status, summary) and the three crew definers
+ *   (remind, witnessed, signer rule), read the signer rules and the
+ *   reminder log through the pending client (select only), and never say
+ *   an email was sent (D-249).
  */
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -296,17 +301,37 @@ describe('publishing (X5-04B)', () => {
 describe('acknowledgements (X5-05A)', () => {
   const ACK_FILES = [
     'src/modules/documents/lib/ackState.ts',
+    'src/modules/documents/lib/ackAdmin.ts',
+    'src/modules/documents/lib/acknowledgementSchema.ts',
     'src/modules/documents/hooks/useFleetDocumentAcks.ts',
     'src/modules/documents/pages/VesselFleetDocumentsPage.tsx',
     'src/modules/documents/components/PendingFleetDocumentsCard.tsx',
+    'src/modules/documents/components/AcknowledgementsTab.tsx',
+    'src/modules/documents/components/CrewAcknowledgementsTab.tsx',
+    'src/modules/documents/components/WitnessedAcknowledgementDialog.tsx',
+    'src/modules/documents/components/RemindDialog.tsx',
+    'src/modules/documents/components/SignerRuleDialog.tsx',
   ];
+  /** The pending tables the acknowledgement code reads (select only, RLS: the readers of acknowledgement data). */
+  const ACK_TABLES = ['fleet_document_reminders', 'fleet_document_signer_rules'];
   const ackSources = ACK_FILES.map((file) => ({ file, text: read(file) }));
   const ackAll = ackSources.map((x) => x.text).join('\n');
   const ACK_SQL = read('supabase/migrations/20261124040400_fleet_documents_acknowledgements.sql');
   const ackRpcs = new Set(Array.from(ackAll.matchAll(/\.rpc\(\s*'([a-z_]+)'/g), (m) => m[1]));
 
   it('reads through the typed pending client only RPCs that 040400 defines and grants to the browser, and declares pending', () => {
-    expect([...ackRpcs].sort()).toEqual(['fleet_document_acknowledge', 'fleet_document_my_pending', 'fleet_document_vessel_documents']);
+    expect([...ackRpcs].sort()).toEqual([
+      'fleet_document_ack_status',
+      'fleet_document_acknowledge',
+      'fleet_document_acknowledge_witnessed',
+      'fleet_document_my_pending',
+      'fleet_document_remind',
+      'fleet_document_set_signer_rule',
+      'fleet_document_summary',
+      'fleet_document_vessel_documents',
+    ]);
+    const ackTables = new Set(Array.from(ackAll.matchAll(/\.from\(\s*'([a-z_]+)'/g), (m) => m[1]));
+    expect([...ackTables].sort()).toEqual(ACK_TABLES);
     for (const fn of ackRpcs) {
       expect(ACK_SQL, fn).toMatch(new RegExp(`CREATE OR REPLACE FUNCTION public\\.${fn}\\(`));
       expect(ACK_SQL, fn).toMatch(new RegExp(`GRANT EXECUTE ON FUNCTION public\\.${fn}\\([^)]*\\) TO authenticated;`));
@@ -317,9 +342,9 @@ describe('acknowledgements (X5-05A)', () => {
     }
     for (const { file, text } of ackSources) {
       expect(text, file).not.toMatch(/@\/integrations\/supabase\/client/);
-      expect(text, file).not.toMatch(/\.from\(\s*'/);
+      for (const m of text.matchAll(/\.from\(\s*'([a-z_]+)'/g)) expect(ACK_TABLES, `${file} reads ${m[1]}`).toContain(m[1]);
       expect(text, file).not.toMatch(/\.(insert|update|upsert)\(|\.delete\(\)/);
-      if (/\.rpc\(\s*'/.test(text)) expect(text, file).toMatch(/from '\.\.\/lib\/fleetDocumentsDb'/);
+      if (/\.(rpc|from)\(\s*'/.test(text)) expect(text, file).toMatch(/from '\.\.\/lib\/fleetDocumentsDb'/);
     }
   });
 
@@ -338,6 +363,11 @@ describe('acknowledgements (X5-05A)', () => {
       .map((x) => x.f)
       .sort();
     expect(cardImporters).toEqual(['src/modules/dashboard/pages/FleetDashboardPage.tsx', 'src/modules/vessels/pages/VesselDashboard.tsx']);
+  });
+
+  it('reminders never claim an email was sent (D-249)', () => {
+    // No string the screens show mentions email (comments may say why not).
+    for (const { file, text } of ackSources) expect(text, file).not.toMatch(/['"`][^'"`\n]*\be-?mail/i);
   });
 
   it('the dashboards no longer call the legacy acknowledgement hooks (the auth hooks stay untouched)', () => {

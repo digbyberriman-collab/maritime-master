@@ -26,7 +26,17 @@ export const DOCUMENTS_VESSEL_PATHS = {
 /** `?doc=<document id>` on the vessel page opens that document (the notifications link there). */
 export const FLEET_DOCUMENT_DOC_PARAM = 'doc';
 
-/** The library's query parameters (`/fleet/documents?tab=&section=&vessel=&settings=1`). */
+/**
+ * The vessel page's views (`?view=crew`, X5-05B): the caller's own
+ * documents (the default) or, for the Master and heads of department, the
+ * crew's acknowledgements.
+ */
+export const VESSEL_FLEET_DOCUMENTS_VIEW_PARAM = 'view';
+
+/**
+ * The library's query parameters (`/fleet/documents?tab=&section=&vessel=&settings=1`;
+ * on the Acknowledgements tab `?doc=<document id>` picks the document, X5-05B).
+ */
 export const FLEET_DOCUMENTS_PARAMS = {
   tab: 'tab',
   section: 'section',
@@ -39,13 +49,17 @@ export const FLEET_DOCUMENTS_PARAMS = {
  * server gates the same rules with fleet reach (`fleet_ops_can` area
  * `documents`): view reads the library, edit changes it (taxonomy,
  * documents, versions, targets, publish, withdraw), delete (the admin
- * level) removes sections and document types.
+ * level) removes sections and document types. X5-05B: edit also reminds
+ * any vessel's crew (`fleet_document_remind`), and admin chooses who can
+ * sign on any vessel (`fleet_document_set_signer_rule`, as the vessel's
+ * Master may for their own).
  */
 export const DOCUMENTS_CAPS = {
   view: 'fleet.operations.fleet_documents.view',
   create: 'fleet.operations.fleet_documents.create',
   edit: 'fleet.operations.fleet_documents.edit',
   delete: 'fleet.operations.fleet_documents.delete',
+  admin: 'fleet.operations.fleet_documents.admin',
 } as const satisfies Record<string, CapabilityKey>;
 
 /**

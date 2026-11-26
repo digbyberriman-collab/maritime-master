@@ -25,6 +25,15 @@
  *   is a sentence (already acknowledged, no longer required, blocked and
  *   why, out of reach).
  *
+ * - X5-05B (gap/02 FD6, FD7, FD8): for the Master, heads of department
+ *   and fleet documents viewers, a second view `?view=crew`
+ *   (CrewAcknowledgementsTab): the crew's states with the reason someone
+ *   cannot sign, Record witnessed acknowledgement, Remind and, for the
+ *   Master, Choose who can sign. The view is offered from the caller's
+ *   capacity on this vessel (useVesselAckCapacity: their own roles once
+ *   loaded, fail closed until then); the server returns only the rows the
+ *   caller may read and refuses any action it does not allow, in words.
+ *
  * D-01: while the acknowledgement RPCs are missing the page says
  * "Acknowledgements are not set up yet"; any other error is PageError with
  * Retry; never sample rows. Tokens only; 44 px targets on coarse pointers;
@@ -61,15 +70,18 @@ import {
   fleetDocumentAckKeys,
   openFleetDocumentFile,
   useAcknowledgeFleetDocument,
+  useVesselAckCapacity,
   useVesselFleetDocuments,
 } from '../hooks/useFleetDocumentAcks';
+import { CrewAcknowledgementsTab } from '../components/CrewAcknowledgementsTab';
 import type { FleetDocumentVesselDocumentRow } from '../types/db.pending';
-import { FLEET_DOCUMENT_DOC_PARAM, VESSEL_FLEET_DOCUMENTS_CAPS } from '../paths';
+import { FLEET_DOCUMENT_DOC_PARAM, VESSEL_FLEET_DOCUMENTS_CAPS, VESSEL_FLEET_DOCUMENTS_VIEW_PARAM } from '../paths';
 
 const COARSE = '[@media(pointer:coarse)]:min-h-11';
 const ACKNOWLEDGE_LABEL = 'I have read and understood this version';
 
 type Filter = 'outstanding' | 'all';
+type View = 'mine' | 'crew';
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString('en-GB')} ${n === 1 ? one : many}`;
 
@@ -132,9 +144,19 @@ function VesselFleetDocumentsBody() {
   const shown = filter === 'outstanding' ? outstanding : rows;
   const sections = useMemo(() => groupBySection(shown), [shown]);
   const opened = openId ? rows.find((r) => r.document_id === openId) ?? null : null;
+  const capacity = useVesselAckCapacity(vessel?.id ?? null, onCrew === true);
+  const crewView = capacity.readsCrew && documents.state === 'ready' && params.get(VESSEL_FLEET_DOCUMENTS_VIEW_PARAM) === 'crew';
+  const view: View = crewView ? 'crew' : 'mine';
+  const setView = (next: View) => {
+    const p = new URLSearchParams(params);
+    if (next === 'crew') p.set(VESSEL_FLEET_DOCUMENTS_VIEW_PARAM, 'crew');
+    else p.delete(VESSEL_FLEET_DOCUMENTS_VIEW_PARAM);
+    setParams(p, { replace: true });
+  };
 
   const refreshing = documents.state === 'ready' && documents.refreshing;
-  const refresh = () => void queryClient.invalidateQueries({ queryKey: fleetDocumentAckKeys.vessel(companyId, vessel?.id ?? null) });
+  // Every acknowledgement read of the company: the caller's own list, and the crew's when it is open.
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: fleetDocumentAckKeys.all(companyId) });
 
   const header = (
     <PageHeader
@@ -184,7 +206,9 @@ function VesselFleetDocumentsBody() {
       break;
     case 'ready':
       body =
-        rows.length === 0 ? (
+        view === 'crew' ? (
+          <CrewAcknowledgementsTab companyId={companyId} vessel={{ id: vessel.id, name: vessel.name }} documents={rows} capacity={capacity} callerProfileId={profile?.id ?? null} />
+        ) : rows.length === 0 ? (
           <EmptyState
             icon={FileText}
             title="Nothing published to this vessel yet"
@@ -245,6 +269,30 @@ function VesselFleetDocumentsBody() {
   return (
     <div className="space-y-6">
       {header}
+      {capacity.readsCrew && documents.state === 'ready' ? (
+        <nav aria-label="Fleet documents views" className="flex gap-1 border-b border-border">
+          {(
+            [
+              ['mine', 'My documents'],
+              ['crew', 'Crew'],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              aria-current={view === key ? 'page' : undefined}
+              onClick={() => setView(key)}
+              className={cn(
+                'focus-ring -mb-px inline-flex h-10 items-center border-b-2 px-3 text-sm font-medium transition-colors duration-quick',
+                COARSE,
+                view === key ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      ) : null}
       {body}
       <DocumentPanel
         row={opened}

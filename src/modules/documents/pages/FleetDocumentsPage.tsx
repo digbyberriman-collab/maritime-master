@@ -13,13 +13,19 @@
  *   a vessel filter (documents that reach the vessel: published to all
  *   vessels, or to that one) and status chips (current = published and
  *   drafts, the default); a DataTable with title, type, version, date,
- *   vessels ("All n" / "k of n"), acknowledged (X5-05B; explained dash
- *   until then) and status; cards below 768 px; the document types with
+ *   vessels ("All n" / "k of n"), acknowledged ("n of m" with a per-person
+ *   bar and the overdue count, X5-05B; an explained dash for drafts,
+ *   documents without acknowledgement, or while acknowledgements are not
+ *   set up) and status; cards below 768 px; the document types with
  *   nothing published under the list (FD5).
  * - Header: one freshness stamp and Refresh (D-88), "Controlled register"
  *   (the live register at /fleet/documents/register), and "Library
  *   settings" for editors (`fleet.operations.fleet_documents.edit`).
- * - Acknowledgements tab: says it is not set up yet (X5-05B builds it).
+ * - Acknowledgements tab (X5-05B; gap/02 FD6, FD7): AcknowledgementsTab,
+ *   `?tab=acknowledgements&doc=<id>`: per document and vessel who has
+ *   acknowledged, who still has to and why someone cannot; Remind for
+ *   editors. The counts are one `fleet_document_summary` read, shared with
+ *   the Acknowledged column.
  * - Publishing (X5-04B; gap/02 FD3, FD4, W1), for editors only:
  *   "Publish document" in the header (and on each "Not uploaded" type
  *   slot) opens PublishDocumentDialog; a row's menu finishes a draft,
@@ -61,7 +67,10 @@ import { PublishDocumentDialog } from '../components/PublishDocumentDialog';
 import { VersionHistoryDrawer } from '../components/VersionHistoryDrawer';
 import { DeleteDraftDialog, WithdrawDocumentDialog } from '../components/WithdrawDocumentDialog';
 import { fleetDocumentActions } from '../lib/fleetDocumentMachine';
+import { AckBar, AcknowledgementsTab } from '../components/AcknowledgementsTab';
+import { summariseByDocument, type AckCounts, type DocumentAckSummary } from '../lib/ackAdmin';
 import { fleetDocumentKeys } from '../hooks/keys';
+import { useFleetDocumentSummary } from '../hooks/useFleetDocumentAcks';
 import { useFleetDocuments } from '../hooks/useFleetDocuments';
 import { useFleetDocumentTaxonomy } from '../hooks/useFleetDocumentTaxonomy';
 import {
@@ -81,7 +90,7 @@ import {
   type LibraryStatusFilter,
   type LibraryVessel,
 } from '../lib/fleetDocumentLibrary';
-import { DOCUMENTS_CAPS, FLEET_DOCUMENTS_PARAMS } from '../paths';
+import { DOCUMENTS_CAPS, FLEET_DOCUMENT_DOC_PARAM, FLEET_DOCUMENTS_PARAMS } from '../paths';
 
 const COARSE = '[@media(pointer:coarse)]:min-h-11';
 const REGISTER_PATH = '/fleet/documents/register';
@@ -100,6 +109,22 @@ type Overlay =
   | { kind: 'withdraw'; document: LibraryRow }
   | { kind: 'delete'; document: LibraryRow }
   | null;
+
+/** The Acknowledged column's source: the page's one summary read. */
+type AckColumn = { state: 'loading' | 'not_set_up' | 'error' } | { state: 'ready'; byDocument: ReadonlyMap<string, DocumentAckSummary> };
+
+/** A row's acknowledgement counts, or why the cell is a dash. */
+function ackCell(row: LibraryRow, ack: AckColumn): { counts: AckCounts } | { reason: string } {
+  if (row.status === 'draft') return { reason: 'Not published yet' };
+  if (row.status === 'withdrawn') return { reason: 'Withdrawn: no longer acknowledged' };
+  if (!row.ackRequired) return { reason: 'No acknowledgement needed' };
+  if (ack.state !== 'ready') {
+    return { reason: ack.state === 'not_set_up' ? ACK_NOT_SET_UP : ack.state === 'error' ? 'The acknowledgements could not load' : 'Loading acknowledgements' };
+  }
+  const summary = ack.byDocument.get(row.id);
+  if (!summary || summary.counts.total === 0) return { reason: 'Nobody on the crew lists of its vessels' };
+  return { counts: summary.counts };
+}
 
 /** What a row (or a type slot) can open. */
 interface LibraryActions {
@@ -135,6 +160,7 @@ function FleetDocumentsBody() {
 
   const taxonomy = useFleetDocumentTaxonomy(companyId);
   const documents = useFleetDocuments(companyId);
+  const summary = useFleetDocumentSummary(companyId, null);
   const shown = useFleetVesselsShown();
   const queryClient = useQueryClient();
   const [overlay, setOverlay] = useState<Overlay>(null);
@@ -160,10 +186,23 @@ function FleetDocumentsBody() {
       { replace: true },
     );
 
-  const refreshing = (taxonomy.state === 'ready' && taxonomy.refreshing) || (documents.state === 'ready' && documents.refreshing);
+  const ackColumn = useMemo<AckColumn>(() => {
+    if (summary.state === 'ready') {
+      const current = new Map((library?.rows ?? []).map((r) => [r.id, r.current?.id ?? null] as const));
+      return { state: 'ready', byDocument: summariseByDocument(summary.data, current) };
+    }
+    if (summary.state === 'not_set_up' || summary.state === 'error') return { state: summary.state };
+    return { state: 'loading' };
+  }, [summary, library]);
+
+  const refreshing =
+    (taxonomy.state === 'ready' && taxonomy.refreshing) || (documents.state === 'ready' && documents.refreshing) || (summary.state === 'ready' && summary.refreshing);
+  // The company prefix holds the library and every acknowledgement read.
   const refresh = () => void queryClient.invalidateQueries({ queryKey: fleetDocumentKeys.company(companyId) });
-  const stamps = [taxonomy, documents].flatMap((s) => (s.state === 'ready' ? [s.updatedAt] : []));
-  const updatedAt = stamps.length === 2 ? Math.min(...stamps) : null;
+  // One stamp (D-88): the oldest read the tab shows (the library's, and on the acknowledgements tab the counts').
+  const reads = tab === 'acknowledgements' ? [taxonomy, documents, summary] : [taxonomy, documents];
+  const stamps = reads.flatMap((s) => (s.state === 'ready' ? [s.updatedAt] : []));
+  const updatedAt = stamps.length === reads.length ? Math.min(...stamps) : null;
   const notSetUp = taxonomy.state === 'not_set_up' || documents.state === 'not_set_up';
   const types = taxonomy.state === 'ready' ? taxonomy.taxonomy.types : [];
   const canPublish = edit.allowed && !notSetUp && library !== null && types.length > 0;
@@ -272,7 +311,19 @@ function FleetDocumentsBody() {
             key={key}
             type="button"
             aria-current={tab === key ? 'page' : undefined}
-            onClick={() => setParam(FLEET_DOCUMENTS_PARAMS.tab, key === 'documents' ? null : key)}
+            onClick={() =>
+              setParams(
+                (current) => {
+                  const next = new URLSearchParams(current);
+                  if (key === 'documents') {
+                    next.delete(FLEET_DOCUMENTS_PARAMS.tab);
+                    next.delete(FLEET_DOCUMENT_DOC_PARAM);
+                  } else next.set(FLEET_DOCUMENTS_PARAMS.tab, key);
+                  return next;
+                },
+                { replace: true },
+              )
+            }
             className={cn(
               'focus-ring -mb-px inline-flex h-10 items-center border-b-2 px-3 text-sm font-medium transition-colors duration-quick',
               COARSE,
@@ -283,15 +334,38 @@ function FleetDocumentsBody() {
           </button>
         ))}
       </nav>
-      {tab === 'acknowledgements' ? (
-        <EmptyState
-          kind="not-enabled"
-          title={ACK_NOT_SET_UP}
-          body="Once they are, this tab shows who has read and acknowledged each document on every vessel, with due dates."
-          bordered
+      {tab === 'acknowledgements' && library ? (
+        <AcknowledgementsTab
+          companyId={companyId}
+          library={library}
+          vessels={vessels}
+          summary={summary}
+          canRemind={edit.allowed}
+          callerProfileId={profile?.id ?? null}
+          documentId={params.get(FLEET_DOCUMENT_DOC_PARAM)}
+          onSelectDocument={(id) => setParam(FLEET_DOCUMENT_DOC_PARAM, id)}
         />
       ) : library ? (
-        <LibraryView library={library} vessels={vessels} canEdit={edit.allowed} actions={actions} params={params} setParam={setParam} />
+        <LibraryView
+          library={library}
+          vessels={vessels}
+          canEdit={edit.allowed}
+          actions={actions}
+          params={params}
+          setParam={setParam}
+          ack={ackColumn}
+          onOpenAcknowledgements={(row) =>
+            setParams(
+              (current) => {
+                const next = new URLSearchParams(current);
+                next.set(FLEET_DOCUMENTS_PARAMS.tab, 'acknowledgements');
+                next.set(FLEET_DOCUMENT_DOC_PARAM, row.id);
+                return next;
+              },
+              { replace: false },
+            )
+          }
+        />
       ) : (
         <PageLoading variant="list" label="Loading fleet documents" />
       )}
@@ -346,11 +420,13 @@ interface LibraryViewProps {
   actions: LibraryActions;
   params: URLSearchParams;
   setParam: (key: string, value: string | null) => void;
+  ack: AckColumn;
+  onOpenAcknowledgements: (row: LibraryRow) => void;
 }
 
 const ALL = '__all__';
 
-function LibraryView({ library, vessels, canEdit, actions, params, setParam }: LibraryViewProps) {
+function LibraryView({ library, vessels, canEdit, actions, params, setParam, ack, onOpenAcknowledgements }: LibraryViewProps) {
   const wide = useMinWidth(TABLET_MIN_WIDTH);
   const rail = useMinWidth(RAIL_MIN_WIDTH);
   const [search, setSearch] = useState('');
@@ -438,8 +514,15 @@ function LibraryView({ library, vessels, canEdit, actions, params, setParam }: L
       header: 'Acknowledged',
       sortable: false,
       searchable: false,
-      cell: () => null,
-      emptyReason: ACK_NOT_SET_UP,
+      minWidth: 140,
+      cell: (r) => {
+        const cell = ackCell(r, ack);
+        return 'counts' in cell ? <AckSummaryCell row={r} counts={cell.counts} onOpen={onOpenAcknowledgements} /> : null;
+      },
+      emptyReason: (r) => {
+        const cell = ackCell(r, ack);
+        return 'reason' in cell ? cell.reason : undefined;
+      },
     },
     {
       id: 'status',
@@ -520,7 +603,16 @@ function LibraryView({ library, vessels, canEdit, actions, params, setParam }: L
             maxHeight="none"
           />
         ) : (
-          <DocumentCards rows={rows} vessels={vessels} hasFilters={hasFilters} onClearFilters={clearFilters} total={library.rows.length} actions={actions} />
+          <DocumentCards
+            rows={rows}
+            vessels={vessels}
+            hasFilters={hasFilters}
+            onClearFilters={clearFilters}
+            total={library.rows.length}
+            actions={actions}
+            ack={ack}
+            onOpenAcknowledgements={onOpenAcknowledgements}
+          />
         )}
 
         {notUploaded.length ? (
@@ -611,6 +703,8 @@ function DocumentCards({
   onClearFilters,
   total,
   actions,
+  ack,
+  onOpenAcknowledgements,
 }: {
   rows: readonly LibraryRow[];
   vessels: readonly LibraryVessel[];
@@ -618,6 +712,8 @@ function DocumentCards({
   onClearFilters: () => void;
   total: number;
   actions: LibraryActions;
+  ack: AckColumn;
+  onOpenAcknowledgements: (row: LibraryRow) => void;
 }) {
   if (!rows.length) {
     return hasFilters && total > 0 ? (
@@ -662,11 +758,34 @@ function DocumentCards({
               </p>
               {r.status === 'published' && r.draft ? <p className="type-caption text-muted-foreground">{`${r.draft.label} in draft`}</p> : null}
               {r.status === 'withdrawn' && r.withdrawnReason ? <p className="type-caption text-muted-foreground">{r.withdrawnReason}</p> : null}
+              {(() => {
+                const cell = ackCell(r, ack);
+                return 'counts' in cell ? <AckSummaryCell row={r} counts={cell.counts} onOpen={onOpenAcknowledgements} /> : null;
+              })()}
             </Card>
           </li>
         );
       })}
     </ul>
+  );
+}
+
+/** "34 of 52" with a per-person bar and the overdue count; opens the document on the Acknowledgements tab. */
+function AckSummaryCell({ row, counts, onOpen }: { row: LibraryRow; counts: AckCounts; onOpen: (row: LibraryRow) => void }) {
+  return (
+    <button
+      type="button"
+      data-row-action=""
+      onClick={() => onOpen(row)}
+      aria-label={`Acknowledgements of ${row.title}: ${counts.acknowledged.toLocaleString('en-GB')} of ${counts.total.toLocaleString('en-GB')} acknowledged${counts.overdue ? `, ${counts.overdue.toLocaleString('en-GB')} overdue` : ''}`}
+      className={cn('focus-ring block w-full min-w-[7rem] space-y-1 rounded-sm text-left', COARSE)}
+    >
+      <span className="flex items-baseline gap-2 text-sm tabular-nums">
+        <span className="text-foreground">{`${counts.acknowledged.toLocaleString('en-GB')} of ${counts.total.toLocaleString('en-GB')}`}</span>
+        {counts.overdue ? <span className="type-caption text-critical">{`${counts.overdue.toLocaleString('en-GB')} overdue`}</span> : null}
+      </span>
+      <AckBar counts={counts} />
+    </button>
   );
 }
 
