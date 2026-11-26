@@ -1,9 +1,27 @@
+/**
+ * The ISM template hooks. Reads are direct (RLS); writes of content are
+ * direct on drafts only (the server's guard refuses anything else); every
+ * status change goes through the Forms & Checklists definers
+ * (@/modules/forms; 20261124040500_fleet_form_templates.sql): publish and
+ * archive with their D-01 fallback while the definers are missing
+ * (D-X5-20), duplicate as a Customise copy. No hook writes a status, a
+ * version or a publish date itself.
+ */
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
-import { useToast } from '@/shared/hooks/use-toast';
-import type { Json } from '@/integrations/supabase/types';
+import { notify } from '@/shared/lib/notify';
+import type { Json, TablesInsert, TablesUpdate } from '@/integrations/supabase/types';
 import type { FormSchema, RequiredSigner, FormTemplateStatus, FormType } from '@/modules/ism/forms/constants';
+import {
+  FormTemplateRefusalError,
+  LEGACY_TEMPLATE_KEYS,
+  archiveTemplateWithFallback,
+  customiseTemplate,
+  formTemplateRefusal,
+  formsKeys,
+  publishTemplateWithFallback,
+} from '@/modules/forms';
 
 // Form Template interface matching database schema
 export interface FormTemplate {
@@ -129,11 +147,29 @@ export function useFormTemplate(templateId: string | null) {
   });
 }
 
-// Create form template mutation
-export function useCreateFormTemplate() {
+/** Invalidate every template list and detail (the ISM keys and the Forms & Checklists keys). */
+function useInvalidateTemplates() {
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
+  return () => {
+    for (const key of LEGACY_TEMPLATE_KEYS) void queryClient.invalidateQueries({ queryKey: [...key] });
+    void queryClient.invalidateQueries({ queryKey: formsKeys.company(profile?.company_id) });
+  };
+}
+
+/** A status the hooks may ask for: only the definers' targets. */
+type RequestedStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED';
+
+/** A status the definers never set on request (a template goes back to a draft only as a new version). */
+function statusRefusal(): never {
+  throw new FormTemplateRefusalError('form_templates_guarded', formTemplateRefusal('form_templates_guarded') as string);
+}
+
+// Create form template mutation: always a draft; publishing it is the
+// definer's job (with the D-01 fallback while the definer is missing).
+export function useCreateFormTemplate() {
   const { profile, user } = useAuth();
-  const { toast } = useToast();
+  const invalidate = useInvalidateTemplates();
 
   return useMutation({
     mutationFn: async (templateData: {
@@ -154,15 +190,14 @@ export function useCreateFormTemplate() {
       source_file_name?: string;
       source_file_type?: string;
       form_schema: FormSchema;
-      status?: string;
+      /** 'PUBLISHED' publishes the new draft through the definer. */
+      status?: RequestedStatus;
     }) => {
       if (!profile?.company_id || !user?.id) {
         throw new Error('Not authenticated');
       }
 
-      const isPublishing = templateData.status === 'PUBLISHED';
-
-      const insertData = {
+      const insertData: TablesInsert<'form_templates'> = {
         company_id: profile.company_id,
         template_code: templateData.template_code,
         template_name: templateData.template_name,
@@ -181,9 +216,7 @@ export function useCreateFormTemplate() {
         source_file_name: templateData.source_file_name || null,
         source_file_type: templateData.source_file_type || null,
         form_schema: templateData.form_schema as unknown as Json,
-        status: templateData.status || 'DRAFT',
-        published_at: isPublishing ? new Date().toISOString() : null,
-        published_by: isPublishing ? user.id : null,
+        status: 'DRAFT',
         created_by: user.id,
       };
 
@@ -194,31 +227,27 @@ export function useCreateFormTemplate() {
         .single();
 
       if (error) throw error;
-      return data as FormTemplate;
+      const created = data as FormTemplate;
+      if (templateData.status !== 'PUBLISHED') return created;
+      await publishTemplateWithFallback(profile.company_id, user.id, { templateId: created.id, expectedUpdatedAt: created.updated_at });
+      // What the server stored, not what was asked.
+      const { data: published, error: readError } = await supabase.from('form_templates').select().eq('id', created.id).maybeSingle();
+      if (readError) throw readError;
+      return (published ?? created) as FormTemplate;
     },
-    onSuccess: (data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['form-templates'] });
-      toast({
-        title: variables.status === 'PUBLISHED' ? 'Template Published' : 'Template Saved',
-        description: `${data.template_name} has been ${variables.status === 'PUBLISHED' ? 'published' : 'saved as draft'}`,
-      });
+    onSuccess: (data) => {
+      notify.success(data.status === 'PUBLISHED' ? 'Template published' : 'Template saved as a draft', { description: data.template_name });
     },
-    onError: (error) => {
-      console.error('Failed to create template:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to create template',
-        variant: 'destructive',
-      });
-    },
+    onError: (error) => notify.error(error, { title: 'Template not saved' }),
+    onSettled: invalidate,
   });
 }
 
-// Update form template mutation
+// Update form template mutation: content on a draft directly; a status
+// change only through the definers.
 export function useUpdateFormTemplate() {
-  const queryClient = useQueryClient();
-  const { user } = useAuth();
-  const { toast } = useToast();
+  const { profile, user } = useAuth();
+  const invalidate = useInvalidateTemplates();
 
   return useMutation({
     mutationFn: async ({
@@ -239,153 +268,81 @@ export function useUpdateFormTemplate() {
         required_signers: RequiredSigner[];
         allow_parallel_signing: boolean;
         form_schema: FormSchema;
-        status: string;
+        status: RequestedStatus;
       }>;
     }) => {
-      const isPublishing = updates.status === 'PUBLISHED';
+      const { status, required_signers, form_schema, ...content } = updates;
+      const updateData: TablesUpdate<'form_templates'> = { ...content };
+      if (required_signers) updateData.required_signers = required_signers as unknown as Json;
+      if (form_schema) updateData.form_schema = form_schema as unknown as Json;
 
-      const updateData: Record<string, unknown> = { ...updates };
-      
-      if (updates.required_signers) {
-        updateData.required_signers = updates.required_signers as unknown as Json;
-      }
-      if (updates.form_schema) {
-        updateData.form_schema = updates.form_schema as unknown as Json;
-      }
-      if (isPublishing) {
-        updateData.published_at = new Date().toISOString();
-        updateData.published_by = user?.id;
+      let row: FormTemplate | null = null;
+      if (Object.keys(updateData).length > 0) {
+        const { data, error } = await supabase
+          .from('form_templates')
+          .update(updateData)
+          .eq('id', templateId)
+          .select()
+          .maybeSingle();
+        if (error) throw error;
+        // RLS filters what it refuses: no row back is no save.
+        if (!data) throw new FormTemplateRefusalError('not_saved', 'The template was not saved. Refresh it and try again.');
+        row = data as FormTemplate;
       }
 
-      const { data, error } = await supabase
-        .from('form_templates')
-        .update(updateData)
-        .eq('id', templateId)
-        .select()
-        .single();
+      if (status !== undefined) {
+        if (!profile?.company_id || !user?.id) throw new Error('Not authenticated');
+        if (status === 'PUBLISHED') {
+          await publishTemplateWithFallback(profile.company_id, user.id, { templateId, expectedUpdatedAt: row?.updated_at ?? null });
+        } else if (status === 'ARCHIVED') {
+          await archiveTemplateWithFallback(profile.company_id, { templateId });
+        } else {
+          statusRefusal();
+        }
+        const { data, error } = await supabase.from('form_templates').select().eq('id', templateId).maybeSingle();
+        if (error) throw error;
+        if (!data) throw new FormTemplateRefusalError('template_not_found', formTemplateRefusal('template_not_found') as string);
+        row = data as FormTemplate;
+      }
 
-      if (error) throw error;
-      return data as FormTemplate;
+      if (!row) throw new FormTemplateRefusalError('not_saved', 'Nothing to save.');
+      return row;
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['form-templates'] });
-      queryClient.invalidateQueries({ queryKey: ['form-template', data.id] });
-      toast({
-        title: 'Template Updated',
-        description: `${data.template_name} has been updated`,
-      });
-    },
-    onError: (error) => {
-      console.error('Failed to update template:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update template',
-        variant: 'destructive',
-      });
-    },
+    onSuccess: (data) => notify.success('Template updated', { description: data.template_name }),
+    onError: (error) => notify.error(error, { title: 'Template not updated' }),
+    onSettled: invalidate,
   });
 }
 
-// Duplicate template mutation
+// Duplicate template mutation: a Customise copy (form_template_customise):
+// a company draft linked to its source, coded <code>_CUSTOM<n>.
 export function useDuplicateFormTemplate() {
-  const queryClient = useQueryClient();
-  const { profile, user } = useAuth();
-  const { toast } = useToast();
+  const { profile } = useAuth();
+  const invalidate = useInvalidateTemplates();
 
   return useMutation({
     mutationFn: async (templateId: string) => {
-      if (!profile?.company_id || !user?.id) {
-        throw new Error('Not authenticated');
-      }
-
-      // Fetch original template
-      const { data: original, error: fetchError } = await supabase
-        .from('form_templates')
-        .select('*')
-        .eq('id', templateId)
-        .single();
-
-      if (fetchError || !original) throw fetchError || new Error('Template not found');
-
-      // Create duplicate with new code
-      const duplicateData = {
-        company_id: profile.company_id,
-        template_code: `${original.template_code}_COPY`,
-        template_name: `${original.template_name} (Copy)`,
-        description: original.description,
-        form_type: original.form_type,
-        vessel_scope: original.vessel_scope,
-        vessel_ids: original.vessel_ids,
-        department_scope: original.department_scope,
-        initiation_mode: original.initiation_mode,
-        has_expiry: original.has_expiry,
-        expiry_hours: original.expiry_hours,
-        allow_line_items: original.allow_line_items,
-        required_signers: original.required_signers,
-        allow_parallel_signing: original.allow_parallel_signing,
-        form_schema: original.form_schema,
-        status: 'DRAFT',
-        created_by: user.id,
-      };
-
-      const { data, error } = await supabase
-        .from('form_templates')
-        .insert(duplicateData)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data as FormTemplate;
+      if (!profile?.company_id) throw new Error('Not authenticated');
+      return customiseTemplate(profile.company_id, templateId);
     },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['form-templates'] });
-      toast({
-        title: 'Template Duplicated',
-        description: `Created "${data.template_name}"`,
-      });
-    },
-    onError: (error) => {
-      console.error('Failed to duplicate template:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to duplicate template',
-        variant: 'destructive',
-      });
-    },
+    onSuccess: (data) => notify.success('Copy created as a draft', { description: `${data.template_name} (${data.template_code})` }),
+    onError: (error) => notify.error(error, { title: 'Template not copied' }),
+    onSettled: invalidate,
   });
 }
 
-// Archive template mutation
+// Archive template mutation (form_template_archive; the D-01 fallback while it is missing).
 export function useArchiveFormTemplate() {
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
+  const { profile } = useAuth();
+  const invalidate = useInvalidateTemplates();
 
   return useMutation({
     mutationFn: async (templateId: string) => {
-      const { data, error } = await supabase
-        .from('form_templates')
-        .update({ status: 'ARCHIVED' })
-        .eq('id', templateId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
+      if (!profile?.company_id) throw new Error('Not authenticated');
+      return archiveTemplateWithFallback(profile.company_id, { templateId });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['form-templates'] });
-      toast({
-        title: 'Template Archived',
-        description: 'Template has been archived',
-      });
-    },
-    onError: (error) => {
-      console.error('Failed to archive template:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to archive template',
-        variant: 'destructive',
-      });
-    },
+    onSuccess: () => notify.success('Template archived', { description: 'Its runs stay in the records.' }),
+    onError: (error) => notify.error(error, { title: 'Template not archived' }),
+    onSettled: invalidate,
   });
 }

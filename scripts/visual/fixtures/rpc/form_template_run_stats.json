@@ -1,0 +1,52 @@
+[
+  {
+    "template_id": "f7000000-0000-4000-8000-000000000001",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "hidden": false,
+    "runs": 38,
+    "last_run_at": "$ts:-1d",
+    "last_run_on": "$date:-1",
+    "next_due": "$date:+0",
+    "overdue": false
+  },
+  {
+    "template_id": "f7000000-0000-4000-8000-000000000001",
+    "vessel_id": "e0000000-0000-4000-8000-000000000007",
+    "hidden": false,
+    "runs": 12,
+    "last_run_at": "$ts:-4d",
+    "last_run_on": "$date:-4",
+    "next_due": "$date:-3",
+    "overdue": true
+  },
+  {
+    "template_id": "f7000000-0000-4000-8000-000000000003",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "hidden": false,
+    "runs": 40,
+    "last_run_at": "$ts:-1d",
+    "last_run_on": "$date:-1",
+    "next_due": "$date:+0",
+    "overdue": false
+  },
+  {
+    "template_id": "f7000000-0000-4000-8000-000000000003",
+    "vessel_id": "e0000000-0000-4000-8000-000000000003",
+    "hidden": true,
+    "runs": 0,
+    "last_run_at": null,
+    "last_run_on": null,
+    "next_due": null,
+    "overdue": false
+  },
+  {
+    "template_id": "f7000000-0000-4000-8000-000000000006",
+    "vessel_id": "e0000000-0000-4000-8000-000000000002",
+    "hidden": false,
+    "runs": 0,
+    "last_run_at": null,
+    "last_run_on": null,
+    "next_due": "$date:-5",
+    "overdue": true
+  }
+]

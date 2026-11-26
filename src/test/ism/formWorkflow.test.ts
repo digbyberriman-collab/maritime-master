@@ -45,11 +45,16 @@ const numberedModules = ['audits', 'drills']
   .map((f) => readFileSync(f, 'utf8'))
   .join('\n');
 
-/** The literal list inside a CHECK (col IN (...)) constraint in the migrations. */
+/**
+ * The literal list inside a CHECK (col IN (...)) constraint in the
+ * migrations: the last definition in apply order (a later file drops and
+ * re-adds it, e.g. 20261124040500 adds SUPERSEDED to the template statuses).
+ */
 function checkValues(constraint: string): string[] {
-  const m = migrations.match(
-    new RegExp(`ADD CONSTRAINT ${constraint}\\s*\\n?\\s*CHECK \\([a-z_]+ IN \\(([^)]*)\\)\\)`),
+  const all = Array.from(
+    migrations.matchAll(new RegExp(`ADD CONSTRAINT ${constraint}\\s*\\n?\\s*CHECK \\([a-z_]+ IN \\(([^)]*)\\)\\)`, 'g')),
   );
+  const m = all[all.length - 1];
   if (!m) return [];
   return Array.from(m[1].matchAll(/'([A-Z_]+)'/g)).map((x) => x[1]);
 }

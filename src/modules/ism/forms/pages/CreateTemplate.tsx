@@ -18,6 +18,9 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/shared/hooks/use-toast';
+import { notify } from '@/shared/lib/notify';
+import type { Json, TablesInsert } from '@/integrations/supabase/types';
+import { publishTemplateWithFallback } from '@/modules/forms';
 import { 
   Upload, FileText, Wand2, Save, ArrowLeft, ArrowRight,
   Plus, Trash2, GripVertical, Settings, Check, Loader2,
@@ -375,22 +378,25 @@ const CreateTemplate: React.FC = () => {
     }));
   };
 
-  // Save template
+  // Save template: always written as a draft; publishing it goes through
+  // the definer (form_template_publish, with today's write as its D-01
+  // fallback while the definer is missing, D-X5-20). A draft that saves but
+  // does not publish is kept and says why.
   const saveTemplate = async (publish: boolean = false) => {
     if (!templateData.template_code || !templateData.template_name) {
-      toast({
-        title: "Validation Error",
-        description: "Template code and name are required",
-        variant: "destructive"
-      });
+      notify.error('Template code and name are required', { title: 'Template not saved' });
+      return;
+    }
+    if (!profile?.company_id || !user?.id) {
+      notify.error('Sign in again to save templates.', { title: 'Template not saved' });
       return;
     }
 
     setIsProcessing(true);
 
     try {
-      const insertData: Record<string, unknown> = {
-        company_id: profile?.company_id,
+      const insertData: TablesInsert<'form_templates'> = {
+        company_id: profile.company_id,
         template_code: templateData.template_code,
         template_name: templateData.template_name,
         description: templateData.description,
@@ -401,38 +407,39 @@ const CreateTemplate: React.FC = () => {
         has_expiry: templateData.has_expiry,
         expiry_hours: templateData.expiry_hours,
         allow_line_items: templateData.allow_line_items,
-        required_signers: templateData.required_signers as unknown as import('@/integrations/supabase/types').Json,
+        required_signers: templateData.required_signers as unknown as Json,
         allow_parallel_signing: templateData.allow_parallel_signing,
         source_file_url: templateData.source_file_url,
         source_file_name: templateData.source_file_name,
         source_file_type: templateData.source_file_type,
-        form_schema: templateData.form_schema as unknown as import('@/integrations/supabase/types').Json,
-        status: publish ? 'PUBLISHED' : 'DRAFT',
-        published_at: publish ? new Date().toISOString() : null,
-        created_by: user?.id
+        form_schema: templateData.form_schema as unknown as Json,
+        status: 'DRAFT',
+        created_by: user.id,
       };
 
       const { data, error } = await supabase
         .from('form_templates')
-        .insert(insertData as any)
-        .select()
+        .insert(insertData)
+        .select('id, updated_at')
         .single();
 
       if (error) throw error;
 
-      toast({
-        title: publish ? "Template Published" : "Template Saved",
-        description: `${templateData.template_name} has been ${publish ? 'published' : 'saved as draft'}`,
-      });
+      if (!publish) {
+        notify.success('Template saved as a draft', { description: templateData.template_name });
+        navigate(`/ism/forms/templates/${data.id}`);
+        return;
+      }
 
+      try {
+        await publishTemplateWithFallback(profile.company_id, user.id, { templateId: data.id, expectedUpdatedAt: data.updated_at });
+        notify.success('Template published', { description: templateData.template_name });
+      } catch (publishError) {
+        notify.error(publishError, { title: 'Saved as a draft, not published' });
+      }
       navigate(`/ism/forms/templates/${data.id}`);
     } catch (error) {
-      console.error('Failed to save template:', error);
-      toast({
-        title: "Error",
-        description: "Failed to save template",
-        variant: "destructive"
-      });
+      notify.error(error, { title: 'Template not saved' });
     } finally {
       setIsProcessing(false);
     }

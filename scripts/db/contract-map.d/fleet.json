@@ -82,6 +82,32 @@
           "fleet_document_set_signer_rule"
         ]
       }
+    },
+    {
+      "file": "src/modules/forms/types/db.pending.ts",
+      "mirrors": "X5 spec §2 X5-06A (20261124040500_fleet_form_templates.sql)",
+      "tables": {
+        "type": "FormsPendingTables",
+        "expect": ["form_template_vessel_settings", "form_template_events"]
+      },
+      "columns": {
+        "type": "FormsPendingColumns",
+        "expect": ["form_templates"]
+      },
+      "functions": {
+        "type": "FormsPendingFunctions",
+        "expect": [
+          "form_template_publish",
+          "form_template_new_version",
+          "form_template_customise",
+          "form_template_archive",
+          "form_template_delete_draft",
+          "form_template_move_area",
+          "form_template_set_visibility",
+          "form_template_reorder",
+          "form_template_run_stats"
+        ]
+      }
     }
   ],
   "notMirrored": {

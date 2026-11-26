@@ -1,289 +1,276 @@
-import { useState, useEffect } from 'react';
+/**
+ * ISM › Draft templates (`/ism/forms/drafts`): the company's templates in
+ * draft, with what still stops each one from being published.
+ *
+ * - Reads the live columns only (the old select named columns the table
+ *   has never had, failed, and showed "no drafts" whatever was there); a
+ *   failed read is an error with Retry, never an empty list.
+ * - "Ready to publish" uses the server's own publish checks
+ *   (@/modules/forms publishBlocker): a draft that is not ready says why.
+ * - Publish goes through form_template_publish (today's write as its D-01
+ *   fallback while the definer is missing, D-X5-20); Delete through
+ *   form_template_delete_draft, after a confirmation. Both toast the real
+ *   outcome; nothing is reported as done before the server answers.
+ */
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { format } from 'date-fns';
+import { CheckCircle2, Clock, Edit, Eye, FilePlus2, FileText, Search, Send, Trash2 } from 'lucide-react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { 
-  FileText, Search, Filter, Edit, Trash2, Clock,
-  Eye, Send, Loader2, AlertCircle
-} from 'lucide-react';
+import PageHeader from '@/shared/components/layout/PageHeader';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from '@/modules/auth/contexts/AuthContext';
+import { useCan } from '@/lib/permissions/useCan';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { format } from 'date-fns';
-import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { KpiTile, type KpiTileState } from '@/shared/components/data';
+import { StatusPill } from '@/shared/components/status';
+import { EmptyState, PageError, PageLoading } from '@/shared/components/states';
+import { formTemplateRefusal, publishBlocker, schemaFields, useFormTemplateMutations, versionDisplay } from '@/modules/forms';
 
-interface DraftTemplate {
+const ADMIN_KEY = 'fleet.operations.fleet_checklists.admin';
+const COARSE = '[@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11';
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+interface DraftRow {
   id: string;
-  name: string;
+  template_code: string;
+  template_name: string;
   description: string | null;
-  category: string | null;
   status: string;
-  created_at: string;
-  updated_at: string;
-  created_by_name: string | null;
-  field_count: number;
+  version: number | null;
+  vessel_scope: string | null;
+  vessel_ids: string[] | null;
+  form_schema: unknown;
+  updated_at: string | null;
 }
 
+const DRAFT_COLUMNS = 'id, template_code, template_name, description, status, version, vessel_scope, vessel_ids, form_schema, updated_at';
+
+/** The fields that are items (not section headers). */
+const itemCount = (schema: unknown) =>
+  schemaFields(schema).filter((f) => !(typeof f === 'object' && f !== null && String((f as { type?: unknown }).type ?? '').trim().toLowerCase() === 'section')).length;
+
 export default function DraftTemplates() {
-  const [templates, setTemplates] = useState<DraftTemplate[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { profile } = useAuth();
+  const companyId = profile?.company_id ?? null;
+  const canManage = useCan(ADMIN_KEY);
+  const mutations = useFormTemplateMutations();
   const [search, setSearch] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<DraftRow | null>(null);
 
-  useEffect(() => {
-    loadDrafts();
-  }, []);
-
-  async function loadDrafts() {
-    setIsLoading(true);
-    try {
+  const drafts = useQuery({
+    queryKey: ['form-templates', companyId, 'drafts'],
+    enabled: !!companyId,
+    queryFn: async (): Promise<DraftRow[]> => {
       const { data, error } = await supabase
         .from('form_templates')
-        .select('id, template_name, description, category, status, created_at, updated_at, created_by_name, fields')
+        .select(DRAFT_COLUMNS)
+        .eq('company_id', companyId as string)
         .eq('status', 'DRAFT')
         .order('updated_at', { ascending: false });
-
       if (error) throw error;
-      
-      setTemplates((data || []).map((t: any) => ({
-        id: t.id,
-        name: t.template_name,
-        description: t.description,
-        category: t.category,
-        status: t.status,
-        created_at: t.created_at,
-        updated_at: t.updated_at,
-        created_by_name: t.created_by_name,
-        field_count: Array.isArray(t.fields) ? t.fields.length : 0,
-      })));
-    } catch (error) {
-      console.error('Failed to load drafts:', error);
-      setTemplates([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function handlePublish(id: string) {
-    try {
-      const { error } = await supabase
-        .from('form_templates')
-        .update({ status: 'PUBLISHED' })
-        .eq('id', id);
-
-      if (error) throw error;
-      toast.success('Template published');
-      loadDrafts();
-    } catch (error) {
-      console.error('Failed to publish:', error);
-      toast.error('Failed to publish template');
-    }
-  }
-
-  async function handleDelete(id: string) {
-    if (!confirm('Are you sure you want to delete this draft?')) return;
-
-    try {
-      const { error } = await supabase
-        .from('form_templates')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      toast.success('Draft deleted');
-      loadDrafts();
-    } catch (error) {
-      console.error('Failed to delete:', error);
-      toast.error('Failed to delete draft');
-    }
-  }
-
-  const filteredTemplates = templates.filter(t => {
-    if (!search) return true;
-    const searchLower = search.toLowerCase();
-    return (
-      t.name?.toLowerCase().includes(searchLower) ||
-      t.description?.toLowerCase().includes(searchLower) ||
-      t.category?.toLowerCase().includes(searchLower)
-    );
+      return (data ?? []) as DraftRow[];
+    },
   });
+
+  const rows = useMemo(() => drafts.data ?? [], [drafts.data]);
+  const withBlocker = useMemo(
+    () =>
+      rows.map((row) => ({
+        row,
+        blocker: publishBlocker({ templateName: row.template_name, formSchema: row.form_schema, vesselScope: row.vessel_scope, vesselIds: row.vessel_ids }),
+        items: itemCount(row.form_schema),
+      })),
+    [rows],
+  );
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    if (!term) return withBlocker;
+    return withBlocker.filter(({ row }) =>
+      [row.template_name, row.template_code, row.description ?? ''].some((v) => v.toLowerCase().includes(term)),
+    );
+  }, [withBlocker, search]);
+
+  const updatedToday = rows.filter((r) => r.updated_at && Date.now() - new Date(r.updated_at).getTime() < DAY_MS).length;
+  const ready = withBlocker.filter((d) => d.blocker === null).length;
+  const tileState: KpiTileState = drafts.isError ? 'error' : drafts.isSuccess ? 'ready' : 'loading';
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    try {
+      await mutations.deleteDraft.mutateAsync(pendingDelete.id);
+      setPendingDelete(null);
+    } catch {
+      // The mutation toasts the refusal; the dialog stays open to cancel.
+    }
+  };
+
+  const renderList = () => {
+    if (!companyId || drafts.isLoading) return <PageLoading variant="list" rows={4} label="Loading drafts" />;
+    if (drafts.isError) return <PageError error={drafts.error} title="Drafts could not be loaded" onRetry={() => void drafts.refetch()} />;
+    if (filtered.length === 0) {
+      return (
+        <EmptyState
+          kind={rows.length > 0 ? 'filtered' : 'first-use'}
+          bordered
+          icon={FileText}
+          title={rows.length > 0 ? 'No drafts match the search' : 'No draft templates'}
+          body={rows.length > 0 ? 'Change the search to see more.' : 'Templates you save without publishing wait here.'}
+          action={
+            rows.length === 0 ? (
+              <Button asChild>
+                <Link to="/ism/forms/templates/create">Create template</Link>
+              </Button>
+            ) : undefined
+          }
+        />
+      );
+    }
+    return (
+      <ul className="space-y-3" aria-label="Draft templates">
+        {filtered.map(({ row, blocker, items }) => (
+          <li key={row.id}>
+            <Card>
+              <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center">
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <p className="type-title break-words">{row.template_name}</p>
+                    <StatusPill domain="form_template" status={row.status} />
+                    <span className="type-mono text-muted-foreground">{row.template_code}</span>
+                  </div>
+                  {row.description ? <p className="type-body line-clamp-1 text-muted-foreground">{row.description}</p> : null}
+                  <p className="type-caption mt-1 flex flex-wrap gap-x-3 text-muted-foreground">
+                    <span>{versionDisplay(row)}</span>
+                    <span>
+                      {items} {items === 1 ? 'item' : 'items'}
+                    </span>
+                    {row.updated_at ? <span>Updated {format(new Date(row.updated_at), 'd MMM yyyy')}</span> : null}
+                  </p>
+                  {blocker ? (
+                    <p className="type-caption mt-1 text-warning">Not ready to publish: {formTemplateRefusal(blocker)}</p>
+                  ) : (
+                    <p className="type-caption mt-1 text-success">Ready to publish</p>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button variant="ghost" size="sm" className={COARSE} asChild>
+                    <Link to={`/ism/forms/templates/${row.id}`} aria-label={`View ${row.template_name}`}>
+                      <Eye className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                  </Button>
+                  <Button variant="ghost" size="sm" className={COARSE} asChild>
+                    <Link to={`/ism/forms/templates/${row.id}/edit`} aria-label={`Edit ${row.template_name}`}>
+                      <Edit className="h-4 w-4" aria-hidden="true" />
+                    </Link>
+                  </Button>
+                  {canManage ? (
+                    <>
+                      <Button
+                        size="sm"
+                        className={COARSE}
+                        disabled={blocker !== null || mutations.publish.isPending}
+                        title={blocker ? formTemplateRefusal(blocker) ?? undefined : undefined}
+                        onClick={() => mutations.publish.mutate({ templateId: row.id, expectedUpdatedAt: row.updated_at })}
+                      >
+                        <Send className="mr-1 h-4 w-4" aria-hidden="true" />
+                        Publish
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className={`${COARSE} text-destructive`}
+                        aria-label={`Delete ${row.template_name}`}
+                        onClick={() => setPendingDelete(row)}
+                      >
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                    </>
+                  ) : null}
+                </div>
+              </CardContent>
+            </Card>
+          </li>
+        ))}
+      </ul>
+    );
+  };
 
   return (
     <DashboardLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <FileText className="w-6 h-6" />
-              Draft Templates
-            </h1>
-            <p className="text-muted-foreground">Templates in draft state awaiting review</p>
-          </div>
-          <Button asChild>
-            <Link to="/ism/forms/templates/create">
-              Create New Template
-            </Link>
-          </Button>
+        <PageHeader
+          title="Draft templates"
+          description="Templates saved but not published yet. Crews see a template only once it is published."
+          actions={
+            <Button asChild className={COARSE}>
+              <Link to="/ism/forms/templates/create">
+                <FilePlus2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                Create template
+              </Link>
+            </Button>
+          }
+        />
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <KpiTile label="Drafts" icon={FileText} value={drafts.isSuccess ? rows.length : null} />
+          {/* Counts, not alerts: none updated or ready is "0", never "All clear". */}
+          <KpiTile label="Updated today" icon={Clock} state={tileState} value={drafts.isSuccess ? updatedToday : null} />
+          <KpiTile label="Ready to publish" icon={CheckCircle2} state={tileState} value={drafts.isSuccess ? ready : null} sub="Pass the publish checks" />
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-yellow-100 rounded-lg">
-                  <Clock className="w-5 h-5 text-yellow-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{templates.length}</p>
-                  <p className="text-sm text-muted-foreground">Total Drafts</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Edit className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {templates.filter(t => {
-                      const updated = new Date(t.updated_at);
-                      const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-                      return updated > dayAgo;
-                    }).length}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Updated Today</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <Send className="w-5 h-5 text-green-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">
-                    {templates.filter(t => t.field_count > 0).length}
-                  </p>
-                  <p className="text-sm text-muted-foreground">Ready to Publish</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Search */}
         <Card>
           <CardContent className="p-4">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search drafts..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+              <Input placeholder="Search drafts" aria-label="Search drafts" value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
             </div>
           </CardContent>
         </Card>
 
-        {/* Drafts List */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          </div>
-        ) : filteredTemplates.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No draft templates found</p>
-              <Button asChild className="mt-4">
-                <Link to="/ism/forms/templates/create">Create Your First Template</Link>
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-3">
-            {filteredTemplates.map((template) => (
-              <Card key={template.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-yellow-100 flex items-center justify-center">
-                      <FileText className="w-6 h-6 text-yellow-600" />
-                    </div>
-                    
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="font-medium">{template.name}</p>
-                        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
-                          Draft
-                        </Badge>
-                        {template.category && (
-                          <Badge variant="secondary" className="text-xs">
-                            {template.category}
-                          </Badge>
-                        )}
-                      </div>
-                      
-                      <p className="text-sm text-muted-foreground line-clamp-1">
-                        {template.description || 'No description'}
-                      </p>
-                      
-                      <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
-                        <span>{template.field_count} fields</span>
-                        <span>•</span>
-                        <span>Updated {format(new Date(template.updated_at), 'MMM d, yyyy')}</span>
-                        {template.created_by_name && (
-                          <>
-                            <span>•</span>
-                            <span>By {template.created_by_name}</span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link to={`/ism/forms/templates/${template.id}`}>
-                          <Eye className="w-4 h-4" />
-                        </Link>
-                      </Button>
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link to={`/ism/forms/templates/${template.id}/edit`}>
-                          <Edit className="w-4 h-4" />
-                        </Link>
-                      </Button>
-                      {template.field_count > 0 && (
-                        <Button 
-                          size="sm" 
-                          onClick={() => handlePublish(template.id)}
-                        >
-                          <Send className="w-4 h-4 mr-1" />
-                          Publish
-                        </Button>
-                      )}
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-red-600"
-                        onClick={() => handleDelete(template.id)}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+        {renderList()}
       </div>
+
+      <AlertDialog open={pendingDelete !== null} onOpenChange={(open) => !open && !mutations.deleteDraft.isPending && setPendingDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this draft?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingDelete ? (
+                <>
+                  <strong>{pendingDelete.template_name}</strong> is removed for good. A draft that was published before, or that crews have already filled in, is kept and
+                  must be archived instead.
+                </>
+              ) : null}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={mutations.deleteDraft.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                void confirmDelete();
+              }}
+              disabled={mutations.deleteDraft.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {mutations.deleteDraft.isPending ? 'Deleting…' : 'Delete draft'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </DashboardLayout>
   );
 }

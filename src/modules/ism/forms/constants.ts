@@ -2,6 +2,16 @@
 // ELECTRONIC FORMS SYSTEM CONSTANTS
 // Shared constants for form templates and submissions
 // =====================================================
+//
+// Status colours are the design tokens of the status registry
+// (statusTone `form_template` / `form_submission`, TONE_SURFACE), never raw
+// palette classes. Template areas, kinds and cadences come from the Forms &
+// Checklists module's pure model (X5-06A), the one source of their labels;
+// it is imported from its lib files, not the module index, so these
+// constants stay free of the Supabase client.
+import { TONE_SURFACE, statusLabel, statusTone } from '@/shared/components/status';
+import { AREA_LABELS, FORM_KIND_LABELS, FORM_TEMPLATE_AREAS, UNSORTED_LABEL, areaLabel } from '@/modules/forms/lib/areaModel';
+import { CADENCE_LABELS } from '@/modules/forms/lib/cadence';
 
 // Field type definitions - used in template builder and form renderer
 export const FIELD_TYPES = [
@@ -40,22 +50,39 @@ export const FORM_TYPES = [
 export type FormType = typeof FORM_TYPES[number]['value'];
 
 // Form/Template statuses.
-// These are exactly the values form_templates_status_check allows: the list
-// used to carry UNDER_REVIEW and SUPERSEDED as well, which the column has
-// never held and now rejects.
+// These are exactly the values form_templates_status_check allows
+// (20261124040500_fleet_form_templates.sql re-adds it with SUPERSEDED: an
+// older version, kept for the runs that used it). UNDER_REVIEW was never a
+// value. Status changes only through the form_template_* definers
+// (@/modules/forms, useFormTemplateMutations).
 export const FORM_TEMPLATE_STATUSES = [
   'DRAFT',
   'PUBLISHED',
+  'SUPERSEDED',
   'ARCHIVED',
 ] as const;
 
 export type FormTemplateStatus = typeof FORM_TEMPLATE_STATUSES[number];
 
+const templateStatus = (status: FormTemplateStatus) => ({
+  label: statusLabel('form_template', status),
+  color: TONE_SURFACE[statusTone('form_template', status)],
+});
+
 export const FORM_TEMPLATE_STATUS_CONFIG: Record<FormTemplateStatus, { label: string; color: string }> = {
-  DRAFT: { label: 'Draft', color: 'bg-muted text-muted-foreground' },
-  PUBLISHED: { label: 'Published', color: 'bg-green-100 text-green-800' },
-  ARCHIVED: { label: 'Archived', color: 'bg-gray-100 text-gray-800' },
+  DRAFT: templateStatus('DRAFT'),
+  PUBLISHED: templateStatus('PUBLISHED'),
+  SUPERSEDED: templateStatus('SUPERSEDED'),
+  ARCHIVED: templateStatus('ARCHIVED'),
 };
+
+/** Where crews find a template on board (form_templates.area), with "Unsorted" for none. */
+export const FORM_TEMPLATE_AREA_OPTIONS = FORM_TEMPLATE_AREAS.map((value) => ({ value, label: AREA_LABELS[value] }));
+export const FORM_TEMPLATE_AREA_LABELS = AREA_LABELS;
+export const FORM_TEMPLATE_UNSORTED_LABEL = UNSORTED_LABEL;
+export const FORM_TEMPLATE_KIND_LABELS = FORM_KIND_LABELS;
+export const FORM_TEMPLATE_CADENCE_LABELS = CADENCE_LABELS;
+export const formTemplateAreaLabel = areaLabel;
 
 // Submission statuses, exactly as form_submissions_status_check allows.
 // SUBMITTED and EXPIRED were in this list and in no transition: a form goes
@@ -72,14 +99,19 @@ export const FORM_SUBMISSION_STATUSES = [
 
 export type FormSubmissionStatus = typeof FORM_SUBMISSION_STATUSES[number];
 
+const submissionStatus = (status: FormSubmissionStatus, label: string) => ({
+  label,
+  color: TONE_SURFACE[status === 'IN_PROGRESS' ? 'signal' : statusTone('form_submission', status)],
+});
+
 export const FORM_SUBMISSION_STATUS_CONFIG: Record<FormSubmissionStatus, { label: string; color: string }> = {
-  DRAFT: { label: 'Draft', color: 'bg-muted text-muted-foreground' },
-  IN_PROGRESS: { label: 'In Progress', color: 'bg-blue-100 text-blue-800' },
-  PENDING_SIGNATURE: { label: 'Pending Signature', color: 'bg-amber-100 text-amber-800' },
-  SIGNED: { label: 'Signed', color: 'bg-green-100 text-green-800' },
-  REJECTED: { label: 'Rejected', color: 'bg-red-100 text-red-800' },
-  AMENDED: { label: 'Amended', color: 'bg-purple-100 text-purple-800' },
-  ARCHIVED: { label: 'Archived', color: 'bg-gray-100 text-gray-800' }
+  DRAFT: submissionStatus('DRAFT', 'Draft'),
+  IN_PROGRESS: submissionStatus('IN_PROGRESS', 'In Progress'),
+  PENDING_SIGNATURE: submissionStatus('PENDING_SIGNATURE', 'Pending Signature'),
+  SIGNED: submissionStatus('SIGNED', 'Signed'),
+  REJECTED: submissionStatus('REJECTED', 'Rejected'),
+  AMENDED: submissionStatus('AMENDED', 'Amended'),
+  ARCHIVED: submissionStatus('ARCHIVED', 'Archived'),
 };
 
 // Signature types
@@ -203,11 +235,11 @@ export function getFormTypeInfo(type: string) {
 }
 
 export function getTemplateStatusConfig(status: string) {
-  return FORM_TEMPLATE_STATUS_CONFIG[status as FormTemplateStatus] || { label: status, color: 'bg-muted' };
+  return FORM_TEMPLATE_STATUS_CONFIG[status as FormTemplateStatus] || { label: status, color: TONE_SURFACE.neutral };
 }
 
 export function getSubmissionStatusConfig(status: string) {
-  return FORM_SUBMISSION_STATUS_CONFIG[status as FormSubmissionStatus] || { label: status, color: 'bg-muted' };
+  return FORM_SUBMISSION_STATUS_CONFIG[status as FormSubmissionStatus] || { label: status, color: TONE_SURFACE.neutral };
 }
 
 

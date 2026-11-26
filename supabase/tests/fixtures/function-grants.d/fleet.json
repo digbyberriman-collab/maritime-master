@@ -71,6 +71,27 @@
     "public.fleet_report_trends(uuid[], integer, date)": ["authenticated"],
     "public.fleet_vessel_comparison(uuid[], date)": ["authenticated"],
     "public.fleet_vessel_list(uuid[], date)": ["authenticated"],
+    "public.form_template_archive(uuid, text)": ["authenticated"],
+    "public.form_template_customise(uuid)": ["authenticated"],
+    "public.form_template_delete_draft(uuid)": ["authenticated"],
+    "public.form_template_events_guard()": [],
+    "public.form_template_gate()": ["service_role"],
+    "public.form_template_legacy_area(text, text)": ["service_role"],
+    "public.form_template_legacy_kind(text, text)": ["service_role"],
+    "public.form_template_log(uuid, uuid, uuid, text, text, text, integer, text, jsonb)": ["service_role"],
+    "public.form_template_move_area(uuid, text)": ["authenticated"],
+    "public.form_template_new_version(uuid)": ["authenticated"],
+    "public.form_template_next_due(text, date)": ["service_role"],
+    "public.form_template_publish(uuid, text, timestamp with time zone)": ["authenticated"],
+    "public.form_template_publish_blocker(text, jsonb, text, uuid[])": ["service_role"],
+    "public.form_template_reorder(uuid, text, uuid[])": ["authenticated"],
+    "public.form_template_run_stats(uuid[], text, date)": ["authenticated"],
+    "public.form_template_set_visibility(uuid, uuid, text, text)": ["authenticated"],
+    "public.form_template_targets_vessel(text, uuid[], uuid)": ["service_role"],
+    "public.form_template_vessel_manager_for(uuid, uuid, uuid)": ["service_role"],
+    "public.form_template_vessel_settings_guard()": [],
+    "public.form_templates_audit()": [],
+    "public.form_templates_guard()": [],
     "public.set_expiry_window_rule(text, uuid, integer)": ["authenticated"]
   },
   "relations": {
@@ -92,6 +113,8 @@
     "public.fleet_document_types": { "kind": "table", "authenticated": ["SELECT"], "authenticatedColumns": {} },
     "public.fleet_document_versions": { "kind": "table", "authenticated": ["SELECT"], "authenticatedColumns": {} },
     "public.fleet_document_vessel_targets": { "kind": "table", "authenticated": ["SELECT"], "authenticatedColumns": {} },
-    "public.fleet_documents": { "kind": "table", "authenticated": ["SELECT"], "authenticatedColumns": {} }
+    "public.fleet_documents": { "kind": "table", "authenticated": ["SELECT"], "authenticatedColumns": {} },
+    "public.form_template_events": { "kind": "table", "authenticated": ["SELECT"], "authenticatedColumns": {} },
+    "public.form_template_vessel_settings": { "kind": "table", "authenticated": ["SELECT"], "authenticatedColumns": {} }
   }
 }
