@@ -13,13 +13,24 @@
  *     signed in with fleet reach), so nobody who opens it today loses it
  *     (D-27). The legacy `/documents` and the old sample-data pages
  *     (`/documents/{manuals,policies,procedures}`) land here.
+ *   - `/v/:vesselCode/safety/fleet-documents`: the documents the company
+ *     publishes to the vessel, to open and acknowledge
+ *     (VesselFleetDocumentsPage, X5-05A; gap/02 FD9), a lazy chunk. Guard:
+ *     `vessel.safety.fleet_documents.view_own` (signed in; the server
+ *     answers only for vessels the caller reaches). Registering it
+ *     activates the armed legacy redirects of `/acknowledgments` and
+ *     `/crew/acknowledgements` (pendingTarget).
  * - nav:
  *   - `fleet.compliance` Documents at order 10, beta, with the library's key;
- *   - `vessel.safety` Fleet Documents at order 110 (planned), the documents
- *     the company publishes to the vessel (X5-05A).
- * - capabilities: the library's keys (./paths.ts DOCUMENTS_CAPS).
+ *   - `vessel.safety` Fleet Documents at order 110, beta, with the vessel
+ *     page's key.
+ * - capabilities: the library's keys and the vessel page's
+ *   (./paths.ts DOCUMENTS_CAPS, VESSEL_FLEET_DOCUMENTS_CAPS).
  * - notificationTypes: the fleet document notification types and their
- *   emitters (platform-prep PP4; deferred until each emitter lands, D-238).
+ *   emitters (platform-prep PP4; D-238): fleet_document_published and
+ *   fleet_document_ack_reminder are live from X5-05A (their emitters are in
+ *   20261124040400, proved by fleet/documents_acks.test.sql); the sweep's
+ *   types stay deferred until X5-09.
  *
  * Platform-prep PP3 moved the routes from src/routes/index.tsx and the
  * leaves from src/config/sitemap.ts; X5-04A swapped in the library.
@@ -28,7 +39,14 @@ import { FileText } from 'lucide-react';
 import type { ModuleManifest } from '@/app/registry/types';
 import { L } from '@/config/navBuilders';
 import { FLEET_ROOT } from '@/modules/fleet/paths';
-import { DOCUMENTS_CAPABILITIES, DOCUMENTS_CAPS, DOCUMENTS_FLEET_PATHS, VESSEL_SAFETY_ROOT } from './paths';
+import {
+  DOCUMENTS_CAPABILITIES,
+  DOCUMENTS_CAPS,
+  DOCUMENTS_FLEET_PATHS,
+  DOCUMENTS_VESSEL_PATHS,
+  VESSEL_FLEET_DOCUMENTS_CAPS,
+  VESSEL_SAFETY_ROOT,
+} from './paths';
 
 const manifest: ModuleManifest = {
   id: 'documents',
@@ -49,6 +67,13 @@ const manifest: ModuleManifest = {
       guard: { kind: 'scope' },
       label: 'Controlled register',
     },
+    {
+      scope: 'vessel',
+      path: DOCUMENTS_VESSEL_PATHS.fleetDocuments,
+      page: () => import('@/modules/documents/pages/VesselFleetDocumentsPage'),
+      guard: { kind: 'capability', capability: VESSEL_FLEET_DOCUMENTS_CAPS.viewOwn },
+      label: 'Fleet documents',
+    },
   ],
   nav: [
     {
@@ -56,14 +81,18 @@ const manifest: ModuleManifest = {
       order: 10,
       node: L('Documents', FLEET_ROOT, { icon: FileText, status: 'beta', capability: DOCUMENTS_CAPS.view }),
     },
-    { slot: 'vessel.safety', order: 110, node: L('Fleet Documents', VESSEL_SAFETY_ROOT, { icon: FileText }) },
+    {
+      slot: 'vessel.safety',
+      order: 110,
+      node: L('Fleet Documents', VESSEL_SAFETY_ROOT, { icon: FileText, status: 'beta', capability: VESSEL_FLEET_DOCUMENTS_CAPS.viewOwn }),
+    },
   ],
   capabilities: DOCUMENTS_CAPABILITIES,
   // Seeded by 20261124030100 (category Documents; X5 PR-08). Each flips to
   // 'live' in the slice that lands its emitter, whose SQL test proves it (D-238).
   notificationTypes: [
-    { key: 'fleet_document_published', status: 'deferred', emitter: 'fleet_document_publish() (X5-05A)' },
-    { key: 'fleet_document_ack_reminder', status: 'deferred', emitter: 'fleet_document_remind() (X5-05B)' },
+    { key: 'fleet_document_published', status: 'live', emitter: 'fleet_documents_after_publish() on fleet_document_publish() (X5-05A)' },
+    { key: 'fleet_document_ack_reminder', status: 'live', emitter: 'fleet_document_remind() (X5-05A; its page is X5-05B)' },
     { key: 'fleet_document_ack_due_soon', status: 'deferred', emitter: 'fleet_ops_daily_sweep() through hr-daily-sweeper (X5-09)' },
     { key: 'fleet_document_ack_overdue', status: 'deferred', emitter: 'fleet_ops_daily_sweep() through hr-daily-sweeper (X5-09)' },
     { key: 'fleet_document_ack_digest', status: 'deferred', emitter: 'fleet_ops_daily_sweep() on Mondays (X5-09)' },

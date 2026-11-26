@@ -250,6 +250,17 @@ describe('a module switched off for the vessel', () => {
     expect(within(menu).queryByRole('menuitem', { name: /SMS form/ })).toBeNull();
     expect(within(menu).queryByRole('menuitem', { name: /drill/ })).toBeNull();
     expect(within(menu).getByRole('menuitem', { name: /Crew list/ })).toBeInTheDocument();
+    // The fleet documents to acknowledge live under Safety (X5-05A): no card either.
+    expect(screen.queryByRole('heading', { name: /To acknowledge/ })).toBeNull();
+  });
+
+  it('Safety on: the "To acknowledge" card sits between the indicators and the lists (X5-05A)', async () => {
+    renderHome();
+    await waitFor(() => expect(tile('Safety')).toHaveAttribute('data-state', 'ready'));
+    const card = screen.getByRole('heading', { name: /To acknowledge/ });
+    const lists = screen.getByRole('heading', { name: 'Needs attention' });
+    expect(card.compareDocumentPosition(lists) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(indicators().compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('Technical off: no Technical tile and no Technical jobs action', async () => {

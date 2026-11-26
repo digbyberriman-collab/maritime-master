@@ -42,7 +42,7 @@
     },
     {
       "file": "src/modules/documents/types/db.pending.ts",
-      "mirrors": "X5 spec §2 X5-04A (20261124040300_fleet_documents_library.sql)",
+      "mirrors": "X5 spec §2 X5-04A (20261124040300_fleet_documents_library.sql) and X5-05A (20261124040400_fleet_documents_acknowledgements.sql)",
       "tables": {
         "type": "DocumentsPendingTables",
         "expect": [
@@ -51,7 +51,10 @@
           "fleet_documents",
           "fleet_document_versions",
           "fleet_document_vessel_targets",
-          "fleet_document_events"
+          "fleet_document_events",
+          "fleet_document_acknowledgements",
+          "fleet_document_signer_rules",
+          "fleet_document_reminders"
         ]
       },
       "functions": {
@@ -68,7 +71,15 @@
           "fleet_document_set_targets",
           "fleet_document_publish",
           "fleet_document_withdraw",
-          "fleet_document_delete_draft"
+          "fleet_document_delete_draft",
+          "fleet_document_vessel_documents",
+          "fleet_document_ack_status",
+          "fleet_document_summary",
+          "fleet_document_my_pending",
+          "fleet_document_acknowledge",
+          "fleet_document_acknowledge_witnessed",
+          "fleet_document_remind",
+          "fleet_document_set_signer_rule"
         ]
       }
     }
@@ -88,7 +99,8 @@
       "expiry_src_crew_contracts": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant"
     },
     "functions": {
-      "fleet_document_visible": "RLS helper of the fleet document library policies (the reader must be able to execute it); the client never calls it"
+      "fleet_document_visible": "RLS helper of the fleet document library policies (the reader must be able to execute it); the client never calls it",
+      "fleet_document_ack_reader_for": "RLS helper of the fleet document acknowledgement, signer-rule and reminder policies (the reader must be able to execute it); the client never calls it"
     }
   }
 }

@@ -12,8 +12,9 @@
  *   off for the vessel is not shown. While the module settings load its
  *   tile is a skeleton; if they fail it is an error with Retry, never "all
  *   on" (D-86). A tile the caller cannot read is hidden (server gates).
- * - The "To acknowledge" slot (X5-05A mounts the pending fleet documents
- *   card there).
+ * - To acknowledge: the caller's own outstanding fleet documents on this
+ *   vessel (PendingFleetDocumentsCard, X5-05A; gap/02 FD9), shown only
+ *   while the vessel's Safety module is on (its page lives under Safety).
  * - Needs attention: the dashboard panels for this vessel (documents and
  *   certificates, safety and compliance, renewals and surveys), lists of an
  *   off module left out.
@@ -55,6 +56,7 @@ import { vesselPath } from '@/modules/vessels/lib/vesselCode';
 import VesselProfileCard from '@/modules/vessels/components/VesselProfileCard';
 import { EmergencyContactsWidget } from '@/modules/emergency/components/EmergencyContactsWidget';
 import { AlertsTriagePanel } from '@/modules/red-room/components/AlertsTriagePanel';
+import { PendingFleetDocumentsCard } from '@/modules/documents/components/PendingFleetDocumentsCard';
 import { QuickActionsMenu } from '@/modules/dashboard/components/QuickActionsMenu';
 import { ExpiryPanels, type PanelScope } from '@/modules/dashboard/components/fleet/ExpiryPanels';
 import { SafetyPanels } from '@/modules/dashboard/components/fleet/SafetyPanels';
@@ -164,17 +166,6 @@ function vesselTileView(
     default:
       return { ...base, state: 'loading' };
   }
-}
-
-// ─── Slot for X5-05A ────────────────────────────────────────────────────
-
-/**
- * The "To acknowledge" slot: X5-05A mounts the vessel's pending fleet
- * documents card (`PendingFleetDocumentsCard`) here, between the indicators
- * and the lists. Until then it renders nothing (no placeholder).
- */
-function ToAcknowledgeSlot(_props: { vesselId: string }) {
-  return null;
 }
 
 // ─── Needs attention ────────────────────────────────────────────────────
@@ -376,7 +367,8 @@ function VesselHome({ vessel, code }: { vessel: Vessel; code: string | null }) {
         </section>
       ) : null}
 
-      <ToAcknowledgeSlot vesselId={vessel.id} />
+      {/* The documents to read live under Safety: none while it is off, or while the settings are unknown (D-86). */}
+      {modules.isModuleOn('safety') ? <PendingFleetDocumentsCard variant="home" vesselId={vessel.id} vesselCode={code} /> : null}
 
       <section aria-labelledby="vessel-home-lists" className="space-y-3">
         <h2 id="vessel-home-lists" className="type-title text-foreground">

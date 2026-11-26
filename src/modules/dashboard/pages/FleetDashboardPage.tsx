@@ -12,6 +12,9 @@
  *   freshness stamp from the KPI read and the Refresh that re-reads it (D-88).
  * - Tiles: FleetKpiRow from `fleet_dashboard_kpis` (server counts, per-tile
  *   gates and module settings) plus the open-alerts tile on the alert scope.
+ * - To acknowledge: the caller's own outstanding fleet documents on every
+ *   vessel whose crew they are on (PendingFleetDocumentsCard, X5-05A; gap/02
+ *   FD9); shown only when there is something to acknowledge.
  * - Needs attention: `fleet_dashboard_panels` (one read for every list) as
  *   the dedicated panels: documents and certificates (D9), safety and
  *   compliance (D10), renewals and surveys (D12), the work list (D13);
@@ -48,6 +51,7 @@ import { InsuranceSurveysPanel } from '../components/fleet/InsuranceSurveysPanel
 import { WorkListPanel } from '../components/fleet/WorkListPanel';
 import { VesselHealthMatrix } from '../components/fleet/VesselHealthMatrix';
 import { FleetGroupMaps } from '../components/fleet/FleetGroupMaps';
+import { PendingFleetDocumentsCard } from '@/modules/documents/components/PendingFleetDocumentsCard';
 import { useOpenAlertCounts } from '../hooks/useOpenAlertCounts';
 import {
   FleetDashboardError,
@@ -220,6 +224,8 @@ function FleetDashboardBody() {
         knownReportKeys={KNOWN_REPORT_KEYS}
         vesselsParam={vesselsParam}
       />
+
+      <PendingFleetDocumentsCard variant="fleet" vesselId={null} limit={3} />
 
       <section aria-labelledby="fleet-dashboard-lists" className="space-y-3">
         <h2 id="fleet-dashboard-lists" className="type-title text-foreground">

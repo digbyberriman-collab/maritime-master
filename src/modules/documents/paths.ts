@@ -17,6 +17,15 @@ export const DOCUMENTS_FLEET_PATHS = {
 /** The vessel Safety tab's root, the base of the vessel Fleet Documents leaf. */
 export const VESSEL_SAFETY_ROOT = 'safety';
 
+/** Vessel pages, relative to `/v/:vesselCode`. */
+export const DOCUMENTS_VESSEL_PATHS = {
+  /** The documents the company publishes to the vessel, to read and acknowledge (X5-05A; gap/02 FD9). */
+  fleetDocuments: `${VESSEL_SAFETY_ROOT}/fleet-documents`,
+} as const;
+
+/** `?doc=<document id>` on the vessel page opens that document (the notifications link there). */
+export const FLEET_DOCUMENT_DOC_PARAM = 'doc';
+
 /** The library's query parameters (`/fleet/documents?tab=&section=&vessel=&settings=1`). */
 export const FLEET_DOCUMENTS_PARAMS = {
   tab: 'tab',
@@ -39,5 +48,16 @@ export const DOCUMENTS_CAPS = {
   delete: 'fleet.operations.fleet_documents.delete',
 } as const satisfies Record<string, CapabilityKey>;
 
+/**
+ * The vessel's Fleet documents keys (PP1): view_own opens the vessel page
+ * (signed in: everyone reads what is published to their vessel and their
+ * own state); sign is the crew member's own acknowledgement. The server
+ * decides who may act (`fleet_document_acknowledge` and friends).
+ */
+export const VESSEL_FLEET_DOCUMENTS_CAPS = {
+  viewOwn: 'vessel.safety.fleet_documents.view_own',
+  sign: 'vessel.safety.fleet_documents.sign',
+} as const satisfies Record<string, CapabilityKey>;
+
 /** Every key the documents manifest declares (ModuleManifest.capabilities). */
-export const DOCUMENTS_CAPABILITIES: readonly CapabilityKey[] = Object.values(DOCUMENTS_CAPS);
+export const DOCUMENTS_CAPABILITIES: readonly CapabilityKey[] = [...Object.values(DOCUMENTS_CAPS), ...Object.values(VESSEL_FLEET_DOCUMENTS_CAPS)];

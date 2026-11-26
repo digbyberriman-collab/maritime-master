@@ -2,21 +2,18 @@
   "routes": [
     "/fleet/documents :: <ModuleRoute{capability=\"fleet.operations.fleet_documents.view\"}> > page(/src/modules/documents/pages/FleetDocumentsPage.tsx) guard=- layout=- label=Fleet documents",
     "/fleet/documents/register :: page(/src/modules/documents/pages/Documents.tsx) guard=- layout=- label=Controlled register",
-    "/v/:vesselCode/safety/fleet-documents :: <PlaceholderWrapper{title=\"Fleet Documents\"}>"
+    "/v/:vesselCode/safety/fleet-documents :: <ModuleRoute{capability=\"vessel.safety.fleet_documents.view_own\"}> > page(/src/modules/documents/pages/VesselFleetDocumentsPage.tsx) guard=- layout=- label=Fleet documents"
   ],
   "nav": {
     "NAVIGATION_ITEMS": [
       "    FileText {\"capability\":\"fleet.operations.fleet_documents.view\",\"id\":\"fleet-documents\",\"kind\":\"leaf\",\"label\":\"Documents\",\"path\":\"/fleet/documents\",\"scope\":\"fleet\",\"status\":\"beta\"}",
-      "    FileText {\"id\":\"vessel-safety-fleet-documents\",\"kind\":\"leaf\",\"label\":\"Fleet Documents\",\"path\":\"/v/:vesselCode/safety/fleet-documents\",\"scope\":\"vessel\",\"status\":\"planned\"}"
+      "    FileText {\"capability\":\"vessel.safety.fleet_documents.view_own\",\"id\":\"vessel-safety-fleet-documents\",\"kind\":\"leaf\",\"label\":\"Fleet Documents\",\"path\":\"/v/:vesselCode/safety/fleet-documents\",\"scope\":\"vessel\",\"status\":\"beta\"}"
     ],
     "VESSEL_MODULES": [
-      "  FileText {\"id\":\"safety-fleet-documents\",\"kind\":\"leaf\",\"label\":\"Fleet Documents\",\"path\":\"safety/fleet-documents\",\"status\":\"planned\"}"
+      "  FileText {\"capability\":\"vessel.safety.fleet_documents.view_own\",\"id\":\"safety-fleet-documents\",\"kind\":\"leaf\",\"label\":\"Fleet Documents\",\"path\":\"safety/fleet-documents\",\"status\":\"beta\"}"
     ],
     "buildVesselNav": [
-      "  FileText {\"id\":\"vessel-safety-fleet-documents\",\"kind\":\"leaf\",\"label\":\"Fleet Documents\",\"path\":\"/v/dra/safety/fleet-documents\",\"scope\":\"vessel\",\"status\":\"planned\"}"
-    ],
-    "VESSEL_PLACEHOLDER_LEAVES": [
-      "safety/fleet-documents Fleet Documents"
+      "  FileText {\"capability\":\"vessel.safety.fleet_documents.view_own\",\"id\":\"vessel-safety-fleet-documents\",\"kind\":\"leaf\",\"label\":\"Fleet Documents\",\"path\":\"/v/dra/safety/fleet-documents\",\"scope\":\"vessel\",\"status\":\"beta\"}"
     ]
   }
 }

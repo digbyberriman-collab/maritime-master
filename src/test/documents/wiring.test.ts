@@ -19,6 +19,15 @@
  *   the document as the file's entity (no envelope, D-X5-17); the only live
  *   table the library reads is `profiles` (the actors' names); the sample
  *   data pages are gone (gap/00 K1) and no documents page holds sample rows.
+ * - X5-05A: the vessel Fleet documents page (`/v/:vesselCode/safety/fleet-documents`,
+ *   guard `vessel.safety.fleet_documents.view_own`, lazy) and the Fleet
+ *   Documents leaf (vessel.safety 110, beta, the same key); the
+ *   acknowledgement code reads only through the typed pending client and
+ *   only RPCs defined in 20261124040400 and declared pending; the file
+ *   opens through a signed URL of the records bucket; the published and
+ *   reminder notification types are live with their emitters in the SQL
+ *   (D-238), the sweep's stay deferred; the vessel home and the fleet
+ *   dashboard stop calling the legacy acknowledgement hooks.
  */
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -27,7 +36,15 @@ import { join, relative } from 'node:path';
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 
 import manifest from '@/modules/documents/module';
-import { DOCUMENTS_CAPABILITIES, DOCUMENTS_CAPS, DOCUMENTS_FLEET_PATHS, FLEET_DOCUMENTS_PARAMS } from '@/modules/documents/paths';
+import {
+  DOCUMENTS_CAPABILITIES,
+  DOCUMENTS_CAPS,
+  DOCUMENTS_FLEET_PATHS,
+  DOCUMENTS_VESSEL_PATHS,
+  FLEET_DOCUMENT_DOC_PARAM,
+  FLEET_DOCUMENTS_PARAMS,
+  VESSEL_FLEET_DOCUMENTS_CAPS,
+} from '@/modules/documents/paths';
 import { MODULE_REGISTRY } from '@/app/registry/modules';
 import { listCatalogueCapabilities } from '@/lib/permissions/catalogue';
 import { NAVIGATION_ITEMS } from '@/config/sitemap';
@@ -90,35 +107,54 @@ describe('documents manifest', () => {
     expect(MODULE_REGISTRY.problems).toEqual([]);
     expect(MODULE_REGISTRY.manifests.find((m) => m.id === 'documents')).toBe(manifest);
     const routes = MODULE_REGISTRY.routes.filter((r) => r.moduleId === 'documents');
-    expect(routes.map((r) => r.fullPath).sort()).toEqual(['/fleet/documents', '/fleet/documents/register']);
+    expect(routes.map((r) => r.fullPath).sort()).toEqual(['/fleet/documents', '/fleet/documents/register', '/v/:vesselCode/safety/fleet-documents']);
     expect(DOCUMENTS_FLEET_PATHS).toEqual({ index: 'documents', register: 'documents/register' });
-    const [library, register] = manifest.routes ?? [];
+    expect(DOCUMENTS_VESSEL_PATHS).toEqual({ fleetDocuments: 'safety/fleet-documents' });
+    const [library, register, vesselPage] = manifest.routes ?? [];
     expect(library).toMatchObject({ scope: 'fleet', path: 'documents', guard: { kind: 'capability', capability: 'fleet.operations.fleet_documents.view' } });
     expect(register).toMatchObject({ scope: 'fleet', path: 'documents/register', guard: { kind: 'scope' } });
+    expect(vesselPage).toMatchObject({
+      scope: 'vessel',
+      path: 'safety/fleet-documents',
+      guard: { kind: 'capability', capability: 'vessel.safety.fleet_documents.view_own' },
+    });
     const text = read('src/modules/documents/module.ts');
     expect(text).toContain("page: () => import('@/modules/documents/pages/FleetDocumentsPage')");
     expect(text).toContain("page: () => import('@/modules/documents/pages/Documents')");
+    expect(text).toContain("page: () => import('@/modules/documents/pages/VesselFleetDocumentsPage')");
+    expect(FLEET_DOCUMENT_DOC_PARAM).toBe('doc');
     expect(FLEET_DOCUMENTS_PARAMS).toEqual({ tab: 'tab', section: 'section', vessel: 'vessel', settings: 'settings' });
   });
 
   it('is data only: icons, nav builders, types and paths', () => {
-    const imports = Array.from(read('src/modules/documents/module.ts').matchAll(/^import .* from '([^']+)';$/gm)).map((m) => m[1]);
+    const imports = Array.from(read('src/modules/documents/module.ts').matchAll(/^import [^;]*? from '([^']+)';$/gm)).map((m) => m[1]);
     expect(imports.sort()).toEqual(['./paths', '@/app/registry/types', '@/config/navBuilders', '@/modules/fleet/paths', 'lucide-react']);
     const pathImports = Array.from(read('src/modules/documents/paths.ts').matchAll(/^import (type )?.* from '([^']+)';$/gm)).map((m) => [m[1], m[2]]);
     expect(pathImports).toEqual([['type ', '@/lib/permissions/types']]);
   });
 
-  it('contributes the Documents leaf (fleet.compliance 10, beta, gated) and keeps the vessel leaf planned', () => {
+  it('contributes the Documents leaf (fleet.compliance 10) and the vessel Fleet Documents leaf (vessel.safety 110), both beta and gated', () => {
     expect(manifest.nav?.map((f) => [f.slot, f.order, f.node.label, f.node.path, f.node.capability, f.node.status])).toEqual([
       ['fleet.compliance', 10, 'Documents', '/fleet/documents', DOCUMENTS_CAPS.view, 'beta'],
-      ['vessel.safety', 110, 'Fleet Documents', 'safety/fleet-documents', undefined, undefined],
+      ['vessel.safety', 110, 'Fleet Documents', 'safety/fleet-documents', VESSEL_FLEET_DOCUMENTS_CAPS.viewOwn, 'beta'],
     ]);
     const leaf = leaves(NAVIGATION_ITEMS).find((l) => l.path === '/fleet/documents');
     expect(leaf).toMatchObject({ label: 'Documents', status: 'beta', capability: 'fleet.operations.fleet_documents.view' });
   });
 
-  it('the notification types stay deferred until their emitters land', () => {
-    expect(manifest.notificationTypes?.every((t) => t.status === 'deferred')).toBe(true);
+  it('the published and reminder types are live (their emitters are in 040400); the sweep\'s stay deferred (D-238)', () => {
+    const status = Object.fromEntries((manifest.notificationTypes ?? []).map((t) => [t.key, t.status]));
+    expect(status).toEqual({
+      fleet_document_published: 'live',
+      fleet_document_ack_reminder: 'live',
+      fleet_document_ack_due_soon: 'deferred',
+      fleet_document_ack_overdue: 'deferred',
+      fleet_document_ack_digest: 'deferred',
+    });
+    const acks = read('supabase/migrations/20261124040400_fleet_documents_acknowledgements.sql');
+    for (const key of Object.keys(status)) {
+      expect(acks.includes(`'${key}'`), key).toBe(status[key] === 'live');
+    }
   });
 });
 
@@ -210,13 +246,14 @@ describe('database objects', () => {
   });
 
   it('RLS is on for every table, with read policies only, and the guards cover every role', () => {
+    // Every fleet document table of block 04 (the library's 040300 and the acknowledgements' 040400).
     for (const t of definedTables) {
       if (!t.startsWith('fleet_document')) continue;
-      expect(SQL, t).toContain(`ALTER TABLE public.${t} ENABLE ROW LEVEL SECURITY;`);
-      expect(SQL, t).toMatch(new RegExp(`CREATE POLICY ${t}_select ON public\\.${t}\\s+FOR SELECT TO authenticated`));
-      expect(SQL, t).toContain(`COMMENT ON TABLE public.${t} IS`);
+      expect(block04, t).toContain(`ALTER TABLE public.${t} ENABLE ROW LEVEL SECURITY;`);
+      expect(block04, t).toMatch(new RegExp(`CREATE POLICY ${t}_select ON public\\.${t}\\s+FOR SELECT TO authenticated`));
+      expect(block04, t).toContain(`COMMENT ON TABLE public.${t} IS`);
     }
-    expect(SQL).not.toMatch(/CREATE POLICY \w+ ON public\.fleet_document\w*\s+FOR (INSERT|UPDATE|DELETE|ALL)/);
+    expect(block04).not.toMatch(/CREATE POLICY \w+ ON public\.fleet_document\w*\s+FOR (INSERT|UPDATE|DELETE|ALL)/);
     for (const g of ['fleet_documents_guard', 'fleet_document_versions_guard', 'fleet_document_vessel_targets_guard', 'fleet_document_events_guard']) {
       expect(SQL).toMatch(new RegExp(`BEFORE INSERT OR UPDATE OR DELETE ON public\\.\\w+\\s+FOR EACH ROW EXECUTE FUNCTION public\\.${g}\\(\\)`));
     }
@@ -253,5 +290,82 @@ describe('publishing (X5-04B)', () => {
     for (const page of pages) expect(read(`src/modules/documents/pages/${page}`), page).not.toMatch(/const mock|SAMPLE_/);
     expect(read('src/modules/documents/index.ts')).not.toMatch(/Manuals|Policies|Procedures/);
     expect(read('src/modules/documents/pages/Documents.tsx')).toMatch(/REGISTER_CATEGORY_PARAM/);
+  });
+});
+
+describe('acknowledgements (X5-05A)', () => {
+  const ACK_FILES = [
+    'src/modules/documents/lib/ackState.ts',
+    'src/modules/documents/hooks/useFleetDocumentAcks.ts',
+    'src/modules/documents/pages/VesselFleetDocumentsPage.tsx',
+    'src/modules/documents/components/PendingFleetDocumentsCard.tsx',
+  ];
+  const ackSources = ACK_FILES.map((file) => ({ file, text: read(file) }));
+  const ackAll = ackSources.map((x) => x.text).join('\n');
+  const ACK_SQL = read('supabase/migrations/20261124040400_fleet_documents_acknowledgements.sql');
+  const ackRpcs = new Set(Array.from(ackAll.matchAll(/\.rpc\(\s*'([a-z_]+)'/g), (m) => m[1]));
+
+  it('reads through the typed pending client only RPCs that 040400 defines and grants to the browser, and declares pending', () => {
+    expect([...ackRpcs].sort()).toEqual(['fleet_document_acknowledge', 'fleet_document_my_pending', 'fleet_document_vessel_documents']);
+    for (const fn of ackRpcs) {
+      expect(ACK_SQL, fn).toMatch(new RegExp(`CREATE OR REPLACE FUNCTION public\\.${fn}\\(`));
+      expect(ACK_SQL, fn).toMatch(new RegExp(`GRANT EXECUTE ON FUNCTION public\\.${fn}\\([^)]*\\) TO authenticated;`));
+      expect(pending, fn).toMatch(new RegExp(`\\b${fn}: \\{`));
+    }
+    for (const t of ['fleet_document_acknowledgements', 'fleet_document_signer_rules', 'fleet_document_reminders']) {
+      expect(pending, t).toMatch(new RegExp(`\\b${t}: PendingTable<`));
+    }
+    for (const { file, text } of ackSources) {
+      expect(text, file).not.toMatch(/@\/integrations\/supabase\/client/);
+      expect(text, file).not.toMatch(/\.from\(\s*'/);
+      expect(text, file).not.toMatch(/\.(insert|update|upsert)\(|\.delete\(\)/);
+      if (/\.rpc\(\s*'/.test(text)) expect(text, file).toMatch(/from '\.\.\/lib\/fleetDocumentsDb'/);
+    }
+  });
+
+  it('opens the file through a signed URL of the private records bucket, never a public URL', () => {
+    const hook = read('src/modules/documents/hooks/useFleetDocumentAcks.ts');
+    expect(hook).toMatch(/\.storage\.from\(RECORD_FILES_BUCKET\)\.createSignedUrl\(/);
+    expect(ackAll).not.toMatch(/getPublicUrl/);
+  });
+
+  it('the vessel page is reached only through the manifest (lazy); the card is imported by the two dashboards only', () => {
+    const files = walk(join(ROOT, 'src')).map((f) => ({ f: relative(ROOT, f), text: readFileSync(f, 'utf8') }));
+    const pageImporters = files.filter((x) => /(import\(|from )'[^']*VesselFleetDocumentsPage'/.test(x.text)).map((x) => x.f);
+    expect(pageImporters).toEqual(['src/modules/documents/module.ts']);
+    const cardImporters = files
+      .filter((x) => /from '[^']*PendingFleetDocumentsCard'/.test(x.text) && x.f !== 'src/modules/documents/components/PendingFleetDocumentsCard.tsx')
+      .map((x) => x.f)
+      .sort();
+    expect(cardImporters).toEqual(['src/modules/dashboard/pages/FleetDashboardPage.tsx', 'src/modules/vessels/pages/VesselDashboard.tsx']);
+  });
+
+  it('the dashboards no longer call the legacy acknowledgement hooks (the auth hooks stay untouched)', () => {
+    for (const f of ['src/modules/vessels/pages/VesselDashboard.tsx', 'src/modules/dashboard/pages/FleetDashboardPage.tsx', ...ACK_FILES]) {
+      expect(read(f), f).not.toMatch(/useMandatoryDocumentsPending|useAcknowledgmentStats/);
+    }
+  });
+
+  it('the acknowledgement states are in the status-tone registry', () => {
+    for (const state of ['pending', 'overdue', 'blocked', 'acknowledged', 'not_required']) {
+      expect(statusMeta('document_ack', state).label, state).not.toBe('');
+    }
+    expect(statusMeta('document_ack', 'overdue').tone).toBe('danger');
+    expect(statusMeta('document_ack', 'acknowledged').tone).toBe('ok');
+  });
+
+  it('040400 defines the storage read-hook predicate with the exact signature the hook names (PR-07)', () => {
+    expect(ACK_SQL).toMatch(/CREATE OR REPLACE FUNCTION public\.fleet_document_file_readable\(p_user_id uuid, p_document_id uuid\)\s+RETURNS boolean/);
+    expect(ACK_SQL).toMatch(/GRANT EXECUTE ON FUNCTION public\.fleet_document_file_readable\(uuid, uuid\) TO service_role;/);
+    expect(ACK_SQL).not.toMatch(/GRANT EXECUTE ON FUNCTION public\.fleet_document_file_readable\(uuid, uuid\) TO authenticated/);
+  });
+
+  it('every 040400 definer has a search_path, every emit is guarded, and no table has a browser write policy', () => {
+    const defs = Array.from(ACK_SQL.matchAll(/CREATE OR REPLACE FUNCTION public\.(\w+)\(/g), (m) => m[1]);
+    for (const fn of defs) expect(ACK_SQL).toMatch(new RegExp(`REVOKE ALL ON FUNCTION public\\.${fn}\\([^)]*\\) FROM PUBLIC, anon, authenticated, service_role;`));
+    expect(ACK_SQL).not.toMatch(/CREATE POLICY \w+ ON public\.fleet_document\w*\s+FOR (INSERT|UPDATE|DELETE|ALL)/);
+    const emits = ACK_SQL.split('PERFORM public.emit_notification_event(').length - 1;
+    expect(emits).toBe(2);
+    expect(ACK_SQL.split('EXCEPTION WHEN others THEN\n      RAISE WARNING').length - 1).toBe(emits);
   });
 });

@@ -53,6 +53,12 @@ vi.mock('@/modules/dashboard/hooks/useOpenAlertCounts', async (importOriginal) =
 vi.mock('@/modules/crew/hooks/useCrew', () => ({
   useRecentCrewChanges: () => ({ data: [], isPending: false, isError: false, refetch: vi.fn(async () => undefined) }),
 }));
+// The caller's own "To acknowledge" tile (X5-05A) has its own test (src/test/documents/PendingFleetDocumentsCard.test.tsx).
+vi.mock('@/modules/documents/components/PendingFleetDocumentsCard', () => ({
+  PendingFleetDocumentsCard: (props: { variant: string; vesselId: string | null }) => (
+    <div data-testid="to-acknowledge-tile" data-variant={props.variant} data-vessel={String(props.vesselId)} />
+  ),
+}));
 
 import FleetDashboardPage from '@/modules/dashboard/pages/FleetDashboardPage';
 
@@ -213,6 +219,15 @@ describe('the header', () => {
     state.shown = shownReady({ shownIds: ['v-dra'], isDefault: false });
     renderPage();
     expect(document.querySelector('[data-page-heading]')).toHaveTextContent('1 vessel shown of 3');
+  });
+
+  it('carries the caller\'s own "To acknowledge" tile across their vessels, after the KPI row (X5-05A)', () => {
+    renderPage();
+    const tileEl = screen.getByTestId('to-acknowledge-tile');
+    expect(tileEl).toHaveAttribute('data-variant', 'fleet');
+    expect(tileEl).toHaveAttribute('data-vessel', 'null');
+    const lists = screen.getByRole('heading', { name: 'Needs attention' });
+    expect(tileEl.compareDocumentPosition(lists) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 
