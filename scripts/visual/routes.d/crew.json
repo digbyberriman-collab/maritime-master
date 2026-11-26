@@ -264,5 +264,82 @@
     "slug": "me-documents-stcw",
     "waitFor": "[data-my-documents] [data-documents-state=\"ready\"]",
     "note": "X1-04B: /me/documents on the STCW tab"
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/documents",
+    "slug": "crew-profile-documents-review",
+    "persona": "vessel-master",
+    "waitFor": "[data-crew-profile] [data-documents-state=\"ready\"] [data-document-review] button[aria-label^=\"Verify \"]",
+    "note": "X1-05: the review line under each row (Verify or Review again, Renew, Alerts, History), the Needs review chip, a document with alerts off and its real state (needs rpc/crew_document_review_rights and crew_certificates edit on the vessel-master persona: scratch fixtures until PR-X1-G)"
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/documents",
+    "slug": "crew-profile-documents-verify",
+    "persona": "vessel-master",
+    "waitFor": "[data-crew-profile] [data-documents-state=\"ready\"] [data-document-review] button[aria-label^=\"Verify \"]",
+    "note": "X1-05: VerifyDialog on the visa, Conditionally approved chosen: the condition, until when, and the note as it is saved (needs rpc/crew_document_review_rights and crew_certificates edit on the vessel-master persona: scratch fixtures until PR-X1-G)",
+    "actions": [
+      {
+        "click": "[data-document-row=\"b6c92818-e7f7-c175-3118-88cb8e83b0e0\"] button[aria-label^=\"Verify \"]"
+      },
+      {
+        "waitFor": "[data-verify-dialog] [data-decision]"
+      },
+      {
+        "click": "[data-verify-dialog] [data-decision=\"conditionally_approved\"]"
+      },
+      {
+        "type": {
+          "selector": "[data-verify-dialog] textarea",
+          "text": "Original to be seen at the next port"
+        }
+      },
+      {
+        "wait": 400
+      }
+    ]
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/documents",
+    "slug": "crew-profile-documents-review-hod",
+    "persona": "vessel-hod",
+    "waitFor": "[data-crew-profile] [data-documents-state=\"ready\"] [data-verify-block]",
+    "note": "X1-05: a head of department of another department: why there is no Verify; Alerts, Renew and History stay (needs rpc/crew_document_review_rights and crew_certificates edit on the vessel-master persona: scratch fixtures until PR-X1-G)"
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/documents",
+    "slug": "crew-profile-documents-history",
+    "persona": "vessel-hod",
+    "waitFor": "[data-crew-profile] [data-documents-state=\"ready\"] [data-document-review] button[aria-label=\"History of Passport\"]",
+    "note": "X1-05: VersionHistoryDrawer: the current version and the replaced ones, who replaced them and why, their files (needs rpc/crew_document_review_rights and crew_certificates edit on the vessel-master persona: scratch fixtures until PR-X1-G)",
+    "actions": [
+      {
+        "click": "button[aria-label=\"History of Passport\"]"
+      },
+      {
+        "waitFor": "[data-version-history] [data-version]"
+      },
+      {
+        "wait": 500
+      }
+    ]
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/documents",
+    "slug": "crew-profile-documents-renew",
+    "persona": "vessel-master",
+    "waitFor": "[data-crew-profile] [data-documents-state=\"ready\"] [data-document-review] button[aria-label=\"Renew Passport\"]",
+    "note": "X1-05: Renew: the new document's details, the current one kept in the history, re-verification (needs rpc/crew_document_review_rights and crew_certificates edit on the vessel-master persona: scratch fixtures until PR-X1-G)",
+    "actions": [
+      {
+        "click": "button[aria-label=\"Renew Passport\"]"
+      },
+      {
+        "waitFor": "[data-renew-note]"
+      },
+      {
+        "wait": 400
+      }
+    ]
   }
 ]

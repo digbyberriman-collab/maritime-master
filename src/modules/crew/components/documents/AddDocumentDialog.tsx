@@ -31,13 +31,18 @@ import {
 } from '@/modules/crew/lib/crewDocumentSchema';
 import { CREW_DOCUMENT_TAB_LABEL } from '@/modules/crew/lib/documentTabs';
 import { DocumentUploadError, UPLOADS_UNAVAILABLE_NOTICE, saveDocumentWithFile } from '@/modules/crew/lib/documentUpload';
+import { useDocumentReviewActions } from '@/modules/crew/hooks/useDocumentVerification';
+import { REVERIFY_HINT, dayText, isMaterialChange, type MaterialFields } from '@/modules/crew/lib/verification';
 import { DocumentTypePicker } from './DocumentTypePicker';
+import { ReverifyWarning } from './ReverifyWarning';
 import { DocumentFields } from './DocumentFields';
 import { DocumentFileField } from './DocumentFileField';
 
 export type AddDocumentDialogMode =
   | { kind: 'add'; tab: CrewDocumentTab; categoryKey?: string | null }
-  | { kind: 'edit'; document: CrewDocumentView };
+  | { kind: 'edit'; document: CrewDocumentView }
+  /** X1-05: a renewal: the new document's values; the current one becomes a version (crew_document_renew). */
+  | { kind: 'renew'; document: CrewDocumentView };
 
 export interface AddDocumentDialogProps {
   mode: AddDocumentDialogMode;
@@ -75,8 +80,33 @@ function documentForForm(doc: CrewDocumentView): DocumentForForm {
   };
 }
 
-/** Changing these sends a verified document back to unverified (crew_certificates_guard). */
-export const REVERIFY_NOTE = 'Changing the number, dates, issuing country, type or file sends this document back for verification.';
+/** Changing these sends a verified document back to unverified (crew_certificates_guard); ReverifyWarning shows it. */
+export const REVERIFY_NOTE = REVERIFY_HINT;
+
+/** A renewal starts from the document's issuing country, office, details and notes; the number, dates and file are the new document's. */
+function renewalDefaults(doc: CrewDocumentView): CrewDocumentFormValues {
+  const current = documentFormDefaults(documentForForm(doc));
+  return { ...current, number: null, issue_date: null, expiry_date: null, no_expiry: false, endorsement_due_date: null };
+}
+
+/** "The current one (X1234567, expires 1 Mar 2030) is kept in the history." */
+function renewedSummary(doc: CrewDocumentView): string {
+  const facts = [doc.number, doc.noExpiry ? 'no expiry' : doc.expiryDate ? `expires ${dayText(doc.expiryDate)}` : null].filter(Boolean);
+  return `The current one${facts.length ? ` (${facts.join(', ')})` : ''} is kept in the history.`;
+}
+
+/** The material fields of the form against the stored document (lib/verification.ts isMaterialChange). */
+function materialOf(values: CrewDocumentFormValues, file: string | null, typeId: string | null): MaterialFields {
+  return {
+    number: values.number,
+    issueDate: values.issue_date,
+    expiryDate: values.no_expiry ? null : values.expiry_date,
+    noExpiry: values.no_expiry,
+    issuingCountryCode: values.issuing_country_code,
+    typeId,
+    file,
+  };
+}
 
 const FORM_FIELDS = new Set<string>(Object.keys(DOCUMENT_FIELD_LABEL));
 
@@ -96,6 +126,13 @@ const FORM_FIELDS = new Set<string>(Object.keys(DOCUMENT_FIELD_LABEL));
  * field it names (22023 HINT), the file, or a toast (crewDocumentRefusal,
  * 42501 DETAIL as is). An edit sends only the changed fields and keeps the
  * stored file unless another is chosen. The dialog stays open while saving.
+ *
+ * X1-05: before an edit of a reviewed document is saved, ReverifyWarning
+ * says it will need to be verified again once a material field (number,
+ * dates, issuing country, file) has changed. Renew opens on the type's
+ * details with the old number, dates and file cleared and saves through
+ * crew_document_renew: the current document is kept in its history, the
+ * new one waits for verification, and its alerts come back on.
  */
 export const AddDocumentDialog: React.FC<AddDocumentDialogProps> = ({
   mode,
@@ -108,7 +145,8 @@ export const AddDocumentDialog: React.FC<AddDocumentDialogProps> = ({
   onOpenChange,
   onSaved,
 }) => {
-  const editing = mode.kind === 'edit' ? mode.document : null;
+  const editing = mode.kind === 'edit' || mode.kind === 'renew' ? mode.document : null;
+  const renewing = mode.kind === 'renew';
   const editingType = editing?.typeId ? catalogue.byId.get(editing.typeId) ?? null : null;
   const [picked, setPicked] = React.useState<DocumentType | null>(null);
   const type = editing ? editingType : picked;
@@ -126,7 +164,7 @@ export const AddDocumentDialog: React.FC<AddDocumentDialogProps> = ({
     onOpenChange(open);
   };
 
-  const title = editing ? `Edit ${editing.name}` : type ? `Add ${type.name}` : 'Add a document';
+  const title = renewing && editing ? `Renew ${editing.name}` : editing ? `Edit ${editing.name}` : type ? `Add ${type.name}` : 'Add a document';
   const whose = personName ? ` for ${personName}` : '';
 
   return (
@@ -145,9 +183,11 @@ export const AddDocumentDialog: React.FC<AddDocumentDialogProps> = ({
           <DialogDescription>
             {step === 'pick'
               ? `Choose the document type${whose}. Its tab follows the type, wherever you started.`
-              : editing
-                ? `Change the details${whose}. Only what you change is saved.`
-                : `Enter the details${whose} as they read on the document, and attach the file.`}
+              : renewing
+                ? `Enter the new document's details${whose} and attach its file. The current one is kept in the history.`
+                : editing
+                  ? `Change the details${whose}. Only what you change is saved.`
+                  : `Enter the details${whose} as they read on the document, and attach the file.`}
           </DialogDescription>
         </DialogHeader>
         {editing && !editingType ? (
@@ -166,9 +206,10 @@ export const AddDocumentDialog: React.FC<AddDocumentDialogProps> = ({
           </div>
         ) : type ? (
           <DocumentForm
-            key={`${type.id}:${editing?.id ?? 'new'}`}
+            key={`${type.id}:${editing?.id ?? 'new'}:${mode.kind}`}
             type={type}
             editing={editing}
+            renewing={renewing}
             profileId={profileId}
             companyId={companyId}
             documents={documents}
@@ -191,6 +232,8 @@ export const AddDocumentDialog: React.FC<AddDocumentDialogProps> = ({
 interface DocumentFormProps {
   type: DocumentType;
   editing: CrewDocumentView | null;
+  /** A renewal of `editing` (crew_document_renew), not a change. */
+  renewing: boolean;
   profileId: string;
   companyId: string;
   documents: readonly CrewDocumentView[];
@@ -205,6 +248,7 @@ interface DocumentFormProps {
 const DocumentForm: React.FC<DocumentFormProps> = ({
   type,
   editing,
+  renewing,
   profileId,
   companyId,
   documents,
@@ -218,12 +262,26 @@ const DocumentForm: React.FC<DocumentFormProps> = ({
   const formType = React.useMemo(() => formTypeOf(type), [type]);
   const today = React.useMemo(() => todayDateOnly(), []);
   const schema = React.useMemo(() => buildCrewDocumentSchema(formType, { today }), [formType, today]);
-  const original = React.useMemo(() => (editing ? documentFormDefaults(documentForForm(editing)) : null), [editing]);
-  const form = useForm<CrewDocumentFormValues>({ resolver: zodResolver(schema), defaultValues: original ?? emptyDocumentValues() });
+  const original = React.useMemo(() => (editing && !renewing ? documentFormDefaults(documentForForm(editing)) : null), [editing, renewing]);
+  const defaults = React.useMemo(
+    () => (renewing && editing ? renewalDefaults(editing) : original ?? emptyDocumentValues()),
+    [renewing, editing, original],
+  );
+  const form = useForm<CrewDocumentFormValues>({ resolver: zodResolver(schema), defaultValues: defaults });
   const [file, setFile] = React.useState<File | null>(null);
   const [fileError, setFileError] = React.useState<string | null>(null);
   const [saving, setSaving] = React.useState(false);
   const save = useSaveCrewDocument(companyId);
+  const { renew } = useDocumentReviewActions(companyId, profileId);
+  const watched = form.watch();
+  // A material change of a reviewed document sends it back for verification (060400 guard; W4).
+  const material = React.useMemo(() => {
+    if (!editing || renewing || !original) return false;
+    const storedFile = editing.filePath ?? editing.fileUrl ?? null;
+    return (
+      isMaterialChange(materialOf(original, storedFile, editing.typeId), materialOf(watched, file ? 'new-file' : storedFile, editing.typeId))
+    );
+  }, [editing, renewing, original, watched, file]);
   const hasOffice = React.useMemo(() => documentFormFields(formType).some((f) => f.field === 'issuing_office'), [formType]);
   const suggestions = useIssuingSuggestions(type.id, { companyId, enabled: hasOffice });
   const reportElsewhere = React.useMemo(() => {
@@ -239,8 +297,8 @@ const DocumentForm: React.FC<DocumentFormProps> = ({
 
   const submit = form.handleSubmit(async (values) => {
     setFileError(null);
-    const payload = toDocumentPayload(values, formType, original);
-    if (editing && Object.keys(payload).length === 0 && !file) {
+    const payload = toDocumentPayload(values, formType, renewing ? null : original);
+    if (editing && !renewing && Object.keys(payload).length === 0 && !file) {
       notify.info('Nothing changed');
       onCancel();
       return;
@@ -251,16 +309,22 @@ const DocumentForm: React.FC<DocumentFormProps> = ({
         companyId,
         profileId,
         file,
-        save: (stored) =>
-          save.mutateAsync({
+        save: async (stored) => {
+          const body = stored ? withDocumentFile(payload, stored) : payload;
+          if (renewing && editing) {
+            const row = await renew.mutateAsync({ id: editing.id, payload: body });
+            return row.id;
+          }
+          return save.mutateAsync({
             id: editing?.id ?? null,
             profileId,
             documentTypeId: editing ? null : type.id,
-            payload: stored ? withDocumentFile(payload, stored) : payload,
-          }),
+            payload: body,
+          });
+        },
       });
       setBusy(false);
-      notify.success(editing ? `${type.name} saved` : `${type.name} added`);
+      notify.success(renewing ? `${type.name} renewed` : editing ? `${type.name} saved` : `${type.name} added`);
       onSaved(result.id);
     } catch (error) {
       setBusy(false);
@@ -282,17 +346,31 @@ const DocumentForm: React.FC<DocumentFormProps> = ({
 
   return (
     <Form {...form}>
-      <form onSubmit={submit} noValidate className="flex min-h-0 flex-1 flex-col" aria-label={editing ? `Edit ${type.name}` : `Add ${type.name}`}>
+      <form
+        onSubmit={submit}
+        noValidate
+        className="flex min-h-0 flex-1 flex-col"
+        aria-label={renewing ? `Renew ${type.name}` : editing ? `Edit ${type.name}` : `Add ${type.name}`}
+      >
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6">
           <p className="type-caption text-muted-foreground" data-document-type-summary="">
             <span className="font-medium text-foreground">{type.name}</span>
             {category ? ` · ${category.label}` : ''} · shown on the {CREW_DOCUMENT_TAB_LABEL[type.tab]} tab
             {type.stcwReference ? ` · ${type.stcwReference}` : ''}
           </p>
-          {editing && editing.verificationStatus !== 'unverified' ? (
-            <Alert variant="info">
+          {editing && !renewing ? <ReverifyWarning status={editing.verificationStatus} material={material} /> : null}
+          {renewing && editing ? (
+            <Alert variant="info" data-renew-note="">
               <Info aria-hidden="true" className="size-4" />
-              <AlertDescription>{REVERIFY_NOTE}</AlertDescription>
+              <AlertDescription>
+                {[
+                  renewedSummary(editing),
+                  'The new document waits for verification.',
+                  editing.alertsMuted ? 'Its expiry alerts come back on.' : null,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              </AlertDescription>
             </Alert>
           ) : null}
           <fieldset disabled={saving} className="min-w-0 border-0 p-0">
@@ -309,7 +387,7 @@ const DocumentForm: React.FC<DocumentFormProps> = ({
               <DocumentFileField
                 file={file}
                 onChange={setFile}
-                existing={editing?.hasFile ? { name: editing.fileName, size: editing.fileSize } : null}
+                existing={editing?.hasFile && !renewing ? { name: editing.fileName, size: editing.fileSize } : null}
                 error={fileError}
                 onError={setFileError}
                 disabledReason={uploadsReady ? null : UPLOADS_UNAVAILABLE_NOTICE}
@@ -337,7 +415,7 @@ const DocumentForm: React.FC<DocumentFormProps> = ({
           </Button>
           <Button type="submit" disabled={saving} className="[@media(pointer:coarse)]:h-11">
             {saving ? <Loader2 aria-hidden="true" className="animate-spin" /> : null}
-            {saving ? (file ? 'Uploading and saving…' : 'Saving…') : editing ? 'Save changes' : 'Save document'}
+            {saving ? (file ? 'Uploading and saving…' : 'Saving…') : renewing ? 'Save the renewal' : editing ? 'Save changes' : 'Save document'}
           </Button>
         </div>
       </form>

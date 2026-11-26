@@ -3,10 +3,10 @@
   "files": [
     {
       "file": "src/modules/crew/types/db.pending.ts",
-      "mirrors": "X1 spec §6 060100 (X1-01: reference data, positions, position manning), 060200 (X1-02: vessel crew list, movements, transfers table), 060300 (X1-03: personal details, languages, employment terms, next-of-kin phone columns, profile RPCs) and 060400 (X1-04: document catalogue, vessel crew settings, crew document columns, document RPCs)",
-      "tables": { "type": "CrewPendingTables", "expect": ["ref_countries", "ref_languages", "departments", "contract_types", "positions", "position_aliases", "position_manning", "crew_movements", "crew_transfers", "crew_personal_details", "crew_languages", "crew_assignment_terms", "crew_document_categories", "crew_document_types", "crew_document_type_satisfies", "vessel_crew_settings"] },
+      "mirrors": "X1 spec §6 060100 (X1-01: reference data, positions, position manning), 060200 (X1-02: vessel crew list, movements, transfers table), 060300 (X1-03: personal details, languages, employment terms, next-of-kin phone columns, profile RPCs), 060400 (X1-04: document catalogue, vessel crew settings, crew document columns, document RPCs) and 060500 (X1-05: document versions, review rights, verify, alerts off and on, renew)",
+      "tables": { "type": "CrewPendingTables", "expect": ["ref_countries", "ref_languages", "departments", "contract_types", "positions", "position_aliases", "position_manning", "crew_movements", "crew_transfers", "crew_personal_details", "crew_languages", "crew_assignment_terms", "crew_document_categories", "crew_document_types", "crew_document_type_satisfies", "vessel_crew_settings", "crew_document_versions"] },
       "columns": { "type": "CrewPendingColumns", "expect": ["crew_next_of_kin", "crew_certificates"] },
-      "functions": { "type": "CrewPendingFunctions", "expect": ["crew_positions_for_vessel", "crew_vessel_unmatched_titles", "crew_position_create", "crew_vessel_positions_save", "crew_position_alias_set", "crew_vessel_list", "crew_vessel_movements", "crew_profile_resolve", "crew_profile_summary", "crew_personal_details_save", "crew_languages_save", "crew_onboarding_save", "crew_find_duplicates", "crew_documents_for_profile", "crew_document_rights", "crew_document_save", "crew_document_delete", "crew_document_issuing_suggestions"] }
+      "functions": { "type": "CrewPendingFunctions", "expect": ["crew_positions_for_vessel", "crew_vessel_unmatched_titles", "crew_position_create", "crew_vessel_positions_save", "crew_position_alias_set", "crew_vessel_list", "crew_vessel_movements", "crew_profile_resolve", "crew_profile_summary", "crew_personal_details_save", "crew_languages_save", "crew_onboarding_save", "crew_find_duplicates", "crew_documents_for_profile", "crew_document_rights", "crew_document_save", "crew_document_delete", "crew_document_issuing_suggestions", "crew_document_review_rights", "crew_document_verify", "crew_document_mute", "crew_document_unmute", "crew_document_renew"] }
     }
   ],
   "notMirrored": {
@@ -19,7 +19,8 @@
       "crew_document_visible_profile_ids": "RLS helper (D-229, X1 spec §3, 20261124060400): the profiles whose documents the caller may read, computed once per statement in the crew_certificates read policy; the browser does not call it"
     },
     "tables": {
-      "crew_document_type_legacy_map": "Service-only mapping (20261124060400): legacy certificate strings to document types, read by the backfill and crew_certificates_guard; no browser grant"
+      "crew_document_type_legacy_map": "Service-only mapping (20261124060400): legacy certificate strings to document types, read by the backfill and crew_certificates_guard; no browser grant",
+      "crew_document_expiry_notices": "Service-only bookkeeping (20261124060500): which recipient was told about which crew document at which expiry stage, written by crew_document_expiry_sweep; no browser grant"
     },
     "views": {
       "expiry_src_crew_documents": "X5 expiry source view (D-X5-01 contract, 20261124060400): read only by X5's definers (fleet_expiry_rows_for); no browser grant"

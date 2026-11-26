@@ -1,5 +1,7 @@
 import React, { Suspense } from 'react';
-import { FileText, Info, Plus, RotateCw } from 'lucide-react';
+import { FileText, History, Info, Plus, RefreshCw, RotateCw, ShieldCheck } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useCan } from '@/lib/permissions/useCan';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,18 +16,30 @@ import {
   type CrewDocumentsState,
 } from '@/modules/crew/hooks/useCrewDocuments';
 import { useDocumentTypes, type DocumentCatalogue, type DocumentTypesState } from '@/modules/crew/hooks/useDocumentTypes';
+import {
+  REVIEW_UNAVAILABLE_NOTICE,
+  useDocumentReviewRights,
+  useDocumentVersions,
+  type CrewDocumentVersion,
+  type DocumentReviewRights,
+} from '@/modules/crew/hooks/useDocumentVerification';
 import type { CrewDocumentTab } from '@/modules/crew/types/db.pending';
 import type { ProfileTabProps } from '@/modules/crew/lib/profileTabs';
 import { countDocumentLegend } from '@/modules/crew/lib/documentState';
 import { SYSTEM_CATEGORY_TAB } from '@/modules/crew/lib/documentTabs';
 import { CATALOGUE_MISSING_NOTICE } from '@/modules/crew/lib/crewDocumentSchema';
 import { UPLOADS_UNAVAILABLE_NOTICE, crewDocumentUploadsReady } from '@/modules/crew/lib/documentUpload';
+import { CREW_CAPS } from '@/modules/crew/paths';
+import { VERIFY_BLOCK_MESSAGE, needsReview } from '@/modules/crew/lib/verification';
 import type { AddDocumentDialogMode } from './AddDocumentDialog';
+import { AlertsOffMenu, AlertsOffNote } from './AlertsOffMenu';
 import { DocumentLegend } from './DocumentLegend';
 import { DocumentRow } from './DocumentRow';
 
 const AddDocumentDialog = React.lazy(() => import('./AddDocumentDialog'));
 const DocumentViewer = React.lazy(() => import('./DocumentViewer'));
+const VerifyDialog = React.lazy(() => import('./VerifyDialog'));
+const VersionHistoryDrawer = React.lazy(() => import('./VersionHistoryDrawer'));
 
 /** Each tab's heading and the line under it. */
 const DOCUMENT_TAB_COPY: Readonly<Record<CrewDocumentTab, { title: string; body: string }>> = {
@@ -110,6 +124,42 @@ const humanise = (key: string) => key.replace(/_/g, ' ').replace(/^\w/, (c) => c
 
 const refusalCode = (error: unknown) => (error && typeof error === 'object' ? (error as { code?: unknown }).code : undefined);
 
+/**
+ * What the reader may do on each row (X1-05): the server's review rights
+ * (crew_document_review_rights) and, for verifying and alerts off, useCan on
+ * the vessel as well (false while it loads). Renewing follows Edit: the
+ * server's answer and the catalogue. `blockLine` says why an approver
+ * cannot verify this person's documents (their own, another department).
+ */
+interface ReviewGates {
+  verify: boolean;
+  mute: boolean;
+  renew: boolean;
+  blockLine: string | null;
+}
+
+const NO_GATES: ReviewGates = { verify: false, mute: false, renew: false, blockLine: null };
+
+/** Asks useCan only once the review rights are in (so a page without them never needs it), then hands the gates down. */
+const WithReviewGates: React.FC<{ rights: DocumentReviewRights; vesselId: string | null; children: (gates: ReviewGates) => React.ReactNode }> = ({
+  rights,
+  vesselId,
+  children,
+}) => {
+  const ctx = { vesselId };
+  const canApprove = useCan(CREW_CAPS.documentsApprove, ctx);
+  const canAlerts = useCan(CREW_CAPS.expiryAlertsEdit, ctx);
+  const block = !rights.canVerify && canApprove && rights.verifyBlock && rights.verifyBlock !== 'not_permitted' ? VERIFY_BLOCK_MESSAGE[rights.verifyBlock] : null;
+  return <>{children({ verify: rights.canVerify && canApprove, mute: rights.canMute && canAlerts, renew: rights.canRenew, blockLine: block })}</>;
+};
+
+/** An earlier version's file, opened in the viewer as if it were the document. */
+function versionAsDocument(doc: CrewDocumentView, v: CrewDocumentVersion): CrewDocumentView {
+  return { ...doc, id: `${doc.id}:v${v.versionNo}`, filePath: v.filePath, fileUrl: v.fileUrl, fileName: v.fileName, fileMime: v.fileMime, fileSize: null, hasFile: v.hasFile };
+}
+
+const COARSE = '[@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:min-w-11';
+
 export interface DocumentsPanelProps {
   tab: CrewDocumentTab;
   profileId: string;
@@ -120,6 +170,8 @@ export interface DocumentsPanelProps {
   context: 'profile' | 'own';
   /** Whose documents, for the dialogs. */
   personName?: string | null;
+  /** The vessel of the profile (the review gates ask useCan for it); null outside a vessel. */
+  vesselId?: string | null;
   /** Heading level of the tab title (2 under a page h1). */
   headingLevel?: 2 | 3;
 }
@@ -138,8 +190,15 @@ export interface DocumentsPanelProps {
  * helper Add is off with UPLOADS_UNAVAILABLE_NOTICE. On /me/documents the
  * rows are read-only and Add follows the server's answer (crew certificate
  * creation, or crew uploads on for the person's vessel).
+ *
+ * X1-05 on the crew profile: each row's verification badge and review line
+ * (Verify, Renew, Alerts off, History) behind crew_document_review_rights
+ * and useCan; a "Needs review" chip filters the tab to the documents waiting
+ * for a verifier. D-01: while 20261124060500 is not applied the badges stay
+ * read-only and REVIEW_UNAVAILABLE_NOTICE says why; any other error of the
+ * rights is an error with Try again.
  */
-export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({ tab, profileId, userId, companyId, context, personName, headingLevel = 2 }) => {
+export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({ tab, profileId, userId, companyId, context, personName, vesselId = null, headingLevel = 2 }) => {
   const documents = useCrewDocuments(profileId, { companyId, userId });
   const rights = useCrewDocumentRights(profileId, { companyId });
   const catalogue = useDocumentTypes(companyId);
@@ -147,6 +206,12 @@ export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({ tab, profileId, 
   const uploadsReady = crewDocumentUploadsReady();
   const [dialog, setDialog] = React.useState<AddDocumentDialogMode | null>(null);
   const [viewing, setViewing] = React.useState<CrewDocumentView | null>(null);
+  const [verifying, setVerifying] = React.useState<CrewDocumentView | null>(null);
+  const [historyOf, setHistoryOf] = React.useState<CrewDocumentView | null>(null);
+  const [reviewOnly, setReviewOnly] = React.useState(false);
+  const reviewEnabled = context === 'profile' && documents.status === 'ready' && documents.source === 'server';
+  const review = useDocumentReviewRights(profileId, { companyId, enabled: reviewEnabled });
+  const versions = useDocumentVersions(profileId, { companyId, enabled: reviewEnabled && review.status === 'ready' });
   const Heading = headingLevel === 3 ? 'h3' : 'h2';
   const blockId = React.useId();
 
@@ -240,9 +305,130 @@ export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({ tab, profileId, 
   }
 
   const onTab = documents.documents.filter((d) => d.tab === tab);
-  const groups = groupDocuments(onTab, catalogueReady);
+  const reviewLive = review.status === 'ready';
+  const reviewCount = onTab.filter(needsReview).length;
+  const filtering = reviewOnly && reviewLive && reviewCount > 0;
+  const shown = filtering ? onTab.filter(needsReview) : onTab;
+  const groups = groupDocuments(shown, catalogueReady);
   const legend = countDocumentLegend(onTab.map((d) => d.state));
   const notice = add.block?.kind === 'notice' ? add.block.reason : documents.notice;
+  const versionCount = (doc: CrewDocumentView) => (versions.status === 'ready' ? versions.versions.byDocument.get(doc.id)?.length ?? 0 : 0);
+
+  const footerFor = (doc: CrewDocumentView, gates: ReviewGates): React.ReactNode => {
+    if (doc.legacy) return null;
+    const count = versionCount(doc);
+    const showHistory = count > 0 || versions.status === 'error';
+    const canRenew = gates.renew && doc.canEdit && Boolean(doc.typeId) && catalogueReady !== null;
+    const anyAction = gates.verify || canRenew || gates.mute || showHistory;
+    if (!anyAction && !doc.alertsMuted) return null;
+    return (
+      <div className="mt-2 min-w-0 space-y-1.5" data-document-review={doc.id}>
+        <AlertsOffNote doc={doc} />
+        {anyAction ? (
+          <div className="flex flex-wrap items-center gap-1.5">
+            {gates.verify ? (
+              <Button
+                type="button"
+                size="sm"
+                variant={needsReview(doc) ? 'default' : 'ghost'}
+                onClick={() => setVerifying(doc)}
+                aria-label={`Verify ${doc.name}`}
+                className={COARSE}
+              >
+                <ShieldCheck aria-hidden="true" />
+                {needsReview(doc) ? 'Verify' : 'Review again'}
+              </Button>
+            ) : null}
+            {canRenew ? (
+              <Button type="button" size="sm" variant="ghost" onClick={() => setDialog({ kind: 'renew', document: doc })} aria-label={`Renew ${doc.name}`} className={COARSE}>
+                <RefreshCw aria-hidden="true" />
+                Renew
+              </Button>
+            ) : null}
+            {gates.mute ? <AlertsOffMenu doc={doc} profileId={profileId} companyId={companyId} /> : null}
+            {showHistory ? (
+              <Button type="button" size="sm" variant="ghost" onClick={() => setHistoryOf(doc)} aria-label={`History of ${doc.name}`} className={COARSE}>
+                <History aria-hidden="true" />
+                {count > 0 ? `History (${count})` : 'History'}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
+  };
+
+  const reviewChip = reviewLive ? (
+    reviewCount > 0 ? (
+      <Button
+        type="button"
+        size="sm"
+        variant={filtering ? 'default' : 'outline'}
+        aria-pressed={filtering}
+        onClick={() => setReviewOnly((v) => !v)}
+        className={cn('gap-2', COARSE)}
+        data-needs-review={reviewCount}
+      >
+        Needs review
+        <span className={cn('rounded-full px-1.5 type-caption tabular-nums', filtering ? 'bg-primary-foreground/20' : 'bg-muted text-muted-foreground')}>{reviewCount}</span>
+      </Button>
+    ) : (
+      <span className="type-caption text-muted-foreground" data-needs-review="0">
+        All verified or reviewed
+      </span>
+    )
+  ) : null;
+
+  const rows = (gates: ReviewGates) => (
+    <>
+      {gates.blockLine ? (
+        <p className="type-caption text-muted-foreground" data-verify-block="">
+          {gates.blockLine}
+        </p>
+      ) : null}
+      <div className="min-w-0 space-y-4">
+        {groups.map((g) => (
+          <Card key={g.key} className="min-w-0" data-document-group={g.key}>
+            <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0 p-4 pb-2 sm:p-6 sm:pb-2">
+              <CardTitle className="type-subtitle flex min-w-0 items-center gap-2">
+                <span className="min-w-0 break-words">{g.label}</span>
+                <span className="rounded-full bg-muted px-2 py-0.5 type-caption tabular-nums text-muted-foreground" aria-label={`${g.documents.length} documents`}>
+                  {g.documents.length}
+                </span>
+              </CardTitle>
+              {canOpenDialog && g.key !== UNCLASSIFIED_GROUP_KEY ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => openAdd(g.key)}
+                  aria-label={`Add to ${g.label}`}
+                  className="[@media(pointer:coarse)]:h-11"
+                >
+                  <Plus aria-hidden="true" />
+                  Add
+                </Button>
+              ) : null}
+            </CardHeader>
+            <CardContent className="min-w-0 p-4 pt-0 sm:p-6 sm:pt-0">
+              <ul className="divide-y divide-border">
+                {g.documents.map((doc) => (
+                  <DocumentRow
+                    key={doc.id}
+                    doc={doc}
+                    countryLabel={countryLabel}
+                    onView={setViewing}
+                    onEdit={canEditRows && doc.canEdit && doc.typeId ? (d) => setDialog({ kind: 'edit', document: d }) : null}
+                    footer={context === 'profile' ? footerFor(doc, gates) : doc.alertsMuted ? <AlertsOffNote doc={doc} className="mt-1.5" /> : null}
+                  />
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </>
+  );
 
   return (
     <div className="min-w-0 space-y-4" data-documents-state="ready" data-documents-source={documents.source} data-documents-tab={tab}>
@@ -252,6 +438,15 @@ export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({ tab, profileId, 
           <Info aria-hidden="true" className="size-4" />
           <AlertDescription>{notice}</AlertDescription>
         </Alert>
+      ) : null}
+      {reviewEnabled && review.status === 'not_applied' ? (
+        <p className="flex items-start gap-2 type-caption text-muted-foreground" data-review-notice="">
+          <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+          {REVIEW_UNAVAILABLE_NOTICE}
+        </p>
+      ) : null}
+      {reviewEnabled && review.status === 'error' ? (
+        <PageError variant="inline" error={review.error} onRetry={review.retry} title="The verification details could not load" treatMissingAsOff={false} />
       ) : null}
       {context === 'own' && add.hidden ? (
         <p className="type-body text-muted-foreground" data-own-uploads="off">
@@ -286,47 +481,17 @@ export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({ tab, profileId, 
         />
       ) : (
         <>
-          <DocumentLegend counts={legend} />
-          <div className="min-w-0 space-y-4">
-            {groups.map((g) => (
-              <Card key={g.key} className="min-w-0" data-document-group={g.key}>
-                <CardHeader className="flex-row flex-wrap items-center justify-between gap-2 space-y-0 p-4 pb-2 sm:p-6 sm:pb-2">
-                  <CardTitle className="type-subtitle flex min-w-0 items-center gap-2">
-                    <span className="min-w-0 break-words">{g.label}</span>
-                    <span className="rounded-full bg-muted px-2 py-0.5 type-caption tabular-nums text-muted-foreground" aria-label={`${g.documents.length} documents`}>
-                      {g.documents.length}
-                    </span>
-                  </CardTitle>
-                  {canOpenDialog && g.key !== UNCLASSIFIED_GROUP_KEY ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openAdd(g.key)}
-                      aria-label={`Add to ${g.label}`}
-                      className="[@media(pointer:coarse)]:h-11"
-                    >
-                      <Plus aria-hidden="true" />
-                      Add
-                    </Button>
-                  ) : null}
-                </CardHeader>
-                <CardContent className="min-w-0 p-4 pt-0 sm:p-6 sm:pt-0">
-                  <ul className="divide-y divide-border">
-                    {g.documents.map((doc) => (
-                      <DocumentRow
-                        key={doc.id}
-                        doc={doc}
-                        countryLabel={countryLabel}
-                        onView={setViewing}
-                        onEdit={canEditRows && doc.canEdit && doc.typeId ? (d) => setDialog({ kind: 'edit', document: d }) : null}
-                      />
-                    ))}
-                  </ul>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <DocumentLegend counts={legend} />
+            {reviewChip}
           </div>
+          {review.status === 'ready' ? (
+            <WithReviewGates rights={review.rights} vesselId={vesselId}>
+              {rows}
+            </WithReviewGates>
+          ) : (
+            rows(NO_GATES)
+          )}
         </>
       )}
       {dialog && catalogueReady ? (
@@ -341,6 +506,37 @@ export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({ tab, profileId, 
             uploadsReady={uploadsReady}
             onOpenChange={(open) => {
               if (!open) setDialog(null);
+            }}
+          />
+        </Suspense>
+      ) : null}
+      {verifying ? (
+        <Suspense fallback={null}>
+          <VerifyDialog
+            document={verifying}
+            profileId={profileId}
+            companyId={companyId}
+            personName={personName}
+            countryLabel={countryLabel}
+            onOpenChange={(open) => {
+              if (!open) setVerifying(null);
+            }}
+          />
+        </Suspense>
+      ) : null}
+      {historyOf ? (
+        <Suspense fallback={null}>
+          <VersionHistoryDrawer
+            document={historyOf}
+            versions={versions}
+            countryLabel={countryLabel}
+            onOpenChange={(open) => {
+              if (!open) setHistoryOf(null);
+            }}
+            onViewFile={(v) => {
+              const doc = historyOf;
+              setHistoryOf(null);
+              setViewing(versionAsDocument(doc, v));
             }}
           />
         </Suspense>
@@ -369,6 +565,7 @@ export const DocumentsTab: React.FC<ProfileTabProps & { tab: CrewDocumentTab }> 
     companyId={vessel.companyId}
     context="profile"
     personName={profile.displayName}
+    vesselId={vessel.id}
   />
 );
 

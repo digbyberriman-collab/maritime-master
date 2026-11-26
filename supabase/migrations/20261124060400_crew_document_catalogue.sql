@@ -108,8 +108,10 @@
 -- TR9 (platform plan contract 3): crew_document_record_from_source() is
 -- what X5's training completion calls as owner: it creates the person's
 -- document of the qualification type, or renews the latest one (later
--- expiry wins; the replaced number and file move to details.replaced until
--- X1-05's versions), idempotent per (source, source reference).
+-- expiry wins), idempotent per (source, source reference). A renewal keeps
+-- the replaced number, dates and file as a version row of X1-05's
+-- crew_document_versions (20261124060500 edited this function in place,
+-- rule §0.2); before that file is applied they go to details.replaced.
 --
 -- Fleet expiry (contract 8). expiry_src_crew_documents follows X5's source
 -- view contract over every document of a person (the latest per type and
@@ -1655,8 +1657,10 @@ $$;
 -- p_source_ref): a reference already recorded returns its document. Else
 -- the person's latest document of the type is renewed when the new expiry
 -- is later (or both have none and the issue is later): new dates, the tick
--- from a missing expiry, the replaced number and file kept in
--- details.replaced (X1-05 versions them), verification reset by the guard;
+-- from a missing expiry, the replaced number, dates and file kept as the
+-- document's next version (crew_document_version_capture, X1-05; edited in
+-- place) and its alerts back on, or in details.replaced while
+-- 20261124060500 is not applied; verification reset by the guard;
 -- otherwise a new document is created. Returns the document id. 22023
 -- source_invalid / source_ref_required / field_invalid; P0002 for an
 -- unknown person or type.
@@ -1724,9 +1728,27 @@ BEGIN
       v_profile.user_id, p_profile_id, v_profile.company_id, v_type.name, v_type.name, p_issue_date, p_expiry_date, 'Valid', v_uid, v_uid,
       v_type.id, p_expiry_date IS NULL, p_source, p_source_ref::text, jsonb_build_object('source_refs', jsonb_build_array(v_ref)))
     RETURNING id INTO v_id;
+  ELSIF ((p_expiry_date IS NOT NULL AND NOT v_doc.no_expiry AND (v_doc.expiry_date IS NULL OR p_expiry_date > v_doc.expiry_date))
+         OR (p_expiry_date IS NULL AND NOT v_doc.no_expiry)
+         OR (p_expiry_date IS NULL AND v_doc.no_expiry AND p_issue_date IS NOT NULL AND (v_doc.issue_date IS NULL OR p_issue_date > v_doc.issue_date)))
+        AND to_regprocedure('public.crew_document_version_capture(uuid,text,uuid)') IS NOT NULL THEN
+    -- X1-05 (20261124060500; this branch edited in place, rule §0.2): the
+    -- replaced number, dates and file become the document's next version
+    -- (crew_document_versions), the new period starts without a number or
+    -- file, alerts come back on, and the guard resets verification.
+    PERFORM public.crew_document_version_capture(v_doc.id, 'Renewed from ' || p_source, v_uid);
+    UPDATE public.crew_certificates AS cc
+    SET issue_date = p_issue_date, expiry_date = p_expiry_date, no_expiry = p_expiry_date IS NULL,
+        certificate_number = NULL, file_path = NULL, file_url = NULL, file_name = NULL, file_size = NULL, file_mime = NULL,
+        source = p_source, external_ref = p_source_ref::text, updated_by = v_uid,
+        alerts_muted = false, muted_by = NULL, muted_at = NULL, muted_reason = NULL,
+        details = jsonb_set(cc.details, '{source_refs}', coalesce(cc.details -> 'source_refs', '[]'::jsonb) || to_jsonb(v_ref))
+    WHERE cc.id = v_doc.id
+    RETURNING cc.id INTO v_id;
   ELSIF (p_expiry_date IS NOT NULL AND NOT v_doc.no_expiry AND (v_doc.expiry_date IS NULL OR p_expiry_date > v_doc.expiry_date))
         OR (p_expiry_date IS NULL AND NOT v_doc.no_expiry)
         OR (p_expiry_date IS NULL AND v_doc.no_expiry AND p_issue_date IS NOT NULL AND (v_doc.issue_date IS NULL OR p_issue_date > v_doc.issue_date)) THEN
+    -- Before 20261124060500 is applied: the replaced values are kept in details.replaced.
     UPDATE public.crew_certificates AS cc
     SET issue_date = p_issue_date, expiry_date = p_expiry_date, no_expiry = p_expiry_date IS NULL,
         certificate_number = NULL, file_path = NULL, file_url = NULL, file_name = NULL, file_size = NULL, file_mime = NULL,
@@ -2028,7 +2050,7 @@ COMMENT ON FUNCTION public.crew_document_rights(uuid) IS 'What the caller may do
 COMMENT ON FUNCTION public.crew_document_save(uuid, uuid, uuid, jsonb) IS 'Adds or changes a crew document (gap/04 C24, C25, C26): crew_document_may_write create / edit; the type''s field_schema decides the fields (22023 field_unknown / field_invalid / field_required with the field in HINT); passports need the issuing country and issue date; an expiry date or the No-expiry tick; one crew-report passport per person (22023 crew_report_passport_exists); the file under <company>/crew/<profile>/documents/ (22023 file_path_invalid). Returns the row.';
 COMMENT ON FUNCTION public.crew_document_delete(uuid, text) IS 'Removes a crew document (soft, W3): the person who added it within 24 hours, or a document editor with a reason (22023 reason_required); 42501 crew_document_delete_refused; P0002 unknown, foreign or removed. Returns the id.';
 COMMENT ON FUNCTION public.crew_document_issuing_suggestions(uuid) IS 'Issuing offices already used for the type in the caller''s company, most used first, at most 20 (T-170). Gate: an HR editor, crew_certificates.create on a reached vessel, or the caller''s own uploads.';
-COMMENT ON FUNCTION public.crew_document_record_from_source(uuid, uuid, date, date, text, uuid) IS 'TR9 provider (platform plan contract 3; X5 calls it as owner): records a qualification from another engine (training, import, registry): idempotent per source and reference; renews the person''s latest document of the type when the new expiry is later (the replaced number and file in details.replaced; verification reset), else creates one. Person and type of one company; a signed-in caller active and of that company. Service role only.';
+COMMENT ON FUNCTION public.crew_document_record_from_source(uuid, uuid, date, date, text, uuid) IS 'TR9 provider (platform plan contract 3; X5 calls it as owner): records a qualification from another engine (training, import, registry): idempotent per source and reference; renews the person''s latest document of the type when the new expiry is later (the replaced values become a crew_document_versions row through crew_document_version_capture, X1-05, else details.replaced; alerts back on; verification reset), else creates one. Person and type of one company; a signed-in caller active and of that company. Service role only.';
 COMMENT ON FUNCTION public.crew_document_catalogue_backfill() IS 'The seed (service role, idempotent): person and company from the login, the type from the legacy map or an exact name / code match, a passport document from profiles.passport_* (and the crew-report flag), passports from crew_travel_documents, a visa document from profiles.visa_expiry. Returns the counts.';
 COMMENT ON FUNCTION public.crew_document_types_scope_guard() IS 'Trigger: a document type keeps its owner (23514 crew_document_type_scope_locked).';
 COMMENT ON FUNCTION public.crew_document_type_satisfies_scope_guard() IS 'Trigger: a satisfaction rule links types of its own company or STORM''s (23514 crew_document_rule_scope_mismatch).';

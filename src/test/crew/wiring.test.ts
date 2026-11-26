@@ -49,24 +49,27 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 describe('pending types and the migrations', () => {
-  it('declares the tables and RPCs of 060100, 060200, 060300 and 060400 (X1-04: the document catalogue and RPCs)', () => {
+  it('declares the tables and RPCs of 060100 to 060400 and 060500 (X1-05: document versions and the review RPCs)', () => {
     expect(pendingTables).toEqual([
       'ref_countries', 'ref_languages', 'departments', 'contract_types', 'positions', 'position_aliases', 'position_manning',
       'crew_movements', 'crew_transfers',
       'crew_personal_details', 'crew_languages', 'crew_assignment_terms',
       'crew_document_categories', 'crew_document_types', 'crew_document_type_satisfies', 'vessel_crew_settings',
+      'crew_document_versions',
     ]);
     expect(pendingFunctions).toEqual([
       'crew_positions_for_vessel', 'crew_vessel_unmatched_titles', 'crew_position_create', 'crew_vessel_positions_save', 'crew_position_alias_set',
       'crew_vessel_list', 'crew_vessel_movements',
       'crew_profile_resolve', 'crew_profile_summary', 'crew_personal_details_save', 'crew_languages_save', 'crew_onboarding_save', 'crew_find_duplicates',
       'crew_documents_for_profile', 'crew_document_rights', 'crew_document_save', 'crew_document_delete', 'crew_document_issuing_suggestions',
+      'crew_document_review_rights', 'crew_document_verify', 'crew_document_mute', 'crew_document_unmute', 'crew_document_renew',
     ]);
     expect(crewMigrationFiles).toEqual([
       '20261124060100_crew_reference_positions.sql',
       '20261124060200_crew_vessel_list.sql',
       '20261124060300_crew_profile_details.sql',
       '20261124060400_crew_document_catalogue.sql',
+      '20261124060500_crew_document_verification.sql',
     ]);
   });
 
@@ -111,6 +114,9 @@ describe('pending types and the migrations', () => {
     expect(ledger).toContain('| 4 | `20261124060400_crew_document_catalogue.sql` | written, not applied |');
     expect(ledger).toContain('| C4 | `20261124060400_crew_document_catalogue.sql` | Query C4 |');
     expect(ledger).toMatch(/-- C4\. crew_document_catalogue/);
+    expect(ledger).toContain('| 5 | `20261124060500_crew_document_verification.sql` | written, not applied |');
+    expect(ledger).toContain('| C5 | `20261124060500_crew_document_verification.sql` | Query C5 |');
+    expect(ledger).toMatch(/-- C5\. crew_document_verification/);
   });
 
   it('the status parity fixture is the one both test suites read (X1-02)', () => {

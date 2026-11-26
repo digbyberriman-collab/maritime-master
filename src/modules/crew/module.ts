@@ -28,7 +28,9 @@
  * - capabilities: the PMS keys the crew pages and actions use (X1 spec §5,
  *   less the crew medical key X5 owns; platform-prep plan §1).
  * - notificationTypes: the crew notification types and their emitters
- *   (platform-prep PP4; deferred until each emitter lands, D-238).
+ *   (platform-prep PP4; deferred until each emitter lands, D-238). The three
+ *   crew document types are live from X1-05 (review needed, decided,
+ *   expiring).
  *
  * Platform-prep PP3 moved the routes and leaves here from
  * src/config/sitemap.ts and src/routes/index.tsx unchanged; X1-01 set the
@@ -97,9 +99,10 @@ const manifest: ModuleManifest = {
   // Seeded by 20261124030100 (category Crew; PR-X1-E). Each flips to 'live'
   // in the slice that lands its emitter, whose SQL test proves it (D-238).
   notificationTypes: [
-    { key: 'crew_document_review_needed', status: 'deferred', emitter: 'crew_certificates_review_notify() trigger (X1-05)' },
-    { key: 'crew_document_decided', status: 'deferred', emitter: 'crew_document_verify() (X1-05)' },
-    { key: 'crew_document_expiring', status: 'deferred', emitter: 'crew_document_expiry_sweep() through hr-daily-sweeper (X1-05)' },
+    // Live from X1-05 (20261124060500; its SQL test proves each emitter).
+    { key: 'crew_document_review_needed', status: 'live', emitter: 'crew_certificates_review_notify() trigger (X1-05)' },
+    { key: 'crew_document_decided', status: 'live', emitter: 'crew_document_verify() (X1-05)' },
+    { key: 'crew_document_expiring', status: 'live', emitter: 'crew_document_expiry_sweep() through hr-daily-sweeper (X1-05)' },
     { key: 'hor_reminder', status: 'deferred', emitter: 'work_rest_remind() and work_rest_send_due_reminders() (X1-08)' },
     { key: 'hor_serious_breach', status: 'deferred', emitter: 'work_rest_serious_breach_notify() trigger (X1-08)' },
     { key: 'hor_breach_report', status: 'deferred', emitter: 'work_rest_breach_report_create() (X1-08)' },

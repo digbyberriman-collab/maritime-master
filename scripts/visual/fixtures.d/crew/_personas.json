@@ -2,5 +2,171 @@
   "crew-list-basic": {
     "note": "X1-02 not applied yet (D-01): crew_vessel_list and crew_vessel_movements are missing, so the crew list is the basic list from the profiles and assignments (with the notice), and the Movements tab says it is not set up yet. Warns by design: the missing RPCs log 404s.",
     "missingRpcs": ["crew_vessel_list", "crew_vessel_movements"]
+  },
+  "vessel-hod": {
+    "note": "X1-05: the DRAAK chief officer, a head of department (deck): RBAC chief_officer on DRAAK only, with crew view and crew certificates edit (verify and alerts off). On the Chief Stew's documents (interior) the server says out_of_department, so the review line says why there is no Verify; Alerts, Renew and History stay.",
+    "auth": {
+      "id": "a0000000-0000-4000-8000-000000000012",
+      "email": "chief.officer.12@demo-fleet.example",
+      "user_metadata": {
+        "first_name": "Demo",
+        "last_name": "Chief Officer"
+      }
+    },
+    "tables": {
+      "user_roles": [
+        {
+          "id": "93000000-0000-4000-8000-000000000012",
+          "user_id": "a0000000-0000-4000-8000-000000000012",
+          "company_id": "c0000000-0000-4000-8000-000000000001",
+          "role": "chief_officer",
+          "vessel_id": "e0000000-0000-4000-8000-000000000001",
+          "department": "deck",
+          "is_active": true,
+          "granted_at": "$ts:-300d",
+          "granted_by": null,
+          "expires_at": null,
+          "metadata": null,
+          "created_at": "$ts:-300d",
+          "updated_at": "$ts:-300d"
+        }
+      ]
+    },
+    "rpc": {
+      "get_user_roles_full": [
+        {
+          "role_id": "90000000-0000-4000-8000-000000000005",
+          "role_name": "chief_officer",
+          "role_display_name": "Chief Officer",
+          "vessel_id": "e0000000-0000-4000-8000-000000000001",
+          "vessel_name": "DRAAK",
+          "department": "deck",
+          "is_fleet_wide": false
+        }
+      ],
+      "get_user_rbac_permissions": [
+        {
+          "module_key": "dashboard",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "vessels",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "documents",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "maintenance",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "training",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "alerts",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "audits",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "itinerary",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "reports",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "settings",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "crew",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "crew_certificates",
+          "permission": "edit",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "certificates",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "drills",
+          "permission": "view",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "logbooks",
+          "permission": "edit",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        },
+        {
+          "module_key": "forms",
+          "permission": "edit",
+          "scope": "vessel",
+          "restrictions": {},
+          "source": "role"
+        }
+      ],
+      "has_capability": false,
+      "crew_document_review_rights": [
+        {
+          "can_verify": false,
+          "verify_block": "out_of_department",
+          "can_mute": true,
+          "can_renew": true
+        }
+      ]
+    }
   }
 }

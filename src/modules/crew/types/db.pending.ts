@@ -30,6 +30,13 @@
  * suggestions). The browser never writes the new columns directly: the
  * guard refuses it outside the X1 definers.
  *
+ * 20261124060500_crew_document_verification.sql (X1-05): the versions of a
+ * renewed document (crew_document_versions, read with the document's own
+ * visibility; written only by the renewal definers), and the review RPCs
+ * (the caller's review rights, verify, alerts off and on, renew). The
+ * sweep's bookkeeping table (crew_document_expiry_notices) is service only
+ * and not mirrored.
+ *
  * `CrewForeignPendingTables` is not this module's: the platform signature
  * store (SIG1, PR-X1-I) that the profile's signature card reads. It is not
  * in the contract map, because no build-out file defines it yet; the
@@ -666,6 +673,53 @@ export type CrewDocumentIssuingSuggestionRpcRow = {
   uses: number;
 };
 
+// ---------------------------------------------------------------- 060500 rows (X1-05)
+
+/** A verification decision (crew_document_verify p_decision): every status but unverified. */
+export type CrewDocumentDecision = Exclude<CrewDocumentVerificationStatus, 'unverified'>;
+
+/** Why the caller may not verify a person's documents (crew_document_review_rights.verify_block; the 42501 MESSAGE of crew_document_verify). */
+export type CrewDocumentVerifyBlock = 'own_document' | 'out_of_department' | 'not_permitted';
+
+/** One earlier version of a crew document (crew_document_versions; C30): what a renewal replaced. */
+export type CrewDocumentVersionRow = {
+  id: string;
+  company_id: string;
+  profile_id: string;
+  crew_document_id: string;
+  version_no: number;
+  document_type_id: string | null;
+  number: string | null;
+  issue_date: string | null;
+  expiry_date: string | null;
+  no_expiry: boolean;
+  issuing_country_code: string | null;
+  issuing_office: string | null;
+  file_path: string | null;
+  /** A legacy upload's stored reference. */
+  file_url: string | null;
+  file_name: string | null;
+  file_mime: string | null;
+  verification_status: CrewDocumentVerificationStatus;
+  verified_by: string | null;
+  verified_at: string | null;
+  verification_note: string | null;
+  reason: string | null;
+  replaced_at: string;
+  replaced_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** The one row of crew_document_review_rights (RETURNS TABLE). */
+export type CrewDocumentReviewRightsRpcRow = {
+  can_verify: boolean;
+  /** Null when the caller may verify. */
+  verify_block: CrewDocumentVerifyBlock | null;
+  can_mute: boolean;
+  can_renew: boolean;
+};
+
 // ---------------------------------------------------------------- the platform signature store (SIG1; not this module's)
 
 /** user_signature_images (gap/08 SIG1, PR-X1-I): not written yet; the profile card reads it and stays hidden while it is missing. */
@@ -706,6 +760,7 @@ export type CrewPendingTables = {
   crew_document_types: PendingTable<CrewDocumentTypeRow, 'category_key' | 'key' | 'name' | 'expiry_item_type'>;
   crew_document_type_satisfies: PendingTable<CrewDocumentTypeSatisfiesRow, 'type_id' | 'satisfies_type_id' | 'kind'>;
   vessel_crew_settings: PendingTable<VesselCrewSettingsRow, 'vessel_id' | 'company_id'>;
+  crew_document_versions: PendingTable<CrewDocumentVersionRow, 'crew_document_id' | 'version_no'>;
 };
 
 /** New columns of live tables (D-133). */
@@ -752,4 +807,9 @@ export type CrewPendingFunctions = {
   };
   crew_document_delete: { Args: { p_id: string; p_reason?: string | null }; Returns: string };
   crew_document_issuing_suggestions: { Args: { p_document_type_id: string }; Returns: CrewDocumentIssuingSuggestionRpcRow[] };
+  crew_document_review_rights: { Args: { p_profile_id: string }; Returns: CrewDocumentReviewRightsRpcRow[] };
+  crew_document_verify: { Args: { p_id: string; p_decision: CrewDocumentDecision; p_note?: string | null }; Returns: CrewDocumentStoredRow };
+  crew_document_mute: { Args: { p_id: string; p_reason: string }; Returns: CrewDocumentStoredRow };
+  crew_document_unmute: { Args: { p_id: string }; Returns: CrewDocumentStoredRow };
+  crew_document_renew: { Args: { p_id: string; p_payload: Json }; Returns: CrewDocumentStoredRow };
 };

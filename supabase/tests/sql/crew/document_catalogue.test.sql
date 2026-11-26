@@ -689,10 +689,27 @@ WHERE id = (SELECT id FROM tr9 WHERE k = 'r1');
 SELECT tests.is(public.crew_document_record_from_source(tests.profile_id('A.crew_hyd'), pg_temp.ty('stcw_pscrb'), current_date, current_date + 1900, 'training', tests.id('ref:2')),
   (SELECT id FROM tr9 WHERE k = 'r1'), 'a later completion renews the same document');
 SELECT tests.results_eq(
-  $q$SELECT expiry_date, certificate_number, file_url, verification_status, external_ref, details -> 'replaced' ->> 'number', details -> 'replaced' ->> 'expiry_date', jsonb_array_length(details -> 'source_refs')
+  $q$SELECT expiry_date, certificate_number, file_url, verification_status, external_ref, jsonb_array_length(details -> 'source_refs')
      FROM public.crew_certificates WHERE id = (SELECT id FROM tr9 WHERE k = 'r1')$q$,
-  $q$VALUES (current_date + 1900, NULL::text, NULL::text, 'unverified', tests.id('ref:2')::text, 'PS-OLD', (current_date + 1800)::text, 2)$q$,
-  'new dates, the old number and file kept in details.replaced, verification reset, both references recorded');
+  $q$VALUES (current_date + 1900, NULL::text, NULL::text, 'unverified', tests.id('ref:2')::text, 2)$q$,
+  'new dates, no number or file for the new period, verification reset, both references recorded');
+-- The replaced values: X1-05's version row once 20261124060500 is built (it
+-- edits this function in place), else details.replaced.
+CREATE OR REPLACE FUNCTION pg_temp.tr9_replaced(p_id uuid) RETURNS text LANGUAGE plpgsql AS $f$
+DECLARE
+  v text;
+BEGIN
+  IF to_regclass('public.crew_document_versions') IS NOT NULL THEN
+    EXECUTE 'SELECT number || ''|'' || expiry_date::text FROM public.crew_document_versions WHERE crew_document_id = $1 ORDER BY version_no DESC LIMIT 1'
+      INTO v USING p_id;
+  ELSE
+    SELECT (cc.details -> 'replaced' ->> 'number') || '|' || (cc.details -> 'replaced' ->> 'expiry_date') INTO v FROM public.crew_certificates AS cc WHERE cc.id = p_id;
+  END IF;
+  RETURN v;
+END;
+$f$;
+SELECT tests.is(pg_temp.tr9_replaced((SELECT id FROM tr9 WHERE k = 'r1')), 'PS-OLD|' || (current_date + 1800)::text,
+  'the old number and expiry are kept (a crew_document_versions row with X1-05, else details.replaced)');
 SELECT tests.is(public.crew_document_record_from_source(tests.profile_id('A.crew_hyd'), pg_temp.ty('stcw_pscrb'), current_date - 400, current_date + 100, 'training', tests.id('ref:3')),
   (SELECT id FROM tr9 WHERE k = 'r1'), 'an older completion is recorded on the same document');
 SELECT tests.results_eq($q$SELECT expiry_date, jsonb_array_length(details -> 'source_refs') FROM public.crew_certificates WHERE id = (SELECT id FROM tr9 WHERE k = 'r1')$q$,
