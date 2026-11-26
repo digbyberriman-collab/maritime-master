@@ -25,6 +25,11 @@ export const COUNTERPARTS: readonly Counterpart[] = Object.freeze([
   { vesselRest: 'crew/medical', fleetPath: '/fleet/medical' },
   { vesselRest: 'crew/visitors', fleetPath: '/fleet/visits' },
   { vesselRest: 'safety', fleetPath: '/fleet/safety' },
+  // The documents the company publishes, and their forms and checklists by
+  // area (gap/02 FD, FC; gap/05).
+  { vesselRest: 'safety/fleet-documents', fleetPath: '/fleet/documents' },
+  { vesselRest: 'safety/checklists', fleetPath: '/fleet/forms/safety' },
+  { vesselRest: 'technical/forms', fleetPath: '/fleet/forms/technical' },
   { vesselRest: 'calendar', fleetPath: '/fleet/calendar' },
   { vesselRest: 'reports', fleetPath: '/fleet/reports' },
   { vesselRest: 'vessel/tracking', fleetPath: '/fleet/tracker' },

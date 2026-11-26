@@ -14,6 +14,9 @@
  * - `workspace.*`: the sidebar of a STORM workspace (D-09). Legal's tree is
  *   its four tabs (gap/10 Workspaces table, D-83); it stays at
  *   `/departments/legal` (R4) and is also linked from `fleet.workspaces`.
+ * - `personal.*`: sections of the personal tree (src/config/personalNav.ts)
+ *   that modules add to. `personal.my_work` is MY WORK: a module's own pages
+ *   for the signed-in user, at absolute paths under `/me`.
  *
  * This file stays light (lucide icons and types only): the sitemap and every
  * manifest import it eagerly.
@@ -47,12 +50,15 @@ export const VESSEL_SLOTS = [
 
 export const WORKSPACE_SLOTS = ['workspace.shoreside', 'workspace.health', 'workspace.yard', 'workspace.hris', 'workspace.legal'] as const;
 
+export const PERSONAL_SLOTS = ['personal.my_work'] as const;
+
 export type FleetSlotId = (typeof FLEET_SLOTS)[number];
 export type VesselSlotId = (typeof VESSEL_SLOTS)[number];
 export type WorkspaceSlotId = (typeof WORKSPACE_SLOTS)[number];
-export type NavSlotId = FleetSlotId | VesselSlotId | WorkspaceSlotId;
+export type PersonalSlotId = (typeof PERSONAL_SLOTS)[number];
+export type NavSlotId = FleetSlotId | VesselSlotId | WorkspaceSlotId | PersonalSlotId;
 
-export const NAV_SLOTS: readonly NavSlotId[] = [...FLEET_SLOTS, ...VESSEL_SLOTS, ...WORKSPACE_SLOTS];
+export const NAV_SLOTS: readonly NavSlotId[] = [...FLEET_SLOTS, ...VESSEL_SLOTS, ...WORKSPACE_SLOTS, ...PERSONAL_SLOTS];
 
 const SLOT_SET = new Set<string>(NAV_SLOTS);
 

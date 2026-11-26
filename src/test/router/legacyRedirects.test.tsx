@@ -2,7 +2,11 @@
  * Legacy redirects (BUILD-PLAN B6; gap/00 B5; gap/01 legacy list; R3, R8).
  *
  * - The table is data only, and every entry is wired to the route it names.
- * - Every target resolves to a real page in the scoped trees.
+ * - Every target of an entry that applies resolves to a real page in the
+ *   scoped trees.
+ * - An entry armed with a `pendingTarget` (platform-prep PP3) applies only
+ *   once a module page serves that target; until then the old page renders
+ *   for everyone, and with a fixture registry serving it, it applies.
  * - Every path the old sitemap claimed as `existing` still resolves, by
  *   redirect or by route, for every kind of user.
  * - The resolver's rules, one by one.
@@ -12,9 +16,13 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 
-import { LEGACY_REDIRECTS } from '@/app/router/legacyRedirects';
+import { matchPath } from 'react-router-dom';
+import { buildRegistry } from '@/app/registry/registry';
+import type { ModuleManifest } from '@/app/registry/types';
+import { LEGACY_REDIRECTS, type LegacyRedirectEntry } from '@/app/router/legacyRedirects';
 import {
   fillPattern,
+  legacyEntryApplies,
   legacyEntryFor,
   patternParams,
   resolveLegacyTarget,
@@ -75,6 +83,21 @@ function landOn(url: string, c: LegacyRedirectContext): ReturnType<typeof resolv
 const isRealPage = (r: ReturnType<typeof resolveUrl>) =>
   r.pattern !== '*' && !isScopeNotFound(r.element) && !isPlaceholderElement(r.element) && r.element !== null;
 
+/** Entries armed with a pending target, and those of them no module page serves yet. */
+const ARMED = LEGACY_REDIRECTS.filter((e) => e.pendingTarget);
+const WAITING = ARMED.filter((e) => !legacyEntryApplies(e));
+
+/** The armed entries PP3 added: [from, to, fleetTo, pendingTarget]. */
+const ARMED_ENTRIES: readonly [string, string, string | undefined, string][] = [
+  ['/acknowledgments', '/v/:vesselCode/safety/fleet-documents', '/fleet/documents?tab=acknowledgements', '/v/:vesselCode/safety/fleet-documents'],
+  ['/crew/acknowledgements', '/v/:vesselCode/safety/fleet-documents', undefined, '/v/:vesselCode/safety/fleet-documents'],
+  ['/development/admin', '/fleet/training/overview', undefined, '/fleet/training/:tab'],
+  ['/development/catalogue', '/fleet/training/catalogue', undefined, '/fleet/training/:tab'],
+  ['/development/applications', '/fleet/training/applications', undefined, '/fleet/training/:tab'],
+  ['/development/courses-register', '/fleet/training/applications', undefined, '/fleet/training/:tab'],
+  ['/ism/forms/templates', '/fleet/forms', undefined, '/fleet/forms'],
+];
+
 describe('legacy redirect table', () => {
   it('is data only: plain strings and plain objects', () => {
     expect(LEGACY_REDIRECTS.length).toBeGreaterThan(40);
@@ -125,9 +148,10 @@ describe('legacy redirect table', () => {
     expect(orphans).toEqual([]);
   });
 
-  it('every target resolves to a real page in its scope', () => {
+  it('every target of an entry that applies resolves to a real page in its scope', () => {
     const broken: string[] = [];
     for (const e of LEGACY_REDIRECTS) {
+      if (!legacyEntryApplies(e)) continue;
       for (const t of [e.to, e.fleetTo].filter(Boolean) as string[]) {
         const url = fillPattern(t.split('?')[0], sampleParams(t)) ?? '';
         const r = resolveUrl(routes, url);
@@ -171,8 +195,33 @@ describe('old sitemap paths still resolve', () => {
   });
 
   it('the old fleet pages land in the fleet scope for a fleet user, and stay put otherwise', () => {
-    expect(landOn('/documents', ctx({ fleetReach: true })).pattern).toBe('/fleet/documents');
+    // The controlled register, the documents module's page (PP3).
+    const fleet = landOn('/documents', ctx({ fleetReach: true }));
+    expect(fleet.pattern).toBe('/fleet/documents/register');
+    expect(isLazyPage(fleet.element)).toBe(true);
     expect(landOn('/documents', ctx()).pattern).toBe('/documents');
+  });
+
+  it('/crew and /crew/roster open the one crew list (gap/04)', () => {
+    for (const from of ['/crew', '/crew/roster']) {
+      const r = landOn(from, ctx());
+      expect(r.pattern, from).toBe('/v/:vesselCode/crew/list');
+      expect(r.url, from).toBe('/v/dra/crew/list');
+      expect(isLazyPage(r.element), from).toBe(true);
+      // Without a vessel the old roster renders where it is (D-27).
+      expect(landOn(from, ctx({ lastVesselCode: null })).pattern, from).toBe(from);
+    }
+  });
+
+  it('the old documents sample-data pages open the fleet register on their category (gap/00 K1)', () => {
+    for (const name of ['manuals', 'policies', 'procedures']) {
+      const r = resolveUrl(routes, `/documents/${name}`);
+      expect(r.hops, name).toEqual([`/documents/${name}`]);
+      expect(r.pattern, name).toBe('/fleet/documents/register');
+      expect(isLazyPage(r.element), name).toBe(true);
+      const redirect = flat.find((f) => f.pattern === `/documents/${name}`)?.route.element as React.ReactElement<{ to: string }>;
+      expect(redirect.props.to, name).toBe(`/fleet/documents/register?category=${name}`);
+    }
   });
 
   it('/dpa-dashboard opens the fleet dashboard for fleet reach, and keeps its page for anyone else (D-27)', () => {
@@ -241,7 +290,7 @@ describe('resolveLegacyTarget', () => {
 
   it('sends fleet pages only to users with fleet reach', () => {
     expect(resolveLegacyTarget(entry('/documents'), {}, '', '', ctx())).toBeNull();
-    expect(resolveLegacyTarget(entry('/documents'), {}, '', '', ctx({ fleetReach: true }))).toBe('/fleet/documents');
+    expect(resolveLegacyTarget(entry('/documents'), {}, '', '', ctx({ fleetReach: true }))).toBe('/fleet/documents/register');
     expect(resolveLegacyTarget(entry('/users-access/:userId'), { userId: 'u1' }, '', '', ctx({ fleetReach: true }))).toBe(
       '/fleet/admin/users/people/u1',
     );
@@ -255,6 +304,107 @@ describe('resolveLegacyTarget', () => {
   it('always sends personal pages to /me', () => {
     expect(resolveLegacyTarget(entry('/settings'), {}, '', '', ctx({ lastVesselCode: null }))).toBe('/me');
     expect(resolveLegacyTarget(entry('/notifications'), {}, '', '', ctx({ lastVesselCode: null }))).toBe('/me/notifications');
+  });
+});
+
+describe('pending targets (armed redirects)', () => {
+  const page = () => Promise.resolve({ default: () => null });
+  /** A fixture registry that serves every pending target as a page. */
+  const serving = buildRegistry([
+    {
+      id: 'pending-fixture',
+      label: 'Pending targets (fixture)',
+      scopes: ['fleet', 'vessel'],
+      routes: [
+        { scope: 'fleet', path: 'training/:tab', page, guard: { kind: 'login' } },
+        { scope: 'fleet', path: 'forms', page, guard: { kind: 'login' } },
+        { scope: 'vessel', path: 'safety/fleet-documents', page, guard: { kind: 'login' } },
+      ],
+    } satisfies ModuleManifest,
+  ]);
+  const users: Record<string, LegacyRedirectContext> = {
+    'vessel user': ctx(),
+    'fleet user on a vessel': ctx({ fleetReach: true }),
+    'fleet user, all vessels': ctx({ fleetReach: true, allVesselsMode: true, lastVesselCode: null }),
+    'user with no vessel': ctx({ lastVesselCode: null }),
+  };
+
+  it('arms exactly the entries the handover names, each with its target', () => {
+    expect(serving.problems).toEqual([]);
+    const byFrom = (a: readonly unknown[], b: readonly unknown[]) => String(a[0]).localeCompare(String(b[0]));
+    expect(ARMED.map((e) => [e.from, e.to, e.fleetTo, e.pendingTarget]).sort(byFrom)).toEqual([...ARMED_ENTRIES].sort(byFrom));
+  });
+
+  it('each pending target is a full route pattern its `to` opens', () => {
+    for (const e of ARMED) {
+      const target = e.pendingTarget as string;
+      expect(target, e.from).toMatch(/^\/(v\/:vesselCode|fleet|me)(\/|$)/);
+      expect(matchPath({ path: target, end: true }, e.to.split('?')[0]), `${e.from}: ${e.to} is not ${target}`).not.toBeNull();
+    }
+  });
+
+  it('is wired like any entry: the old route renders LegacyRoute around its page', () => {
+    for (const e of ARMED) {
+      const el = flat.find((f) => f.pattern === e.from)?.route.element as React.ReactElement<{ from: string; children: React.ReactElement }>;
+      expect(isLegacyRouteElement(el), e.from).toBe(true);
+      expect(el.props.from, e.from).toBe(e.from);
+      expect(isLazyPage(el.props.children), e.from).toBe(true);
+    }
+  });
+
+  it.each(Object.keys(users))('until a module serves the target, the old page renders for a %s', (who) => {
+    for (const e of WAITING) {
+      const r = landOn(e.from, users[who]);
+      expect(r.pattern, e.from).toBe(e.from);
+      expect(isLazyPage(r.element), e.from).toBe(true);
+      expect(resolveLegacyTarget(e, sampleParams(e.from), '', '', users[who]), e.from).toBeNull();
+    }
+  });
+
+  it('once a module serves the target, the entry applies as any other', () => {
+    const resolve = (from: string, c: LegacyRedirectContext) => {
+      const e = legacyEntryFor(from) as LegacyRedirectEntry;
+      expect(legacyEntryApplies(e, serving.hasPage), from).toBe(true);
+      return resolveLegacyTarget(e, {}, '?x=1', '', c, serving.hasPage);
+    };
+    const vessel = ctx();
+    const fleet = ctx({ fleetReach: true });
+    expect(resolve('/acknowledgments', vessel)).toBe('/v/dra/safety/fleet-documents?x=1');
+    expect(resolve('/acknowledgments', fleet)).toBe('/fleet/documents?tab=acknowledgements&x=1');
+    expect(resolve('/crew/acknowledgements', vessel)).toBe('/v/dra/safety/fleet-documents?x=1');
+    expect(resolve('/crew/acknowledgements', ctx({ lastVesselCode: null }))).toBeNull();
+    expect(resolve('/development/admin', fleet)).toBe('/fleet/training/overview?x=1');
+    expect(resolve('/development/catalogue', fleet)).toBe('/fleet/training/catalogue?x=1');
+    expect(resolve('/development/applications', fleet)).toBe('/fleet/training/applications?x=1');
+    expect(resolve('/development/courses-register', fleet)).toBe('/fleet/training/applications?x=1');
+    // A fleet target still needs fleet reach (D-27).
+    expect(resolve('/development/admin', vessel)).toBeNull();
+    expect(resolve('/ism/forms/templates', fleet)).toBe('/fleet/forms?x=1');
+    expect(resolve('/ism/forms/templates', vessel)).toBeNull();
+  });
+
+  it('a redirect, or a page on another path, does not serve a pending target', () => {
+    const e = legacyEntryFor('/development/admin') as LegacyRedirectEntry;
+    const near = buildRegistry([
+      {
+        id: 'near-fixture',
+        label: 'Near misses (fixture)',
+        scopes: ['fleet'],
+        routes: [
+          { scope: 'fleet', path: 'training/:tab', redirectTo: '/fleet/training' },
+          { scope: 'fleet', path: 'training/overview/more', page, guard: { kind: 'login' } },
+        ],
+      } satisfies ModuleManifest,
+    ]);
+    expect(near.problems).toEqual([]);
+    expect(legacyEntryApplies(e, near.hasPage)).toBe(false);
+    expect(resolveLegacyTarget(e, {}, '', '', ctx({ fleetReach: true }), near.hasPage)).toBeNull();
+  });
+
+  it('an entry with no pending target always applies', () => {
+    const e = legacyEntryFor('/documents') as LegacyRedirectEntry;
+    expect(legacyEntryApplies(e, () => false)).toBe(true);
+    expect(resolveLegacyTarget(e, {}, '', '', ctx({ fleetReach: true }), () => false)).toBe('/fleet/documents/register');
   });
 });
 

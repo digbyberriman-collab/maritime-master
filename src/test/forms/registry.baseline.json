@@ -1,0 +1,13 @@
+{
+  "routes": [
+    "/fleet/forms :: <PlaceholderWrapper{title=\"Forms & Checklists\"}>"
+  ],
+  "nav": {
+    "NAVIGATION_ITEMS": [
+      "    SquareCheckBig {\"id\":\"fleet-forms\",\"kind\":\"leaf\",\"label\":\"Forms & Checklists\",\"path\":\"/fleet/forms\",\"scope\":\"fleet\",\"status\":\"planned\"}"
+    ],
+    "FLEET_PLACEHOLDER_LEAVES": [
+      "forms Forms & Checklists"
+    ]
+  }
+}

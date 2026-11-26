@@ -1,0 +1,10 @@
+{
+  "routes": [
+    "/fleet/dashboard :: page(/src/modules/dashboard/pages/Dashboard.tsx) guard=- layout=-"
+  ],
+  "nav": {
+    "NAVIGATION_ITEMS": [
+      "    LayoutDashboard {\"id\":\"fleet-dashboard\",\"kind\":\"leaf\",\"label\":\"Dashboard\",\"path\":\"/fleet/dashboard\",\"scope\":\"fleet\",\"status\":\"live\"}"
+    ]
+  }
+}

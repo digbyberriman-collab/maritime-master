@@ -1,0 +1,10 @@
+{
+  "routes": [
+    "/fleet/reports :: page(/src/modules/dashboard/pages/FleetReportsIndex.tsx) guard=ProtectedRoute layout=-"
+  ],
+  "nav": {
+    "NAVIGATION_ITEMS": [
+      "    FileChartColumnIncreasing {\"id\":\"fleet-reports\",\"kind\":\"leaf\",\"label\":\"Reports\",\"path\":\"/fleet/reports\",\"scope\":\"fleet\",\"status\":\"live\"}"
+    ]
+  }
+}

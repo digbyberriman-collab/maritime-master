@@ -7,7 +7,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 
-import { PERSONAL_SETTINGS_ROUTES, buildPersonalNav } from '@/config/personalNav';
+import { PERSONAL_SETTINGS_ROUTES, buildPersonalNav, myWorkFragments } from '@/config/personalNav';
+import { L } from '@/config/navBuilders';
+import { PERSONAL_SLOTS } from '@/config/navSlots';
+import { MODULE_REGISTRY } from '@/app/registry/modules';
 import { NAVIGATION_ITEMS, PERSONAL_PLACEHOLDER_LEAVES, navLeaves } from '@/config/sitemap';
 import { personalNavFor } from '@/app/nav/usePersonalNav';
 import { resolveModuleForPath } from '@/shared/lib/moduleNavigation';
@@ -78,6 +81,51 @@ describe('buildPersonalNav', () => {
     expect(planned.sort()).toEqual(
       ['/me/billing', '/me/compliance', '/me/documents', '/me/leave', '/me/logs', '/me/signature', '/me/templates'].sort(),
     );
+  });
+});
+
+describe('MY WORK is a nav slot (personal.my_work, platform-prep PP3)', () => {
+  const myWork = (fragments?: Parameters<typeof buildPersonalNav>[1]) =>
+    buildPersonalNav(() => true, fragments).find((s) => s.label === 'My work')?.children ?? [];
+
+  it('is a registered slot, and the crew module contributes Documents to it', () => {
+    expect(PERSONAL_SLOTS).toEqual(['personal.my_work']);
+    expect(myWorkFragments().map((f) => [MODULE_REGISTRY.nav.find((n) => n.node === f.node)?.moduleId, f.order, f.node.id])).toEqual([
+      ['crew', 40, 'me-documents'],
+    ]);
+  });
+
+  it('keeps today\'s leaves in today\'s order, with the module leaf at its order', () => {
+    expect(myWork().map((l) => [l.label, l.path, l.status])).toEqual([
+      ['Hours of rest', '/me/hours-of-rest', 'live'],
+      ['Training', '/me/training', 'live'],
+      ['Inbox', '/inbox', 'live'],
+      ['Documents', '/me/documents', 'planned'],
+      ['Leave', '/me/leave', 'planned'],
+    ]);
+  });
+
+  it('merges the fragments it is given by order; with none, only the platform leaves', () => {
+    expect(myWork([]).map((l) => l.label)).toEqual(['Hours of rest', 'Training', 'Inbox', 'Leave']);
+    const extra = [
+      { order: 45, node: L('Payslips', '/me', { status: 'planned' }) },
+      { order: 5, node: L('Today', '/me', { status: 'beta' }) },
+    ];
+    expect(myWork(extra).map((l) => [l.label, l.scope])).toEqual([
+      ['Today', 'personal'],
+      ['Hours of rest', 'personal'],
+      ['Training', 'personal'],
+      ['Inbox', 'personal'],
+      ['Payslips', 'personal'],
+      ['Leave', 'personal'],
+    ]);
+  });
+
+  it('settles a fragment leaf with no status from the registry: planned until a module routes its path', () => {
+    const leaf = (path: string) => myWork([{ order: 40, node: L('X', '/me', { slug: path }) }]).find((l) => l.label === 'X');
+    // Nothing routes /me/unbuilt, so it is planned and gets a Coming Soon route like any planned leaf.
+    expect(leaf('unbuilt')?.status).toBe('planned');
+    expect(MODULE_REGISTRY.hasPage('/me/unbuilt')).toBe(false);
   });
 });
 

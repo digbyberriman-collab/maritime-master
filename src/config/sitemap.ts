@@ -102,32 +102,33 @@ const shoresideChildren: NavChild[] = [
 // gap/10 "Fleet view — left sidebar" is canonical for the grouping (R1); the
 // routes come from the domain docs (02 operations, 03 administration, 05
 // safety queue, 06 catalogues). A leaf is live only where the Fleet scope
-// router mounts a page at its path (src/routes/index.tsx); every other leaf
-// is planned and opens a Coming Soon placeholder inside the Fleet scope.
+// router mounts a page at its path (src/routes/index.tsx or a module
+// manifest); every other leaf is planned and opens a Coming Soon placeholder
+// inside the Fleet scope.
+//
+// Overview, Compliance and People are mostly module leaves (platform-prep
+// PP3): Dashboard 10 (dashboard), Reports 30 (reports), Documents 10
+// (documents), Forms & Checklists 20 (forms), Training 10 (development),
+// Medical 20 (fleet operations). The platform nodes left here pin their
+// orders, so a module leaf can sit between them.
 const FLEET_BASE = '/fleet';
 const FLEET_ADMIN = `${FLEET_BASE}/admin`;
 
 const fleetChildren: NavChild[] = [
   S('Overview', FLEET_BASE, fill('fleet.overview', [
-    L('Dashboard', FLEET_BASE, { icon: LayoutDashboard, ...LIVE }),
-    L('Tracker', FLEET_BASE, { icon: MapIcon, ...LIVE }),
-    L('Reports', FLEET_BASE, { icon: FileBarChart, ...LIVE }),
-    L('Calendar', FLEET_BASE, { icon: Calendar, ...LIVE }),
+    { order: 20, node: L('Tracker', FLEET_BASE, { icon: MapIcon, ...LIVE }) },
+    { order: 40, node: L('Calendar', FLEET_BASE, { icon: Calendar, ...LIVE }) },
     // Crew rotation and season planning (gap/04, gap/07); replaces the old
-    // Fleet Scheduler placeholder and the Rotation Planner cross-link.
-    L('Planner', FLEET_BASE, { icon: Network, ...LIVE }),
+    // Fleet Scheduler placeholder and the Rotation Planner cross-link. The
+    // crew manifest routes its page; the leaf stays a platform node.
+    { order: 50, node: L('Planner', FLEET_BASE, { icon: Network, ...LIVE }) },
     // The Company's whose-move inbox across vessels (gap/05).
-    L('Safety queue', FLEET_BASE, { icon: ShieldAlert, slug: 'safety' }),
+    { order: 60, node: L('Safety queue', FLEET_BASE, { icon: ShieldAlert, slug: 'safety' }) },
   ]), { icon: LayoutDashboard }),
-  S('Compliance', FLEET_BASE, fill('fleet.compliance', [
-    L('Documents', FLEET_BASE, { icon: FileText, ...LIVE }),
-    L('Forms & Checklists', FLEET_BASE, { icon: CheckSquare, slug: 'forms' }),
-  ]), { icon: ShieldCheck }),
+  S('Compliance', FLEET_BASE, fill('fleet.compliance'), { icon: ShieldCheck }),
   S('People', FLEET_BASE, fill('fleet.people', [
-    L('Training', FLEET_BASE, { icon: GraduationCap, ...LIVE }),
-    L('Medical', FLEET_BASE, { icon: Stethoscope }),
-    L('Visits', FLEET_BASE, { icon: UserCheck }),
-    L('Employment', FLEET_BASE, { icon: Briefcase }),
+    { order: 30, node: L('Visits', FLEET_BASE, { icon: UserCheck }) },
+    { order: 40, node: L('Employment', FLEET_BASE, { icon: Briefcase }) },
   ]), { icon: Users }),
   // The STORM workspaces, the same entries as the Apps menu (D-09). They are
   // cross-links: each page belongs to its workspace, which keeps its own URL
@@ -184,31 +185,16 @@ const fleetChildren: NavChild[] = [
 // leaf per logbook, departments) are static seeds here until their providers
 // land (gap/10 IA24).
 
-const vCrew: NavChild[] = [
-  L('Crew List', 'crew', { slug: 'list', icon: Users, ...LIVE }),
-  // STORM extra: the roster page stays reachable until gap/04 folds it into
-  // Crew List.
-  L('Crew Roster', 'crew', { slug: 'roster', icon: ClipboardList, ...LIVE }),
-  // Label "Leave" on vessels that rename it (vessel_module_settings).
-  L('Planner', 'crew', { icon: Network, moduleSetting: 'planner', ...LIVE }),
-  L('Crew Compliance', 'crew', { slug: 'compliance', icon: ShieldCheck, ...LIVE }),
-  // One crew member's month (`crew/people/:crewId/hours-of-rest`, the target
-  // of the legacy /crew/work-rest/:crewId) is an Hours of Rest page too: the
-  // crew_hor setting closes it with the overview (gap/10 W4, D-63).
-  { ...L('Hours of Rest', 'crew', { icon: Clock, moduleSetting: 'crew_hor', ...LIVE }), alsoCovers: ['crew/people/*/hours-of-rest'] },
-  L('Crew Medical', 'crew', { slug: 'medical', icon: Stethoscope }),
-  L('Crew Training', 'crew', { slug: 'training', icon: GraduationCap, moduleSetting: 'crew_training', ...LIVE }),
-  L('Familiarisation', 'crew', { icon: FileCheck, ...LIVE }),
-  L('Checklists', 'crew', { icon: CheckSquare }),
-  L('Performance Appraisals', 'crew', { slug: 'appraisals', icon: ClipboardCheck }),
-  L('Visitors & Occasional Workers', 'crew', { slug: 'visitors', icon: UserCheck }),
-  L('Employment History', 'crew', { icon: Briefcase }),
-];
+// Every Crew leaf is a module's (platform-prep PP3): the crew manifest's,
+// with Crew Medical (60) from fleet operations and Crew Training (70) from
+// development.
+const vCrew: NavChild[] = [];
 
 // Seeded vessel document sections (gap/10: they appear under VESSEL
-// DOCUMENTS once a section has a document; gap/05).
+// DOCUMENTS once a section has a document; gap/05). Fleet Documents (110) is
+// the documents manifest's; Settings pins its order after it.
 const vesselDocs = 'safety/vessel-documents';
-const vSafety: NavChild[] = [
+const vSafety: (NavChild | SlotEntry)[] = [
   L('Summary', 'safety', { icon: LayoutGrid }),
   L('Safety Management Manual', 'safety', { slug: 'manual', icon: BookMarked, moduleSetting: 'safety_manual' }),
   L('Drills', 'safety', { icon: Siren, ...LIVE }),
@@ -238,8 +224,7 @@ const vSafety: NavChild[] = [
     L('Agent Information', vesselDocs, { icon: Phone }),
     L('NTVRP / OPA 90', vesselDocs, { icon: Shield }),
   ], { icon: FolderOpen }),
-  L('Fleet Documents', 'safety', { icon: FileText }),
-  L('Settings', 'safety', { icon: Settings }),
+  { order: 120, node: L('Settings', 'safety', { icon: Settings }) },
 ];
 
 // Seeded certificate sections (data-driven per vessel later, gap/06).
@@ -408,6 +393,9 @@ const vDepartments: NavChild[] = [
   G('Dive',        DEPT, diveChildren,                         { icon: Waves,     slug: 'dive' }),
 ];
 
+/** A vessel module as declared here: its children are the platform's slot entries. */
+type VesselModuleDef = Omit<VesselModule, 'children'> & { children: (NavChild | SlotEntry)[] };
+
 /**
  * The Vessel view modules in tab order (gap/10): Home · Crew · Safety ·
  * Certificates · Technical · Charter · Vessel · Logbooks · Finance ·
@@ -415,14 +403,14 @@ const vDepartments: NavChild[] = [
  * The tab row and the per-module sidebar (Phase 1, S2/S3) read this through
  * `buildVesselNav(code)`.
  */
-const vesselModule = (m: VesselModule): VesselModule => ({
+const vesselModule = (m: VesselModuleDef): VesselModule => ({
   ...m,
   // Each tab's sidebar is its slot (navSlots.ts `vessel.<id>`); a leaf with no
   // status is live once a vessel route is registered at its path.
   children: resolveNavStatus(fill(vesselSlot(m.id), m.children), (rel) => isRouted(underVessel(VESSEL_SCOPE_PATTERN, rel))),
 });
 
-const VESSEL_MODULE_DEFS: VesselModule[] = [
+const VESSEL_MODULE_DEFS: VesselModuleDef[] = [
   { id: 'home', label: 'Home', icon: LayoutDashboard, root: '', children: [], status: 'live' },
   { id: 'crew', label: 'Crew', icon: Users, root: 'crew', children: vCrew, moduleSetting: 'crew', status: 'live' },
   {
@@ -744,13 +732,15 @@ export const PERSONAL_PLACEHOLDER_LEAVES: SitemapLeaf[] = (() => {
  * first own leaf, preferring a real page: `crew` → `crew/list`. `to` is
  * relative to `from`, so it can be the `to` of a nested <Navigate>.
  * Sections are headings that share their parent's path, so they add nothing.
+ * A root or group a module manifest routes itself (a crew index page, say)
+ * gets none, as in SECTION_REDIRECTS, so no path is declared twice.
  */
 export const VESSEL_ROOT_REDIRECTS: SectionRedirect[] = (() => {
   const leafPaths = new Set(vesselOwnLeaves().map((l) => l.path));
   const out: SectionRedirect[] = [];
   const seen = new Set<string>();
   const add = (from: string, items: NavChild[]) => {
-    if (leafPaths.has(from) || seen.has(from)) return;
+    if (leafPaths.has(from) || seen.has(from) || manifestRoutePaths.has(underVessel(VESSEL_SCOPE_PATTERN, from))) return;
     const target = firstLeaf(items);
     if (!target || !target.startsWith(`${from}/`)) return;
     seen.add(from);

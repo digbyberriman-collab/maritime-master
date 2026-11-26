@@ -75,6 +75,10 @@ describe('vesselSwitchTarget from other scopes', () => {
     ['/fleet/calendar', 'calendar'],
     ['/fleet/tracker', 'vessel/tracking'],
     ['/fleet/dashboard', ''],
+    ['/fleet/documents', 'safety/fleet-documents'],
+    ['/fleet/documents?tab=acknowledgements', 'safety/fleet-documents'],
+    ['/fleet/forms/safety', 'safety/checklists'],
+    ['/fleet/forms/technical', 'technical/forms'],
   ])('a Fleet page %s opens its counterpart %s', (from, rest) => {
     expect(vesselSwitchTarget({ currentPath: from, targetCode: 'HYD', isModuleOn: allOn })).toBe(rest ? `/v/hyd/${rest}` : '/v/hyd');
   });
@@ -85,7 +89,15 @@ describe('vesselSwitchTarget from other scopes', () => {
   });
 
   it('a Fleet page without a counterpart opens the vessel home', () => {
-    expect(vesselSwitchTarget({ currentPath: '/fleet/documents', targetCode: 'HYD', isModuleOn: allOn })).toBe('/v/hyd');
+    expect(vesselSwitchTarget({ currentPath: '/fleet/admin/vessels', targetCode: 'HYD', isModuleOn: allOn })).toBe('/v/hyd');
+    // The fleet forms overview has no single vessel page; only its areas do.
+    expect(vesselSwitchTarget({ currentPath: '/fleet/forms', targetCode: 'HYD', isModuleOn: allOn })).toBe('/v/hyd');
+  });
+
+  it('a counterpart the target vessel does not show (Fleet Documents is planned) opens the vessel home', () => {
+    expect(
+      vesselSwitchTarget({ currentPath: '/fleet/documents', targetCode: 'HYD', isModuleOn: allOn, isVisible: (rest) => rest !== 'safety/fleet-documents' }),
+    ).toBe('/v/hyd');
   });
 
   it.each(['/hris/people', '/me/hours-of-rest', '/ism/incidents?x=1', '/'])('%s opens the vessel home', (from) => {
@@ -164,6 +176,11 @@ describe('counterparts', () => {
     expect(fleetCounterpart('crew/visitors')).toBe('/fleet/visits');
     expect(fleetCounterpart('safety/drills')).toBe('/fleet/safety');
     expect(fleetCounterpart('vessel/tracking')).toBe('/fleet/tracker');
+    // The fleet documents and forms areas (gap/02 FD, FC) beat the Safety tab's queue.
+    expect(fleetCounterpart('safety/fleet-documents')).toBe('/fleet/documents');
+    expect(fleetCounterpart('safety/checklists')).toBe('/fleet/forms/safety');
+    expect(fleetCounterpart('technical/forms')).toBe('/fleet/forms/technical');
+    expect(fleetCounterpart('technical/jobs')).toBeNull();
     expect(fleetCounterpart('crew/list')).toBeNull();
     expect(fleetCounterpart('vessel/details')).toBeNull();
   });
@@ -171,6 +188,9 @@ describe('counterparts', () => {
   it('map back from Fleet pages', () => {
     expect(vesselCounterpart('/fleet/visits')).toBe('crew/visitors');
     expect(vesselCounterpart('/fleet/safety?tab=queue')).toBe('safety');
+    expect(vesselCounterpart('/fleet/documents?tab=acknowledgements')).toBe('safety/fleet-documents');
+    expect(vesselCounterpart('/fleet/forms/technical')).toBe('technical/forms');
+    expect(vesselCounterpart('/fleet/forms')).toBeNull();
     expect(vesselCounterpart('/fleet/admin/users')).toBeNull();
   });
 

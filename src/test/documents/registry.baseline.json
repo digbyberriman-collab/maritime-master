@@ -1,0 +1,22 @@
+{
+  "routes": [
+    "/fleet/documents :: page(/src/modules/documents/pages/Documents.tsx) guard=ProtectedRoute layout=-",
+    "/fleet/documents/register :: page(/src/modules/documents/pages/Documents.tsx) guard=ProtectedRoute layout=-",
+    "/v/:vesselCode/safety/fleet-documents :: <PlaceholderWrapper{title=\"Fleet Documents\"}>"
+  ],
+  "nav": {
+    "NAVIGATION_ITEMS": [
+      "    FileText {\"id\":\"fleet-documents\",\"kind\":\"leaf\",\"label\":\"Documents\",\"path\":\"/fleet/documents\",\"scope\":\"fleet\",\"status\":\"live\"}",
+      "    FileText {\"id\":\"vessel-safety-fleet-documents\",\"kind\":\"leaf\",\"label\":\"Fleet Documents\",\"path\":\"/v/:vesselCode/safety/fleet-documents\",\"scope\":\"vessel\",\"status\":\"planned\"}"
+    ],
+    "VESSEL_MODULES": [
+      "  FileText {\"id\":\"safety-fleet-documents\",\"kind\":\"leaf\",\"label\":\"Fleet Documents\",\"path\":\"safety/fleet-documents\",\"status\":\"planned\"}"
+    ],
+    "buildVesselNav": [
+      "  FileText {\"id\":\"vessel-safety-fleet-documents\",\"kind\":\"leaf\",\"label\":\"Fleet Documents\",\"path\":\"/v/dra/safety/fleet-documents\",\"scope\":\"vessel\",\"status\":\"planned\"}"
+    ],
+    "VESSEL_PLACEHOLDER_LEAVES": [
+      "safety/fleet-documents Fleet Documents"
+    ]
+  }
+}

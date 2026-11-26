@@ -15,7 +15,7 @@
   "/ism/corrective-actions",
   { "path": "/certificates", "expectRedirect": true, "note": "Legacy URL (B6): /v/<code>/certificates" },
   { "path": "/maintenance", "expectRedirect": true, "note": "Legacy URL (B6): /v/<code>/technical" },
-  { "path": "/documents", "expectRedirect": "/fleet/documents", "note": "Legacy URL (B6)" },
+  { "path": "/documents", "expectRedirect": "/fleet/documents/register", "note": "Legacy URL (B6): the fleet controlled register (PP3)" },
   { "path": "/users-access", "expectRedirect": "/fleet/admin/users/crew", "note": "Legacy URL (B6)" },
   { "path": "/settings", "expectRedirect": "/me/profile", "note": "Legacy URL (B6): personal scope, via /me to the first section (D-59)" },
   { "path": "/hris", "expectRedirect": true, "note": "Section path; redirects to the HRIS landing page" },

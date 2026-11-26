@@ -14,6 +14,12 @@
  * - Any other `to` (the personal area, `/me`) always applies.
  * - Other `:params` in `to` come from the matching `:params` in `from`. The
  *   query string and hash are kept; a query in `to` is added to them.
+ * - `pendingTarget`, when set, arms the entry ahead of its page: the entry
+ *   applies only once a module manifest registers a page at that route
+ *   pattern (`MODULE_REGISTRY.hasPage`). Until then the old page renders
+ *   where it is, as for a user the target is not for (D-27). A stream turns
+ *   the redirect on by registering the page, with no edit here; it registers
+ *   the route only together with a working page (platform-prep plan risk 5).
  *
  * `from` must be the exact pattern the router declares, so
  * src/test/router/legacyRedirects.test.tsx can check that each one is wired
@@ -51,6 +57,12 @@ export interface LegacyRedirectEntry {
   fleetTo?: string;
   /** Take the vessel from the old URL rather than the selected vessel. */
   vessel?: { slugParam: string } | { idParam: string };
+  /**
+   * A full route pattern (`/fleet/training/:tab`, `/v/:vesselCode/safety/fleet-documents`)
+   * that a module page must serve before the entry applies; until then the
+   * old page renders where it is.
+   */
+  pendingTarget?: string;
 }
 
 export const LEGACY_REDIRECTS: readonly LegacyRedirectEntry[] = [
@@ -60,7 +72,8 @@ export const LEGACY_REDIRECTS: readonly LegacyRedirectEntry[] = [
   { from: '/dpa-dashboard', to: '/fleet/dashboard' },
   { from: '/fleet-map', to: '/fleet/tracker' },
   { from: '/itinerary/timeline', to: '/fleet/calendar' },
-  { from: '/documents', to: '/fleet/documents' },
+  // The controlled register; the fleet documents page becomes its own (gap/02 FD).
+  { from: '/documents', to: '/fleet/documents/register' },
   { from: '/reports', to: '/fleet/reports/incident-analytics' },
   { from: '/reports/incident-analytics', to: '/fleet/reports/incident-analytics' },
   { from: '/reports/capa-tracker', to: '/fleet/reports/capa-tracker' },
@@ -73,15 +86,23 @@ export const LEGACY_REDIRECTS: readonly LegacyRedirectEntry[] = [
   { from: '/admin/roles', to: '/fleet/admin/users/sets' },
   { from: '/vessels/list', to: '/fleet/admin/vessels' },
   { from: '/settings/notifications', to: '/fleet/admin/notifications' },
+  // The development admin pages become the tabs of Fleet › Training (gap/02
+  // TR). Armed: each applies once the training module routes its tabs.
+  { from: '/development/admin', to: '/fleet/training/overview', pendingTarget: '/fleet/training/:tab' },
+  { from: '/development/catalogue', to: '/fleet/training/catalogue', pendingTarget: '/fleet/training/:tab' },
+  { from: '/development/applications', to: '/fleet/training/applications', pendingTarget: '/fleet/training/:tab' },
+  { from: '/development/courses-register', to: '/fleet/training/applications', pendingTarget: '/fleet/training/:tab' },
+  // Form templates become Fleet › Forms & Checklists (gap/02 FC). Armed.
+  { from: '/ism/forms/templates', to: '/fleet/forms', pendingTarget: '/fleet/forms' },
 
   // ─── Vessel (gap/01, gap/04–07) ──────────────────────────────────────────
   { from: '/vessels/dashboard', to: '/v/:vesselCode' },
   { from: '/vessel/:vesselSlug', to: '/v/:vesselCode', vessel: { slugParam: 'vesselSlug' } },
   { from: '/vessel/:vesselSlug/dashboard', to: '/v/:vesselCode', vessel: { slugParam: 'vesselSlug' } },
   { from: '/crew/list', to: '/v/:vesselCode/crew/list' },
-  { from: '/crew/roster', to: '/v/:vesselCode/crew/roster' },
-  // `/crew` has always opened the roster; it keeps doing so.
-  { from: '/crew', to: '/v/:vesselCode/crew/roster' },
+  // gap/04: one crew list. The roster folds into it, so both old URLs open it.
+  { from: '/crew/roster', to: '/v/:vesselCode/crew/list' },
+  { from: '/crew', to: '/v/:vesselCode/crew/list' },
   { from: '/crew/certificates', to: '/v/:vesselCode/crew/compliance/status?view=documents' },
   { from: '/crew/work-rest/overview', to: '/v/:vesselCode/crew/hours-of-rest' },
   { from: '/crew/work-rest/:crewId', to: '/v/:vesselCode/crew/people/:crewId/hours-of-rest' },
@@ -91,6 +112,16 @@ export const LEGACY_REDIRECTS: readonly LegacyRedirectEntry[] = [
   { from: '/development/crew-training', to: '/v/:vesselCode/crew/training' },
   { from: '/training', to: '/v/:vesselCode/crew/familiarisation' },
   { from: '/crew/calendar', to: '/v/:vesselCode/calendar' },
+  // Document acknowledgements are the fleet documents page's tab for the
+  // office and the vessel's Safety › Fleet Documents on board (gap/02 FD,
+  // gap/05). Armed: they apply once the vessel page is routed.
+  {
+    from: '/acknowledgments',
+    to: '/v/:vesselCode/safety/fleet-documents',
+    fleetTo: '/fleet/documents?tab=acknowledgements',
+    pendingTarget: '/v/:vesselCode/safety/fleet-documents',
+  },
+  { from: '/crew/acknowledgements', to: '/v/:vesselCode/safety/fleet-documents', pendingTarget: '/v/:vesselCode/safety/fleet-documents' },
   { from: '/ism/drills', to: '/v/:vesselCode/safety/drills' },
   { from: '/drills', to: '/v/:vesselCode/safety/drills' },
   { from: '/ism/miscellaneous', to: '/v/:vesselCode/safety/forms' },

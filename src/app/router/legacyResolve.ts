@@ -1,8 +1,11 @@
 /**
  * Pure resolution of the legacy redirect table (./legacyRedirects.ts).
  * No React, no data access: the route element feeds it what the user can
- * reach, so every rule is unit-tested here.
+ * reach, so every rule is unit-tested here. Whether a module serves an
+ * entry's `pendingTarget` is read from the module registry by default (data
+ * known at build time); tests pass a fixture registry's `hasPage` instead.
  */
+import { MODULE_REGISTRY } from '@/app/registry/modules';
 import { parseVesselPath, vesselPatternPath } from '@/modules/vessels/lib/vesselCode';
 import { LEGACY_REDIRECTS, type LegacyRedirectEntry } from './legacyRedirects';
 
@@ -23,6 +26,19 @@ export interface LegacyRedirectContext {
 export type LegacyTargetKind = 'vessel' | 'fleet' | 'personal';
 
 const pathOf = (target: string) => target.split(/[?#]/)[0];
+
+/** Whether a registered module page serves a full route pattern (`ModuleRegistry.hasPage`). */
+export type HasPage = (fullPath: string) => boolean;
+
+const registryHasPage: HasPage = (fullPath) => MODULE_REGISTRY.hasPage(fullPath);
+
+/**
+ * Whether an entry applies yet: always, unless it waits on a `pendingTarget`
+ * that no module page serves (then the old page renders where it is, D-27).
+ */
+export function legacyEntryApplies(entry: LegacyRedirectEntry, hasPage: HasPage = registryHasPage): boolean {
+  return !entry.pendingTarget || hasPage(entry.pendingTarget);
+}
 
 /** Which scope a target lives in. */
 export function targetKind(target: string): LegacyTargetKind {
@@ -70,7 +86,8 @@ export function withSearch(target: string, search: string, hash: string): string
 
 /**
  * The URL an old route should now open, or null to keep rendering the old
- * page where it is (no vessel to scope to, or no fleet reach).
+ * page where it is (its pending target has no page yet, no vessel to scope
+ * to, or no fleet reach).
  */
 export function resolveLegacyTarget(
   entry: LegacyRedirectEntry,
@@ -78,7 +95,10 @@ export function resolveLegacyTarget(
   search: string,
   hash: string,
   ctx: LegacyRedirectContext,
+  hasPage: HasPage = registryHasPage,
 ): string | null {
+  if (!legacyEntryApplies(entry, hasPage)) return null;
+
   if (entry.fleetTo && ctx.fleetReach) {
     const filled = fillPattern(entry.fleetTo, params);
     return filled ? withSearch(filled, search, hash) : null;

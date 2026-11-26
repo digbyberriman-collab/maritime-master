@@ -72,6 +72,14 @@ const walk = (items: readonly NavChild[], visit: (n: NavChild) => void) => {
 /** Every leaf of the assembled site map with its full path (vessel leaves on the pattern). */
 const allLeaves: NavChild[] = navLeaves(NAVIGATION_ITEMS);
 
+/**
+ * A fragment node's id in the assembled site map. A vessel fragment's node
+ * sits in the static vessel tree as `vessel-<id>`, on the `/v/:vesselCode`
+ * pattern (sitemap vesselModuleNav), so it is looked up by that id.
+ */
+const assembledId = (fragment: { slot: string; node: NavChild }): string =>
+  fragment.slot.startsWith('vessel.') ? `vessel-${fragment.node.id}` : fragment.node.id;
+
 describe('module registry', () => {
   it('loads every manifest with no problems', () => {
     expect(MODULE_REGISTRY.problems).toEqual([]);
@@ -168,7 +176,7 @@ describe('nav invariants', () => {
     const broken: string[] = [];
     let checked = 0;
     for (const fragment of MODULE_REGISTRY.nav) {
-      walk([assembled.get(fragment.node.id) ?? fragment.node], (n) => {
+      walk([assembled.get(assembledId(fragment)) ?? fragment.node], (n) => {
         if (n.children?.length || n.status !== 'live') return;
         checked += 1;
         if (MODULE_REGISTRY.hasPage(n.path)) return;
@@ -203,7 +211,7 @@ describe('nav invariants', () => {
   it('every nav fragment lands in the assembled site map', () => {
     const ids = new Set<string>();
     walk(NAVIGATION_ITEMS.flatMap((m) => m.children ?? []), (n) => ids.add(n.id));
-    const missing = MODULE_REGISTRY.nav.filter((f) => !ids.has(f.node.id)).map((f) => `${f.moduleId}: ${f.node.id} (${f.slot})`);
+    const missing = MODULE_REGISTRY.nav.filter((f) => !ids.has(assembledId(f))).map((f) => `${f.moduleId}: ${f.node.id} (${f.slot})`);
     expect(MODULE_REGISTRY.nav.length).toBeGreaterThanOrEqual(10);
     expect(missing).toEqual([]);
   });

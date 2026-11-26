@@ -30,10 +30,10 @@ import {
 } from '@/app/router/manifestRoutes';
 import { Building2 } from 'lucide-react';
 
-// Main Pages - Keep critical path pages sync, lazy load the rest
+// Main Pages - Keep critical path pages sync, lazy load the rest. The fleet
+// dashboard is a lazy page of the dashboard module's manifest.
 import Auth from '@/modules/auth/pages/Auth';
 import ResetPassword from '@/modules/auth/pages/ResetPassword';
-import Dashboard from '@/modules/dashboard/pages/Dashboard';
 
 /**
  * A signed-in page. Every lazy page in this file is created once, here at
@@ -139,9 +139,6 @@ const AcknowledgmentTracking = protectedPage(() => import('@/modules/crew/pages/
 const MasterDocumentIndex = protectedPage(() => import('@/modules/documents/pages/MasterDocumentIndex'));
 const DocumentSearch = protectedPage(() => import('@/modules/documents/pages/DocumentSearch'));
 const ReviewDashboard = protectedPage(() => import('@/modules/documents/pages/ReviewDashboard'));
-const Manuals = protectedPage(() => import('@/modules/documents/pages/Manuals'));
-const Policies = protectedPage(() => import('@/modules/documents/pages/Policies'));
-const Procedures = protectedPage(() => import('@/modules/documents/pages/Procedures'));
 const ISM_SMS = protectedPage(() => import('@/modules/documents/pages/ISM_SMS'));
 const Drawings = protectedPage(() => import('@/modules/documents/pages/Drawings'));
 
@@ -149,7 +146,6 @@ const Drawings = protectedPage(() => import('@/modules/documents/pages/Drawings'
 const IncidentAnalytics = protectedPage(() => import('@/modules/incidents/pages/IncidentAnalytics'));
 const CAPATracker = protectedPage(() => import('@/modules/incidents/pages/CAPATracker'));
 const DrillAnalytics = protectedPage(() => import('@/modules/drills/pages/DrillAnalytics'));
-const FleetReportsIndex = protectedPage(() => import('@/modules/dashboard/pages/FleetReportsIndex'));
 const CertificateAlerts = protectedPage(() => import('@/modules/certificates/pages/CertificateAlerts'));
 
 // Settings and admin pages
@@ -276,7 +272,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/crew/leave/calculator" element={<LeaveCalculatorPage />} />
       <Route path="/crew/rotation-planner" element={legacy('/crew/rotation-planner', <RotationPlannerPage />)} />
       <Route path="/crew/tasks" element={<CrewTasksPage />} />
-      <Route path="/crew/acknowledgements" element={<DocumentAcknowledgementsPage />} />
+      <Route path="/crew/acknowledgements" element={legacy('/crew/acknowledgements', <DocumentAcknowledgementsPage />)} />
 
       {/* Crew Admin */}
       <Route path="/crew/admin" element={<CrewAdminDashboard />} />
@@ -303,7 +299,7 @@ export const AppRoutes: React.FC = () => {
 
       {/* ISM - Forms */}
       <Route path="/ism/forms" element={<Navigate to="/ism/forms/templates" replace />} />
-      <Route path="/ism/forms/templates" element={<FormTemplates />} />
+      <Route path="/ism/forms/templates" element={legacy('/ism/forms/templates', <FormTemplates />)} />
       <Route path="/ism/forms/templates/create" element={<CreateTemplate />} />
       <Route path="/ism/forms/templates/:templateId" element={<TemplateDetail />} />
       <Route path="/ism/forms/templates/:templateId/edit" element={<EditTemplate />} />
@@ -346,16 +342,18 @@ export const AppRoutes: React.FC = () => {
 
       {/* Documents */}
       <Route path="/documents" element={legacy('/documents', <Documents />)} />
-      <Route path="/documents/manuals" element={<Manuals />} />
-      <Route path="/documents/procedures" element={<Procedures />} />
+      {/* The Manuals, Procedures and Policies pages held sample data (gap/00
+          K1): their URLs open the fleet register on that category. */}
+      <Route path="/documents/manuals" element={<KeepSearchNavigate to="/fleet/documents/register?category=manuals" />} />
+      <Route path="/documents/procedures" element={<KeepSearchNavigate to="/fleet/documents/register?category=procedures" />} />
       <Route path="/documents/ism-sms" element={<ISM_SMS />} />
-      <Route path="/documents/policies" element={<Policies />} />
+      <Route path="/documents/policies" element={<KeepSearchNavigate to="/fleet/documents/register?category=policies" />} />
       <Route path="/documents/drawings" element={<Drawings />} />
       <Route path="/documents/search" element={<DocumentSearch />} />
       <Route path="/documents/master-index" element={<MasterDocumentIndex />} />
       <Route path="/documents/reviews" element={<ReviewDashboard />} />
       <Route path="/review-queue" element={<ReviewQueue />} />
-      <Route path="/acknowledgments" element={<AcknowledgmentTracking />} />
+      <Route path="/acknowledgments" element={legacy('/acknowledgments', <AcknowledgmentTracking />)} />
 
       {/* Itinerary */}
       <Route path="/itinerary" element={<Navigate to="/itinerary/planning" replace />} />
@@ -367,11 +365,11 @@ export const AppRoutes: React.FC = () => {
       {/* Crew Development */}
       <Route path="/development" element={<Navigate to="/development/my" replace />} />
       <Route path="/development/my" element={legacy('/development/my', <MyDevelopment />)} />
-      <Route path="/development/catalogue" element={<CourseCatalogue />} />
-      <Route path="/development/applications" element={<DevelopmentApplications />} />
-      <Route path="/development/courses-register" element={<CoursesRegister />} />
+      <Route path="/development/catalogue" element={legacy('/development/catalogue', <CourseCatalogue />)} />
+      <Route path="/development/applications" element={legacy('/development/applications', <DevelopmentApplications />)} />
+      <Route path="/development/courses-register" element={legacy('/development/courses-register', <CoursesRegister />)} />
       <Route path="/development/crew-training" element={legacy('/development/crew-training', <CrewTraining />)} />
-      <Route path="/development/admin" element={<DevelopmentAdmin />} />
+      <Route path="/development/admin" element={legacy('/development/admin', <DevelopmentAdmin />)} />
 
       {/* HR */}
       <Route path="/hr" element={<HRPage />} />
@@ -458,17 +456,14 @@ export const AppRoutes: React.FC = () => {
           DashboardLayout itself gets the idempotent one. Old URLs redirect here
           through LegacyRoute (src/app/router/legacyRedirects.ts). */}
 
-      {/* Fleet view: oversight across every vessel the user can reach. */}
+      {/* Fleet view: oversight across every vessel the user can reach. The
+          dashboard, reports overview, documents, training and planner pages
+          are module routes (fleetManifestRoutes, below). */}
       <Route path="/fleet" element={<FleetScope />}>
         <Route index element={<KeepSearchNavigate to="/fleet/dashboard" />} />
-        <Route path="dashboard" element={<Dashboard />} />
         <Route path="tracker" element={<FleetMap />} />
         <Route path="calendar" element={<FleetTimelinePage />} />
-        <Route path="planner" element={<RotationPlannerPage />} />
-        <Route path="documents" element={<Documents />} />
-        <Route path="training" element={<CrewTraining />} />
-        {/* The reports overview (gap/02): links every fleet report, risk overview included. */}
-        <Route path="reports" element={<FleetReportsIndex />} />
+        {/* The four legacy report pages the reports overview links. */}
         <Route path="reports/incident-analytics" element={<IncidentAnalytics />} />
         <Route path="reports/capa-tracker" element={<CAPATracker />} />
         <Route path="reports/drill-analytics" element={<DrillAnalytics />} />
@@ -487,21 +482,11 @@ export const AppRoutes: React.FC = () => {
         <Route path="*" element={<ScopeNotFound />} />
       </Route>
 
-      {/* Vessel view: one vessel, named by its code in the URL (D-03, C20). */}
+      {/* Vessel view: one vessel, named by its code in the URL (D-03, C20).
+          The Crew tab's pages are module routes (the crew and development
+          manifests; vesselManifestRoutes, below). */}
       <Route path="/v/:vesselCode" element={<VesselScopeRoute />}>
         <Route index element={<VesselDashboard />} />
-        <Route path="crew/list" element={<CrewList />} />
-        <Route path="crew/roster" element={<CrewRoster />} />
-        <Route path="crew/compliance" element={<KeepSearchNavigate to="status" />} />
-        <Route path="crew/compliance/status" element={<CrewDocuments />} />
-        <Route path="crew/hours-of-rest" element={<WorkRestOverview />} />
-        <Route path="crew/people/:crewId/hours-of-rest" element={<CrewWorkRestMonth />} />
-        <Route path="crew/planner" element={<KeepSearchNavigate to="timeline" />} />
-        <Route path="crew/planner/timeline" element={<RotationPlannerPage />} />
-        <Route path="crew/planner/manning" element={<LeavePlannerPage />} />
-        <Route path="crew/planner/requests" element={<LeaveRequestsPage />} />
-        <Route path="crew/training" element={<CrewTraining />} />
-        <Route path="crew/familiarisation" element={<Training />} />
         <Route path="safety/drills" element={<ISMDrillsPage />} />
         <Route path="safety/forms" element={<MiscellaneousPage />} />
         <Route path="safety/checklists" element={<ChecklistsPage />} />

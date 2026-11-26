@@ -11,6 +11,7 @@ import { describe, expect, it } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { NAVIGATION_ITEMS } from '@/config/sitemap';
+import { MODULE_REGISTRY } from '@/app/registry/modules';
 import type { NavChild } from '@/config/navigation-types';
 
 const ROOT = process.cwd();
@@ -67,11 +68,12 @@ describe('Work & Rest wiring', () => {
   });
 
   it('the sidebar leaf and the routes agree on hours of rest', () => {
-    // The vessel tree (BUILD-PLAN B7) links the vessel HoR board; the legacy
-    // /crew/work-rest pages keep their routes behind LegacyRoute (B6, R8).
+    // The vessel tree (BUILD-PLAN B7) links the vessel HoR board, which the
+    // crew manifest routes (platform-prep PP3); the legacy /crew/work-rest
+    // pages keep their routes behind LegacyRoute (B6, R8).
     const leaf = leavesOf(NAVIGATION_ITEMS.flatMap((m) => m.children ?? [])).find((l) => l.path === '/v/:vesselCode/crew/hours-of-rest');
     expect(leaf, 'sidebar leaf for /v/:vesselCode/crew/hours-of-rest').toBeTruthy();
-    expect(routesIndex).toContain('path="crew/hours-of-rest"');
+    expect(MODULE_REGISTRY.hasPage('/v/:vesselCode/crew/hours-of-rest'), 'a module page serves the vessel board').toBe(true);
     expect(routesIndex).toContain('path="hours-of-rest"');
     expect(routesIndex).toContain('path="/crew/work-rest"');
     expect(routesIndex).toContain('path="/crew/work-rest/overview"');

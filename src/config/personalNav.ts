@@ -29,17 +29,25 @@
  * (`/me/training`, the user's own development plan) is not vessel-bound, so
  * `crew_training` (the vessel's Crew Training) does not govern it.
  *
+ * MY WORK is a nav slot (`personal.my_work`, src/config/navSlots.ts): the
+ * platform's leaves here sit at fixed orders (Hours of rest 10, Training 20,
+ * Inbox 30, Leave 50) and module manifests add their own (the crew module's
+ * Documents at 40). A slot leaf with no status is live once a module
+ * registers a route at its path, planned otherwise; a planned one still gets
+ * its Coming Soon route (sitemap PERSONAL_PLACEHOLDER_LEAVES).
+ *
  * The company settings stay under `/me` until gap/03 moves them to
  * `/fleet/admin`.
  */
 import {
-  Bell, BellRing, BookOpen, Clock, Database, Download, Eye, FileCheck, FileText, FileWarning, GraduationCap, Inbox,
+  Bell, BellRing, BookOpen, Clock, Database, Download, Eye, FileCheck, FileWarning, GraduationCap, Inbox,
   LayoutList, LifeBuoy, Lock, Mail, Palette, PenLine, Plane, Plug, CreditCard, ScrollText, Shield, Ship, Star, User, UserX,
   type LucideIcon,
 } from 'lucide-react';
+import { MODULE_REGISTRY } from '@/app/registry/modules';
 import { SETTINGS_SECTION_IDS, settingsSectionPath } from '@/shared/utils/settingsPermissions';
 import type { NavChild } from './navigation-types';
-import { L, LIVE, S, withScope } from './navBuilders';
+import { L, LIVE, S, mergeSlot, resolveNavStatus, withScope, type SlotEntry } from './navBuilders';
 
 /** The personal area's root. */
 export const PERSONAL_BASE = '/me';
@@ -76,12 +84,19 @@ const COMPANY_SETTINGS: readonly CompanySetting[] = [
 
 const PLANNED = { status: 'planned' } as const;
 
+/** The nav fragments module manifests add to MY WORK (slot `personal.my_work`). */
+export const myWorkFragments = (): readonly SlotEntry[] => MODULE_REGISTRY.fragmentsFor('personal.my_work');
+
 /**
  * The personal tree. `canAccessSection(id)` decides the company settings
  * sections (a settings section id such as `permissions`); the user's own
- * sections are always listed.
+ * sections are always listed. `myWork` is what modules add to MY WORK; it
+ * defaults to the registry's fragments for that slot (tests pass their own).
  */
-export function buildPersonalNav(canAccessSection: (id: string) => boolean): NavChild[] {
+export function buildPersonalNav(
+  canAccessSection: (id: string) => boolean,
+  myWork: readonly SlotEntry[] = myWorkFragments(),
+): NavChild[] {
   const me = PERSONAL_BASE;
   const company = COMPANY_SETTINGS.filter((s) => canAccessSection(s.id)).map((s) =>
     L(s.label, me, { slug: s.id, icon: s.icon, ...(s.planned ? PLANNED : LIVE) }),
@@ -104,14 +119,24 @@ export function buildPersonalNav(canAccessSection: (id: string) => boolean): Nav
       ],
       { slug: 'notifications-section' },
     ),
-    S('My work', me, [
-      // Shown only while crew_hor is on for one of the user's vessels (usePersonalNav, D-109).
-      L('Hours of rest', me, { slug: 'hours-of-rest', icon: Clock, moduleSetting: 'crew_hor', ...LIVE }),
-      L('Training', me, { icon: GraduationCap, ...LIVE }),
-      L('Inbox', me, { existing: INBOX_PATH, icon: Inbox }),
-      L('Documents', me, { icon: FileText, ...PLANNED }),
-      L('Leave', me, { icon: Plane, ...PLANNED }),
-    ]),
+    S(
+      'My work',
+      me,
+      resolveNavStatus(
+        mergeSlot(
+          [
+            // Shown only while crew_hor is on for one of the user's vessels (usePersonalNav, D-109).
+            { order: 10, node: L('Hours of rest', me, { slug: 'hours-of-rest', icon: Clock, moduleSetting: 'crew_hor', ...LIVE }) },
+            { order: 20, node: L('Training', me, { icon: GraduationCap, ...LIVE }) },
+            { order: 30, node: L('Inbox', me, { existing: INBOX_PATH, icon: Inbox }) },
+            // 40: the crew module's Documents (/me/documents).
+            { order: 50, node: L('Leave', me, { icon: Plane, ...PLANNED }) },
+          ],
+          myWork,
+        ),
+        (path) => MODULE_REGISTRY.hasPage(path),
+      ),
+    ),
     S('Data & help', me, [
       L('Data & exports', me, { slug: 'data-exports', icon: Download, ...LIVE }),
       L('How-to guides', me, { existing: '/help/how-to-guides', icon: BookOpen }),

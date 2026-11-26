@@ -800,7 +800,7 @@ describe('LegacyRoute', () => {
 
   it('redirects an old fleet page for a fleet user', async () => {
     renderApp('/documents', { reachable: [DRAAK], canAccessAllVessels: true });
-    await waitFor(() => expect(location()).toBe('/fleet/documents'));
+    await waitFor(() => expect(location()).toBe('/fleet/documents/register'));
   });
 
   it('redirects personal pages for everyone', async () => {

@@ -155,8 +155,8 @@ describe('old URLs (the legacy redirect table)', () => {
     expect(legacyEntryForPathname('/documents/master-index')).toBeNull();
   });
 
-  it('a redirect is judged by where it lands: /crew opens the current vessel’s roster', () => {
-    expect(resolvePinScope('/crew', access())).toEqual({ kind: 'vessel', vesselId: 'v-dra', rest: 'crew/roster' });
+  it('a redirect is judged by where it lands: /crew opens the current vessel’s crew list', () => {
+    expect(resolvePinScope('/crew', access())).toEqual({ kind: 'vessel', vesselId: 'v-dra', rest: 'crew/list' });
     expect(availability('/crew')).toBe('available');
     expect(availability('/crew', access(), checks({ moduleSettings: off('crew') }))).toBe('unavailable');
     expect(availability('/crew', access(), checks({ moduleSettings: settings('loading') }))).toBe('waiting');
