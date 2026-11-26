@@ -1,5 +1,43 @@
 {
   "version": 1,
-  "files": [],
-  "notMirrored": {}
+  "files": [
+    {
+      "file": "src/modules/fleet/types/db.pending.ts",
+      "mirrors": "X5 spec §2 X5-01A (20261124040000_fleet_expiry_engine.sql)",
+      "tables": {
+        "type": "FleetPendingTables",
+        "expect": ["expiry_window_rules"]
+      },
+      "functions": {
+        "type": "FleetPendingFunctions",
+        "expect": [
+          "expiry_days_remaining",
+          "expiry_bucket",
+          "expiry_endorsement_state",
+          "expiry_default_window",
+          "expiry_window_for",
+          "set_expiry_window_rule",
+          "clear_expiry_window_rule",
+          "fleet_ops_can",
+          "fleet_expiry_items",
+          "fleet_expiry_summary"
+        ]
+      }
+    }
+  ],
+  "notMirrored": {
+    "tables": {
+      "expiry_sources": "service-only registry of the expiry source views (D-X5-01, D-55): migrations and the service role write it, the fleet expiry definers read it; no browser grant"
+    },
+    "views": {
+      "expiry_src_vessel_certificates": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant",
+      "expiry_src_insurance_policies": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant",
+      "expiry_src_crew_certificates": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant",
+      "expiry_src_profile_identity": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant",
+      "expiry_src_work_authorisations": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant",
+      "expiry_src_training_records": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant",
+      "expiry_src_medical_fitness": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant",
+      "expiry_src_crew_contracts": "expiry source view (D-X5-01 contract) read only by fleet_expiry_rows_for(); no browser grant"
+    }
+  }
 }

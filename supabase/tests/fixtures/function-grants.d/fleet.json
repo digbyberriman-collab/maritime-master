@@ -1,1 +1,31 @@
-{}
+{
+  "functions": {
+    "public.clear_expiry_window_rule(uuid)": ["authenticated"],
+    "public.expiry_bucket(date, integer, date, boolean)": ["authenticated", "service_role"],
+    "public.expiry_days_remaining(date, date)": ["authenticated", "service_role"],
+    "public.expiry_default_window(text)": ["authenticated", "service_role"],
+    "public.expiry_endorsement_state(date, date, integer)": ["authenticated", "service_role"],
+    "public.expiry_window_for(uuid, text, uuid)": ["authenticated", "service_role"],
+    "public.fleet_counted_vessels_for(uuid, uuid, uuid[])": ["service_role"],
+    "public.fleet_current_crew(uuid[])": ["service_role"],
+    "public.fleet_expiry_items(uuid[], text[], text[], text, boolean, integer, integer, date)": ["authenticated"],
+    "public.fleet_expiry_rows_for(uuid, uuid, uuid[], text[], boolean, date)": ["service_role"],
+    "public.fleet_expiry_summary(uuid[], boolean, date)": ["authenticated"],
+    "public.fleet_hod_covers(uuid, uuid, text)": ["service_role"],
+    "public.fleet_ops_can(uuid, uuid, text, text)": ["authenticated", "service_role"],
+    "public.fleet_ops_can_for(uuid, uuid, uuid, text, text)": ["service_role"],
+    "public.set_expiry_window_rule(text, uuid, integer)": ["authenticated"]
+  },
+  "relations": {
+    "public.expiry_sources": { "kind": "table", "authenticated": [], "authenticatedColumns": {} },
+    "public.expiry_src_crew_certificates": { "kind": "view", "authenticated": [], "authenticatedColumns": {} },
+    "public.expiry_src_crew_contracts": { "kind": "view", "authenticated": [], "authenticatedColumns": {} },
+    "public.expiry_src_insurance_policies": { "kind": "view", "authenticated": [], "authenticatedColumns": {} },
+    "public.expiry_src_medical_fitness": { "kind": "view", "authenticated": [], "authenticatedColumns": {} },
+    "public.expiry_src_profile_identity": { "kind": "view", "authenticated": [], "authenticatedColumns": {} },
+    "public.expiry_src_training_records": { "kind": "view", "authenticated": [], "authenticatedColumns": {} },
+    "public.expiry_src_vessel_certificates": { "kind": "view", "authenticated": [], "authenticatedColumns": {} },
+    "public.expiry_src_work_authorisations": { "kind": "view", "authenticated": [], "authenticatedColumns": {} },
+    "public.expiry_window_rules": { "kind": "table", "authenticated": ["SELECT"], "authenticatedColumns": {} }
+  }
+}
