@@ -5,8 +5,10 @@
  *   guard, and no path is declared twice;
  * - the moved pages are exactly today's (a pure move), except the crew list
  *   that X1-02 rebuilt (CrewListPage behind vessel.crew.crew_list.view, the
- *   roster folded into it as a redirect), and every vessel crew URL of
- *   today resolves to its page through the real route tree;
+ *   roster folded into it as a redirect), plus the routed crew profile of
+ *   X1-03 (crew/people/:profileId -> personal, crew/people/:profileId/:tab),
+ *   and every vessel crew URL of today resolves to its page through the
+ *   real route tree;
  * - nav orders are unique in each slot, 60 and 70 stay X5's (Crew Medical,
  *   Crew Training), and crew/training and crew/medical are never routed
  *   here;
@@ -33,6 +35,9 @@ import type { NavChild } from '@/config/navigation-types';
 import { appRouteObjects, describeElement, loaderTarget, resolveUrl } from '@/test/router/routeHarness';
 
 const pages = CREW_ROUTES.filter((r): r is PageRouteDef => !isRedirectDef(r));
+/** The routed crew profile (X1-03). */
+const PROFILE_PATH = 'crew/people/:profileId';
+const PROFILE_TAB_PATH = 'crew/people/:profileId/:tab';
 const catalogue = new Set(listCatalogueCapabilities());
 
 /** Today's page for each crew path (PP3's pure move; X1-02 rebuilt the list and folded the roster in). */
@@ -46,6 +51,8 @@ const TODAY: Record<string, string> = {
   [`vessel ${CREW_PATHS.plannerRequests}`]: '/src/modules/crew/pages/LeaveRequestsPage.tsx',
   [`vessel ${CREW_PATHS.familiarisation}`]: '/src/modules/training/pages/Training.tsx',
   [`fleet ${CREW_FLEET_PATHS.planner}`]: '/src/modules/rotation-planner/pages/RotationPlannerPage.tsx',
+  // X1-03: the routed crew profile (new; gated in the page and on the server).
+  [`vessel ${PROFILE_TAB_PATH}`]: '/src/modules/crew/pages/CrewProfilePage.tsx',
 };
 
 describe('crew routes', () => {
@@ -66,13 +73,19 @@ describe('crew routes', () => {
   it('keeps today\'s guard on every moved page (ProtectedRoute, as the old protectedPage); the rebuilt list is behind its capability', () => {
     for (const r of pages) {
       if (r.path === CREW_PATHS.list) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.crewListView });
+      else if (r.path === PROFILE_TAB_PATH) expect(r.guard, r.path).toEqual({ kind: 'scope' });
       else expect(r.guard, r.path).toEqual({ kind: 'login' });
     }
   });
 
   it('redirects the two section roots as before, and the roster to the list (X1-02)', () => {
     const redirects = Object.fromEntries(CREW_ROUTES.filter(isRedirectDef).map((r) => [r.path, r.redirectTo]));
-    expect(redirects).toEqual({ [CREW_PATHS.roster]: './../list', [CREW_PATHS.compliance]: 'status', [CREW_PATHS.planner]: 'timeline' });
+    expect(redirects).toEqual({
+      [CREW_PATHS.roster]: './../list',
+      [CREW_PATHS.compliance]: 'status',
+      [CREW_PATHS.planner]: 'timeline',
+      [PROFILE_PATH]: 'personal',
+    });
   });
 
   it('the roster redirect lands on the crew list in React Router itself, query kept (route-relative resolution)', () => {
@@ -129,6 +142,9 @@ describe('every vessel crew URL of today resolves to its page', () => {
     ['/v/dra/crew/training', 'development/pages/CrewTraining.tsx'],
     ['/v/dra/crew/familiarisation', 'training/pages/Training.tsx'],
     ['/fleet/planner', 'rotation-planner/pages/RotationPlannerPage.tsx'],
+    // X1-03: the routed profile; the static hours-of-rest month still outranks the :tab route.
+    ['/v/dra/crew/people/b0000000-0000-4000-8000-000000000015', 'crew/pages/CrewProfilePage.tsx'],
+    ['/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/contact', 'crew/pages/CrewProfilePage.tsx'],
   ])('%s -> %s', (url, page) => {
     const resolved = resolveUrl(routes, url);
     expect(describeElement(resolved.element)).toContain(`page(/src/modules/${page})`);

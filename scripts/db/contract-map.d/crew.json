@@ -3,14 +3,15 @@
   "files": [
     {
       "file": "src/modules/crew/types/db.pending.ts",
-      "mirrors": "X1 spec §6 060100 (X1-01: reference data, positions, position manning) and 060200 (X1-02: vessel crew list, movements, transfers table)",
+      "mirrors": "X1 spec §6 060100 (X1-01: reference data, positions, position manning), 060200 (X1-02: vessel crew list, movements, transfers table) and 060300 (X1-03: personal details, languages, employment terms, next-of-kin phone columns, profile RPCs)",
       "tables": {
         "type": "CrewPendingTables",
-        "expect": ["ref_countries", "ref_languages", "departments", "contract_types", "positions", "position_aliases", "position_manning", "crew_movements", "crew_transfers"]
+        "expect": ["ref_countries", "ref_languages", "departments", "contract_types", "positions", "position_aliases", "position_manning", "crew_movements", "crew_transfers", "crew_personal_details", "crew_languages", "crew_assignment_terms"]
       },
+      "columns": { "type": "CrewPendingColumns", "expect": ["crew_next_of_kin"] },
       "functions": {
         "type": "CrewPendingFunctions",
-        "expect": ["crew_positions_for_vessel", "crew_vessel_unmatched_titles", "crew_position_create", "crew_vessel_positions_save", "crew_position_alias_set", "crew_vessel_list", "crew_vessel_movements"]
+        "expect": ["crew_positions_for_vessel", "crew_vessel_unmatched_titles", "crew_position_create", "crew_vessel_positions_save", "crew_position_alias_set", "crew_vessel_list", "crew_vessel_movements", "crew_profile_resolve", "crew_profile_summary", "crew_personal_details_save", "crew_languages_save", "crew_onboarding_save", "crew_find_duplicates"]
       }
     }
   ],
@@ -18,7 +19,9 @@
     "functions": {
       "crew_vessel_cap": "RLS predicate and X1 definer gate (X1 spec §3, 20261124060100): text-first boolean the policies and every X1 definer call; the client gates with useCan() on the same capability keys",
       "crew_cap_vessel_ids": "RLS helper (D-229, X1 spec §3, 20261124060100): the caller's vessels holding a capability key, computed once per statement in the X1 read policies; the browser does not call it",
-      "crew_caller_is_external": "RLS and RPC helper (D-229, X1 spec §3, 20261124060200): caller-only boolean the crew_movements / crew_transfers policies and the crew RPCs use to refuse external viewers; the browser does not call it"
+      "crew_caller_is_external": "RLS and RPC helper (D-229, X1 spec §3, 20261124060200): caller-only boolean the crew_movements / crew_transfers policies and the crew RPCs use to refuse external viewers; the browser does not call it",
+      "crew_profile_visible": "RLS and X1 definer helper (X1 spec §3, 20261124060300): one-argument boolean \"the caller may see this person\" the profile definers gate with; the page asks crew_profile_resolve / crew_profile_summary, which answer P0002 for an invisible person",
+      "crew_visible_profile_ids": "RLS helper (D-229, X1 spec §3, 20261124060300): the profiles the caller may see, computed once per statement in the crew_personal_details / crew_languages read policies; the browser does not call it"
     }
   }
 }

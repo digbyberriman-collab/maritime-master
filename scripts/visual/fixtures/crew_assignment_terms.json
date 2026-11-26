@@ -1,0 +1,27 @@
+[
+  {
+    "id": "f4000000-0000-4000-8000-000000000015",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "profile_id": "b0000000-0000-4000-8000-000000000015",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "assignment_id": "d0000000-0000-4000-8000-000000000015",
+    "position_id": "d11d07a1-c174-8b08-72e6-8180ffe6a6be",
+    "department_key": "interior",
+    "start_date": "$date:-135",
+    "date_joining_vessel": "$date:-135",
+    "review_date": "$date:+230",
+    "contract_type_key": "rotational",
+    "leave_method": "ratio",
+    "leave_days_per_year": null,
+    "leave_ratio_on": 10,
+    "leave_ratio_off": 10,
+    "place_of_embarkation": "Palma de Mallorca",
+    "end_date": null,
+    "end_reason": null,
+    "end_notes": null,
+    "created_by": null,
+    "updated_by": null,
+    "created_at": "$ts:-135d",
+    "updated_at": "$ts:-20d"
+  }
+]

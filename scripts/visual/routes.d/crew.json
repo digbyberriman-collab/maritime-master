@@ -68,5 +68,29 @@
     "persona": "crew-list-basic",
     "waitFor": "[data-movements-state=\"not-set-up\"]",
     "note": "X1-02 not applied (D-01): the Movements tab says it is not set up yet. Warns by design: the missing RPCs log 404s"
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/personal",
+    "slug": "crew-profile-personal",
+    "waitFor": "[data-crew-profile=\"server\"] [data-personal-mode=\"server\"]",
+    "note": "X1-03: the routed crew profile, Personal tab: header with the prev/next switcher, Rotation schedule and Edit profile; personal details, languages, current employment and biography"
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/personal?edit=1",
+    "slug": "crew-profile-personal-edit",
+    "waitFor": "[data-crew-profile=\"server\"] form",
+    "note": "X1-03: Edit profile opens the Personal tab's form (identity and self fields, country and language pickers)"
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/contact",
+    "slug": "crew-profile-contact",
+    "waitFor": "[data-crew-profile=\"server\"] [data-profile-card=\"contact\"]",
+    "note": "X1-03: the Contact tab: address, repatriation airport, phones as dial code and number, next of kin (HR or the person only)"
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015",
+    "slug": "crew-profile-redirect",
+    "expectRedirect": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/personal",
+    "note": "X1-03: the bare profile URL lands on the Personal tab"
   }
 ]

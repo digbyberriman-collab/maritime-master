@@ -1,0 +1,38 @@
+[
+  {
+    "id": "f3000000-0000-4000-8000-000000000151",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "profile_id": "b0000000-0000-4000-8000-000000000015",
+    "slot": 1,
+    "language_code": "en",
+    "proficiency": null,
+    "created_by": null,
+    "updated_by": null,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "id": "f3000000-0000-4000-8000-000000000152",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "profile_id": "b0000000-0000-4000-8000-000000000015",
+    "slot": 2,
+    "language_code": "es",
+    "proficiency": "conversational",
+    "created_by": null,
+    "updated_by": null,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "id": "f3000000-0000-4000-8000-000000000153",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "profile_id": "b0000000-0000-4000-8000-000000000015",
+    "slot": 3,
+    "language_code": "fr",
+    "proficiency": "basic",
+    "created_by": null,
+    "updated_by": null,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  }
+]

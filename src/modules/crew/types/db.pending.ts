@@ -15,6 +15,17 @@
  * status, invitation state) and crew_vessel_movements. The browser reads
  * through the RPCs; the tables are read-only for it as well.
  *
+ * 20261124060300_crew_profile_details.sql (X1-03): crew_personal_details,
+ * crew_languages and crew_assignment_terms (read through RLS: the people
+ * who may see the person), the new next-of-kin phone columns (T-68), and
+ * the profile RPCs (resolve, summary, the two saves, onboarding and the
+ * duplicate check). Every write is an RPC.
+ *
+ * `CrewForeignPendingTables` is not this module's: the platform signature
+ * store (SIG1, PR-X1-I) that the profile's signature card reads. It is not
+ * in the contract map, because no build-out file defines it yet; the
+ * platform's own pending file takes it over when its migration is written.
+ *
  * Types only: each crew hook builds its client with
  * `pendingClient<CrewPendingTables, NoPending, CrewPendingFunctions>()`.
  *
@@ -24,9 +35,9 @@
  * the pickers fall back to free text); any other error is an error with
  * Retry. Never mock rows.
  */
-import type { PendingTable } from '@/integrations/supabase/pending';
+import type { PendingColumns, PendingTable } from '@/integrations/supabase/pending';
 import type { Json } from '@/integrations/supabase/types';
-import type { AccessSetKey, PositionScope, RankTier } from './domain';
+import type { AccessSetKey, LanguageProficiency, PositionScope, RankTier } from './domain';
 import type { CrewPlacementKind, CrewStatus, CrewStatusDetail } from '../lib/crewStatus';
 
 // ---------------------------------------------------------------- 060100 rows
@@ -273,6 +284,207 @@ export type CrewVesselMovementRpcRow = {
   notes: string | null;
 };
 
+// ---------------------------------------------------------------- 060300 rows
+
+export type CrewTitle = 'mr' | 'mrs' | 'ms' | 'miss' | 'dr' | 'capt' | 'mx';
+export type CrewSex = 'male' | 'female' | 'other' | 'undisclosed';
+export type CrewMaritalStatus =
+  | 'single'
+  | 'married'
+  | 'living_with_partner'
+  | 'divorced'
+  | 'widowed'
+  | 'separated'
+  | 'domestic_partnership'
+  | 'undisclosed';
+export type CrewHasChildren = 'yes' | 'no' | 'undisclosed';
+export type CrewLeaveMethod = 'days_per_year' | 'ratio' | 'none';
+export type CrewEndReason =
+  | 'contract_end'
+  | 'resignation'
+  | 'dismissal'
+  | 'medical'
+  | 'end_of_temporary_contract'
+  | 'transfer_to_another_employer'
+  | 'retirement'
+  | 'transfer'
+  | 'other';
+
+export type CrewPersonalDetailsRow = {
+  profile_id: string;
+  company_id: string;
+  crew_number: string | null;
+  title: CrewTitle | null;
+  middle_name: string | null;
+  work_email: string | null;
+  sex: CrewSex | null;
+  date_of_birth: string | null;
+  place_of_birth: string | null;
+  nationality_code: string | null;
+  dual_nationality_code: string | null;
+  residency_country_code: string | null;
+  place_of_embarkation: string | null;
+  height_cm: number | null;
+  weight_kg: number | null;
+  marital_status: CrewMaritalStatus | null;
+  has_children: CrewHasChildren | null;
+  biography: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  region: string | null;
+  postal_code: string | null;
+  country_code: string | null;
+  repatriation_airport: string | null;
+  phone_dial_code: string | null;
+  phone_number: string | null;
+  mobile_dial_code: string | null;
+  mobile_number: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CrewLanguageRow = {
+  id: string;
+  company_id: string;
+  profile_id: string;
+  /** 1 = mother tongue, 2-4 further languages. */
+  slot: number;
+  language_code: string;
+  /** Null for the mother tongue (slot 1), set for slots 2-4. */
+  proficiency: LanguageProficiency | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CrewAssignmentTermsRow = {
+  id: string;
+  company_id: string;
+  profile_id: string;
+  vessel_id: string;
+  /** Advisory link to the current crew_assignments row (D-X1-2). */
+  assignment_id: string | null;
+  position_id: string | null;
+  department_key: string | null;
+  start_date: string;
+  date_joining_vessel: string | null;
+  review_date: string | null;
+  contract_type_key: string | null;
+  leave_method: CrewLeaveMethod | null;
+  leave_days_per_year: number | null;
+  leave_ratio_on: number | null;
+  leave_ratio_off: number | null;
+  place_of_embarkation: string | null;
+  end_date: string | null;
+  end_reason: CrewEndReason | null;
+  end_notes: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** New columns of the live crew_next_of_kin (T-68: dial code + national number). */
+export type CrewNextOfKinNewColumns = {
+  phone_dial_code: string | null;
+  mobile_dial_code: string | null;
+  mobile_number: string | null;
+  country_code: string | null;
+};
+
+/** The tabs a profile can have (X1 spec §4), in the server's spelling. */
+export type CrewProfileTabKey =
+  | 'personal'
+  | 'contact'
+  | 'documents'
+  | 'stcw'
+  | 'qualifications'
+  | 'training'
+  | 'hours-of-rest'
+  | 'employment'
+  | 'medical'
+  | 'activity';
+
+/** The one row of crew_profile_summary (RETURNS TABLE). */
+export type CrewProfileSummaryRpcRow = {
+  profile_id: string;
+  user_id: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  preferred_name: string | null;
+  avatar_url: string | null;
+  crew_number: string | null;
+  position_id: string | null;
+  position_name: string | null;
+  position_text: string | null;
+  department_key: string | null;
+  department_label: string | null;
+  rank_tier: RankTier | null;
+  /** On this vessel's crew today (current, planned or pending placement). */
+  on_vessel: boolean;
+  placement_kind: CrewPlacementKind | null;
+  assignment_id: string | null;
+  join_date: string | null;
+  leave_date: string | null;
+  status: CrewStatus | null;
+  status_detail: CrewStatusDetail | null;
+  transfer_vessel_id: string | null;
+  leave_code: string | null;
+  login_state: 'active' | 'pending_login' | 'disabled';
+  prev_profile_id: string | null;
+  prev_name: string | null;
+  next_profile_id: string | null;
+  next_name: string | null;
+  /** 1-based place in the vessel's rank order among the people the caller may see. */
+  member_index: number | null;
+  member_count: number | null;
+  is_own: boolean;
+  /** May change identity fields (names, birth, nationalities, crew number). */
+  can_edit: boolean;
+  /** May change self fields (contact, address, phones, languages, biography). */
+  can_edit_self: boolean;
+  tabs: string[];
+};
+
+/** One row of crew_find_duplicates (RETURNS TABLE). */
+export type CrewDuplicateRpcRow = {
+  profile_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  vessel_id: string | null;
+  vessel_name: string | null;
+  match_kind: 'email' | 'name_dob' | 'name';
+};
+
+/** One element of crew_languages_save's p_rows. */
+export type CrewLanguageSaveRow = {
+  slot: number;
+  language_code: string;
+  proficiency: LanguageProficiency | null;
+};
+
+// ---------------------------------------------------------------- the platform signature store (SIG1; not this module's)
+
+/** user_signature_images (gap/08 SIG1, PR-X1-I): not written yet; the profile card reads it and stays hidden while it is missing. */
+export type UserSignatureImageRow = {
+  id: string;
+  profile_id: string;
+  storage_path: string;
+  sha256: string;
+  width: number | null;
+  height: number | null;
+  created_at: string;
+  revoked_at: string | null;
+};
+
+export type CrewForeignPendingTables = {
+  user_signature_images: PendingTable<UserSignatureImageRow, 'profile_id' | 'storage_path' | 'sha256'>;
+};
+
 // ---------------------------------------------------------------- pending shapes
 
 export type CrewPendingTables = {
@@ -288,6 +500,14 @@ export type CrewPendingTables = {
     CrewTransferRow,
     'company_id' | 'profile_id' | 'from_vessel_id' | 'to_vessel_id' | 'sign_off_date' | 'sign_on_date'
   >;
+  crew_personal_details: PendingTable<CrewPersonalDetailsRow, 'profile_id' | 'company_id'>;
+  crew_languages: PendingTable<CrewLanguageRow, 'company_id' | 'profile_id' | 'slot' | 'language_code'>;
+  crew_assignment_terms: PendingTable<CrewAssignmentTermsRow, 'company_id' | 'profile_id' | 'vessel_id' | 'start_date'>;
+};
+
+/** New columns of live tables (D-133). */
+export type CrewPendingColumns = {
+  crew_next_of_kin: PendingColumns<CrewNextOfKinNewColumns>;
 };
 
 export type CrewPendingFunctions = {
@@ -308,4 +528,16 @@ export type CrewPendingFunctions = {
   crew_position_alias_set: { Args: { p_vessel_id: string; p_alias: string; p_position_id: string }; Returns: PositionAliasRow };
   crew_vessel_list: { Args: { p_vessel_id: string; p_on?: string }; Returns: CrewVesselListRpcRow[] };
   crew_vessel_movements: { Args: { p_vessel_id: string; p_from: string; p_to: string }; Returns: CrewVesselMovementRpcRow[] };
+  crew_profile_resolve: { Args: { p_vessel_id: string; p_ref: string }; Returns: string };
+  crew_profile_summary: { Args: { p_profile_id: string; p_vessel_id: string }; Returns: CrewProfileSummaryRpcRow[] };
+  crew_personal_details_save: { Args: { p_profile_id: string; p_payload: Json }; Returns: CrewPersonalDetailsRow };
+  crew_languages_save: { Args: { p_profile_id: string; p_rows: Json }; Returns: CrewLanguageRow[] };
+  crew_onboarding_save: {
+    Args: { p_profile_id: string; p_vessel_id: string; p_terms: Json; p_personal?: Json };
+    Returns: CrewAssignmentTermsRow;
+  };
+  crew_find_duplicates: {
+    Args: { p_vessel_id: string; p_email: string; p_first: string; p_last: string; p_dob?: string };
+    Returns: CrewDuplicateRpcRow[];
+  };
 };

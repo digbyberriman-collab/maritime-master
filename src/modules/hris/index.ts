@@ -8,3 +8,7 @@ export { useCrewContracts, useCompanyContracts, useContractMutations, useHrExpir
 export { useEmploymentHistory, useRecentMovements } from './hooks/useEmploymentHistory';
 export { useCrewCompensation, useCompanyCompensation, useCompensationMutations, useBankDetails, useBankDetailMutations, useFxRatesTo } from './hooks/useCompensation';
 export { useHrCompanySettings, useHrCompanySettingsMutations, usePayGrades, usePayGradeMutations, useFxRates, useFxRateMutations, usePayPeriods, usePayPeriodMutations } from './hooks/useCompensationSettings';
+// Next of kin (shared with the vessel crew profile's Contact tab, X1-03; gap/04 C20).
+export { NextOfKinCard } from './components/next-of-kin/NextOfKinCard';
+export { NextOfKinFormDialog } from './components/next-of-kin/NextOfKinFormDialog';
+export { useCrewNextOfKin, NEXT_OF_KIN_RELATIONSHIPS, type NextOfKin, type NextOfKinFormData } from './hooks/useCrewNextOfKin';

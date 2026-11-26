@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRightLeft, Clock, Edit, KeyRound, LogOut, MailPlus, MoreHorizontal, Send, Ship, UserCheck, UserX } from 'lucide-react';
+import { ArrowRightLeft, Clock, Edit, IdCard, KeyRound, LogOut, MailPlus, MoreHorizontal, Send, Ship, UserCheck, UserX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -13,6 +13,11 @@ import {
 import { Portal as TooltipPortal } from '@radix-ui/react-tooltip';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import type { CrewListRow } from '@/modules/crew/lib/crewListModel';
+import { useCan } from '@/lib/permissions/useCan';
+import { useScope } from '@/app/router/scopeContext';
+import { useScopedPath } from '@/app/router/scopes';
+import { CREW_CAPS } from '@/modules/crew/paths';
+import { profilePath } from '@/modules/crew/lib/profileTabs';
 import { ROW_BUTTON } from './CrewTable';
 
 /** What the viewer may do on the list (useCan answers, computed once by the page). */
@@ -78,18 +83,23 @@ const DisabledAction: React.FC<{ label: string; reason: string; icon: React.Reac
 };
 
 /**
- * The row's actions (gap/04 C8): Hours of rest and Transfer as icon buttons
- * (View profile arrives with the routed profile, X1-03), then an overflow
- * menu with Edit, Sign off, Reset account, access on / off and Reallocate,
- * each shown only when the viewer may use it (useCan). A pending placement
- * has no assignment yet (D-225): Transfer and Sign off say why they are not
- * available instead of failing.
+ * The row's actions (gap/04 C8): View profile, Hours of rest and Transfer
+ * as icon buttons, then an overflow menu with Edit, Sign off, Reset
+ * account, access on / off and Reallocate, each shown only when the viewer
+ * may use it (useCan). View profile opens the routed profile (X1-03) for a
+ * holder of vessel.crew.crew_profiles.view on the vessel, and on the
+ * viewer's own row. A pending placement has no assignment yet (D-225):
+ * Transfer and Sign off say why they are not available instead of failing.
  */
 export const CrewRowActions: React.FC<CrewRowActionsProps> = ({ row, currentUserId, can, hoursOfRestPath, inviteFromMenu, onAction }) => {
+  const scope = useScope();
+  const scopedPath = useScopedPath();
+  const canViewProfiles = useCan(CREW_CAPS.profilesView, { vesselId: scope.scope === 'vessel' ? scope.vessel?.id ?? null : null });
   const pending = row.placementKind === 'pending_placement';
   const own = Boolean(row.userId) && row.userId === currentUserId;
   const name = row.displayName;
   const showHor = can.hoursOfRest || own;
+  const showProfile = canViewProfiles || own;
   const hasLogin = Boolean(row.userId);
   const menuItems: React.ReactNode[] = [];
 
@@ -144,6 +154,13 @@ export const CrewRowActions: React.FC<CrewRowActionsProps> = ({ row, currentUser
   return (
     <TooltipProvider delayDuration={200}>
       <div className="flex items-center justify-end gap-1">
+        {showProfile ? (
+          <Button asChild variant="ghost" size="icon" className="size-8 [@media(pointer:coarse)]:size-11">
+            <Link to={scopedPath(profilePath(row.profileId))} aria-label={`View profile: ${name}`}>
+              <IdCard aria-hidden="true" />
+            </Link>
+          </Button>
+        ) : null}
         {showHor ? (
           hasLogin ? (
             <Button asChild variant="ghost" size="icon" className="size-8 [@media(pointer:coarse)]:size-11">
