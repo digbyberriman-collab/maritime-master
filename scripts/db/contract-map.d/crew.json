@@ -8,6 +8,12 @@
       "views": { "type": "CrewPendingViews", "expect": ["crew_requirement_status", "crew_compliance_summary"] },
       "columns": { "type": "CrewPendingColumns", "expect": ["crew_next_of_kin", "crew_certificates"] },
       "functions": { "type": "CrewPendingFunctions", "expect": ["crew_positions_for_vessel", "crew_vessel_unmatched_titles", "crew_position_create", "crew_vessel_positions_save", "crew_position_alias_set", "crew_vessel_list", "crew_vessel_movements", "crew_profile_resolve", "crew_profile_summary", "crew_personal_details_save", "crew_languages_save", "crew_onboarding_save", "crew_find_duplicates", "crew_documents_for_profile", "crew_document_rights", "crew_document_save", "crew_document_delete", "crew_document_issuing_suggestions", "crew_document_review_rights", "crew_document_verify", "crew_document_mute", "crew_document_unmute", "crew_document_renew", "crew_vessel_compliance", "crew_vessel_requirement_status", "crew_compliance_for_vessels", "crew_requirements_config", "crew_requirement_row_save", "crew_requirement_row_delete", "crew_requirement_cell_set", "crew_requirement_row_bulk", "crew_requirements_add_stcw_basic", "crew_vessel_set_passenger", "crew_vessel_settings_save", "crew_document_type_create", "crew_document_type_satisfies_save"] }
+    },
+    {
+      "file": "src/modules/work-rest/types/db.pending.ts",
+      "mirrors": "X1 spec §6 060700 (X1-07: the hours-of-rest engine: vessel settings margins, serious thresholds, HoD step and reminders, month signer columns, breach day, serious flag, deficit and review columns, stale signatures, and the save, fill and month RPCs)",
+      "columns": { "type": "WorkRestPendingColumns", "expect": ["vessel_work_rest_settings", "work_rest_monthly_submissions", "work_rest_non_conformities", "work_rest_signatures"] },
+      "functions": { "type": "WorkRestPendingFunctions", "expect": ["work_rest_save_day", "work_rest_fill_days", "work_rest_month_transition"] }
     }
   ],
   "notMirrored": {

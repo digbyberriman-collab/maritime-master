@@ -1,0 +1,67 @@
+[
+  {
+    "id": "ea000000-0000-4000-8000-000000000001",
+    "submission_id": "dc000000-0000-4000-8000-000000000001",
+    "signer_id": "a0000000-0000-4000-8000-000000000014",
+    "signer_role": "crew",
+    "signature_method": "electronic",
+    "signature_payload": null,
+    "signed_at": "2026-11-01T08:10:00.000Z",
+    "ip_address": null,
+    "user_agent": null,
+    "stale_at": null,
+    "stale_reason": null
+  },
+  {
+    "id": "ea000000-0000-4000-8000-000000000002",
+    "submission_id": "dc000000-0000-4000-8000-000000000001",
+    "signer_id": "a0000000-0000-4000-8000-000000000012",
+    "signer_role": "hod",
+    "signature_method": "electronic",
+    "signature_payload": null,
+    "signed_at": "2026-11-01T17:30:00.000Z",
+    "ip_address": null,
+    "user_agent": null,
+    "stale_at": null,
+    "stale_reason": null
+  },
+  {
+    "id": "ea000000-0000-4000-8000-000000000003",
+    "submission_id": "dc000000-0000-4000-8000-000000000001",
+    "signer_id": "a0000000-0000-4000-8000-000000000011",
+    "signer_role": "captain",
+    "signature_method": "electronic",
+    "signature_payload": null,
+    "signed_at": "2026-11-02T09:00:00.000Z",
+    "ip_address": null,
+    "user_agent": null,
+    "stale_at": null,
+    "stale_reason": null
+  },
+  {
+    "id": "ea000000-0000-4000-8000-000000000004",
+    "submission_id": "dc000000-0000-4000-8000-000000000002",
+    "signer_id": "a0000000-0000-4000-8000-000000000016",
+    "signer_role": "crew",
+    "signature_method": "electronic",
+    "signature_payload": null,
+    "signed_at": "2026-11-01T09:00:00.000Z",
+    "ip_address": null,
+    "user_agent": null,
+    "stale_at": null,
+    "stale_reason": null
+  },
+  {
+    "id": "ea000000-0000-4000-8000-000000000005",
+    "submission_id": "dc000000-0000-4000-8000-000000000003",
+    "signer_id": "a0000000-0000-4000-8000-000000000015",
+    "signer_role": "crew",
+    "signature_method": "electronic",
+    "signature_payload": null,
+    "signed_at": "2026-11-01T10:00:00.000Z",
+    "ip_address": null,
+    "user_agent": null,
+    "stale_at": "2026-11-02T12:00:00.000Z",
+    "stale_reason": "Day 6 was entered on the wrong day; correct it and sign again."
+  }
+]
