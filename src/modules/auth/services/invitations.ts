@@ -61,9 +61,13 @@ export async function fetchInvitationsByProfile(companyId: string, profileIds: r
 }
 
 /**
- * The status to show: the stored status, except that a sent or pending
- * invitation past `expires_at` reads as expired before the expiry job runs
- * (derived, honest: the link no longer works).
+ * The status to show: the stored status, except that a pending, sent or
+ * send_failed invitation past `expires_at` reads as expired before the
+ * expiry job runs. Derived and honest: past `expires_at` the link no longer
+ * works and, once the build-out is applied, the server ends the access the
+ * invitation opened (`user_is_active()` / `record_session_start()`, D-228).
+ * The stored row is still live, so it can still be revoked
+ * (`invitationCell`).
  */
 export function invitationDisplayStatus(row: Pick<UserInvitationRow, 'status' | 'expires_at'>, now: Date = new Date()): InvitationStatus {
   if ((row.status === 'sent' || row.status === 'pending' || row.status === 'send_failed') && row.expires_at) {

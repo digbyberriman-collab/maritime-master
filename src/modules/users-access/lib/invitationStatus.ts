@@ -6,6 +6,13 @@
  * - An invitation row (`user_invitations`) decides the invitation status,
  *   through `invitationDisplayStatus` (a link past `expires_at` reads
  *   Expired before the expiry job runs).
+ * - Revoke follows the stored row, not the display status: a row shown
+ *   Expired whose stored status is still live (pending, sent, send_failed)
+ *   can be revoked, because `revoke_invitation()` accepts it and withdraws
+ *   the access it opened. Once the build-out is applied the server grants
+ *   such a row nothing: `user_is_active()` and `record_session_start()` end
+ *   the access past `expires_at` (D-228). A stored expired, revoked or
+ *   accepted row offers no revoke.
  * - A backfilled row (`pending` + `legacy_unverified`) was "sent" by the old
  *   flow, which cannot prove it: it says so and offers a resend.
  * - No row (the table is not live yet, D-01, or no row is visible to the
@@ -88,7 +95,8 @@ export function invitationCell(
       invitationId: invitation.id,
       canInvite: false,
       canResend: !disabled && resendable && account !== 'active',
-      canRevoke: !disabled && live && status !== 'expired',
+      // The stored row decides: a live row past expires_at (shown Expired) can still be revoked (D-228).
+      canRevoke: !disabled && live,
     };
   }
 

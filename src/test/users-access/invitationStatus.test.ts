@@ -79,10 +79,33 @@ describe('invitationCell', () => {
     expect(invitationCell('invited', row({ status: 'revoked' }), 'table', NOW)).toMatchObject({ status: 'revoked', canResend: true, canRevoke: false });
   });
 
-  it('a sent link past expires_at reads Expired before the expiry job runs, and can be resent but not revoked', () => {
+  it('a sent link past expires_at reads Expired before the expiry job runs, and can be resent and revoked (the stored row is live, D-228)', () => {
     const late = row({ status: 'sent', expires_at: '2026-11-20T00:00:00Z' });
     expect(invitationDisplayStatus(late, NOW)).toBe('expired');
-    expect(invitationCell('invited', late, 'table', NOW)).toMatchObject({ status: 'expired', canResend: true, canRevoke: false });
+    expect(invitationCell('invited', late, 'table', NOW)).toMatchObject({ status: 'expired', canResend: true, canRevoke: true });
+  });
+
+  it('a pending or send_failed row past expiry is shown Expired and can still be revoked', () => {
+    for (const status of ['pending', 'send_failed'] as const) {
+      const late = row({ status, expires_at: '2026-11-20T00:00:00Z', last_sent_at: null });
+      expect(invitationCell('invited', late, 'table', NOW)).toMatchObject({ status: 'expired', canRevoke: true, invitationId: 'inv-1' });
+    }
+  });
+
+  it('a stored expired, revoked or accepted row offers no revoke, before or after expires_at', () => {
+    for (const status of ['expired', 'revoked', 'accepted'] as const) {
+      for (const expires_at of ['2026-11-29T12:00:00Z', '2026-11-20T00:00:00Z']) {
+        expect(invitationCell('invited', row({ status, expires_at }), 'table', NOW).canRevoke).toBe(false);
+      }
+    }
+  });
+
+  it('a disabled account offers no revoke, even for a live row past expiry', () => {
+    for (const expires_at of ['2026-11-29T12:00:00Z', '2026-11-20T00:00:00Z']) {
+      for (const status of ['pending', 'sent', 'send_failed'] as const) {
+        expect(invitationCell('disabled', row({ status, expires_at }), 'table', NOW)).toMatchObject({ canRevoke: false, canResend: false });
+      }
+    }
   });
 
   it('send failed shows why, with resend', () => {

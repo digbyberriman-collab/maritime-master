@@ -266,6 +266,39 @@ describe('Users & Access list', () => {
     expect(h.notify.success).not.toHaveBeenCalled();
   });
 
+  const openMenu = async (name: string) => {
+    const row = await rowOf(name);
+    const more = await row.findByRole('button', { name: `More actions for ${name}` });
+    fireEvent.pointerDown(more, { button: 0, ctrlKey: false });
+    return screen.findByRole('menu');
+  };
+  // A 'sent' row whose link is past expires_at, before any expiry job ran: shown Expired, still live in the database.
+  const sentPastExpiry = () => ({ data: [inv('p-3', 'sent', { expires_at: '2020-01-01T00:00:00Z' })], error: null });
+
+  it('a sent row past expires_at reads Expired, and an admin can still revoke it from the row menu (D-228)', async () => {
+    h.tables.user_invitations = sentPastExpiry;
+    h.invoke.mockResolvedValueOnce({ data: { ok: true, invitation: REVOKED, loginBlocked: true, loginNote: 'banned' }, error: null });
+    renderPage();
+    const bosun = await rowOf('Demo Bosun');
+    await waitFor(() => expect(bosun.getAllByText('Expired').length).toBeGreaterThan(0));
+    const menu = await openMenu('Demo Bosun');
+    fireEvent.click(within(menu).getByRole('menuitem', { name: /Revoke invitation/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Revoke invitation' }));
+    await waitFor(() => expect(h.invoke).toHaveBeenCalledWith('admin-actions', { body: { action: 'revoke_invitation', invitationId: 'inv-p-3' } }));
+  });
+
+  it('a non-admin sees the same Expired row without Revoke in its menu', async () => {
+    h.tables.user_invitations = sentPastExpiry;
+    h.can = { assign: true, admin: false };
+    renderPage();
+    const bosun = await rowOf('Demo Bosun');
+    await waitFor(() => expect(bosun.getAllByText('Expired').length).toBeGreaterThan(0));
+    // The menu still opens (Edit access sits there next to Resend), but holds no revoke.
+    const menu = await openMenu('Demo Bosun');
+    expect(within(menu).getByRole('menuitem', { name: /Edit access/ })).toBeInTheDocument();
+    expect(within(menu).queryByRole('menuitem', { name: /Revoke invitation/ })).toBeNull();
+  });
+
   it('without the capability there are no invite or revoke actions and no selection', async () => {
     h.can = { assign: false, admin: false };
     renderPage();
