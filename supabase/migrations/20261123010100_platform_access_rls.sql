@@ -484,6 +484,13 @@ REVOKE SELECT ON TABLE public.permission_audit_log FROM anon;
 -- actor = auth.uid() (no row for service-role maintenance without a JWT),
 -- the target's company, and before / after state as ids, module keys and
 -- levels only (no names, emails or free text).
+--
+-- vessel_scope is NULL once the vessel row is gone (review round 7,
+-- user-roles-vessel-delete-widens; D-245): a vessel delete cascades to its
+-- vessel-scoped rbac_user_roles, user_permission_overrides and user_roles
+-- rows, and an audit row naming the deleted vessel would fail
+-- permission_audit_log_vessel_scope_fkey and so refuse the delete. The
+-- vessel id stays in before_state.
 CREATE OR REPLACE FUNCTION public.access_change_audit()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -558,7 +565,9 @@ BEGIN
     before_state, after_state, vessel_scope, is_high_impact, company_id
   ) VALUES (
     v_actor, coalesce(v_actor_role, 'unknown'), v_action, v_target, v_role_id, v_module,
-    v_before, v_after, v_vessel,
+    v_before, v_after,
+    -- D-245: NULL once the vessel row is gone (an FK cascade of a vessel delete).
+    CASE WHEN v_vessel IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.vessels AS v WHERE v.id = v_vessel) THEN NULL ELSE v_vessel END,
     v_action IN ('role_assigned', 'role_removed') OR coalesce(v_module IN ('settings', 'hr', 'insurance', 'incidents'), false),
     v_company
   );
@@ -684,7 +693,7 @@ COMMENT ON FUNCTION public.user_permission_overrides_stamp() IS 'Trigger: compan
 COMMENT ON FUNCTION public.rbac_user_roles_stamp() IS 'Trigger trg_rbac_user_roles_stamp (D-230): on INSERT under a JWT assigned_by = auth.uid() and assigned_at = now() (client values overwritten); on UPDATE both keep the stored values; without a JWT the given values are kept.';
 COMMENT ON COLUMN public.rbac_user_roles.assigned_by IS 'Who assigned the role: the signed-in caller, stamped by trg_rbac_user_roles_stamp (D-230); never changed by an update. Service-role inserts keep the given value.';
 COMMENT ON COLUMN public.rbac_user_roles.assigned_at IS 'When the role was assigned: now() at a signed-in insert, stamped by trg_rbac_user_roles_stamp (D-230); never changed by an update.';
-COMMENT ON FUNCTION public.access_change_audit() IS 'Trigger (gap/01 F53): one permission_audit_log row per change of rbac_user_roles, user_permission_overrides or user_roles, actor = auth.uid(), ids / keys / levels only. Skipped without a JWT (service-role maintenance).';
+COMMENT ON FUNCTION public.access_change_audit() IS 'Trigger (gap/01 F53): one permission_audit_log row per change of rbac_user_roles, user_permission_overrides or user_roles, actor = auth.uid(), ids / keys / levels only. Skipped without a JWT (service-role maintenance). vessel_scope is NULL once the vessel row is gone (D-245: the FK cascade of a vessel delete), the vessel id stays in before_state.';
 COMMENT ON FUNCTION public.log_permission_change(uuid, text, public.audit_action_type, uuid, uuid, text, jsonb, jsonb, text, uuid, inet, text) IS 'CC-4: the live signature, one overload. With a JWT the actor, role and company are the caller''s (users-access admin required; target and vessel of that company); without, the parameters are used. Service role only.';
 COMMENT ON COLUMN public.user_permission_overrides.company_id IS 'The target user''s company (stamped by trg_user_permission_overrides_stamp); scopes reads and writes.';
 COMMENT ON COLUMN public.user_permission_overrides.vessel_id IS 'Reserved: must be NULL until the evaluators honour a vessel limit (D-124)';

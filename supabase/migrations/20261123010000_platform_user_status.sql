@@ -22,7 +22,9 @@
 --   set_membership_status(), auth_user_id_for_email(), user_is_admin_target()
 --   (service role), lock_company_admin_managers() (no grant)
 -- Redefined (live, same signature): hr_anonymize_profile() (the W7 guards
---   and the audit row around its account_status write)
+--   and the audit row around its account_status write);
+--   payroll_runs_guard_transitions() (trigger; the no-JWT exemption of its
+--   approve / pay gate, D-248)
 -- TS mirror: src/modules/auth/services/accountStatus.ts (a disabled user
 --   reads no profile row: the status comes from my_account_status() /
 --   record_session_start()); the edge functions call set_membership_status
@@ -110,6 +112,7 @@ BEGIN
       'public.performance_review_submit_self_assessment(uuid,jsonb,text)', 'public.performance_review_acknowledge(uuid,text)',
       'public.disciplinary_record_acknowledge(uuid)', 'public.pay_review_apply(uuid)', 'public.payroll_calculate_run(uuid)',
       'public.gratuity_calculate_pool(uuid)', 'public.legal_generate_alerts(uuid)', 'public.legal_attachment_path_allowed(text)',
+      'public.payroll_runs_guard_transitions()',
       'public.hr_company_settings_for(uuid)', 'public.hr_days_onboard(uuid,date,date,uuid,text[])',
       'public.fx_rate_for(uuid,character,character,date)', 'public.legal_request_type_label(text)'
     ]) AS f(sig)
@@ -1206,11 +1209,46 @@ BEGIN
 END;
 $$;
 
--- The legacy triggers payroll_runs_guard_transitions() ("IF ... AND NOT
--- payroll_can_admin(auth.uid())") and profiles_guard_privileged_columns()
--- ("AND NOT hr_can_admin(auth.uid())") are unchanged: with the helpers
--- two-valued their gates close for an inactive caller
--- (p3_user_status/inactive_gates.test.sql).
+-- The legacy trigger profiles_guard_privileged_columns() ("AND NOT
+-- hr_can_admin(auth.uid())") is unchanged: with the helper two-valued its
+-- gate closes for an inactive caller (p3_user_status/inactive_gates.test.sql).
+--
+-- payroll_runs_guard_transitions() (live body of 20260917120000 /
+-- 20260917180124, redefined once here; review round 7,
+-- payroll-guard-refuses-no-jwt, D-248): with payroll_can_admin() two-valued
+-- (D-233) its approve / pay gate, "IF NEW.status IN ('approved', 'paid')
+-- AND NOT payroll_can_admin(auth.uid())", also refused the trusted no-JWT
+-- callers (the service role, the SQL editor, pg_cron), whose NULL used to
+-- skip the RAISE. The gate now asks a signed-in caller only, as
+-- profiles_guard_privileged_columns(), hw_people_guard_consent(), the
+-- legal triggers and crew_assignments_guard() already exempt the no-JWT
+-- context: an inactive or non-admin signed-in caller is still refused.
+-- Without a JWT approved_by / submitted_by stay NULL, as before D-233. The
+-- body is otherwise the live one, unchanged; the trigger
+-- (trg_payroll_runs_guard) is not recreated.
+CREATE OR REPLACE FUNCTION public.payroll_runs_guard_transitions()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NEW.status IS DISTINCT FROM OLD.status THEN
+    IF NEW.status IN ('approved', 'paid') AND auth.uid() IS NOT NULL AND NOT public.payroll_can_admin(auth.uid()) THEN
+      RAISE EXCEPTION 'Only payroll admins can approve or pay a payroll run';
+    END IF;
+    IF OLD.status = 'paid' THEN
+      RAISE EXCEPTION 'A paid payroll run cannot change status';
+    END IF;
+    IF NEW.status = 'approved' THEN NEW.approved_by := auth.uid(); NEW.approved_at := now(); END IF;
+    IF NEW.status = 'pending_approval' THEN NEW.submitted_by := auth.uid(); NEW.submitted_at := now(); END IF;
+    IF NEW.status = 'paid' THEN
+      NEW.paid_at := now();
+      UPDATE public.gratuity_distributions SET payout_status = 'paid', paid_at = now()
+      WHERE payroll_line_id IN (SELECT id FROM public.payroll_lines WHERE run_id = NEW.id);
+      UPDATE public.payroll_lines SET status = 'paid' WHERE run_id = NEW.id;
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
 
 -- ---------------------------------------------------------------- own-row profile policies (CC-7)
 
@@ -2045,6 +2083,9 @@ REVOKE ALL ON FUNCTION public.payroll_calculate_run(uuid) FROM PUBLIC, anon, aut
 REVOKE ALL ON FUNCTION public.gratuity_calculate_pool(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.legal_generate_alerts(uuid) FROM PUBLIC, anon, authenticated, service_role;
 REVOKE ALL ON FUNCTION public.legal_attachment_path_allowed(text) FROM PUBLIC, anon, authenticated, service_role;
+-- A trigger function needs no EXECUTE grant (D-248; the build-out ACL rule:
+-- never PUBLIC or anon).
+REVOKE ALL ON FUNCTION public.payroll_runs_guard_transitions() FROM PUBLIC, anon, authenticated, service_role;
 
 GRANT EXECUTE ON FUNCTION public.hr_can_admin(uuid) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.hr_can_edit(uuid) TO authenticated, service_role;
@@ -2114,8 +2155,9 @@ COMMENT ON FUNCTION public.hr_can_write_crew_record(uuid) IS 'Live helper redefi
 COMMENT ON FUNCTION public.performance_review_submit_self_assessment(uuid, jsonb, text) IS 'HRIS self-service (live body of 20260917180528, redefined by 20261123010000, D-233): an active caller submits the self-assessment of their own review only (r.profile_id IS DISTINCT FROM my_profile_id() raises Review not found, a profile-less or inactive caller included).';
 COMMENT ON FUNCTION public.performance_review_acknowledge(uuid, text) IS 'HRIS self-service (live body of 20260917180528, redefined by 20261123010000, D-233): an active caller acknowledges their own review only (IS DISTINCT FROM my_profile_id(); Review not found otherwise, a profile-less or inactive caller included).';
 COMMENT ON FUNCTION public.disciplinary_record_acknowledge(uuid) IS 'HRIS self-service (live body of 20260917180528, redefined by 20261123010000, D-233): an active caller acknowledges their own disciplinary record only (IS DISTINCT FROM my_profile_id(); Record not found otherwise, a profile-less or inactive caller included).';
-COMMENT ON FUNCTION public.pay_review_apply(uuid) IS 'Payroll (live body of 20260917180124, redefined by 20261123010000, D-233): an active payroll admin applies an approved pay review of their own company only (the row''s company IS DISTINCT FROM get_user_company_id(auth.uid()) raises Pay review not found).';
-COMMENT ON FUNCTION public.payroll_calculate_run(uuid) IS 'Payroll (live body of 20260917180124, redefined by 20261123010000, D-233): an active payroll editor calculates a draft or calculated run of their own company only (Payroll run not found otherwise).';
-COMMENT ON FUNCTION public.gratuity_calculate_pool(uuid) IS 'Payroll (live body of 20260917180124, redefined by 20261123010000, D-233): an active payroll editor splits a draft or calculated gratuity pool of their own company only (Gratuity pool not found otherwise).';
+COMMENT ON FUNCTION public.pay_review_apply(uuid) IS 'Payroll (live body of 20260917180124, redefined by 20261123010000, D-233): an active payroll admin applies an approved pay review of their own company only (the row''s company IS DISTINCT FROM get_user_company_id(auth.uid()) raises Pay review not found). A no-JWT caller (service role) is refused (auth.uid() IS NULL); run as a signed-in payroll admin.';
+COMMENT ON FUNCTION public.payroll_calculate_run(uuid) IS 'Payroll (live body of 20260917180124, redefined by 20261123010000, D-233): an active payroll editor calculates a draft or calculated run of their own company only (Payroll run not found otherwise). A no-JWT caller (service role) is refused (auth.uid() IS NULL); run as a signed-in payroll admin.';
+COMMENT ON FUNCTION public.gratuity_calculate_pool(uuid) IS 'Payroll (live body of 20260917180124, redefined by 20261123010000, D-233): an active payroll editor splits a draft or calculated gratuity pool of their own company only (Gratuity pool not found otherwise). A no-JWT caller (service role) is refused (auth.uid() IS NULL); run as a signed-in payroll admin.';
+COMMENT ON FUNCTION public.payroll_runs_guard_transitions() IS 'Trigger trg_payroll_runs_guard (live body of 20260917120000, redefined by 20261123010000; review round 7, D-248): approving or paying a run needs an active payroll admin (payroll_can_admin, two-valued, D-233) when the caller is signed in; a no-JWT caller (the service role, the SQL editor, pg_cron) is exempt, as the other legacy guards exempt it, and leaves approved_by / submitted_by NULL. A paid run never changes status. No EXECUTE grant (a trigger).';
 COMMENT ON FUNCTION public.legal_generate_alerts(uuid) IS 'Legal SLA alerts (live body of 20260919120000_legal_module, redefined by 20261123010000, D-233): a signed-in legal editor sweeps their own company only and gets 0 when they have no company (an inactive caller included); without a JWT (the service role, the scheduler) p_company_id, or every company when NULL.';
 COMMENT ON FUNCTION public.legal_attachment_path_allowed(text) IS 'Legal-documents storage predicate (live body of 20260919120000_legal_module, redefined by 20261123010000, D-233): false without an active caller or with fewer than three folders; the first folder must be the caller''s company (IS DISTINCT FROM); legal editors anything under it, others only their own request or submission folder.';

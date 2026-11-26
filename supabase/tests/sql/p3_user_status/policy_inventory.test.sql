@@ -207,9 +207,13 @@ $$;
 -- counts legacy own-row comparisons that are AND-ed with a company helper
 -- or sit inside a profiles subquery (not holes, counted conservatively):
 -- +60 legacy in all, 0 build-out (20261123010500's 27 own-row branches now
--- ask the active state, asserted above).
-SELECT tests.ok((SELECT count(*) FROM inventory WHERE class IN ('role_gated_unscoped', 'rbac_only', 'own_row', 'signed_in', 'unscoped', 'other')) <= 152,
-                format('residual policies: %s (ratchet <= 152)', (SELECT count(*) FROM inventory WHERE class IN ('role_gated_unscoped', 'rbac_only', 'own_row', 'signed_in', 'unscoped', 'other'))));
+-- ask the active state, asserted above). 2026-11-26, review round 7
+-- (D-247): 152 -> 149, measured: the three legacy crew_tasks policies
+-- ("Users can view tasks assigned to them", "Users can update their own
+-- tasks", "Assigners can delete tasks"; own_row 108 -> 105) are recreated
+-- company-scoped and active-aware by 20261123010500.
+SELECT tests.ok((SELECT count(*) FROM inventory WHERE class IN ('role_gated_unscoped', 'rbac_only', 'own_row', 'signed_in', 'unscoped', 'other')) <= 149,
+                format('residual policies: %s (ratchet <= 149)', (SELECT count(*) FROM inventory WHERE class IN ('role_gated_unscoped', 'rbac_only', 'own_row', 'signed_in', 'unscoped', 'other'))));
 SELECT tests.is((SELECT count(*) FROM inventory WHERE class = 'other'), 0::bigint, 'every policy falls in a named class');
 -- Role-gated policies with no company or vessel scope (a user_roles row of
 -- any company passes them): 45 before 20261123010400 / 20261123010500, 0
@@ -219,7 +223,10 @@ SELECT tests.is((SELECT count(*) FROM inventory WHERE class = 'role_gated_unscop
 SELECT tests.is(i.class, 'active_aware', format('%s "%s" is company-scoped and active-aware (own-row branch included)', t.tablename, t.policyname))
 FROM (VALUES ('medical_reports', 'DPA and Captain can manage medical reports'), ('medical_reports', 'Medical reports visible to authorized users'),
              ('flight_bookings', 'Travel agents and DPA can manage bookings'), ('flight_bookings', 'Flight bookings viewable by request owner and staff'),
-             ('flight_requests', 'Users can view own flight requests'), ('flight_requests', 'Authorized users can manage flight requests')) AS t(tablename, policyname)
+             ('flight_requests', 'Users can view own flight requests'), ('flight_requests', 'Authorized users can manage flight requests'),
+             -- review round 7 (D-247): the crew_tasks policies, the three legacy has_fleet_access ones recreated company-scoped
+             ('crew_tasks', 'Officers can create tasks'), ('crew_tasks', 'Users can view tasks assigned to them'),
+             ('crew_tasks', 'Users can update their own tasks'), ('crew_tasks', 'Assigners can delete tasks')) AS t(tablename, policyname)
 LEFT JOIN inventory AS i ON i.schemaname = 'public' AND i.tablename = t.tablename AND i.policyname = t.policyname
 ORDER BY t.tablename, t.policyname;
 

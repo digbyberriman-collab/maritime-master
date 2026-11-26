@@ -43,8 +43,8 @@ SELECT tests.lives(format($q$INSERT INTO public.crew_assignments (id, vessel_id,
 SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET user_id = auth.uid() WHERE id = %L$q$, tests.id('ca:deckhand')),
                          '42501', 'self_assignment_refused', 'nor re-point someone else''s row to themselves');
 -- The verify-csr controls hold.
-SELECT tests.throws(format($q$INSERT INTO public.crew_assignments (vessel_id, user_id, position, join_date, is_current) VALUES (%L, auth.uid(), 'Master', current_date, true)$q$, tests.vessel_id('B.lev')),
-                    '42501', 'nor on another company''s vessel');
+SELECT tests.throws_like(format($q$INSERT INTO public.crew_assignments (vessel_id, user_id, position, join_date, is_current) VALUES (%L, auth.uid(), 'Master', current_date, true)$q$, tests.vessel_id('B.lev')),
+                         '42501', 'assignment_user_out_of_company', 'nor on another company''s vessel (rule h, D-246: the vessel''s company is not theirs)');
 SELECT tests.ok(NOT public.user_can_reach_vessel(auth.uid(), tests.vessel_id('A.hyd')) AND NOT public.user_can_reach_vessel(auth.uid(), tests.vessel_id('A.gam')), 'the Master''s reach is unchanged');
 SELECT tests.ok(NOT public.has_capability('admin.access.users_access.assign', tests.company_id('A'), tests.vessel_id('A.hyd')), 'and so is the assign capability');
 SELECT tests.reset_role();
@@ -109,10 +109,28 @@ FROM (VALUES ('leave_date = current_date - 1', 'assignment:A.master_dra@A.dra', 
              ('end_date = current_date', 'assignment:A.master_dra@A.dra', 'Master row with end_date today'),
              ('leave_date = current_date - 1', 'assignment:A.capt_dra@A.dra', 'Captain-rank row with leave_date yesterday'),
              ('end_date = current_date', 'assignment:A.capt_dra@A.dra', 'Captain-rank row with end_date today')) AS v(set_clause, row_key, what);
-SELECT tests.lives(format($q$UPDATE public.crew_assignments SET leave_date = current_date + 30 WHERE id = %L$q$, tests.id('assignment:A.master_dra@A.dra')),
-                   'a future leave date keeps the Master current, so it is no office change');
-SELECT tests.lives(format($q$UPDATE public.crew_assignments SET leave_date = NULL, end_date = NULL WHERE id = %L$q$, tests.id('assignment:A.master_dra@A.dra')),
-                   'and clearing it again is none either');
+-- Rule g (D-244; review round 7, master-office-end-date-edit-unguarded):
+-- the office ends at coalesce(leave_date, end_date), so a future leave
+-- date on the sitting Master ends the office on that day; only a
+-- users-access admin of the vessel sets, moves or clears it.
+SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET leave_date = current_date + 30 WHERE id = %L$q$, tests.id('assignment:A.master_dra@A.dra')),
+                         '42501', 'master_office_change_refused', 'the purser cannot set a future leave date on the sitting Master (it ends the office on that day)');
+SAVEPOINT master_end;
+SELECT tests.reset_role();
+UPDATE public.crew_assignments SET leave_date = current_date + 10, end_date = current_date + 10 WHERE id = tests.id('assignment:A.master_dra@A.dra');
+SELECT tests.as_user(tests.user_id('A.purser_dra'));
+SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET %s WHERE id = %L$q$, v.set_clause, tests.id('assignment:A.master_dra@A.dra')), '42501', 'master_office_change_refused',
+                         'the purser cannot ' || v.what || ' of the sitting Master')
+FROM (VALUES ('leave_date = NULL, end_date = NULL', 'clear the admin-set leave date'),
+             ('leave_date = current_date + 3650, end_date = current_date + 3650', 'push the admin-set leave date out ten years'),
+             ('end_date = current_date + 20', 'move the end date alone')) AS v(set_clause, what);
+SELECT tests.lives(format($q$UPDATE public.crew_assignments SET leave_date = NULL WHERE id = %L$q$, tests.id('assignment:A.master_dra@A.dra')),
+                   'clearing leave_date alone lives: end_date stays, the normaliser refills leave_date, the office end is unchanged');
+SELECT tests.reset_role();
+SELECT tests.ok((SELECT is_current AND leave_date = current_date + 10 AND end_date = current_date + 10 FROM public.crew_assignments WHERE id = tests.id('assignment:A.master_dra@A.dra')),
+                'the admin-set office end (+10) is unchanged');
+ROLLBACK TO SAVEPOINT master_end;
+SELECT tests.as_user(tests.user_id('A.purser_dra'));
 SELECT tests.lives(format($q$UPDATE public.crew_assignments SET leave_date = current_date - 1 WHERE id = %L$q$, tests.id('assignment:A.steward_dra@A.dra')),
                    'the purser still ends a non-Master row by its leave date');
 -- An already-ended Master row (history) is no appointment: the stored row
@@ -347,3 +365,134 @@ SELECT tests.ok(public.record_is_master(tests.user_id('A.relief_gam'), tests.ves
                 'the admin''s date edits moved the office');
 ROLLBACK TO SAVEPOINT master_join;
 SELECT tests.ok(position('join_date' IN pg_get_functiondef('public.crew_assignments_guard()'::regprocedure)) > 0, 'the guard reads the join date (D-237)');
+
+-- ------------------------------------------------------------ the Master office ends at the leave date (D-244; review round 7)
+
+-- record_is_master() and the reach helpers read the office end as
+-- coalesce(leave_date, end_date) (crew_assignment_is_current /
+-- crew_assignment_holds_office; D-217, D-227), but rule e caught a leave
+-- or end date only once it was today or earlier, so an HR editor who is no
+-- users-access admin moved the office end: a future date on the sitting
+-- Master (the office ends that day), an admin-set date cleared or pushed
+-- out (the office runs on), a relief Master ended before their join date.
+-- Rule g: on a row that is a current Master / Captain row before or after
+-- the update, a changed office end, or its mirror (end_date becomes the
+-- office end once leave_date is cleared), needs users-access admin of the
+-- vessel, the caller's own row included. Ports scratchpad
+-- verify-moed/repro.sql and repro2.sql (on GAME CHANGER, as set up above).
+SELECT tests.as_user(tests.user_id('A.purser_gam'));
+SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET %s WHERE id = %L$q$, v.set_clause, tests.id(v.row_key)), '42501', 'master_office_change_refused',
+                         'the purser cannot ' || v.what)
+FROM (VALUES ('leave_date = current_date + 1, end_date = current_date + 1', 'assignment:A.sitting_gam@A.gam', 'give the sitting Master a leave date tomorrow'),
+             ('leave_date = current_date + 5, end_date = current_date + 5', 'assignment:A.relief_gam@A.gam', 'end the planned relief Master before their join date'),
+             ('end_date = current_date + 5', 'assignment:A.capt_plan_gam@A.gam', 'set an end date alone on the planned Captain-rank row')) AS v(set_clause, row_key, what);
+SELECT tests.reset_role();
+
+-- An admin-planned handover: the sitting Master leaves on day +29 (set
+-- without a JWT, as the service role or the SQL editor would).
+SAVEPOINT handover;
+UPDATE public.crew_assignments SET leave_date = current_date + 29, end_date = current_date + 29 WHERE id = tests.id('assignment:A.sitting_gam@A.gam');
+SELECT tests.as_user(tests.user_id('A.purser_gam'));
+SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET %s WHERE id = %L$q$, v.set_clause, tests.id('assignment:A.sitting_gam@A.gam')), '42501', 'master_office_change_refused',
+                         'the purser cannot ' || v.what)
+FROM (VALUES ('leave_date = NULL, end_date = NULL', 'clear the sitting Master''s planned leave date'),
+             ('leave_date = current_date + 60, end_date = current_date + 60', 'push it out to day +60'),
+             ('end_date = current_date + 40', 'move its end date alone')) AS v(set_clause, what);
+SELECT tests.reset_role();
+UPDATE public.crew_assignments SET leave_date = current_date + 40, end_date = current_date + 40 WHERE id = tests.id('assignment:A.relief_self_gam@A.gam');
+SELECT tests.as_user(tests.user_id('A.relief_self_gam'));
+SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET %s WHERE id = %L$q$, v.set_clause, tests.id('assignment:A.relief_self_gam@A.gam')), '42501', 'master_office_change_refused',
+                         'a legacy master who is no users-access admin cannot ' || v.what)
+FROM (VALUES ('leave_date = NULL, end_date = NULL', 'clear the planned leave date of their own Master row'),
+             ('leave_date = current_date + 3650, end_date = current_date + 3650', 'push it out ten years')) AS v(set_clause, what);
+SELECT tests.as_user(tests.user_id('A.purser_gam'));
+SELECT tests.lives(format($q$UPDATE public.crew_assignments SET leave_date = current_date + 5 WHERE id = %L$q$, tests.id('assignment:A.cook_gam@A.gam')),
+                   'a leave date on a non-Master row stays open to HR');
+SELECT tests.lives(format($q$UPDATE public.crew_assignments SET leave_date = current_date - 300, end_date = current_date - 300 WHERE id = %L$q$, tests.id('assignment:A.old_master_gam@A.gam')),
+                   'and on an ended Master row (history)');
+SELECT tests.reset_role();
+SELECT tests.results_eq(
+  format($q$SELECT id, public.record_is_master(user_id, vessel_id), coalesce(leave_date, end_date) FROM public.crew_assignments WHERE id IN (%L, %L, %L, %L)$q$,
+         tests.id('assignment:A.sitting_gam@A.gam'), tests.id('assignment:A.relief_gam@A.gam'), tests.id('assignment:A.capt_plan_gam@A.gam'), tests.id('assignment:A.relief_self_gam@A.gam')),
+  format($q$VALUES (%L::uuid, true, current_date + 29), (%L::uuid, false, NULL::date), (%L::uuid, false, NULL::date), (%L::uuid, false, current_date + 40)$q$,
+         tests.id('assignment:A.sitting_gam@A.gam'), tests.id('assignment:A.relief_gam@A.gam'), tests.id('assignment:A.capt_plan_gam@A.gam'), tests.id('assignment:A.relief_self_gam@A.gam')),
+  'the Master rows keep their office (record_is_master) and their office end');
+ROLLBACK TO SAVEPOINT handover;
+
+-- A users-access admin of the vessel may make every one of these edits;
+-- the service role (no JWT: the daily sweep, admin-actions) is exempt.
+SAVEPOINT admin_end;
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.lives(format($q$UPDATE public.crew_assignments SET %s WHERE id = %L$q$, v.set_clause, tests.id(v.row_key)), 'a users-access admin may ' || v.what)
+FROM (VALUES ('leave_date = current_date + 1, end_date = current_date + 1', 'assignment:A.sitting_gam@A.gam', 'give the sitting Master a leave date tomorrow'),
+             ('leave_date = current_date + 60, end_date = current_date + 60', 'assignment:A.sitting_gam@A.gam', 'push it out'),
+             ('end_date = current_date + 40', 'assignment:A.sitting_gam@A.gam', 'move its end date alone'),
+             ('leave_date = NULL, end_date = NULL', 'assignment:A.sitting_gam@A.gam', 'clear it'),
+             ('leave_date = current_date + 5, end_date = current_date + 5', 'assignment:A.relief_gam@A.gam', 'end the relief before their join date'),
+             ('end_date = current_date + 5', 'assignment:A.capt_plan_gam@A.gam', 'set an end date alone on the planned Captain-rank row'),
+             ('leave_date = current_date + 3650, end_date = current_date + 3650', 'assignment:A.relief_self_gam@A.gam', 'push the other relief''s leave date out')) AS v(set_clause, row_key, what);
+SELECT tests.as_service();
+SELECT tests.lives(format($q$UPDATE public.crew_assignments SET leave_date = current_date + 1, end_date = current_date + 1 WHERE id = %L$q$, tests.id('assignment:A.relief_gam@A.gam')),
+                   'the service role is not limited');
+SELECT tests.reset_role();
+ROLLBACK TO SAVEPOINT admin_end;
+SELECT tests.ok(position('coalesce(NEW.leave_date, NEW.end_date)' IN pg_get_functiondef('public.crew_assignments_guard()'::regprocedure)) > 0, 'the guard reads the office end (D-244)');
+
+-- ------------------------------------------------------------ an assignment names a member of the vessel's company (D-246; review round 7)
+
+-- The legacy HR policies check the caller and the vessel, and the guard
+-- the caller's reach, own-row edits and the Master office: nothing checked
+-- that NEW.user_id belongs to the vessel's company, so an HR editor of A
+-- wrote current assignments for B's crew on A's vessels. B cannot see or
+-- remove them, yet hr_days_onboard and payroll_calculate_run's current
+-- vessel read them without RLS. Rule h: an INSERT, a changed user or
+-- vessel, or a revived row needs NEW.user_id's profile in the vessel's
+-- company. Ports scratchpad r6sec/a3_foreign_crew_assignment.sql and
+-- vfy-foreign-ca/extended.sql, repoint.sql.
+-- (the DRAAK Master's own row was deleted under the engine flag above;
+-- seed it again so the Master reaches DRAAK)
+SELECT tests.seed_assignment('A.master_dra', 'A.dra', true, 'Master');
+SELECT tests.seed_user('B', 'B.crew_cur', 'crew');
+SELECT tests.seed_assignment('B.crew_cur', 'B.lev', true, 'Deckhand');
+SELECT tests.seed_user('A', 'A.deck3_dra', 'crew');
+SELECT tests.seed_assignment('A.deck3_dra', 'A.dra', true, 'Deckhand');
+SELECT tests.seed_user('A', 'A.deck4_dra', 'crew');
+SELECT tests.reset_role();
+INSERT INTO public.crew_assignments (id, vessel_id, user_id, position, join_date, leave_date, end_date, is_current)
+VALUES (tests.id('ca:foreign_hist'), tests.vessel_id('A.dra'), tests.user_id('B.crew_cur'), 'Deckhand', current_date - 200, current_date - 10, current_date - 10, false);
+
+SELECT tests.as_user(tests.user_id('A.master_dra'));
+SELECT tests.ok(public.hr_can_edit(auth.uid()) AND public.user_can_reach_vessel(auth.uid(), tests.vessel_id('A.dra')), 'setup: the DRAAK Master is an HR editor who reaches DRAAK');
+SELECT tests.throws_like(format($q$INSERT INTO public.crew_assignments (vessel_id, user_id, position, join_date, is_current) VALUES (%L, %L, 'Deckhand', current_date - 30, true)$q$, tests.vessel_id('A.dra'), tests.user_id('B.crew_cur')),
+                         '42501', 'assignment_user_out_of_company', 'the DRAAK Master cannot place B''s crew member on DRAAK');
+SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET user_id = %L, join_date = current_date WHERE id = %L$q$, tests.user_id('B.crew_cur'), tests.id('assignment:A.deck3_dra@A.dra')),
+                         '42501', 'assignment_user_out_of_company', 'nor re-point a DRAAK row to B''s crew member');
+SELECT tests.throws_like(format($q$UPDATE public.crew_assignments SET is_current = true, leave_date = NULL, end_date = NULL WHERE id = %L$q$, tests.id('ca:foreign_hist')),
+                         '42501', 'assignment_user_out_of_company', 'nor revive an ended DRAAK row that names B''s crew member');
+SELECT tests.lives(format($q$UPDATE public.crew_assignments SET notes = 'History corrected' WHERE id = %L$q$, tests.id('ca:foreign_hist')),
+                   'a notes edit of an existing row stays open (it grants no reach)');
+SELECT tests.lives(format($q$INSERT INTO public.crew_assignments (id, vessel_id, user_id, position, join_date, is_current) VALUES (%L, %L, %L, 'Deckhand', current_date, true)$q$, tests.id('ca:deck4_dra'), tests.vessel_id('A.dra'), tests.user_id('A.deck4_dra')),
+                   'control: the DRAAK Master still places an A crew member (non-Master) on DRAAK');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT count(*) FROM public.crew_assignments WHERE user_id = tests.user_id('B.crew_cur') AND is_current AND vessel_id <> tests.vessel_id('B.lev')), 0::bigint,
+                'B''s crew member has no current assignment outside LEVIATHAN');
+SELECT tests.is((SELECT ca.vessel_id FROM public.crew_assignments AS ca WHERE ca.user_id = tests.user_id('B.crew_cur') AND ca.is_current ORDER BY ca.join_date DESC LIMIT 1), tests.vessel_id('B.lev'),
+                'and their newest current assignment (payroll_calculate_run''s current vessel) is still LEVIATHAN');
+SELECT tests.ok((SELECT notes = 'History corrected' AND NOT is_current FROM public.crew_assignments WHERE id = tests.id('ca:foreign_hist')), 'the history row is corrected and still ended');
+-- The service role (a company transfer through admin-actions) and the
+-- engine definers are not limited.
+SAVEPOINT foreign_exempt;
+SELECT tests.as_service();
+SELECT tests.lives(format($q$INSERT INTO public.crew_assignments (vessel_id, user_id, position, join_date, is_current) VALUES (%L, %L, 'Deckhand', current_date, true)$q$, tests.vessel_id('A.dra'), tests.user_id('B.crew_cur')),
+                   'the service role writes an assignment for another company''s user');
+SELECT tests.reset_role();
+ROLLBACK TO SAVEPOINT foreign_exempt;
+SAVEPOINT foreign_exempt;
+SELECT tests.as_user(tests.user_id('A.master_dra'));
+SELECT set_config('storm.access_engine', 'on', true);
+SELECT tests.lives(format($q$INSERT INTO public.crew_assignments (vessel_id, user_id, position, join_date, is_current) VALUES (%L, %L, 'Deckhand', current_date, true)$q$, tests.vessel_id('A.dra'), tests.user_id('B.crew_cur')),
+                   'and storm.access_engine lets an engine definer write it');
+SELECT set_config('storm.access_engine', '', true);
+SELECT tests.reset_role();
+ROLLBACK TO SAVEPOINT foreign_exempt;
+SELECT tests.ok(position('assignment_user_out_of_company' IN pg_get_functiondef('public.crew_assignments_guard()'::regprocedure)) > 0, 'the guard checks the assignment''s user company (D-246)');

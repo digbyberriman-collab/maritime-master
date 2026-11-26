@@ -284,6 +284,33 @@ SELECT tests.reset_role();
 SELECT tests.is((SELECT status FROM public.payroll_runs WHERE id = tests.id('run:A2')), 'calculated', 'the run is unchanged');
 SELECT tests.is((SELECT role::text FROM public.profiles WHERE user_id = tests.user_id('A.crew_hyd')), 'crew', 'the role is unchanged');
 
+-- Review round 7 (payroll-guard-refuses-no-jwt, D-248): payroll_can_admin()
+-- is two-valued now, so the approve / pay gate of
+-- payroll_runs_guard_transitions() asks a signed-in caller only; the
+-- trusted no-JWT context (the SQL editor, pg_cron, the service role)
+-- approves and pays again, and the inactive refusals above still hold.
+-- Ports scratchpad probe-payroll-nojwt.sql.
+SAVEPOINT payroll_nojwt;
+SELECT tests.reset_role();
+SELECT tests.lives(format($q$UPDATE public.payroll_runs SET status = 'approved' WHERE id = %L$q$, tests.id('run:A2')), 'without a JWT a payroll run is approved');
+SELECT tests.ok((SELECT status = 'approved' AND approved_by IS NULL AND approved_at IS NOT NULL FROM public.payroll_runs WHERE id = tests.id('run:A2')),
+                'approved_by stays NULL (no caller), approved_at is set');
+SELECT tests.lives(format($q$UPDATE public.payroll_runs SET status = 'paid' WHERE id = %L$q$, tests.id('run:A2')), 'and paid');
+SELECT tests.throws_like(format($q$UPDATE public.payroll_runs SET status = 'approved' WHERE id = %L$q$, tests.id('run:A2')), NULL, 'A paid payroll run cannot change status',
+                         'a paid run still never changes status');
+ROLLBACK TO SAVEPOINT payroll_nojwt;
+SAVEPOINT payroll_nojwt;
+SELECT tests.as_service();
+SELECT tests.lives(format($q$UPDATE public.payroll_runs SET status = 'approved' WHERE id = %L$q$, tests.id('run:A2')), 'the service role approves a payroll run');
+SELECT tests.reset_role();
+ROLLBACK TO SAVEPOINT payroll_nojwt;
+SELECT tests.is((SELECT status FROM public.payroll_runs WHERE id = tests.id('run:A2')), 'calculated', 'setup restored: the run is calculated');
+SELECT tests.ok(position('auth.uid() IS NOT NULL' IN pg_get_functiondef('public.payroll_runs_guard_transitions()'::regprocedure)) > 0,
+                'the approve / pay gate asks a signed-in caller only (D-248)');
+SELECT tests.ok(NOT has_function_privilege('anon', 'public.payroll_runs_guard_transitions()', 'EXECUTE')
+                AND NOT has_function_privilege('authenticated', 'public.payroll_runs_guard_transitions()', 'EXECUTE'),
+                'payroll_runs_guard_transitions is executable by neither anon nor authenticated');
+
 -- ------------------------------------------------------------ inventory
 
 -- Every public plpgsql SECURITY DEFINER function the browser can execute,

@@ -83,6 +83,7 @@
     "public.payroll_can_admin(uuid)": ["authenticated", "service_role"],
     "public.payroll_can_edit(uuid)": ["authenticated", "service_role"],
     "public.payroll_can_view(uuid)": ["authenticated", "service_role"],
+    "public.payroll_runs_guard_transitions()": [],
     "public.performance_review_acknowledge(uuid, text)": ["authenticated", "service_role"],
     "public.performance_review_submit_self_assessment(uuid, jsonb, text)": ["authenticated", "service_role"],
     "public.permission_override_write_allowed(uuid, uuid, text, permission_level)": ["authenticated"],

@@ -334,3 +334,159 @@ SELECT tests.is((SELECT count(*) FROM public.role_vessel_ids(ARRAY['captain']::p
 SELECT tests.is(public.has_role_on_vessel_in_company(auth.uid(), ARRAY['captain']::public.app_role[], tests.vessel_id('B.lev')), false, 'nor the vessel itself');
 SELECT tests.is(public.has_any_role(auth.uid(), ARRAY['captain']::public.app_role[]), false, 'nor has_any_role(captain)');
 SELECT tests.reset_role();
+
+-- ------------------------------------------------------------ a vessel delete removes its vessel-scoped grants (D-245; review round 7)
+
+-- user-roles-vessel-delete-widens (scratchpad r6sec/a1_vessel_delete_widens_role.sql):
+-- user_roles_vessel_id_fkey was ON DELETE SET NULL, and under D-234 a NULL
+-- vessel_id is company-wide, so deleting a vessel turned its vessel-scoped
+-- captain into a company-wide captain (every vessel, legacy HRIS edit). It
+-- is ON DELETE CASCADE now, like rbac_user_roles, and access_change_audit()
+-- writes vessel_scope NULL for a vessel that is gone (the vessel id stays
+-- in before_state), so an authorised delete succeeds and is audited.
+SELECT tests.seed_vessel('A', 'A.tmp1', 'TEMP ONE');
+SELECT tests.seed_user('A', 'A.capt_tmp', 'crew');
+SELECT tests.seed_user_role('A.capt_tmp', 'captain', 'A');
+UPDATE public.user_roles SET vessel_id = tests.vessel_id('A.tmp1') WHERE user_id = tests.user_id('A.capt_tmp');
+SELECT tests.seed_rbac_role('A.capt_tmp', 'purser', 'A.tmp1');
+SELECT tests.as_user(tests.user_id('A.capt_tmp'));
+SELECT tests.is(public.has_role_in_company(auth.uid(), ARRAY['captain']::public.app_role[], tests.company_id('A')), false, 'setup: the TEMP ONE captain is no company-wide captain');
+SELECT tests.is((SELECT array_agg(r) FROM public.role_vessel_ids(ARRAY['captain']::public.app_role[]) AS r), ARRAY[tests.vessel_id('A.tmp1')], 'setup: role_vessel_ids(captain) = {TEMP ONE}');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.lives(format('DELETE FROM public.vessels WHERE id = %L', tests.vessel_id('A.tmp1')), 'the fleet manager deletes TEMP ONE (its vessel-scoped grants cascade, audited)');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT count(*) FROM public.user_roles WHERE user_id = tests.user_id('A.capt_tmp')), 0::bigint, 'the captain''s user_roles row is gone (no company-wide row with a NULL vessel is left)');
+SELECT tests.is((SELECT count(*) FROM public.rbac_user_roles WHERE user_id = tests.user_id('A.capt_tmp')), 0::bigint, 'and so is the RBAC purser row');
+SELECT tests.is((SELECT count(*) FROM public.permission_audit_log
+                  WHERE target_user_id = tests.user_id('A.capt_tmp') AND action_type = 'role_removed'
+                    AND vessel_scope IS NULL AND before_state ->> 'vessel_id' = tests.vessel_id('A.tmp1')::text), 2::bigint,
+                'both removals are audited (role_removed, vessel_scope NULL, the vessel in before_state)');
+SELECT tests.as_user(tests.user_id('A.capt_tmp'));
+SELECT tests.is(public.has_role_in_company(auth.uid(), ARRAY['captain']::public.app_role[], tests.company_id('A')), false, 'after the delete: no captain in A');
+SELECT tests.is(public.has_role_on_vessel_in_company(auth.uid(), ARRAY['captain']::public.app_role[], tests.vessel_id('A.hyd')), false, 'nor on HYDRA');
+SELECT tests.is((SELECT count(*) FROM public.role_vessel_ids(ARRAY['captain']::public.app_role[])), 0::bigint, 'role_vessel_ids(captain) is empty');
+SELECT tests.is(public.hr_can_edit(auth.uid()), false, 'and no legacy HRIS edit');
+SELECT tests.reset_role();
+-- Without a JWT (the SQL editor, the service role) the delete cascades too,
+-- and the audit trigger writes nothing.
+SELECT tests.seed_vessel('A', 'A.tmp2', 'TEMP TWO');
+SELECT tests.seed_user('A', 'A.capt_tmp2', 'crew');
+SELECT tests.seed_user_role('A.capt_tmp2', 'captain', 'A');
+UPDATE public.user_roles SET vessel_id = tests.vessel_id('A.tmp2') WHERE user_id = tests.user_id('A.capt_tmp2');
+SELECT tests.lives(format('DELETE FROM public.vessels WHERE id = %L', tests.vessel_id('A.tmp2')), 'without a JWT the vessel delete cascades too');
+SELECT tests.is((SELECT count(*) FROM public.user_roles WHERE user_id = tests.user_id('A.capt_tmp2')), 0::bigint, 'the TEMP TWO captain row is gone');
+SELECT tests.is((SELECT count(*) FROM public.permission_audit_log WHERE target_user_id = tests.user_id('A.capt_tmp2')), 0::bigint, 'and no audit row is written without a JWT');
+SELECT tests.is((SELECT confdeltype::text FROM pg_constraint WHERE conrelid = 'public.user_roles'::regclass AND conname = 'user_roles_vessel_id_fkey'), 'c',
+                'user_roles_vessel_id_fkey is ON DELETE CASCADE');
+
+-- ------------------------------------------------------------ role-branch writes name a person of the row's company (D-247; review round 7)
+
+-- role-branch-writes-foreign-subject (scratchpad verify-frp/repro*.sql,
+-- r6sec/a2_foreign_crew_plant.sql): the WITH CHECK of "Authorized users can
+-- manage flight requests" and of "Officers can create tasks" pinned the
+-- vessel but not the person, so a captain of A planted a flight request or
+-- a task naming a user of B, which that user read and updated; the legacy
+-- crew_tasks update policy let a task be re-pointed after a legitimate
+-- insert, and its has_fleet_access read showed every tenant's tasks.
+-- profile_company_of(crew_id / assigned_to) = company_id now pins them; an
+-- unknown id is 42501 as well (no profiles-FK existence oracle).
+SELECT tests.seed_user('A', 'A.co_dra', 'crew');                    -- a vessel-scoped chief officer on DRAAK
+SELECT tests.seed_assignment('A.co_dra', 'A.dra', true, 'Chief Officer');
+SELECT tests.seed_user_role('A.co_dra', 'chief_officer', 'A');
+UPDATE public.user_roles SET vessel_id = tests.vessel_id('A.dra') WHERE user_id = tests.user_id('A.co_dra');
+
+-- Flight requests: the company-wide captain and the DRAAK-only captain.
+DO $$
+DECLARE p text;
+BEGIN
+  FOREACH p IN ARRAY ARRAY['A.captain', 'A.capt_dra'] LOOP
+    PERFORM tests.as_user(tests.user_id(p));
+    PERFORM tests.throws(format($q$INSERT INTO public.flight_requests (crew_id, company_id, vessel_id, request_number, request_type, depart_from, arrive_to, earliest_departure_date) VALUES (%L, %L, %L, 'FR-PLANT', 'crew_change', 'NCE', 'PMI', current_date)$q$,
+                                tests.user_id('B.crew'), tests.company_id('A'), tests.vessel_id('A.dra')),
+                         '42501', p || ': no DRAAK flight request for B''s crew member');
+    PERFORM tests.throws(format($q$INSERT INTO public.flight_requests (crew_id, company_id, vessel_id, request_number, request_type, depart_from, arrive_to, earliest_departure_date) VALUES (%L, %L, %L, 'FR-RAND', 'crew_change', 'NCE', 'PMI', current_date)$q$,
+                                gen_random_uuid(), tests.company_id('A'), tests.vessel_id('A.dra')),
+                         '42501', p || ': nor for an unknown id (42501, not the profiles FK: no existence oracle)');
+    PERFORM tests.lives(format($q$INSERT INTO public.flight_requests (id, crew_id, company_id, vessel_id, request_number, request_type, depart_from, arrive_to, earliest_departure_date) VALUES (%L, %L, %L, %L, %L, 'crew_change', 'NCE', 'PMI', current_date)$q$,
+                               tests.id('d247:fr:' || p), tests.user_id('A.master_dra'), tests.company_id('A'), tests.vessel_id('A.dra'), 'FR-OK-' || p),
+                        p || ': a DRAAK flight request for A''s Master lives');
+    PERFORM tests.throws(format($q$UPDATE public.flight_requests SET crew_id = %L WHERE id = %L$q$, tests.user_id('B.crew'), tests.id('d247:fr:' || p)),
+                         '42501', p || ': and cannot be re-pointed to B''s crew member');
+  END LOOP;
+END
+$$;
+SELECT tests.as_user(tests.user_id('A.captain'));
+SELECT tests.throws(format($q$INSERT INTO public.flight_requests (crew_id, company_id, request_number, request_type, depart_from, arrive_to, earliest_departure_date) VALUES (%L, %L, 'FR-PLANT-NV', 'crew_change', 'NCE', 'PMI', current_date)$q$,
+                           tests.user_id('B.crew'), tests.company_id('A')),
+                    '42501', 'A.captain: nor a vessel-less one for B''s crew member');
+SELECT tests.reset_role();
+SELECT tests.is((SELECT count(*) FROM public.flight_requests WHERE crew_id = tests.user_id('B.crew')), 0::bigint, 'no flight request names B''s crew member');
+
+-- Crew tasks: inserts.
+SELECT tests.as_user(tests.user_id('A.captain'));
+SELECT tests.throws(format($q$INSERT INTO public.crew_tasks (company_id, vessel_id, title, task_type, assigned_to, assigned_by) VALUES (%L, NULL, 'T-PLANT', 'task', %L, auth.uid())$q$, tests.company_id('A'), tests.user_id('B.crew')),
+                    '42501', 'A.captain: no vessel-less task for B''s crew member');
+SELECT tests.throws(format($q$INSERT INTO public.crew_tasks (company_id, vessel_id, title, task_type, assigned_to, assigned_by) VALUES (%L, %L, 'T-PLANT', 'task', %L, auth.uid())$q$, tests.company_id('A'), tests.vessel_id('A.dra'), tests.user_id('B.crew')),
+                    '42501', 'A.captain: nor a DRAAK task for them');
+SELECT tests.throws(format($q$INSERT INTO public.crew_tasks (company_id, vessel_id, title, task_type, assigned_to, assigned_by) VALUES (%L, NULL, 'T-RAND', 'task', %L, auth.uid())$q$, tests.company_id('A'), gen_random_uuid()),
+                    '42501', 'A.captain: nor for an unknown id (42501, not the profiles FK)');
+SELECT tests.lives(format($q$INSERT INTO public.crew_tasks (id, company_id, vessel_id, title, task_type, assigned_to, assigned_by) VALUES (%L, %L, NULL, 'T-CAP', 'task', %L, auth.uid())$q$, tests.id('d247:ct:cap'), tests.company_id('A'), tests.user_id('A.crew_hyd')),
+                   'A.captain: a task for HYDRA crew lives');
+SELECT tests.as_user(tests.user_id('A.capt_dra'));
+SELECT tests.throws(format($q$INSERT INTO public.crew_tasks (company_id, vessel_id, title, task_type, assigned_to, assigned_by) VALUES (%L, %L, 'T-PLANT', 'task', %L, auth.uid())$q$, tests.company_id('A'), tests.vessel_id('A.dra'), tests.user_id('B.crew')),
+                    '42501', 'A.capt_dra: no DRAAK task for B''s crew member');
+SELECT tests.as_user(tests.user_id('A.co_dra'));
+SELECT tests.throws(format($q$INSERT INTO public.crew_tasks (company_id, vessel_id, title, task_type, assigned_to, assigned_by) VALUES (%L, %L, 'T-PLANT', 'task', %L, auth.uid())$q$, tests.company_id('A'), tests.vessel_id('A.dra'), tests.user_id('B.crew')),
+                    '42501', 'A.co_dra: no DRAAK task for B''s crew member');
+SELECT tests.throws(format($q$INSERT INTO public.crew_tasks (company_id, vessel_id, title, task_type, assigned_to, assigned_by) VALUES (%L, %L, 'T-RAND', 'task', %L, auth.uid())$q$, tests.company_id('A'), tests.vessel_id('A.dra'), gen_random_uuid()),
+                    '42501', 'A.co_dra: nor for an unknown id');
+SELECT tests.lives(format($q$INSERT INTO public.crew_tasks (id, company_id, vessel_id, title, task_type, assigned_to, assigned_by) VALUES (%L, %L, %L, 'T-CO', 'task', %L, auth.uid())$q$, tests.id('d247:ct:co'), tests.company_id('A'), tests.vessel_id('A.dra'), tests.user_id('A.master_dra')),
+                   'A.co_dra: a DRAAK task for the Master lives');
+SELECT tests.reset_role();
+-- Crew tasks: updates never re-point a task to another tenant or its people.
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN SELECT * FROM (VALUES ('A.captain', 'd247:ct:cap'), ('A.co_dra', 'd247:ct:co')) AS v(persona, task_key) LOOP
+    PERFORM tests.as_user(tests.user_id(r.persona));
+    PERFORM tests.throws(format($q$UPDATE public.crew_tasks SET assigned_to = %L WHERE id = %L$q$, tests.user_id('B.crew'), tests.id(r.task_key)),
+                         '42501', r.persona || ': cannot re-point their task to B''s crew member');
+    PERFORM tests.throws(format($q$UPDATE public.crew_tasks SET company_id = %L WHERE id = %L$q$, tests.company_id('B'), tests.id(r.task_key)),
+                         '42501', r.persona || ': nor move it to company B');
+  END LOOP;
+END
+$$;
+SELECT tests.reset_role();
+SELECT tests.is((SELECT count(*) FROM public.crew_tasks WHERE assigned_to = tests.user_id('B.crew') OR company_id = tests.company_id('B')), 0::bigint,
+                'no task names B''s crew member or company B');
+
+-- Rows planted before the fix (no JWT here): a task and a flight request of
+-- A naming B's crew member, and a booking on the request.
+INSERT INTO public.crew_tasks (id, company_id, vessel_id, title, task_type, assigned_to, assigned_by)
+VALUES (tests.id('d247:ct:plant'), tests.company_id('A'), tests.vessel_id('A.dra'), 'T-PLANTED', 'task', tests.user_id('B.crew'), tests.user_id('A.captain'));
+INSERT INTO public.flight_requests (id, crew_id, company_id, vessel_id, request_number, request_type, depart_from, arrive_to, earliest_departure_date)
+VALUES (tests.id('d247:fr:plant'), tests.user_id('B.crew'), tests.company_id('A'), tests.vessel_id('A.dra'), 'FR-PLANTED', 'crew_change', 'NCE', 'PMI', current_date + 7);
+INSERT INTO public.flight_bookings (id, flight_request_id, airline, flight_number)
+VALUES (tests.id('d247:fb:plant'), tests.id('d247:fr:plant'), 'XX', 'XX1');
+SELECT tests.as_user(tests.user_id('B.crew'));
+SELECT tests.is((SELECT count(*) FROM public.crew_tasks), 0::bigint, 'B''s crew member reads no task of A (not even the one naming them)');
+SELECT tests.is((SELECT count(*) FROM public.flight_requests WHERE company_id = tests.company_id('A')), 0::bigint, 'nor the planted flight request');
+SELECT tests.is((SELECT count(*) FROM public.flight_bookings WHERE id = tests.id('d247:fb:plant')), 0::bigint, 'nor its booking');
+SELECT tests.denied(format($q$UPDATE public.crew_tasks SET status = 'completed' WHERE id = %L RETURNING id$q$, tests.id('d247:ct:plant')), 'and cannot complete the planted task');
+SELECT tests.as_user(tests.user_id('B.admin'));
+SELECT tests.is((SELECT count(*) FROM public.crew_tasks WHERE company_id = tests.company_id('A')), 0::bigint, 'B''s DPA reads no task of A (the has_fleet_access read is gone)');
+SELECT tests.as_user(tests.user_id('A.fleet_manager'));
+SELECT tests.is((SELECT count(*) FROM public.crew_tasks WHERE id IN (tests.id('d247:ct:cap'), tests.id('d247:ct:co'), tests.id('d247:ct:plant'))), 3::bigint, 'A''s DPA reads A''s tasks, the planted one included');
+SELECT tests.lives(format($q$UPDATE public.crew_tasks SET status = 'in_progress' WHERE id = %L$q$, tests.id('d247:ct:co')), 'and updates one');
+SELECT tests.lives(format($q$DELETE FROM public.crew_tasks WHERE id = %L$q$, tests.id('d247:ct:plant')), 'and deletes the planted one');
+SELECT tests.as_user(tests.user_id('A.crew_hyd'));
+SELECT tests.is((SELECT count(*) FROM public.crew_tasks WHERE id = tests.id('d247:ct:cap')), 1::bigint, 'HYDRA crew read their own task');
+SELECT tests.lives(format($q$UPDATE public.crew_tasks SET status = 'completed' WHERE id = %L$q$, tests.id('d247:ct:cap')), 'and complete it');
+SELECT tests.reset_role();
+SELECT tests.results_eq(format($q$SELECT id, status FROM public.crew_tasks WHERE id IN (%L, %L, %L)$q$, tests.id('d247:ct:cap'), tests.id('d247:ct:co'), tests.id('d247:ct:plant')),
+                        format($q$VALUES (%L::uuid, 'completed'::text), (%L::uuid, 'in_progress'::text)$q$, tests.id('d247:ct:cap'), tests.id('d247:ct:co')),
+                        'the tasks as left: completed, in progress, the planted one deleted');
+SELECT tests.ok(EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'crew_tasks' AND policyname = 'Officers can create tasks' AND with_check LIKE '%profile_company_of%')
+                AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'flight_requests' AND policyname = 'Authorized users can manage flight requests' AND with_check LIKE '%profile_company_of%')
+                AND NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'crew_tasks' AND coalesce(qual, '') LIKE '%has_fleet_access%'),
+                'the pins are in place and no crew_tasks policy reads has_fleet_access');

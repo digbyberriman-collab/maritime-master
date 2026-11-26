@@ -2,6 +2,10 @@
 -- PLATFORM P3 follow-up: legacy app-role policies scoped to the row's
 -- company (gap/01 F6, CC-5; Phase 2 security rules; proposed D-124)
 -- Tables: none new. Columns: none.
+-- Constraints: user_roles_vessel_id_fkey recreated ON DELETE CASCADE (D-245;
+--   review round 7: a vessel delete removes its vessel-scoped user_roles
+--   rows, as it already does for rbac_user_roles, user_permission_overrides
+--   and account_membership_vessels, instead of turning them company-wide)
 -- Helpers: has_role_in_company() (authenticated; RLS predicate, rule 11;
 --   company-wide user_roles rows only, D-234); the live single-role
 --   overload redefined on the same rule; has_role_on_vessel_in_company()
@@ -14,11 +18,17 @@
 -- Policies (legacy names, recreated with the same command and roles):
 --   crew_change_dates_insert / _update; crew_import_write_privileged /
 --   _update_privileged (service role); crew_tasks "Officers can create
---   tasks"; destinations_update; fleet_groups "DPA and Superadmin can manage
+--   tasks" (assigned_to pinned to the row's company, D-247), "Users can
+--   view tasks assigned to them", "Users can update their own tasks",
+--   "Assigners can delete tasks" (the legacy has_fleet_access reads,
+--   updates and deletes of 20260129133606, company-scoped and active-aware,
+--   review round 7, D-247); destinations_update; fleet_groups "DPA and Superadmin can manage
 --   fleet groups"; flight_bookings "Flight bookings viewable by request
 --   owner and staff", "Travel agents and DPA can manage bookings";
---   flight_requests "Authorized users can manage flight requests", "Users
---   can view own flight requests"; hours_of_rest_records "Users can manage
+--   flight_requests "Authorized users can manage flight requests" (crew_id
+--   pinned to the row's company, D-247), "Users can view own flight
+--   requests" (own row in the caller's company, D-247); flight_bookings'
+--   own-request branch in the caller's company (D-247); hours_of_rest_records "Users can manage
 --   own rest records", "Users can view own rest records"; leave_requests
 --   "Authorized users can manage leave requests", "Users can view own leave
 --   requests"; medical_reports "DPA and Captain can manage medical
@@ -121,6 +131,24 @@
 -- also pins the vessel to the crew member's own company
 -- (vessel_company_of(vessel_id) = profile_company_of(crew_id)), so no branch
 -- pairs a crew member with a foreign vessel or re-points a row to one.
+--
+-- Role-branch subjects (review round 7, role-branch-writes-foreign-subject,
+-- D-247): a role-branch write names only a person of the row's company, as
+-- the leave, rest, work / rest and medical policies already did: the
+-- flight_requests WITH CHECK pins profile_company_of(crew_id) = company_id
+-- (FOR ALL, so an UPDATE cannot re-point crew_id either), and the crew_tasks
+-- insert and update checks pin profile_company_of(assigned_to) = company_id.
+-- profile_company_of() answers NULL for a person outside the caller's
+-- company (and for an unknown id), so the check fails with 42501 before the
+-- profiles foreign key is ever consulted: no existence oracle. The own-row
+-- reads of flight requests and bookings and of crew tasks are in the
+-- caller's company too, so a row another tenant planted before the fix
+-- shows nothing to the person it names. The legacy crew_tasks reads,
+-- updates and deletes (20260129133606: assigned_to / assigned_by =
+-- auth.uid() OR has_fleet_access(), which let any tenant's fleet user read
+-- every company's tasks and discover user ids) are recreated
+-- company-scoped and active-aware.
+--
 -- Global catalogs without a company (modules, training_courses) and the
 -- company-less crew_import staging table are written by the service role
 -- only; their read policies are unchanged.
@@ -144,11 +172,30 @@ BEGIN
     RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010500_platform_role_scoped_policies needs the closed user_roles write path: apply 20261123010100_platform_access_rls.sql first';
   END IF;
   IF to_regclass('public.user_roles') IS NULL OR to_regclass('public.medical_reports') IS NULL OR to_regclass('public.flight_requests') IS NULL
-     OR to_regclass('public.work_rest_monthly_submissions') IS NULL OR to_regclass('public.vessel_work_rest_settings') IS NULL THEN
-    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010500_platform_role_scoped_policies needs the live user_roles, medical_reports, flight_requests and work / rest tables';
+     OR to_regclass('public.work_rest_monthly_submissions') IS NULL OR to_regclass('public.vessel_work_rest_settings') IS NULL
+     OR to_regclass('public.crew_tasks') IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010500_platform_role_scoped_policies needs the live user_roles, medical_reports, flight_requests, crew_tasks and work / rest tables';
+  END IF;
+  IF to_regprocedure('public.user_has_fleet_reach(uuid,uuid)') IS NULL THEN
+    RAISE EXCEPTION USING ERRCODE = '55000', MESSAGE = '20261123010500_platform_role_scoped_policies needs user_has_fleet_reach() (the crew_tasks fleet branch): apply 20261123000300 first';
   END IF;
 END
 $$;
+
+-- ---------------------------------------------------------------- user_roles_vessel_id_fkey (D-245)
+
+-- Under D-234 a user_roles row with a NULL vessel_id is company-wide, so the
+-- live ON DELETE SET NULL turned a vessel-scoped grant into a company-wide
+-- role when its vessel was deleted (review round 7,
+-- user-roles-vessel-delete-widens; D-04: fail closed). The grant goes with
+-- its vessel instead, as its siblings already do (rbac_user_roles,
+-- user_permission_overrides and account_membership_vessels CASCADE). The
+-- name is the live one (types.ts Relationships). The cascaded delete is
+-- audited by trg_user_roles_audit with vessel_scope NULL and the vessel id
+-- in before_state (access_change_audit(), 20261123010100).
+ALTER TABLE public.user_roles
+  DROP CONSTRAINT IF EXISTS user_roles_vessel_id_fkey,
+  ADD CONSTRAINT user_roles_vessel_id_fkey FOREIGN KEY (vessel_id) REFERENCES public.vessels(id) ON DELETE CASCADE;
 
 -- ---------------------------------------------------------------- legacy rows without a company
 
@@ -509,7 +556,51 @@ CREATE POLICY "Officers can create tasks" ON public.crew_tasks
              THEN public.has_role_on_vessel_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'fleet_master', 'captain', 'chief_officer', 'chief_engineer']::public.app_role[], crew_tasks.vessel_id)
                   AND public.vessel_company_of(crew_tasks.vessel_id) = crew_tasks.company_id
              ELSE public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'fleet_master', 'captain', 'chief_officer', 'chief_engineer']::public.app_role[], company_id) END
+    -- D-247 (review round 7): the assignee is a person of the row's company
+    -- (NULL for anyone outside the caller's company or an unknown id: 42501,
+    -- never the profiles foreign key's 23503).
+    AND public.profile_company_of(crew_tasks.assigned_to) = crew_tasks.company_id
   );
+
+-- The legacy reads, updates and deletes (20260129133606: assigned_to /
+-- assigned_by = auth.uid() OR has_fleet_access(auth.uid()), no company at
+-- all) recreated TO authenticated, company-scoped and active-aware (D-247;
+-- review round 7, role-branch-writes-foreign-subject: any tenant's fleet
+-- user read every company's tasks, which also disclosed user ids, and the
+-- assignee of a task another tenant planted read and updated it). The own
+-- row counts only in the caller's company; the fleet branch is a
+-- company-wide superadmin / dpa / fleet_master user_roles row of the row's
+-- company, or fleet reach in the caller's own company
+-- (user_has_fleet_reach(): legacy fleet roles, RBAC fleet roles and
+-- fleet-access memberships, as has_fleet_access() read them). The update
+-- WITH CHECK keeps the row in the writer's company with its assignee and
+-- its vessel there too, so a task is never moved to another tenant nor
+-- re-pointed to a person outside it.
+DROP POLICY IF EXISTS "Users can view tasks assigned to them" ON public.crew_tasks;
+CREATE POLICY "Users can view tasks assigned to them" ON public.crew_tasks
+  FOR SELECT TO authenticated
+  USING (((assigned_to = (SELECT auth.uid()) OR assigned_by = (SELECT auth.uid())) AND (SELECT public.user_is_active(auth.uid())) AND company_id = (SELECT public.get_user_company_id(auth.uid())))
+         OR public.has_role_in_company((SELECT auth.uid()), ARRAY['superadmin', 'dpa', 'fleet_master']::public.app_role[], company_id)
+         OR (company_id = (SELECT public.get_user_company_id(auth.uid())) AND (SELECT public.user_has_fleet_reach(auth.uid(), public.get_user_company_id(auth.uid())))));
+
+DROP POLICY IF EXISTS "Users can update their own tasks" ON public.crew_tasks;
+CREATE POLICY "Users can update their own tasks" ON public.crew_tasks
+  FOR UPDATE TO authenticated
+  USING (((assigned_to = (SELECT auth.uid()) OR assigned_by = (SELECT auth.uid())) AND (SELECT public.user_is_active(auth.uid())) AND company_id = (SELECT public.get_user_company_id(auth.uid())))
+         OR public.has_role_in_company((SELECT auth.uid()), ARRAY['superadmin', 'dpa', 'fleet_master']::public.app_role[], company_id)
+         OR (company_id = (SELECT public.get_user_company_id(auth.uid())) AND (SELECT public.user_has_fleet_reach(auth.uid(), public.get_user_company_id(auth.uid())))))
+  WITH CHECK ((((assigned_to = auth.uid() OR assigned_by = auth.uid()) AND public.user_is_active(auth.uid()) AND public.user_belongs_to_company(auth.uid(), company_id))
+                OR public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'fleet_master']::public.app_role[], company_id)
+                OR (public.user_belongs_to_company(auth.uid(), company_id) AND public.user_has_fleet_reach(auth.uid(), company_id)))
+              AND public.profile_company_of(assigned_to) = company_id
+              AND (vessel_id IS NULL OR public.vessel_company_of(vessel_id) = company_id));
+
+DROP POLICY IF EXISTS "Assigners can delete tasks" ON public.crew_tasks;
+CREATE POLICY "Assigners can delete tasks" ON public.crew_tasks
+  FOR DELETE TO authenticated
+  USING ((assigned_by = (SELECT auth.uid()) AND (SELECT public.user_is_active(auth.uid())) AND company_id = (SELECT public.get_user_company_id(auth.uid())))
+         OR public.has_role_in_company((SELECT auth.uid()), ARRAY['superadmin', 'dpa', 'fleet_master']::public.app_role[], company_id)
+         OR (company_id = (SELECT public.get_user_company_id(auth.uid())) AND (SELECT public.user_has_fleet_reach(auth.uid(), public.get_user_company_id(auth.uid())))));
 
 -- ---------------------------------------------------------------- destinations (company)
 
@@ -542,12 +633,18 @@ CREATE POLICY "Authorized users can manage flight requests" ON public.flight_req
                OR CASE WHEN flight_requests.vessel_id IS NOT NULL
                        THEN public.has_role_on_vessel_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser']::public.app_role[], flight_requests.vessel_id)
                        ELSE public.has_role_in_company(auth.uid(), ARRAY['superadmin', 'dpa', 'captain', 'purser']::public.app_role[], company_id) END)
-              AND (vessel_id IS NULL OR public.vessel_company_of(vessel_id) = company_id));
+              AND (vessel_id IS NULL OR public.vessel_company_of(vessel_id) = company_id)
+              -- D-247 (review round 7): the crew member is a person of the
+              -- row's company, on every branch and on an UPDATE too (FOR ALL).
+              AND public.profile_company_of(crew_id) = company_id);
 
+-- The own-row read counts only in the caller's company (D-247), so a
+-- request another tenant planted before the fix shows nothing to the
+-- person it names.
 DROP POLICY IF EXISTS "Users can view own flight requests" ON public.flight_requests;
 CREATE POLICY "Users can view own flight requests" ON public.flight_requests
   FOR SELECT
-  USING ((crew_id = (SELECT auth.uid()) AND (SELECT public.user_is_active(auth.uid())))
+  USING ((crew_id = (SELECT auth.uid()) AND (SELECT public.user_is_active(auth.uid())) AND company_id = (SELECT public.get_user_company_id(auth.uid())))
          OR public.has_role_in_company((SELECT auth.uid()), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'travel_agent']::public.app_role[], company_id)
          OR (flight_requests.vessel_id IS NOT NULL AND flight_requests.vessel_id IN (SELECT public.role_vessel_ids(ARRAY['superadmin', 'dpa', 'captain', 'purser', 'travel_agent']::public.app_role[]))
              AND company_id = (SELECT public.get_user_company_id(auth.uid()))));
@@ -559,7 +656,7 @@ CREATE POLICY "Flight bookings viewable by request owner and staff" ON public.fl
     EXISTS (
       SELECT 1 FROM public.flight_requests AS fr
       WHERE fr.id = flight_bookings.flight_request_id
-        AND ((fr.crew_id = (SELECT auth.uid()) AND (SELECT public.user_is_active(auth.uid())))
+        AND ((fr.crew_id = (SELECT auth.uid()) AND (SELECT public.user_is_active(auth.uid())) AND fr.company_id = (SELECT public.get_user_company_id(auth.uid())))
              OR public.has_role_in_company((SELECT auth.uid()), ARRAY['superadmin', 'dpa', 'captain', 'purser', 'travel_agent']::public.app_role[], fr.company_id)
              OR (fr.vessel_id IS NOT NULL AND fr.vessel_id IN (SELECT public.role_vessel_ids(ARRAY['superadmin', 'dpa', 'captain', 'purser', 'travel_agent']::public.app_role[]))
                  AND fr.company_id = (SELECT public.get_user_company_id(auth.uid()))))
