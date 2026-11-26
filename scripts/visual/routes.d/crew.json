@@ -1,1 +1,23 @@
-[]
+[
+  {
+    "path": "/v/dra/crew/list?positions=1",
+    "slug": "crew-positions-drawer",
+    "waitFor": "[data-testid=\"positions-summary\"]",
+    "note": "X1-01: the positions drawer on the crew list (rank order by department, manning range, held-below-minimum pills, add a position, unmatched titles)"
+  },
+  {
+    "path": "/v/dra/crew/planner/timeline",
+    "slug": "crew-planner-timeline",
+    "note": "X1-01: the planner moved into the crew manifest (same page as before)"
+  },
+  {
+    "path": "/v/dra/crew/training",
+    "slug": "crew-training",
+    "note": "X1-01: Crew Training stays X5's page in the development manifest; the crew nav around it is X1's"
+  },
+  {
+    "path": "/fleet/planner",
+    "slug": "fleet-planner",
+    "note": "X1-01: the fleet planner route moved into the crew manifest (same page as before)"
+  }
+]

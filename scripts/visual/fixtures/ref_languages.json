@@ -1,0 +1,730 @@
+[
+  {
+    "code": "en",
+    "name": "English",
+    "sort_order": 10,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "af",
+    "name": "Afrikaans",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "sq",
+    "name": "Albanian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "am",
+    "name": "Amharic",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ar",
+    "name": "Arabic",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "hy",
+    "name": "Armenian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "az",
+    "name": "Azerbaijani",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "eu",
+    "name": "Basque",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "be",
+    "name": "Belarusian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "bn",
+    "name": "Bengali",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "bs",
+    "name": "Bosnian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "bg",
+    "name": "Bulgarian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "my",
+    "name": "Burmese",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "yue",
+    "name": "Cantonese",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ca",
+    "name": "Catalan",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "zh",
+    "name": "Chinese (Mandarin)",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "hr",
+    "name": "Croatian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "cs",
+    "name": "Czech",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "da",
+    "name": "Danish",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "nl",
+    "name": "Dutch",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "et",
+    "name": "Estonian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "fj",
+    "name": "Fijian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "fil",
+    "name": "Filipino",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "fi",
+    "name": "Finnish",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "fr",
+    "name": "French",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "gl",
+    "name": "Galician",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ka",
+    "name": "Georgian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "de",
+    "name": "German",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "el",
+    "name": "Greek",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "gu",
+    "name": "Gujarati",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ht",
+    "name": "Haitian Creole",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ha",
+    "name": "Hausa",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "he",
+    "name": "Hebrew",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "hi",
+    "name": "Hindi",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "hu",
+    "name": "Hungarian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "is",
+    "name": "Icelandic",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ig",
+    "name": "Igbo",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "id",
+    "name": "Indonesian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ga",
+    "name": "Irish",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "it",
+    "name": "Italian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ja",
+    "name": "Japanese",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "kn",
+    "name": "Kannada",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "kk",
+    "name": "Kazakh",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "km",
+    "name": "Khmer",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ko",
+    "name": "Korean",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ku",
+    "name": "Kurdish",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ky",
+    "name": "Kyrgyz",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "lo",
+    "name": "Lao",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "lv",
+    "name": "Latvian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "lt",
+    "name": "Lithuanian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "lb",
+    "name": "Luxembourgish",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "mk",
+    "name": "Macedonian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "mg",
+    "name": "Malagasy",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ms",
+    "name": "Malay",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ml",
+    "name": "Malayalam",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "mt",
+    "name": "Maltese",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "mi",
+    "name": "Maori",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "mr",
+    "name": "Marathi",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "mn",
+    "name": "Mongolian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ne",
+    "name": "Nepali",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "no",
+    "name": "Norwegian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "fa",
+    "name": "Persian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "pl",
+    "name": "Polish",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "pt",
+    "name": "Portuguese",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "pa",
+    "name": "Punjabi",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ro",
+    "name": "Romanian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ru",
+    "name": "Russian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "sm",
+    "name": "Samoan",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "sr",
+    "name": "Serbian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "si",
+    "name": "Sinhala",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "sk",
+    "name": "Slovak",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "sl",
+    "name": "Slovenian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "so",
+    "name": "Somali",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "es",
+    "name": "Spanish",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "sw",
+    "name": "Swahili",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "sv",
+    "name": "Swedish",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "tl",
+    "name": "Tagalog",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ta",
+    "name": "Tamil",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "te",
+    "name": "Telugu",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "th",
+    "name": "Thai",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ti",
+    "name": "Tigrinya",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "to",
+    "name": "Tongan",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "tr",
+    "name": "Turkish",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "uk",
+    "name": "Ukrainian",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "ur",
+    "name": "Urdu",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "uz",
+    "name": "Uzbek",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "vi",
+    "name": "Vietnamese",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "cy",
+    "name": "Welsh",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "xh",
+    "name": "Xhosa",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "yo",
+    "name": "Yoruba",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "code": "zu",
+    "name": "Zulu",
+    "sort_order": 1000,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  }
+]

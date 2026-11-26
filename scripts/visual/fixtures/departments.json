@@ -1,0 +1,106 @@
+[
+  {
+    "key": "bridge",
+    "label": "Bridge",
+    "sort_order": 10,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "key": "deck",
+    "label": "Deck",
+    "sort_order": 20,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "key": "engineering",
+    "label": "Engineering",
+    "sort_order": 30,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "key": "interior",
+    "label": "Interior",
+    "sort_order": 40,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "key": "galley",
+    "label": "Galley",
+    "sort_order": 50,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "key": "purser_office",
+    "label": "Purser's Office",
+    "sort_order": 60,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "key": "medical",
+    "label": "Medical",
+    "sort_order": 70,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "key": "security",
+    "label": "Security",
+    "sort_order": 80,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "key": "dive",
+    "label": "Dive",
+    "sort_order": 90,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "key": "media",
+    "label": "Media",
+    "sort_order": 100,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "key": "it_av",
+    "label": "IT & AV",
+    "sort_order": 110,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "key": "spa_wellness",
+    "label": "Spa & Wellness",
+    "sort_order": 120,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "key": "other",
+    "label": "Other",
+    "sort_order": 900,
+    "is_active": true,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  }
+]

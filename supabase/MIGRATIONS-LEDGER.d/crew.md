@@ -16,10 +16,22 @@ In version order. Every row starts as `written, not applied`, with a check query
 
 | # | File | Status | Evidence | Lovable copy | Notes |
 |---|---|---|---|---|---|
+| 1 | `20261124060100_crew_reference_positions.sql` | written, not applied | Tables `ref_countries`, `ref_languages`, `departments`, `contract_types`, `positions`, `position_aliases`, `position_manning` and functions `crew_vessel_cap`, `crew_cap_vessel_ids`, `crew_vessel_gate`, `crew_position_synonym`, `crew_position_for`, `crew_positions_backfill`, `crew_positions_for_vessel`, `crew_vessel_unmatched_titles`, `crew_position_create`, `crew_vessel_positions_save`, `crew_position_alias_set` absent from `types.ts`; no copy. Verified on the DB harness (26 Nov 2026): build-out pass 1 and pass 2, the one-definition scan, the contract and `crew/reference_positions` green. | — | X1-01 (gap/04 C1, C12, C49, C70, C71; DECISIONS C22, D-X1-1, D-X1-2, D-X1-16). Global reference data (250 countries with demonym, dial code and flag; 91 languages; 13 departments; 3 contract types), about 100 STORM-authored system positions (every vessel role of `storm.json` with its tier), the per-company alias backfill from legacy titles and the listed positions per vessel. Reference tables read for active signed-in users; positions by row scope; aliases for company members; manning with `vessel.crew.crew_list.view`; no browser write policy (writes through the RPCs, gated by `vessel.crew.crew_compliance.admin`). **Live behaviour:** none changes; the positions drawer on the crew list (`?positions=1`) switches from "Positions are not set up yet" to the catalogue once applied. The seed runs `crew_positions_backfill()` once (idempotent). |
 
 ## Apply queue
 
 | Order | File | Check first | If not live |
 |---|---|---|---|
+| C1 | `20261124060100_crew_reference_positions.sql` | Query C1 | Apply after the fleet rows (`F*`) and after main order 25. Needs `has_capability_for()` with the crew keys (platform prep PP1, main order 23 or later). Then open a vessel's crew list with `?positions=1` as a fleet manager: the vessel's held positions are listed, and an unmatched title shows under "Unmatched titles". |
 
 Check queries (read-only; run in the Supabase SQL editor): one per row, named in *Check first* and added in the same commit as the row.
+
+```sql
+-- C1. crew_reference_positions: true means applied.
+SELECT to_regclass('public.positions') IS NOT NULL
+   AND to_regclass('public.position_manning') IS NOT NULL
+   AND to_regclass('public.ref_countries') IS NOT NULL
+   AND to_regprocedure('public.crew_positions_for_vessel(uuid)') IS NOT NULL
+   AND to_regprocedure('public.crew_cap_vessel_ids(text)') IS NOT NULL
+   AND (SELECT count(*) FROM public.positions WHERE company_id IS NULL) >= 100 AS applied;
+```

@@ -119,15 +119,21 @@ const AcknowledgmentTracking: React.FC = () => {
               Monitor mandatory document acknowledgments across your fleet
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" disabled={selectedDocuments.size === 0}>
-              <Send className="w-4 h-4 mr-2" />
-              Send Bulk Reminder ({selectedDocuments.size})
-            </Button>
-            <Button variant="outline">
-              <Download className="w-4 h-4 mr-2" />
-              Export Report
-            </Button>
+          <div className="flex flex-col items-start gap-1 sm:items-end">
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" disabled aria-describedby="ack-actions-unavailable">
+                <Send className="w-4 h-4 mr-2" />
+                Send Bulk Reminder ({selectedDocuments.size})
+              </Button>
+              <Button variant="outline" disabled aria-describedby="ack-actions-unavailable">
+                <Download className="w-4 h-4 mr-2" />
+                Export Report
+              </Button>
+            </div>
+            {/* FD7: these never sent or exported anything; they stay off until they do (no fake success). */}
+            <p id="ack-actions-unavailable" className="text-xs text-muted-foreground">
+              Reminders and the export are not available yet.
+            </p>
           </div>
         </div>
 
@@ -326,11 +332,12 @@ const AcknowledgmentTracking: React.FC = () => {
                           <Button
                             variant="ghost"
                             size="icon"
-                            title="Send Reminder"
+                            title="Who is outstanding"
+                            aria-label="Show who has not acknowledged"
                             onClick={() => openReminderModal(stat.documentId)}
                             disabled={stat.pending === 0}
                           >
-                            <Send className="w-4 h-4" />
+                            <Users className="w-4 h-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -348,50 +355,40 @@ const AcknowledgmentTracking: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Send Reminder Modal */}
+        {/* Outstanding acknowledgments (FD7: reminders are not sent from here yet) */}
         <Dialog open={reminderModalOpen} onOpenChange={setReminderModalOpen}>
           <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>Send Reminder</DialogTitle>
+              <DialogTitle>Not acknowledged yet</DialogTitle>
               <DialogDescription>
-                Send a reminder to crew members who haven't acknowledged this document.
+                Crew members who have not acknowledged this document ({pendingCrew?.length || 0}).
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-4 py-4">
-              <div className="flex items-center gap-2">
-                <Checkbox id="selectAll" defaultChecked />
-                <label htmlFor="selectAll" className="text-sm font-medium">
-                  Send to all pending crew ({pendingCrew?.length || 0})
-                </label>
-              </div>
-
-              <ScrollArea className="h-[200px] border rounded-lg p-3">
-                {pendingCrew?.map((member) => (
-                  <div key={member.user_id} className="flex items-center gap-2 py-2">
-                    <Checkbox id={member.user_id} defaultChecked />
-                    <label htmlFor={member.user_id} className="text-sm">
+            <ScrollArea className="h-[200px] border rounded-lg p-3">
+              {pendingCrew?.length ? (
+                <ul className="space-y-2">
+                  {pendingCrew.map((member) => (
+                    <li key={member.user_id} className="text-sm">
                       {member.first_name} {member.last_name}
                       <span className="text-muted-foreground ml-2">({member.email})</span>
-                    </label>
-                  </div>
-                ))}
-              </ScrollArea>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-muted-foreground">Everyone has acknowledged this document.</p>
+              )}
+            </ScrollArea>
 
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <p className="text-sm font-medium mb-2">Email Preview</p>
-                <div className="text-sm text-muted-foreground space-y-1">
-                  <p><strong>Subject:</strong> Action Required: Acknowledge Document</p>
-                  <p><strong>Body:</strong> You have a mandatory document pending acknowledgment...</p>
-                </div>
-              </div>
-            </div>
+            <p id="ack-reminder-unavailable" className="rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">
+              Sending reminders is not available yet, so nothing is sent from here. Remind these crew members directly for now.
+            </p>
 
             <DialogFooter>
               <Button variant="outline" onClick={() => setReminderModalOpen(false)}>
-                Cancel
+                Done
               </Button>
-              <Button onClick={() => setReminderModalOpen(false)}>
+              <Button disabled aria-describedby="ack-reminder-unavailable">
                 <Send className="w-4 h-4 mr-2" />
                 Send Reminder
               </Button>

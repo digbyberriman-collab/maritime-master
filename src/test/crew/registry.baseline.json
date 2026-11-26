@@ -28,9 +28,9 @@
       "    Clock {\"alsoCovers\":[\"crew/people/*/hours-of-rest\"],\"id\":\"vessel-crew-hours-of-rest\",\"kind\":\"leaf\",\"label\":\"Hours of Rest\",\"moduleSetting\":\"crew_hor\",\"path\":\"/v/:vesselCode/crew/hours-of-rest\",\"scope\":\"vessel\",\"status\":\"live\"}",
       "    FileCheck {\"id\":\"vessel-crew-familiarisation\",\"kind\":\"leaf\",\"label\":\"Familiarisation\",\"path\":\"/v/:vesselCode/crew/familiarisation\",\"scope\":\"vessel\",\"status\":\"live\"}",
       "    SquareCheckBig {\"id\":\"vessel-crew-checklists\",\"kind\":\"leaf\",\"label\":\"Checklists\",\"path\":\"/v/:vesselCode/crew/checklists\",\"scope\":\"vessel\",\"status\":\"planned\"}",
-      "    ClipboardCheck {\"id\":\"vessel-crew-appraisals\",\"kind\":\"leaf\",\"label\":\"Performance Appraisals\",\"path\":\"/v/:vesselCode/crew/appraisals\",\"scope\":\"vessel\",\"status\":\"planned\"}",
-      "    UserCheck {\"id\":\"vessel-crew-visitors\",\"kind\":\"leaf\",\"label\":\"Visitors & Occasional Workers\",\"path\":\"/v/:vesselCode/crew/visitors\",\"scope\":\"vessel\",\"status\":\"planned\"}",
-      "    Briefcase {\"id\":\"vessel-crew-employment-history\",\"kind\":\"leaf\",\"label\":\"Employment History\",\"path\":\"/v/:vesselCode/crew/employment-history\",\"scope\":\"vessel\",\"status\":\"planned\"}",
+      "    ClipboardCheck {\"capability\":\"hris.performance.annual_evaluations.view\",\"id\":\"vessel-crew-appraisals\",\"kind\":\"leaf\",\"label\":\"Performance Appraisals\",\"path\":\"/v/:vesselCode/crew/appraisals\",\"scope\":\"vessel\",\"status\":\"planned\"}",
+      "    UserCheck {\"capability\":\"vessel.crew.crew_list.view\",\"id\":\"vessel-crew-visitors\",\"kind\":\"leaf\",\"label\":\"Visitors & Occasional Workers\",\"path\":\"/v/:vesselCode/crew/visitors\",\"scope\":\"vessel\",\"status\":\"planned\"}",
+      "    Briefcase {\"capability\":\"hris.employee_records.contracts_employment.view\",\"id\":\"vessel-crew-employment-history\",\"kind\":\"leaf\",\"label\":\"Employment History\",\"path\":\"/v/:vesselCode/crew/employment-history\",\"scope\":\"vessel\",\"status\":\"planned\"}",
       "    FileText {\"id\":\"me-documents\",\"kind\":\"leaf\",\"label\":\"Documents\",\"path\":\"/me/documents\",\"scope\":\"personal\",\"status\":\"planned\"}"
     ],
     "VESSEL_MODULES": [
@@ -41,9 +41,9 @@
       "  Clock {\"alsoCovers\":[\"crew/people/*/hours-of-rest\"],\"id\":\"crew-hours-of-rest\",\"kind\":\"leaf\",\"label\":\"Hours of Rest\",\"moduleSetting\":\"crew_hor\",\"path\":\"crew/hours-of-rest\",\"status\":\"live\"}",
       "  FileCheck {\"id\":\"crew-familiarisation\",\"kind\":\"leaf\",\"label\":\"Familiarisation\",\"path\":\"crew/familiarisation\",\"status\":\"live\"}",
       "  SquareCheckBig {\"id\":\"crew-checklists\",\"kind\":\"leaf\",\"label\":\"Checklists\",\"path\":\"crew/checklists\",\"status\":\"planned\"}",
-      "  ClipboardCheck {\"id\":\"crew-appraisals\",\"kind\":\"leaf\",\"label\":\"Performance Appraisals\",\"path\":\"crew/appraisals\",\"status\":\"planned\"}",
-      "  UserCheck {\"id\":\"crew-visitors\",\"kind\":\"leaf\",\"label\":\"Visitors & Occasional Workers\",\"path\":\"crew/visitors\",\"status\":\"planned\"}",
-      "  Briefcase {\"id\":\"crew-employment-history\",\"kind\":\"leaf\",\"label\":\"Employment History\",\"path\":\"crew/employment-history\",\"status\":\"planned\"}"
+      "  ClipboardCheck {\"capability\":\"hris.performance.annual_evaluations.view\",\"id\":\"crew-appraisals\",\"kind\":\"leaf\",\"label\":\"Performance Appraisals\",\"path\":\"crew/appraisals\",\"status\":\"planned\"}",
+      "  UserCheck {\"capability\":\"vessel.crew.crew_list.view\",\"id\":\"crew-visitors\",\"kind\":\"leaf\",\"label\":\"Visitors & Occasional Workers\",\"path\":\"crew/visitors\",\"status\":\"planned\"}",
+      "  Briefcase {\"capability\":\"hris.employee_records.contracts_employment.view\",\"id\":\"crew-employment-history\",\"kind\":\"leaf\",\"label\":\"Employment History\",\"path\":\"crew/employment-history\",\"status\":\"planned\"}"
     ],
     "buildVesselNav": [
       "  Users {\"id\":\"vessel-crew-list\",\"kind\":\"leaf\",\"label\":\"Crew List\",\"path\":\"/v/dra/crew/list\",\"scope\":\"vessel\",\"status\":\"live\"}",
@@ -53,9 +53,9 @@
       "  Clock {\"alsoCovers\":[\"crew/people/*/hours-of-rest\"],\"id\":\"vessel-crew-hours-of-rest\",\"kind\":\"leaf\",\"label\":\"Hours of Rest\",\"moduleSetting\":\"crew_hor\",\"path\":\"/v/dra/crew/hours-of-rest\",\"scope\":\"vessel\",\"status\":\"live\"}",
       "  FileCheck {\"id\":\"vessel-crew-familiarisation\",\"kind\":\"leaf\",\"label\":\"Familiarisation\",\"path\":\"/v/dra/crew/familiarisation\",\"scope\":\"vessel\",\"status\":\"live\"}",
       "  SquareCheckBig {\"id\":\"vessel-crew-checklists\",\"kind\":\"leaf\",\"label\":\"Checklists\",\"path\":\"/v/dra/crew/checklists\",\"scope\":\"vessel\",\"status\":\"planned\"}",
-      "  ClipboardCheck {\"id\":\"vessel-crew-appraisals\",\"kind\":\"leaf\",\"label\":\"Performance Appraisals\",\"path\":\"/v/dra/crew/appraisals\",\"scope\":\"vessel\",\"status\":\"planned\"}",
-      "  UserCheck {\"id\":\"vessel-crew-visitors\",\"kind\":\"leaf\",\"label\":\"Visitors & Occasional Workers\",\"path\":\"/v/dra/crew/visitors\",\"scope\":\"vessel\",\"status\":\"planned\"}",
-      "  Briefcase {\"id\":\"vessel-crew-employment-history\",\"kind\":\"leaf\",\"label\":\"Employment History\",\"path\":\"/v/dra/crew/employment-history\",\"scope\":\"vessel\",\"status\":\"planned\"}"
+      "  ClipboardCheck {\"capability\":\"hris.performance.annual_evaluations.view\",\"id\":\"vessel-crew-appraisals\",\"kind\":\"leaf\",\"label\":\"Performance Appraisals\",\"path\":\"/v/dra/crew/appraisals\",\"scope\":\"vessel\",\"status\":\"planned\"}",
+      "  UserCheck {\"capability\":\"vessel.crew.crew_list.view\",\"id\":\"vessel-crew-visitors\",\"kind\":\"leaf\",\"label\":\"Visitors & Occasional Workers\",\"path\":\"/v/dra/crew/visitors\",\"scope\":\"vessel\",\"status\":\"planned\"}",
+      "  Briefcase {\"capability\":\"hris.employee_records.contracts_employment.view\",\"id\":\"vessel-crew-employment-history\",\"kind\":\"leaf\",\"label\":\"Employment History\",\"path\":\"/v/dra/crew/employment-history\",\"scope\":\"vessel\",\"status\":\"planned\"}"
     ],
     "VESSEL_PLACEHOLDER_LEAVES": [
       "crew/checklists Checklists",

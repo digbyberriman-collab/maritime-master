@@ -1,0 +1,35 @@
+[
+  {
+    "id": "073201d4-f1e0-0bdd-4c1f-8612cfa4fa11",
+    "company_id": null,
+    "key": "permanent",
+    "label": "Permanent",
+    "is_system": true,
+    "is_active": true,
+    "sort_order": 10,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "id": "4f6032e1-58b8-d5f5-8e14-e8bc198ed16c",
+    "company_id": null,
+    "key": "rotational",
+    "label": "Rotational",
+    "is_system": true,
+    "is_active": true,
+    "sort_order": 20,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "id": "2b304f04-798a-c25b-0c2e-7ba4b4cd2a61",
+    "company_id": null,
+    "key": "temporary",
+    "label": "Temporary",
+    "is_system": true,
+    "is_active": true,
+    "sort_order": 30,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  }
+]

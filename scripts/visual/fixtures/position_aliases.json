@@ -1,0 +1,26 @@
+[
+  {
+    "id": "ae987ee8-6aa2-9627-3782-a8870931fa81",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "alias_key": "captain",
+    "alias_label": "Captain",
+    "position_id": "d351f605-09f5-f1d8-11c0-cc264fe07c2e",
+    "source": "backfill",
+    "created_by": null,
+    "updated_by": null,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  {
+    "id": "f7339558-b3d1-02a3-6b2c-6671018fcdbb",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "alias_key": "stewardess",
+    "alias_label": "Stewardess",
+    "position_id": "abb6d96e-3291-568e-dc0c-df3bb1ef3c89",
+    "source": "backfill",
+    "created_by": null,
+    "updated_by": null,
+    "created_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  }
+]

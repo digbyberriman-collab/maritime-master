@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { Suspense, lazy, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import {
-  Users, Search, FileText, Download, IdCard, Ship, Building2, HardHat, AlertTriangle,
+  Users, Search, FileText, Download, IdCard, Ship, Building2, HardHat, AlertTriangle, ListOrdered,
 } from 'lucide-react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
 import PageHeader from '@/shared/components/layout/PageHeader';
@@ -24,6 +25,15 @@ import PersonnelRecordDialog from '@/modules/crew/components/PersonnelRecordDial
 import { personnelToCsv } from '@/modules/crew/lib/crewListPdf';
 import { KpiGrid, KpiTile, TABLET_MIN_WIDTH, useMinWidth } from '@/shared/components/data';
 import { StatusPill } from '@/shared/components/status';
+import { useScope } from '@/app/router/scopeContext';
+
+/**
+ * The vessel's positions (X1-01), opened with ?positions=1 and loaded only
+ * then. The drawer holds its own gates (crew_list.view to see it,
+ * crew_compliance.admin to change it), so this page imports no access code.
+ */
+const PositionsDrawer = lazy(() => import('@/modules/crew/components/PositionsDrawer'));
+const POSITIONS_PARAM = 'positions';
 
 type TypeFilter = 'all' | 'crew' | 'contractor' | 'shoreside';
 
@@ -74,6 +84,20 @@ const CrewList: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [officialOpen, setOfficialOpen] = useState(false);
   const [recordPerson, setRecordPerson] = useState<CrewMember | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const scope = useScope();
+  const routeVessel = scope.scope === 'vessel' ? scope.vessel ?? null : null;
+  const positionsOpen = routeVessel !== null && searchParams.get(POSITIONS_PARAM) === '1';
+  const setPositionsOpen = (open: boolean) =>
+    setSearchParams(
+      (current) => {
+        const next = new URLSearchParams(current);
+        if (open) next.set(POSITIONS_PARAM, '1');
+        else next.delete(POSITIONS_PARAM);
+        return next;
+      },
+      { replace: true },
+    );
 
   const departments = useMemo(
     () => Array.from(new Set(crew.map((person) => person.department).filter(Boolean))).sort() as string[],
@@ -142,6 +166,11 @@ const CrewList: React.FC = () => {
           description="Every person on the books (crew, contractors and shoreside staff), with the official crew list ready for port and immigration."
           actions={
             <>
+              {routeVessel ? (
+                <Button variant="outline" onClick={() => setPositionsOpen(true)} aria-haspopup="dialog">
+                  <ListOrdered aria-hidden="true" className="mr-2 h-4 w-4" /> Positions
+                </Button>
+              ) : null}
               <Button variant="outline" onClick={handleCsv} disabled={filtered.length === 0}>
                 <Download aria-hidden="true" className="mr-2 h-4 w-4" /> Export list
               </Button>
@@ -332,6 +361,16 @@ const CrewList: React.FC = () => {
         onOpenChange={(open) => { if (!open) setRecordPerson(null); }}
         person={recordPerson}
       />
+
+      {positionsOpen && routeVessel ? (
+        <Suspense fallback={null}>
+          <PositionsDrawer
+            open
+            onOpenChange={setPositionsOpen}
+            vessel={{ id: routeVessel.id, companyId: routeVessel.company_id, name: routeVessel.name }}
+          />
+        </Suspense>
+      ) : null}
     </DashboardLayout>
   );
 };

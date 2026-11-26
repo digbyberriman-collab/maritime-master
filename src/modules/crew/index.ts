@@ -44,7 +44,6 @@ export {
   LEAVE_STATUS_CODES,
   STATUS_CODE_MAP,
   LEAVE_DEPARTMENTS,
-  CREW_SEED_DATA,
 } from './leaveConstants';
 export type {
   LeaveStatusCode,

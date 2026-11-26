@@ -1,0 +1,126 @@
+/**
+ * Crew wiring (X1-01): the pieces that must line up across files, checked
+ * with plain file reads so a later slice cannot drift one of them alone.
+ *
+ * - every pending table and RPC of src/modules/crew/types/db.pending.ts is
+ *   created by a block-06 migration, is not in the generated types yet
+ *   (D-01), and is listed in the crew contract-map fragment;
+ * - every function the migration creates has a grants entry, and the
+ *   ledger fragment lists the file;
+ * - the positions drawer is mounted on the crew list lazily, behind
+ *   ?positions=1, and nothing eager (the manifest, the routes, the crew
+ *   barrel) imports the drawer, the pickers or the positions hooks;
+ * - the named-people seed list is gone (gap/04 headline 9).
+ */
+import { describe, expect, it } from 'vitest';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+
+const ROOT = process.cwd();
+const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
+const MIGRATION = 'supabase/migrations/20261124060100_crew_reference_positions.sql';
+
+const pending = read('src/modules/crew/types/db.pending.ts');
+const blockOf = (typeName: string) => {
+  const m = pending.match(new RegExp(`export type ${typeName} = \\{([\\s\\S]*?)\\n\\};`));
+  return m ? m[1] : '';
+};
+const namesIn = (block: string) => Array.from(block.matchAll(/^ {2}([a-z0-9_]+):/gm)).map((m) => m[1]);
+const pendingTables = namesIn(blockOf('CrewPendingTables'));
+const pendingFunctions = namesIn(blockOf('CrewPendingFunctions'));
+
+const crewMigrations = readdirSync(join(ROOT, 'supabase/migrations'))
+  .filter((f) => /^2026112406\d{4}_crew_[a-z0-9_]+\.sql$/.test(f))
+  .map((f) => read(`supabase/migrations/${f}`))
+  .join('\n');
+const migration = read(MIGRATION);
+const types = read('src/integrations/supabase/types.ts');
+const contractMap = JSON.parse(read('scripts/db/contract-map.d/crew.json'));
+const grants = JSON.parse(read('supabase/tests/fixtures/function-grants.d/crew.json'));
+const ledger = read('supabase/MIGRATIONS-LEDGER.d/crew.md');
+
+function walk(dir: string, out: string[] = []): string[] {
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) walk(full, out);
+    else if (/\.(ts|tsx)$/.test(name)) out.push(full);
+  }
+  return out;
+}
+
+describe('pending types and the migrations', () => {
+  it('declares the seven tables and five RPCs of 060100', () => {
+    expect(pendingTables).toEqual(['ref_countries', 'ref_languages', 'departments', 'contract_types', 'positions', 'position_aliases', 'position_manning']);
+    expect(pendingFunctions).toEqual([
+      'crew_positions_for_vessel', 'crew_vessel_unmatched_titles', 'crew_position_create', 'crew_vessel_positions_save', 'crew_position_alias_set',
+    ]);
+  });
+
+  it('every pending table and RPC is created by a block-06 migration', () => {
+    for (const t of pendingTables) expect(crewMigrations, t).toMatch(new RegExp(`CREATE TABLE IF NOT EXISTS public\\.${t} \\(`));
+    for (const f of pendingFunctions) expect(crewMigrations, f).toMatch(new RegExp(`CREATE OR REPLACE FUNCTION public\\.${f}\\(`));
+  });
+
+  it('none is in the generated types yet (D-01: the shim stays until types.ts is regenerated)', () => {
+    for (const name of [...pendingTables, ...pendingFunctions]) expect(types.includes(`      ${name}: {`), name).toBe(false);
+  });
+
+  it('the crew contract-map fragment expects exactly these names from the pending file', () => {
+    const entry = contractMap.files.find((f: { file: string }) => f.file === 'src/modules/crew/types/db.pending.ts');
+    expect(entry?.tables).toEqual({ type: 'CrewPendingTables', expect: pendingTables });
+    expect(entry?.functions).toEqual({ type: 'CrewPendingFunctions', expect: pendingFunctions });
+    expect(Object.keys(contractMap.notMirrored.functions).sort()).toEqual(['crew_cap_vessel_ids', 'crew_vessel_cap']);
+  });
+
+  it('every function the migration creates has a grants entry, and every table its relation entry', () => {
+    const fns = Array.from(new Set(Array.from(migration.matchAll(/CREATE OR REPLACE FUNCTION public\.([a-z0-9_]+)\(/g)).map((m) => m[1]))).sort();
+    const granted = Object.keys(grants.functions).map((k) => k.replace(/^public\.([a-z0-9_]+)\(.*$/, '$1')).sort();
+    expect(granted).toEqual(fns);
+    const tables = Array.from(migration.matchAll(/CREATE TABLE IF NOT EXISTS public\.([a-z0-9_]+) \(/g)).map((m) => `public.${m[1]}`).sort();
+    expect(Object.keys(grants.relations).sort()).toEqual(tables);
+    for (const key of Object.keys(grants.functions)) expect(grants.functions[key], key).not.toContain('anon');
+  });
+
+  it('the ledger fragment lists the file with a check query and an apply-queue row', () => {
+    expect(ledger).toContain('| 1 | `20261124060100_crew_reference_positions.sql` | written, not applied |');
+    expect(ledger).toContain('| C1 | `20261124060100_crew_reference_positions.sql` | Query C1 |');
+    expect(ledger).toMatch(/-- C1\. crew_reference_positions/);
+  });
+
+  it('the parity fixture is the one both test suites read', () => {
+    expect(read('supabase/tests/sql/crew/reference_positions.test.sql')).toContain('src/test/crew/fixtures/positionCases.json');
+    expect(read('src/test/crew/positions.test.ts')).toContain('./fixtures/positionCases.json');
+  });
+});
+
+describe('the positions drawer is lazy and behind ?positions=1', () => {
+  const crewList = read('src/modules/crew/pages/CrewList.tsx');
+
+  it('the crew list loads the drawer with a lazy import and opens it from the URL', () => {
+    expect(crewList).toMatch(/lazy\(\(\) => import\('@\/modules\/crew\/components\/PositionsDrawer'\)\)/);
+    expect(crewList).toMatch(/POSITIONS_PARAM = 'positions'/);
+    expect(crewList).toMatch(/searchParams\.get\(POSITIONS_PARAM\) === '1'/);
+    expect(crewList).not.toMatch(/^import .*PositionsDrawer/m);
+  });
+
+  it('nothing eager imports the drawer, the pickers or the positions hooks', () => {
+    const lazyOnly = /components\/(PositionsDrawer|PositionPicker|CountrySelect|LanguageSelect)|hooks\/(usePositions|useReferenceData)/;
+    for (const file of ['src/modules/crew/module.ts', 'src/modules/crew/routes.tsx', 'src/modules/crew/paths.ts', 'src/modules/crew/index.ts']) {
+      const staticImports = Array.from(read(file).matchAll(/^import\s+[^;]*?from\s+['"]([^'"]+)['"]/gm)).map((m) => m[1]);
+      expect(staticImports.filter((s) => lazyOnly.test(s)), file).toEqual([]);
+    }
+    const staticImporters = walk(join(ROOT, 'src'))
+      .filter((f) => !f.includes('/src/test/') && !f.endsWith('PositionsDrawer.tsx'))
+      .filter((f) => /^import\s+[^;]*?from\s+['"][^'"]*components\/PositionsDrawer['"]/m.test(readFileSync(f, 'utf8')));
+    expect(staticImporters).toEqual([]);
+  });
+});
+
+describe('hygiene', () => {
+  it('the named-people seed list is gone from src (gap/04 headline 9)', () => {
+    // Spelled in two parts so this file is not a hit of the done check's grep.
+    const name = ['CREW', 'SEED', 'DATA'].join('_');
+    const hits = walk(join(ROOT, 'src')).filter((f) => readFileSync(f, 'utf8').includes(name));
+    expect(hits).toEqual([]);
+  });
+});

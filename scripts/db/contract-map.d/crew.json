@@ -1,5 +1,23 @@
 {
   "version": 1,
-  "files": [],
-  "notMirrored": {}
+  "files": [
+    {
+      "file": "src/modules/crew/types/db.pending.ts",
+      "mirrors": "X1 spec §6 060100 (X1-01: reference data, positions, position manning)",
+      "tables": {
+        "type": "CrewPendingTables",
+        "expect": ["ref_countries", "ref_languages", "departments", "contract_types", "positions", "position_aliases", "position_manning"]
+      },
+      "functions": {
+        "type": "CrewPendingFunctions",
+        "expect": ["crew_positions_for_vessel", "crew_vessel_unmatched_titles", "crew_position_create", "crew_vessel_positions_save", "crew_position_alias_set"]
+      }
+    }
+  ],
+  "notMirrored": {
+    "functions": {
+      "crew_vessel_cap": "RLS predicate and X1 definer gate (X1 spec §3, 20261124060100): text-first boolean the policies and every X1 definer call; the client gates with useCan() on the same capability keys",
+      "crew_cap_vessel_ids": "RLS helper (D-229, X1 spec §3, 20261124060100): the caller's vessels holding a capability key, computed once per statement in the X1 read policies; the browser does not call it"
+    }
+  }
 }

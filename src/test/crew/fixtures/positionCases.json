@@ -1,0 +1,823 @@
+{
+  "description": "Parity cases for crew_position_for (supabase/migrations/20261124060100_crew_reference_positions.sql) and resolvePositionFor (src/modules/crew/lib/positions.ts). Asserted by src/test/crew/positions.test.ts and supabase/tests/sql/crew/reference_positions.test.sql. Companies A and B and vessels dra, hyd (A) and lev (B) are the SQL test librarys seed_two_tenants() world. \"system\" lists the STORM positions the cases rely on (each must be seeded with that key and name); expect is \"system:<key>\", a position ref, or null. The synonym cases cover every entry of the synonym map.",
+  "system": [
+    {
+      "key": "ab_seaman",
+      "name": "AB Seaman"
+    },
+    {
+      "key": "av_it_officer",
+      "name": "AV/IT Officer"
+    },
+    {
+      "key": "av_it_technician",
+      "name": "AV/IT Technician"
+    },
+    {
+      "key": "beauty_therapist",
+      "name": "Beauty Therapist"
+    },
+    {
+      "key": "bosun",
+      "name": "Bosun"
+    },
+    {
+      "key": "chief_officer",
+      "name": "Chief Officer"
+    },
+    {
+      "key": "chief_stew",
+      "name": "Chief Stew"
+    },
+    {
+      "key": "crew_chef",
+      "name": "Crew Chef"
+    },
+    {
+      "key": "deckhand",
+      "name": "Deckhand"
+    },
+    {
+      "key": "electrician",
+      "name": "Electrician"
+    },
+    {
+      "key": "eto",
+      "name": "ETO"
+    },
+    {
+      "key": "fourth_engineer",
+      "name": "Fourth Engineer"
+    },
+    {
+      "key": "head_chef",
+      "name": "Head Chef"
+    },
+    {
+      "key": "head_housekeeper",
+      "name": "Head Housekeeper"
+    },
+    {
+      "key": "junior_stew",
+      "name": "Junior Stew"
+    },
+    {
+      "key": "massage_therapist",
+      "name": "Massage Therapist"
+    },
+    {
+      "key": "master",
+      "name": "Master"
+    },
+    {
+      "key": "officer_of_the_watch",
+      "name": "Officer of the Watch"
+    },
+    {
+      "key": "os_seaman",
+      "name": "OS Seaman"
+    },
+    {
+      "key": "second_engineer",
+      "name": "Second Engineer"
+    },
+    {
+      "key": "second_officer",
+      "name": "Second Officer"
+    },
+    {
+      "key": "second_stew",
+      "name": "Second Stew"
+    },
+    {
+      "key": "ships_doctor",
+      "name": "Ship's Doctor"
+    },
+    {
+      "key": "sous_chef",
+      "name": "Sous Chef"
+    },
+    {
+      "key": "steward",
+      "name": "Steward"
+    },
+    {
+      "key": "third_engineer",
+      "name": "Third Engineer"
+    },
+    {
+      "key": "third_officer",
+      "name": "Third Officer"
+    },
+    {
+      "key": "third_stew",
+      "name": "Third Stew"
+    }
+  ],
+  "positions": [
+    {
+      "ref": "A.co.bosun",
+      "company": "A",
+      "vessel": null,
+      "key": "bosun",
+      "name": "Bosun",
+      "active": true
+    },
+    {
+      "ref": "A.dra.bosun",
+      "company": "A",
+      "vessel": "dra",
+      "key": "bosun",
+      "name": "Bosun",
+      "active": true
+    },
+    {
+      "ref": "A.dra.tender_captain",
+      "company": "A",
+      "vessel": "dra",
+      "key": "tender_captain",
+      "name": "Tender Captain",
+      "active": true
+    },
+    {
+      "ref": "A.hyd.aerial_photographer",
+      "company": "A",
+      "vessel": "hyd",
+      "key": "aerial_photographer",
+      "name": "Aerial Photographer",
+      "active": true
+    },
+    {
+      "ref": "A.co.yacht_manager",
+      "company": "A",
+      "vessel": null,
+      "key": "yacht_manager",
+      "name": "Yacht Manager",
+      "active": false
+    },
+    {
+      "ref": "A.co.night_watchman",
+      "company": "A",
+      "vessel": null,
+      "key": "night_watchman",
+      "name": "Night Watchman",
+      "active": true
+    },
+    {
+      "ref": "A.co.deck_hand_lead",
+      "company": "A",
+      "vessel": null,
+      "key": "deck_lead",
+      "name": "Deck Lead",
+      "active": true
+    },
+    {
+      "ref": "B.co.deck_supervisor",
+      "company": "B",
+      "vessel": null,
+      "key": "deck_supervisor",
+      "name": "Deck Supervisor",
+      "active": true
+    }
+  ],
+  "aliases": [
+    {
+      "company": "A",
+      "alias": "old_man",
+      "label": "Old Man",
+      "position": "system:master"
+    },
+    {
+      "company": "A",
+      "alias": "tender_cox",
+      "label": "Tender Cox",
+      "position": "A.dra.tender_captain"
+    },
+    {
+      "company": "A",
+      "alias": "drone_op",
+      "label": "Drone Op",
+      "position": "A.hyd.aerial_photographer"
+    },
+    {
+      "company": "A",
+      "alias": "chef",
+      "label": "Chef",
+      "position": "system:crew_chef"
+    },
+    {
+      "company": "A",
+      "alias": "yacht_mgr",
+      "label": "Yacht Mgr",
+      "position": "A.co.yacht_manager"
+    },
+    {
+      "company": "A",
+      "alias": "stewardess",
+      "label": "Stewardess",
+      "position": "system:steward"
+    },
+    {
+      "company": "A",
+      "alias": "bosn",
+      "label": "Bosn",
+      "position": "system:bosun"
+    },
+    {
+      "company": "B",
+      "alias": "night_guard",
+      "label": "Night Guard",
+      "position": "B.co.deck_supervisor"
+    }
+  ],
+  "cases": [
+    {
+      "title": "Master",
+      "company": "A",
+      "vessel": "dra",
+      "expect": "system:master",
+      "why": "the key"
+    },
+    {
+      "title": "  MASTER ",
+      "company": "A",
+      "vessel": "dra",
+      "expect": "system:master",
+      "why": "case and spaces are normalised"
+    },
+    {
+      "title": "Master.",
+      "company": "A",
+      "vessel": "dra",
+      "expect": "system:master",
+      "why": "punctuation is normalised"
+    },
+    {
+      "title": "Captain",
+      "company": "A",
+      "vessel": "dra",
+      "expect": "system:master",
+      "why": "synonym map"
+    },
+    {
+      "title": "Old Man",
+      "company": "A",
+      "vessel": "dra",
+      "expect": "system:master",
+      "why": "company alias"
+    },
+    {
+      "title": "Bosun",
+      "company": "A",
+      "vessel": "dra",
+      "expect": "A.dra.bosun",
+      "why": "the vessel row beats the company row"
+    },
+    {
+      "title": "Bosun",
+      "company": "A",
+      "vessel": "hyd",
+      "expect": "A.co.bosun",
+      "why": "the company row beats the system row"
+    },
+    {
+      "title": "Bosun",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:bosun",
+      "why": "another company sees the system row"
+    },
+    {
+      "title": "Boatswain",
+      "company": "A",
+      "vessel": "dra",
+      "expect": "A.dra.bosun",
+      "why": "a synonym resolves by the same precedence"
+    },
+    {
+      "title": "Boatswain",
+      "company": "A",
+      "vessel": "hyd",
+      "expect": "A.co.bosun",
+      "why": "a synonym resolves by the same precedence"
+    },
+    {
+      "title": "Tender Captain",
+      "company": "A",
+      "vessel": "dra",
+      "expect": "A.dra.tender_captain",
+      "why": "a vessel row on its vessel"
+    },
+    {
+      "title": "Tender Captain",
+      "company": "A",
+      "vessel": "hyd",
+      "expect": null,
+      "why": "a vessel row is not visible on another vessel"
+    },
+    {
+      "title": "Bosn",
+      "company": "A",
+      "vessel": "dra",
+      "expect": "A.dra.bosun",
+      "why": "an alias names a key: the vessel row still beats the system row it names"
+    },
+    {
+      "title": "Bosn",
+      "company": "A",
+      "vessel": "hyd",
+      "expect": "A.co.bosun",
+      "why": "an alias names a key: the company row beats the system row"
+    },
+    {
+      "title": "Bosn",
+      "company": "B",
+      "vessel": "lev",
+      "expect": null,
+      "why": "another companys alias"
+    },
+    {
+      "title": "Tender Cox",
+      "company": "A",
+      "vessel": "dra",
+      "expect": "A.dra.tender_captain",
+      "why": "an alias to a vessel row, on that vessel"
+    },
+    {
+      "title": "Tender Cox",
+      "company": "A",
+      "vessel": "hyd",
+      "expect": null,
+      "why": "an alias whose position is not visible on the vessel"
+    },
+    {
+      "title": "Drone Op",
+      "company": "A",
+      "vessel": "dra",
+      "expect": null,
+      "why": "an alias to another vessels row"
+    },
+    {
+      "title": "Drone Op",
+      "company": "A",
+      "vessel": "hyd",
+      "expect": "A.hyd.aerial_photographer",
+      "why": "the same alias on the positions vessel"
+    },
+    {
+      "title": "Chef",
+      "company": "A",
+      "vessel": "dra",
+      "expect": "system:crew_chef",
+      "why": "a company alias beats the synonym map"
+    },
+    {
+      "title": "Chef",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:head_chef",
+      "why": "the synonym map without the alias"
+    },
+    {
+      "title": "Stewardess",
+      "company": "A",
+      "vessel": "dra",
+      "expect": "system:steward",
+      "why": "an alias that agrees with the synonym map"
+    },
+    {
+      "title": "Yacht Mgr",
+      "company": "A",
+      "vessel": "dra",
+      "expect": null,
+      "why": "an alias to an inactive position"
+    },
+    {
+      "title": "Yacht Manager",
+      "company": "A",
+      "vessel": "dra",
+      "expect": null,
+      "why": "an inactive company position"
+    },
+    {
+      "title": "Night Watchman",
+      "company": "A",
+      "vessel": "dra",
+      "expect": "A.co.night_watchman",
+      "why": "a company position"
+    },
+    {
+      "title": "Night Watchman",
+      "company": "B",
+      "vessel": "lev",
+      "expect": null,
+      "why": "another companys position"
+    },
+    {
+      "title": "Night Guard",
+      "company": "A",
+      "vessel": "dra",
+      "expect": null,
+      "why": "another companys alias"
+    },
+    {
+      "title": "Night Guard",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "B.co.deck_supervisor",
+      "why": "its own companys alias"
+    },
+    {
+      "title": "Deck Supervisor",
+      "company": "A",
+      "vessel": "dra",
+      "expect": null,
+      "why": "another companys position"
+    },
+    {
+      "title": "Deck Lead",
+      "company": "A",
+      "vessel": "dra",
+      "expect": "A.co.deck_hand_lead",
+      "why": "a company position by its key"
+    },
+    {
+      "title": "Ship's Doctor",
+      "company": "A",
+      "vessel": "dra",
+      "expect": "system:ships_doctor",
+      "why": "the normalised name of a system row"
+    },
+    {
+      "title": "Deckhand",
+      "company": "A",
+      "vessel": "dra",
+      "expect": "system:deckhand",
+      "why": "a system key"
+    },
+    {
+      "title": "",
+      "company": "A",
+      "vessel": "dra",
+      "expect": null,
+      "why": "blank"
+    },
+    {
+      "title": "   ",
+      "company": "A",
+      "vessel": "dra",
+      "expect": null,
+      "why": "blank"
+    },
+    {
+      "title": "—",
+      "company": "A",
+      "vessel": "dra",
+      "expect": null,
+      "why": "no letters or digits"
+    },
+    {
+      "title": "Unknown Title",
+      "company": "A",
+      "vessel": "dra",
+      "expect": null,
+      "why": "unmatched"
+    },
+    {
+      "title": "Captain",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:master",
+      "why": "synonym captain -> master"
+    },
+    {
+      "title": "Skipper",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:master",
+      "why": "synonym skipper -> master"
+    },
+    {
+      "title": "First Officer",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:chief_officer",
+      "why": "synonym first_officer -> chief_officer"
+    },
+    {
+      "title": "Chief Mate",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:chief_officer",
+      "why": "synonym chief_mate -> chief_officer"
+    },
+    {
+      "title": "First Mate",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:chief_officer",
+      "why": "synonym first_mate -> chief_officer"
+    },
+    {
+      "title": "Mate",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:chief_officer",
+      "why": "synonym mate -> chief_officer"
+    },
+    {
+      "title": "2nd Officer",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:second_officer",
+      "why": "synonym 2nd_officer -> second_officer"
+    },
+    {
+      "title": "Second Mate",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:second_officer",
+      "why": "synonym second_mate -> second_officer"
+    },
+    {
+      "title": "3rd Officer",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:third_officer",
+      "why": "synonym 3rd_officer -> third_officer"
+    },
+    {
+      "title": "Third Mate",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:third_officer",
+      "why": "synonym third_mate -> third_officer"
+    },
+    {
+      "title": "Oow",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:officer_of_the_watch",
+      "why": "synonym oow -> officer_of_the_watch"
+    },
+    {
+      "title": "Boatswain",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:bosun",
+      "why": "synonym boatswain -> bosun"
+    },
+    {
+      "title": "Able Seaman",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:ab_seaman",
+      "why": "synonym able_seaman -> ab_seaman"
+    },
+    {
+      "title": "Able Bodied Seaman",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:ab_seaman",
+      "why": "synonym able_bodied_seaman -> ab_seaman"
+    },
+    {
+      "title": "Ab",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:ab_seaman",
+      "why": "synonym ab -> ab_seaman"
+    },
+    {
+      "title": "Ordinary Seaman",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:os_seaman",
+      "why": "synonym ordinary_seaman -> os_seaman"
+    },
+    {
+      "title": "Os",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:os_seaman",
+      "why": "synonym os -> os_seaman"
+    },
+    {
+      "title": "2nd Engineer",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:second_engineer",
+      "why": "synonym 2nd_engineer -> second_engineer"
+    },
+    {
+      "title": "3rd Engineer",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:third_engineer",
+      "why": "synonym 3rd_engineer -> third_engineer"
+    },
+    {
+      "title": "4th Engineer",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:fourth_engineer",
+      "why": "synonym 4th_engineer -> fourth_engineer"
+    },
+    {
+      "title": "Electro Technical Officer",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:eto",
+      "why": "synonym electro_technical_officer -> eto"
+    },
+    {
+      "title": "Electrotechnical Officer",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:eto",
+      "why": "synonym electrotechnical_officer -> eto"
+    },
+    {
+      "title": "Electro Technical Rating",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:electrician",
+      "why": "synonym electro_technical_rating -> electrician"
+    },
+    {
+      "title": "Etr",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:electrician",
+      "why": "synonym etr -> electrician"
+    },
+    {
+      "title": "Chief Stewardess",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:chief_stew",
+      "why": "synonym chief_stewardess -> chief_stew"
+    },
+    {
+      "title": "Chief Steward",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:chief_stew",
+      "why": "synonym chief_steward -> chief_stew"
+    },
+    {
+      "title": "Chief Steward Ess",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:chief_stew",
+      "why": "synonym chief_steward_ess -> chief_stew"
+    },
+    {
+      "title": "Stewardess",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:steward",
+      "why": "synonym stewardess -> steward"
+    },
+    {
+      "title": "Stew",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:steward",
+      "why": "synonym stew -> steward"
+    },
+    {
+      "title": "Steward Ess",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:steward",
+      "why": "synonym steward_ess -> steward"
+    },
+    {
+      "title": "Second Stewardess",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:second_stew",
+      "why": "synonym second_stewardess -> second_stew"
+    },
+    {
+      "title": "Second Steward",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:second_stew",
+      "why": "synonym second_steward -> second_stew"
+    },
+    {
+      "title": "2nd Stew",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:second_stew",
+      "why": "synonym 2nd_stew -> second_stew"
+    },
+    {
+      "title": "Third Stewardess",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:third_stew",
+      "why": "synonym third_stewardess -> third_stew"
+    },
+    {
+      "title": "Third Steward",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:third_stew",
+      "why": "synonym third_steward -> third_stew"
+    },
+    {
+      "title": "3rd Stew",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:third_stew",
+      "why": "synonym 3rd_stew -> third_stew"
+    },
+    {
+      "title": "Junior Stewardess",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:junior_stew",
+      "why": "synonym junior_stewardess -> junior_stew"
+    },
+    {
+      "title": "Junior Steward",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:junior_stew",
+      "why": "synonym junior_steward -> junior_stew"
+    },
+    {
+      "title": "Head Of Housekeeping",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:head_housekeeper",
+      "why": "synonym head_of_housekeeping -> head_housekeeper"
+    },
+    {
+      "title": "Chef",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:head_chef",
+      "why": "synonym chef -> head_chef"
+    },
+    {
+      "title": "Second Chef",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:sous_chef",
+      "why": "synonym second_chef -> sous_chef"
+    },
+    {
+      "title": "Ship S Doctor",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:ships_doctor",
+      "why": "synonym ship_s_doctor -> ships_doctor"
+    },
+    {
+      "title": "Doctor",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:ships_doctor",
+      "why": "synonym doctor -> ships_doctor"
+    },
+    {
+      "title": "Av Technician",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:av_it_technician",
+      "why": "synonym av_technician -> av_it_technician"
+    },
+    {
+      "title": "It Officer",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:av_it_officer",
+      "why": "synonym it_officer -> av_it_officer"
+    },
+    {
+      "title": "Masseuse",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:massage_therapist",
+      "why": "synonym masseuse -> massage_therapist"
+    },
+    {
+      "title": "Masseur",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:massage_therapist",
+      "why": "synonym masseur -> massage_therapist"
+    },
+    {
+      "title": "Beautician",
+      "company": "B",
+      "vessel": "lev",
+      "expect": "system:beauty_therapist",
+      "why": "synonym beautician -> beauty_therapist"
+    }
+  ]
+}
