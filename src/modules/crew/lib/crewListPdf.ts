@@ -2,6 +2,31 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { format } from 'date-fns';
 import type { CrewMember } from '@/modules/crew/hooks/useCrew';
+import { logClientExport } from '@/lib/records/services/exports';
+import { EXPORT_COPY, exportFileName, isLegacyUnloggedExport } from '@/lib/export';
+
+/**
+ * One person on the official crew list: the identity fields of FAL 5. A
+ * CrewMember fits; the vessel crew list report builds these from the
+ * as-at list and the profiles' identity columns.
+ */
+export interface CrewListPerson {
+  first_name?: string | null;
+  last_name?: string | null;
+  rank?: string | null;
+  job_title?: string | null;
+  nationality?: string | null;
+  date_of_birth?: string | null;
+  place_of_birth?: string | null;
+  passport_number?: string | null;
+  passport_country?: string | null;
+  passport_expiry?: string | null;
+  seamans_book_number?: string | null;
+  embarkation_port?: string | null;
+  contract_start_date?: string | null;
+  personnel_type?: string | null;
+  current_assignment?: { join_date?: string | null } | null;
+}
 
 export interface CrewListVessel {
   name: string;
@@ -18,6 +43,10 @@ export interface OfficialCrewListOptions {
   lastPortOfCall?: string;
   masterName?: string;
   includeContractors: boolean;
+  /** The day the list is for, when it is not the day it is made (T-306: a crew list as at a later day). */
+  asAtDate?: string;
+  /** A line under the list, e.g. what the list leaves out. */
+  footnote?: string;
 }
 
 const dash = (value?: string | null) => (value && value.trim() !== '' ? value : '—');
@@ -34,7 +63,7 @@ const fmtDate = (value?: string | null) => {
  * master's declaration footer.
  */
 export const buildOfficialCrewListPdf = (
-  people: CrewMember[],
+  people: readonly CrewListPerson[],
   options: OfficialCrewListOptions,
 ): jsPDF => {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
@@ -45,7 +74,12 @@ export const buildOfficialCrewListPdf = (
   doc.text('CREW LIST', pageWidth / 2, 40, { align: 'center' });
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
-  doc.text('IMO FAL Form 5', pageWidth / 2, 54, { align: 'center' });
+  doc.text(
+    options.asAtDate ? `IMO FAL Form 5 · crew as at ${fmtDate(options.asAtDate)}` : 'IMO FAL Form 5',
+    pageWidth / 2,
+    54,
+    { align: 'center' },
+  );
 
   const particulars: string[][] = [
     ['Name of ship', dash(options.vessel.name), 'IMO number', dash(options.vessel.imo_number)],
@@ -129,6 +163,13 @@ export const buildOfficialCrewListPdf = (
   const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
   const height = doc.internal.pageSize.getHeight();
   let declarationY = finalY + 30;
+  if (options.footnote) {
+    doc.setFontSize(7);
+    doc.setTextColor(90);
+    doc.text(options.footnote, 40, finalY + 14, { maxWidth: pageWidth - 80 });
+    doc.setTextColor(0);
+    declarationY += 10;
+  }
   if (declarationY > height - 90) {
     doc.addPage();
     declarationY = 60;
@@ -156,6 +197,61 @@ export const buildOfficialCrewListPdf = (
 
   return doc;
 };
+
+/** The crew list report's source key (an export that worked before the log, LEGACY_UNLOGGED_EXPORTS). */
+export const CREW_LIST_EXPORT_SOURCE = 'crew.crew_list';
+
+export type CrewListPdfResult = { status: 'ok'; fileName: string; logged: boolean } | { status: 'refused'; message: string };
+
+/**
+ * Log, then build and save the official crew list (gap/08 EX1, EX4; the
+ * export engine's contract 9). The export is logged first with
+ * `logClientExport` (kind register_pdf, personal data, the vessel and the
+ * as-at day); while the log is not in the database (D-01) this export,
+ * which worked before the log existed, still runs unlogged; any other
+ * refusal stops it before anything is built. The file is named
+ * `<VESSEL>_CrewList_<as-at day>_<made on>.pdf`.
+ */
+export async function downloadOfficialCrewList(
+  people: readonly CrewListPerson[],
+  options: OfficialCrewListOptions & { vesselId?: string | null; vesselCode?: string | null; now?: Date },
+): Promise<CrewListPdfResult> {
+  const asAt = options.asAtDate ?? options.dateOfArrival;
+  let logged = false;
+  try {
+    const log = await logClientExport({
+      kind: 'register_pdf',
+      sourceKey: CREW_LIST_EXPORT_SOURCE,
+      params: { as_at: asAt, include_contractors: options.includeContractors },
+      containsPersonalData: true,
+      rowCount: people.length,
+      vesselId: options.vesselId ?? undefined,
+    });
+    if (log.status === 'refused') {
+      return { status: 'refused', message: log.code === 'impersonating' ? EXPORT_COPY.impersonating : EXPORT_COPY.invalid };
+    }
+    if (log.status === 'missing' && !isLegacyUnloggedExport(CREW_LIST_EXPORT_SOURCE)) {
+      return { status: 'refused', message: EXPORT_COPY.logMissingPersonal };
+    }
+    logged = log.status === 'ok';
+  } catch (error) {
+    const code = (error as { code?: unknown } | null)?.code;
+    return { status: 'refused', message: code === '42501' ? EXPORT_COPY.accessDenied : EXPORT_COPY.logFailed };
+  }
+  try {
+    const fileName = exportFileName({
+      vesselCode: options.vesselCode,
+      kind: 'Crew list',
+      range: asAt ? { on: asAt } : null,
+      ext: 'pdf',
+      generatedOn: options.now,
+    });
+    buildOfficialCrewListPdf(people, options).save(fileName);
+    return { status: 'ok', fileName, logged };
+  } catch {
+    return { status: 'refused', message: EXPORT_COPY.buildFailed };
+  }
+}
 
 export const personnelToCsv = (people: CrewMember[]): string => {
   const headers = [

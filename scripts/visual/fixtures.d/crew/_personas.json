@@ -1,0 +1,6 @@
+{
+  "crew-list-basic": {
+    "note": "X1-02 not applied yet (D-01): crew_vessel_list and crew_vessel_movements are missing, so the crew list is the basic list from the profiles and assignments (with the notice), and the Movements tab says it is not set up yet. Warns by design: the missing RPCs log 404s.",
+    "missingRpcs": ["crew_vessel_list", "crew_vessel_movements"]
+  }
+}

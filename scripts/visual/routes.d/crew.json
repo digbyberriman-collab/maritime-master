@@ -19,5 +19,54 @@
     "path": "/fleet/planner",
     "slug": "fleet-planner",
     "note": "X1-01: the fleet planner route moved into the crew manifest (same page as before)"
+  },
+  {
+    "path": "/v/dra/crew/list",
+    "slug": "crew-vessel-list-pending-login",
+    "waitFor": "[data-crew-list-source=\"server\"] table tbody tr",
+    "note": "X1-02: the crew list from crew_vessel_list with the Pending login chip hovered: a crew member added without a sign-in is assigned once they accept an invitation (D-199)",
+    "actions": [
+      {
+        "waitFor": "button[aria-label^=\"Pending login\"]"
+      },
+      {
+        "hover": "button[aria-label^=\"Pending login\"]"
+      },
+      {
+        "wait": 400
+      }
+    ]
+  },
+  {
+    "path": "/v/dra/crew/list?status=pending&sort=name",
+    "slug": "crew-vessel-list-pending",
+    "waitFor": "[data-crew-list-source=\"server\"] table tbody tr",
+    "note": "X1-02: the status chip and sort kept in the URL: only the pending people (planned joiner, pending placements), by name"
+  },
+  {
+    "path": "/v/dra/crew/list?tab=movements",
+    "slug": "crew-vessel-movements",
+    "waitFor": "[data-movements-state=\"ready\"] table tbody tr",
+    "note": "X1-02: the Movements tab: joins, departures, transfers and in/out toggles in the URL's date range, newest first, with their source"
+  },
+  {
+    "path": "/v/dra/crew/roster",
+    "slug": "crew-roster-redirect",
+    "expectRedirect": "/v/dra/crew/list",
+    "note": "X1-02: the roster is folded into the crew list; the old vessel URL lands on it"
+  },
+  {
+    "path": "/v/dra/crew/list",
+    "slug": "crew-vessel-list-basic",
+    "persona": "crew-list-basic",
+    "waitFor": "[data-crew-list-source=\"basic\"]",
+    "note": "X1-02 not applied (D-01): the basic list from the profiles and assignments with the notice. Warns by design: the missing RPCs log 404s"
+  },
+  {
+    "path": "/v/dra/crew/list?tab=movements",
+    "slug": "crew-vessel-movements-basic",
+    "persona": "crew-list-basic",
+    "waitFor": "[data-movements-state=\"not-set-up\"]",
+    "note": "X1-02 not applied (D-01): the Movements tab says it is not set up yet. Warns by design: the missing RPCs log 404s"
   }
 ]

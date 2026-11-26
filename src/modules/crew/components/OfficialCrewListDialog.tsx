@@ -14,7 +14,8 @@ import {
 import { toast } from '@/shared/hooks/use-toast';
 import type { CrewMember } from '@/modules/crew/hooks/useCrew';
 import type { Vessel } from '@/modules/vessels/contexts/VesselContext';
-import { buildOfficialCrewListPdf } from '@/modules/crew/lib/crewListPdf';
+import { downloadOfficialCrewList } from '@/modules/crew/lib/crewListPdf';
+import { notify } from '@/shared/lib/notify';
 
 interface Props {
   open: boolean;
@@ -34,6 +35,7 @@ const OfficialCrewListDialog: React.FC<Props> = ({
   const [lastPort, setLastPort] = useState('');
   const [arrivalDate, setArrivalDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [includeContractors, setIncludeContractors] = useState(true);
+  const [generating, setGenerating] = useState(false);
 
   const vessel = vessels.find((item) => item.id === vesselId) ?? null;
 
@@ -56,22 +58,33 @@ const OfficialCrewListDialog: React.FC<Props> = ({
     return master ? `${master.first_name} ${master.last_name}` : '';
   }, [listed]);
 
-  const handleGenerate = () => {
+  /** Logged first (personal data, EX4), then built and saved under its EX1 name. */
+  const handleGenerate = async () => {
     if (!vessel) {
       toast({ title: 'Choose a vessel first', variant: 'destructive' });
       return;
     }
-    const doc = buildOfficialCrewListPdf(listed, {
-      vessel,
-      portOfArrival: port,
-      dateOfArrival: arrivalDate,
-      lastPortOfCall: lastPort,
-      masterName,
-      includeContractors,
-    });
-    const safeName = vessel.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase();
-    doc.save(`crew-list-${safeName}-${arrivalDate}.pdf`);
-    onOpenChange(false);
+    setGenerating(true);
+    try {
+      const result = await downloadOfficialCrewList(listed, {
+        vessel,
+        vesselId: vessel.id,
+        vesselCode: vessel.code ?? vessel.name,
+        portOfArrival: port,
+        dateOfArrival: arrivalDate,
+        lastPortOfCall: lastPort,
+        masterName,
+        includeContractors,
+      });
+      if (result.status === 'refused') {
+        notify.error(result.message, { title: 'The crew list was not made' });
+        return;
+      }
+      notify.success('Crew list downloaded', { description: result.fileName });
+      onOpenChange(false);
+    } finally {
+      setGenerating(false);
+    }
   };
 
   return (
@@ -130,7 +143,9 @@ const OfficialCrewListDialog: React.FC<Props> = ({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleGenerate} disabled={!vesselId}>Download PDF</Button>
+          <Button onClick={() => void handleGenerate()} disabled={!vesselId || generating}>
+            {generating ? 'Making the PDF…' : 'Download PDF'}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

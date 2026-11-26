@@ -1,8 +1,16 @@
 /**
- * Crew list (/v/:vesselCode/crew/list; Phase 1 S7): its own h1 becomes the
- * page's PageHeader, the counts are KpiTiles, status is the registry pill,
- * and below 768 px the register is a list of cards instead of a nine-column
- * table (usable at 390 px without page scroll).
+ * Crew list layout.
+ *
+ * - The vessel crew list (X1-02, /v/:vesselCode/crew/list): one PageHeader
+ *   (the only h1) whose actions are at most three controls (Crew list
+ *   report, Add crew, More), with Import CSV, Sync Airtable and Positions in
+ *   the More menu: the roster header was 102 px too wide at 390 px. The
+ *   register table scrolls inside its own card, the name column stays in
+ *   view, and the page root never grows past the viewport (min-w-0).
+ * - The legacy personnel list (CrewList, still served at /crew/list for
+ *   people outside the vessel scope, Phase 1 S7): its own h1 becomes the
+ *   page's PageHeader, the counts are KpiTiles, status is the registry pill,
+ *   and below 768 px the register is a list of cards.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
@@ -30,7 +38,8 @@ const person = (id: string, first: string, last: string, extra: Record<string, u
 vi.mock('@/shared/components/layout/DashboardLayout', () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
-vi.mock('@/modules/crew/hooks/useCrew', () => ({
+vi.mock('@/modules/crew/hooks/useCrew', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/modules/crew/hooks/useCrew')>()),
   useCrew: () => ({
     isLoading: state.isLoading,
     crew: state.isLoading
@@ -48,6 +57,44 @@ vi.mock('@/modules/crew/components/OfficialCrewListDialog', () => ({ default: ()
 vi.mock('@/modules/crew/components/PersonnelRecordDialog', () => ({ default: () => null }));
 
 import CrewList from '@/modules/crew/pages/CrewList';
+import CrewListPage from '@/modules/crew/pages/CrewListPage';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+const rpcRows = vi.hoisted(() => [
+  {
+    profile_id: 'p-1', user_id: 'u-1', first_name: 'Demo', last_name: 'Bosun', preferred_name: null, avatar_url: null, email: null,
+    position_id: 'pos-bosun', position_name: 'Bosun', position_text: 'Bosun', department_key: 'deck', department_label: 'Deck', rank_tier: 'officer',
+    sort_order: 30201, assignment_id: 'a-1', placement_kind: 'assignment', join_date: '2026-10-01', leave_date: null, status: 'on_board',
+    status_detail: null, transfer_vessel_id: null, leave_code: null, travel_today: false, login_state: 'active', account_status: 'active',
+    invitation_id: null, invitation_status: null, invitation_expires_at: null, invitation_last_sent_at: null, invitation_last_error_code: null,
+    nationality: null, is_master_office: false,
+  },
+]);
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: {
+    rpc: () => Promise.resolve({ data: rpcRows, error: null }),
+    from: () => {
+      const chain: Record<string, unknown> = {};
+      for (const m of ['select', 'eq', 'in', 'order', 'limit']) chain[m] = () => chain;
+      chain.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(resolve);
+      return chain;
+    },
+    functions: { invoke: vi.fn() },
+  },
+}));
+vi.mock('@/lib/permissions/useCan', () => ({
+  useCapability: () => ({ allowed: true, status: 'granted', reason: 'test' }),
+  useCan: () => true,
+}));
+vi.mock('@/app/router/scopeContext', () => ({
+  useScope: () => ({ scope: 'vessel', vesselCode: 'DRA', vessel: { id: 'v-1', company_id: 'c-1', name: 'DRAAK' } }),
+}));
+vi.mock('@/app/router/scopes', () => ({ useScopedPath: () => (rel = '') => `/v/dra/${rel}` }));
+vi.mock('@/modules/auth/contexts/AuthContext', () => ({ useAuth: () => ({ user: { id: 'u-admin' }, profile: { company_id: 'c-1' } }) }));
+vi.mock('@/modules/auth/hooks/useAdminActions', () => ({ useAdminActions: () => ({ isConfirmed: () => false }) }));
+vi.mock('@/modules/users-access/hooks/useInvitations', () => ({
+  useInvitationActions: () => ({ inviteOne: vi.fn(), inviteMany: vi.fn(), invitingProfileId: null, bulkPending: false }),
+}));
 
 let original: typeof window.matchMedia;
 beforeEach(() => {
@@ -112,5 +159,47 @@ describe('crew list', () => {
     renderPage();
     const table = screen.getByRole('table');
     expect(within(table).getAllByRole('row')).toHaveLength(3);
+  });
+});
+
+describe('vessel crew list at 390 px (X1-02)', () => {
+  const renderVesselPage = () =>
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <MemoryRouter>
+          <CrewListPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+  it('one PageHeader, at most three header controls, the admin actions in the More menu', async () => {
+    const { container } = renderVesselPage();
+    await screen.findByText('Bosun, Demo');
+    const headers = container.querySelectorAll('[data-page-heading]');
+    expect(headers).toHaveLength(1);
+    expect(container.querySelectorAll('h1')).toHaveLength(1);
+    const actions = within(headers[0] as HTMLElement).getAllByRole('button');
+    expect(actions.map((b) => b.textContent?.trim() || b.getAttribute('aria-label'))).toEqual(['Crew list report', 'Add crew', 'More crew list actions']);
+    expect(within(headers[0] as HTMLElement).queryByRole('button', { name: /Import CSV|Sync Airtable|Positions/ })).toBeNull();
+  });
+
+  it('the page root cannot grow past the viewport, the table scrolls inside its card, the name stays in view', async () => {
+    const { container } = renderVesselPage();
+    await screen.findByText('Bosun, Demo');
+    const root = container.querySelector('[data-crew-list-source]') as HTMLElement;
+    expect(root.className).toContain('min-w-0');
+    const table = screen.getByRole('table', { name: 'Crew list' });
+    const scroller = table.parentElement as HTMLElement;
+    expect(scroller.className).toMatch(/overflow-auto/);
+    const nameHeader = within(table).getAllByRole('columnheader').find((th) => /Name/.test(th.textContent ?? '')) as HTMLElement;
+    expect(nameHeader.className).toMatch(/sticky/);
+  });
+
+  it('row actions are 44 px on touch and labelled with the person', async () => {
+    renderVesselPage();
+    await screen.findByText('Bosun, Demo');
+    const more = screen.getByRole('button', { name: 'More actions for Bosun, Demo' });
+    expect(more.className).toContain('[@media(pointer:coarse)]:size-11');
+    expect(screen.getByRole('link', { name: 'Hours of rest: Bosun, Demo' }).className).toContain('[@media(pointer:coarse)]:size-11');
   });
 });

@@ -32,8 +32,14 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useVessels } from '@/modules/vessels/hooks/useVessels';
 import type { TransferCrewData, CrewMember } from '@/modules/crew/hooks/useCrew';
+import { isPendingPlacementAssignment } from '@/modules/crew/lib/crewUpdateErrors';
+
+/** D-225: a pending placement is not an assignment; a transfer waits until the login is linked. */
+export const TRANSFER_PENDING_MESSAGE =
+  'This person is not assigned to the vessel yet: the assignment is written once they are invited and their login is linked. They can be transferred after that.';
 
 const formSchema = z.object({
   newVesselId: z.string().min(1, 'Please select a vessel'),
@@ -82,17 +88,24 @@ const TransferCrewModal: React.FC<TransferCrewModalProps> = ({
     }
   }, [isOpen, crewMember, form]);
 
-  const handleSubmit = async (values: FormValues) => {
-    if (!crewMember?.current_assignment) return;
+  const pending = isPendingPlacementAssignment(crewMember?.current_assignment) || !crewMember?.user_id;
 
-    await onSubmit({
-      userId: crewMember.user_id,
-      currentAssignmentId: crewMember.current_assignment.id,
-      newVesselId: values.newVesselId,
-      position: values.position,
-      transferDate: format(values.transferDate, 'yyyy-MM-dd'),
-      notes: values.notes,
-    });
+  const handleSubmit = async (values: FormValues) => {
+    if (!crewMember?.current_assignment || !crewMember.user_id || pending) return;
+
+    try {
+      await onSubmit({
+        userId: crewMember.user_id,
+        currentAssignmentId: crewMember.current_assignment.id,
+        newVesselId: values.newVesselId,
+        position: values.position,
+        transferDate: format(values.transferDate, 'yyyy-MM-dd'),
+        notes: values.notes,
+      });
+    } catch {
+      // The writer has already said why (a STORM sentence, or "Partly saved"); keep the entries.
+      return;
+    }
     onClose();
   };
 
@@ -111,6 +124,12 @@ const TransferCrewModal: React.FC<TransferCrewModalProps> = ({
             Transfer {crewMember.first_name} {crewMember.last_name} to a different vessel.
           </DialogDescription>
         </DialogHeader>
+
+        {pending ? (
+          <Alert variant="info" data-transfer-refused="pending_placement">
+            <AlertDescription>{TRANSFER_PENDING_MESSAGE}</AlertDescription>
+          </Alert>
+        ) : null}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
@@ -227,7 +246,7 @@ const TransferCrewModal: React.FC<TransferCrewModalProps> = ({
               <Button type="button" variant="outline" onClick={onClose}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading}>
+              <Button type="submit" disabled={isLoading || pending}>
                 {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 Transfer
               </Button>

@@ -11,7 +11,9 @@
  *     Familiarisation 80, …). Crew Medical (60) comes from the fleet
  *     operations manifest and Crew Training (70) from development's
  *     (platform-prep plan §1), so this module never uses those two orders.
- *     The Crew Roster leaf (15) stays until X1-02 folds it into Crew List.
+ *     X1-02 folded the roster into the Crew List (beta, behind
+ *     vessel.crew.crew_list.view); crew/roster redirects to it, and its
+ *     leaf is gone.
  *     There is no Dashboard leaf yet: a planned leaf at the module root
  *     would turn today's crew -> crew/list redirect into a Coming Soon page
  *     (X1-10B adds it as beta with its page).
@@ -29,11 +31,11 @@
  * §4 orders (same sequence as before) and the planned leaves' gates.
  */
 import {
-  Briefcase, CheckSquare, ClipboardCheck, ClipboardList, Clock, FileCheck, FileText, Network, ShieldCheck, UserCheck, Users,
+  Briefcase, CheckSquare, ClipboardCheck, Clock, FileCheck, FileText, Network, ShieldCheck, UserCheck, Users,
 } from 'lucide-react';
 import type { ModuleManifest } from '@/app/registry/types';
 import { L, LIVE } from '@/config/navBuilders';
-import { CREW_CAPABILITIES, CREW_ROOT, PERSONAL_ROOT } from './paths';
+import { CREW_CAPABILITIES, CREW_CAPS, CREW_ROOT, PERSONAL_ROOT } from './paths';
 import { CREW_ROUTES } from './routes';
 
 const manifest: ModuleManifest = {
@@ -42,9 +44,12 @@ const manifest: ModuleManifest = {
   scopes: ['vessel', 'fleet', 'personal'],
   routes: CREW_ROUTES,
   nav: [
-    { slot: 'vessel.crew', order: 10, node: L('Crew List', CREW_ROOT, { slug: 'list', icon: Users, ...LIVE }) },
-    // STORM extra: the roster page stays reachable until X1-02 folds it into Crew List.
-    { slot: 'vessel.crew', order: 15, node: L('Crew Roster', CREW_ROOT, { slug: 'roster', icon: ClipboardList, ...LIVE }) },
+    // X1-02: one list (the roster folded in), beta behind its capability (X1 spec §4).
+    {
+      slot: 'vessel.crew',
+      order: 10,
+      node: L('Crew List', CREW_ROOT, { slug: 'list', icon: Users, status: 'beta', capability: CREW_CAPS.crewListView }),
+    },
     // Label "Leave" on vessels that rename it (vessel_module_settings).
     { slot: 'vessel.crew', order: 20, node: L('Planner', CREW_ROOT, { icon: Network, moduleSetting: 'planner', ...LIVE }) },
     { slot: 'vessel.crew', order: 30, node: L('Crew Compliance', CREW_ROOT, { slug: 'compliance', icon: ShieldCheck, ...LIVE }) },

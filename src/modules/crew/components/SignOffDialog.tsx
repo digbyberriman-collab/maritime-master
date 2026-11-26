@@ -21,8 +21,14 @@ import {
 } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import type { CrewMember } from '@/modules/crew/hooks/useCrew';
+import { isPendingPlacementAssignment } from '@/modules/crew/lib/crewUpdateErrors';
+
+/** D-225: a pending placement is the profile's vessel, not a crew_assignments row; there is nothing to end. */
+export const SIGN_OFF_PENDING_MESSAGE =
+  'This person is not assigned to the vessel yet: the assignment is written once they are invited and their login is linked. There is nothing to sign off.';
 
 const SIGN_OFF_REASONS = [
   { value: 'contract_end', label: 'Contract End' },
@@ -52,16 +58,23 @@ const SignOffDialog: React.FC<SignOffDialogProps> = ({
   const [reason, setReason] = useState<string>('contract_end');
   const [notes, setNotes] = useState<string>('');
 
-  const handleConfirm = async () => {
-    if (!crewMember?.current_assignment) return;
+  const pending = isPendingPlacementAssignment(crewMember?.current_assignment);
 
-    await onConfirm({
-      assignmentId: crewMember.current_assignment.id,
-      leaveDate: format(leaveDate, 'yyyy-MM-dd'),
-      reason,
-      notes: notes || undefined,
-    });
-    
+  const handleConfirm = async () => {
+    if (!crewMember?.current_assignment || pending) return;
+
+    try {
+      await onConfirm({
+        assignmentId: crewMember.current_assignment.id,
+        leaveDate: format(leaveDate, 'yyyy-MM-dd'),
+        reason,
+        notes: notes || undefined,
+      });
+    } catch {
+      // The writer has already said why (a STORM sentence); the dialog stays open with the entries.
+      return;
+    }
+
     // Reset form
     setLeaveDate(new Date());
     setReason('contract_end');
@@ -80,6 +93,12 @@ const SignOffDialog: React.FC<SignOffDialogProps> = ({
             {crewMember.current_assignment?.vessel_name}
           </DialogDescription>
         </DialogHeader>
+
+        {pending ? (
+          <Alert variant="info" data-sign-off-refused="pending_placement">
+            <AlertDescription>{SIGN_OFF_PENDING_MESSAGE}</AlertDescription>
+          </Alert>
+        ) : null}
 
         <div className="space-y-4 py-4">
           <div className="space-y-2">
@@ -141,7 +160,7 @@ const SignOffDialog: React.FC<SignOffDialogProps> = ({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleConfirm} disabled={isLoading}>
+          <Button onClick={() => void handleConfirm()} disabled={isLoading || pending}>
             {isLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Sign Off
           </Button>

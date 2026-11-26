@@ -1,0 +1,53 @@
+[
+  {
+    "id": "c7000000-0000-4000-8000-000000000001",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "profile_id": "b0000000-0000-4000-8000-000000000013",
+    "kind": "disembark",
+    "occurred_on": "$date:-8",
+    "occurred_at": null,
+    "port": "Monaco",
+    "source": "manual",
+    "source_id": null,
+    "notes": "Leave rotation; returns with the next crew change.",
+    "created_by": "a0000000-0000-4000-8000-000000000001",
+    "updated_by": null,
+    "created_at": "$ts:-8d",
+    "updated_at": "$ts:-8d"
+  },
+  {
+    "id": "c7000000-0000-4000-8000-000000000002",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "vessel_id": "e0000000-0000-4000-8000-000000000005",
+    "profile_id": "b0000000-0000-4000-8000-000000000022",
+    "kind": "transfer_in",
+    "occurred_on": "$date:-44",
+    "occurred_at": null,
+    "port": "Antibes",
+    "source": "transfer",
+    "source_id": "c8000000-0000-4000-8000-000000000002",
+    "notes": null,
+    "created_by": "a0000000-0000-4000-8000-000000000001",
+    "updated_by": null,
+    "created_at": "$ts:-44d",
+    "updated_at": "$ts:-44d"
+  },
+  {
+    "id": "c7000000-0000-4000-8000-000000000003",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "profile_id": "b0000000-0000-4000-8000-000000000016",
+    "kind": "disembark",
+    "occurred_on": "$date:-1",
+    "occurred_at": null,
+    "port": null,
+    "source": "toggle",
+    "source_id": null,
+    "notes": "Ashore for the yard visit.",
+    "created_by": "a0000000-0000-4000-8000-000000000012",
+    "updated_by": null,
+    "created_at": "$ts:-1d",
+    "updated_at": "$ts:-1d"
+  }
+]

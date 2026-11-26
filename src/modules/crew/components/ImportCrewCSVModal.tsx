@@ -81,6 +81,13 @@ interface ImportResults {
   invited: boolean;
 }
 
+/**
+ * A row's message says its vessel waits for the login (create-crew-member
+ * answered `assignment: 'pending_login'`, D-199): crewImportRowResult words it
+ * "… assigned once they are invited and their login is linked."
+ */
+const PENDING_LOGIN_ROW = /assigned once they are invited and their login is linked/;
+
 /** How each row's result reads (Badge tone variants). */
 const ROW_STATUS: Readonly<Record<CrewImportRowStatus, { label: string; variant: 'ok' | 'warn' | 'danger' }>> = {
   invited: { label: 'Added and invited', variant: 'ok' },
@@ -556,6 +563,8 @@ const ImportCrewCSVModal: React.FC<ImportCrewCSVModalProps> = ({
     const summary = crewImportSummary(importResults.rows.map((r) => r.result));
     const problems = importResults.rows.filter((r) => r.result.status !== 'invited' && r.result.status !== 'added');
     const clean = problems.length === 0;
+    // Added without an invitation and without a login (D-199): their vessel assignment waits for the login.
+    const waitingForLogin = importResults.rows.filter((r) => r.result.status === 'added' && PENDING_LOGIN_ROW.test(r.result.message)).length;
 
     return (
       <div className="space-y-6 py-4" data-import-summary="">
@@ -582,6 +591,14 @@ const ImportCrewCSVModal: React.FC<ImportCrewCSVModalProps> = ({
           <KpiTile label="Not added" value={summary.failed} state="ready" tone={summary.failed > 0 ? 'danger' : undefined} />
           <KpiTile label="Skipped" value={importResults.skipped} state="ready" sub="Already in STORM" />
         </div>
+
+        {waitingForLogin > 0 ? (
+          <p className="rounded-md border border-border bg-muted px-3 py-2 text-sm text-muted-foreground" data-import-note="pending-login">
+            {`${waitingForLogin === 1 ? '1 person was' : `${waitingForLogin} people were`} added without an invitation. `}
+            Each is assigned to the vessel once they are invited and their login is linked; send the invitations from the crew
+            list or Users &amp; Access.
+          </p>
+        ) : null}
 
         {problems.length > 0 && (
           <div>

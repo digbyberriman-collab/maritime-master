@@ -1,5 +1,5 @@
 import type { ManifestPageLoader, RouteDef } from '@/app/registry/types';
-import { CREW_FLEET_PATHS, CREW_PATHS } from './paths';
+import { CREW_CAPS, CREW_FLEET_PATHS, CREW_PATHS } from './paths';
 
 /**
  * Crew routes, as data (BUILD-PLAN B8). The module manifest (./module.ts)
@@ -10,7 +10,10 @@ import { CREW_FLEET_PATHS, CREW_PATHS } from './paths';
  * Platform-prep PP3 moved these out of src/routes/index.tsx unchanged: each
  * page is the one that served the path before, behind the same check
  * (`login`: ProtectedRoute around the page, as the old protectedPage did).
- * The crew slices swap in their pages and capability guards here.
+ * The crew slices swap in their pages and capability guards here:
+ * X1-02 serves the vessel crew list (CrewListPage, guard
+ * vessel.crew.crew_list.view) at crew/list and turns crew/roster into a
+ * redirect to it (the roster is folded into the list, gap/04 C3).
  */
 const vesselPage = (path: string, loader: ManifestPageLoader): RouteDef => ({
   scope: 'vessel',
@@ -19,13 +22,24 @@ const vesselPage = (path: string, loader: ManifestPageLoader): RouteDef => ({
   guard: { kind: 'login' },
 });
 
+/** A rebuilt vessel page behind its PMS capability (X1 spec §4). */
+const vesselCapabilityPage = (path: string, capability: (typeof CREW_CAPS)[keyof typeof CREW_CAPS], loader: ManifestPageLoader): RouteDef => ({
+  scope: 'vessel',
+  path,
+  page: loader,
+  guard: { kind: 'capability', capability },
+});
+
 /** A redirect inside the vessel scope; `redirectTo` is relative to the route. */
 const vesselRedirect = (path: string, redirectTo: string): RouteDef => ({ scope: 'vessel', path, redirectTo });
 
 export const CREW_ROUTES: readonly RouteDef[] = [
-  vesselPage(CREW_PATHS.list, () => import('@/modules/crew/pages/CrewList')),
-  // STORM extra: the roster stays reachable until gap/04 folds it into Crew List.
-  vesselPage(CREW_PATHS.roster, () => import('@/modules/crew/pages/CrewRoster')),
+  vesselCapabilityPage(CREW_PATHS.list, CREW_CAPS.crewListView, () => import('@/modules/crew/pages/CrewListPage')),
+  // The roster is folded into the crew list (X1-02); old links land on the list, query kept.
+  // Path-relative on purpose ('./' first): a leading '..' climbs one route in
+  // React Router (to /v/:vesselCode), one segment in plain path resolution;
+  // './../list' lands on crew/list under both.
+  vesselRedirect(CREW_PATHS.roster, './../list'),
   vesselRedirect(CREW_PATHS.compliance, 'status'),
   vesselPage(CREW_PATHS.complianceStatus, () => import('@/modules/crew/pages/CrewDocuments')),
   vesselPage(CREW_PATHS.hoursOfRest, () => import('@/modules/work-rest/pages/WorkRestOverview')),

@@ -173,6 +173,18 @@ describe('ImportCrewCSVModal', () => {
     expect((h.invoke.mock.calls as Array<[string, { body: Record<string, unknown> }]>).every(([, { body }]) => body.sendInvite === false)).toBe(true);
     expect(screen.getByText(/4 of 4 rows were added\./)).toBeInTheDocument();
     expect(screen.queryByText(/invited/)).toBeNull();
+    expect(document.querySelector('[data-import-note]')).toBeNull();
+  });
+
+  it('without invitations and no login yet (D-199): the complete step says the vessel waits for the login, and counts no invitation', async () => {
+    for (const id of ['a', 'b', 'c']) ok({ ok: true, profileId: `p-${id}`, invitation: { status: 'not_sent' }, assignment: 'pending_login' });
+    ok({ ok: true, profileId: 'p-d', invitation: { status: 'not_sent' }, assignment: 'created' });
+    await runImport({ sendInvites: false });
+    expect(screen.getByText(/4 of 4 rows were added\./)).toBeInTheDocument();
+    expect(screen.queryByText(/· \d+ invited/)).toBeNull();
+    const note = document.querySelector('[data-import-note="pending-login"]');
+    expect(note).not.toBeNull();
+    expect(note).toHaveTextContent(/^3 people were added without an invitation\. Each is assigned to the vessel once they are invited and their login is linked/);
   });
 
   it('nothing added: onSuccess is not called', async () => {

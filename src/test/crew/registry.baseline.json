@@ -10,19 +10,18 @@
     "/v/:vesselCode/crew/employment-history :: <PlaceholderWrapper{title=\"Employment History\"}>",
     "/v/:vesselCode/crew/familiarisation :: page(/src/modules/training/pages/Training.tsx) guard=ProtectedRoute layout=-",
     "/v/:vesselCode/crew/hours-of-rest :: page(/src/modules/work-rest/pages/WorkRestOverview.tsx) guard=ProtectedRoute layout=-",
-    "/v/:vesselCode/crew/list :: page(/src/modules/crew/pages/CrewList.tsx) guard=ProtectedRoute layout=-",
+    "/v/:vesselCode/crew/list :: <ModuleRoute{capability=\"vessel.crew.crew_list.view\"}> > page(/src/modules/crew/pages/CrewListPage.tsx) guard=- layout=-",
     "/v/:vesselCode/crew/people/:crewId/hours-of-rest :: page(/src/modules/work-rest/pages/MyWorkRestMonth.tsx) guard=ProtectedRoute layout=-",
     "/v/:vesselCode/crew/planner :: redirect(timeline)",
     "/v/:vesselCode/crew/planner/manning :: page(/src/modules/crew/pages/LeavePlannerPage.tsx) guard=ProtectedRoute layout=-",
     "/v/:vesselCode/crew/planner/requests :: page(/src/modules/crew/pages/LeaveRequestsPage.tsx) guard=ProtectedRoute layout=-",
     "/v/:vesselCode/crew/planner/timeline :: page(/src/modules/rotation-planner/pages/RotationPlannerPage.tsx) guard=ProtectedRoute layout=-",
-    "/v/:vesselCode/crew/roster :: page(/src/modules/crew/pages/CrewRoster.tsx) guard=ProtectedRoute layout=-",
+    "/v/:vesselCode/crew/roster :: redirect(./../list)",
     "/v/:vesselCode/crew/visitors :: <PlaceholderWrapper{title=\"Visitors & Occasional Workers\"}>"
   ],
   "nav": {
     "NAVIGATION_ITEMS": [
-      "    Users {\"id\":\"vessel-crew-list\",\"kind\":\"leaf\",\"label\":\"Crew List\",\"path\":\"/v/:vesselCode/crew/list\",\"scope\":\"vessel\",\"status\":\"live\"}",
-      "    ClipboardList {\"id\":\"vessel-crew-roster\",\"kind\":\"leaf\",\"label\":\"Crew Roster\",\"path\":\"/v/:vesselCode/crew/roster\",\"scope\":\"vessel\",\"status\":\"live\"}",
+      "    Users {\"capability\":\"vessel.crew.crew_list.view\",\"id\":\"vessel-crew-list\",\"kind\":\"leaf\",\"label\":\"Crew List\",\"path\":\"/v/:vesselCode/crew/list\",\"scope\":\"vessel\",\"status\":\"beta\"}",
       "    Network {\"id\":\"vessel-crew-planner\",\"kind\":\"leaf\",\"label\":\"Planner\",\"moduleSetting\":\"planner\",\"path\":\"/v/:vesselCode/crew/planner\",\"scope\":\"vessel\",\"status\":\"live\"}",
       "    ShieldCheck {\"id\":\"vessel-crew-compliance\",\"kind\":\"leaf\",\"label\":\"Crew Compliance\",\"path\":\"/v/:vesselCode/crew/compliance\",\"scope\":\"vessel\",\"status\":\"live\"}",
       "    Clock {\"alsoCovers\":[\"crew/people/*/hours-of-rest\"],\"id\":\"vessel-crew-hours-of-rest\",\"kind\":\"leaf\",\"label\":\"Hours of Rest\",\"moduleSetting\":\"crew_hor\",\"path\":\"/v/:vesselCode/crew/hours-of-rest\",\"scope\":\"vessel\",\"status\":\"live\"}",
@@ -34,8 +33,7 @@
       "    FileText {\"id\":\"me-documents\",\"kind\":\"leaf\",\"label\":\"Documents\",\"path\":\"/me/documents\",\"scope\":\"personal\",\"status\":\"planned\"}"
     ],
     "VESSEL_MODULES": [
-      "  Users {\"id\":\"crew-list\",\"kind\":\"leaf\",\"label\":\"Crew List\",\"path\":\"crew/list\",\"status\":\"live\"}",
-      "  ClipboardList {\"id\":\"crew-roster\",\"kind\":\"leaf\",\"label\":\"Crew Roster\",\"path\":\"crew/roster\",\"status\":\"live\"}",
+      "  Users {\"capability\":\"vessel.crew.crew_list.view\",\"id\":\"crew-list\",\"kind\":\"leaf\",\"label\":\"Crew List\",\"path\":\"crew/list\",\"status\":\"beta\"}",
       "  Network {\"id\":\"crew-planner\",\"kind\":\"leaf\",\"label\":\"Planner\",\"moduleSetting\":\"planner\",\"path\":\"crew/planner\",\"status\":\"live\"}",
       "  ShieldCheck {\"id\":\"crew-compliance\",\"kind\":\"leaf\",\"label\":\"Crew Compliance\",\"path\":\"crew/compliance\",\"status\":\"live\"}",
       "  Clock {\"alsoCovers\":[\"crew/people/*/hours-of-rest\"],\"id\":\"crew-hours-of-rest\",\"kind\":\"leaf\",\"label\":\"Hours of Rest\",\"moduleSetting\":\"crew_hor\",\"path\":\"crew/hours-of-rest\",\"status\":\"live\"}",
@@ -46,8 +44,7 @@
       "  Briefcase {\"capability\":\"hris.employee_records.contracts_employment.view\",\"id\":\"crew-employment-history\",\"kind\":\"leaf\",\"label\":\"Employment History\",\"path\":\"crew/employment-history\",\"status\":\"planned\"}"
     ],
     "buildVesselNav": [
-      "  Users {\"id\":\"vessel-crew-list\",\"kind\":\"leaf\",\"label\":\"Crew List\",\"path\":\"/v/dra/crew/list\",\"scope\":\"vessel\",\"status\":\"live\"}",
-      "  ClipboardList {\"id\":\"vessel-crew-roster\",\"kind\":\"leaf\",\"label\":\"Crew Roster\",\"path\":\"/v/dra/crew/roster\",\"scope\":\"vessel\",\"status\":\"live\"}",
+      "  Users {\"capability\":\"vessel.crew.crew_list.view\",\"id\":\"vessel-crew-list\",\"kind\":\"leaf\",\"label\":\"Crew List\",\"path\":\"/v/dra/crew/list\",\"scope\":\"vessel\",\"status\":\"beta\"}",
       "  Network {\"id\":\"vessel-crew-planner\",\"kind\":\"leaf\",\"label\":\"Planner\",\"moduleSetting\":\"planner\",\"path\":\"/v/dra/crew/planner\",\"scope\":\"vessel\",\"status\":\"live\"}",
       "  ShieldCheck {\"id\":\"vessel-crew-compliance\",\"kind\":\"leaf\",\"label\":\"Crew Compliance\",\"path\":\"/v/dra/crew/compliance\",\"scope\":\"vessel\",\"status\":\"live\"}",
       "  Clock {\"alsoCovers\":[\"crew/people/*/hours-of-rest\"],\"id\":\"vessel-crew-hours-of-rest\",\"kind\":\"leaf\",\"label\":\"Hours of Rest\",\"moduleSetting\":\"crew_hor\",\"path\":\"/v/dra/crew/hours-of-rest\",\"scope\":\"vessel\",\"status\":\"live\"}",
