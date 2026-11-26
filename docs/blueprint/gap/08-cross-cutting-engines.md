@@ -526,6 +526,8 @@ Concurrency: every RPC that changes an envelope takes `p_expected_version`; on m
 
 Each type stores `link_template` (from the registry), `is_sensitive` (excerpt suppressed, never to external addresses), and `module_key` so module subscriptions ("vessel safety subscribers") apply.
 
+Phase 2 status (DECISIONS D-238, D-164; review round 6): every engine type above is seeded in `notification_types` (category `Records`), plus `invitation_accepted` and `invitation_bounced`. Six have no live emitter yet and show "Not available yet" (non-interactive) in preferences and in Notification Management, never as a working switch: `signature_reminder` (future emitter: the SIG Remind action), `signatures_stale` (`record_set_section_digests` when a required signature goes stale), `status_request_due` / `status_request_overdue` (the TH5 daily job), `invitation_accepted` (a definer on the accept path, `invited_by` as the must-act user) and `invitation_bounced` (the C3 dispatcher bounce feed). `personal_data_exported` is live: `trg_record_events_personal_data` (`20261123030000`) emits it to the company's DPA for every `export.logged` (browser) or `export.ready` (server) event of an export flagged personal, as a fleet link with no vessel (no module-off rule applies) and never to the actor; a ready server export still sends `export_ready` to its requester. A non-legacy `is_dpa` membership without fleet access that is neither admin nor owner is not notified (the fleet-link filter). `supabase/tests/sql/p5_notifications/emitters.test.sql` pins the deferred list; `upload_rejected_scan` and `calendar_feed_token_created` are not seeded yet.
+
 ---
 
 ## Data model
