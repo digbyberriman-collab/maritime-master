@@ -258,7 +258,7 @@ describe('ReportShell: header', () => {
     const trigger = screen.getByRole('combobox', { name: 'Switch report' });
     fireEvent.keyDown(trigger, { key: 'Enter' });
     const options = (await screen.findAllByRole('option')).map((o) => o.textContent);
-    expect(options).toEqual(['Vessel comparison', 'Incident analytics', 'Drill analytics', 'Risk overview']);
+    expect(options).toEqual(['Vessel comparison', 'Fleet list', 'Fleet certificates', 'Crew documents', 'Incident analytics', 'Drill analytics', 'Risk overview']);
     fireEvent.keyDown(screen.getByRole('option', { name: 'Drill analytics' }), { key: 'Enter' });
     await waitFor(() => expect(location()).toBe('/fleet/reports/drill-analytics'));
   });

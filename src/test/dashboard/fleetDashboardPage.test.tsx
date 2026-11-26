@@ -298,7 +298,9 @@ describe('the KPI row', () => {
     renderPage();
     await waitFor(() => expect(tile('Safety')).toHaveAttribute('data-state', 'ready'));
     expect(tile('Safety').closest('a')).toHaveAttribute('href', '/fleet/reports/capa-tracker');
-    for (const label of ['Document alerts', 'Hours of rest', 'Technical']) {
+    // Fleet certificates is registered (X5-03B); hours of rest and the work list are not yet.
+    expect(tile('Document alerts').closest('a')).toHaveAttribute('href', '/fleet/reports/fleet-certificates');
+    for (const label of ['Hours of rest', 'Technical']) {
       expect(tile(label).closest('a'), label).toBeNull();
     }
   });

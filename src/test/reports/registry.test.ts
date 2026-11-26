@@ -39,9 +39,12 @@ describe('report registry', () => {
     for (const key of keys) expect(key, key).toMatch(/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/);
   });
 
-  it('lists the wave-1 fleet reports: the Vessel comparison page and the four legacy pages', () => {
+  it('lists the wave-1 fleet reports: the registry pages and the four legacy pages', () => {
     expect(REPORTS.map((r) => [r.key, r.load ? 'page' : 'href'])).toEqual([
       ['vessel-comparison', 'page'],
+      ['fleet-list', 'page'],
+      ['fleet-certificates', 'page'],
+      ['crew-documents', 'page'],
       ['incident-analytics', 'href'],
       ['capa-tracker', 'href'],
       ['drill-analytics', 'href'],
@@ -126,6 +129,8 @@ describe('report registry', () => {
   it('the keys the dashboard may link to are the fleet reports', () => {
     expect([...FLEET_REPORT_KEYS].sort()).toEqual(reportsForScope('fleet').map((r) => r.key).sort());
     expect(FLEET_REPORT_KEYS.has('vessel-comparison')).toBe(true);
-    expect(FLEET_REPORT_KEYS.has('fleet-certificates')).toBe(false);
+    expect(FLEET_REPORT_KEYS.has('fleet-certificates')).toBe(true);
+    expect(FLEET_REPORT_KEYS.has('crew-documents')).toBe(true);
+    expect(FLEET_REPORT_KEYS.has('crew-qualifications')).toBe(false);
   });
 });

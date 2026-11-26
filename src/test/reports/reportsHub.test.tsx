@@ -251,9 +251,9 @@ describe('reports hub: current position', () => {
     expect(within(section).queryByText('Hours of rest')).toBeNull(); // no access: hidden
     expect(within(section).queryByText(/Leave/)).toBeNull();
     expect(within(section).getByText(/2 expired certificates/)).toBeInTheDocument();
-    // Safety opens the CAPA tracker; Document alerts' report (fleet-certificates) is not registered yet.
+    // Document alerts opens Fleet certificates and Safety the CAPA tracker; Technical's work list is not registered yet.
     const links = within(section).getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(links).toEqual(['/fleet/reports/capa-tracker']);
+    expect(links).toEqual(['/fleet/reports/fleet-certificates', '/fleet/reports/capa-tracker']);
   });
 });
 
@@ -332,10 +332,13 @@ describe('reports hub: catalogue', () => {
     renderHub('/fleet/reports?vessels=DRA');
     const catalogue = (await screen.findByRole('heading', { name: 'All reports' })).closest('section') as HTMLElement;
     const groups = within(catalogue).getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
-    expect(groups).toEqual(['Fleet', 'Safety', 'Risk']);
+    expect(groups).toEqual(['Fleet', 'Documents and certificates', 'Safety', 'Risk']);
     const hrefs = within(catalogue).getAllByRole('link').map((a) => a.getAttribute('href'));
     expect(hrefs).toEqual([
       '/fleet/reports/vessel-comparison?vessels=DRA',
+      '/fleet/reports/fleet-list?vessels=DRA',
+      '/fleet/reports/fleet-certificates?vessels=DRA',
+      '/fleet/reports/crew-documents?vessels=DRA',
       '/fleet/reports/incident-analytics',
       '/fleet/reports/drill-analytics',
       '/fleet/reports/risk-overview',
@@ -348,10 +351,13 @@ describe('reports hub: catalogue', () => {
       key === 'fleet.operations.fleet_reports.view' ? { allowed: true, status: 'granted', reason: '' } : { allowed: false, status: 'denied', reason: '' };
     state.shown = shownReady();
     state.answers = { fleet_report_trends: { data: trends(), error: null }, fleet_dashboard_kpis: { data: kpis(), error: null } };
-    // Every report is gated by a key the reader lacks but the hub's own: only Vessel comparison remains.
+    // Every report is gated by a key the reader lacks but the hub's own: only Vessel comparison and Fleet list remain.
     renderHub();
     const catalogue = (await screen.findByRole('heading', { name: 'All reports' })).closest('section') as HTMLElement;
-    expect(within(catalogue).getAllByRole('link').map((a) => a.textContent)).toEqual([expect.stringContaining('Vessel comparison')]);
+    expect(within(catalogue).getAllByRole('link').map((a) => a.textContent)).toEqual([
+      expect.stringContaining('Vessel comparison'),
+      expect.stringContaining('Fleet list'),
+    ]);
   });
 });
 
