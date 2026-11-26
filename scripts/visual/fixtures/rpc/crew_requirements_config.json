@@ -1,0 +1,586 @@
+{
+  "vessel_id": "e0000000-0000-4000-8000-000000000001",
+  "company_id": "c0000000-0000-4000-8000-000000000001",
+  "can_admin": true,
+  "can_admin_company": true,
+  "settings": {
+    "is_passenger_ship": false,
+    "crew_uploads_enabled": true,
+    "transfer_requires_fleet_approval": false,
+    "requirements_seeded_at": "$ts:-30d",
+    "updated_at": "$ts:-30d"
+  },
+  "positions": [
+    {
+      "position_id": "d351f605-09f5-f1d8-11c0-cc264fe07c2e",
+      "key": "master",
+      "name": "Master",
+      "department_key": "bridge",
+      "department_label": "Bridge",
+      "department_sort": 10,
+      "rank_tier": "command",
+      "sort_order": 10101,
+      "is_listed": true
+    },
+    {
+      "position_id": "7e356fd1-02bb-9c7d-2a1f-17557edff73c",
+      "key": "chief_officer",
+      "name": "Chief Officer",
+      "department_key": "deck",
+      "department_label": "Deck",
+      "department_sort": 20,
+      "rank_tier": "hod",
+      "sort_order": 20201,
+      "is_listed": true
+    },
+    {
+      "position_id": "7a944c6f-5c48-1c62-b883-be88af7d97c1",
+      "key": "chief_engineer",
+      "name": "Chief Engineer",
+      "department_key": "engineering",
+      "department_label": "Engineering",
+      "department_sort": 30,
+      "rank_tier": "hod",
+      "sort_order": 20301,
+      "is_listed": true
+    },
+    {
+      "position_id": "d11d07a1-c174-8b08-72e6-8180ffe6a6be",
+      "key": "chief_stew",
+      "name": "Chief Stew",
+      "department_key": "interior",
+      "department_label": "Interior",
+      "department_sort": 40,
+      "rank_tier": "hod",
+      "sort_order": 20402,
+      "is_listed": true
+    },
+    {
+      "position_id": "fbc04f63-7175-c43e-8c42-f7ebe22e3ad1",
+      "key": "head_chef",
+      "name": "Head Chef",
+      "department_key": "galley",
+      "department_label": "Galley",
+      "department_sort": 50,
+      "rank_tier": "hod",
+      "sort_order": 20502,
+      "is_listed": true
+    },
+    {
+      "position_id": "2831bb7d-1bc2-cc69-85e3-c65fe9d86b36",
+      "key": "second_officer",
+      "name": "Second Officer",
+      "department_key": "bridge",
+      "department_label": "Bridge",
+      "department_sort": 10,
+      "rank_tier": "officer",
+      "sort_order": 30101,
+      "is_listed": true
+    },
+    {
+      "position_id": "531730fb-95cb-133d-47dd-40c75b8d61ff",
+      "key": "bosun",
+      "name": "Bosun",
+      "department_key": "deck",
+      "department_label": "Deck",
+      "department_sort": 20,
+      "rank_tier": "officer",
+      "sort_order": 30201,
+      "is_listed": true
+    },
+    {
+      "position_id": "3fd65d41-aed5-9ca3-a0db-e8367e088243",
+      "key": "second_engineer",
+      "name": "Second Engineer",
+      "department_key": "engineering",
+      "department_label": "Engineering",
+      "department_sort": 30,
+      "rank_tier": "officer",
+      "sort_order": 30301,
+      "is_listed": true
+    },
+    {
+      "position_id": "aa126c5b-2854-9b35-5247-8a8156eb178e",
+      "key": "eto",
+      "name": "ETO",
+      "department_key": "engineering",
+      "department_label": "Engineering",
+      "department_sort": 30,
+      "rank_tier": "officer",
+      "sort_order": 30304,
+      "is_listed": true
+    },
+    {
+      "position_id": "6600d220-2b1c-9b5b-76c3-57219af22c16",
+      "key": "lead_deckhand",
+      "name": "Lead Deckhand",
+      "department_key": "deck",
+      "department_label": "Deck",
+      "department_sort": 20,
+      "rank_tier": "rating",
+      "sort_order": 40202,
+      "is_listed": true
+    },
+    {
+      "position_id": "5aebd9dd-6627-27af-f908-8e90753426f9",
+      "key": "deckhand",
+      "name": "Deckhand",
+      "department_key": "deck",
+      "department_label": "Deck",
+      "department_sort": 20,
+      "rank_tier": "rating",
+      "sort_order": 40204,
+      "is_listed": true
+    },
+    {
+      "position_id": "abb6d96e-3291-568e-dc0c-df3bb1ef3c89",
+      "key": "steward",
+      "name": "Steward",
+      "department_key": "interior",
+      "department_label": "Interior",
+      "department_sort": 40,
+      "rank_tier": "rating",
+      "sort_order": 40402,
+      "is_listed": true
+    },
+    {
+      "position_id": "e3a52587-9785-a0a8-1ca0-fd8c6c68ce87",
+      "key": "purser",
+      "name": "Purser",
+      "department_key": "purser_office",
+      "department_label": "Purser's Office",
+      "department_sort": 60,
+      "rank_tier": "hod",
+      "sort_order": 20601,
+      "is_listed": false
+    }
+  ],
+  "rows": [
+    {
+      "id": "6a8b1e40-0a2f-8fe4-66c9-a1f53a7a717d",
+      "group_key": "stcw_basic",
+      "label": "Personal survival techniques",
+      "kind": "document",
+      "sort_order": 21,
+      "seed_key": "stcw_basic.pst",
+      "tab": "stcw",
+      "options": [
+        {
+          "id": "8c01a5d5-09ed-57fd-fb41-a177a6e85368",
+          "document_type_id": "b1abeba0-4a5a-9999-ee1a-ef000c90a618",
+          "familiarization_template_id": null,
+          "sort_order": 0,
+          "name": "Personal survival techniques",
+          "code": "STCW-PST",
+          "abbreviation": "PST",
+          "category_key": "stcw_basic",
+          "tab": "stcw",
+          "is_company_type": false
+        }
+      ],
+      "position_ids": [
+        "2831bb7d-1bc2-cc69-85e3-c65fe9d86b36",
+        "3fd65d41-aed5-9ca3-a0db-e8367e088243",
+        "531730fb-95cb-133d-47dd-40c75b8d61ff",
+        "5aebd9dd-6627-27af-f908-8e90753426f9",
+        "6600d220-2b1c-9b5b-76c3-57219af22c16",
+        "7a944c6f-5c48-1c62-b883-be88af7d97c1",
+        "7e356fd1-02bb-9c7d-2a1f-17557edff73c",
+        "aa126c5b-2854-9b35-5247-8a8156eb178e",
+        "abb6d96e-3291-568e-dc0c-df3bb1ef3c89",
+        "d11d07a1-c174-8b08-72e6-8180ffe6a6be",
+        "d351f605-09f5-f1d8-11c0-cc264fe07c2e",
+        "e3a52587-9785-a0a8-1ca0-fd8c6c68ce87",
+        "fbc04f63-7175-c43e-8c42-f7ebe22e3ad1"
+      ],
+      "held_by": 6
+    },
+    {
+      "id": "893d58d6-e4fc-44f7-80be-639ed31b4608",
+      "group_key": "stcw_basic",
+      "label": "Fire prevention and fire fighting",
+      "kind": "document",
+      "sort_order": 22,
+      "seed_key": "stcw_basic.fpff",
+      "tab": "stcw",
+      "options": [
+        {
+          "id": "666eb40e-7934-c33d-ceee-70a64f22295c",
+          "document_type_id": "d446a506-119f-4165-41a5-431be773d663",
+          "familiarization_template_id": null,
+          "sort_order": 0,
+          "name": "Fire prevention and fire fighting",
+          "code": "STCW-FPFF",
+          "abbreviation": "FPFF",
+          "category_key": "stcw_basic",
+          "tab": "stcw",
+          "is_company_type": false
+        }
+      ],
+      "position_ids": [
+        "2831bb7d-1bc2-cc69-85e3-c65fe9d86b36",
+        "3fd65d41-aed5-9ca3-a0db-e8367e088243",
+        "531730fb-95cb-133d-47dd-40c75b8d61ff",
+        "5aebd9dd-6627-27af-f908-8e90753426f9",
+        "6600d220-2b1c-9b5b-76c3-57219af22c16",
+        "7a944c6f-5c48-1c62-b883-be88af7d97c1",
+        "7e356fd1-02bb-9c7d-2a1f-17557edff73c",
+        "aa126c5b-2854-9b35-5247-8a8156eb178e",
+        "abb6d96e-3291-568e-dc0c-df3bb1ef3c89",
+        "d11d07a1-c174-8b08-72e6-8180ffe6a6be",
+        "d351f605-09f5-f1d8-11c0-cc264fe07c2e",
+        "e3a52587-9785-a0a8-1ca0-fd8c6c68ce87",
+        "fbc04f63-7175-c43e-8c42-f7ebe22e3ad1"
+      ],
+      "held_by": 6
+    },
+    {
+      "id": "0b536a3c-7d89-2fad-5b71-bd621b104dac",
+      "group_key": "stcw_basic",
+      "label": "Elementary first aid",
+      "kind": "document",
+      "sort_order": 23,
+      "seed_key": "stcw_basic.efa",
+      "tab": "stcw",
+      "options": [
+        {
+          "id": "688d0052-b94f-45af-8d76-1c2ca7a80cef",
+          "document_type_id": "8dabfc9b-0992-d02d-992b-0764de75dc77",
+          "familiarization_template_id": null,
+          "sort_order": 0,
+          "name": "Elementary first aid",
+          "code": "STCW-EFA",
+          "abbreviation": "EFA",
+          "category_key": "stcw_basic",
+          "tab": "stcw",
+          "is_company_type": false
+        }
+      ],
+      "position_ids": [
+        "2831bb7d-1bc2-cc69-85e3-c65fe9d86b36",
+        "3fd65d41-aed5-9ca3-a0db-e8367e088243",
+        "531730fb-95cb-133d-47dd-40c75b8d61ff",
+        "5aebd9dd-6627-27af-f908-8e90753426f9",
+        "6600d220-2b1c-9b5b-76c3-57219af22c16",
+        "7a944c6f-5c48-1c62-b883-be88af7d97c1",
+        "7e356fd1-02bb-9c7d-2a1f-17557edff73c",
+        "aa126c5b-2854-9b35-5247-8a8156eb178e",
+        "abb6d96e-3291-568e-dc0c-df3bb1ef3c89",
+        "d11d07a1-c174-8b08-72e6-8180ffe6a6be",
+        "d351f605-09f5-f1d8-11c0-cc264fe07c2e",
+        "e3a52587-9785-a0a8-1ca0-fd8c6c68ce87",
+        "fbc04f63-7175-c43e-8c42-f7ebe22e3ad1"
+      ],
+      "held_by": 5
+    },
+    {
+      "id": "3a28235b-b4cc-029d-6c9c-02930d3809ad",
+      "group_key": "stcw_basic",
+      "label": "Personal safety and social responsibilities",
+      "kind": "document",
+      "sort_order": 24,
+      "seed_key": "stcw_basic.pssr",
+      "tab": "stcw",
+      "options": [
+        {
+          "id": "b8656321-8b08-a522-7b12-e9e605397956",
+          "document_type_id": "1234e2b1-d1cd-cea5-5ca7-e22209a292a3",
+          "familiarization_template_id": null,
+          "sort_order": 0,
+          "name": "Personal safety and social responsibilities",
+          "code": "STCW-PSSR",
+          "abbreviation": "PSSR",
+          "category_key": "stcw_basic",
+          "tab": "stcw",
+          "is_company_type": false
+        }
+      ],
+      "position_ids": [
+        "2831bb7d-1bc2-cc69-85e3-c65fe9d86b36",
+        "3fd65d41-aed5-9ca3-a0db-e8367e088243",
+        "531730fb-95cb-133d-47dd-40c75b8d61ff",
+        "5aebd9dd-6627-27af-f908-8e90753426f9",
+        "6600d220-2b1c-9b5b-76c3-57219af22c16",
+        "7a944c6f-5c48-1c62-b883-be88af7d97c1",
+        "7e356fd1-02bb-9c7d-2a1f-17557edff73c",
+        "aa126c5b-2854-9b35-5247-8a8156eb178e",
+        "abb6d96e-3291-568e-dc0c-df3bb1ef3c89",
+        "d11d07a1-c174-8b08-72e6-8180ffe6a6be",
+        "d351f605-09f5-f1d8-11c0-cc264fe07c2e",
+        "e3a52587-9785-a0a8-1ca0-fd8c6c68ce87",
+        "fbc04f63-7175-c43e-8c42-f7ebe22e3ad1"
+      ],
+      "held_by": 6
+    },
+    {
+      "id": "d78624e7-2cde-467d-b8d5-7bdbbea8dce8",
+      "group_key": "medical",
+      "label": "Seafarer medical certificate",
+      "kind": "document",
+      "sort_order": 100,
+      "seed_key": null,
+      "tab": "documents",
+      "options": [
+        {
+          "id": "4f7f7b5d-35a9-f26b-85aa-6ad7fb44bb8f",
+          "document_type_id": "24170069-c406-797b-63ff-12f5aee7803f",
+          "familiarization_template_id": null,
+          "sort_order": 0,
+          "name": "ENG1 seafarer medical certificate",
+          "code": "ENG1",
+          "abbreviation": "ENG1",
+          "category_key": "medical_fitness",
+          "tab": "documents",
+          "is_company_type": false
+        }
+      ],
+      "position_ids": [
+        "2831bb7d-1bc2-cc69-85e3-c65fe9d86b36",
+        "3fd65d41-aed5-9ca3-a0db-e8367e088243",
+        "531730fb-95cb-133d-47dd-40c75b8d61ff",
+        "5aebd9dd-6627-27af-f908-8e90753426f9",
+        "6600d220-2b1c-9b5b-76c3-57219af22c16",
+        "7a944c6f-5c48-1c62-b883-be88af7d97c1",
+        "7e356fd1-02bb-9c7d-2a1f-17557edff73c",
+        "aa126c5b-2854-9b35-5247-8a8156eb178e",
+        "abb6d96e-3291-568e-dc0c-df3bb1ef3c89",
+        "d11d07a1-c174-8b08-72e6-8180ffe6a6be",
+        "d351f605-09f5-f1d8-11c0-cc264fe07c2e",
+        "e3a52587-9785-a0a8-1ca0-fd8c6c68ce87",
+        "fbc04f63-7175-c43e-8c42-f7ebe22e3ad1"
+      ],
+      "held_by": 6
+    },
+    {
+      "id": "f2cdaa35-e779-e92e-15bd-371a4400bb03",
+      "group_key": "documents",
+      "label": "Passport",
+      "kind": "document",
+      "sort_order": 110,
+      "seed_key": null,
+      "tab": "documents",
+      "options": [
+        {
+          "id": "858a8b6a-f738-2be7-cc5c-8d35c85ab2be",
+          "document_type_id": "6c902bdf-21b3-6993-e1f3-0700c797639e",
+          "familiarization_template_id": null,
+          "sort_order": 0,
+          "name": "Passport",
+          "code": "PASSPORT",
+          "abbreviation": "PP",
+          "category_key": "passports",
+          "tab": "documents",
+          "is_company_type": false
+        }
+      ],
+      "position_ids": [
+        "2831bb7d-1bc2-cc69-85e3-c65fe9d86b36",
+        "3fd65d41-aed5-9ca3-a0db-e8367e088243",
+        "531730fb-95cb-133d-47dd-40c75b8d61ff",
+        "5aebd9dd-6627-27af-f908-8e90753426f9",
+        "6600d220-2b1c-9b5b-76c3-57219af22c16",
+        "7a944c6f-5c48-1c62-b883-be88af7d97c1",
+        "7e356fd1-02bb-9c7d-2a1f-17557edff73c",
+        "aa126c5b-2854-9b35-5247-8a8156eb178e",
+        "abb6d96e-3291-568e-dc0c-df3bb1ef3c89",
+        "d11d07a1-c174-8b08-72e6-8180ffe6a6be",
+        "d351f605-09f5-f1d8-11c0-cc264fe07c2e",
+        "e3a52587-9785-a0a8-1ca0-fd8c6c68ce87",
+        "fbc04f63-7175-c43e-8c42-f7ebe22e3ad1"
+      ],
+      "held_by": 8
+    },
+    {
+      "id": "2d54bf93-5dd2-e596-5e4d-64bc3f2fa9e7",
+      "group_key": "security",
+      "label": "Proficiency in security awareness",
+      "kind": "document",
+      "sort_order": 200,
+      "seed_key": null,
+      "tab": "stcw",
+      "options": [
+        {
+          "id": "cf72b1e2-07ff-bd6d-7c9c-6dad3e737e1d",
+          "document_type_id": "9dbd5190-be5b-2331-826d-be41b8cb30a0",
+          "familiarization_template_id": null,
+          "sort_order": 0,
+          "name": "Proficiency in security awareness",
+          "code": "STCW-PSA",
+          "abbreviation": "PSA",
+          "category_key": "stcw_security",
+          "tab": "stcw",
+          "is_company_type": false
+        }
+      ],
+      "position_ids": [
+        "2831bb7d-1bc2-cc69-85e3-c65fe9d86b36",
+        "3fd65d41-aed5-9ca3-a0db-e8367e088243",
+        "531730fb-95cb-133d-47dd-40c75b8d61ff",
+        "5aebd9dd-6627-27af-f908-8e90753426f9",
+        "6600d220-2b1c-9b5b-76c3-57219af22c16",
+        "7a944c6f-5c48-1c62-b883-be88af7d97c1",
+        "7e356fd1-02bb-9c7d-2a1f-17557edff73c",
+        "aa126c5b-2854-9b35-5247-8a8156eb178e",
+        "abb6d96e-3291-568e-dc0c-df3bb1ef3c89",
+        "d11d07a1-c174-8b08-72e6-8180ffe6a6be",
+        "d351f605-09f5-f1d8-11c0-cc264fe07c2e",
+        "fbc04f63-7175-c43e-8c42-f7ebe22e3ad1"
+      ],
+      "held_by": 4
+    },
+    {
+      "id": "a897ee24-5512-0f75-7d0a-b4f1780d84ed",
+      "group_key": "coc_gmdss",
+      "label": "GMDSS radio operator",
+      "kind": "document",
+      "sort_order": 300,
+      "seed_key": null,
+      "tab": "qualifications",
+      "options": [
+        {
+          "id": "6e34ac50-5c52-b4e4-361b-a17ecd2a3f07",
+          "document_type_id": "6f375ca7-95d9-ce54-0bcb-f4fb9896c879",
+          "familiarization_template_id": null,
+          "sort_order": 0,
+          "name": "GMDSS general operator certificate",
+          "code": "GMDSS-GOC",
+          "abbreviation": "GOC",
+          "category_key": "radio",
+          "tab": "qualifications",
+          "is_company_type": false
+        },
+        {
+          "id": "3be694c4-7a7b-63bf-b6db-30cbf8157f73",
+          "document_type_id": "6ddd13e7-e4ef-fb56-58b2-abc0e0c98d3b",
+          "familiarization_template_id": null,
+          "sort_order": 1,
+          "name": "GMDSS restricted operator certificate",
+          "code": "GMDSS-ROC",
+          "abbreviation": "ROC",
+          "category_key": "radio",
+          "tab": "qualifications",
+          "is_company_type": false
+        }
+      ],
+      "position_ids": [
+        "2831bb7d-1bc2-cc69-85e3-c65fe9d86b36",
+        "7e356fd1-02bb-9c7d-2a1f-17557edff73c",
+        "d351f605-09f5-f1d8-11c0-cc264fe07c2e"
+      ],
+      "held_by": 2
+    },
+    {
+      "id": "734a811f-ea03-77ab-2029-bf74c38a0d31",
+      "group_key": "coc_gmdss",
+      "label": "Master certificate of competency",
+      "kind": "document",
+      "sort_order": 310,
+      "seed_key": null,
+      "tab": "qualifications",
+      "options": [
+        {
+          "id": "f2c2614d-4c2c-e201-9312-88078192be24",
+          "document_type_id": "ed5ae889-f923-1893-0c74-52345cba3526",
+          "familiarization_template_id": null,
+          "sort_order": 0,
+          "name": "Master (yachts under 3000 GT)",
+          "code": "COC-MY3000",
+          "abbreviation": "Master Y <3000",
+          "category_key": "coc_deck_yacht",
+          "tab": "qualifications",
+          "is_company_type": false
+        },
+        {
+          "id": "c9db9dd2-505b-713f-af54-a14fda6f6d55",
+          "document_type_id": "6b663357-1725-8de5-d00b-7639304f182d",
+          "familiarization_template_id": null,
+          "sort_order": 1,
+          "name": "Master (under 3000 GT)",
+          "code": "COC-M3000",
+          "abbreviation": "Master <3000",
+          "category_key": "coc_deck",
+          "tab": "qualifications",
+          "is_company_type": false
+        }
+      ],
+      "position_ids": [
+        "d351f605-09f5-f1d8-11c0-cc264fe07c2e"
+      ],
+      "held_by": 1
+    },
+    {
+      "id": "eae5c696-98b0-f038-4ac4-25f53c0260cc",
+      "group_key": "custom",
+      "label": "Food safety and hygiene",
+      "kind": "document",
+      "sort_order": 400,
+      "seed_key": null,
+      "tab": "qualifications",
+      "options": [
+        {
+          "id": "b36646a3-d645-625e-8d4c-68b4c971687a",
+          "document_type_id": "6ae4c9d1-04e9-326f-2b67-5a303283b05c",
+          "familiarization_template_id": null,
+          "sort_order": 0,
+          "name": "Food safety and hygiene, level 2",
+          "code": "FOOD-L2",
+          "abbreviation": "Food safety L2",
+          "category_key": "culinary",
+          "tab": "qualifications",
+          "is_company_type": false
+        }
+      ],
+      "position_ids": [
+        "abb6d96e-3291-568e-dc0c-df3bb1ef3c89",
+        "d11d07a1-c174-8b08-72e6-8180ffe6a6be",
+        "fbc04f63-7175-c43e-8c42-f7ebe22e3ad1"
+      ],
+      "held_by": 1
+    },
+    {
+      "id": "452fbc9e-5b92-b052-efbe-a66f28077f73",
+      "group_key": "familiarisation",
+      "label": "Vessel familiarisation",
+      "kind": "familiarisation",
+      "sort_order": 900,
+      "seed_key": null,
+      "tab": "familiarisation",
+      "options": [
+        {
+          "id": "92d87817-3d6f-4b8d-df8c-5093ace745f6",
+          "document_type_id": null,
+          "familiarization_template_id": "31c0c218-ccfa-017a-4c0c-6a85839503c1",
+          "sort_order": 0,
+          "name": "Vessel familiarisation (DRAAK)",
+          "code": null,
+          "abbreviation": null,
+          "category_key": null,
+          "tab": null,
+          "is_company_type": false
+        }
+      ],
+      "position_ids": [
+        "2831bb7d-1bc2-cc69-85e3-c65fe9d86b36",
+        "3fd65d41-aed5-9ca3-a0db-e8367e088243",
+        "531730fb-95cb-133d-47dd-40c75b8d61ff",
+        "5aebd9dd-6627-27af-f908-8e90753426f9",
+        "6600d220-2b1c-9b5b-76c3-57219af22c16",
+        "7a944c6f-5c48-1c62-b883-be88af7d97c1",
+        "7e356fd1-02bb-9c7d-2a1f-17557edff73c",
+        "aa126c5b-2854-9b35-5247-8a8156eb178e",
+        "abb6d96e-3291-568e-dc0c-df3bb1ef3c89",
+        "d11d07a1-c174-8b08-72e6-8180ffe6a6be",
+        "d351f605-09f5-f1d8-11c0-cc264fe07c2e",
+        "fbc04f63-7175-c43e-8c42-f7ebe22e3ad1"
+      ],
+      "held_by": 5
+    }
+  ],
+  "templates": [
+    {
+      "id": "31c0c218-ccfa-017a-4c0c-6a85839503c1",
+      "name": "Vessel familiarisation (DRAAK)",
+      "is_active": true
+    }
+  ]
+}

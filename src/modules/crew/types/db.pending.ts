@@ -37,6 +37,17 @@
  * sweep's bookkeeping table (crew_document_expiry_notices) is service only
  * and not mirrored.
  *
+ * 20261124060600_crew_compliance.sql (X1-06): the requirement
+ * configuration (rows per vessel, their options, the ticked positions;
+ * read with vessel.crew.crew_compliance.view, written only through the
+ * RPCs), vessel_crew_settings.requirements_seeded_at, the compliance views
+ * fleet operations reads (crew_requirement_status, crew_compliance_summary:
+ * security invoker over gated SRFs) and the RPCs (the vessel summary and
+ * status rows, the fleet report read crew_compliance_for_vessels, the
+ * configuration and its writes, tenant document types and company
+ * satisfaction rules). The status and summary row shapes below are the
+ * frozen contract of platform plan §1 contract 5 (X5-10A's R5 report).
+ *
  * `CrewForeignPendingTables` is not this module's: the platform signature
  * store (SIG1, PR-X1-I) that the profile's signature card reads. It is not
  * in the contract map, because no build-out file defines it yet; the
@@ -51,7 +62,7 @@
  * the pickers fall back to free text); any other error is an error with
  * Retry. Never mock rows.
  */
-import type { PendingColumns, PendingTable } from '@/integrations/supabase/pending';
+import type { PendingColumns, PendingTable, PendingView } from '@/integrations/supabase/pending';
 import type { Json, Tables } from '@/integrations/supabase/types';
 import type { AccessSetKey, LanguageProficiency, PositionScope, RankTier } from './domain';
 import type { CrewPlacementKind, CrewStatus, CrewStatusDetail } from '../lib/crewStatus';
@@ -558,6 +569,8 @@ export type VesselCrewSettingsRow = {
   is_passenger_ship: boolean;
   crew_uploads_enabled: boolean;
   transfer_requires_fleet_approval: boolean;
+  /** When crew_requirements_seed() seeded the vessel's requirements (060600); never seeded again. */
+  requirements_seeded_at: string | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
@@ -720,6 +733,186 @@ export type CrewDocumentReviewRightsRpcRow = {
   can_renew: boolean;
 };
 
+// ---------------------------------------------------------------- 060600 rows (X1-06)
+
+/** The W5 requirement groups (crew_requirement_rows.group_key CHECK). */
+export type CrewRequirementGroup =
+  | 'stcw_basic'
+  | 'survival_craft'
+  | 'advanced_training'
+  | 'medical'
+  | 'security'
+  | 'stcw_passenger'
+  | 'coc_gmdss'
+  | 'deck_engineering'
+  | 'navigation_safety'
+  | 'documents'
+  | 'familiarisation'
+  | 'custom';
+
+export type CrewRequirementKind = 'document' | 'familiarisation';
+
+/** A requirement of a vessel (one row of the configuration matrix). */
+export type CrewRequirementRowRow = {
+  id: string;
+  company_id: string;
+  vessel_id: string;
+  group_key: CrewRequirementGroup;
+  label: string;
+  kind: CrewRequirementKind;
+  sort_order: number;
+  /** The bulk set or seed that created it (stcw_basic.pst, stcw_passenger.crowd, training_matrix.<type key>); null for a hand-made row. */
+  seed_key: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** What satisfies a requirement: exactly one of the two ids. */
+export type CrewRequirementOptionRow = {
+  id: string;
+  company_id: string;
+  vessel_id: string;
+  row_id: string;
+  document_type_id: string | null;
+  familiarization_template_id: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+};
+
+/** A ticked cell: the requirement applies to the position on its vessel. */
+export type CrewRequirementPositionRow = {
+  id: string;
+  company_id: string;
+  vessel_id: string;
+  row_id: string;
+  position_id: string;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/**
+ * One requirement status row (crew_requirement_status_for; the view
+ * crew_requirement_status and crew_vessel_requirement_status). Frozen for
+ * fleet operations (contract 5). Text columns are typed as strings because
+ * a view carries no CHECK; lib/compliance.ts parses them into its
+ * vocabularies (parseRequirementStatusRow in hooks/useVesselCompliance.ts).
+ *   state            met | expiring | expired | missing
+ *   tab              documents | stcw | qualifications | familiarisation
+ *   satisfied_via    option | component | supersedes | equivalent | familiarisation
+ *   bucket           the satisfier's expiry bucket (null for a missing date)
+ *   gap_reason       rejected | not_linked | in_progress | none (missing rows only)
+ */
+export type CrewRequirementStatusDbRow = {
+  company_id: string;
+  vessel_id: string;
+  profile_id: string;
+  user_id: string | null;
+  position_id: string | null;
+  placement_kind: string;
+  row_id: string;
+  group_key: string;
+  row_label: string;
+  row_kind: string;
+  tab: string;
+  row_sort: number;
+  state: string;
+  satisfying_document_id: string | null;
+  satisfying_record_id: string | null;
+  satisfying_type_id: string | null;
+  satisfying_name: string | null;
+  satisfied_via: string | null;
+  via_option_type_id: string | null;
+  next_expiry: string | null;
+  no_expiry: boolean;
+  bucket: string | null;
+  days_remaining: number | null;
+  verification_status: string | null;
+  is_conditional: boolean;
+  is_muted: boolean;
+  missing_date: boolean;
+  has_file: boolean | null;
+  gap_reason: string | null;
+  nearest_document_id: string | null;
+  nearest_record_id: string | null;
+  nearest_type_id: string | null;
+  nearest_name: string | null;
+};
+
+/**
+ * One compliance summary row per crew member (crew_compliance_summary_for;
+ * the view crew_compliance_summary, crew_vessel_compliance and
+ * crew_compliance_for_vessels). Frozen for fleet operations (contract 5:
+ * X5-10A's R5 report reads crew_compliance_for_vessels(uuid[]) behind a
+ * to_regprocedure guard).
+ *   status              complete | expiring | missing | expired
+ *   dot_documents,
+ *   dot_qualifications  none | ok | warn | danger
+ *   issues              [{row_id, label, tab, state, reason}], worst first
+ *                       (reason: expired | missing | expiring | conditional | missing_date)
+ */
+export type CrewComplianceSummaryDbRow = {
+  company_id: string;
+  vessel_id: string;
+  profile_id: string;
+  user_id: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  preferred_name: string | null;
+  position_id: string | null;
+  position_name: string | null;
+  position_text: string | null;
+  department_key: string | null;
+  rank_tier: string | null;
+  sort_order: number | null;
+  placement_kind: string;
+  required: number;
+  met: number;
+  expiring: number;
+  expired: number;
+  missing: number;
+  conditional: number;
+  muted: number;
+  docs_required: number;
+  docs_met: number;
+  stcw_required: number;
+  stcw_met: number;
+  quals_required: number;
+  quals_met: number;
+  fam_required: number;
+  fam_met: number;
+  status: string;
+  next_expiry: string | null;
+  dot_documents: string;
+  dot_qualifications: string;
+  issues: Json;
+};
+
+/** crew_requirement_row_save's p_payload (options replace the options; position_ids replace the ticks). */
+export type CrewRequirementRowPayload = {
+  group_key?: CrewRequirementGroup;
+  label?: string;
+  kind?: CrewRequirementKind;
+  sort_order?: number;
+  options?: Array<{ document_type_id: string } | { familiarization_template_id: string }>;
+  position_ids?: string[];
+};
+
+/** One cell of crew_requirement_cell_set's p_cells. */
+export type CrewRequirementCell = { row_id: string; position_id: string; required: boolean };
+
+/** crew_requirements_add_stcw_basic's one row. */
+export type CrewRequirementSetAddedRpcRow = { rows_added: number; cells_added: number };
+
+/** crew_vessel_set_passenger's one row. */
+export type CrewPassengerToggleRpcRow = { is_passenger_ship: boolean; rows_added: number; rows_removed: number };
+
+/** crew_vessel_settings_save's p_patch. */
+export type VesselCrewSettingsPatch = { crew_uploads_enabled?: boolean; transfer_requires_fleet_approval?: boolean };
+
 // ---------------------------------------------------------------- the platform signature store (SIG1; not this module's)
 
 /** user_signature_images (gap/08 SIG1, PR-X1-I): not written yet; the profile card reads it and stays hidden while it is missing. */
@@ -761,6 +954,15 @@ export type CrewPendingTables = {
   crew_document_type_satisfies: PendingTable<CrewDocumentTypeSatisfiesRow, 'type_id' | 'satisfies_type_id' | 'kind'>;
   vessel_crew_settings: PendingTable<VesselCrewSettingsRow, 'vessel_id' | 'company_id'>;
   crew_document_versions: PendingTable<CrewDocumentVersionRow, 'crew_document_id' | 'version_no'>;
+  crew_requirement_rows: PendingTable<CrewRequirementRowRow, 'company_id' | 'vessel_id' | 'group_key' | 'label'>;
+  crew_requirement_options: PendingTable<CrewRequirementOptionRow, 'row_id'>;
+  crew_requirement_positions: PendingTable<CrewRequirementPositionRow, 'row_id' | 'position_id'>;
+};
+
+/** The security-invoker views fleet operations reads (060600; contract 5). */
+export type CrewPendingViews = {
+  crew_requirement_status: PendingView<CrewRequirementStatusDbRow>;
+  crew_compliance_summary: PendingView<CrewComplianceSummaryDbRow>;
 };
 
 /** New columns of live tables (D-133). */
@@ -812,4 +1014,31 @@ export type CrewPendingFunctions = {
   crew_document_mute: { Args: { p_id: string; p_reason: string }; Returns: CrewDocumentStoredRow };
   crew_document_unmute: { Args: { p_id: string }; Returns: CrewDocumentStoredRow };
   crew_document_renew: { Args: { p_id: string; p_payload: Json }; Returns: CrewDocumentStoredRow };
+  crew_vessel_compliance: { Args: { p_vessel_id: string }; Returns: CrewComplianceSummaryDbRow[] };
+  crew_vessel_requirement_status: { Args: { p_vessel_id: string; p_profile_id?: string | null }; Returns: CrewRequirementStatusDbRow[] };
+  crew_compliance_for_vessels: { Args: { p_vessel_ids: string[] }; Returns: CrewComplianceSummaryDbRow[] };
+  /** One jsonb object: parseRequirementsConfig (hooks/useRequirementsConfig.ts) reads it. */
+  crew_requirements_config: { Args: { p_vessel_id: string }; Returns: Json };
+  crew_requirement_row_save: { Args: { p_vessel_id: string; p_row_id: string | null; p_payload: Json }; Returns: CrewRequirementRowRow };
+  crew_requirement_row_delete: { Args: { p_vessel_id: string; p_row_id: string }; Returns: string };
+  crew_requirement_cell_set: { Args: { p_vessel_id: string; p_cells: Json }; Returns: number };
+  crew_requirement_row_bulk: { Args: { p_vessel_id: string; p_row_id: string; p_action: 'require_all' | 'clear_all' }; Returns: number };
+  crew_requirements_add_stcw_basic: { Args: { p_vessel_id: string }; Returns: CrewRequirementSetAddedRpcRow[] };
+  crew_vessel_set_passenger: { Args: { p_vessel_id: string; p_on: boolean }; Returns: CrewPassengerToggleRpcRow[] };
+  crew_vessel_settings_save: { Args: { p_vessel_id: string; p_patch: Json }; Returns: VesselCrewSettingsRow };
+  crew_document_type_create: {
+    Args: {
+      p_category_key: string;
+      p_name: string;
+      p_code?: string | null;
+      p_abbreviation?: string | null;
+      p_default_validity_months?: number | null;
+      p_stcw_reference?: string | null;
+    };
+    Returns: CrewDocumentTypeRow;
+  };
+  crew_document_type_satisfies_save: {
+    Args: { p_type_id: string; p_satisfies_type_id: string; p_kind?: CrewDocumentSatisfactionKind | null; p_remove?: boolean };
+    Returns: string;
+  };
 };

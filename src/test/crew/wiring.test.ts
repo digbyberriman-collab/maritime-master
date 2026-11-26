@@ -29,6 +29,7 @@ const blockOf = (typeName: string) => {
 const namesIn = (block: string) => Array.from(block.matchAll(/^ {2}([a-z0-9_]+):/gm)).map((m) => m[1]);
 const pendingTables = namesIn(blockOf('CrewPendingTables'));
 const pendingFunctions = namesIn(blockOf('CrewPendingFunctions'));
+const pendingViews = namesIn(blockOf('CrewPendingViews'));
 
 const crewMigrationFiles = readdirSync(join(ROOT, 'supabase/migrations'))
   .filter((f) => /^2026112406\d{4}_crew_[a-z0-9_]+\.sql$/.test(f))
@@ -49,20 +50,26 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 describe('pending types and the migrations', () => {
-  it('declares the tables and RPCs of 060100 to 060400 and 060500 (X1-05: document versions and the review RPCs)', () => {
+  it('declares the tables and RPCs of 060100 to 060500 and 060600 (X1-06: requirement rows, the compliance views and RPCs)', () => {
     expect(pendingTables).toEqual([
       'ref_countries', 'ref_languages', 'departments', 'contract_types', 'positions', 'position_aliases', 'position_manning',
       'crew_movements', 'crew_transfers',
       'crew_personal_details', 'crew_languages', 'crew_assignment_terms',
       'crew_document_categories', 'crew_document_types', 'crew_document_type_satisfies', 'vessel_crew_settings',
       'crew_document_versions',
+      'crew_requirement_rows', 'crew_requirement_options', 'crew_requirement_positions',
     ]);
+    expect(pendingViews).toEqual(['crew_requirement_status', 'crew_compliance_summary']);
     expect(pendingFunctions).toEqual([
       'crew_positions_for_vessel', 'crew_vessel_unmatched_titles', 'crew_position_create', 'crew_vessel_positions_save', 'crew_position_alias_set',
       'crew_vessel_list', 'crew_vessel_movements',
       'crew_profile_resolve', 'crew_profile_summary', 'crew_personal_details_save', 'crew_languages_save', 'crew_onboarding_save', 'crew_find_duplicates',
       'crew_documents_for_profile', 'crew_document_rights', 'crew_document_save', 'crew_document_delete', 'crew_document_issuing_suggestions',
       'crew_document_review_rights', 'crew_document_verify', 'crew_document_mute', 'crew_document_unmute', 'crew_document_renew',
+      'crew_vessel_compliance', 'crew_vessel_requirement_status', 'crew_compliance_for_vessels', 'crew_requirements_config',
+      'crew_requirement_row_save', 'crew_requirement_row_delete', 'crew_requirement_cell_set', 'crew_requirement_row_bulk',
+      'crew_requirements_add_stcw_basic', 'crew_vessel_set_passenger', 'crew_vessel_settings_save', 'crew_document_type_create',
+      'crew_document_type_satisfies_save',
     ]);
     expect(crewMigrationFiles).toEqual([
       '20261124060100_crew_reference_positions.sql',
@@ -70,24 +77,28 @@ describe('pending types and the migrations', () => {
       '20261124060300_crew_profile_details.sql',
       '20261124060400_crew_document_catalogue.sql',
       '20261124060500_crew_document_verification.sql',
+      '20261124060600_crew_compliance.sql',
     ]);
   });
 
   it('every pending table and RPC is created by a block-06 migration', () => {
     for (const t of pendingTables) expect(crewMigrations, t).toMatch(new RegExp(`CREATE TABLE IF NOT EXISTS public\\.${t} \\(`));
     for (const f of pendingFunctions) expect(crewMigrations, f).toMatch(new RegExp(`CREATE OR REPLACE FUNCTION public\\.${f}\\(`));
+    for (const v of pendingViews) expect(crewMigrations, v).toMatch(new RegExp(`CREATE OR REPLACE VIEW public\\.${v}\\b`));
   });
 
   it('none is in the generated types yet (D-01: the shim stays until types.ts is regenerated)', () => {
-    for (const name of [...pendingTables, ...pendingFunctions]) expect(types.includes(`      ${name}: {`), name).toBe(false);
+    for (const name of [...pendingTables, ...pendingViews, ...pendingFunctions]) expect(types.includes(`      ${name}: {`), name).toBe(false);
   });
 
   it('the crew contract-map fragment expects exactly these names from the pending file', () => {
     const entry = contractMap.files.find((f: { file: string }) => f.file === 'src/modules/crew/types/db.pending.ts');
     expect(entry?.tables).toEqual({ type: 'CrewPendingTables', expect: pendingTables });
     expect(entry?.functions).toEqual({ type: 'CrewPendingFunctions', expect: pendingFunctions });
+    expect(entry?.views).toEqual({ type: 'CrewPendingViews', expect: pendingViews });
     expect(Object.keys(contractMap.notMirrored.functions).sort()).toEqual([
-      'crew_caller_is_external', 'crew_cap_vessel_ids', 'crew_document_visible_profile_ids', 'crew_profile_visible', 'crew_vessel_cap', 'crew_visible_profile_ids',
+      'crew_caller_is_external', 'crew_cap_vessel_ids', 'crew_compliance_summary_rows', 'crew_document_visible_profile_ids', 'crew_profile_visible',
+      'crew_requirement_status_rows', 'crew_vessel_cap', 'crew_visible_profile_ids',
     ]);
     expect(entry?.columns).toEqual({ type: 'CrewPendingColumns', expect: ['crew_next_of_kin', 'crew_certificates'] });
   });
@@ -117,6 +128,14 @@ describe('pending types and the migrations', () => {
     expect(ledger).toContain('| 5 | `20261124060500_crew_document_verification.sql` | written, not applied |');
     expect(ledger).toContain('| C5 | `20261124060500_crew_document_verification.sql` | Query C5 |');
     expect(ledger).toMatch(/-- C5\. crew_document_verification/);
+    expect(ledger).toContain('| 6 | `20261124060600_crew_compliance.sql` | written, not applied |');
+    expect(ledger).toContain('| C6 | `20261124060600_crew_compliance.sql` | Query C6 |');
+    expect(ledger).toMatch(/-- C6\. crew_compliance/);
+  });
+
+  it('the compliance parity fixture is the one both test suites read (X1-06)', () => {
+    expect(read('supabase/tests/sql/crew/compliance_parity.test.sql')).toContain('src/test/crew/fixtures/complianceCases.json');
+    expect(read('src/test/crew/compliance.test.ts')).toContain('src/test/crew/fixtures/complianceCases.json');
   });
 
   it('the status parity fixture is the one both test suites read (X1-02)', () => {

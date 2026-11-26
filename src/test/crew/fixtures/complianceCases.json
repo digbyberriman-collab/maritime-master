@@ -1,0 +1,492 @@
+{
+  "$comment": "Crew requirement engine parity cases (X1-06; gap/04 W5, C34, C36). Read by src/test/crew/compliance.test.ts (lib/compliance.ts) and supabase/tests/sql/crew/compliance_parity.test.sql (crew_requirement_status_for / crew_compliance_summary_for), which must both give the expected answers. Each case is one crew member on one vessel of its own company. Dates are day offsets from today. Types are catalogue keys (20261124060400's system types) or the case's own company types; rules are the case's company rules on top of STORM's. Rows are ticked for the person's position (Deckhand) unless ticked is false (then Bosun). Defaults: row kind document; document status verified, muted false, file true, deleted false, noExpiry false; person title Deckhand with a login. Expected row fields left out read: doc null, record null, type null, via null, viaOption null, expiry null, noExpiry false, bucket null, conditional false, muted false, missingDate false, hasFile true when a doc is named (else null), gap null, nearest null, nearestType null. Summary pairs are [required, met].",
+  "cases": [
+    {
+      "name": "option_met",
+      "rows": [{ "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "stcw_pst", "expiry": 400 }],
+      "expect": {
+        "rows": { "pst": { "state": "met", "doc": "d1", "type": "stcw_pst", "via": "option", "viaOption": "stcw_pst", "expiry": 400, "bucket": "valid" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 400, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    },
+    {
+      "name": "combined_certificate_component",
+      "rows": [{ "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "stcw_basic_safety", "expiry": 400 }],
+      "expect": {
+        "rows": { "pst": { "state": "met", "doc": "d1", "type": "stcw_basic_safety", "via": "component", "viaOption": "stcw_pst", "expiry": 400, "bucket": "valid" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 400, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    },
+    {
+      "name": "combined_certificate_covers_all_four",
+      "rows": [
+        { "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 },
+        { "key": "fpff", "group": "stcw_basic", "options": ["stcw_fpff"], "sort": 20 },
+        { "key": "efa", "group": "stcw_basic", "options": ["stcw_efa"], "sort": 30 },
+        { "key": "pssr", "group": "stcw_basic", "options": ["stcw_pssr"], "sort": 40 }
+      ],
+      "documents": [{ "key": "d1", "type": "stcw_basic_safety", "expiry": 400 }],
+      "expect": {
+        "rows": {
+          "pst": { "state": "met", "doc": "d1", "type": "stcw_basic_safety", "via": "component", "viaOption": "stcw_pst", "expiry": 400, "bucket": "valid" },
+          "fpff": { "state": "met", "doc": "d1", "type": "stcw_basic_safety", "via": "component", "viaOption": "stcw_fpff", "expiry": 400, "bucket": "valid" },
+          "efa": { "state": "met", "doc": "d1", "type": "stcw_basic_safety", "via": "component", "viaOption": "stcw_efa", "expiry": 400, "bucket": "valid" },
+          "pssr": { "state": "met", "doc": "d1", "type": "stcw_basic_safety", "via": "component", "viaOption": "stcw_pssr", "expiry": 400, "bucket": "valid" }
+        },
+        "summary": { "required": 4, "met": 4, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [4, 4], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 400, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    },
+    {
+      "name": "supersession_chain",
+      "rows": [{ "key": "oow", "group": "coc_gmdss", "options": ["coc_oow_deck_unlimited"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "coc_master_unlimited", "expiry": 900 }],
+      "expect": {
+        "rows": { "oow": { "state": "met", "doc": "d1", "type": "coc_master_unlimited", "via": "supersedes", "viaOption": "coc_oow_deck_unlimited", "expiry": 900, "bucket": "valid" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [0, 0], "quals": [1, 1], "fam": [0, 0], "status": "complete", "nextExpiry": 900, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    },
+    {
+      "name": "supersession_chain_of_five_rules",
+      "rows": [{ "key": "aec", "group": "advanced_training", "options": ["approved_engine_course"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "coc_chief_engineer_unlimited", "expiry": 900 }],
+      "expect": {
+        "rows": { "aec": { "state": "met", "doc": "d1", "type": "coc_chief_engineer_unlimited", "via": "supersedes", "viaOption": "approved_engine_course", "expiry": 900, "bucket": "valid" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 900, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    },
+    {
+      "name": "chain_of_six_rules_is_too_far",
+      "types": [
+        { "key": "acme_t0", "category": "stcw_basic", "name": "Acme course level 0" },
+        { "key": "acme_t1", "category": "stcw_basic", "name": "Acme course level 1" },
+        { "key": "acme_t2", "category": "stcw_basic", "name": "Acme course level 2" },
+        { "key": "acme_t3", "category": "stcw_basic", "name": "Acme course level 3" },
+        { "key": "acme_t4", "category": "stcw_basic", "name": "Acme course level 4" },
+        { "key": "acme_t5", "category": "stcw_basic", "name": "Acme course level 5" },
+        { "key": "acme_t6", "category": "stcw_basic", "name": "Acme course level 6" }
+      ],
+      "rules": [
+        { "type": "acme_t1", "satisfies": "acme_t0", "kind": "supersedes" },
+        { "type": "acme_t2", "satisfies": "acme_t1", "kind": "supersedes" },
+        { "type": "acme_t3", "satisfies": "acme_t2", "kind": "supersedes" },
+        { "type": "acme_t4", "satisfies": "acme_t3", "kind": "supersedes" },
+        { "type": "acme_t5", "satisfies": "acme_t4", "kind": "supersedes" },
+        { "type": "acme_t6", "satisfies": "acme_t5", "kind": "supersedes" }
+      ],
+      "rows": [{ "key": "t0", "group": "stcw_basic", "options": ["acme_t0"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "acme_t6", "expiry": 400 }],
+      "expect": {
+        "rows": { "t0": { "state": "missing", "gap": "not_linked", "nearest": "d1", "nearestType": "acme_t6" } },
+        "summary": { "required": 1, "met": 0, "expiring": 0, "expired": 0, "missing": 1, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 0], "quals": [0, 0], "fam": [0, 0], "status": "missing", "nextExpiry": null, "dotDocuments": "none", "dotQualifications": "danger", "issues": [["t0", "missing"]] }
+      }
+    },
+    {
+      "name": "chain_of_five_company_rules",
+      "types": [
+        { "key": "acme_t0", "category": "stcw_basic", "name": "Acme course level 0" },
+        { "key": "acme_t1", "category": "stcw_basic", "name": "Acme course level 1" },
+        { "key": "acme_t2", "category": "stcw_basic", "name": "Acme course level 2" },
+        { "key": "acme_t3", "category": "stcw_basic", "name": "Acme course level 3" },
+        { "key": "acme_t4", "category": "stcw_basic", "name": "Acme course level 4" },
+        { "key": "acme_t5", "category": "stcw_basic", "name": "Acme course level 5" }
+      ],
+      "rules": [
+        { "type": "acme_t1", "satisfies": "acme_t0", "kind": "supersedes" },
+        { "type": "acme_t2", "satisfies": "acme_t1", "kind": "supersedes" },
+        { "type": "acme_t3", "satisfies": "acme_t2", "kind": "supersedes" },
+        { "type": "acme_t4", "satisfies": "acme_t3", "kind": "supersedes" },
+        { "type": "acme_t5", "satisfies": "acme_t4", "kind": "supersedes" }
+      ],
+      "rows": [{ "key": "t0", "group": "stcw_basic", "options": ["acme_t0"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "acme_t5", "expiry": 400 }],
+      "expect": {
+        "rows": { "t0": { "state": "met", "doc": "d1", "type": "acme_t5", "via": "supersedes", "viaOption": "acme_t0", "expiry": 400, "bucket": "valid" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 400, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    },
+    {
+      "name": "accepted_medical_equivalent",
+      "rows": [{ "key": "eng1", "group": "medical", "options": ["eng1"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "seafarer_medical_malta", "expiry": 400 }],
+      "expect": {
+        "rows": { "eng1": { "state": "met", "doc": "d1", "type": "seafarer_medical_malta", "via": "equivalent", "viaOption": "eng1", "expiry": 400, "bucket": "valid" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [1, 1], "stcw": [0, 0], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 400, "dotDocuments": "ok", "dotQualifications": "none", "issues": [] }
+      }
+    },
+    {
+      "name": "equivalents_in_a_cycle",
+      "rows": [{ "key": "sm", "group": "medical", "options": ["seafarer_medical"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "eng1", "expiry": 400 }],
+      "expect": {
+        "rows": { "sm": { "state": "met", "doc": "d1", "type": "eng1", "via": "equivalent", "viaOption": "seafarer_medical", "expiry": 400, "bucket": "valid" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [1, 1], "stcw": [0, 0], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 400, "dotDocuments": "ok", "dotQualifications": "none", "issues": [] }
+      }
+    },
+    {
+      "name": "any_option_satisfies",
+      "rows": [{ "key": "med", "group": "medical", "options": ["eng1", "seafarer_medical_us"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "seafarer_medical_us", "expiry": 400 }],
+      "expect": {
+        "rows": { "med": { "state": "met", "doc": "d1", "type": "seafarer_medical_us", "via": "option", "viaOption": "seafarer_medical_us", "expiry": 400, "bucket": "valid" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [1, 1], "stcw": [0, 0], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 400, "dotDocuments": "ok", "dotQualifications": "none", "issues": [] }
+      }
+    },
+    {
+      "name": "latest_expiry_wins",
+      "rows": [{ "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 }],
+      "documents": [
+        { "key": "d1", "type": "stcw_pst", "expiry": 100 },
+        { "key": "d2", "type": "stcw_basic_safety", "expiry": 900 }
+      ],
+      "expect": {
+        "rows": { "pst": { "state": "met", "doc": "d2", "type": "stcw_basic_safety", "via": "component", "viaOption": "stcw_pst", "expiry": 900, "bucket": "valid" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 900, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    },
+    {
+      "name": "a_valid_satisfier_beats_an_expired_one",
+      "rows": [{ "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 }],
+      "documents": [
+        { "key": "d1", "type": "stcw_pst", "expiry": -10 },
+        { "key": "d2", "type": "stcw_basic_safety", "expiry": 50 }
+      ],
+      "expect": {
+        "rows": { "pst": { "state": "expiring", "doc": "d2", "type": "stcw_basic_safety", "via": "component", "viaOption": "stcw_pst", "expiry": 50, "bucket": "expiring" } },
+        "summary": { "required": 1, "met": 1, "expiring": 1, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "expiring", "nextExpiry": 50, "dotDocuments": "none", "dotQualifications": "warn", "issues": [["pst", "expiring"]] }
+      }
+    },
+    {
+      "name": "only_expired_satisfiers",
+      "rows": [{ "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 }],
+      "documents": [
+        { "key": "d1", "type": "stcw_pst", "expiry": -1 },
+        { "key": "d2", "type": "stcw_basic_safety", "expiry": -30 }
+      ],
+      "expect": {
+        "rows": { "pst": { "state": "expired", "doc": "d1", "type": "stcw_pst", "via": "option", "viaOption": "stcw_pst", "expiry": -1, "bucket": "expired" } },
+        "summary": { "required": 1, "met": 0, "expiring": 0, "expired": 1, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 0], "quals": [0, 0], "fam": [0, 0], "status": "expired", "nextExpiry": null, "dotDocuments": "none", "dotQualifications": "danger", "issues": [["pst", "expired"]] }
+      }
+    },
+    {
+      "name": "the_expiry_day_is_expiring",
+      "rows": [{ "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "stcw_pst", "expiry": 0 }],
+      "expect": {
+        "rows": { "pst": { "state": "expiring", "doc": "d1", "type": "stcw_pst", "via": "option", "viaOption": "stcw_pst", "expiry": 0, "bucket": "expiring_soon" } },
+        "summary": { "required": 1, "met": 1, "expiring": 1, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "expiring", "nextExpiry": 0, "dotDocuments": "none", "dotQualifications": "warn", "issues": [["pst", "expiring"]] }
+      }
+    },
+    {
+      "name": "no_expiry_beats_a_dated_satisfier",
+      "rows": [{ "key": "efa", "group": "stcw_basic", "options": ["stcw_efa"], "sort": 10 }],
+      "documents": [
+        { "key": "d1", "type": "stcw_efa", "expiry": null, "noExpiry": true },
+        { "key": "d2", "type": "stcw_mfa", "expiry": 500 }
+      ],
+      "expect": {
+        "rows": { "efa": { "state": "met", "doc": "d1", "type": "stcw_efa", "via": "option", "viaOption": "stcw_efa", "noExpiry": true, "bucket": "no_expiry" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": null, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    },
+    {
+      "name": "a_missing_date_counts_amber",
+      "rows": [{ "key": "pssr", "group": "stcw_basic", "options": ["stcw_pssr"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "stcw_pssr", "expiry": null }],
+      "expect": {
+        "rows": { "pssr": { "state": "met", "doc": "d1", "type": "stcw_pssr", "via": "option", "viaOption": "stcw_pssr", "missingDate": true } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": null, "dotDocuments": "none", "dotQualifications": "warn", "issues": [["pssr", "missing_date"]] }
+      }
+    },
+    {
+      "name": "a_dated_satisfier_beats_a_missing_date",
+      "rows": [{ "key": "pssr", "group": "stcw_basic", "options": ["stcw_pssr"], "sort": 10 }],
+      "documents": [
+        { "key": "d1", "type": "stcw_pssr", "expiry": null },
+        { "key": "d2", "type": "stcw_basic_safety", "expiry": 300 }
+      ],
+      "expect": {
+        "rows": { "pssr": { "state": "met", "doc": "d2", "type": "stcw_basic_safety", "via": "component", "viaOption": "stcw_pssr", "expiry": 300, "bucket": "valid" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 300, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    },
+    {
+      "name": "conditionally_approved_counts_amber",
+      "rows": [{ "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "stcw_pst", "expiry": 400, "status": "conditionally_approved" }],
+      "expect": {
+        "rows": { "pst": { "state": "met", "doc": "d1", "type": "stcw_pst", "via": "option", "viaOption": "stcw_pst", "expiry": 400, "bucket": "valid", "conditional": true } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 1, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 400, "dotDocuments": "none", "dotQualifications": "warn", "issues": [["pst", "conditional"]] }
+      }
+    },
+    {
+      "name": "an_unconditional_satisfier_wins_a_tie",
+      "rows": [{ "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 }],
+      "documents": [
+        { "key": "d1", "type": "stcw_pst", "expiry": 400, "status": "conditionally_approved" },
+        { "key": "d2", "type": "stcw_basic_safety", "expiry": 400 }
+      ],
+      "expect": {
+        "rows": { "pst": { "state": "met", "doc": "d2", "type": "stcw_basic_safety", "via": "component", "viaOption": "stcw_pst", "expiry": 400, "bucket": "valid" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 400, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    },
+    {
+      "name": "a_rejected_document_never_counts",
+      "rows": [{ "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "stcw_pst", "expiry": 400, "status": "rejected" }],
+      "expect": {
+        "rows": { "pst": { "state": "missing", "gap": "rejected", "nearest": "d1", "nearestType": "stcw_pst" } },
+        "summary": { "required": 1, "met": 0, "expiring": 0, "expired": 0, "missing": 1, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 0], "quals": [0, 0], "fam": [0, 0], "status": "missing", "nextExpiry": null, "dotDocuments": "none", "dotQualifications": "danger", "issues": [["pst", "missing"]] }
+      }
+    },
+    {
+      "name": "a_rejected_document_beside_a_valid_one",
+      "rows": [{ "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 }],
+      "documents": [
+        { "key": "d1", "type": "stcw_pst", "expiry": 400, "status": "rejected" },
+        { "key": "d2", "type": "stcw_basic_safety", "expiry": 100 }
+      ],
+      "expect": {
+        "rows": { "pst": { "state": "met", "doc": "d2", "type": "stcw_basic_safety", "via": "component", "viaOption": "stcw_pst", "expiry": 100, "bucket": "valid" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 100, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    },
+    {
+      "name": "muted_expiring_raises_nothing",
+      "rows": [{ "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "stcw_pst", "expiry": 20, "muted": true }],
+      "expect": {
+        "rows": { "pst": { "state": "expiring", "doc": "d1", "type": "stcw_pst", "via": "option", "viaOption": "stcw_pst", "expiry": 20, "bucket": "expiring_soon", "muted": true } },
+        "summary": { "required": 1, "met": 1, "expiring": 1, "expired": 0, "missing": 0, "conditional": 0, "muted": 1, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 20, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    },
+    {
+      "name": "muted_expired_is_still_expired",
+      "rows": [{ "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "stcw_pst", "expiry": -5, "muted": true }],
+      "expect": {
+        "rows": { "pst": { "state": "expired", "doc": "d1", "type": "stcw_pst", "via": "option", "viaOption": "stcw_pst", "expiry": -5, "bucket": "expired", "muted": true } },
+        "summary": { "required": 1, "met": 0, "expiring": 0, "expired": 1, "missing": 0, "conditional": 0, "muted": 1, "docs": [0, 0], "stcw": [1, 0], "quals": [0, 0], "fam": [0, 0], "status": "expired", "nextExpiry": null, "dotDocuments": "none", "dotQualifications": "danger", "issues": [["pst", "expired"]] }
+      }
+    },
+    {
+      "name": "a_removed_document_is_ignored",
+      "rows": [{ "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "stcw_pst", "expiry": 400, "deleted": true }],
+      "expect": {
+        "rows": { "pst": { "state": "missing", "gap": "none" } },
+        "summary": { "required": 1, "met": 0, "expiring": 0, "expired": 0, "missing": 1, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 0], "quals": [0, 0], "fam": [0, 0], "status": "missing", "nextExpiry": null, "dotDocuments": "none", "dotQualifications": "danger", "issues": [["pst", "missing"]] }
+      }
+    },
+    {
+      "name": "same_category_but_not_linked",
+      "rows": [{ "key": "efa", "group": "stcw_basic", "options": ["stcw_efa"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "stcw_pst", "expiry": 400 }],
+      "expect": {
+        "rows": { "efa": { "state": "missing", "gap": "not_linked", "nearest": "d1", "nearestType": "stcw_pst" } },
+        "summary": { "required": 1, "met": 0, "expiring": 0, "expired": 0, "missing": 1, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 0], "quals": [0, 0], "fam": [0, 0], "status": "missing", "nextExpiry": null, "dotDocuments": "none", "dotQualifications": "danger", "issues": [["efa", "missing"]] }
+      }
+    },
+    {
+      "name": "nothing_near",
+      "rows": [{ "key": "eng1", "group": "medical", "options": ["eng1"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "passport", "expiry": 2000 }],
+      "expect": {
+        "rows": { "eng1": { "state": "missing", "gap": "none" } },
+        "summary": { "required": 1, "met": 0, "expiring": 0, "expired": 0, "missing": 1, "conditional": 0, "muted": 0, "docs": [1, 0], "stcw": [0, 0], "quals": [0, 0], "fam": [0, 0], "status": "missing", "nextExpiry": null, "dotDocuments": "danger", "dotQualifications": "none", "issues": [["eng1", "missing"]] }
+      }
+    },
+    {
+      "name": "a_record_without_a_file_still_counts",
+      "rows": [{ "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "stcw_pst", "expiry": 400, "file": false }],
+      "expect": {
+        "rows": { "pst": { "state": "met", "doc": "d1", "type": "stcw_pst", "via": "option", "viaOption": "stcw_pst", "expiry": 400, "bucket": "valid", "hasFile": false } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 400, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    },
+    {
+      "name": "familiarisation_completed",
+      "templates": ["t1"],
+      "rows": [{ "key": "fam", "group": "familiarisation", "kind": "familiarisation", "options": ["t1"], "sort": 10 }],
+      "familiarisation": [{ "key": "r1", "template": "t1", "status": "Completed", "completed": -5 }],
+      "expect": {
+        "rows": { "fam": { "state": "met", "record": "r1", "via": "familiarisation" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [0, 0], "quals": [0, 0], "fam": [1, 1], "status": "complete", "nextExpiry": null, "dotDocuments": "none", "dotQualifications": "none", "issues": [] }
+      }
+    },
+    {
+      "name": "familiarisation_in_progress",
+      "templates": ["t1"],
+      "rows": [{ "key": "fam", "group": "familiarisation", "kind": "familiarisation", "options": ["t1"], "sort": 10 }],
+      "familiarisation": [{ "key": "r1", "template": "t1", "status": "In_Progress", "completed": null }],
+      "expect": {
+        "rows": { "fam": { "state": "missing", "gap": "in_progress", "nearestRecord": "r1" } },
+        "summary": { "required": 1, "met": 0, "expiring": 0, "expired": 0, "missing": 1, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [0, 0], "quals": [0, 0], "fam": [1, 0], "status": "missing", "nextExpiry": null, "dotDocuments": "none", "dotQualifications": "none", "issues": [["fam", "missing"]] }
+      }
+    },
+    {
+      "name": "familiarisation_not_started",
+      "templates": ["t1"],
+      "rows": [{ "key": "fam", "group": "familiarisation", "kind": "familiarisation", "options": ["t1"], "sort": 10 }],
+      "expect": {
+        "rows": { "fam": { "state": "missing", "gap": "none" } },
+        "summary": { "required": 1, "met": 0, "expiring": 0, "expired": 0, "missing": 1, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [0, 0], "quals": [0, 0], "fam": [1, 0], "status": "missing", "nextExpiry": null, "dotDocuments": "none", "dotQualifications": "none", "issues": [["fam", "missing"]] }
+      }
+    },
+    {
+      "name": "familiarisation_any_template",
+      "templates": ["t1", "t2"],
+      "rows": [{ "key": "fam", "group": "familiarisation", "kind": "familiarisation", "options": ["t1", "t2"], "sort": 10 }],
+      "familiarisation": [
+        { "key": "r1", "template": "t1", "status": "in_progress", "completed": null },
+        { "key": "r2", "template": "t2", "status": "completed", "completed": -2 }
+      ],
+      "expect": {
+        "rows": { "fam": { "state": "met", "record": "r2", "via": "familiarisation" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [0, 0], "quals": [0, 0], "fam": [1, 1], "status": "complete", "nextExpiry": null, "dotDocuments": "none", "dotQualifications": "none", "issues": [] }
+      }
+    },
+    {
+      "name": "not_ticked_for_the_position",
+      "rows": [{ "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10, "ticked": false }],
+      "expect": {
+        "rows": {},
+        "summary": { "required": 0, "met": 0, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [0, 0], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": null, "dotDocuments": "none", "dotQualifications": "none", "issues": [] }
+      }
+    },
+    {
+      "name": "a_title_with_no_position",
+      "person": { "title": "Basket weaver" },
+      "rows": [{ "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 }],
+      "expect": {
+        "rows": {},
+        "summary": { "required": 0, "met": 0, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [0, 0], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": null, "dotDocuments": "none", "dotQualifications": "none", "issues": [] }
+      }
+    },
+    {
+      "name": "tabs_dots_and_issues",
+      "templates": ["t1"],
+      "rows": [
+        { "key": "passport", "group": "documents", "options": ["passport"], "sort": 10 },
+        { "key": "eng1", "group": "medical", "options": ["eng1"], "sort": 20 },
+        { "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 30 },
+        { "key": "oow", "group": "coc_gmdss", "options": ["coc_oow_deck_unlimited"], "sort": 40 },
+        { "key": "fam", "group": "familiarisation", "kind": "familiarisation", "options": ["t1"], "sort": 50 }
+      ],
+      "documents": [
+        { "key": "d1", "type": "eng1", "expiry": 20 },
+        { "key": "d2", "type": "stcw_pst", "expiry": 400 },
+        { "key": "d3", "type": "coc_oow_deck_unlimited", "expiry": 700, "status": "conditionally_approved" }
+      ],
+      "familiarisation": [{ "key": "r1", "template": "t1", "status": "completed", "completed": -1 }],
+      "expect": {
+        "rows": {
+          "passport": { "state": "missing", "gap": "none" },
+          "eng1": { "state": "expiring", "doc": "d1", "type": "eng1", "via": "option", "viaOption": "eng1", "expiry": 20, "bucket": "expiring_soon" },
+          "pst": { "state": "met", "doc": "d2", "type": "stcw_pst", "via": "option", "viaOption": "stcw_pst", "expiry": 400, "bucket": "valid" },
+          "oow": { "state": "met", "doc": "d3", "type": "coc_oow_deck_unlimited", "via": "option", "viaOption": "coc_oow_deck_unlimited", "expiry": 700, "bucket": "valid", "conditional": true },
+          "fam": { "state": "met", "record": "r1", "via": "familiarisation" }
+        },
+        "summary": { "required": 5, "met": 4, "expiring": 1, "expired": 0, "missing": 1, "conditional": 1, "muted": 0, "docs": [2, 1], "stcw": [1, 1], "quals": [1, 1], "fam": [1, 1], "status": "missing", "nextExpiry": 20, "dotDocuments": "danger", "dotQualifications": "warn", "issues": [["passport", "missing"], ["eng1", "expiring"], ["oow", "conditional"]] }
+      }
+    },
+    {
+      "name": "expired_is_worse_than_missing",
+      "rows": [
+        { "key": "passport", "group": "documents", "options": ["passport"], "sort": 10 },
+        { "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 20 }
+      ],
+      "documents": [{ "key": "d1", "type": "stcw_pst", "expiry": -3 }],
+      "expect": {
+        "rows": {
+          "passport": { "state": "missing", "gap": "none" },
+          "pst": { "state": "expired", "doc": "d1", "type": "stcw_pst", "via": "option", "viaOption": "stcw_pst", "expiry": -3, "bucket": "expired" }
+        },
+        "summary": { "required": 2, "met": 0, "expiring": 0, "expired": 1, "missing": 1, "conditional": 0, "muted": 0, "docs": [1, 0], "stcw": [1, 0], "quals": [0, 0], "fam": [0, 0], "status": "expired", "nextExpiry": null, "dotDocuments": "danger", "dotQualifications": "danger", "issues": [["pst", "expired"], ["passport", "missing"]] }
+      }
+    },
+    {
+      "name": "a_company_equivalent",
+      "types": [{ "key": "acme_survival", "category": "stcw_basic", "name": "Acme sea survival course" }],
+      "rules": [{ "type": "acme_survival", "satisfies": "stcw_pst", "kind": "equivalent" }],
+      "rows": [{ "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "acme_survival", "expiry": 400 }],
+      "expect": {
+        "rows": { "pst": { "state": "met", "doc": "d1", "type": "acme_survival", "via": "equivalent", "viaOption": "stcw_pst", "expiry": 400, "bucket": "valid" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 400, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    },
+    {
+      "name": "a_passport_uses_its_270_day_window",
+      "rows": [{ "key": "pp", "group": "documents", "options": ["passport"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "passport", "expiry": 200 }],
+      "expect": {
+        "rows": { "pp": { "state": "expiring", "doc": "d1", "type": "passport", "via": "option", "viaOption": "passport", "expiry": 200, "bucket": "expiring" } },
+        "summary": { "required": 1, "met": 1, "expiring": 1, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [1, 1], "stcw": [0, 0], "quals": [0, 0], "fam": [0, 0], "status": "expiring", "nextExpiry": 200, "dotDocuments": "warn", "dotQualifications": "none", "issues": [["pp", "expiring"]] }
+      }
+    },
+    {
+      "name": "passenger_combined_certificate",
+      "rows": [{ "key": "crowd", "group": "stcw_passenger", "options": ["stcw_crowd_management"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "stcw_passenger_combined", "expiry": 400 }],
+      "expect": {
+        "rows": { "crowd": { "state": "met", "doc": "d1", "type": "stcw_passenger_combined", "via": "component", "viaOption": "stcw_crowd_management", "expiry": 400, "bucket": "valid" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 400, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    },
+    {
+      "name": "a_pending_placement_without_a_login",
+      "person": { "login": false },
+      "rows": [{ "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "stcw_pst", "expiry": 400 }],
+      "expect": {
+        "rows": { "pst": { "state": "met", "doc": "d1", "type": "stcw_pst", "via": "option", "viaOption": "stcw_pst", "expiry": 400, "bucket": "valid" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 400, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    },
+    {
+      "name": "only_the_ticked_rows_are_required",
+      "rows": [
+        { "key": "pst", "group": "stcw_basic", "options": ["stcw_pst"], "sort": 10 },
+        { "key": "efa", "group": "stcw_basic", "options": ["stcw_efa"], "sort": 20, "ticked": false }
+      ],
+      "expect": {
+        "rows": { "pst": { "state": "missing", "gap": "none" } },
+        "summary": { "required": 1, "met": 0, "expiring": 0, "expired": 0, "missing": 1, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 0], "quals": [0, 0], "fam": [0, 0], "status": "missing", "nextExpiry": null, "dotDocuments": "none", "dotQualifications": "danger", "issues": [["pst", "missing"]] }
+      }
+    },
+    {
+      "name": "the_shorter_chain_wins_a_tie",
+      "rows": [{ "key": "efa", "group": "stcw_basic", "options": ["stcw_efa"], "sort": 10 }],
+      "documents": [
+        { "key": "d1", "type": "stcw_mfa", "expiry": 400 },
+        { "key": "d2", "type": "ship_captain_medical", "expiry": 400 }
+      ],
+      "expect": {
+        "rows": { "efa": { "state": "met", "doc": "d1", "type": "stcw_mfa", "via": "supersedes", "viaOption": "stcw_efa", "expiry": 400, "bucket": "valid" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 400, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    },
+    {
+      "name": "the_kind_is_the_rule_next_to_the_option",
+      "rows": [{ "key": "efa", "group": "stcw_basic", "options": ["stcw_efa"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "ship_captain_medical", "expiry": 400 }],
+      "expect": {
+        "rows": { "efa": { "state": "met", "doc": "d1", "type": "ship_captain_medical", "via": "supersedes", "viaOption": "stcw_efa", "expiry": 400, "bucket": "valid" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 400, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    },
+    {
+      "name": "a_direct_equivalent",
+      "rows": [{ "key": "mc", "group": "medical", "options": ["stcw_medical_care"], "sort": 10 }],
+      "documents": [{ "key": "d1", "type": "ship_captain_medical", "expiry": 400 }],
+      "expect": {
+        "rows": { "mc": { "state": "met", "doc": "d1", "type": "ship_captain_medical", "via": "equivalent", "viaOption": "stcw_medical_care", "expiry": 400, "bucket": "valid" } },
+        "summary": { "required": 1, "met": 1, "expiring": 0, "expired": 0, "missing": 0, "conditional": 0, "muted": 0, "docs": [0, 0], "stcw": [1, 1], "quals": [0, 0], "fam": [0, 0], "status": "complete", "nextExpiry": 400, "dotDocuments": "none", "dotQualifications": "ok", "issues": [] }
+      }
+    }
+  ]
+}
