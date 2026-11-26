@@ -1,7 +1,7 @@
 {
   "routes": [
     "/fleet/planner :: page(/src/modules/rotation-planner/pages/RotationPlannerPage.tsx) guard=ProtectedRoute layout=-",
-    "/me/documents :: <PlaceholderWrapper{title=\"Documents\"}>",
+    "/me/documents :: <ModuleRoute{capability=\"vessel.crew.crew_certificates.view_own\"}> > page(/src/modules/crew/pages/MyDocumentsPage.tsx) guard=- layout=-",
     "/v/:vesselCode/crew :: redirect(list)",
     "/v/:vesselCode/crew/appraisals :: <PlaceholderWrapper{title=\"Performance Appraisals\"}>",
     "/v/:vesselCode/crew/checklists :: <PlaceholderWrapper{title=\"Checklists\"}>",
@@ -33,7 +33,7 @@
       "    ClipboardCheck {\"capability\":\"hris.performance.annual_evaluations.view\",\"id\":\"vessel-crew-appraisals\",\"kind\":\"leaf\",\"label\":\"Performance Appraisals\",\"path\":\"/v/:vesselCode/crew/appraisals\",\"scope\":\"vessel\",\"status\":\"planned\"}",
       "    UserCheck {\"capability\":\"vessel.crew.crew_list.view\",\"id\":\"vessel-crew-visitors\",\"kind\":\"leaf\",\"label\":\"Visitors & Occasional Workers\",\"path\":\"/v/:vesselCode/crew/visitors\",\"scope\":\"vessel\",\"status\":\"planned\"}",
       "    Briefcase {\"capability\":\"hris.employee_records.contracts_employment.view\",\"id\":\"vessel-crew-employment-history\",\"kind\":\"leaf\",\"label\":\"Employment History\",\"path\":\"/v/:vesselCode/crew/employment-history\",\"scope\":\"vessel\",\"status\":\"planned\"}",
-      "    FileText {\"id\":\"me-documents\",\"kind\":\"leaf\",\"label\":\"Documents\",\"path\":\"/me/documents\",\"scope\":\"personal\",\"status\":\"planned\"}"
+      "    FileText {\"capability\":\"vessel.crew.crew_certificates.view_own\",\"id\":\"me-documents\",\"kind\":\"leaf\",\"label\":\"Documents\",\"path\":\"/me/documents\",\"scope\":\"personal\",\"status\":\"beta\"}"
     ],
     "VESSEL_MODULES": [
       "  Users {\"capability\":\"vessel.crew.crew_list.view\",\"id\":\"crew-list\",\"kind\":\"leaf\",\"label\":\"Crew List\",\"path\":\"crew/list\",\"status\":\"beta\"}",
@@ -62,9 +62,6 @@
       "crew/appraisals Performance Appraisals",
       "crew/visitors Visitors & Occasional Workers",
       "crew/employment-history Employment History"
-    ],
-    "PERSONAL_PLACEHOLDER_LEAVES": [
-      "documents Documents"
     ],
     "VESSEL_ROOT_REDIRECTS": [
       "crew -> list"

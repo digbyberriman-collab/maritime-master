@@ -4,7 +4,7 @@
  *
  *   personal, contact                        X1-03
  *   training, medical, activity              X1-03B
- *   documents, stcw, qualifications          X1-04B
+ *   documents, stcw, qualifications          X1-04B (one body, components/documents/DocumentsTab)
  *   hours-of-rest                            X1-07B (until then the route
  *                                            crew/people/:crewId/hours-of-rest
  *                                            keeps the month page)
@@ -78,6 +78,32 @@ export const PROFILE_TABS: readonly ProfileTabDef[] = [
     capability: CREW_CAPS.profilesView,
     ownAlways: true,
     load: () => import('@/modules/crew/components/profile/ContactTab'),
+  },
+  // X1-04B: the person's crew documents, one tab per catalogue tab (gap/04
+  // C24; T-185: the tab is a property of the document type). The three share
+  // one chunk; the server reads the documents again behind its own gate
+  // (crew_documents_for_profile: own, or crew profiles and crew certificates
+  // view on a vessel of the person).
+  {
+    key: 'documents',
+    label: 'Documents',
+    capability: CREW_CAPS.profilesView,
+    ownAlways: true,
+    load: () => import('@/modules/crew/components/documents/DocumentsTab').then((m) => ({ default: m.DocumentsProfileTab })),
+  },
+  {
+    key: 'stcw',
+    label: 'STCW',
+    capability: CREW_CAPS.profilesView,
+    ownAlways: true,
+    load: () => import('@/modules/crew/components/documents/DocumentsTab').then((m) => ({ default: m.StcwProfileTab })),
+  },
+  {
+    key: 'qualifications',
+    label: 'Qualifications',
+    capability: CREW_CAPS.profilesView,
+    ownAlways: true,
+    load: () => import('@/modules/crew/components/documents/DocumentsTab').then((m) => ({ default: m.QualificationsProfileTab })),
   },
   // X1-03B: the person's courses and training applications (read-only).
   {

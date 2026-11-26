@@ -1,6 +1,9 @@
 import type { ManifestPageLoader, RouteDef } from '@/app/registry/types';
 import { CREW_CAPS, CREW_FLEET_PATHS, CREW_PATHS, CREW_ROOT } from './paths';
 
+/** The person's own documents, relative to `/me` (X1-04B; the crew manifest's personal.my_work leaf). */
+export const MY_DOCUMENTS_PATH = 'documents';
+
 /**
  * Crew routes, as data (BUILD-PLAN B8). The module manifest (./module.ts)
  * registers them, and the router mounts them inside their scope's layout
@@ -25,6 +28,11 @@ import { CREW_CAPS, CREW_FLEET_PATHS, CREW_PATHS, CREW_ROOT } from './paths';
  * vessel again, and Save also needs users-access administration because
  * create-crew-member makes the person's account). The crew list's Add crew
  * opens it.
+ * X1-04B adds the person's own documents at /me/documents (scope personal,
+ * path `documents`, guard vessel.crew.crew_certificates.view_own; the page
+ * asks again and the server answers only for the caller's own profile). The
+ * profile's Documents, STCW and Qualifications tabs are crew/people/:profileId/:tab
+ * pages (lib/profileTabs.ts), not routes of their own.
  */
 const vesselPage = (path: string, loader: ManifestPageLoader): RouteDef => ({
   scope: 'vessel',
@@ -74,6 +82,13 @@ export const CREW_ROUTES: readonly RouteDef[] = [
   vesselPage(CREW_PATHS.plannerManning, () => import('@/modules/crew/pages/LeavePlannerPage')),
   vesselPage(CREW_PATHS.plannerRequests, () => import('@/modules/crew/pages/LeaveRequestsPage')),
   vesselPage(CREW_PATHS.familiarisation, () => import('@/modules/training/pages/Training')),
+  // The person's own documents (X1-04B; gap/04 C24-C26; X1 spec §4 personal row).
+  {
+    scope: 'personal',
+    path: MY_DOCUMENTS_PATH,
+    page: () => import('@/modules/crew/pages/MyDocumentsPage'),
+    guard: { kind: 'capability', capability: CREW_CAPS.documentsViewOwn },
+  },
   // Crew rotation and season planning across the fleet (gap/04, gap/07). Its
   // nav leaf stays a platform node of Fleet › Overview (src/config/sitemap.ts).
   {

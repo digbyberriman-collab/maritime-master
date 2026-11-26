@@ -21,10 +21,13 @@ import {
 } from '@/modules/crew/lib/profileTabs';
 
 describe('the registry', () => {
-  it('lists Personal and Contact (X1-03), Training, Medical and Activity (X1-03B), Personal first (the default)', () => {
+  it('lists Personal and Contact (X1-03), Documents, STCW and Qualifications (X1-04B), Training, Medical and Activity (X1-03B), Personal first (the default)', () => {
     expect(PROFILE_TABS.map((t) => [t.key, t.label])).toEqual([
       ['personal', 'Personal'],
       ['contact', 'Contact'],
+      ['documents', 'Documents'],
+      ['stcw', 'STCW'],
+      ['qualifications', 'Qualifications'],
       ['training', 'Training'],
       ['medical', 'Medical'],
       ['activity', 'Activity'],
@@ -56,8 +59,8 @@ describe('the registry', () => {
       }
       expect(typeof tab.load).toBe('function');
       expect(tab.load.length).toBe(0);
-      // A dynamic import of the tab body under components/profile (one lazy chunk per tab).
-      expect(String(tab.load)).toMatch(/import.*\/src\/modules\/crew\/components\/profile\/\w+Tab/);
+      // A dynamic import of the tab body under components/profile, or the one documents body (X1-04B) for its three tabs.
+      expect(String(tab.load)).toMatch(/import.*\/src\/modules\/crew\/components\/(profile|documents)\/\w+Tab/);
       expect(PROFILE_TAB_COMPONENTS[tab.key], tab.key).toBeTruthy();
     }
   });
@@ -65,7 +68,8 @@ describe('the registry', () => {
   it('profileTabFor answers built tabs only', () => {
     expect(profileTabFor('contact')?.label).toBe('Contact');
     expect(profileTabFor('medical')?.label).toBe('Medical');
-    expect(profileTabFor('documents')).toBeNull();
+    expect(profileTabFor('stcw')?.label).toBe('STCW');
+    expect(profileTabFor('employment')).toBeNull();
     expect(profileTabFor('nonsense')).toBeNull();
     expect(profileTabFor(null)).toBeNull();
   });
@@ -84,16 +88,17 @@ describe('visibleProfileTabs', () => {
   const all = () => true;
 
   it('follows the server answer when there is one', () => {
-    expect(visibleProfileTabs({ serverTabs: ['personal', 'contact', 'documents'], own: false, can: none }).map((t) => t.key)).toEqual(['personal', 'contact']);
+    expect(visibleProfileTabs({ serverTabs: ['personal', 'contact', 'documents', 'employment'], own: false, can: none }).map((t) => t.key)).toEqual(['personal', 'contact', 'documents']);
     expect(visibleProfileTabs({ serverTabs: ['contact'], own: true, can: all }).map((t) => t.key)).toEqual(['contact']);
     expect(visibleProfileTabs({ serverTabs: [], own: true, can: all })).toEqual([]);
   });
 
   it('without it (D-01): the own profile always, else the capability', () => {
-    expect(visibleProfileTabs({ serverTabs: null, own: true, can: none }).map((t) => t.key)).toEqual(['personal', 'contact', 'training', 'activity']);
-    expect(visibleProfileTabs({ serverTabs: null, own: false, can: (k) => k === CREW_CAPS.profilesView }).map((t) => t.key)).toEqual(['personal', 'contact', 'training', 'activity']);
+    const docs = ['documents', 'stcw', 'qualifications'];
+    expect(visibleProfileTabs({ serverTabs: null, own: true, can: none }).map((t) => t.key)).toEqual(['personal', 'contact', ...docs, 'training', 'activity']);
+    expect(visibleProfileTabs({ serverTabs: null, own: false, can: (k) => k === CREW_CAPS.profilesView }).map((t) => t.key)).toEqual(['personal', 'contact', ...docs, 'training', 'activity']);
     // Medical opens only with the medical capability, own profile included (X1-03B).
-    expect(visibleProfileTabs({ serverTabs: null, own: true, can: (k) => k === CREW_CAPS.medicalRecordsView }).map((t) => t.key)).toEqual(['personal', 'contact', 'training', 'medical', 'activity']);
+    expect(visibleProfileTabs({ serverTabs: null, own: true, can: (k) => k === CREW_CAPS.medicalRecordsView }).map((t) => t.key)).toEqual(['personal', 'contact', ...docs, 'training', 'medical', 'activity']);
     expect(PROFILE_TAB_CAPABILITIES).toEqual([CREW_CAPS.profilesView, CREW_CAPS.medicalRecordsView]);
     expect(visibleProfileTabs({ serverTabs: null, own: false, can: none })).toEqual([]);
   });
@@ -101,7 +106,7 @@ describe('visibleProfileTabs', () => {
   it('a module setting that is off closes a tab that names it', () => {
     const tabs = visibleProfileTabs({ serverTabs: null, own: true, can: all, moduleOn: () => false });
     // No built tab names a module setting, so all stay.
-    expect(tabs.map((t) => t.key)).toEqual(['personal', 'contact', 'training', 'medical', 'activity']);
+    expect(tabs.map((t) => t.key)).toEqual(['personal', 'contact', 'documents', 'stcw', 'qualifications', 'training', 'medical', 'activity']);
   });
 });
 
@@ -115,7 +120,8 @@ describe('resolveProfileTab', () => {
   it('an unknown, missing or not-yet-built tab lands on Personal', () => {
     expect(resolveProfileTab('nonsense', visible)?.key).toBe('personal');
     expect(resolveProfileTab(null, visible)?.key).toBe('personal');
-    expect(resolveProfileTab('documents', visible)?.key).toBe('personal');
+    expect(resolveProfileTab('employment', visible)?.key).toBe('personal');
+    expect(resolveProfileTab('documents', visible)?.key).toBe('documents');
   });
 
   it('the first open tab when Personal is closed, nothing when none is', () => {

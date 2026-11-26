@@ -19,7 +19,9 @@
  *     There is no Dashboard leaf yet: a planned leaf at the module root
  *     would turn today's crew -> crew/list redirect into a Coming Soon page
  *     (X1-10B adds it as beta with its page).
- *   - `personal.my_work`: the user's own documents (planned until /me/documents is built).
+ *   - `personal.my_work`: the user's own documents at /me/documents (X1-04B,
+ *     PR-X1-J: beta behind vessel.crew.crew_certificates.view_own; the leaf
+ *     is no longer planned, so its Coming Soon route is gone by itself).
  *   Moved leaves keep `live` and exactly today's gates (D-X1-25): the slice
  *   that swaps in a leaf's page sets its §4 capability and status beta.
  *   Planned leaves carry their capability now.
@@ -84,7 +86,12 @@ const manifest: ModuleManifest = {
       order: 120,
       node: L('Employment History', CREW_ROOT, { icon: Briefcase, capability: 'hris.employee_records.contracts_employment.view' }),
     },
-    { slot: 'personal.my_work', order: 40, node: L('Documents', PERSONAL_ROOT, { icon: FileText, status: 'planned' }) },
+    // X1-04B (PR-X1-J): the person's own documents at /me/documents, beta behind view_own.
+    {
+      slot: 'personal.my_work',
+      order: 40,
+      node: L('Documents', PERSONAL_ROOT, { icon: FileText, status: 'beta', capability: CREW_CAPS.documentsViewOwn }),
+    },
   ],
   capabilities: CREW_CAPABILITIES,
   // Seeded by 20261124030100 (category Crew; PR-X1-E). Each flips to 'live'

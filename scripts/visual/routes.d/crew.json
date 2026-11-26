@@ -177,5 +177,92 @@
         "wait": 300
       }
     ]
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/documents",
+    "slug": "crew-profile-documents",
+    "waitFor": "[data-crew-profile] [data-documents-state=\"ready\"] [data-document-row]",
+    "note": "X1-04B: the profile Documents tab: category groups with counts and + Add, the legend with counts, rows with the expiry pill, number, issuing country, expiry, verification and who reviewed it (needs the crew_profile_summary fixture tabs to list documents, stcw and qualifications and an rpc/crew_document_rights fixture: scratch fixtures until PR-X1-G)"
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/stcw",
+    "slug": "crew-profile-stcw",
+    "waitFor": "[data-crew-profile] [data-documents-state=\"ready\"] [data-document-row]",
+    "note": "X1-04B: the profile STCW tab (a certificate recorded without a file) (needs the crew_profile_summary fixture tabs to list documents, stcw and qualifications and an rpc/crew_document_rights fixture: scratch fixtures until PR-X1-G)"
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/qualifications",
+    "slug": "crew-profile-qualifications",
+    "waitFor": "[data-crew-profile] [data-documents-state=\"ready\"] [data-document-row]",
+    "note": "X1-04B: the profile Qualifications tab (No expiry, a legacy row not classified yet, with its missing date) (needs the crew_profile_summary fixture tabs to list documents, stcw and qualifications and an rpc/crew_document_rights fixture: scratch fixtures until PR-X1-G)"
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/documents",
+    "slug": "crew-profile-documents-add",
+    "waitFor": "[data-crew-profile] [data-documents-state=\"ready\"] [data-add-document]:not([disabled])",
+    "note": "X1-04B: Add document, step 1: search by name, code or abbreviation, the tab and category chips with counts, Added tiles (needs the crew_profile_summary fixture tabs to list documents, stcw and qualifications and an rpc/crew_document_rights fixture: scratch fixtures until PR-X1-G)",
+    "actions": [
+      {
+        "click": "[data-add-document]"
+      },
+      {
+        "waitFor": "[data-add-document-dialog][data-step=\"pick\"] [data-document-type]"
+      },
+      {
+        "wait": 400
+      }
+    ]
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/documents",
+    "slug": "crew-profile-documents-add-passport",
+    "waitFor": "[data-crew-profile] [data-documents-state=\"ready\"] [data-add-document]:not([disabled])",
+    "note": "X1-04B: Add document, step 2 for a passport: issuing country and issue date required, expiry or No expiry, issuing-office suggestions, the crew-report flag held by the existing passport, the file field (needs the crew_profile_summary fixture tabs to list documents, stcw and qualifications and an rpc/crew_document_rights fixture: scratch fixtures until PR-X1-G)",
+    "actions": [
+      {
+        "click": "[data-add-document]"
+      },
+      {
+        "waitFor": "[data-document-type=\"passport\"]"
+      },
+      {
+        "click": "[data-document-type=\"passport\"]"
+      },
+      {
+        "waitFor": "[data-add-document-dialog][data-step=\"details\"] [data-document-fields]"
+      },
+      {
+        "wait": 400
+      }
+    ]
+  },
+  {
+    "path": "/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/documents",
+    "slug": "crew-profile-documents-view",
+    "waitFor": "[data-crew-profile] [data-documents-state=\"ready\"] [data-document-row]",
+    "note": "X1-04B: View opens the stored file through a signed URL (needs the crew_profile_summary fixture tabs to list documents, stcw and qualifications and an rpc/crew_document_rights fixture: scratch fixtures until PR-X1-G)",
+    "actions": [
+      {
+        "click": "button[aria-label=\"View Passport\"]"
+      },
+      {
+        "waitFor": "[data-document-viewer]"
+      },
+      {
+        "wait": 600
+      }
+    ]
+  },
+  {
+    "path": "/me/documents",
+    "slug": "me-documents",
+    "waitFor": "[data-my-documents] [data-documents-state=\"ready\"]",
+    "note": "X1-04B: the person's own documents: the tab row with counts, rows read-only (View, no Edit), Add when the server allows own uploads (needs an rpc/crew_document_rights fixture: scratch fixtures until PR-X1-G)"
+  },
+  {
+    "path": "/me/documents?tab=stcw",
+    "slug": "me-documents-stcw",
+    "waitFor": "[data-my-documents] [data-documents-state=\"ready\"]",
+    "note": "X1-04B: /me/documents on the STCW tab"
   }
 ]

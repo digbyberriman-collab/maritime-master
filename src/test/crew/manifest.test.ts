@@ -26,7 +26,7 @@ import KeepSearchNavigate from '@/app/router/KeepSearchNavigate';
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 
 import manifest from '@/modules/crew/module';
-import { CREW_ROUTES } from '@/modules/crew/routes';
+import { CREW_ROUTES, MY_DOCUMENTS_PATH } from '@/modules/crew/routes';
 import { ADD_CREW_PATH } from '@/modules/crew/lib/addCrewSchema';
 import { CREW_CAPABILITIES, CREW_CAPS, CREW_FLEET_PATHS, CREW_PATHS } from '@/modules/crew/paths';
 import { MODULE_REGISTRY } from '@/app/registry/modules';
@@ -56,6 +56,8 @@ const TODAY: Record<string, string> = {
   [`vessel ${PROFILE_TAB_PATH}`]: '/src/modules/crew/pages/CrewProfilePage.tsx',
   // X1-03B: Add crew member (new; behind crew profile creation).
   [`vessel ${ADD_CREW_PATH}`]: '/src/modules/crew/pages/AddCrewPage.tsx',
+  // X1-04B: the person's own documents at /me/documents (new; behind view_own).
+  [`personal ${MY_DOCUMENTS_PATH}`]: '/src/modules/crew/pages/MyDocumentsPage.tsx',
 };
 
 describe('crew routes', () => {
@@ -78,6 +80,7 @@ describe('crew routes', () => {
       if (r.path === CREW_PATHS.list) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.crewListView });
       else if (r.path === PROFILE_TAB_PATH) expect(r.guard, r.path).toEqual({ kind: 'scope' });
       else if (r.path === ADD_CREW_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.profilesCreate });
+      else if (r.scope === 'personal' && r.path === MY_DOCUMENTS_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.documentsViewOwn });
       else expect(r.guard, r.path).toEqual({ kind: 'login' });
     }
   });
@@ -152,6 +155,9 @@ describe('every vessel crew URL of today resolves to its page', () => {
     // X1-03B: Add crew member, also prefilled for a re-hire.
     ['/v/dra/crew/new', 'crew/pages/AddCrewPage.tsx'],
     ['/v/dra/crew/new?rehire=b0000000-0000-4000-8000-000000000015', 'crew/pages/AddCrewPage.tsx'],
+    // X1-04B: the profile's documents tabs are the profile page; /me/documents is the person's own.
+    ['/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/stcw', 'crew/pages/CrewProfilePage.tsx'],
+    ['/me/documents', 'crew/pages/MyDocumentsPage.tsx'],
   ])('%s -> %s', (url, page) => {
     const resolved = resolveUrl(routes, url);
     expect(describeElement(resolved.element)).toContain(`page(/src/modules/${page})`);
@@ -228,6 +234,15 @@ describe('crew nav', () => {
     expect(byLabel('Visitors & Occasional Workers').capability).toBe(CREW_CAPS.crewListView);
     expect(byLabel('Employment History').capability).toBe(CREW_CAPS.employmentView);
     for (const f of planned) if (f.node.capability) expect(catalogue.has(f.node.capability), f.node.capability).toBe(true);
+  });
+
+  it('the personal Documents leaf is beta behind view_own and reaches its page (X1-04B, PR-X1-J)', () => {
+    const leaf = fragments.find((f) => f.slot === 'personal.my_work');
+    expect(leaf?.order).toBe(40);
+    expect(leaf?.node.status).toBe('beta');
+    expect(leaf?.node.capability).toBe(CREW_CAPS.documentsViewOwn);
+    expect(leaf?.node.path).toBe('/me/documents');
+    expect(MODULE_REGISTRY.hasPage('/me/documents')).toBe(true);
   });
 
   it('every live or beta leaf reaches a page of the registry', () => {

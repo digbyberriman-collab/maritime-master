@@ -281,8 +281,8 @@ describe('the URL', () => {
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`/v/dra/crew/people/${P_BOSUN}/personal`));
   });
 
-  it('a tab a later slice builds (documents) lands on Personal too', async () => {
-    renderAt(`/v/dra/crew/people/${P_BOSUN}/documents`);
+  it('a tab a later slice builds (employment) lands on Personal too', async () => {
+    renderAt(`/v/dra/crew/people/${P_BOSUN}/employment`);
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(`/v/dra/crew/people/${P_BOSUN}/personal`));
   });
 });
@@ -309,7 +309,7 @@ describe('populated', () => {
     const nav = await screen.findByRole('navigation', { name: 'Profile sections' });
     const links = within(nav).getAllByRole('link');
     // The server opens training and activity, not medical (no medical capability): X1-03B's tabs follow it.
-    expect(links.map((l) => l.textContent)).toEqual(['Personal', 'Contact', 'Training', 'Activity']);
+    expect(links.map((l) => l.textContent)).toEqual(['Personal', 'Contact', 'Documents', 'STCW', 'Qualifications', 'Training', 'Activity']);
     expect(links[0]).toHaveAttribute('aria-current', 'page');
     expect(links[1]).toHaveAttribute('href', `/v/dra/crew/people/${P_BOSUN}/contact`);
     expect(nav.querySelector('ul')?.className).toMatch(/overflow-x-auto/);
