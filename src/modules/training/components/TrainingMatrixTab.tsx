@@ -1,18 +1,19 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TONE_SURFACE, type Tone } from '@/components/ui/tones';
 import { cn } from '@/lib/utils';
 import { useTraining } from '@/modules/training/hooks/useTraining';
 import { useCrew } from '@/modules/crew/hooks/useCrew';
-import { useVessels } from '@/modules/vessels/hooks/useVessels';
+import { useScopedPath } from '@/app/router/scopes';
 import { MatrixGrid, type MatrixColumn, type ChipFilter } from '@/shared/components/data';
 import { PageLoading } from '@/shared/components/states';
 import { humanizeStatus, statusMeta } from '@/shared/components/status';
+import { notifyExportResult, runExport, type ExportColumn } from '@/lib/export';
 import { format } from 'date-fns';
-import { Grid3X3, Check, X, AlertTriangle, Download, type LucideIcon } from 'lucide-react';
+import { Grid3X3, Check, X, AlertTriangle, Download, Minus, type LucideIcon } from 'lucide-react';
 
 type CellRecord = { status: string; expiry: string | null };
 
@@ -22,10 +23,13 @@ const CELL_LOOK: Record<string, { icon: LucideIcon; tone: Tone }> = {
   Expiring_Soon: { icon: AlertTriangle, tone: statusMeta('training', 'Expiring_Soon').tone },
   Expired: { icon: X, tone: statusMeta('training', 'Expired').tone },
 };
-const MISSING_LOOK = { icon: X, tone: 'neutral' as Tone };
+const NO_RECORD_LOOK = { icon: Minus, tone: 'neutral' as Tone };
+
+/** A course nobody recorded for the person: a fact about the records, not a compliance gap (that is Crew Compliance's). */
+export const NO_RECORD = 'No record';
 
 function StatusDot({ status }: { status: string | null }) {
-  const look = (status && CELL_LOOK[status]) || MISSING_LOOK;
+  const look = (status && CELL_LOOK[status]) || NO_RECORD_LOOK;
   const Icon = look.icon;
   return (
     <span
@@ -37,54 +41,55 @@ function StatusDot({ status }: { status: string | null }) {
   );
 }
 
-const cellText = (record: CellRecord | null) =>
-  record ? statusMeta('training', record.status).label : 'Missing or not required';
+const cellText = (record: CellRecord | null) => (record ? statusMeta('training', record.status).label : NO_RECORD);
 
 const LEGEND: Array<{ status: string | null; label: string }> = [
   { status: 'Valid', label: 'Valid' },
-  { status: 'Expiring_Soon', label: 'Expiring Soon (<90 days)' },
+  { status: 'Expiring_Soon', label: 'Expiring soon (within 90 days)' },
   { status: 'Expired', label: 'Expired' },
-  { status: null, label: 'Missing/Not Required' },
+  { status: null, label: NO_RECORD },
 ];
 
+/**
+ * Course records (Training › Course records): the crew's training records
+ * for the catalogue's core courses, as a MatrixGrid (crew × courses, a
+ * sticky crew column, course categories as column groups, each cell an
+ * icon, the status word and the expiry month), with counts and a CSV.
+ *
+ * X1-06B: this is no longer a compliance source. It used to call every
+ * core course "required" for everyone and score an "overall compliance"
+ * from it; what each position must hold is set per vessel in Crew
+ * Compliance (the requirement engine, gap/04 C33 / C35), which the tab
+ * links to. A course without a record reads "No record", never "Missing".
+ * The non-working vessel filter is gone.
+ */
 const TrainingMatrixTab: React.FC = () => {
   const { trainingRecords, courses, isLoading } = useTraining();
   const { crew } = useCrew();
-  const { vessels } = useVessels();
-  const [selectedVessel, setSelectedVessel] = useState<string>('all');
+  const scopedPath = useScopedPath();
+  const [exporting, setExporting] = useState(false);
 
-  // Get unique crew with their training records
-  const crewWithTraining = useMemo(() => {
-    // Filter crew if vessel selected (would need crew assignment data)
-    const filtered = crew;
-
-    return filtered.map(member => {
-      const memberRecords = trainingRecords.filter(r => r.user_id === member.user_id);
-      const recordsByCourse: Record<string, CellRecord> = {};
-
-      memberRecords.forEach(record => {
-        if (record.course) {
-          recordsByCourse[record.course.id] = {
-            status: record.status,
-            expiry: record.expiry_date,
-          };
+  const crewWithTraining = useMemo(
+    () =>
+      crew.map(member => {
+        const recordsByCourse: Record<string, CellRecord> = {};
+        for (const record of trainingRecords) {
+          if (record.user_id === member.user_id && record.course) {
+            recordsByCourse[record.course.id] = { status: record.status, expiry: record.expiry_date };
+          }
         }
-      });
-
-      return {
-        ...member,
-        trainingRecords: recordsByCourse,
-      };
-    });
-  }, [crew, trainingRecords]);
+        return { ...member, trainingRecords: recordsByCourse };
+      }),
+    [crew, trainingRecords],
+  );
 
   type MatrixRow = (typeof crewWithTraining)[number];
 
-  // Mandatory courses, grouped by category so each group sits under one header.
-  const mandatoryCourses = useMemo(() => {
-    const mandatory = courses.filter(c => c.is_mandatory);
-    const order = Array.from(new Set(mandatory.map(c => c.course_category)));
-    return mandatory
+  // The catalogue's core courses (is_mandatory), grouped by category so each group sits under one header.
+  const coreCourses = useMemo(() => {
+    const core = courses.filter(c => c.is_mandatory);
+    const order = Array.from(new Set(core.map(c => c.course_category)));
+    return core
       .map((course, index) => ({ course, index }))
       .sort((a, b) => order.indexOf(a.course.course_category) - order.indexOf(b.course.course_category) || a.index - b.index)
       .map(({ course }) => course);
@@ -92,7 +97,7 @@ const TrainingMatrixTab: React.FC = () => {
 
   const columns = useMemo<MatrixColumn[]>(
     () =>
-      mandatoryCourses.map(course => ({
+      coreCourses.map(course => ({
         id: course.id,
         label: course.course_code,
         sublabel: course.course_name,
@@ -100,110 +105,88 @@ const TrainingMatrixTab: React.FC = () => {
         group: course.course_category || undefined,
         width: 100,
       })),
-    [mandatoryCourses],
+    [coreCourses],
   );
 
   const groups = useMemo(
     () =>
-      Array.from(new Set(mandatoryCourses.map(c => c.course_category).filter(Boolean))).map(category => ({
+      Array.from(new Set(coreCourses.map(c => c.course_category).filter(Boolean))).map(category => ({
         id: category,
         label: humanizeStatus(category),
       })),
-    [mandatoryCourses],
+    [coreCourses],
   );
 
   const filters = useMemo<ChipFilter<MatrixRow>[]>(
     () => [
       {
-        id: 'gaps',
-        label: 'Missing or expired',
-        predicate: member =>
-          mandatoryCourses.some(course => {
-            const record = member.trainingRecords[course.id];
-            return !record || record.status === 'Expired';
-          }),
+        id: 'expired',
+        label: 'Expired',
+        predicate: member => coreCourses.some(course => member.trainingRecords[course.id]?.status === 'Expired'),
       },
       {
         id: 'expiring',
         label: 'Expiring soon',
-        predicate: member => mandatoryCourses.some(course => member.trainingRecords[course.id]?.status === 'Expiring_Soon'),
+        predicate: member => coreCourses.some(course => member.trainingRecords[course.id]?.status === 'Expiring_Soon'),
       },
     ],
-    [mandatoryCourses],
+    [coreCourses],
   );
 
-  // Calculate compliance summary
-  const complianceSummary = useMemo(() => {
-    const summary = {
-      total: crewWithTraining.length * mandatoryCourses.length,
-      valid: 0,
-      expiring: 0,
-      expired: 0,
-      missing: 0,
-    };
-
-    crewWithTraining.forEach(member => {
-      mandatoryCourses.forEach(course => {
+  // Counts of the cells: records by status, and the courses without one.
+  const counts = useMemo(() => {
+    const summary = { valid: 0, expiring: 0, expired: 0, none: 0 };
+    for (const member of crewWithTraining) {
+      for (const course of coreCourses) {
         const record = member.trainingRecords[course.id];
-        if (!record) {
-          summary.missing++;
-        } else if (record.status === 'Valid') {
-          summary.valid++;
-        } else if (record.status === 'Expiring_Soon') {
-          summary.expiring++;
-        } else if (record.status === 'Expired') {
-          summary.expired++;
-        }
-      });
-    });
-
+        if (!record) summary.none++;
+        else if (record.status === 'Valid') summary.valid++;
+        else if (record.status === 'Expiring_Soon') summary.expiring++;
+        else if (record.status === 'Expired') summary.expired++;
+      }
+    }
     return summary;
-  }, [crewWithTraining, mandatoryCourses]);
+  }, [crewWithTraining, coreCourses]);
 
-  const exportToExcel = () => {
-    // Create CSV content
-    const headers = ['Name', 'Rank', ...mandatoryCourses.map(c => c.course_code)];
-    const rows = crewWithTraining.map(member => {
-      const row = [
-        `${member.first_name} ${member.last_name}`,
-        member.rank || 'Crew',
-      ];
-      mandatoryCourses.forEach(course => {
-        const record = member.trainingRecords[course.id];
-        if (!record) {
-          row.push('Missing');
-        } else if (record.expiry) {
-          row.push(`${record.status} (${format(new Date(record.expiry), 'MMM yy')})`);
-        } else {
-          row.push(record.status);
-        }
+  const exportCsv = async () => {
+    const cellOf = (member: MatrixRow, courseId: string) => {
+      const record = member.trainingRecords[courseId];
+      if (!record) return NO_RECORD;
+      const label = statusMeta('training', record.status).label;
+      return record.expiry ? `${label} (${format(new Date(record.expiry), 'MMM yy')})` : label;
+    };
+    const exportColumns: ExportColumn<MatrixRow>[] = [
+      { key: 'name', header: 'Name', value: member => `${member.first_name} ${member.last_name}` },
+      { key: 'rank', header: 'Rank', value: member => member.rank || 'Crew' },
+      ...coreCourses.map(course => ({ key: course.id, header: course.course_code, value: (member: MatrixRow) => cellOf(member, course.id) })),
+    ];
+    setExporting(true);
+    try {
+      const result = await runExport({
+        format: 'csv',
+        kind: 'Course records',
+        sourceKey: 'training.training_matrix',
+        legacyUnlogged: true,
+        personalData: true,
+        columns: exportColumns,
+        rows: crewWithTraining,
+        params: { courses: coreCourses.length, rows: crewWithTraining.length },
       });
-      return row;
-    });
-
-    const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `training-matrix-${format(new Date(), 'yyyy-MM-dd')}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+      notifyExportResult(result);
+    } finally {
+      setExporting(false);
+    }
   };
 
   if (isLoading) {
-    return <PageLoading variant="tiles" rows={5} label="Loading training matrix" />;
+    return <PageLoading variant="tiles" rows={4} label="Loading course records" />;
   }
 
   const summaryTiles: Array<{ label: string; value: React.ReactNode; className?: string }> = [
-    {
-      label: 'Overall Compliance',
-      value: `${complianceSummary.total > 0 ? Math.round((complianceSummary.valid / complianceSummary.total) * 100) : 0}%`,
-    },
-    { label: 'Valid', value: complianceSummary.valid, className: 'text-success' },
-    { label: 'Expiring Soon', value: complianceSummary.expiring, className: 'text-warning' },
-    { label: 'Expired', value: complianceSummary.expired, className: 'text-critical' },
-    { label: 'Missing', value: complianceSummary.missing, className: 'text-muted-foreground' },
+    { label: 'Valid', value: counts.valid, className: 'text-success' },
+    { label: 'Expiring soon', value: counts.expiring, className: 'text-warning' },
+    { label: 'Expired', value: counts.expired, className: 'text-critical' },
+    { label: NO_RECORD, value: counts.none, className: 'text-muted-foreground' },
   ];
 
   return (
@@ -211,30 +194,23 @@ const TrainingMatrixTab: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-xl font-semibold">Training Matrix</h2>
-          <p className="text-muted-foreground">Required vs actual training compliance grid</p>
+          <h2 className="text-xl font-semibold">Course records</h2>
+          <p className="text-muted-foreground">
+            The crew's training records for the catalogue's core courses. What each position must hold is set in{' '}
+            <Link to={`${scopedPath('crew/compliance/status')}?view=stcw`} className="rounded-sm font-medium text-primary underline-offset-4 hover:underline focus-ring">
+              Crew Compliance
+            </Link>
+            .
+          </p>
         </div>
-        <div className="flex gap-2">
-          <Select value={selectedVessel} onValueChange={setSelectedVessel}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Filter by vessel" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Vessels</SelectItem>
-              {vessels.map(v => (
-                <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button variant="outline" onClick={exportToExcel}>
-            <Download className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-        </div>
+        <Button variant="outline" onClick={() => void exportCsv()} disabled={exporting || crewWithTraining.length === 0}>
+          <Download className="h-4 w-4 mr-2" />
+          Export
+        </Button>
       </div>
 
-      {/* Compliance Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      {/* Record counts */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {summaryTiles.map(tile => (
           <Card key={tile.label}>
             <CardContent className="pt-4 text-center">
@@ -247,7 +223,7 @@ const TrainingMatrixTab: React.FC = () => {
 
       {/* Matrix */}
       <MatrixGrid<MatrixRow, CellRecord | null>
-        label="Training matrix"
+        label="Course records"
         noun={{ one: 'crew member', other: 'crew members' }}
         rows={crewWithTraining}
         getRowId={member => member.id}

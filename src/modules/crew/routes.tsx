@@ -28,6 +28,11 @@ export const MY_DOCUMENTS_PATH = 'documents';
  * vessel again, and Save also needs users-access administration because
  * create-crew-member makes the person's account). The crew list's Add crew
  * opens it.
+ * X1-06B serves Crew Compliance at crew/compliance/:tab (status |
+ * configuration; guard vessel.crew.crew_compliance.view, the page asks
+ * again for the route vessel and the server for every read) in place of the
+ * legacy crew documents page; crew/compliance still redirects to status,
+ * and the legacy /crew/certificates lands on status?view=documents.
  * X1-04B adds the person's own documents at /me/documents (scope personal,
  * path `documents`, guard vessel.crew.crew_certificates.view_own; the page
  * asks again and the server answers only for the caller's own profile). The
@@ -72,8 +77,9 @@ export const CREW_ROUTES: readonly RouteDef[] = [
   vesselScopePage(`${CREW_ROOT}/people/:profileId/:tab`, () => import('@/modules/crew/pages/CrewProfilePage')),
   // Add crew member (X1-03B; gap/04 C14, W1): `?rehire=<profileId>` prefills a returning crew member (X1-11B).
   vesselCapabilityPage(`${CREW_ROOT}/new`, CREW_CAPS.profilesCreate, () => import('@/modules/crew/pages/AddCrewPage')),
+  // Crew Compliance (X1-06B; gap/04 C33, C35): Status and Configuration tabs; an unknown tab lands on Status in the page.
   vesselRedirect(CREW_PATHS.compliance, 'status'),
-  vesselPage(CREW_PATHS.complianceStatus, () => import('@/modules/crew/pages/CrewDocuments')),
+  vesselCapabilityPage(`${CREW_PATHS.compliance}/:tab`, CREW_CAPS.complianceView, () => import('@/modules/crew/pages/CrewCompliancePage')),
   vesselPage(CREW_PATHS.hoursOfRest, () => import('@/modules/work-rest/pages/WorkRestOverview')),
   // One crew member's month: the target of the legacy /crew/work-rest/:crewId.
   vesselPage(CREW_PATHS.personHoursOfRest, () => import('@/modules/work-rest/pages/MyWorkRestMonth')),

@@ -17,6 +17,8 @@ import {
   type SortDirection,
 } from '@/modules/crew/lib/crewListModel';
 import { CrewStatusPill, PendingLoginChip, TravelTodayIcon } from './CrewStatusPill';
+import { ComplianceDotsCell } from '@/modules/crew/components/compliance/ComplianceDots';
+import { useCrewListCompliance } from '@/modules/crew/components/compliance/crewListCompliance';
 
 const NOUN = { one: 'crew member', other: 'crew members' };
 
@@ -38,19 +40,6 @@ const fmtDay = (day: string | null) => {
   const [y, m, d] = day.slice(0, 10).split('-').map(Number);
   return y && m && d ? format(new Date(y, m - 1, d), 'd MMM yyyy') : null;
 };
-
-/** Two compliance dots (documents; STCW and qualifications), neutral until crew compliance is built (X1-06B). */
-const ComplianceDots: React.FC = () => (
-  <span
-    className="inline-flex items-center gap-1.5 text-muted-foreground"
-    aria-label="Documents and qualifications: not checked yet"
-    title="Compliance appears here once crew compliance is set up"
-    data-compliance-dots=""
-  >
-    <span aria-hidden="true">–</span>
-    <span aria-hidden="true">–</span>
-  </span>
-);
 
 export interface CrewTableProps {
   rows: readonly CrewListRow[];
@@ -88,9 +77,11 @@ export interface CrewTableProps {
 /**
  * The vessel's crew (gap/04 C3, C4, C7, C8) on the register table: name
  * (with Pending login and Travel today), position (the vessel's rank
- * order), department, the derived status with its reason, two neutral
- * compliance dots until crew compliance exists, the invitation status with
- * Invite / Resend, and the join date. Below 768 px the table scrolls inside
+ * order), department, the derived status with its reason, the two
+ * compliance dots (X1-06B: documents, then STCW and qualifications, from
+ * crew_vessel_compliance merged by profile id, a tooltip listing the
+ * reasons; a dash that says why while compliance is not set up or not the
+ * reader's), the invitation status with Invite / Resend, and the join date. Below 768 px the table scrolls inside
  * its card with the name column held in view; the page never scrolls
  * sideways.
  */
@@ -121,6 +112,7 @@ export const CrewTable: React.FC<CrewTableProps> = ({
   inviteBusy,
   empty,
 }) => {
+  const compliance = useCrewListCompliance();
   const columns = useMemo<DataTableColumn<CrewListRow>[]>(() => {
     const list: DataTableColumn<CrewListRow>[] = [
       {
@@ -178,8 +170,9 @@ export const CrewTable: React.FC<CrewTableProps> = ({
       {
         id: 'compliance',
         header: 'Compliance',
+        headerLabel: 'documents and qualifications',
         sortable: false,
-        cell: () => <ComplianceDots />,
+        cell: (row) => <ComplianceDotsCell profileId={row.profileId} name={row.displayName} state={compliance} />,
       },
     ];
     if (showInvitations) {
@@ -231,7 +224,7 @@ export const CrewTable: React.FC<CrewTableProps> = ({
       cell: (row) => fmtDay(row.joinDate),
     });
     return list;
-  }, [showInvitations, canInvite, invitingProfileId, inviteBusy, onInvite, vesselName]);
+  }, [showInvitations, canInvite, invitingProfileId, inviteBusy, onInvite, vesselName, compliance]);
 
   const tableSort: TableSort = { columnId: SORT_COLUMN[sort], direction: dir };
 

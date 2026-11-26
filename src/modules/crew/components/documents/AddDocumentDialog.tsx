@@ -1,7 +1,7 @@
 import React from 'react';
 import { useForm, type FieldPath } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, Info, Loader2 } from 'lucide-react';
+import { ArrowLeft, Check, Info, Loader2, Plus } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -33,13 +33,16 @@ import { CREW_DOCUMENT_TAB_LABEL } from '@/modules/crew/lib/documentTabs';
 import { DocumentUploadError, UPLOADS_UNAVAILABLE_NOTICE, saveDocumentWithFile } from '@/modules/crew/lib/documentUpload';
 import { useDocumentReviewActions } from '@/modules/crew/hooks/useDocumentVerification';
 import { REVERIFY_HINT, dayText, isMaterialChange, type MaterialFields } from '@/modules/crew/lib/verification';
+import { StatusPill } from '@/shared/components/status';
+import type { MissingRequirement } from '@/modules/crew/lib/compliance';
 import { DocumentTypePicker } from './DocumentTypePicker';
 import { ReverifyWarning } from './ReverifyWarning';
 import { DocumentFields } from './DocumentFields';
 import { DocumentFileField } from './DocumentFileField';
 
 export type AddDocumentDialogMode =
-  | { kind: 'add'; tab: CrewDocumentTab; categoryKey?: string | null }
+  /** X1-06B: `typeId` opens straight on that type's form (a missing requirement with one option). */
+  | { kind: 'add'; tab: CrewDocumentTab; categoryKey?: string | null; typeId?: string | null }
   | { kind: 'edit'; document: CrewDocumentView }
   /** X1-05: a renewal: the new document's values; the current one becomes a version (crew_document_renew). */
   | { kind: 'renew'; document: CrewDocumentView };
@@ -55,9 +58,18 @@ export interface AddDocumentDialogProps {
   documents: readonly CrewDocumentView[];
   /** The storage helper is in the build (PR-X1-F); without it no file can be attached. */
   uploadsReady: boolean;
+  /**
+   * X1-06B: the document requirements of the person's position they do not
+   * meet (lib/compliance.ts missingForRole), offered first in step 1 as
+   * "Missing for current role". Absent or empty: no such section.
+   */
+  missingForRole?: readonly MissingForRoleItem[];
   onOpenChange: (open: boolean) => void;
   onSaved?: (id: string) => void;
 }
+
+/** What the quick-add needs of a missing requirement. */
+export type MissingForRoleItem = Pick<MissingRequirement, 'rowId' | 'label' | 'tab' | 'state' | 'optionTypeIds'>;
 
 /** What the form needs of a catalogue type. */
 function formTypeOf(type: DocumentType): DocumentTypeForForm {
@@ -142,13 +154,18 @@ export const AddDocumentDialog: React.FC<AddDocumentDialogProps> = ({
   catalogue,
   documents,
   uploadsReady,
+  missingForRole,
   onOpenChange,
   onSaved,
 }) => {
   const editing = mode.kind === 'edit' || mode.kind === 'renew' ? mode.document : null;
   const renewing = mode.kind === 'renew';
   const editingType = editing?.typeId ? catalogue.byId.get(editing.typeId) ?? null : null;
-  const [picked, setPicked] = React.useState<DocumentType | null>(null);
+  const [picked, setPicked] = React.useState<DocumentType | null>(() => {
+    const id = mode.kind === 'add' ? mode.typeId ?? null : null;
+    const t = id ? catalogue.byId.get(id) ?? null : null;
+    return t && t.isActive ? t : null;
+  });
   const type = editing ? editingType : picked;
   const step: 'pick' | 'details' = type ? 'details' : 'pick';
   const [saving, setSaving] = React.useState(false);
@@ -195,7 +212,10 @@ export const AddDocumentDialog: React.FC<AddDocumentDialogProps> = ({
             <p className="type-body text-muted-foreground">This document's type is not in the catalogue you can see, so it cannot be changed here.</p>
           </div>
         ) : step === 'pick' ? (
-          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6">
+          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 sm:px-6">
+            {missingForRole && missingForRole.length > 0 ? (
+              <MissingForRole items={missingForRole} catalogue={catalogue} held={held} onPick={setPicked} />
+            ) : null}
             <DocumentTypePicker
               catalogue={catalogue}
               tab={mode.kind === 'add' ? mode.tab : 'documents'}
@@ -228,6 +248,60 @@ export const AddDocumentDialog: React.FC<AddDocumentDialogProps> = ({
     </Dialog>
   );
 };
+
+/**
+ * "Missing for current role" (gap/04 C25, W5 §5): the document
+ * requirements of the person's position they do not meet, worst first, each
+ * with the document types that would satisfy it (any one does). Picking one
+ * goes straight to its form; a requirement whose options cannot be read
+ * says to find the document below.
+ */
+const MissingForRole: React.FC<{
+  items: readonly MissingForRoleItem[];
+  catalogue: DocumentCatalogue;
+  held: ReadonlyMap<string, number>;
+  onPick: (type: DocumentType) => void;
+}> = ({ items, catalogue, held, onPick }) => (
+  <section className="space-y-2" aria-labelledby="missing-for-role" data-missing-for-role={items.length}>
+    <h3 id="missing-for-role" className="type-subtitle text-foreground">
+      Missing for current role <span className="type-caption tabular-nums text-muted-foreground">{items.length}</span>
+    </h3>
+    <ul className="space-y-2">
+      {items.map((item) => {
+        const types = item.optionTypeIds.map((id) => catalogue.byId.get(id)).filter((t): t is DocumentType => Boolean(t && t.isActive));
+        return (
+          <li key={item.rowId} className="rounded-md border border-border p-3" data-missing-for-role-row={item.rowId}>
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <span className="min-w-0 break-words type-body-sm font-medium text-foreground">{item.label}</span>
+              <StatusPill domain="crew_requirement" status={item.state} />
+              <span className="type-caption text-muted-foreground">{CREW_DOCUMENT_TAB_LABEL[item.tab === 'familiarisation' ? 'documents' : item.tab]} tab</span>
+            </div>
+            {types.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {types.map((t) => (
+                  <Button
+                    key={t.id}
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => onPick(t)}
+                    className="h-auto min-h-8 max-w-full justify-start whitespace-normal py-1 text-left [@media(pointer:coarse)]:min-h-11"
+                    aria-label={`Add ${t.name}${held.get(t.id) ? ' (one is already added)' : ''}`}
+                  >
+                    {held.get(t.id) ? <Check aria-hidden="true" /> : <Plus aria-hidden="true" />}
+                    <span className="min-w-0 break-words">{t.name}</span>
+                  </Button>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-1 type-caption text-muted-foreground">Find the document in the list below.</p>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  </section>
+);
 
 interface DocumentFormProps {
   type: DocumentType;

@@ -15,7 +15,8 @@
  *     (platform-prep plan §1), so this module never uses those two orders.
  *     X1-02 folded the roster into the Crew List (beta, behind
  *     vessel.crew.crew_list.view); crew/roster redirects to it, and its
- *     leaf is gone.
+ *     leaf is gone. X1-06B rebuilt Crew Compliance (beta, behind
+ *     vessel.crew.crew_compliance.view; crew/compliance/:tab).
  *     There is no Dashboard leaf yet: a planned leaf at the module root
  *     would turn today's crew -> crew/list redirect into a Coming Soon page
  *     (X1-10B adds it as beta with its page).
@@ -58,7 +59,12 @@ const manifest: ModuleManifest = {
     },
     // Label "Leave" on vessels that rename it (vessel_module_settings).
     { slot: 'vessel.crew', order: 20, node: L('Planner', CREW_ROOT, { icon: Network, moduleSetting: 'planner', ...LIVE }) },
-    { slot: 'vessel.crew', order: 30, node: L('Crew Compliance', CREW_ROOT, { slug: 'compliance', icon: ShieldCheck, ...LIVE }) },
+    // X1-06B: the requirement-driven compliance page (status matrix and configuration), beta behind its capability.
+    {
+      slot: 'vessel.crew',
+      order: 30,
+      node: L('Crew Compliance', CREW_ROOT, { slug: 'compliance', icon: ShieldCheck, status: 'beta', capability: CREW_CAPS.complianceView }),
+    },
     // One crew member's month (`crew/people/:crewId/hours-of-rest`, the target
     // of the legacy /crew/work-rest/:crewId) is an Hours of Rest page too: the
     // crew_hor setting closes it with the overview (gap/10 W4, D-63).

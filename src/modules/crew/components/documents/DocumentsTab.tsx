@@ -1,5 +1,5 @@
 import React, { Suspense } from 'react';
-import { FileText, History, Info, Plus, RefreshCw, RotateCw, ShieldCheck } from 'lucide-react';
+import { FileText, History, Info, ListPlus, Plus, RefreshCw, RotateCw, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCan } from '@/lib/permissions/useCan';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -31,7 +31,13 @@ import { CATALOGUE_MISSING_NOTICE } from '@/modules/crew/lib/crewDocumentSchema'
 import { UPLOADS_UNAVAILABLE_NOTICE, crewDocumentUploadsReady } from '@/modules/crew/lib/documentUpload';
 import { CREW_CAPS } from '@/modules/crew/paths';
 import { VERIFY_BLOCK_MESSAGE, needsReview } from '@/modules/crew/lib/verification';
-import type { AddDocumentDialogMode } from './AddDocumentDialog';
+import { missingForRole, requirementExplanation } from '@/modules/crew/lib/compliance';
+import { missingOnTab, type MissingOnTab } from '@/modules/crew/lib/complianceModel';
+import { usePersonRequirementStatus } from '@/modules/crew/hooks/useVesselCompliance';
+import { useRequirementsConfig } from '@/modules/crew/hooks/useRequirementsConfig';
+import { EmptySlotRow, MissingRequiredBlock } from '@/modules/crew/components/compliance/MissingRequiredBlock';
+import { REQUIRED_GROUP_KEY, withEmptySlots } from '@/modules/crew/components/compliance/emptySlots';
+import type { AddDocumentDialogMode, MissingForRoleItem } from './AddDocumentDialog';
 import { AlertsOffMenu, AlertsOffNote } from './AlertsOffMenu';
 import { DocumentLegend } from './DocumentLegend';
 import { DocumentRow } from './DocumentRow';
@@ -88,6 +94,8 @@ interface DocumentGroup {
   key: string;
   label: string;
   documents: CrewDocumentView[];
+  /** "Show empty slots": the required documents of this category the person does not hold. */
+  slots?: MissingOnTab[];
 }
 
 /**
@@ -174,6 +182,13 @@ export interface DocumentsPanelProps {
   vesselId?: string | null;
   /** Heading level of the tab title (2 under a page h1). */
   headingLevel?: 2 | 3;
+  /**
+   * X1-06B: the person's requirements on the vessel (gap/04 C24, C25): the
+   * "Missing required (n)" block, "Show empty slots" and the add dialog's
+   * "Missing for current role" read the requirement engine for this
+   * vessel. Null (or /me/documents): none of them.
+   */
+  requirements?: { vesselId: string; positionLabel: string | null } | null;
 }
 
 /**
@@ -198,7 +213,17 @@ export interface DocumentsPanelProps {
  * read-only and REVIEW_UNAVAILABLE_NOTICE says why; any other error of the
  * rights is an error with Try again.
  */
-export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({ tab, profileId, userId, companyId, context, personName, vesselId = null, headingLevel = 2 }) => {
+export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({
+  tab,
+  profileId,
+  userId,
+  companyId,
+  context,
+  personName,
+  vesselId = null,
+  headingLevel = 2,
+  requirements = null,
+}) => {
   const documents = useCrewDocuments(profileId, { companyId, userId });
   const rights = useCrewDocumentRights(profileId, { companyId });
   const catalogue = useDocumentTypes(companyId);
@@ -214,6 +239,31 @@ export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({ tab, profileId, 
   const versions = useDocumentVersions(profileId, { companyId, enabled: reviewEnabled && review.status === 'ready' });
   const Heading = headingLevel === 3 ? 'h3' : 'h2';
   const blockId = React.useId();
+  // X1-06B: what the person's position requires on the vessel (the server gates it: crew compliance view, or the person's own).
+  const reqVesselId = context === 'profile' ? requirements?.vesselId ?? null : null;
+  const required = usePersonRequirementStatus(reqVesselId, profileId, { companyId, enabled: Boolean(reqVesselId) });
+  const requiredRows = required.status === 'ready' ? required.rows : null;
+  const anyMissing = Boolean(requiredRows?.some((r) => r.kind === 'document' && (r.state === 'missing' || r.state === 'expired')));
+  // The options of each requirement (for + Add and the quick-add), read only when something is missing.
+  const reqConfig = useRequirementsConfig(reqVesselId, { companyId, enabled: anyMissing });
+  const optionsByRow = React.useMemo(() => {
+    const m = new Map<string, string[]>();
+    if (reqConfig.status !== 'ready') return m;
+    for (const r of reqConfig.config.rows) {
+      m.set(
+        r.id,
+        [...r.options].sort((a, b) => a.sortOrder - b.sortOrder).map((o) => o.documentTypeId).filter((id): id is string => Boolean(id)),
+      );
+    }
+    return m;
+  }, [reqConfig]);
+  const missingHere = React.useMemo(
+    () => (requiredRows ? missingOnTab(requiredRows, tab, optionsByRow, requirementExplanation) : []),
+    [requiredRows, tab, optionsByRow],
+  );
+  const missingAll = React.useMemo<MissingForRoleItem[]>(() => (requiredRows ? missingForRole(requiredRows, optionsByRow) : []), [requiredRows, optionsByRow]);
+  const requiredOnTab = requiredRows ? requiredRows.filter((r) => r.tab === tab && r.kind === 'document').length : 0;
+  const [showSlots, setShowSlots] = React.useState(false);
 
   const countryLabel = React.useCallback(
     (code: string | null) => {
@@ -233,6 +283,22 @@ export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({ tab, profileId, 
   const openAdd = (categoryKey: string | null = null) => {
     if (canOpenDialog) setDialog({ kind: 'add', tab, categoryKey });
   };
+  /** + Add on a missing requirement: straight to its form with one known option, else the picker with the quick-add on top. */
+  const addMissing = (item: MissingOnTab) => {
+    if (!canOpenDialog) return;
+    const types = item.optionTypeIds.filter((id) => catalogueReady?.byId.get(id)?.isActive);
+    setDialog(types.length === 1 ? { kind: 'add', tab, typeId: types[0] } : { kind: 'add', tab, categoryKey: null });
+  };
+  const missingBlock =
+    requiredOnTab > 0 || required.status === 'error' ? (
+      <MissingRequiredBlock
+        items={missingHere}
+        positionLabel={requirements?.positionLabel ?? null}
+        onAdd={canOpenDialog ? addMissing : null}
+        error={required.status === 'error' ? { retry: required.retry } : null}
+        allHeld={requiredOnTab > 0}
+      />
+    ) : null;
 
   const header = (
     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -309,7 +375,10 @@ export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({ tab, profileId, 
   const reviewCount = onTab.filter(needsReview).length;
   const filtering = reviewOnly && reviewLive && reviewCount > 0;
   const shown = filtering ? onTab.filter(needsReview) : onTab;
-  const groups = groupDocuments(shown, catalogueReady);
+  const slotsOn = showSlots && !filtering && missingHere.length > 0;
+  const groups = slotsOn
+    ? withEmptySlots(groupDocuments(shown, catalogueReady), missingHere, catalogueReady, UNCLASSIFIED_GROUP_KEY)
+    : groupDocuments(shown, catalogueReady);
   const legend = countDocumentLegend(onTab.map((d) => d.state));
   const notice = add.block?.kind === 'notice' ? add.block.reason : documents.notice;
   const versionCount = (doc: CrewDocumentView) => (versions.status === 'ready' ? versions.versions.byDocument.get(doc.id)?.length ?? 0 : 0);
@@ -395,8 +464,11 @@ export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({ tab, profileId, 
                 <span className="rounded-full bg-muted px-2 py-0.5 type-caption tabular-nums text-muted-foreground" aria-label={`${g.documents.length} documents`}>
                   {g.documents.length}
                 </span>
+                {g.slots?.length ? (
+                  <span className="type-caption font-normal text-muted-foreground">{g.slots.length} required, not held</span>
+                ) : null}
               </CardTitle>
-              {canOpenDialog && g.key !== UNCLASSIFIED_GROUP_KEY ? (
+              {canOpenDialog && g.key !== UNCLASSIFIED_GROUP_KEY && g.key !== REQUIRED_GROUP_KEY ? (
                 <Button
                   type="button"
                   variant="ghost"
@@ -422,6 +494,7 @@ export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({ tab, profileId, 
                     footer={context === 'profile' ? footerFor(doc, gates) : doc.alertsMuted ? <AlertsOffNote doc={doc} className="mt-1.5" /> : null}
                   />
                 ))}
+                {g.slots?.map((slot) => <EmptySlotRow key={`slot:${slot.rowId}`} item={slot} onAdd={canOpenDialog ? addMissing : null} />)}
               </ul>
             </CardContent>
           </Card>
@@ -459,6 +532,7 @@ export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({ tab, profileId, 
           Load the document types again
         </Button>
       ) : null}
+      {missingBlock}
       {onTab.length === 0 ? (
         <EmptyState
           kind="first-use"
@@ -483,7 +557,23 @@ export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({ tab, profileId, 
         <>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <DocumentLegend counts={legend} />
-            {reviewChip}
+            <div className="flex flex-wrap items-center gap-2">
+              {missingHere.length > 0 ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={slotsOn ? 'default' : 'outline'}
+                  aria-pressed={slotsOn}
+                  onClick={() => setShowSlots((v) => !v)}
+                  className={COARSE}
+                  data-show-empty-slots={slotsOn ? 'on' : 'off'}
+                >
+                  <ListPlus aria-hidden="true" />
+                  Show empty slots
+                </Button>
+              ) : null}
+              {reviewChip}
+            </div>
           </div>
           {review.status === 'ready' ? (
             <WithReviewGates rights={review.rights} vesselId={vesselId}>
@@ -504,6 +594,7 @@ export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({ tab, profileId, 
             catalogue={catalogueReady}
             documents={documents.documents}
             uploadsReady={uploadsReady}
+            missingForRole={dialog.kind === 'add' ? missingAll : undefined}
             onOpenChange={(open) => {
               if (!open) setDialog(null);
             }}
@@ -566,6 +657,8 @@ export const DocumentsTab: React.FC<ProfileTabProps & { tab: CrewDocumentTab }> 
     context="profile"
     personName={profile.displayName}
     vesselId={vessel.id}
+    // What the person's position requires on this vessel (X1-06B); only for a member of the vessel's crew.
+    requirements={profile.onVessel ? { vesselId: vessel.id, positionLabel: profile.positionName ?? profile.positionText ?? null } : null}
   />
 );
 

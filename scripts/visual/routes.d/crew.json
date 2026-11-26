@@ -341,5 +341,101 @@
         "wait": 400
       }
     ]
+  },
+  {
+    "path": "/v/dra/crew/compliance/status",
+    "slug": "crew-compliance-status",
+    "waitFor": "[data-compliance-state=\"ready\"] [data-compliance-group]",
+    "note": "X1-06B: Crew Compliance, Status overview: KPI tiles, the views, on board / all, by department, the crew x summary matrix (Met, Documents with the next expiry, STCW, Qualifications, Familiarisation, Status, Next expiry); every cell an icon and a word with a tooltip"
+  },
+  {
+    "path": "/v/dra/crew/compliance/status?view=gaps",
+    "slug": "crew-compliance-gaps",
+    "waitFor": "[data-compliance-view=\"gaps\"] [data-compliance-group]",
+    "note": "X1-06B: the Gaps view: only the crew with something to look at, the requirements someone has a gap in, grouped by tab"
+  },
+  {
+    "path": "/v/dra/crew/compliance/status?view=stcw",
+    "slug": "crew-compliance-stcw",
+    "waitFor": "[data-compliance-view=\"stcw\"] [data-compliance-group]",
+    "note": "X1-06B: the STCW view: crew x the vessel's STCW requirements, grouped by requirement group, each cell met / expiring / expired / missing with its expiry month"
+  },
+  {
+    "path": "/v/dra/crew/compliance/status?layout=cards",
+    "slug": "crew-compliance-cards",
+    "waitFor": "[data-compliance-cards]",
+    "note": "X1-06B: the cards layout (forced below 768 px): one card per crew member with the status, Met, next expiry, the four tabs and what needs a look"
+  },
+  {
+    "path": "/v/dra/crew/compliance/status?group=flat&status=missing",
+    "slug": "crew-compliance-flat-missing",
+    "waitFor": "[data-compliance-state=\"ready\"] [data-compliance-group]",
+    "note": "X1-06B: one list (group=flat) filtered to the Missing status chip, as the KPI tile links"
+  },
+  {
+    "path": "/v/dra/crew/compliance/configuration",
+    "slug": "crew-compliance-configuration",
+    "waitFor": "[data-compliance-config] table",
+    "note": "X1-06B: Crew Compliance, Configuration: the vessel settings (passenger ship, crew uploads, transfer approval), the requirements x positions matrix with ticks, N options · held by X, Equivalences, Add STCW basic set and Add requirement"
+  },
+  {
+    "path": "/v/dra/crew/compliance/configuration",
+    "slug": "crew-compliance-configuration-add",
+    "waitFor": "[data-compliance-config] table",
+    "note": "X1-06B: the add requirement dialog (document types or familiarisations, a company type, group, require for every listed position)",
+    "actions": [
+      {
+        "click": "[data-add-requirement]"
+      },
+      {
+        "waitFor": "[data-add-qualification-dialog]"
+      },
+      {
+        "wait": 300
+      }
+    ]
+  },
+  {
+    "path": "/v/dra/crew/compliance/configuration",
+    "slug": "crew-compliance-equivalences",
+    "waitFor": "[data-compliance-config] table",
+    "note": "X1-06B: the equivalence drawer: STORM's and the company's satisfaction rules, add a company rule",
+    "actions": [
+      {
+        "click": "[data-open-equivalences]"
+      },
+      {
+        "waitFor": "[data-equivalence-drawer]"
+      },
+      {
+        "wait": 400
+      }
+    ]
+  },
+  {
+    "path": "/v/dra/crew/compliance",
+    "slug": "crew-compliance-redirect",
+    "expectRedirect": "/v/dra/crew/compliance/status",
+    "note": "X1-06B: crew/compliance lands on the Status tab"
+  },
+  {
+    "path": "/crew/certificates",
+    "slug": "crew-certificates-legacy",
+    "expectRedirect": true,
+    "note": "X1-06B: the legacy crew certificates URL lands on the Documents view of Crew Compliance (?view=documents) on the person's vessel"
+  },
+  {
+    "path": "/v/dra/crew/familiarisation",
+    "slug": "crew-familiarisation-course-records",
+    "waitFor": "[data-training-compliance-pointer]",
+    "note": "X1-06B: Training is no longer a compliance source: the pointer to Crew Compliance, and the Course records tab (records by course, no compliance score)",
+    "actions": [
+      {
+        "click": "[role=\"tab\"]:has-text(\"Course records\")"
+      },
+      {
+        "wait": 400
+      }
+    ]
   }
 ]

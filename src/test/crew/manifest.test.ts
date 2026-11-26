@@ -38,13 +38,16 @@ import { appRouteObjects, describeElement, loaderTarget, resolveUrl } from '@/te
 const pages = CREW_ROUTES.filter((r): r is PageRouteDef => !isRedirectDef(r));
 /** The routed crew profile (X1-03). */
 const PROFILE_PATH = 'crew/people/:profileId';
+/** Crew Compliance (X1-06B). */
+const COMPLIANCE_TAB_PATH = `${CREW_PATHS.compliance}/:tab`;
 const PROFILE_TAB_PATH = 'crew/people/:profileId/:tab';
 const catalogue = new Set(listCatalogueCapabilities());
 
 /** Today's page for each crew path (PP3's pure move; X1-02 rebuilt the list and folded the roster in). */
 const TODAY: Record<string, string> = {
   [`vessel ${CREW_PATHS.list}`]: '/src/modules/crew/pages/CrewListPage.tsx',
-  [`vessel ${CREW_PATHS.complianceStatus}`]: '/src/modules/crew/pages/CrewDocuments.tsx',
+  // X1-06B: Crew Compliance (status and configuration) replaces the legacy crew documents page.
+  [`vessel ${COMPLIANCE_TAB_PATH}`]: '/src/modules/crew/pages/CrewCompliancePage.tsx',
   [`vessel ${CREW_PATHS.hoursOfRest}`]: '/src/modules/work-rest/pages/WorkRestOverview.tsx',
   [`vessel ${CREW_PATHS.personHoursOfRest}`]: '/src/modules/work-rest/pages/MyWorkRestMonth.tsx',
   [`vessel ${CREW_PATHS.plannerTimeline}`]: '/src/modules/rotation-planner/pages/RotationPlannerPage.tsx',
@@ -80,6 +83,7 @@ describe('crew routes', () => {
       if (r.path === CREW_PATHS.list) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.crewListView });
       else if (r.path === PROFILE_TAB_PATH) expect(r.guard, r.path).toEqual({ kind: 'scope' });
       else if (r.path === ADD_CREW_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.profilesCreate });
+      else if (r.path === COMPLIANCE_TAB_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.complianceView });
       else if (r.scope === 'personal' && r.path === MY_DOCUMENTS_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.documentsViewOwn });
       else expect(r.guard, r.path).toEqual({ kind: 'login' });
     }
@@ -138,8 +142,9 @@ describe('every vessel crew URL of today resolves to its page', () => {
     ['/v/dra/crew/list?positions=1', 'crew/pages/CrewListPage.tsx'],
     ['/v/dra/crew/list?tab=movements', 'crew/pages/CrewListPage.tsx'],
     ['/v/dra/crew/roster', 'crew/pages/CrewListPage.tsx'],
-    ['/v/dra/crew/compliance', 'crew/pages/CrewDocuments.tsx'],
-    ['/v/dra/crew/compliance/status', 'crew/pages/CrewDocuments.tsx'],
+    ['/v/dra/crew/compliance', 'crew/pages/CrewCompliancePage.tsx'],
+    ['/v/dra/crew/compliance/status', 'crew/pages/CrewCompliancePage.tsx'],
+    ['/v/dra/crew/compliance/configuration', 'crew/pages/CrewCompliancePage.tsx'],
     ['/v/dra/crew/hours-of-rest', 'work-rest/pages/WorkRestOverview.tsx'],
     ['/v/dra/crew/people/a0000000-0000-4000-8000-000000000011/hours-of-rest', 'work-rest/pages/MyWorkRestMonth.tsx'],
     ['/v/dra/crew/planner', 'rotation-planner/pages/RotationPlannerPage.tsx'],
@@ -211,8 +216,13 @@ describe('crew nav', () => {
     expect(fragments.some((f) => f.node.label === 'Crew Roster')).toBe(false);
   });
 
+  it('the rebuilt Crew Compliance is beta behind vessel.crew.crew_compliance.view (X1-06B)', () => {
+    expect(byLabel('Crew Compliance').status).toBe('beta');
+    expect(byLabel('Crew Compliance').capability).toBe(CREW_CAPS.complianceView);
+  });
+
   it('moved leaves keep live and today\'s gates (no capability until their page is rebuilt, D-X1-25)', () => {
-    for (const label of ['Planner', 'Crew Compliance', 'Hours of Rest', 'Familiarisation']) {
+    for (const label of ['Planner', 'Hours of Rest', 'Familiarisation']) {
       const node = byLabel(label);
       expect(node.status, label).toBe('live');
       expect(node.capability, label).toBeUndefined();
