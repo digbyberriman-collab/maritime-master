@@ -23,7 +23,12 @@
     "public.fleet_hod_covers(uuid, uuid, text)": ["service_role"],
     "public.fleet_ops_can(uuid, uuid, text, text)": ["authenticated", "service_role"],
     "public.fleet_ops_can_for(uuid, uuid, uuid, text, text)": ["service_role"],
+    "public.fleet_report_corrective_actions(uuid)": ["service_role"],
+    "public.fleet_report_gate_can_for(uuid, uuid, uuid, text)": ["service_role"],
+    "public.fleet_report_scope_for(uuid, uuid, uuid[], date)": ["service_role"],
+    "public.fleet_report_trends(uuid[], integer, date)": ["authenticated"],
     "public.fleet_vessel_comparison(uuid[], date)": ["authenticated"],
+    "public.fleet_vessel_list(uuid[], date)": ["authenticated"],
     "public.set_expiry_window_rule(text, uuid, integer)": ["authenticated"]
   },
   "relations": {

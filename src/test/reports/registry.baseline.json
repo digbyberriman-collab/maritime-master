@@ -1,10 +1,11 @@
 {
   "routes": [
-    "/fleet/reports :: page(/src/modules/dashboard/pages/FleetReportsIndex.tsx) guard=ProtectedRoute layout=-"
+    "/fleet/reports :: <ModuleRoute{capability=\"fleet.operations.fleet_reports.view\"}> > page(/src/modules/reports/pages/ReportsHubPage.tsx) guard=- layout=- label=Fleet reports",
+    "/fleet/reports/:reportKey :: <ModuleRoute{capability=\"fleet.operations.fleet_reports.view\"}> > page(/src/modules/reports/pages/ReportPage.tsx) guard=- layout=- label=Fleet report"
   ],
   "nav": {
     "NAVIGATION_ITEMS": [
-      "    FileChartColumnIncreasing {\"id\":\"fleet-reports\",\"kind\":\"leaf\",\"label\":\"Reports\",\"path\":\"/fleet/reports\",\"scope\":\"fleet\",\"status\":\"live\"}"
+      "    FileChartColumnIncreasing {\"capability\":\"fleet.operations.fleet_reports.view\",\"id\":\"fleet-reports\",\"kind\":\"leaf\",\"label\":\"Reports\",\"path\":\"/fleet/reports\",\"scope\":\"fleet\",\"status\":\"beta\"}"
     ]
   }
 }

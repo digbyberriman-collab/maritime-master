@@ -2,5 +2,6 @@
   { "probe": { "callee": "fleet_ops_can", "expr": "public.fleet_ops_can({company:A}, NULL, 'reports', 'view')" } },
   { "probe": { "callee": "fleet_ops_can_for", "expr": "public.fleet_ops_can_for(auth.uid(), {company:A}, {vessel:A.dra}, 'certificates', 'view')" } },
   { "probe": { "callee": "fleet_hod_covers", "expr": "public.fleet_hod_covers(auth.uid(), {vessel:A.dra}, NULL)" } },
-  { "probe": { "callee": "fleet_dashboard_tile_can_for", "expr": "public.fleet_dashboard_tile_can_for(auth.uid(), {company:A}, {vessel:A.dra}, 'corrective_actions')" } }
+  { "probe": { "callee": "fleet_dashboard_tile_can_for", "expr": "public.fleet_dashboard_tile_can_for(auth.uid(), {company:A}, {vessel:A.dra}, 'corrective_actions')" } },
+  { "probe": { "callee": "fleet_report_gate_can_for", "expr": "public.fleet_report_gate_can_for(auth.uid(), {company:A}, {vessel:A.dra}, 'incidents')" } }
 ]

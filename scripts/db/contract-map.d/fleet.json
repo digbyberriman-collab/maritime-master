@@ -31,6 +31,14 @@
         "type": "DashboardPendingFunctions",
         "expect": ["fleet_dashboard_kpis", "fleet_dashboard_panels", "fleet_vessel_comparison"]
       }
+    },
+    {
+      "file": "src/modules/reports/types/db.pending.ts",
+      "mirrors": "X5 spec §2 X5-03A (20261124040200_fleet_reports_hub.sql)",
+      "functions": {
+        "type": "ReportsPendingFunctions",
+        "expect": ["fleet_report_trends", "fleet_vessel_list"]
+      }
     }
   ],
   "notMirrored": {

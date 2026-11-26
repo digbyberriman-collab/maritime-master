@@ -59,11 +59,11 @@ import {
   type FleetDashboardState,
 } from '../hooks/useFleetDashboard';
 import { FLEET_DASHBOARD_VIEW, fleetKpisInput, fleetReportHref, formatFreshnessUtc } from '../lib/fleetKpiRules';
-import { FLEET_REPORT_PATHS } from './FleetReportsIndex';
+import { FLEET_REPORT_KEYS } from '@/modules/reports/registry';
 import type { FleetDashboardPanelsJson } from '../types/db.pending';
 
-/** The report keys the report registry knows today (the fleet reports index, until X5-03A's registry). */
-const KNOWN_REPORT_KEYS: ReadonlySet<string> = new Set(FLEET_REPORT_PATHS);
+/** The report keys the report registry knows (C12): a number or "View all" links only to one of these. */
+const KNOWN_REPORT_KEYS: ReadonlySet<string> = FLEET_REPORT_KEYS;
 
 /** The report each ranked list's "View all" opens (gap/02 R-keys); a link only once the registry knows it. */
 const LIST_REPORT_KEY: Readonly<Record<PanelListKey, string | null>> = {
