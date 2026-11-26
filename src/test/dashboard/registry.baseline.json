@@ -1,10 +1,10 @@
 {
   "routes": [
-    "/fleet/dashboard :: page(/src/modules/dashboard/pages/Dashboard.tsx) guard=- layout=-"
+    "/fleet/dashboard :: <ModuleRoute{capability=\"fleet.operations.fleet_dashboard.view\"}> > page(/src/modules/dashboard/pages/FleetDashboardPage.tsx) guard=- layout=- label=Fleet dashboard"
   ],
   "nav": {
     "NAVIGATION_ITEMS": [
-      "    LayoutDashboard {\"id\":\"fleet-dashboard\",\"kind\":\"leaf\",\"label\":\"Dashboard\",\"path\":\"/fleet/dashboard\",\"scope\":\"fleet\",\"status\":\"live\"}"
+      "    LayoutDashboard {\"capability\":\"fleet.operations.fleet_dashboard.view\",\"id\":\"fleet-dashboard\",\"kind\":\"leaf\",\"label\":\"Dashboard\",\"path\":\"/fleet/dashboard\",\"scope\":\"fleet\",\"status\":\"beta\"}"
     ]
   }
 }

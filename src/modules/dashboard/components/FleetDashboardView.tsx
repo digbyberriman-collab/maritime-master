@@ -5,11 +5,17 @@ import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useVessels, type Vessel } from '@/modules/vessels/hooks/useVessels';
 import type { VesselDashboardData } from '@/modules/vessels/hooks/useVesselDashboard';
 import { Skeleton } from '@/components/ui/skeleton';
-import FleetSubNav from './fleet/FleetSubNav';
 import RegionMapCard from './fleet/RegionMapCard';
-import FleetKPITiles, { type FleetKPI } from './fleet/FleetKPITiles';
+import { FleetKpiRow } from './fleet/FleetKpiRow';
 import VesselHealthMatrix from './fleet/VesselHealthMatrix';
 import { FLEET_REGIONS, regionForFlag, type FleetRegion } from './fleet/regionUtils';
+import { useFleetDashboardKpis, type FleetDashboardScope } from '../hooks/useFleetDashboard';
+import { useOpenAlertCounts } from '../hooks/useOpenAlertCounts';
+import { fleetKpisInput } from '../lib/fleetKpiRules';
+import { FLEET_REPORT_PATHS } from '../pages/FleetReportsIndex';
+
+/** Report keys the fleet reports index knows (a KPI number links only to one of these). */
+const KNOWN_REPORT_KEYS: ReadonlySet<string> = new Set(FLEET_REPORT_PATHS);
 
 function useFleetVesselSummaries(vesselIds: string[]) {
   const { profile } = useAuth();
@@ -30,15 +36,17 @@ function useFleetVesselSummaries(vesselIds: string[]) {
   });
 }
 
+/**
+ * The legacy `?view=fleet` branch of the vessel dashboard (X5-02B removes
+ * it with this file). Its KPI row is the fleet dashboard's (X5-02A): the
+ * server's counts over every counted vessel (fleet-wide), not sums of
+ * get_vessel_dashboard_summary.
+ */
 const FleetDashboardView: React.FC = () => {
+  const { profile } = useAuth();
   const { vessels, isLoading: vesselsLoading } = useVessels();
   const vesselIds = useMemo(() => vessels.map((v) => v.id), [vessels]);
-  const {
-    data: summaries,
-    isLoading: summariesLoading,
-    isError: summariesError,
-    refetch: refetchSummaries,
-  } = useFleetVesselSummaries(vesselIds);
+  const { data: summaries, isLoading: summariesLoading } = useFleetVesselSummaries(vesselIds);
 
   const summaryByVessel = useMemo(() => {
     const m = new Map<string, VesselDashboardData>();
@@ -62,25 +70,12 @@ const FleetDashboardView: React.FC = () => {
     }));
   }, [vessels]);
 
-  // Aggregate the counts the summary RPC returns. Hours of rest, leave and
-  // accounting are not in it; FleetKPITiles shows them as not tracked yet.
-  const kpi = useMemo((): FleetKPI | null => {
-    // No vessels in reach: the summary query never runs, and every count is a real 0.
-    const list = vesselIds.length === 0 && !vesselsLoading ? [] : summaries;
-    if (!list) return null;
-    const sum = (f: (d: VesselDashboardData) => number) =>
-      list.reduce((acc, d) => acc + (f(d) || 0), 0);
-    const docAlerts = sum((d) => d.certs_expiring_90d);
-    const red = sum((d) => d.red_alerts_count);
-    const capas = sum((d) => d.open_capas_count);
-    const overdue = sum((d) => d.overdue_maintenance_count);
-    const defects = sum((d) => d.critical_defects_count);
-    return {
-      documentAlerts: { value: docAlerts, sub: `${docAlerts} expiring within 90 days` },
-      safety: { value: red + capas, sub: `${red} red alerts · ${capas} open CAPAs` },
-      technical: { value: overdue + defects, sub: `${overdue} overdue · ${defects} critical defects` },
-    };
-  }, [summaries, vesselIds.length, vesselsLoading]);
+  const kpiScope = useMemo<FleetDashboardScope | null>(
+    () => (profile?.company_id ? { companyId: profile.company_id, vesselIds, fleetWide: true } : null),
+    [profile?.company_id, vesselIds],
+  );
+  const kpis = useFleetDashboardKpis(kpiScope);
+  const alerts = useOpenAlertCounts();
 
   const matrixRows = useMemo(
     () =>
@@ -94,10 +89,8 @@ const FleetDashboardView: React.FC = () => {
   const loading = vesselsLoading || summariesLoading;
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6">
-      <FleetSubNav />
-
-      <div className="flex-1 min-w-0 space-y-6">
+    <div className="flex flex-col gap-6">
+      <div className="min-w-0 space-y-6">
         <div>
           <h2 className="type-title text-foreground">Fleet overview</h2>
           <p className="text-sm text-muted-foreground">
@@ -124,10 +117,11 @@ const FleetDashboardView: React.FC = () => {
           </div>
         ) : null}
 
-        <FleetKPITiles
-          kpi={vesselsLoading ? null : kpi}
-          error={summariesError}
-          onRetry={() => void refetchSummaries()}
+        <FleetKpiRow
+          kpis={fleetKpisInput(kpis)}
+          onRetry={kpis.state === 'error' ? kpis.retry : undefined}
+          alerts={alerts}
+          knownReportKeys={KNOWN_REPORT_KEYS}
         />
 
         {/* Vessel Health Matrix */}

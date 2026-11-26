@@ -1,0 +1,18 @@
+[
+  {
+    "id": "c5000000-0000-4000-8000-000000000001",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "name": "Charter fleet",
+    "description": "Vessels in the charter programme",
+    "color_hex": null,
+    "created_at": "$ts:-400d"
+  },
+  {
+    "id": "c5000000-0000-4000-8000-000000000002",
+    "company_id": "c0000000-0000-4000-8000-000000000001",
+    "name": "Private fleet",
+    "description": "Owner-use vessels",
+    "color_hex": null,
+    "created_at": "$ts:-400d"
+  }
+]

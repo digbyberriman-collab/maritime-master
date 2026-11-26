@@ -1,0 +1,368 @@
+{
+  "vessels": 6,
+  "today": "$date:0",
+  "expiry": {
+    "state": "ok",
+    "groups": {
+      "vessel_certificates": {
+        "total": 4,
+        "items": [
+          {
+            "vessel_id": "e0000000-0000-4000-8000-000000000002",
+            "vessel_name": "GAME CHANGER",
+            "vessel_code": "GAM",
+            "source_key": "vessel_certificates",
+            "item_type": "vessel_certificate",
+            "record_id": "c1000000-0000-4000-8000-000000000005",
+            "person_name": null,
+            "label": "International Oil Pollution Prevention Certificate",
+            "detail": "DNV",
+            "expires_on": "$date:-3",
+            "days_remaining": -3,
+            "bucket": "expired",
+            "endorsement_due_on": null,
+            "endorsement_state": null,
+            "link_scope": "vessel",
+            "link_rel": "certificates"
+          },
+          {
+            "vessel_id": "e0000000-0000-4000-8000-000000000001",
+            "vessel_name": "DRAAK",
+            "vessel_code": "DRA",
+            "source_key": "vessel_certificates",
+            "item_type": "vessel_certificate",
+            "record_id": "c1000000-0000-4000-8000-000000000001",
+            "person_name": null,
+            "label": "Safety Management Certificate",
+            "detail": "Cayman Islands Shipping Registry",
+            "expires_on": "$date:+6",
+            "days_remaining": 6,
+            "bucket": "expiring_soon",
+            "endorsement_due_on": null,
+            "endorsement_state": null,
+            "link_scope": "vessel",
+            "link_rel": "certificates"
+          },
+          {
+            "vessel_id": "e0000000-0000-4000-8000-000000000002",
+            "vessel_name": "GAME CHANGER",
+            "vessel_code": "GAM",
+            "source_key": "vessel_certificates",
+            "item_type": "vessel_certificate",
+            "record_id": "c1000000-0000-4000-8000-000000000004",
+            "person_name": null,
+            "label": "International Load Line Certificate",
+            "detail": "DNV",
+            "expires_on": "$date:+27",
+            "days_remaining": 27,
+            "bucket": "expiring_soon",
+            "endorsement_due_on": null,
+            "endorsement_state": null,
+            "link_scope": "vessel",
+            "link_rel": "certificates"
+          },
+          {
+            "vessel_id": "e0000000-0000-4000-8000-000000000004",
+            "vessel_name": "ROCINANTE",
+            "vessel_code": "ROC",
+            "source_key": "vessel_certificates",
+            "item_type": "vessel_certificate",
+            "record_id": "c1000000-0000-4000-8000-000000000007",
+            "person_name": null,
+            "label": "Maritime Labour Certificate",
+            "detail": "Netherlands Shipping Inspectorate",
+            "expires_on": "$date:+75",
+            "days_remaining": 75,
+            "bucket": "expiring",
+            "endorsement_due_on": null,
+            "endorsement_state": null,
+            "link_scope": "vessel",
+            "link_rel": "certificates"
+          }
+        ]
+      },
+      "crew_documents": {
+        "total": 0,
+        "items": []
+      },
+      "crew_qualifications": {
+        "total": 5,
+        "items": [
+          {
+            "vessel_id": "e0000000-0000-4000-8000-000000000001",
+            "vessel_name": "DRAAK",
+            "vessel_code": "DRA",
+            "source_key": "crew_certificates_legacy",
+            "item_type": "crew_qualification",
+            "record_id": "c3000000-0000-4000-8000-000000000004",
+            "person_name": "Demo Bosun",
+            "label": "STCW Basic Safety Training",
+            "detail": "Flag administration",
+            "expires_on": "$date:-12",
+            "days_remaining": -12,
+            "bucket": "expired",
+            "endorsement_due_on": null,
+            "endorsement_state": null,
+            "link_scope": "vessel",
+            "link_rel": "crew/people/b0000000-0000-4000-8000-000000000014/documents"
+          },
+          {
+            "vessel_id": "e0000000-0000-4000-8000-000000000007",
+            "vessel_name": "HYDRA",
+            "vessel_code": "HYD",
+            "source_key": "crew_certificates_legacy",
+            "item_type": "crew_qualification",
+            "record_id": "c3000000-0000-4000-8000-000000000006",
+            "person_name": "Demo Second Engineer",
+            "label": "ENG1 Medical Fitness",
+            "detail": "Flag administration",
+            "expires_on": "$date:+12",
+            "days_remaining": 12,
+            "bucket": "expiring_soon",
+            "endorsement_due_on": null,
+            "endorsement_state": null,
+            "link_scope": "vessel",
+            "link_rel": "crew/people/b0000000-0000-4000-8000-000000000020/documents"
+          },
+          {
+            "vessel_id": "e0000000-0000-4000-8000-000000000001",
+            "vessel_name": "DRAAK",
+            "vessel_code": "DRA",
+            "source_key": "crew_certificates_legacy",
+            "item_type": "crew_qualification",
+            "record_id": "c3000000-0000-4000-8000-000000000002",
+            "person_name": "Demo Chief Officer",
+            "label": "Chief Mate (Yachts < 3000 GT)",
+            "detail": "Flag administration",
+            "expires_on": "$date:+22",
+            "days_remaining": 22,
+            "bucket": "expiring_soon",
+            "endorsement_due_on": null,
+            "endorsement_state": null,
+            "link_scope": "vessel",
+            "link_rel": "crew/people/b0000000-0000-4000-8000-000000000012/documents"
+          },
+          {
+            "vessel_id": "e0000000-0000-4000-8000-000000000002",
+            "vessel_name": "GAME CHANGER",
+            "vessel_code": "GAM",
+            "source_key": "crew_certificates_legacy",
+            "item_type": "crew_qualification",
+            "record_id": "c3000000-0000-4000-8000-000000000008",
+            "person_name": "Demo Chief Engineer",
+            "label": "Advanced Fire Fighting",
+            "detail": "Flag administration",
+            "expires_on": "$date:+40",
+            "days_remaining": 40,
+            "bucket": "expiring",
+            "endorsement_due_on": null,
+            "endorsement_state": null,
+            "link_scope": "vessel",
+            "link_rel": "crew/people/b0000000-0000-4000-8000-000000000018/documents"
+          },
+          {
+            "vessel_id": "e0000000-0000-4000-8000-000000000001",
+            "vessel_name": "DRAAK",
+            "vessel_code": "DRA",
+            "source_key": "crew_certificates_legacy",
+            "item_type": "crew_qualification",
+            "record_id": "c3000000-0000-4000-8000-000000000005",
+            "person_name": "Demo Chief Stew",
+            "label": "Medical First Aid",
+            "detail": "Flag administration",
+            "expires_on": "$date:+65",
+            "days_remaining": 65,
+            "bucket": "expiring",
+            "endorsement_due_on": null,
+            "endorsement_state": null,
+            "link_scope": "vessel",
+            "link_rel": "crew/people/b0000000-0000-4000-8000-000000000015/documents"
+          }
+        ]
+      }
+    }
+  },
+  "corrective_actions": {
+    "state": "ok",
+    "total": 3,
+    "overdue": 1,
+    "items": [
+      {
+        "vessel_id": "e0000000-0000-4000-8000-000000000001",
+        "vessel_name": "DRAAK",
+        "vessel_code": "DRA",
+        "id": "c1000000-0000-4000-8000-000000000011",
+        "action_number": "CA-{year}-011",
+        "description": "Re-brief snap-back zones and mark them on the mooring deck",
+        "action_type": "Corrective",
+        "status": "Open",
+        "due_date": "$date:-2",
+        "days_overdue": 2,
+        "source": "incident",
+        "source_id": "d1000000-0000-4000-8000-000000000001"
+      },
+      {
+        "vessel_id": "e0000000-0000-4000-8000-000000000002",
+        "vessel_name": "GAME CHANGER",
+        "vessel_code": "GAM",
+        "id": "c1000000-0000-4000-8000-000000000012",
+        "action_number": "CA-{year}-012",
+        "description": "Replace the slicer guard interlock and add it to the galley checks",
+        "action_type": "Corrective",
+        "status": "In Progress",
+        "due_date": "$date:+10",
+        "days_overdue": 0,
+        "source": "incident",
+        "source_id": "d1000000-0000-4000-8000-000000000002"
+      },
+      {
+        "vessel_id": "e0000000-0000-4000-8000-000000000002",
+        "vessel_name": "GAME CHANGER",
+        "vessel_code": "GAM",
+        "id": "c1000000-0000-4000-8000-000000000013",
+        "action_number": "CA-{year}-013",
+        "description": "Galley knife and slicer safety familiarisation for new crew",
+        "action_type": "Preventive",
+        "status": "Verification",
+        "due_date": "$date:+20",
+        "days_overdue": 0,
+        "source": "incident",
+        "source_id": "d1000000-0000-4000-8000-000000000002"
+      }
+    ]
+  },
+  "overdue_drills": {
+    "state": "ok",
+    "total": 1,
+    "items": [
+      {
+        "vessel_id": "e0000000-0000-4000-8000-000000000001",
+        "vessel_name": "DRAAK",
+        "vessel_code": "DRA",
+        "id": "c2000000-0000-4000-8000-000000000001",
+        "drill_number": "DRL-DRA-{year}-014",
+        "drill_type": "Abandon ship drill",
+        "scheduled_on": "$date:-4",
+        "days_overdue": 4
+      }
+    ]
+  },
+  "hess": {
+    "state": "not_tracked"
+  },
+  "insurance": {
+    "state": "ok",
+    "total": 2,
+    "items": [
+      {
+        "vessel_id": "e0000000-0000-4000-8000-000000000001",
+        "vessel_name": "DRAAK",
+        "vessel_code": "DRA",
+        "record_id": "c3000000-0000-4000-8000-000000000001",
+        "label": "Hull & Machinery",
+        "detail": "Demo Marine Insurers · HM-DRA-01",
+        "expires_on": "$date:+38",
+        "days_remaining": 38,
+        "bucket": "expiring",
+        "link_scope": "vessel",
+        "link_rel": "vessel/insurance"
+      },
+      {
+        "vessel_id": null,
+        "vessel_name": null,
+        "vessel_code": null,
+        "record_id": "c3000000-0000-4000-8000-000000000002",
+        "label": "Protection & Indemnity",
+        "detail": "Demo Mutual Club · PI-FLEET-01",
+        "expires_on": "$date:+72",
+        "days_remaining": 72,
+        "bucket": "expiring",
+        "link_scope": "fleet",
+        "link_rel": "reports/insurance"
+      }
+    ]
+  },
+  "surveys": {
+    "state": "ok",
+    "total": 2,
+    "items": [
+      {
+        "vessel_id": "e0000000-0000-4000-8000-000000000007",
+        "vessel_name": "HYDRA",
+        "vessel_code": "HYD",
+        "kind": "audit",
+        "id": "c4000000-0000-4000-8000-000000000001",
+        "reference": "AUD-HYD-{year}-004",
+        "label": "Internal ISM audit · Vessel",
+        "status": "Planned",
+        "due_on": "$date:+18",
+        "days_remaining": 18
+      },
+      {
+        "vessel_id": "e0000000-0000-4000-8000-000000000002",
+        "vessel_name": "GAME CHANGER",
+        "vessel_code": "GAM",
+        "kind": "certificate_survey",
+        "id": "c4000000-0000-4000-8000-000000000002",
+        "reference": "LL-GAM-2019",
+        "label": "International Load Line Certificate",
+        "status": "Valid",
+        "due_on": "$date:+46",
+        "days_remaining": 46
+      }
+    ]
+  },
+  "work_list": {
+    "state": "ok",
+    "vessels": [
+      {
+        "vessel_id": "e0000000-0000-4000-8000-000000000001",
+        "vessel_name": "DRAAK",
+        "vessel_code": "DRA",
+        "open": 3,
+        "overdue": 1,
+        "pending_approval": 0
+      },
+      {
+        "vessel_id": "e0000000-0000-4000-8000-000000000003",
+        "vessel_name": "LEVIATHAN",
+        "vessel_code": "LEV",
+        "open": 1,
+        "overdue": 0,
+        "pending_approval": 0
+      },
+      {
+        "vessel_id": "e0000000-0000-4000-8000-000000000004",
+        "vessel_name": "ROCINANTE",
+        "vessel_code": "ROC",
+        "open": 1,
+        "overdue": 0,
+        "pending_approval": 0
+      },
+      {
+        "vessel_id": "e0000000-0000-4000-8000-000000000007",
+        "vessel_name": "HYDRA",
+        "vessel_code": "HYD",
+        "open": 1,
+        "overdue": 0,
+        "pending_approval": 0
+      },
+      {
+        "vessel_id": "e0000000-0000-4000-8000-000000000006",
+        "vessel_name": "DAGON",
+        "vessel_code": "DAG",
+        "open": 0,
+        "overdue": 0,
+        "pending_approval": 0
+      },
+      {
+        "vessel_id": "e0000000-0000-4000-8000-000000000002",
+        "vessel_name": "GAME CHANGER",
+        "vessel_code": "GAM",
+        "open": 0,
+        "overdue": 0,
+        "pending_approval": 0
+      }
+    ]
+  }
+}

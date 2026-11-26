@@ -23,6 +23,14 @@
           "fleet_expiry_summary"
         ]
       }
+    },
+    {
+      "file": "src/modules/dashboard/types/db.pending.ts",
+      "mirrors": "X5 spec §2 X5-02A (20261124040100_fleet_dashboard_kpis.sql)",
+      "functions": {
+        "type": "DashboardPendingFunctions",
+        "expect": ["fleet_dashboard_kpis", "fleet_dashboard_panels", "fleet_vessel_comparison"]
+      }
     }
   ],
   "notMirrored": {

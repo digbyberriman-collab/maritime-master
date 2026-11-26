@@ -1,0 +1,6 @@
+{
+  "fleet-dashboard-not-set-up": {
+    "note": "The fleet dashboard RPCs are not in the database yet (D-01): the tiles say \"Not set up yet\" and the ranked lists show their not-set-up state. Warns by design: the missing RPCs log 404s.",
+    "missingRpcs": ["fleet_dashboard_kpis", "fleet_dashboard_panels", "fleet_vessel_comparison"]
+  }
+}

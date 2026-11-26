@@ -1,0 +1,49 @@
+{
+  "vessels": 6,
+  "today": "$date:0",
+  "tiles": {
+    "documents": {
+      "state": "ok",
+      "value": 9,
+      "vessels": 6,
+      "parts": {
+        "expired_vessel_certificates": 1,
+        "expired_crew_documents": 0,
+        "expired_crew_qualifications": 1,
+        "endorsements_overdue": 0,
+        "expiring": 7
+      }
+    },
+    "hours_of_rest": {
+      "state": "ok",
+      "value": 2,
+      "breach_days": 2,
+      "near_threshold": 3,
+      "crew_without_entries": 4,
+      "vessels_logging": 5,
+      "vessels_off": 1
+    },
+    "safety": {
+      "state": "ok",
+      "value": 4,
+      "vessels": 6,
+      "open_corrective_actions": 3,
+      "overdue_corrective_actions": 1,
+      "overdue_drills": 1
+    },
+    "technical": {
+      "state": "ok",
+      "value": 1,
+      "vessels": 6,
+      "overdue_jobs": 1,
+      "pending_approval": 0,
+      "open_jobs": 6
+    },
+    "leave": {
+      "state": "not_enabled"
+    },
+    "finance": {
+      "state": "hidden"
+    }
+  }
+}

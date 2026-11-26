@@ -1,0 +1,178 @@
+[
+  {
+    "vessel_id": "e0000000-0000-4000-8000-000000000006",
+    "vessel_name": "DAGON",
+    "vessel_code": "DAG",
+    "documents": {
+      "value": 0,
+      "expired": 0,
+      "endorsements_overdue": 0,
+      "expiring": 0
+    },
+    "safety": {
+      "open_corrective_actions": 0,
+      "overdue_corrective_actions": 0,
+      "overdue_drills": 0
+    },
+    "technical": {
+      "open_jobs": 0,
+      "overdue_jobs": 0,
+      "pending_approval": 0
+    },
+    "insurance": {
+      "expired": 0,
+      "expiring": 0
+    },
+    "hours_of_rest": null
+  },
+  {
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "vessel_name": "DRAAK",
+    "vessel_code": "DRA",
+    "documents": {
+      "value": 4,
+      "expired": 1,
+      "endorsements_overdue": 0,
+      "expiring": 3
+    },
+    "safety": {
+      "open_corrective_actions": 1,
+      "overdue_corrective_actions": 1,
+      "overdue_drills": 1
+    },
+    "technical": {
+      "open_jobs": 3,
+      "overdue_jobs": 1,
+      "pending_approval": 0
+    },
+    "insurance": {
+      "expired": 0,
+      "expiring": 1
+    },
+    "hours_of_rest": {
+      "breach_days": 1,
+      "near_threshold": 1,
+      "crew_without_entries": 0
+    }
+  },
+  {
+    "vessel_id": "e0000000-0000-4000-8000-000000000002",
+    "vessel_name": "GAME CHANGER",
+    "vessel_code": "GAM",
+    "documents": {
+      "value": 3,
+      "expired": 1,
+      "endorsements_overdue": 0,
+      "expiring": 2
+    },
+    "safety": {
+      "open_corrective_actions": 2,
+      "overdue_corrective_actions": 0,
+      "overdue_drills": 0
+    },
+    "technical": {
+      "open_jobs": 0,
+      "overdue_jobs": 0,
+      "pending_approval": 0
+    },
+    "insurance": {
+      "expired": 0,
+      "expiring": 0
+    },
+    "hours_of_rest": {
+      "breach_days": 0,
+      "near_threshold": 2,
+      "crew_without_entries": 0
+    }
+  },
+  {
+    "vessel_id": "e0000000-0000-4000-8000-000000000007",
+    "vessel_name": "HYDRA",
+    "vessel_code": "HYD",
+    "documents": {
+      "value": 1,
+      "expired": 0,
+      "endorsements_overdue": 0,
+      "expiring": 1
+    },
+    "safety": {
+      "open_corrective_actions": 0,
+      "overdue_corrective_actions": 0,
+      "overdue_drills": 0
+    },
+    "technical": {
+      "open_jobs": 1,
+      "overdue_jobs": 0,
+      "pending_approval": 0
+    },
+    "insurance": {
+      "expired": 0,
+      "expiring": 0
+    },
+    "hours_of_rest": {
+      "breach_days": 1,
+      "near_threshold": 0,
+      "crew_without_entries": 0
+    }
+  },
+  {
+    "vessel_id": "e0000000-0000-4000-8000-000000000003",
+    "vessel_name": "LEVIATHAN",
+    "vessel_code": "LEV",
+    "documents": {
+      "value": 0,
+      "expired": 0,
+      "endorsements_overdue": 0,
+      "expiring": 0
+    },
+    "safety": {
+      "open_corrective_actions": 0,
+      "overdue_corrective_actions": 0,
+      "overdue_drills": 0
+    },
+    "technical": {
+      "open_jobs": 1,
+      "overdue_jobs": 0,
+      "pending_approval": 0
+    },
+    "insurance": {
+      "expired": 0,
+      "expiring": 0
+    },
+    "hours_of_rest": {
+      "breach_days": 0,
+      "near_threshold": 0,
+      "crew_without_entries": 1
+    }
+  },
+  {
+    "vessel_id": "e0000000-0000-4000-8000-000000000004",
+    "vessel_name": "ROCINANTE",
+    "vessel_code": "ROC",
+    "documents": {
+      "value": 1,
+      "expired": 0,
+      "endorsements_overdue": 0,
+      "expiring": 1
+    },
+    "safety": {
+      "open_corrective_actions": 0,
+      "overdue_corrective_actions": 0,
+      "overdue_drills": 0
+    },
+    "technical": {
+      "open_jobs": 1,
+      "overdue_jobs": 0,
+      "pending_approval": 0
+    },
+    "insurance": {
+      "expired": 0,
+      "expiring": 0
+    },
+    "hours_of_rest": {
+      "breach_days": 0,
+      "near_threshold": 0,
+      "crew_without_entries": 3
+    }
+  }
+]

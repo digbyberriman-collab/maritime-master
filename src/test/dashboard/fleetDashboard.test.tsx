@@ -1,5 +1,10 @@
 /**
- * Fleet dashboard (/fleet/dashboard; Phase 1 S7, gap/10 C.2 item 8, DS13).
+ * The legacy fleet dashboards (Phase 1 S7, gap/10 C.2 item 8, DS13):
+ * DPADashboard (still the page of the legacy `/dpa-dashboard` URL for
+ * users without fleet reach) and the generic Dashboard page it came from.
+ * `/fleet/dashboard` itself is FleetDashboardPage since X5-02A
+ * (fleetDashboardPage.test.tsx); its KPI row, FleetKpiRow, is also the
+ * vessel dashboard's legacy `?view=fleet` row (the last block here).
  *
  * - The gradient "Welcome" hero is gone: the page heading is one PageHeader
  *   (title "Fleet dashboard", the company's display name as eyebrow).
@@ -90,7 +95,8 @@ vi.mock('@/modules/red-room/components/RedRoomPanel', () => ({ default: () => <d
 vi.mock('@/modules/dashboard/components/MaintenanceWidgets', () => ({ default: () => <div data-testid="maintenance" /> }));
 
 import Dashboard from '@/modules/dashboard/pages/Dashboard';
-import FleetKPITiles from '@/modules/dashboard/components/fleet/FleetKPITiles';
+import { FleetKpiRow } from '@/modules/dashboard/components/fleet/FleetKpiRow';
+import type { FleetDashboardKpisJson } from '@/modules/dashboard/types/db.pending';
 
 const alertsReady = (counts: { RED: number; ORANGE: number; YELLOW: number; GREEN?: number }): AlertState => {
   const full = { GREEN: 0, ...counts };
@@ -310,42 +316,61 @@ describe.each(['dpa', 'superadmin'])('recent crew changes (%s)', (role) => {
   });
 });
 
-describe('FleetKPITiles (vessel dashboard, fleet view)', () => {
-  const kpi = {
-    documentAlerts: { value: 4, sub: '4 expiring within 90 days' },
-    safety: { value: 0, sub: '0 red alerts · 0 open CAPAs' },
-    technical: { value: 2, sub: '1 overdue · 1 critical defects' },
+describe('FleetKpiRow (also the vessel dashboard\'s legacy fleet view)', () => {
+  const data: FleetDashboardKpisJson = {
+    vessels: 3,
+    today: '2026-11-26',
+    tiles: {
+      documents: {
+        state: 'ok',
+        value: 4,
+        vessels: 3,
+        parts: { expired_vessel_certificates: 0, expired_crew_documents: 0, expired_crew_qualifications: 0, endorsements_overdue: 0, expiring: 4 },
+      },
+      hours_of_rest: { state: 'module_off', vessels_off: 3 },
+      safety: { state: 'ok', value: 0, vessels: 3, open_corrective_actions: 0, overdue_corrective_actions: 0, overdue_drills: 0 },
+      technical: { state: 'ok', value: 2, vessels: 3, overdue_jobs: 1, pending_approval: 1, open_jobs: 4 },
+      leave: { state: 'not_enabled' },
+      finance: { state: 'hidden' },
+    },
   };
-  const renderTiles = (props: React.ComponentProps<typeof FleetKPITiles>) =>
+  const renderRow = (props: Partial<React.ComponentProps<typeof FleetKpiRow>> = {}) =>
     render(
       <MemoryRouter>
-        <FleetKPITiles {...props} />
+        <FleetKpiRow
+          kpis={{ kind: 'ready', data }}
+          alerts={alertsReady({ RED: 0, ORANGE: 1, YELLOW: 0 })}
+          knownReportKeys={new Set()}
+          {...props}
+        />
       </MemoryRouter>,
     );
 
-  it('marks sources the fleet summary does not report as not tracked, never as 0', () => {
-    renderTiles({ kpi });
-    for (const label of ['Hours of rest', 'Leave overdue', 'Accounting']) {
-      expect(tile(label)).toHaveAttribute('data-state', 'not-enabled');
-      expect(tile(label)).toHaveTextContent('—');
-      expect(tile(label)).not.toHaveTextContent('All clear');
-    }
+  it('says why a tile has no number, never 0: leave not enabled, a module off on every vessel; finance is hidden', () => {
+    renderRow();
+    expect(tile('Leave overdue')).toHaveAttribute('data-state', 'not-enabled');
+    expect(tile('Leave overdue')).toHaveTextContent('Leave limits are not set up yet');
+    expect(tile('Hours of rest')).toHaveAttribute('data-state', 'not-enabled');
+    expect(tile('Hours of rest')).toHaveTextContent('Hours of Rest is off on every vessel shown');
+    for (const label of ['Leave overdue', 'Hours of rest']) expect(tile(label)).not.toHaveTextContent('All clear');
+    expect(screen.queryByText('Finance')).toBeNull();
     expect(tile('Document alerts')).toHaveAttribute('data-tone', 'warn');
     expect(tile('Safety')).toHaveAttribute('data-state', 'zero');
+    expect(tile('Technical')).toHaveAttribute('data-tone', 'danger');
   });
 
   it('loads and fails like every other tile', () => {
-    const first = renderTiles({ kpi: null });
+    const first = renderRow({ kpis: { kind: 'loading' } });
     expect(tile('Safety')).toHaveAttribute('data-state', 'loading');
     first.unmount();
     const onRetry = vi.fn();
-    renderTiles({ kpi: null, error: true, onRetry });
+    renderRow({ kpis: { kind: 'error' }, onRetry });
     fireEvent.click(within(tile('Technical')).getByRole('button', { name: /try again/i }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
   it('has no raw palette colours left', () => {
-    const { container } = renderTiles({ kpi });
-    expect(container.innerHTML).not.toMatch(/(bg|text)-(amber|sky|emerald|rose|slate|violet)-\d/);
+    const { container } = renderRow();
+    expect(container.innerHTML).not.toMatch(/(bg|text|border)-(amber|sky|emerald|rose|slate|violet|red|green|yellow|blue|orange)-\d/);
   });
 });
