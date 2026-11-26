@@ -1,13 +1,14 @@
 {
   "routes": [
-    "/fleet/forms :: <PlaceholderWrapper{title=\"Forms & Checklists\"}>"
+    "/fleet/forms :: <ModuleRoute{capability=\"fleet.operations.fleet_checklists.view\"}> > page(/src/modules/forms/pages/FleetFormsOverviewPage.tsx) guard=- layout=- label=Forms & Checklists",
+    "/fleet/forms/:area :: <ModuleRoute{capability=\"fleet.operations.fleet_checklists.view\"}> > page(/src/modules/forms/pages/FleetFormsAreaPage.tsx) guard=- layout=- label=Forms & Checklists area",
+    "/fleet/forms/:templateId/edit :: <ModuleRoute{capability=\"fleet.operations.fleet_checklists.edit\"}> > page(/src/modules/forms/pages/FormTemplateBuilderPage.tsx) guard=- layout=- label=Edit template",
+    "/fleet/forms/:templateId/preview :: <ModuleRoute{capability=\"fleet.operations.fleet_checklists.view\"}> > page(/src/modules/forms/pages/FormTemplatePreviewPage.tsx) guard=- layout=- label=Template preview",
+    "/fleet/forms/new :: <ModuleRoute{capability=\"fleet.operations.fleet_checklists.create\"}> > page(/src/modules/forms/pages/FormTemplateBuilderPage.tsx) guard=- layout=- label=New template"
   ],
   "nav": {
     "NAVIGATION_ITEMS": [
-      "    SquareCheckBig {\"id\":\"fleet-forms\",\"kind\":\"leaf\",\"label\":\"Forms & Checklists\",\"path\":\"/fleet/forms\",\"scope\":\"fleet\",\"status\":\"planned\"}"
-    ],
-    "FLEET_PLACEHOLDER_LEAVES": [
-      "forms Forms & Checklists"
+      "    SquareCheckBig {\"capability\":\"fleet.operations.fleet_checklists.view\",\"id\":\"fleet-forms\",\"kind\":\"leaf\",\"label\":\"Forms & Checklists\",\"path\":\"/fleet/forms\",\"scope\":\"fleet\",\"status\":\"beta\"}"
     ]
   }
 }

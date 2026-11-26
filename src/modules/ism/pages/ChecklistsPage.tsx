@@ -1,224 +1,282 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import DashboardLayout from '@/shared/components/layout/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+/**
+ * Vessel › Safety › Checklists (`/v/:vesselCode/safety/checklists`; gap/02
+ * FC1, FC4, FC6, W2; DECISIONS D-01, D-04, D-27, D-88; X5 spec X5-06B).
+ * The safety checklists the company offers on this vessel.
+ *
+ * - The list is `useVesselFormTemplates(vessel, 'safety')` from the Forms
+ *   & Checklists module: published templates of the Safety area offered
+ *   on the vessel, in the order set for it, with the ones hidden on it
+ *   left out. Each row: name, version, how often it is run, its last run
+ *   and when it is next due (or that it is overdue); Start opens a new
+ *   run, Preview the template.
+ * - The tiles come from `form_template_run_stats` for this vessel and
+ *   area: checklists available, run today, due in the next 7 days and
+ *   overdue. Never a hard-coded number: while run tracking is not set up
+ *   the run tiles say so (not enabled); a reader who may not see runs here
+ *   is told so; an error has Retry.
+ * - D-01: while the area column is not applied, every published template
+ *   offered on the vessel is listed, and the page says "Areas are not set
+ *   up yet". Any other failure is PageError with Retry, never sample rows.
+ * - The page keeps its scope gate (signed in, reaches the vessel, D-27);
+ *   the server's row rules decide what is returned. Opened from a legacy
+ *   URL with no vessel to show, it asks for a vessel.
+ *
+ * Tokens only; KpiTile and StatusPill; 44 px targets on coarse pointers;
+ * usable at 390 px (rows stack).
+ */
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
+import { CalendarClock, CheckCircle2, ClipboardList, ListChecks, RefreshCw, Search, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useFormTemplates } from '@/modules/ism/forms/hooks/useFormTemplates';
-import { 
-  ClipboardList, 
-  Plus, 
-  Search, 
-  FileCheck,
-  Calendar,
-  Clock,
-  CheckCircle2,
-  ListChecks
-} from 'lucide-react';
-import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { useCan } from '@/lib/permissions/useCan';
+import { useVesselScope, useScopedPath } from '@/app/router/scopes';
+import { useAuth } from '@/modules/auth/contexts/AuthContext';
+import {
+  FORMS_CAPS,
+  cadenceLabel,
+  fleetFormsPath,
+  formatDay,
+  formatUpdatedUtc,
+  formsKeys,
+  lastRunText,
+  useFormTemplateRunStats,
+  useVesselFormTemplates,
+  versionDisplay,
+  vesselRunTally,
+  type CatalogueTemplate,
+} from '@/modules/forms';
+import { KpiGrid, KpiTile } from '@/shared/components/data';
+import PageHeader from '@/shared/components/layout/PageHeader';
+import { EmptyState, PageEmpty, PageError, PageLoading } from '@/shared/components/states';
+import { StatusPill } from '@/shared/components/status';
+import { todayDateOnly } from '@/shared/lib/form';
+
+const COARSE = '[@media(pointer:coarse)]:min-h-11';
 
 const ChecklistsPage: React.FC = () => {
-  const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('templates');
-  
-  const { data: templates = [], isLoading } = useFormTemplates();
-
-  // Filter templates that are checklists (by category or naming).
-  // form_type is stored upper case ('CHECKLIST'), so compare case-insensitively.
-  const checklistTemplates = templates.filter(
-    t => t.category?.name?.toLowerCase().includes('checklist') ||
-         t.template_name?.toLowerCase().includes('checklist') ||
-         t.form_type?.toLowerCase() === 'checklist'
-  );
-
-  const filteredTemplates = checklistTemplates.filter(
-    t => searchQuery === '' || 
-         t.template_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-         t.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // Stats
-  // form_templates.status is DRAFT / PUBLISHED / ARCHIVED; 'active' was never a value.
-  const activeTemplates = checklistTemplates.filter(t => t.status === 'PUBLISHED').length;
-  const totalTemplates = checklistTemplates.length;
-
-  return (
-    <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="p-2 bg-primary/10 rounded-lg">
-                <ClipboardList className="w-6 h-6 text-primary" />
-              </div>
-              <h1 className="text-2xl font-bold text-foreground">Checklists</h1>
-            </div>
-            <p className="text-muted-foreground">
-              Safety and operational checklists for vessel operations
-            </p>
-          </div>
-          <Button onClick={() => navigate('/ism/forms/templates/create', { state: { preselectedType: 'CHECKLIST' } })}>
-            <Plus className="w-4 h-4 mr-2" />
-            Create Checklist
-          </Button>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Checklists</CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{activeTemplates}</div>
-              <p className="text-xs text-muted-foreground">In use</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Templates</CardTitle>
-              <ListChecks className="h-4 w-4 text-blue-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalTemplates}</div>
-              <p className="text-xs text-muted-foreground">All checklists</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Completed Today</CardTitle>
-              <FileCheck className="h-4 w-4 text-purple-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">0</div>
-              <p className="text-xs text-muted-foreground">Submissions</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Scheduled</CardTitle>
-              <Calendar className="h-4 w-4 text-orange-500" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">0</div>
-              <p className="text-xs text-muted-foreground">Due this week</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="templates">Templates</TabsTrigger>
-            <TabsTrigger value="submissions">Recent Submissions</TabsTrigger>
-            <TabsTrigger value="scheduled">Scheduled</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="templates" className="space-y-4">
-            {/* Search */}
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search checklists..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-
-            {/* Checklist Grid */}
-            {isLoading ? (
-              <div className="flex items-center justify-center h-64">
-                <p className="text-muted-foreground">Loading checklists...</p>
-              </div>
-            ) : filteredTemplates.length === 0 ? (
-              <Card>
-                <CardContent className="flex flex-col items-center justify-center h-64 text-center">
-                  <ClipboardList className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                  <h3 className="text-lg font-semibold">No checklists found</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Create your first checklist to get started
-                  </p>
-                   <Button onClick={() => navigate('/ism/forms/templates/create', { state: { preselectedType: 'CHECKLIST' } })}>
-                     <Plus className="w-4 h-4 mr-2" />
-                     Create Checklist
-                   </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredTemplates.map((template) => (
-                  <Card key={template.id} className="hover:shadow-md transition-shadow cursor-pointer">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-2">
-                          <ClipboardList className="h-5 w-5 text-primary" />
-                          <CardTitle className="text-base">{template.template_name}</CardTitle>
-                        </div>
-                        <Badge variant={template.status === 'PUBLISHED' ? 'default' : 'secondary'}>
-                          {template.status}
-                        </Badge>
-                      </div>
-                      <CardDescription className="line-clamp-2">
-                        {template.description || 'No description'}
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>Version {template.version || 1}</span>
-                        <span>{template.created_at && format(new Date(template.created_at), 'MMM d, yyyy')}</span>
-                      </div>
-                      <div className="mt-4 flex gap-2">
-                        <Button variant="outline" size="sm" className="flex-1" onClick={(e) => { e.stopPropagation(); navigate(`/ism/forms/templates/${template.id}`); }}>
-                          Preview
-                        </Button>
-                        <Button size="sm" className="flex-1" onClick={(e) => { e.stopPropagation(); navigate(`/ism/forms/new?templateId=${template.id}`); }}>
-                          Start
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="submissions">
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center h-64 text-center">
-                <FileCheck className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <h3 className="text-lg font-semibold">No recent submissions</h3>
-                <p className="text-muted-foreground">
-                  Completed checklists will appear here
-                </p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="scheduled">
-            <Card>
-              <CardContent className="flex flex-col items-center justify-center h-64 text-center">
-                <Calendar className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <h3 className="text-lg font-semibold">No scheduled checklists</h3>
-                <p className="text-muted-foreground">
-                  Set up recurring checklists for your operations
-                </p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </div>
-    </DashboardLayout>
-  );
+  const scope = useVesselScope();
+  if (!scope) return <NoVessel />;
+  return <VesselChecklists key={scope.vessel.id} vesselId={scope.vessel.id} vesselName={scope.vessel.name} />;
 };
 
 export default ChecklistsPage;
+
+/** Opened from a legacy URL with no vessel to scope to (D-27): ask for one. */
+function NoVessel() {
+  const scoped = useScopedPath();
+  const target = scoped('safety/checklists');
+  return (
+    <EmptyState
+      headingLevel={1}
+      icon={ClipboardList}
+      title="Choose a vessel"
+      body="Checklists belong to a vessel. Open a vessel to see the checklists its crew use."
+      action={
+        target !== '/' ? (
+          <Button asChild size="sm" className={COARSE}>
+            <Link to={target}>Open the vessel's checklists</Link>
+          </Button>
+        ) : undefined
+      }
+    />
+  );
+}
+
+function VesselChecklists({ vesselId, vesselName }: { vesselId: string; vesselName: string }) {
+  const { profile } = useAuth();
+  const companyId = profile?.company_id ?? null;
+  const queryClient = useQueryClient();
+  const canManage = useCan(FORMS_CAPS.admin);
+  const today = todayDateOnly();
+  const [search, setSearch] = React.useState('');
+
+  const list = useVesselFormTemplates(vesselId, 'safety');
+  const areasSetUp = list.status === 'ready' && list.areasSetUp;
+  const stats = useFormTemplateRunStats([vesselId], 'safety', today, areasSetUp);
+  const refresh = () => void queryClient.invalidateQueries({ queryKey: formsKeys.company(companyId) });
+
+  const header = (
+    <PageHeader
+      eyebrow={vesselName}
+      title="Checklists"
+      description={`The safety checklists the company offers on ${vesselName}, in the order set for this vessel.`}
+      actions={
+        <>
+          {list.status === 'ready' ? (
+            <span className="type-caption tabular-nums text-muted-foreground" data-testid="checklists-updated">
+              {formatUpdatedUtc(list.updatedAt)}
+            </span>
+          ) : null}
+          <Button type="button" variant="outline" size="sm" className={COARSE} onClick={refresh} disabled={list.status === 'ready' && list.refreshing}>
+            <RefreshCw aria-hidden="true" className={cn('h-4 w-4', list.status === 'ready' && list.refreshing && 'motion-safe:animate-spin')} />
+            Refresh
+          </Button>
+          {canManage ? (
+            <Button asChild variant="outline" size="sm" className={COARSE}>
+              <Link to={fleetFormsPath.area('safety')}>Manage templates</Link>
+            </Button>
+          ) : null}
+        </>
+      }
+    />
+  );
+
+  if (list.status === 'loading') {
+    return (
+      <div className="space-y-4">
+        {header}
+        <PageLoading variant="list" label="Loading checklists" />
+      </div>
+    );
+  }
+  if (list.status === 'error') {
+    return (
+      <div className="space-y-4">
+        {header}
+        <PageError error={list.error} title="The checklists could not be loaded" onRetry={list.retry} treatMissingAsOff={false} />
+      </div>
+    );
+  }
+
+  const templates = list.templates;
+  const statsList = stats.status === 'ready' ? stats.stats : [];
+  const tally = vesselRunTally(statsList, templates.map((t) => t.id), vesselId, today);
+  const term = search.trim().toLowerCase();
+  const shown = term ? templates.filter((t) => t.name.toLowerCase().includes(term) || (t.description ?? '').toLowerCase().includes(term)) : templates;
+
+  const runTileState = (): { state?: 'loading' | 'not-enabled' | 'error'; reason?: string } => {
+    if (!areasSetUp || stats.status === 'not_set_up') return { state: 'not-enabled', reason: 'Run tracking is not set up yet.' };
+    if (stats.status === 'no_access') return { state: 'not-enabled', reason: 'Run history needs checklist access on this vessel.' };
+    if (stats.status === 'loading') return { state: 'loading' };
+    if (stats.status === 'error') return { state: 'error' };
+    return {};
+  };
+  const run = runTileState();
+  const retry = stats.status === 'error' ? stats.retry : undefined;
+
+  return (
+    <div className="space-y-4">
+      {header}
+      {!list.areasSetUp ? (
+        <p role="note" className="rounded-md border border-border bg-muted/40 px-3 py-2 type-body-sm text-muted-foreground" data-testid="checklists-areas-not-set-up">
+          Areas are not set up yet, so every published form and checklist offered on this vessel is listed here.
+        </p>
+      ) : null}
+
+      <KpiGrid className="lg:grid-cols-4 min-[1440px]:grid-cols-4">
+        <KpiTile label="Checklists available" icon={ListChecks} value={templates.length} zeroLabel="None offered yet" />
+        <KpiTile label="Run today" icon={CheckCircle2} value={tally.ranToday} sub={`of ${templates.length.toLocaleString('en-GB')}`} state={run.state} notEnabledReason={run.reason} onRetry={retry} errorMessage="Run history could not be loaded" />
+        <KpiTile label="Due in the next 7 days" icon={CalendarClock} value={tally.dueSoon} state={run.state} notEnabledReason={run.reason} onRetry={retry} errorMessage="Run history could not be loaded" />
+        <KpiTile
+          label="Overdue"
+          icon={TriangleAlert}
+          value={tally.overdue}
+          tone={tally.overdue ? 'danger' : undefined}
+          state={run.state}
+          notEnabledReason={run.reason}
+          onRetry={retry}
+          errorMessage="Run history could not be loaded"
+          zeroLabel="Nothing overdue"
+        />
+      </KpiGrid>
+
+      {templates.length === 0 ? (
+        <PageEmpty
+          title="No checklists on this vessel yet"
+          body={
+            list.hiddenCount
+              ? `${list.hiddenCount.toLocaleString('en-GB')} ${list.hiddenCount === 1 ? 'checklist is' : 'checklists are'} hidden on ${vesselName}.`
+              : 'The company has not published a safety checklist for this vessel.'
+          }
+        />
+      ) : (
+        <section aria-labelledby="checklists-heading" className="space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 id="checklists-heading" className="font-display text-base font-semibold text-foreground">
+              {`${templates.length.toLocaleString('en-GB')} ${templates.length === 1 ? 'checklist' : 'checklists'}`}
+            </h2>
+            <div className="relative w-full sm:max-w-xs">
+              <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input aria-label="Search checklists" placeholder="Search checklists" value={search} onChange={(e) => setSearch(e.target.value)} className={cn('pl-9', COARSE)} />
+            </div>
+          </div>
+          {shown.length === 0 ? (
+            <PageEmpty filtered title="No checklist matches" body="Try another word." onClearFilters={() => setSearch('')} />
+          ) : (
+            <ol aria-label={`Checklists on ${vesselName}`} className="flex flex-col gap-2">
+              {shown.map((t, i) => (
+                <ChecklistRow key={t.id} template={t} position={term ? null : i + 1} stats={statsList} statsReady={stats.status === 'ready'} vesselId={vesselId} today={today} />
+              ))}
+            </ol>
+          )}
+          {list.hiddenCount && canManage ? (
+            <p className="type-body-sm text-muted-foreground">{`${list.hiddenCount.toLocaleString('en-GB')} hidden on ${vesselName}. Manage templates shows them.`}</p>
+          ) : null}
+        </section>
+      )}
+
+      <p className="type-body-sm text-muted-foreground">
+        <Link to="/ism/forms/submissions" className="font-medium text-primary underline-offset-4 hover:underline focus-visible:underline">
+          All submitted forms and checklists
+        </Link>
+      </p>
+    </div>
+  );
+}
+
+function ChecklistRow({
+  template,
+  position,
+  stats,
+  statsReady,
+  vesselId,
+  today,
+}: {
+  template: CatalogueTemplate;
+  position: number | null;
+  stats: ReadonlyArray<{ template_id: string; vessel_id: string; last_run_on: string | null; next_due: string | null; overdue: boolean; hidden: boolean }>;
+  statsReady: boolean;
+  vesselId: string;
+  today: string;
+}) {
+  const stat = stats.find((s) => s.template_id === template.id && s.vessel_id === vesselId) ?? null;
+  const cadence = cadenceLabel(template.cadence);
+  const last = stat ? lastRunText(stat.last_run_on, today) : null;
+  return (
+    <li className="flex flex-col gap-3 rounded-lg border border-border bg-card px-4 py-3 md:flex-row md:items-center md:justify-between">
+      <span className="flex min-w-0 items-start gap-3">
+        {position ? (
+          <span aria-hidden="true" className="mt-0.5 w-6 shrink-0 text-right font-mono text-sm tabular-nums text-muted-foreground">
+            {position}
+          </span>
+        ) : null}
+        <span className="min-w-0">
+          <span className="block font-medium text-foreground">{template.name}</span>
+          {template.description ? <span className="mt-0.5 block line-clamp-2 type-body-sm text-muted-foreground">{template.description}</span> : null}
+          <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 type-caption text-muted-foreground">
+            <span className="type-mono rounded-sm border border-input px-1 leading-5">{versionDisplay({ version: template.version, version_label: template.versionLabel })}</span>
+            {cadence ? <span>{cadence}</span> : null}
+            {statsReady ? <span>{last ? `Last run ${last.toLowerCase() === 'today' || last.toLowerCase() === 'yesterday' ? last.toLowerCase() : last}` : 'No recorded runs'}</span> : null}
+            {statsReady && stat?.next_due && !stat.overdue ? <span>{`Next due ${formatDay(stat.next_due)}`}</span> : null}
+          </span>
+        </span>
+      </span>
+      <span className="flex shrink-0 flex-wrap items-center gap-2 md:justify-end">
+        {stat?.overdue ? <StatusPill tone="danger" label={stat.next_due ? `Overdue since ${formatDay(stat.next_due)}` : 'Overdue'} /> : null}
+        <Button asChild variant="outline" size="sm" className={COARSE}>
+          <Link to={`/ism/forms/templates/${template.id}`} aria-label={`Preview ${template.name}`}>
+            Preview
+          </Link>
+        </Button>
+        <Button asChild size="sm" className={COARSE}>
+          <Link to={`/ism/forms/new?templateId=${encodeURIComponent(template.id)}`} aria-label={`Start ${template.name}`}>
+            Start
+          </Link>
+        </Button>
+      </span>
+    </li>
+  );
+}

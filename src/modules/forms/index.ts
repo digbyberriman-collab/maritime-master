@@ -11,6 +11,11 @@
  *   (`useFormTemplateMutations` and the plain async wrappers), with the
  *   D-X5-20 publish / archive fallback while the definers are missing.
  * - The pending types of the catalogue columns, settings, history and RPCs.
+ * - X5-06B: the catalogue reads (`useFormTemplateCatalogue`, settings, run
+ *   statistics, one template), the draft save, and `useVesselFormTemplates`
+ *   (one vessel's templates in one area: hidden ones left out, the
+ *   vessel's order) for the vessel pages; the catalogue model and the
+ *   builder's schema (pure); the module's paths and keys.
  */
 export { formsKeys, LEGACY_TEMPLATE_KEYS } from './hooks/keys';
 export {
@@ -110,3 +115,72 @@ export type {
   FormTemplateVisibility,
   LiveFormTemplateRow,
 } from './types/db.pending';
+export {
+  CODE_TAKEN_MESSAGE,
+  DRAFT_NOT_PERMITTED_MESSAGE,
+  NO_LONGER_DRAFT_MESSAGE,
+  codeEditable,
+  saveTemplateDraft,
+  useFormTemplateCatalogue,
+  useFormTemplateDetail,
+  useFormTemplateDrafts,
+  useFormTemplateRunStats,
+  useFormTemplateVesselSettings,
+  useSaveTemplateDraft,
+  type CatalogueState,
+  type DraftFormsState,
+  type RunStatsState,
+  type SaveDraftInput,
+  type SavedDraft,
+  type TemplateDetailState,
+  type VesselSettingsState,
+} from './hooks/useFleetFormTemplates';
+export { useVesselFormTemplates, type VesselFormTemplatesState } from './hooks/useVesselFormTemplates';
+export {
+  ORIGIN_LABELS,
+  areaCounts,
+  areaKeyFromSlug,
+  areaKeyLabel,
+  areaKeySlug,
+  formatDay,
+  formatUpdatedUtc,
+  indexSettings,
+  isCustomisedCopy,
+  lastRunText,
+  originKind,
+  orderOnVessel,
+  placement,
+  resolveShowing,
+  runSummary,
+  targetsVessel,
+  vesselRunTally,
+  vesselTemplates,
+  type AreaCounts,
+  type AreaKey,
+  type CatalogueTemplate,
+  type OriginKind,
+  type RunSummary,
+  type Showing,
+  type ShowingVessel,
+  type TemplatePlacement,
+  type VesselRunTally,
+  type VesselSetting,
+} from './lib/catalogueModel';
+export {
+  ITEM_TYPES,
+  ITEM_TYPE_LABELS,
+  builderIssues,
+  formSchemaToSections,
+  parseSeveralItems,
+  sectionsToFields,
+  sectionsToFormSchema,
+  suggestTemplateCode,
+  templateFormSchema,
+  valuesFromTemplate,
+  type BuilderIssue,
+  type BuilderItem,
+  type BuilderSection,
+  type TemplateDetail,
+  type TemplateFormValues,
+} from './lib/templateSchema';
+export { FORMS_CAPABILITIES, FORMS_CAPS, FORMS_FLEET_PATHS, FORMS_FLEET_ROOT, FORMS_PARAMS, fleetFormsPath } from './paths';
