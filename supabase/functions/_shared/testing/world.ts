@@ -695,7 +695,17 @@ function installP3Rpcs(world: FakeWorld): void {
     const fulfil = wd.rpcs.fulfil_imported_assignment;
     if (profile.user_id && fulfil) fulfil({ p_profile_id: profile.id, p_actor: args.p_invited_by ?? null }, { role: 'service', userId: null }, wd);
     if (outcome === 'sent') {
-      if (!['active', 'disabled'].includes(String(profile.account_status))) profile.account_status = 'invited';
+      // D-236: disabled / deactivated stay; active stays only once the person has joined (a profile sign-in,
+      // a signed-in login, or an accepted membership in the profile's company); anything else becomes invited.
+      const current = String(profile.account_status ?? '').toLowerCase();
+      const joinedUserId = profile.user_id ?? null;
+      const joined =
+        !!profile.last_login_at ||
+        (!!joinedUserId && !!wd.authUsers.find((u) => u.id === joinedUserId)?.last_sign_in_at) ||
+        (wd.tables.account_memberships ?? []).some(
+          (m) => !!joinedUserId && m.user_id === joinedUserId && m.company_id === profile.company_id && !!m.accepted_at,
+        );
+      if (!isDisabled(profile) && !(current === 'active' && joined)) profile.account_status = 'invited';
       profile.last_invited_at = at;
       profile.invited_at ??= at;
       profile.invitation_count = Number(profile.invitation_count ?? 0) + 1;

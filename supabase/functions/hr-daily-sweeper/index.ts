@@ -20,7 +20,12 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.2';
  *
  * Each result is the count the function returned, 'not applied' when the
  * function is not in the database yet (the platform build-out is not
- * applied, D-01; PostgREST PGRST202 or Postgres 42883), or `error: …`.
+ * applied, D-01), or `error: …`. 'not applied' is PostgREST PGRST202 (no
+ * such RPC in its schema cache), or a Postgres 42883 only when its message
+ * names the called function itself (`function [public.]<fn>(…) does not
+ * exist`, a stale schema cache). A 42883 raised inside an existing body
+ * (`operator does not exist: uuid = text`, or a missing helper such as
+ * `function public.hr_can_admin(uuid) does not exist`) is a failure (D-239).
  * 'not applied' is not a failure. Any error makes the answer ok: false with
  * status 500, so a scheduler sees the failure (no fake success); the
  * remaining sweeps still run.
@@ -42,8 +47,19 @@ const SWEEPS = [
 
 const NOT_APPLIED = 'not applied';
 
-/** PostgREST: the function is not in the schema cache; Postgres: undefined_function. */
-const isMissingFunction = (error: { code?: string | null }) => error.code === 'PGRST202' || error.code === '42883';
+/** Escapes a string for use as a literal inside a RegExp. */
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Not applied (D-01, D-239): PostgREST has no such RPC (PGRST202), or
+ * Postgres says THIS function does not exist (42883 from a stale schema
+ * cache; the pattern is `^function (public\.)?<fn>\(.*\) does not exist$`).
+ * A 42883 raised inside an existing body (operator does not exist, a missing
+ * helper) is a failure.
+ */
+const isNotApplied = (fn: string, error: { code?: string | null; message?: string | null }) =>
+  error.code === 'PGRST202' ||
+  (error.code === '42883' && new RegExp(`^function (public\\.)?${escapeRe(fn)}\\(.*\\) does not exist$`).test(error.message ?? ''));
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
@@ -63,7 +79,7 @@ serve(async (req: Request) => {
     const { data, error } = await admin.rpc(fn);
     if (!error) {
       results[fn] = (data as number) ?? 0;
-    } else if (isMissingFunction(error)) {
+    } else if (isNotApplied(fn, error)) {
       results[fn] = NOT_APPLIED;
     } else {
       results[fn] = `error: ${error.message}`;

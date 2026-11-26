@@ -3,7 +3,7 @@ import { getAuthContext } from './auth.ts';
 import { type EmailMessage, type EmailResult, payloadTag, sendEmail } from './email.ts';
 import type { EdgeEnv } from './env.ts';
 import { HttpError } from './http.ts';
-import { bulkRow, bulkSummary, type InviteDeps, inviteProfile, invitationResponse, isFakeEmail, MAX_INVITE_ATTEMPT } from './invitations.ts';
+import { bulkRow, bulkSummary, type InviteDeps, inviteProfile, invitationResponse, isFakeEmail, legacyInviteStatus, MAX_INVITE_ATTEMPT } from './invitations.ts';
 import { idempotentProvider } from './testing/fakeFetch.ts';
 import { callsOf, fail, fakeClientFactory, type FakeWorld, ok } from './testing/fakeSupabase.ts';
 import { buildWorld, CO_A, envWith, obj, P, type Persona, profileRow, request, TEST_ENV, V_A1, V_A2, V_A_SOLD, V_B1 } from './testing/world.ts';
@@ -1078,4 +1078,137 @@ Deno.test('assignment (D-01): a login that already had the profile is not placed
   assertEquals(outcome.assignment, 'failed');
   assertEquals(assignmentInserts(world).length, 0);
   assertEquals(assignmentsOf(world, P.invitedA.userId).length, 0);
+});
+
+// ---- round 6: the legacy stamp mirrors the SQL rule for an `active` default (D-236, D-228) -----------
+
+/** The legacy stamp: the service-client profiles update that carries `last_invited_at`. */
+function legacyStamps(world: FakeWorld, profileId: string): Record<string, unknown>[] {
+  return callsOf(world, 'query')
+    .filter((q) => q.table === 'profiles' && q.op === 'update' && q.caller.role === 'service')
+    .filter((q) => q.filters.some((f) => f.column === 'id' && f.value === profileId))
+    .map((q) => q.values as Record<string, unknown>)
+    .filter((v) => 'last_invited_at' in v);
+}
+
+/** invitedA with an `active` profile (the column default) and its unconfirmed login; no RPCs (D-01). */
+function activeDefaultInvitee(patch: { lastLoginAt?: string | null; lastSignInAt?: string | null } = {}): { world: FakeWorld; login: FakeAuthUser } {
+  const world = buildWorld({ p3: false });
+  Object.assign(profileRow(world, P.invitedA.profileId), { account_status: 'active', last_login_at: patch.lastLoginAt ?? null });
+  const login = world.authUsers.find((u) => u.id === P.invitedA.userId);
+  assert(login);
+  login.last_sign_in_at = patch.lastSignInAt ?? null;
+  return { world, login };
+}
+
+Deno.test('legacyInviteStatus: invited unless disabled / deactivated, or active with sign-in evidence (D-236)', () => {
+  const table: Array<[status: string, signedIn: boolean, expected: 'invited' | null]> = [
+    ['active', false, 'invited'],
+    ['active', true, null],
+    ['Active', false, 'invited'],
+    ['not_invited', false, 'invited'],
+    ['not_invited', true, 'invited'],
+    ['invited', true, 'invited'],
+    ['', false, 'invited'],
+    ['disabled', false, null],
+    ['disabled', true, null],
+    ['deactivated', false, null],
+    ['Deactivated', true, null],
+  ];
+  for (const [status, signedIn, expected] of table) assertEquals(legacyInviteStatus(status, signedIn), expected, `${status}/${signedIn}`);
+});
+
+Deno.test('invite (legacy, record RPC missing): an active profile with no sign-in evidence is stamped invited (D-236)', async () => {
+  const { world } = activeDefaultInvitee();
+  assert(!world.rpcs.record_invitation_send, 'record_invitation_send is missing (PGRST202)');
+  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.invitedA.profileId, mailer().deps);
+  assert(outcome.status === 'sent' && !outcome.stored, 'sent, not stored');
+  const rec = callsOf(world, 'rpc').find((c) => c.fn === 'record_invitation_send');
+  assert(rec, 'the record RPC was asked (and answered PGRST202)');
+  const stamps = legacyStamps(world, P.invitedA.profileId);
+  assertEquals(stamps.length, 1);
+  assertEquals(stamps[0].account_status, 'invited');
+  // The rest of the patch is unchanged.
+  assertEquals(stamps[0].last_invited_at, NOW.toISOString());
+  assertEquals(stamps[0].invitation_count, 1);
+  assertEquals(profileRow(world, P.invitedA.profileId).account_status, 'invited');
+  // No extra network call: the login was read once (step 5), never again for the stamp.
+  assertEquals(callsOf(world, 'admin').filter((c) => c.method === 'getUserById').length, 1);
+});
+
+Deno.test('invite (legacy, record RPC missing): an active profile with last_login_at, or a login with last_sign_in_at, keeps its status', async () => {
+  const variants: Array<[string, { lastLoginAt?: string; lastSignInAt?: string }]> = [
+    ['last_login_at on the profile', { lastLoginAt: '2026-11-20T08:00:00Z' }],
+    ['last_sign_in_at on the login', { lastSignInAt: '2026-11-20T08:00:00Z' }],
+    ['both', { lastLoginAt: '2026-11-20T08:00:00Z', lastSignInAt: '2026-11-20T08:00:00Z' }],
+  ];
+  for (const [label, patch] of variants) {
+    const { world } = activeDefaultInvitee(patch);
+    const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.invitedA.profileId, mailer().deps);
+    assert(outcome.status === 'sent' && !outcome.stored, label);
+    const stamps = legacyStamps(world, P.invitedA.profileId);
+    assertEquals(stamps.length, 1, label);
+    assertFalse('account_status' in stamps[0], `${label}: account_status is not patched`);
+    assertEquals(stamps[0].last_invited_at, NOW.toISOString(), `${label}: the rest of the stamp is written`);
+    assertEquals(profileRow(world, P.invitedA.profileId).account_status, 'active', label);
+  }
+});
+
+Deno.test('invite (legacy, record RPC missing): an active-default profile without a login gets a fresh login and is stamped invited', async () => {
+  // The importer's insert leaves account_status at its default ('active'); nobody has signed in.
+  const world = buildWorld({ p3: false });
+  profileRow(world, P.importedA.profileId).account_status = 'active';
+  const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, mailer().deps);
+  assert(outcome.status === 'sent' && !outcome.stored);
+  assertEquals(linkCalls(world).map((c) => c.args.type), ['invite']);
+  const stamps = legacyStamps(world, P.importedA.profileId);
+  assertEquals(stamps.length, 1);
+  assertEquals(stamps[0].account_status, 'invited');
+  assert(stamps[0].user_id, 'the login invite created is linked');
+  assertEquals(profileRow(world, P.importedA.profileId).account_status, 'invited');
+});
+
+Deno.test('invite (legacy, record RPC missing): the login vetted after "already registered" carries the sign-in evidence', async () => {
+  // A login STORM invited for this profile (a user_invitations row carries it) that has signed in since; the profile
+  // has no login yet and reads active. Without the lookup function the magic link names the login and it is vetted.
+  for (const signedIn of [true, false]) {
+    const world = buildWorld({ p3: false });
+    world.missingTables.delete('user_invitations');
+    profileRow(world, P.importedA.profileId).account_status = 'active';
+    const login: FakeAuthUser = {
+      id: '00000000-0000-4000-8000-00000000f001',
+      email: P.importedA.email,
+      email_confirmed_at: null,
+      invited_at: '2026-11-10T00:00:00Z',
+      last_sign_in_at: signedIn ? '2026-11-12T08:00:00Z' : null,
+      identities: [{ provider: 'email' }],
+    };
+    world.authUsers.push(login);
+    (world.tables.user_invitations ??= []).push({
+      id: 'inv-old', company_id: CO_A, profile_id: P.importedA.profileId, user_id: login.id, status: 'expired', send_attempts: 1,
+    });
+    const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.importedA.profileId, mailer().deps);
+    assert(outcome.status === 'sent' && !outcome.stored, `signedIn=${signedIn}`);
+    assertEquals(linkCalls(world).map((c) => c.args.type), ['invite', 'magiclink'], `signedIn=${signedIn}`);
+    const stamps = legacyStamps(world, P.importedA.profileId);
+    assertEquals(stamps.length, 1, `signedIn=${signedIn}`);
+    assertEquals(stamps[0].user_id, login.id, `signedIn=${signedIn}: the vetted login is linked`);
+    if (signedIn) assertFalse('account_status' in stamps[0], 'signed in: account_status is not patched');
+    else assertEquals(stamps[0].account_status, 'invited');
+    assertEquals(profileRow(world, P.importedA.profileId).account_status, signedIn ? 'active' : 'invited');
+  }
+});
+
+Deno.test('invite (legacy, record RPC missing): a disabled or deactivated profile stays as it is (refused, nothing stamped)', async () => {
+  for (const status of ['disabled', 'deactivated']) {
+    const { world } = activeDefaultInvitee();
+    profileRow(world, P.invitedA.profileId).account_status = status;
+    const m = mailer();
+    const outcome = await inviteProfile(await ctxFor(world, P.adminA), P.invitedA.profileId, m.deps);
+    assert(outcome.status === 'refused', status);
+    assertEquals([outcome.error.status, outcome.error.code, outcome.error.details?.reason], [409, 'conflict', 'access_disabled'], status);
+    assertEquals(m.sent.length, 0, status);
+    assertEquals(legacyStamps(world, P.invitedA.profileId).length, 0, status);
+    assertEquals(profileRow(world, P.invitedA.profileId).account_status, status);
+  }
 });

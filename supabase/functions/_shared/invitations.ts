@@ -89,8 +89,13 @@
  *    and links `user_id`. When the RPC is missing (D-01) the legacy profile
  *    columns are updated **only after a successful send**, linking only the
  *    vetted login (adopted, or the one `invite` just created), and the
- *    answer says `stored: false`. Any other error (a 42501 refusal such as
- *    `inviter_out_of_reach`, `manages_admins_required`,
+ *    answer says `stored: false`. The legacy stamp mirrors the SQL rule
+ *    (D-236): `account_status` becomes `invited` unless it is `disabled` /
+ *    `deactivated`, or `active` with sign-in evidence (the profile's
+ *    `last_login_at`, or `last_sign_in_at` on the vetted login), so a
+ *    profile left `active` by the column default whose person never signed
+ *    in is one the D-228 expiry reaches. Any other error (a 42501 refusal
+ *    such as `inviter_out_of_reach`, `manages_admins_required`,
  *    `master_needs_admin`, `login_email_mismatch`, `login_not_invited`, or
  *    a failure) stores and links nothing and skips step 11: the answer
  *    keeps the email's real result with `stored: false`, and the refusal
@@ -282,7 +287,7 @@ async function readTarget(ctx: AuthContext, profileId: string): Promise<Target> 
   const res = await ctx.userClient
     .from('profiles')
     .select(
-      'id, user_id, email, first_name, company_id, account_status, role, last_invited_at, invitation_count, invited_at, imported_vessel_id, is_imported, position, rank, joining_date',
+      'id, user_id, email, first_name, company_id, account_status, role, last_invited_at, last_login_at, invitation_count, invited_at, imported_vessel_id, is_imported, position, rank, joining_date',
     )
     .eq('id', profileId)
     .maybeSingle();
@@ -345,6 +350,13 @@ interface Link {
   ok: true;
   actionLink: string;
   userId: string | null;
+  /**
+   * The vetted login's auth row (the plan's, the one vetted after `invite`
+   * answered "already registered", else the login the link names, e.g. the
+   * one `invite` just created); its `last_sign_in_at` is sign-in evidence
+   * for the legacy stamp (D-236). Null when unknown.
+   */
+  login: Row | null;
 }
 
 /**
@@ -445,6 +457,7 @@ async function planLogin(ctx: AuthContext, target: Target, email: string, ownUse
 async function generateInviteLink(ctx: AuthContext, target: Target, email: string, landing: string, plan: LoginPlan, now: Date): Promise<Link | { ok: false }> {
   const admin = ctx.serviceClient().auth.admin;
   let vetted: string | null = plan.kind === 'own' || plan.kind === 'adopt' ? plan.userId : null;
+  let vettedLogin: Row | null = plan.kind === 'own' || plan.kind === 'adopt' ? plan.user : null;
   let type: 'invite' | 'magiclink' = vetted ? 'magiclink' : 'invite';
   let vetLinkUser = false;
   let res = await admin.generateLink({ type, email, options: { redirectTo: landing } });
@@ -454,6 +467,7 @@ async function generateInviteLink(ctx: AuthContext, target: Target, email: strin
       const p = await dispose(ctx, target, again.id, false);
       if (p.kind === 'adopt' && bannedNow(p.user, now)) throw LOGIN_BLOCKED();
       vetted = again.id;
+      vettedLogin = p.kind === 'adopt' ? p.user : null;
     } else if (!again.available) {
       vetLinkUser = true;
     } else {
@@ -473,10 +487,11 @@ async function generateInviteLink(ctx: AuthContext, target: Target, email: strin
     const p = await dispose(ctx, target, linkUserId, false);
     if (p.kind === 'adopt' && bannedNow(p.user, now)) throw LOGIN_BLOCKED();
     vetted = linkUserId;
+    vettedLogin = p.kind === 'adopt' ? p.user : null;
   }
   if (vetted && linkUserId && linkUserId !== vetted) throw EMAIL_TAKEN();
   if (!vetted && linkUserId && (await linkedElsewhere(ctx, linkUserId, target.profileId))) throw EMAIL_TAKEN();
-  return { ok: true, actionLink: res.data.properties.action_link, userId: linkUserId ?? vetted };
+  return { ok: true, actionLink: res.data.properties.action_link, userId: linkUserId ?? vetted, login: vettedLogin ?? asRow(res.data.user) };
 }
 
 async function bestEffortName(ctx: AuthContext, table: 'companies' | 'vessels', id: string | null): Promise<string | undefined> {
@@ -490,12 +505,43 @@ async function bestEffortName(ctx: AuthContext, table: 'companies' | 'vessels', 
 }
 
 /**
+ * Sign-in evidence (D-236, the edge side of `record_invitation_send`'s rule):
+ * the profile records a sign-in (`last_login_at`), or the vetted login has
+ * signed in (`last_sign_in_at`). The SQL rule also counts an accepted
+ * membership in the profile's company; the edge reads no memberships here
+ * (no extra call), and accepting one takes a signed-in login, whose
+ * `last_sign_in_at` the auth row already carries.
+ */
+function hasSignedIn(target: Target, login: Row | null): boolean {
+  return !!text(target.row, 'last_login_at') || !!text(login, 'last_sign_in_at');
+}
+
+/**
+ * The `account_status` a sent invitation's legacy stamp writes, or null to
+ * leave it (D-236, the SQL rule of `record_invitation_send`): `disabled` /
+ * `deactivated` stay; `active` stays only with sign-in evidence; anything
+ * else (including an `active` left by the column default whose person never
+ * signed in) becomes `invited`.
+ */
+export function legacyInviteStatus(status: string, signedIn: boolean): 'invited' | null {
+  const current = status.trim().toLowerCase();
+  if (DISABLED.has(current)) return null;
+  if (current === 'active' && signedIn) return null;
+  return 'invited';
+}
+
+/**
  * Legacy profile columns, only after a successful send and only when
  * `record_invitation_send` is missing (D-01). `linkUserId` is the vetted
- * login (step 6 / step 8). True when the update was stored (so `user_id` is
- * linked when it was missing).
+ * login (step 6 / step 8) and `login` its auth row (sign-in evidence). True
+ * when the update was stored (so `user_id` is linked when it was missing).
+ *
+ * `account_status` becomes `invited` unless it is `disabled` / `deactivated`,
+ * or `active` with sign-in evidence (D-236): a profile left `active` by the
+ * column default (an importer insert) whose person never signed in is
+ * stamped `invited`, so an invitation past its expiry grants nothing (D-228).
  */
-async function stampLegacyProfile(ctx: AuthContext, target: Target, linkUserId: string | null, now: Date): Promise<boolean> {
+async function stampLegacyProfile(ctx: AuthContext, target: Target, linkUserId: string | null, login: Row | null, now: Date): Promise<boolean> {
   const at = now.toISOString();
   const patch: Record<string, string | number> = {
     last_invited_at: at,
@@ -503,7 +549,8 @@ async function stampLegacyProfile(ctx: AuthContext, target: Target, linkUserId: 
     invitation_count: (int(target.row, 'invitation_count') ?? 0) + 1,
     updated_at: at,
   };
-  if (target.status !== 'active' && !DISABLED.has(target.status)) patch.account_status = 'invited';
+  const status = legacyInviteStatus(target.status, hasSignedIn(target, login));
+  if (status) patch.account_status = status;
   if (!target.userId && linkUserId) patch.user_id = linkUserId;
   const res = await ctx.serviceClient().from('profiles').update(patch).eq('id', target.profileId);
   if (res.error) log('warn', 'invite_legacy_stamp_failed', { profile_id: target.profileId, code: errorCode(res.error) || 'none' });
@@ -806,8 +853,10 @@ async function runInvite(ctx: AuthContext, profileId: string, deps: InviteDeps):
   const link = ready ? await generateInviteLink(ctx, target, email, landing, plan, now) : ({ ok: false } as const);
   let result: EmailResult | { ok: false; errorCode: 'link_failed' };
   let linkUserId: string | null = null;
+  let linkLogin: Row | null = null;
   if (link.ok) {
     linkUserId = link.userId;
+    linkLogin = link.login;
     const attempt = reservation.attempt;
     const variables: Record<string, string> = { action_link: link.actionLink };
     const firstName = text(target.row, 'first_name');
@@ -841,7 +890,7 @@ async function runInvite(ctx: AuthContext, profileId: string, deps: InviteDeps):
   let recordAccepted = true;
   if (record.error) {
     if (isMissingFunction(record.error)) {
-      if (result.ok) linkStored = await stampLegacyProfile(ctx, target, linkUserId, now);
+      if (result.ok) linkStored = await stampLegacyProfile(ctx, target, linkUserId, linkLogin, now);
     } else {
       // A refusal (42501 inviter_out_of_reach, manages_admins_required, master_needs_admin, login_email_mismatch,
       // login_not_invited) or a failure: nothing is stored or linked here, and the answer keeps what the email did.
