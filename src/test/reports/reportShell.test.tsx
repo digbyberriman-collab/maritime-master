@@ -263,12 +263,16 @@ describe('ReportShell: header', () => {
       'Fleet list',
       'Fleet certificates',
       'Crew documents',
+      'Insurance',
       'Crew qualifications',
       'Hours of rest',
       'Agreements',
       'Contracts ending',
+      'Overdue drills',
       'Incident analytics',
       'Drill analytics',
+      'Audits and surveys',
+      'Work list',
       'Risk overview',
     ]);
     fireEvent.keyDown(screen.getByRole('option', { name: 'Drill analytics' }), { key: 'Enter' });

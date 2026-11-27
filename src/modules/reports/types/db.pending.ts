@@ -23,6 +23,18 @@
  *     months not submitted, vessels logging, the heat map and people with
  *     repeat breaches over a period of at most 366 days.
  *   - `fleet_report_contracts` (R10 agreements / R11 contracts ending).
+ * - The operations reports (X5-10B; `20261124041000_fleet_report_ops_sources.sql`),
+ *   each one jsonb parsed by ../hooks/useOpsReports.ts:
+ *   - `fleet_report_overdue_drills` (R7): scheduled drills missed, required
+ *     drill types past their interval or due within 7 days, and required
+ *     types never carried out;
+ *   - `fleet_report_insurance` (R13): every policy with the expiry engine's
+ *     bucket and window (fleet policies for the fleet-wide read with fleet
+ *     reach);
+ *   - `fleet_report_audits` (R17): audits and certificate surveys over a
+ *     period of at most 731 days, overdue and in-progress audits always;
+ *   - `fleet_report_work_list` (R18): jobs per vessel with status chips, and
+ *     the overdue jobs.
  *
  * The hub's current-position tiles read the dashboard's
  * `fleet_dashboard_kpis` and the Vessel comparison report reads
@@ -252,6 +264,179 @@ export interface FleetReportContractsJson {
   rows: ContractReportRow[];
 }
 
+// ─── Operations reports (X5-10B) ────────────────────────────────────────
+
+/** Why a drill row is listed (gap/02 R7; SQL fleet_report_drill_interval_state for the interval kinds). */
+export type DrillRowKind = 'missed' | 'lapsed' | 'due_soon' | 'never';
+
+/**
+ * One row of `fleet_report_overdue_drills`: a scheduled drill missed
+ * (`drill_id` set), or a required drill type's interval on a vessel
+ * (`lapsed`, `due_soon`, `never`). `days_overdue` is today − the due day
+ * (negative while still due; null for `never`).
+ */
+export interface OverdueDrillRow {
+  kind: DrillRowKind;
+  vessel_id: string;
+  drill_type_id: string;
+  drill_type: string;
+  /** SOLAS_Required, Company_Required or Voluntary (the live drill_types.category). */
+  category: string;
+  /** The interval in days (drill_types.minimum_frequency). */
+  frequency_days: number;
+  solas_reference: string | null;
+  drill_id: string | null;
+  drill_number: string | null;
+  /** The missed drill's live status; null for an interval row. */
+  status: string | null;
+  due_on: string | null;
+  days_overdue: number | null;
+  last_done_on: string | null;
+  next_scheduled_on: string | null;
+}
+
+/** `fleet_report_overdue_drills` as parsed. */
+export interface FleetReportOverdueDrillsJson {
+  today: string;
+  /** The active required drill types the interval rows are checked against. */
+  required_types: number;
+  vessels: ReportVesselCoverage[];
+  rows: OverdueDrillRow[];
+}
+
+/** One policy of `fleet_report_insurance` (amounts, contacts and notes are never sent). */
+export interface InsurancePolicyRow {
+  policy_id: string;
+  /** null = a fleet policy. */
+  vessel_id: string | null;
+  policy_type: string | null;
+  insurer: string | null;
+  policy_number: string | null;
+  coverage_start: string | null;
+  coverage_end: string | null;
+  days_remaining: number | null;
+  /** The expiry engine's bucket (expired, expiring_soon, expiring, valid). */
+  bucket: string;
+  window_days: number;
+  status: string | null;
+  certificate_on_file: boolean;
+}
+
+/** `fleet_report_insurance` as parsed. */
+export interface FleetReportInsuranceJson {
+  today: string;
+  vessels: Array<ReportVesselCoverage & { state: 'ok' | 'no_access' }>;
+  /** Fleet policies are listed (the fleet-wide read with fleet reach). */
+  fleet_level: boolean;
+  rows: InsurancePolicyRow[];
+}
+
+/** An audit's or survey's state (gap/02 R17; SQL fleet_report_audit_state). */
+export type AuditState = 'due' | 'overdue' | 'in_progress' | 'done' | 'cancelled';
+export type AuditRowKind = 'audit' | 'certificate_survey';
+
+export interface AuditFindingCounts {
+  total: number;
+  /** Not Closed. */
+  open: number;
+  major: number;
+  minor: number;
+  observations: number;
+}
+
+/** One row of `fleet_report_audits`: an audit, or a vessel certificate's next survey. */
+export interface AuditSurveyRow {
+  kind: AuditRowKind;
+  id: string;
+  /** null = a company audit. */
+  vessel_id: string | null;
+  reference: string | null;
+  /** The audit type, or the certificate's name. */
+  title: string | null;
+  /** The audit scope, or the certificate type. */
+  scope: string | null;
+  /** The audit's live status; null for a survey. */
+  status: string | null;
+  state: AuditState;
+  outcome: string | null;
+  scheduled_on: string | null;
+  started_on: string | null;
+  ended_on: string | null;
+  /** The row's date: the actual start, else the scheduled day (a survey's due day). */
+  on_date: string | null;
+  /** on_date − today. */
+  days: number | null;
+  /** The external organisation, or a certificate's issuing authority. */
+  auditor_org: string | null;
+  auditor_name: string | null;
+  lead_auditor: string | null;
+  /** null for a survey. */
+  findings: AuditFindingCounts | null;
+}
+
+export interface AuditVesselCoverage extends ReportVesselCoverage {
+  /** Certificate surveys follow the certificates rule, not Safety. */
+  surveys_state: 'ok' | 'no_access';
+}
+
+/** `fleet_report_audits` as parsed. */
+export interface FleetReportAuditsJson {
+  from: string;
+  to: string;
+  today: string;
+  vessels: AuditVesselCoverage[];
+  /** Company audits are listed (the fleet-wide read with fleet reach). */
+  fleet_level: boolean;
+  rows: AuditSurveyRow[];
+}
+
+/** One vessel of `fleet_report_work_list`; every number is null where the vessel is not covered. */
+export interface WorkListVesselRow extends ReportVesselCoverage {
+  open: number | null;
+  overdue: number | null;
+  pending_approval: number | null;
+  /** Open, not overdue, due within 30 days. */
+  due_30: number | null;
+  /** High or urgent, open. */
+  high_priority: number | null;
+  completed_30: number | null;
+  /** Open jobs by chip: overdue, pending_approval, then the live status of the rest. */
+  statuses: Record<string, number> | null;
+}
+
+export interface WorkListTotals {
+  vessels_covered: number;
+  open: number;
+  overdue: number;
+  pending_approval: number;
+  due_30: number;
+  high_priority: number;
+  completed_30: number;
+}
+
+/** One overdue job (most overdue first). */
+export interface OverdueJobRow {
+  job_id: string;
+  vessel_id: string;
+  task_number: string | null;
+  task_name: string;
+  equipment_name: string | null;
+  priority: string | null;
+  status: string | null;
+  due_date: string;
+  days_overdue: number;
+}
+
+/** `fleet_report_work_list` as parsed. */
+export interface FleetReportWorkListJson {
+  today: string;
+  vessels: WorkListVesselRow[];
+  /** null when no vessel is covered: never zeros. */
+  totals: WorkListTotals | null;
+  /** At most 200 rows, with the total. */
+  overdue: { total: number; rows: OverdueJobRow[] };
+}
+
 export type ReportsPendingFunctions = {
   fleet_report_trends: {
     Args: { p_vessel_ids?: string[] | null; p_months?: number; p_today?: string };
@@ -271,6 +456,22 @@ export type ReportsPendingFunctions = {
   };
   fleet_report_contracts: {
     Args: { p_vessel_ids?: string[] | null; p_mode?: 'agreements' | 'ending'; p_today?: string };
+    Returns: Json;
+  };
+  fleet_report_overdue_drills: {
+    Args: { p_vessel_ids?: string[] | null; p_today?: string };
+    Returns: Json;
+  };
+  fleet_report_insurance: {
+    Args: { p_vessel_ids?: string[] | null; p_today?: string };
+    Returns: Json;
+  };
+  fleet_report_audits: {
+    Args: { p_vessel_ids?: string[] | null; p_from?: string | null; p_to?: string | null; p_today?: string };
+    Returns: Json;
+  };
+  fleet_report_work_list: {
+    Args: { p_vessel_ids?: string[] | null; p_today?: string };
     Returns: Json;
   };
 };

@@ -1,0 +1,191 @@
+{
+ "today": "$date:+0",
+ "vessels": [
+  {
+   "vessel_id": "e0000000-0000-4000-8000-000000000006",
+   "vessel_name": "DAGON",
+   "vessel_code": "DAG",
+   "state": "ok",
+   "open": 9,
+   "overdue": 1,
+   "pending_approval": 0,
+   "due_30": 4,
+   "high_priority": 1,
+   "completed_30": 6,
+   "statuses": {
+    "overdue": 1,
+    "pending": 5,
+    "scheduled": 3
+   }
+  },
+  {
+   "vessel_id": "e0000000-0000-4000-8000-000000000001",
+   "vessel_name": "DRAAK",
+   "vessel_code": "DRA",
+   "state": "ok",
+   "open": 14,
+   "overdue": 4,
+   "pending_approval": 1,
+   "due_30": 5,
+   "high_priority": 3,
+   "completed_30": 9,
+   "statuses": {
+    "overdue": 4,
+    "pending_approval": 1,
+    "in_progress": 2,
+    "pending": 4,
+    "scheduled": 3
+   }
+  },
+  {
+   "vessel_id": "e0000000-0000-4000-8000-000000000002",
+   "vessel_name": "GAME CHANGER",
+   "vessel_code": "GAM",
+   "state": "ok",
+   "open": 6,
+   "overdue": 2,
+   "pending_approval": 0,
+   "due_30": 2,
+   "high_priority": 1,
+   "completed_30": 3,
+   "statuses": {
+    "overdue": 2,
+    "in_progress": 1,
+    "scheduled": 3
+   }
+  },
+  {
+   "vessel_id": "e0000000-0000-4000-8000-000000000007",
+   "vessel_name": "HYDRA",
+   "vessel_code": "HYD",
+   "state": "module_off",
+   "open": null,
+   "overdue": null,
+   "pending_approval": null,
+   "due_30": null,
+   "high_priority": null,
+   "completed_30": null,
+   "statuses": null
+  },
+  {
+   "vessel_id": "e0000000-0000-4000-8000-000000000003",
+   "vessel_name": "LEVIATHAN",
+   "vessel_code": "LEV",
+   "state": "no_access",
+   "open": null,
+   "overdue": null,
+   "pending_approval": null,
+   "due_30": null,
+   "high_priority": null,
+   "completed_30": null,
+   "statuses": null
+  },
+  {
+   "vessel_id": "e0000000-0000-4000-8000-000000000004",
+   "vessel_name": "ROCINANTE",
+   "vessel_code": "ROC",
+   "state": "ok",
+   "open": 3,
+   "overdue": 0,
+   "pending_approval": 0,
+   "due_30": 1,
+   "high_priority": 0,
+   "completed_30": 11,
+   "statuses": {
+    "pending": 1,
+    "scheduled": 2
+   }
+  }
+ ],
+ "totals": {
+  "vessels_covered": 4,
+  "open": 32,
+  "overdue": 7,
+  "pending_approval": 1,
+  "due_30": 12,
+  "high_priority": 5,
+  "completed_30": 29
+ },
+ "overdue": {
+  "total": 7,
+  "rows": [
+   {
+    "job_id": "d6000000-0000-4000-8000-000000000001",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "task_number": "PMS-0142",
+    "task_name": "Main engine 2,000 h service",
+    "equipment_name": "Main engine (port)",
+    "priority": "High",
+    "status": "Pending",
+    "due_date": "$date:-23",
+    "days_overdue": 23
+   },
+   {
+    "job_id": "d6000000-0000-4000-8000-000000000002",
+    "vessel_id": "e0000000-0000-4000-8000-000000000002",
+    "task_number": "PMS-0311",
+    "task_name": "Emergency generator load test",
+    "equipment_name": "Emergency generator",
+    "priority": "Urgent",
+    "status": "Scheduled",
+    "due_date": "$date:-17",
+    "days_overdue": 17
+   },
+   {
+    "job_id": "d6000000-0000-4000-8000-000000000003",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "task_number": "PMS-0157",
+    "task_name": "Fire pump pressure check",
+    "equipment_name": "Fire pump",
+    "priority": "Normal",
+    "status": "Pending",
+    "due_date": "$date:-11",
+    "days_overdue": 11
+   },
+   {
+    "job_id": "d6000000-0000-4000-8000-000000000004",
+    "vessel_id": "e0000000-0000-4000-8000-000000000006",
+    "task_number": "PMS-0420",
+    "task_name": "Steering gear inspection",
+    "equipment_name": "Steering gear",
+    "priority": "High",
+    "status": "In_Progress",
+    "due_date": "$date:-6",
+    "days_overdue": 6
+   },
+   {
+    "job_id": "d6000000-0000-4000-8000-000000000005",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "task_number": "PMS-0166",
+    "task_name": "Watermaker membrane change",
+    "equipment_name": "Watermaker",
+    "priority": "Normal",
+    "status": "Scheduled",
+    "due_date": "$date:-4",
+    "days_overdue": 4
+   },
+   {
+    "job_id": "d6000000-0000-4000-8000-000000000006",
+    "vessel_id": "e0000000-0000-4000-8000-000000000002",
+    "task_number": "PMS-0325",
+    "task_name": "Tender davit wire inspection",
+    "equipment_name": "Tender davit",
+    "priority": "Normal",
+    "status": "Pending",
+    "due_date": "$date:-2",
+    "days_overdue": 2
+   },
+   {
+    "job_id": "d6000000-0000-4000-8000-000000000007",
+    "vessel_id": "e0000000-0000-4000-8000-000000000001",
+    "task_number": "PMS-0171",
+    "task_name": "Sewage plant service",
+    "equipment_name": "Sewage treatment plant",
+    "priority": "Low",
+    "status": "Overdue",
+    "due_date": "$date:+0",
+    "days_overdue": 0
+   }
+  ]
+ }
+}

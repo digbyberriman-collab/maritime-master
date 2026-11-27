@@ -169,6 +169,9 @@ CREATE TEMP TABLE fm_by_vessel ON COMMIT DROP AS SELECT * FROM public.fleet_expi
 SELECT tests.reset_role();
 GRANT SELECT ON fm_items, fm_unassigned, fm_summary, fm_by_vessel TO PUBLIC;
 
+-- With the crew document catalogue (X1, 20261124060400) applied, the legacy crew
+-- rows are read through the crew_documents source (D-X5-01 handover) and a
+-- qualification links to its own profile tab.
 SELECT tests.results_eq(
   'SELECT source_key, record_id, item_type, vessel_id, bucket, days_remaining FROM fm_items',
   format($q$VALUES
@@ -177,14 +180,14 @@ SELECT tests.results_eq(
     ('zz_muted', %L, 'crew_document', %L, 'expired', -1),
     ('vessel_certificates', %L, 'vessel_certificate', %L, 'expiring_soon', 10),
     ('medical_fitness', %L, 'medical', %L, 'expiring_soon', 20),
-    ('crew_certificates_legacy', %L, 'crew_qualification', %L, 'expiring_soon', 25),
+    ('crew_documents', %L, 'crew_qualification', %L, 'expiring_soon', 25),
     ('insurance_policies', %L, 'insurance_policy', %L, 'expiring', 40),
-    ('profile_identity_legacy', %L, 'passport', %L, 'expiring', 50),
+    ('crew_documents', %L, 'passport', %L, 'expiring', 50),
     ('crew_contracts', %L, 'contract', %L, 'expiring', 80),
-    ('profile_identity_legacy', %L, 'passport', %L, 'expiring', 100),
+    ('crew_documents', %L, 'passport', %L, 'expiring', 100),
     ('training_records', %L, 'crew_qualification', %L, 'valid', 60),
     ('vessel_certificates', %L, 'vessel_certificate', %L, 'valid', 200),
-    ('profile_identity_legacy', %L, 'visa', %L, 'valid', 400)$q$,
+    ('crew_documents', %L, 'visa', %L, 'valid', 400)$q$,
     tests.id('cert:dra'), tests.vessel_id('A.dra'),
     tests.id('zz:loud'), tests.vessel_id('A.dra'),
     tests.id('zz:muted'), tests.vessel_id('A.dra'),
@@ -231,7 +234,7 @@ SELECT tests.results_eq(
   format($q$SELECT vessel_name, vessel_code IS NOT NULL, person_name, label, detail, link_scope, link_rel FROM fm_items WHERE record_id IN (%L, %L, %L)$q$,
          tests.id('cert:dra'), tests.id('cc:stcw'), tests.profile_id('A.pending')),
   format($q$VALUES ('M/Y DRAAK'::text, true, NULL::text, 'Safety Management Certificate'::text, 'DRA-1 · Flag'::text, 'vessel'::text, 'certificates'::text),
-                   ('M/Y DRAAK', true, 'Master A.master_dra', 'STCW Basic Safety', 'BST-2', 'vessel', 'crew/people/' || %L || '/documents'),
+                   ('M/Y DRAAK', true, 'Master A.master_dra', 'STCW Basic Safety', 'BST-2', 'vessel', 'crew/people/' || %L || '/qualifications'),
                    ('M/Y DRAAK', true, 'Crew A.pending', 'Passport', NULL, 'vessel', 'crew/people/' || %L || '/documents')$q$,
          tests.profile_id('A.master_dra'), tests.profile_id('A.pending')),
   'fleet list: vessel, person, label, detail and the deep link');
@@ -241,8 +244,8 @@ SELECT tests.is((SELECT detail FROM fm_items WHERE record_id = tests.id('med:eng
 SELECT tests.results_eq(
   'SELECT source_key, record_id, item_type, bucket, link_scope, link_rel FROM fm_unassigned WHERE vessel_id IS NULL',
   format($q$VALUES ('insurance_policies'::text, %L::uuid, 'insurance_policy'::text, 'expiring_soon'::text, 'fleet'::text, 'reports/insurance'::text),
-                   ('profile_identity_legacy', %L, 'passport', 'expiring_soon', 'workspace', 'hris/employee-records'),
-                   ('profile_identity_legacy', %L, 'passport', 'expiring_soon', 'workspace', 'hris/employee-records'),
+                   ('crew_documents', %L, 'passport', 'expiring_soon', 'workspace', 'hris/employee-records'),
+                   ('crew_documents', %L, 'passport', 'expiring_soon', 'workspace', 'hris/employee-records'),
                    ('work_authorisations', %L, 'visa', 'expiring_soon', 'workspace', 'hris/employee-records')$q$,
          tests.id('ins:fleet'), tests.profile_id('A.arc_crew'), tests.profile_id('A.ashore'), tests.id('wa:ashore')),
   'unassigned: the fleet policy, the people with no current vessel (ended, or on a sold vessel) and the b1/b2 visa as item type visa');
@@ -376,7 +379,7 @@ FROM public.expiry_sources WHERE source_key NOT LIKE 'zz\_%' ORDER BY sort_order
 SELECT tests.is(
   (SELECT count(*) FROM public.expiry_sources AS s JOIN pg_attribute AS a ON a.attrelid = to_regclass('public.' || s.view_name) AND a.attnum > 0 AND NOT a.attisdropped
    WHERE s.source_key NOT LIKE 'zz\_%'),
-  8 * 15::bigint, 'seed: every source view has exactly the 15 contract columns');
+  (SELECT count(*) * 15 FROM public.expiry_sources WHERE source_key NOT LIKE 'zz\_%'), 'seed: every source view has exactly the 15 contract columns');
 
 -- ------------------------------------------------------------ time budget (10 vessels x 3,000 items)
 

@@ -1,0 +1,226 @@
+{
+ "today": "$date:+0",
+ "vessels": [
+  {
+   "vessel_id": "e0000000-0000-4000-8000-000000000006",
+   "vessel_name": "DAGON",
+   "vessel_code": "DAG",
+   "state": "ok"
+  },
+  {
+   "vessel_id": "e0000000-0000-4000-8000-000000000001",
+   "vessel_name": "DRAAK",
+   "vessel_code": "DRA",
+   "state": "ok"
+  },
+  {
+   "vessel_id": "e0000000-0000-4000-8000-000000000002",
+   "vessel_name": "GAME CHANGER",
+   "vessel_code": "GAM",
+   "state": "ok"
+  },
+  {
+   "vessel_id": "e0000000-0000-4000-8000-000000000007",
+   "vessel_name": "HYDRA",
+   "vessel_code": "HYD",
+   "state": "ok"
+  },
+  {
+   "vessel_id": "e0000000-0000-4000-8000-000000000003",
+   "vessel_name": "LEVIATHAN",
+   "vessel_code": "LEV",
+   "state": "no_access"
+  },
+  {
+   "vessel_id": "e0000000-0000-4000-8000-000000000004",
+   "vessel_name": "ROCINANTE",
+   "vessel_code": "ROC",
+   "state": "ok"
+  }
+ ],
+ "fleet_level": true,
+ "rows": [
+  {
+   "policy_id": "d3000000-0000-4000-8000-000000000001",
+   "vessel_id": "e0000000-0000-4000-8000-000000000002",
+   "policy_type": "Hull & Machinery",
+   "insurer": "Insurer One",
+   "policy_number": "POL-2026-0001",
+   "coverage_start": "$date:-330",
+   "coverage_end": "$date:-6",
+   "days_remaining": -6,
+   "bucket": "expired",
+   "window_days": 90,
+   "status": "pending_renewal",
+   "certificate_on_file": true
+  },
+  {
+   "policy_id": "d3000000-0000-4000-8000-000000000002",
+   "vessel_id": "e0000000-0000-4000-8000-000000000001",
+   "policy_type": "P&I",
+   "insurer": "Mutual Club",
+   "policy_number": "POL-2026-0002",
+   "coverage_start": "$date:-330",
+   "coverage_end": "$date:+12",
+   "days_remaining": 12,
+   "bucket": "expiring_soon",
+   "window_days": 90,
+   "status": "active",
+   "certificate_on_file": true
+  },
+  {
+   "policy_id": "d3000000-0000-4000-8000-000000000003",
+   "vessel_id": "e0000000-0000-4000-8000-000000000007",
+   "policy_type": "Hull & Machinery",
+   "insurer": "Insurer One",
+   "policy_number": "POL-2026-0003",
+   "coverage_start": "$date:-330",
+   "coverage_end": "$date:+26",
+   "days_remaining": 26,
+   "bucket": "expiring_soon",
+   "window_days": 90,
+   "status": "pending_renewal",
+   "certificate_on_file": true
+  },
+  {
+   "policy_id": "d3000000-0000-4000-8000-000000000004",
+   "vessel_id": null,
+   "policy_type": "War risks",
+   "insurer": "Insurer Three",
+   "policy_number": "POL-2026-0004",
+   "coverage_start": "$date:-330",
+   "coverage_end": "$date:+48",
+   "days_remaining": 48,
+   "bucket": "expiring",
+   "window_days": 90,
+   "status": "active",
+   "certificate_on_file": false
+  },
+  {
+   "policy_id": "d3000000-0000-4000-8000-000000000005",
+   "vessel_id": "e0000000-0000-4000-8000-000000000004",
+   "policy_type": "P&I",
+   "insurer": "Mutual Club",
+   "policy_number": "POL-2026-0005",
+   "coverage_start": "$date:-330",
+   "coverage_end": "$date:+61",
+   "days_remaining": 61,
+   "bucket": "expiring",
+   "window_days": 90,
+   "status": "active",
+   "certificate_on_file": true
+  },
+  {
+   "policy_id": "d3000000-0000-4000-8000-000000000006",
+   "vessel_id": "e0000000-0000-4000-8000-000000000006",
+   "policy_type": "Crew Medical",
+   "insurer": "Insurer Two",
+   "policy_number": "POL-2026-0006",
+   "coverage_start": "$date:-330",
+   "coverage_end": "$date:+84",
+   "days_remaining": 84,
+   "bucket": "expiring",
+   "window_days": 90,
+   "status": "active",
+   "certificate_on_file": false
+  },
+  {
+   "policy_id": "d3000000-0000-4000-8000-000000000007",
+   "vessel_id": "e0000000-0000-4000-8000-000000000001",
+   "policy_type": "Hull & Machinery",
+   "insurer": "Insurer One",
+   "policy_number": "POL-2026-0007",
+   "coverage_start": "$date:-330",
+   "coverage_end": "$date:+140",
+   "days_remaining": 140,
+   "bucket": "valid",
+   "window_days": 90,
+   "status": "active",
+   "certificate_on_file": true
+  },
+  {
+   "policy_id": "d3000000-0000-4000-8000-000000000008",
+   "vessel_id": "e0000000-0000-4000-8000-000000000006",
+   "policy_type": "P&I",
+   "insurer": "Mutual Club",
+   "policy_number": "POL-2026-0008",
+   "coverage_start": "$date:-330",
+   "coverage_end": "$date:+201",
+   "days_remaining": 201,
+   "bucket": "valid",
+   "window_days": 90,
+   "status": "active",
+   "certificate_on_file": true
+  },
+  {
+   "policy_id": "d3000000-0000-4000-8000-000000000009",
+   "vessel_id": "e0000000-0000-4000-8000-000000000002",
+   "policy_type": "P&I",
+   "insurer": "Mutual Club",
+   "policy_number": "POL-2026-0009",
+   "coverage_start": "$date:-330",
+   "coverage_end": "$date:+201",
+   "days_remaining": 201,
+   "bucket": "valid",
+   "window_days": 90,
+   "status": "active",
+   "certificate_on_file": true
+  },
+  {
+   "policy_id": "d3000000-0000-4000-8000-000000000010",
+   "vessel_id": "e0000000-0000-4000-8000-000000000004",
+   "policy_type": "Hull & Machinery",
+   "insurer": "Insurer One",
+   "policy_number": "POL-2026-0010",
+   "coverage_start": "$date:-330",
+   "coverage_end": "$date:+233",
+   "days_remaining": 233,
+   "bucket": "valid",
+   "window_days": 90,
+   "status": "active",
+   "certificate_on_file": true
+  },
+  {
+   "policy_id": "d3000000-0000-4000-8000-000000000011",
+   "vessel_id": null,
+   "policy_type": "Crew & Employer's Liability",
+   "insurer": "Insurer Two",
+   "policy_number": "POL-2026-0011",
+   "coverage_start": "$date:-330",
+   "coverage_end": "$date:+289",
+   "days_remaining": 289,
+   "bucket": "valid",
+   "window_days": 90,
+   "status": "active",
+   "certificate_on_file": true
+  },
+  {
+   "policy_id": "d3000000-0000-4000-8000-000000000012",
+   "vessel_id": "e0000000-0000-4000-8000-000000000006",
+   "policy_type": "Hull & Machinery",
+   "insurer": "Insurer One",
+   "policy_number": "POL-2026-0012",
+   "coverage_start": "$date:-330",
+   "coverage_end": "$date:+310",
+   "days_remaining": 310,
+   "bucket": "valid",
+   "window_days": 90,
+   "status": "active",
+   "certificate_on_file": true
+  },
+  {
+   "policy_id": "d3000000-0000-4000-8000-000000000013",
+   "vessel_id": "e0000000-0000-4000-8000-000000000004",
+   "policy_type": "Pollution Liability",
+   "insurer": "Insurer Three",
+   "policy_number": "POL-2026-0013",
+   "coverage_start": "$date:-330",
+   "coverage_end": "$date:+356",
+   "days_remaining": 356,
+   "bucket": "valid",
+   "window_days": 90,
+   "status": "active",
+   "certificate_on_file": false
+  }
+ ]
+}

@@ -251,9 +251,9 @@ describe('reports hub: current position', () => {
     expect(within(section).queryByText('Hours of rest')).toBeNull(); // no access: hidden
     expect(within(section).queryByText(/Leave/)).toBeNull();
     expect(within(section).getByText(/2 expired certificates/)).toBeInTheDocument();
-    // Document alerts opens Fleet certificates and Safety the CAPA tracker; Technical's work list is not registered yet.
+    // Document alerts opens Fleet certificates, Safety the CAPA tracker and Technical the work list (X5-10B).
     const links = within(section).getAllByRole('link').map((a) => a.getAttribute('href'));
-    expect(links).toEqual(['/fleet/reports/fleet-certificates', '/fleet/reports/capa-tracker']);
+    expect(links).toEqual(['/fleet/reports/fleet-certificates', '/fleet/reports/capa-tracker', '/fleet/reports/work-list']);
   });
 });
 
@@ -332,19 +332,23 @@ describe('reports hub: catalogue', () => {
     renderHub('/fleet/reports?vessels=DRA');
     const catalogue = (await screen.findByRole('heading', { name: 'All reports' })).closest('section') as HTMLElement;
     const groups = within(catalogue).getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
-    expect(groups).toEqual(['Fleet', 'Documents and certificates', 'Crew', 'Safety', 'Risk']);
+    expect(groups).toEqual(['Fleet', 'Documents and certificates', 'Crew', 'Safety', 'Technical', 'Risk']);
     const hrefs = within(catalogue).getAllByRole('link').map((a) => a.getAttribute('href'));
     expect(hrefs).toEqual([
       '/fleet/reports/vessel-comparison?vessels=DRA',
       '/fleet/reports/fleet-list?vessels=DRA',
       '/fleet/reports/fleet-certificates?vessels=DRA',
       '/fleet/reports/crew-documents?vessels=DRA',
+      '/fleet/reports/insurance?vessels=DRA',
       '/fleet/reports/crew-qualifications?vessels=DRA',
       '/fleet/reports/hours-of-rest?vessels=DRA',
       '/fleet/reports/agreements?vessels=DRA',
       '/fleet/reports/contracts-ending?vessels=DRA',
+      '/fleet/reports/overdue-drills?vessels=DRA',
       '/fleet/reports/incident-analytics',
       '/fleet/reports/drill-analytics',
+      '/fleet/reports/audits-surveys?vessels=DRA',
+      '/fleet/reports/work-list?vessels=DRA',
       '/fleet/reports/risk-overview',
     ]);
     expect(within(catalogue).queryByText('CAPA tracker')).toBeNull();

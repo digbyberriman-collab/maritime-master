@@ -35,4 +35,19 @@ export const reportsKeys = {
     vesselIds: readonly string[],
     opts: { fleetWide: boolean; mode: 'agreements' | 'ending'; today: string },
   ) => [...company(companyId), 'contracts', opts.mode, sortedIds(vesselIds), { fleetWide: opts.fleetWide, today: opts.today }] as const,
+  /** R7 overdue drills. */
+  overdueDrills: (companyId: string | null | undefined, vesselIds: readonly string[], opts: { fleetWide: boolean; today: string }) =>
+    [...company(companyId), 'overdue-drills', sortedIds(vesselIds), { fleetWide: opts.fleetWide, today: opts.today }] as const,
+  /** R13 insurance. */
+  insurance: (companyId: string | null | undefined, vesselIds: readonly string[], opts: { fleetWide: boolean; today: string }) =>
+    [...company(companyId), 'insurance', sortedIds(vesselIds), { fleetWide: opts.fleetWide, today: opts.today }] as const,
+  /** R17 audits and surveys over a period (from .. to inclusive). */
+  audits: (
+    companyId: string | null | undefined,
+    vesselIds: readonly string[],
+    opts: { fleetWide: boolean; from: string; to: string; today: string },
+  ) => [...company(companyId), 'audits-surveys', sortedIds(vesselIds), { fleetWide: opts.fleetWide, from: opts.from, to: opts.to, today: opts.today }] as const,
+  /** R18 work list. */
+  workList: (companyId: string | null | undefined, vesselIds: readonly string[], opts: { fleetWide: boolean; today: string }) =>
+    [...company(companyId), 'work-list', sortedIds(vesselIds), { fleetWide: opts.fleetWide, today: opts.today }] as const,
 };

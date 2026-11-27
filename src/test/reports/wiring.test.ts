@@ -53,6 +53,7 @@ const definedFunctions = new Set(Array.from(block04.matchAll(/CREATE (?:OR REPLA
 const pending = read('src/modules/reports/types/db.pending.ts');
 const HUB_SQL = read('supabase/migrations/20261124040200_fleet_reports_hub.sql');
 const CREW_SQL = read('supabase/migrations/20261124040900_fleet_report_crew_sources.sql');
+const OPS_SQL = read('supabase/migrations/20261124041000_fleet_report_ops_sources.sql');
 
 const leaves = (items: readonly NavChild[], acc: NavChild[] = []): NavChild[] => {
   for (const it of items) {
@@ -116,12 +117,16 @@ describe('capabilities', () => {
 describe('database objects', () => {
   const rpcs = new Set(Array.from(allSource.matchAll(/\.rpc\(\s*'([a-z_]+)'/g)).map((m) => m[1]));
 
-  it('calls the five report RPCs and reads no table directly', () => {
+  it('calls the nine report RPCs and reads no table directly', () => {
     expect([...rpcs].sort()).toEqual([
+      'fleet_report_audits',
       'fleet_report_contracts',
       'fleet_report_crew_qualifications',
       'fleet_report_hours_of_rest',
+      'fleet_report_insurance',
+      'fleet_report_overdue_drills',
       'fleet_report_trends',
+      'fleet_report_work_list',
       'fleet_vessel_list',
     ]);
     // X1's crew_compliance_for_vessels is reached only through the server wrapper (to_regprocedure, agreement 5).
@@ -200,6 +205,39 @@ describe('the crew reports SQL (X5-10A)', () => {
     expect(CREW_SQL).toContain("column_name IN ('review_outcome', 'is_serious', 'superseded_at', 'vessel_id', 'breach_day')");
     // Wages and terms of crew_contracts are never read.
     expect(CREW_SQL).not.toMatch(/base_wage_minor|wage_currency|wage_frequency|notice_period_days|governing_law/);
+  });
+});
+
+describe('the operations reports SQL (X5-10B)', () => {
+  it('sets search_path on every function, grants only the four report RPCs to authenticated, revokes the rest', () => {
+    const defs = Array.from(OPS_SQL.matchAll(/CREATE OR REPLACE FUNCTION public\.(\w+)\(/g)).map((m) => m[1]);
+    expect(defs.sort()).toEqual([
+      'fleet_report_audit_state',
+      'fleet_report_audits',
+      'fleet_report_drill_interval_state',
+      'fleet_report_insurance',
+      'fleet_report_ops_scope_for',
+      'fleet_report_overdue_drills',
+      'fleet_report_work_list',
+    ]);
+    expect(OPS_SQL.match(/SET search_path = public/g)?.length).toBe(defs.length);
+    expect(OPS_SQL.match(/SECURITY DEFINER/g)?.length).toBe(defs.length);
+    const granted = Array.from(OPS_SQL.matchAll(/GRANT EXECUTE ON FUNCTION public\.(\w+)\([^)]*\) TO authenticated;/g)).map((m) => m[1]);
+    expect(granted.sort()).toEqual(['fleet_report_audits', 'fleet_report_insurance', 'fleet_report_overdue_drills', 'fleet_report_work_list']);
+    for (const fn of defs) expect(OPS_SQL).toMatch(new RegExp(`REVOKE ALL ON FUNCTION public\\.${fn}\\([^)]*\\) FROM PUBLIC, anon, authenticated, service_role;`));
+  });
+
+  it('reuses the dashboard\'s rules and the expiry engine, so the numbers agree (D-04)', () => {
+    // Missed drills are the dashboard's overdue drills; jobs use its job state; insurance buckets come from the engine.
+    expect(OPS_SQL).toContain('public.fleet_dashboard_drill_overdue(dr.status, dr.drill_date_actual, dr.drill_date_scheduled, v_today)');
+    expect(OPS_SQL).toContain('public.fleet_dashboard_job_state(mt.status, mt.due_date, v_today)');
+    expect(OPS_SQL).toContain("public.fleet_expiry_rows_for(v_uid, v_company, s.insurance, ARRAY['insurance_policies'], s.fleet_insurance, v_today)");
+    // Per-vessel gates: the adaptor's rules for each report's capability, and the module settings.
+    for (const gate of ["'drills'", "'audits_surveys'", "'technical'"]) expect(OPS_SQL).toContain(`fleet_dashboard_tile_can_for(_user_id, _company_id, r.id, ${gate})`);
+    expect(OPS_SQL).toContain("vessel_module_on_internal(r.id, 'safety', v_today)");
+    expect(OPS_SQL).toContain("vessel_module_on_internal(r.id, 'technical.jobs', v_today)");
+    // Amounts, premiums, contacts and notes of insurance policies are never sent.
+    expect(OPS_SQL).not.toMatch(/'(premium_amount|coverage_amount|deductible_amount|insurer_contact|notes)'/);
   });
 });
 

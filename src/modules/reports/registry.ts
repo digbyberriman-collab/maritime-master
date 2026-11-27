@@ -123,6 +123,19 @@ export const REPORTS: readonly ReportDefinition[] = [
     load: () => import('./reports/CrewDocumentsReport'),
   },
   {
+    key: 'insurance',
+    scope: 'fleet',
+    group: 'documents',
+    title: 'Insurance',
+    description: 'Each vessel’s P&I, hull and machinery, crew and other cover: insurer, policy number and when it ends, most urgent first.',
+    moduleChip: 'Insurance',
+    // The insurance read (fleet_ops_can 'insurance'), on top of the reports route guard; fleet policies need fleet reach.
+    capability: 'vessel.management.office_insurance.view',
+    personalData: false,
+    exporters: ['csv', 'xlsx', 'pdf'],
+    load: () => import('./reports/InsuranceReport'),
+  },
+  {
     key: 'crew-qualifications',
     scope: 'fleet',
     group: 'crew',
@@ -174,6 +187,19 @@ export const REPORTS: readonly ReportDefinition[] = [
     load: () => import('./reports/ContractsEndingReport'),
   },
   {
+    key: 'overdue-drills',
+    scope: 'fleet',
+    group: 'safety',
+    title: 'Overdue drills',
+    description: 'Scheduled drills that were missed and required drills past their interval on each vessel, most overdue first.',
+    moduleChip: 'Safety',
+    // The drills read (fleet_dashboard_tile_can_for 'drills'), on top of the reports route guard.
+    capability: 'vessel.safety.drills.view',
+    personalData: false,
+    exporters: ['csv', 'xlsx', 'pdf'],
+    load: () => import('./reports/OverdueDrillsReport'),
+  },
+  {
     key: 'incident-analytics',
     scope: 'fleet',
     group: 'safety',
@@ -208,6 +234,33 @@ export const REPORTS: readonly ReportDefinition[] = [
     personalData: false,
     exporters: [],
     href: 'drill-analytics',
+  },
+  {
+    key: 'audits-surveys',
+    scope: 'fleet',
+    group: 'technical',
+    title: 'Audits and surveys',
+    description: 'Audits and certificate surveys across the fleet: overdue first, with their outcome, auditor and findings.',
+    moduleChip: 'Safety',
+    // The audits read (fleet_dashboard_tile_can_for 'audits_surveys'); surveys also follow the certificates read.
+    capability: 'vessel.safety.audits_surveys.view',
+    // Auditors are named.
+    personalData: true,
+    exporters: ['csv', 'xlsx', 'pdf'],
+    load: () => import('./reports/AuditsSurveysReport'),
+  },
+  {
+    key: 'work-list',
+    scope: 'fleet',
+    group: 'technical',
+    title: 'Work list',
+    description: 'Open, overdue and awaiting-approval jobs on each vessel, with the overdue jobs most overdue first.',
+    moduleChip: 'Technical',
+    // The jobs read (fleet_dashboard_tile_can_for 'technical'), on top of the reports route guard.
+    capability: 'vessel.technical.tasks.view',
+    personalData: false,
+    exporters: ['csv', 'xlsx', 'pdf'],
+    load: () => import('./reports/WorkListReport'),
   },
   {
     key: 'risk-overview',

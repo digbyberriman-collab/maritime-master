@@ -45,13 +45,17 @@ describe('report registry', () => {
       ['fleet-list', 'page'],
       ['fleet-certificates', 'page'],
       ['crew-documents', 'page'],
+      ['insurance', 'page'],
       ['crew-qualifications', 'page'],
       ['hours-of-rest', 'page'],
       ['agreements', 'page'],
       ['contracts-ending', 'page'],
+      ['overdue-drills', 'page'],
       ['incident-analytics', 'href'],
       ['capa-tracker', 'href'],
       ['drill-analytics', 'href'],
+      ['audits-surveys', 'page'],
+      ['work-list', 'page'],
       ['risk-overview', 'href'],
     ]);
   });
@@ -85,6 +89,11 @@ describe('report registry', () => {
     for (const key of ['crew-qualifications', 'hours-of-rest', 'agreements', 'contracts-ending']) {
       expect(getReport(key, 'fleet'), key).toMatchObject({ group: 'crew', personalData: true, exporters: ['csv', 'xlsx', 'pdf'] });
     }
+    // The operations reports (X5-10B): only Audits and surveys names people (its auditors).
+    expect(getReport('overdue-drills', 'fleet')).toMatchObject({ group: 'safety', personalData: false, capability: 'vessel.safety.drills.view' });
+    expect(getReport('insurance', 'fleet')).toMatchObject({ group: 'documents', personalData: false, capability: 'vessel.management.office_insurance.view' });
+    expect(getReport('audits-surveys', 'fleet')).toMatchObject({ group: 'technical', personalData: true, capability: 'vessel.safety.audits_surveys.view' });
+    expect(getReport('work-list', 'fleet')).toMatchObject({ group: 'technical', personalData: false, capability: 'vessel.technical.tasks.view' });
   });
 
   it('every loader resolves to a component', async () => {
@@ -141,6 +150,8 @@ describe('report registry', () => {
     expect(FLEET_REPORT_KEYS.has('crew-documents')).toBe(true);
     expect(FLEET_REPORT_KEYS.has('crew-qualifications')).toBe(true);
     expect(FLEET_REPORT_KEYS.has('hours-of-rest')).toBe(true);
-    expect(FLEET_REPORT_KEYS.has('work-list')).toBe(false);
+    // The dashboard's "View all" and Technical tile targets (X5-10B).
+    for (const key of ['overdue-drills', 'insurance', 'audits-surveys', 'work-list']) expect(FLEET_REPORT_KEYS.has(key), key).toBe(true);
+    expect(FLEET_REPORT_KEYS.has('no-such-report')).toBe(false);
   });
 });
