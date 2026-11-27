@@ -36,10 +36,16 @@
     },
     {
       "file": "src/modules/reports/types/db.pending.ts",
-      "mirrors": "X5 spec §2 X5-03A (20261124040200_fleet_reports_hub.sql)",
+      "mirrors": "X5 spec §2 X5-03A (20261124040200_fleet_reports_hub.sql) and X5-10A (20261124040900_fleet_report_crew_sources.sql)",
       "functions": {
         "type": "ReportsPendingFunctions",
-        "expect": ["fleet_report_trends", "fleet_vessel_list"]
+        "expect": [
+          "fleet_report_trends",
+          "fleet_vessel_list",
+          "fleet_report_crew_qualifications",
+          "fleet_report_hours_of_rest",
+          "fleet_report_contracts"
+        ]
       }
     },
     {

@@ -332,13 +332,17 @@ describe('reports hub: catalogue', () => {
     renderHub('/fleet/reports?vessels=DRA');
     const catalogue = (await screen.findByRole('heading', { name: 'All reports' })).closest('section') as HTMLElement;
     const groups = within(catalogue).getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
-    expect(groups).toEqual(['Fleet', 'Documents and certificates', 'Safety', 'Risk']);
+    expect(groups).toEqual(['Fleet', 'Documents and certificates', 'Crew', 'Safety', 'Risk']);
     const hrefs = within(catalogue).getAllByRole('link').map((a) => a.getAttribute('href'));
     expect(hrefs).toEqual([
       '/fleet/reports/vessel-comparison?vessels=DRA',
       '/fleet/reports/fleet-list?vessels=DRA',
       '/fleet/reports/fleet-certificates?vessels=DRA',
       '/fleet/reports/crew-documents?vessels=DRA',
+      '/fleet/reports/crew-qualifications?vessels=DRA',
+      '/fleet/reports/hours-of-rest?vessels=DRA',
+      '/fleet/reports/agreements?vessels=DRA',
+      '/fleet/reports/contracts-ending?vessels=DRA',
       '/fleet/reports/incident-analytics',
       '/fleet/reports/drill-analytics',
       '/fleet/reports/risk-overview',

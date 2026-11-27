@@ -45,6 +45,10 @@ describe('report registry', () => {
       ['fleet-list', 'page'],
       ['fleet-certificates', 'page'],
       ['crew-documents', 'page'],
+      ['crew-qualifications', 'page'],
+      ['hours-of-rest', 'page'],
+      ['agreements', 'page'],
+      ['contracts-ending', 'page'],
       ['incident-analytics', 'href'],
       ['capa-tracker', 'href'],
       ['drill-analytics', 'href'],
@@ -77,6 +81,10 @@ describe('report registry', () => {
       else expect(r.exporters.length, r.key).toBeGreaterThan(0);
     }
     expect(getReport('vessel-comparison', 'fleet')).toMatchObject({ personalData: false, exporters: ['csv', 'xlsx', 'pdf'] });
+    // The crew reports show people: personal data, which the export engine refuses while the export log is not set up (D-X5-12).
+    for (const key of ['crew-qualifications', 'hours-of-rest', 'agreements', 'contracts-ending']) {
+      expect(getReport(key, 'fleet'), key).toMatchObject({ group: 'crew', personalData: true, exporters: ['csv', 'xlsx', 'pdf'] });
+    }
   });
 
   it('every loader resolves to a component', async () => {
@@ -131,6 +139,8 @@ describe('report registry', () => {
     expect(FLEET_REPORT_KEYS.has('vessel-comparison')).toBe(true);
     expect(FLEET_REPORT_KEYS.has('fleet-certificates')).toBe(true);
     expect(FLEET_REPORT_KEYS.has('crew-documents')).toBe(true);
-    expect(FLEET_REPORT_KEYS.has('crew-qualifications')).toBe(false);
+    expect(FLEET_REPORT_KEYS.has('crew-qualifications')).toBe(true);
+    expect(FLEET_REPORT_KEYS.has('hours-of-rest')).toBe(true);
+    expect(FLEET_REPORT_KEYS.has('work-list')).toBe(false);
   });
 });

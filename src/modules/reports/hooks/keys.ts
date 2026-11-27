@@ -20,4 +20,19 @@ export const reportsKeys = {
     [...company(companyId), 'trends', sortedIds(vesselIds), { fleetWide: opts.fleetWide, months: opts.months, today: opts.today }] as const,
   vesselList: (companyId: string | null | undefined, vesselIds: readonly string[], opts: { fleetWide: boolean; today: string }) =>
     [...company(companyId), 'vessel-list', sortedIds(vesselIds), { fleetWide: opts.fleetWide, today: opts.today }] as const,
+  /** R5 crew qualifications (X1's compliance summaries through fleet_report_crew_qualifications). */
+  crewQualifications: (companyId: string | null | undefined, vesselIds: readonly string[], opts: { fleetWide: boolean }) =>
+    [...company(companyId), 'crew-qualifications', sortedIds(vesselIds), { fleetWide: opts.fleetWide }] as const,
+  /** R9 hours of rest over a period (from .. to inclusive). */
+  hoursOfRest: (
+    companyId: string | null | undefined,
+    vesselIds: readonly string[],
+    opts: { fleetWide: boolean; from: string; to: string; today: string },
+  ) => [...company(companyId), 'hours-of-rest', sortedIds(vesselIds), { fleetWide: opts.fleetWide, from: opts.from, to: opts.to, today: opts.today }] as const,
+  /** R10 agreements / R11 contracts ending. */
+  contracts: (
+    companyId: string | null | undefined,
+    vesselIds: readonly string[],
+    opts: { fleetWide: boolean; mode: 'agreements' | 'ending'; today: string },
+  ) => [...company(companyId), 'contracts', opts.mode, sortedIds(vesselIds), { fleetWide: opts.fleetWide, today: opts.today }] as const,
 };

@@ -52,6 +52,7 @@ const block04 = readdirSync(join(ROOT, 'supabase/migrations'))
 const definedFunctions = new Set(Array.from(block04.matchAll(/CREATE (?:OR REPLACE )?FUNCTION public\.(\w+)\s*\(/gi)).map((m) => m[1]));
 const pending = read('src/modules/reports/types/db.pending.ts');
 const HUB_SQL = read('supabase/migrations/20261124040200_fleet_reports_hub.sql');
+const CREW_SQL = read('supabase/migrations/20261124040900_fleet_report_crew_sources.sql');
 
 const leaves = (items: readonly NavChild[], acc: NavChild[] = []): NavChild[] => {
   for (const it of items) {
@@ -115,8 +116,16 @@ describe('capabilities', () => {
 describe('database objects', () => {
   const rpcs = new Set(Array.from(allSource.matchAll(/\.rpc\(\s*'([a-z_]+)'/g)).map((m) => m[1]));
 
-  it('calls the two report RPCs and reads no table directly', () => {
-    expect([...rpcs].sort()).toEqual(['fleet_report_trends', 'fleet_vessel_list']);
+  it('calls the five report RPCs and reads no table directly', () => {
+    expect([...rpcs].sort()).toEqual([
+      'fleet_report_contracts',
+      'fleet_report_crew_qualifications',
+      'fleet_report_hours_of_rest',
+      'fleet_report_trends',
+      'fleet_vessel_list',
+    ]);
+    // X1's crew_compliance_for_vessels is reached only through the server wrapper (to_regprocedure, agreement 5).
+    expect(allSource).not.toMatch(/\.rpc\(\s*'crew_compliance_for_vessels'/);
     expect(allSource).not.toMatch(/\.from\(\s*'/);
   });
 
@@ -163,6 +172,34 @@ describe('database objects', () => {
     const granted = Array.from(HUB_SQL.matchAll(/GRANT EXECUTE ON FUNCTION public\.(\w+)\([^)]*\) TO authenticated;/g)).map((m) => m[1]);
     expect(granted.sort()).toEqual(['fleet_report_trends', 'fleet_vessel_list']);
     for (const fn of defs) expect(HUB_SQL).toMatch(new RegExp(`REVOKE ALL ON FUNCTION public\\.${fn}\\([^)]*\\) FROM PUBLIC, anon, authenticated, service_role;`));
+  });
+});
+
+describe('the crew reports SQL (X5-10A)', () => {
+  it('sets search_path on every function, grants only the three report RPCs to authenticated, revokes the rest', () => {
+    const defs = Array.from(CREW_SQL.matchAll(/CREATE OR REPLACE FUNCTION public\.(\w+)\(/g)).map((m) => m[1]);
+    expect(defs.sort()).toEqual([
+      'fleet_report_agreement_awaiting',
+      'fleet_report_agreement_state',
+      'fleet_report_contract_bucket',
+      'fleet_report_contracts',
+      'fleet_report_crew_qualifications',
+      'fleet_report_crew_scope_for',
+      'fleet_report_hor_vessel_on',
+      'fleet_report_hours_of_rest',
+    ]);
+    expect(CREW_SQL.match(/SET search_path = public/g)?.length).toBe(defs.length);
+    const granted = Array.from(CREW_SQL.matchAll(/GRANT EXECUTE ON FUNCTION public\.(\w+)\([^)]*\) TO authenticated;/g)).map((m) => m[1]);
+    expect(granted.sort()).toEqual(['fleet_report_contracts', 'fleet_report_crew_qualifications', 'fleet_report_hours_of_rest']);
+    for (const fn of defs) expect(CREW_SQL).toMatch(new RegExp(`REVOKE ALL ON FUNCTION public\\.${fn}\\([^)]*\\) FROM PUBLIC, anon, authenticated, service_role;`));
+  });
+
+  it('reaches X1 only through guarded, dynamic calls on the agreed names (D-X5-10, contracts 5 and 6)', () => {
+    expect(CREW_SQL).toContain("to_regprocedure('public.crew_compliance_for_vessels(uuid[])')");
+    expect(CREW_SQL).toMatch(/EXECUTE \$x\$[\s\S]*FROM public\.crew_compliance_for_vessels\(\$1\)/);
+    expect(CREW_SQL).toContain("column_name IN ('review_outcome', 'is_serious', 'superseded_at', 'vessel_id', 'breach_day')");
+    // Wages and terms of crew_contracts are never read.
+    expect(CREW_SQL).not.toMatch(/base_wage_minor|wage_currency|wage_frequency|notice_period_days|governing_law/);
   });
 });
 

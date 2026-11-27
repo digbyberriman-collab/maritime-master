@@ -10,6 +10,19 @@
  * - `fleet_report_trends`: the hub's monthly trends as one jsonb
  *   (`FleetReportTrendsJson`, parsed by ../hooks/useReportsHub.ts).
  * - `fleet_vessel_list`: one row per vessel (the Fleet list report, X5-03B).
+ * - The crew reports (X5-10A; `20261124040900_fleet_report_crew_sources.sql`),
+ *   each one jsonb parsed by ../hooks/useCrewReports.ts:
+ *   - `fleet_report_crew_qualifications` (R5): X1's
+ *     `crew_compliance_for_vessels(uuid[])` summary rows for the vessels the
+ *     reader may see them on, through a server wrapper that checks
+ *     `to_regprocedure` first (`state: 'not_set_up'` while X1's function is
+ *     missing). The person rows are X1's frozen columns (platform plan
+ *     contract 5; `src/modules/crew/types/db.pending.ts`
+ *     `CrewComplianceSummaryDbRow`) less the login id.
+ *   - `fleet_report_hours_of_rest` (R9): breaches, serious breach days,
+ *     months not submitted, vessels logging, the heat map and people with
+ *     repeat breaches over a period of at most 366 days.
+ *   - `fleet_report_contracts` (R10 agreements / R11 contracts ending).
  *
  * The hub's current-position tiles read the dashboard's
  * `fleet_dashboard_kpis` and the Vessel comparison report reads
@@ -62,6 +75,183 @@ export type FleetVesselListRow = {
   certificates_expiring: number | null;
 };
 
+// ─── Crew reports (X5-10A) ──────────────────────────────────────────────
+
+/** How a report covers a vessel: `ok`, or why it shows no numbers there. */
+export type ReportVesselState = 'ok' | 'no_access' | 'module_off';
+
+/** One vessel of a crew report's read and whether the report counts it. */
+export interface ReportVesselCoverage {
+  vessel_id: string;
+  vessel_name: string;
+  vessel_code: string | null;
+  state: ReportVesselState;
+}
+
+/** A person's compliance status (X1's crew_compliance_status_decide; statusTone `crew_compliance`). */
+export type CrewComplianceStatus = 'complete' | 'expiring' | 'missing' | 'expired';
+
+/** One unmet requirement behind a person's status, worst first (X1's issues). */
+export interface CrewQualificationIssue {
+  row_id: string;
+  label: string;
+  tab: string;
+  state: string;
+  reason: string | null;
+}
+
+/**
+ * One person of `fleet_report_crew_qualifications` (R5): X1's frozen summary
+ * columns (contract 5) less `user_id`. Counts are requirement rows: `met`
+ * includes expiring rows; the per-tab pairs are met of required.
+ */
+export interface CrewQualificationRow {
+  vessel_id: string;
+  profile_id: string;
+  first_name: string | null;
+  last_name: string | null;
+  preferred_name: string | null;
+  position_name: string | null;
+  position_text: string | null;
+  department_key: string | null;
+  rank_tier: string | null;
+  sort_order: number | null;
+  /** 'assignment' | 'planned' | 'pending_placement' (X1's crew_vessel_members). */
+  placement_kind: string;
+  required: number;
+  met: number;
+  expiring: number;
+  expired: number;
+  missing: number;
+  conditional: number;
+  muted: number;
+  docs_required: number;
+  docs_met: number;
+  stcw_required: number;
+  stcw_met: number;
+  quals_required: number;
+  quals_met: number;
+  fam_required: number;
+  fam_met: number;
+  status: CrewComplianceStatus;
+  next_expiry: string | null;
+  issues: CrewQualificationIssue[];
+}
+
+/** `fleet_report_crew_qualifications` as parsed. */
+export interface FleetReportCrewQualificationsJson {
+  /** `not_set_up` while X1's requirement engine is not in the database (no rows then). */
+  state: 'ok' | 'not_set_up';
+  today: string;
+  vessels: ReportVesselCoverage[];
+  rows: CrewQualificationRow[];
+}
+
+/** Where the hours-of-rest breaches come from: X1's breach review, or the legacy compliance checks. */
+export type HoursOfRestSource = 'breach_review' | 'compliance_checks';
+
+/** One vessel of `fleet_report_hours_of_rest`; every number is null where the vessel is not covered. */
+export interface HoursOfRestVesselRow extends ReportVesselCoverage {
+  crew_logging: number | null;
+  crew_days: number | null;
+  breach_days: number | null;
+  serious_days: number | null;
+  unreviewed: number | null;
+  months_not_submitted: number | null;
+  /** Breach days per 100 crew-days logged (one decimal); null when nothing was logged. */
+  rate_per_100: number | null;
+  last_entry: string | null;
+}
+
+/** One vessel-day of the heat map (days with nothing logged, breached or unreviewed are left out). */
+export interface HoursOfRestHeatCell {
+  vessel_id: string;
+  day: string;
+  logged: number;
+  breaches: number;
+  serious: number;
+  unreviewed: number;
+}
+
+/** A person with breaches on two or more days of the period (emerging issues). */
+export interface HoursOfRestEmergingRow {
+  profile_id: string;
+  person_name: string | null;
+  position: string | null;
+  vessel_id: string | null;
+  breach_days: number;
+  serious_days: number;
+  unreviewed: number;
+  last_breach: string;
+}
+
+export interface HoursOfRestTotals {
+  vessels_covered: number;
+  vessels_logging: number;
+  crew_days: number;
+  breach_days: number;
+  serious_days: number;
+  unreviewed: number;
+  months_not_submitted: number;
+  rate_per_100: number | null;
+}
+
+/** `fleet_report_hours_of_rest` as parsed. */
+export interface FleetReportHoursOfRestJson {
+  vessels: number;
+  from: string;
+  to: string;
+  today: string;
+  /** null for an empty answer (no company). */
+  source: HoursOfRestSource | null;
+  /** null when no vessel is covered: never zeros. */
+  totals: HoursOfRestTotals | null;
+  per_vessel: HoursOfRestVesselRow[];
+  heat: HoursOfRestHeatCell[];
+  emerging: { total: number; rows: HoursOfRestEmergingRow[] };
+}
+
+/** An agreement's state (gap/02 R10; SQL fleet_report_agreement_state). */
+export type AgreementState = 'draft' | 'not_signed' | 'signed';
+/** Who a not-yet-signed agreement waits for. */
+export type AgreementAwaiting = 'crew' | 'company' | 'both';
+/** A contract end date's bucket (gap/02 R11; SQL fleet_report_contract_bucket). */
+export type ContractBucket = 'ended' | 'd30' | 'd60' | 'd90';
+
+/** One contract of `fleet_report_contracts` (wages and terms are never sent). */
+export interface ContractReportRow {
+  contract_id: string;
+  profile_id: string;
+  person_name: string | null;
+  position: string | null;
+  department: string | null;
+  /** The person's current vessel, else the contract's own; null = no current vessel. */
+  vessel_id: string | null;
+  contract_type: string;
+  contract_number: string | null;
+  sea_reference: string | null;
+  status: string;
+  start_date: string;
+  end_date: string | null;
+  signed_by_crew_at: string | null;
+  signed_by_company_at: string | null;
+  agreement_state: AgreementState;
+  awaiting: AgreementAwaiting | null;
+  days_left: number | null;
+  bucket: ContractBucket | null;
+  renewal_drafted: boolean;
+}
+
+/** `fleet_report_contracts` as parsed. */
+export interface FleetReportContractsJson {
+  mode: string;
+  today: string;
+  vessels: Array<ReportVesselCoverage & { state: 'ok' | 'no_access' }>;
+  /** Contracts of people with no current vessel are listed (a fleet-wide read with fleet reach). */
+  unassigned: boolean;
+  rows: ContractReportRow[];
+}
+
 export type ReportsPendingFunctions = {
   fleet_report_trends: {
     Args: { p_vessel_ids?: string[] | null; p_months?: number; p_today?: string };
@@ -70,5 +260,17 @@ export type ReportsPendingFunctions = {
   fleet_vessel_list: {
     Args: { p_vessel_ids?: string[] | null; p_today?: string };
     Returns: FleetVesselListRow[];
+  };
+  fleet_report_crew_qualifications: {
+    Args: { p_vessel_ids?: string[] | null };
+    Returns: Json;
+  };
+  fleet_report_hours_of_rest: {
+    Args: { p_vessel_ids?: string[] | null; p_from?: string | null; p_to?: string | null; p_today?: string };
+    Returns: Json;
+  };
+  fleet_report_contracts: {
+    Args: { p_vessel_ids?: string[] | null; p_mode?: 'agreements' | 'ending'; p_today?: string };
+    Returns: Json;
   };
 };
