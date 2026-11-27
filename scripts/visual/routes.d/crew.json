@@ -8,7 +8,34 @@
   {
     "path": "/v/dra/crew/planner/timeline",
     "slug": "crew-planner-timeline",
-    "note": "X1-01: the planner moved into the crew manifest (same page as before)"
+    "waitFor": "[data-planner-engine=\"on\"] [data-period-bar]",
+    "note": "X1-09B: the planner's Timeline tab: a row per person by department, bars by leave type with type and duration, the vessel movements lane, the manning gap rows, weekend and today columns, Month/Year zoom, Today and the legend. Until PR-X1-G adds rpc/planner_vessel_periods.json, capture it with a scratch --fixtures copy that answers it from frp_rotation_assignments; without it the timeline is empty."
+  },
+  {
+    "path": "/v/dra/crew/planner/manning",
+    "slug": "crew-planner-manning",
+    "waitFor": "[data-manning-row]",
+    "note": "X1-09B: the Manning grid: per department a row per person and a column per day in leave-type tones, the banded On board total, qualified/aboard per position, Today and Refresh; the grid scrolls inside its card (same scratch --fixtures note as the timeline)"
+  },
+  {
+    "path": "/v/dra/crew/planner/requests",
+    "slug": "crew-planner-requests",
+    "waitFor": "[data-planner-tab=\"requests\"] tbody tr",
+    "note": "X1-09B: the Requests tab: pending first, status filters, the requester, the periods, Request leave and Add leave; the row hovered shows Approve and Decline for a leave approver (the scratch --fixtures copy gives the fleet manager the crew.approve_leave flag; without it the row has no actions)",
+    "actions": [
+      {
+        "hover": "[data-planner-tab=\"requests\"] tbody tr"
+      },
+      {
+        "wait": 400
+      }
+    ]
+  },
+  {
+    "path": "/v/dra/crew/planner/configuration",
+    "slug": "crew-planner-configuration",
+    "waitFor": "[data-planner-config=\"manning\"]",
+    "note": "X1-09B: the Configuration tab: position manning min/max per department, positions with nobody aboard apart, the head-of-department step and the leave-type legend"
   },
   {
     "path": "/v/dra/crew/training",
@@ -18,7 +45,8 @@
   {
     "path": "/fleet/planner",
     "slug": "fleet-planner",
-    "note": "X1-01: the fleet planner route moved into the crew manifest (same page as before)"
+    "waitFor": "[data-fleet-planner=\"crew\"] [data-fleet-lane]",
+    "note": "X1-09B: the fleet planner's Crew tab: a stacked, read-only lane per reachable vessel (one planner read per lane), Month/Year zoom and a link to each vessel's timeline; the Season tab stays hidden (X4). Same scratch --fixtures note as the timeline: the static fixture answers every lane with DRAAK's periods."
   },
   {
     "path": "/v/dra/crew/list",

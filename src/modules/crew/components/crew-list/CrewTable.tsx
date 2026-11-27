@@ -19,6 +19,9 @@ import {
 import { CrewStatusPill, PendingLoginChip, TravelTodayIcon } from './CrewStatusPill';
 import { ComplianceDotsCell } from '@/modules/crew/components/compliance/ComplianceDots';
 import { useCrewListCompliance } from '@/modules/crew/components/compliance/crewListCompliance';
+import { OnboardToggleDialog, OnboardToggleSwitch } from './OnboardToggleDialog';
+import { useOnboardToggleAccess } from '@/modules/rotation-planner/components/planner/onboardToggle';
+import { localToday } from '@/modules/rotation-planner/lib/duration';
 
 const NOUN = { one: 'crew member', other: 'crew members' };
 
@@ -81,7 +84,10 @@ export interface CrewTableProps {
  * compliance dots (X1-06B: documents, then STCW and qualifications, from
  * crew_vessel_compliance merged by profile id, a tooltip listing the
  * reasons; a dash that says why while compliance is not set up or not the
- * reader's), the invitation status with Invite / Resend, and the join date. Below 768 px the table scrolls inside
+ * reader's), the invitation status with Invite / Resend, and the join date.
+ * With crew_scheduling.edit (and the planner engine applied, X1-09B) the
+ * status cell carries the On/Off quick toggle (gap/04 C4): a switch that
+ * opens the toggle dialog, never a write by itself. Below 768 px the table scrolls inside
  * its card with the name column held in view; the page never scrolls
  * sideways.
  */
@@ -113,6 +119,8 @@ export const CrewTable: React.FC<CrewTableProps> = ({
   empty,
 }) => {
   const compliance = useCrewListCompliance();
+  const toggle = useOnboardToggleAccess();
+  const [toggleRow, setToggleRow] = React.useState<CrewListRow | null>(null);
   const columns = useMemo<DataTableColumn<CrewListRow>[]>(() => {
     const list: DataTableColumn<CrewListRow>[] = [
       {
@@ -165,7 +173,15 @@ export const CrewTable: React.FC<CrewTableProps> = ({
         header: 'Status',
         minWidth: 150,
         sortable: false,
-        cell: (row) => <CrewStatusPill row={row} vesselName={vesselName} />,
+        cell: (row) =>
+          toggle.available ? (
+            <div className="flex min-w-0 items-start justify-between gap-2">
+              <CrewStatusPill row={row} vesselName={vesselName} />
+              <OnboardToggleSwitch row={row} onRequest={setToggleRow} />
+            </div>
+          ) : (
+            <CrewStatusPill row={row} vesselName={vesselName} />
+          ),
       },
       {
         id: 'compliance',
@@ -224,11 +240,12 @@ export const CrewTable: React.FC<CrewTableProps> = ({
       cell: (row) => fmtDay(row.joinDate),
     });
     return list;
-  }, [showInvitations, canInvite, invitingProfileId, inviteBusy, onInvite, vesselName, compliance]);
+  }, [showInvitations, canInvite, invitingProfileId, inviteBusy, onInvite, vesselName, compliance, toggle.available]);
 
   const tableSort: TableSort = { columnId: SORT_COLUMN[sort], direction: dir };
 
   return (
+    <>
     <DataTable<CrewListRow>
       label="Crew list"
       noun={NOUN}
@@ -264,6 +281,18 @@ export const CrewTable: React.FC<CrewTableProps> = ({
         `Showing ${shown} of ${total} ${total === 1 ? NOUN.one : NOUN.other}${selected ? ` · ${selected} selected` : ''}`
       }
     />
+    {toggle.available && toggleRow ? (
+      <OnboardToggleDialog
+        key={toggleRow.profileId}
+        open
+        onOpenChange={(open) => !open && setToggleRow(null)}
+        vessel={toggle.vessel}
+        row={toggleRow}
+        types={toggle.types}
+        today={localToday()}
+      />
+    ) : null}
+    </>
   );
 };
 

@@ -16,7 +16,10 @@
  *     X1-02 folded the roster into the Crew List (beta, behind
  *     vessel.crew.crew_list.view); crew/roster redirects to it, and its
  *     leaf is gone. X1-06B rebuilt Crew Compliance (beta, behind
- *     vessel.crew.crew_compliance.view; crew/compliance/:tab). X1-08
+ *     vessel.crew.crew_compliance.view; crew/compliance/:tab). X1-09B
+ *     rebuilt the Planner (beta, behind vessel.crew.crew_scheduling.view;
+ *     crew/planner/:tab with Timeline, Manning, Requests, Configuration).
+ *     X1-08
  *     rebuilt Hours of Rest as the vessel board (beta, behind
  *     vessel.crew.hours_of_rest.approve); X1-08B added its report at
  *     crew/hours-of-rest/report (behind vessel.crew.hours_of_rest.view),
@@ -63,8 +66,13 @@ const manifest: ModuleManifest = {
       order: 10,
       node: L('Crew List', CREW_ROOT, { slug: 'list', icon: Users, status: 'beta', capability: CREW_CAPS.crewListView }),
     },
+    // X1-09B: the planner (Timeline, Manning, Requests, Configuration), beta behind crew scheduling view.
     // Label "Leave" on vessels that rename it (vessel_module_settings).
-    { slot: 'vessel.crew', order: 20, node: L('Planner', CREW_ROOT, { icon: Network, moduleSetting: 'planner', ...LIVE }) },
+    {
+      slot: 'vessel.crew',
+      order: 20,
+      node: L('Planner', CREW_ROOT, { icon: Network, moduleSetting: 'planner', status: 'beta', capability: CREW_CAPS.schedulingView }),
+    },
     // X1-06B: the requirement-driven compliance page (status matrix and configuration), beta behind its capability.
     {
       slot: 'vessel.crew',

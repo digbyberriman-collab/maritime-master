@@ -26,7 +26,7 @@ import KeepSearchNavigate from '@/app/router/KeepSearchNavigate';
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 
 import manifest from '@/modules/crew/module';
-import { CREW_ROUTES, HOR_REPORT_PATH, MY_DOCUMENTS_PATH } from '@/modules/crew/routes';
+import { CREW_ROUTES, HOR_REPORT_PATH, MY_DOCUMENTS_PATH, PLANNER_TAB_PATH } from '@/modules/crew/routes';
 import { ADD_CREW_PATH } from '@/modules/crew/lib/addCrewSchema';
 import { CREW_CAPABILITIES, CREW_CAPS, CREW_FLEET_PATHS, CREW_PATHS } from '@/modules/crew/paths';
 import { MODULE_REGISTRY } from '@/app/registry/modules';
@@ -53,11 +53,11 @@ const TODAY: Record<string, string> = {
   // X1-08B: the vessel's hours-of-rest report (new; behind hours_of_rest.view).
   [`vessel ${HOR_REPORT_PATH}`]: '/src/modules/work-rest/pages/HoursOfRestReportPage.tsx',
   // X1-07B: one crew member's month is the profile's Hours of rest tab (crew/people/:profileId/:tab); no route of its own.
-  [`vessel ${CREW_PATHS.plannerTimeline}`]: '/src/modules/rotation-planner/pages/RotationPlannerPage.tsx',
-  [`vessel ${CREW_PATHS.plannerManning}`]: '/src/modules/crew/pages/LeavePlannerPage.tsx',
-  [`vessel ${CREW_PATHS.plannerRequests}`]: '/src/modules/crew/pages/LeaveRequestsPage.tsx',
+  // X1-09B: the planner's tabs on one page (the three legacy pages are its D-01 fallback and their legacy URLs' wrappers).
+  [`vessel ${PLANNER_TAB_PATH}`]: '/src/modules/rotation-planner/pages/PlannerPage.tsx',
   [`vessel ${CREW_PATHS.familiarisation}`]: '/src/modules/training/pages/Training.tsx',
-  [`fleet ${CREW_FLEET_PATHS.planner}`]: '/src/modules/rotation-planner/pages/RotationPlannerPage.tsx',
+  // X1-09B: the fleet planner is the same page in fleet scope (?tab=crew).
+  [`fleet ${CREW_FLEET_PATHS.planner}`]: '/src/modules/rotation-planner/pages/PlannerPage.tsx',
   // X1-03: the routed crew profile (new; gated in the page and on the server).
   [`vessel ${PROFILE_TAB_PATH}`]: '/src/modules/crew/pages/CrewProfilePage.tsx',
   // X1-03B: Add crew member (new; behind crew profile creation).
@@ -90,6 +90,9 @@ describe('crew routes', () => {
       else if (r.path === CREW_PATHS.hoursOfRest) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.horApprove });
       else if (r.path === HOR_REPORT_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.horView });
       else if (r.scope === 'personal' && r.path === MY_DOCUMENTS_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.documentsViewOwn });
+      else if (r.path === PLANNER_TAB_PATH || (r.scope === 'fleet' && r.path === CREW_FLEET_PATHS.planner)) {
+        expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.schedulingView });
+      }
       else expect(r.guard, r.path).toEqual({ kind: 'login' });
     }
   });
@@ -153,13 +156,15 @@ describe('every vessel crew URL of today resolves to its page', () => {
     ['/v/dra/crew/hours-of-rest', 'work-rest/pages/HoursOfRestBoardPage.tsx'],
     // X1-07B: one crew member's month is the profile's Hours of rest tab (a login id there is resolved by the page).
     ['/v/dra/crew/people/a0000000-0000-4000-8000-000000000011/hours-of-rest', 'crew/pages/CrewProfilePage.tsx'],
-    ['/v/dra/crew/planner', 'rotation-planner/pages/RotationPlannerPage.tsx'],
-    ['/v/dra/crew/planner/timeline', 'rotation-planner/pages/RotationPlannerPage.tsx'],
-    ['/v/dra/crew/planner/manning', 'crew/pages/LeavePlannerPage.tsx'],
-    ['/v/dra/crew/planner/requests', 'crew/pages/LeaveRequestsPage.tsx'],
+    // X1-09B: every planner tab (and the bare crew/planner) is the planner page.
+    ['/v/dra/crew/planner', 'rotation-planner/pages/PlannerPage.tsx'],
+    ['/v/dra/crew/planner/timeline', 'rotation-planner/pages/PlannerPage.tsx'],
+    ['/v/dra/crew/planner/manning', 'rotation-planner/pages/PlannerPage.tsx'],
+    ['/v/dra/crew/planner/requests', 'rotation-planner/pages/PlannerPage.tsx'],
+    ['/v/dra/crew/planner/configuration', 'rotation-planner/pages/PlannerPage.tsx'],
     ['/v/dra/crew/training', 'development/pages/CrewTraining.tsx'],
     ['/v/dra/crew/familiarisation', 'training/pages/Training.tsx'],
-    ['/fleet/planner', 'rotation-planner/pages/RotationPlannerPage.tsx'],
+    ['/fleet/planner', 'rotation-planner/pages/PlannerPage.tsx'],
     // X1-03: the routed profile.
     ['/v/dra/crew/people/b0000000-0000-4000-8000-000000000015', 'crew/pages/CrewProfilePage.tsx'],
     ['/v/dra/crew/people/b0000000-0000-4000-8000-000000000015/contact', 'crew/pages/CrewProfilePage.tsx'],
@@ -228,11 +233,16 @@ describe('crew nav', () => {
   });
 
   it('moved leaves keep live and today\'s gates (no capability until their page is rebuilt, D-X1-25)', () => {
-    for (const label of ['Planner', 'Familiarisation']) {
+    for (const label of ['Familiarisation']) {
       const node = byLabel(label);
       expect(node.status, label).toBe('live');
       expect(node.capability, label).toBeUndefined();
     }
+  });
+
+  it('the rebuilt Planner is beta behind vessel.crew.crew_scheduling.view, labelled by the vessel\'s planner setting (X1-09B)', () => {
+    expect(byLabel('Planner').status).toBe('beta');
+    expect(byLabel('Planner').capability).toBe(CREW_CAPS.schedulingView);
     expect(byLabel('Planner').moduleSetting).toBe('planner');
   });
 

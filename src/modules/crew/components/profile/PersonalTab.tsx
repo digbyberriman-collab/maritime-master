@@ -47,6 +47,7 @@ import type { ProfileTabProps } from '@/modules/crew/lib/profileTabs';
 import { LANGUAGE_PROFICIENCIES, LANGUAGE_PROFICIENCY_LABEL, type Country } from '@/modules/crew/types/domain';
 import { BiographyCard } from './BiographyCard';
 import { CurrentEmploymentCard, Fact, FactGrid } from './CurrentEmploymentCard';
+import { LeaveBalanceCard } from './LeaveBalanceCard';
 import { SignatureCard } from './SignatureCard';
 
 
@@ -124,10 +125,12 @@ const LoadingCard: React.FC = () => (
 );
 
 /**
- * The Personal tab (gap/04 C17, C19, C21): the person's identity and
+ * The Personal tab (gap/04 C17, C19, C21, C55): the person's identity and
  * personal details with their languages, edited in place (Cancel and Save,
- * RHF + zod, W1 field rules), beside Current employment, Biography and the
- * stored signature. Identity fields need an editor (HR or crew_profiles.edit
+ * RHF + zod, W1 field rules), beside Current employment, the Leave balance
+ * (X1-09B: from the employment terms' allowance, else the vessel's leave
+ * policy; shown to the person and to planner, leave and HR viewers),
+ * Biography and the stored signature. Identity fields need an editor (HR or crew_profiles.edit
  * on the vessel); the person edits their own self fields. Edit profile in
  * the header opens the form here (?edit=1).
  *
@@ -153,6 +156,7 @@ const PersonalTab: React.FC<ProfileTabProps> = ({ profile, vessel }) => {
       </div>
       <div className="min-w-0 space-y-4">
         <CurrentEmploymentCard vessel={vessel} profile={profile} nameOfVessel={nameOfVessel} />
+        <LeaveBalanceCard vessel={vessel} profile={profile} />
         <BiographyCard
           biography={state.mode === 'server' ? state.details?.biography ?? null : null}
           canEdit={profile.canEditSelf}

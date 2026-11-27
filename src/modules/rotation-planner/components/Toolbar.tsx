@@ -23,6 +23,8 @@ interface Props {
   filters: PlannerFilters;
   setFilters: (f: PlannerFilters) => void;
   vessels: VesselLite[];
+  /** The planner is locked to one vessel (the vessel Planner's D-01 fallback): no vessel filter. */
+  lockedVessel?: boolean;
   conflictCount: number;
   conflictPanelOpen: boolean;
   onToggleConflictPanel: () => void;
@@ -48,7 +50,7 @@ interface Props {
 
 const Toolbar: React.FC<Props> = ({
   zoom, setZoom, viewStart, viewEnd, onToday, onShift,
-  filters, setFilters, vessels, conflictCount, conflictPanelOpen, onToggleConflictPanel,
+  filters, setFilters, vessels, lockedVessel = false, conflictCount, conflictPanelOpen, onToggleConflictPanel,
   onImport, onExport, onExportPdf, onCreate, canEdit = true,
   selectionCount, clipboardCount, canUndo, canRedo, undoLabel, redoLabel,
   onUndo, onRedo, onCopy, onPaste, onDeleteSelection, onClearSelection,
@@ -84,19 +86,22 @@ const Toolbar: React.FC<Props> = ({
           <Button size="icon" variant="outline" onClick={zoomOut} disabled={zoomIdx === ZOOM_ORDER.length - 1} title="Zoom out"><ZoomOut className="h-4 w-4" /></Button>
         </div>
 
-        <Select
-          value={filters.vesselIds.length === 1 ? filters.vesselIds[0] : '__all__'}
-          onValueChange={(v) => setFilters({ ...filters, vesselIds: v === '__all__' ? [] : [v] })}
-        >
-          <SelectTrigger className="h-8 w-44"><SelectValue placeholder="All vessels" /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__all__">All vessels</SelectItem>
-            {vessels.map((v) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        {lockedVessel ? null : (
+          <Select
+            value={filters.vesselIds.length === 1 ? filters.vesselIds[0] : '__all__'}
+            onValueChange={(v) => setFilters({ ...filters, vesselIds: v === '__all__' ? [] : [v] })}
+          >
+            <SelectTrigger className="h-8 w-44" aria-label="Vessel"><SelectValue placeholder="All vessels" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All vessels</SelectItem>
+              {vessels.map((v) => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
 
         <Input
           className="h-8 w-56"
+          aria-label="Search the planner"
           placeholder="Search crew, lane or notes…"
           value={filters.search}
           onChange={(e) => setFilters({ ...filters, search: e.target.value })}

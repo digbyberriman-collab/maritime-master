@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
+import PlannerPage from '@/modules/rotation-planner/pages/PlannerPage';
 import { useCrewLeave } from '@/modules/crew/hooks/useCrewLeave';
 import { LEAVE_STATUS_CODES, STATUS_CODE_MAP, LEAVE_DEPARTMENTS, type LeaveDepartment } from '@/modules/crew/leaveConstants';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
@@ -31,7 +32,16 @@ const csvEscape = (v: any): string => {
   return s;
 };
 
-export default function LeavePlannerPage() {
+/**
+ * The legacy day-code leave grid (before X1-09B): a month of day codes per
+ * crew member, painted straight into crew_leave_entries, with month locks,
+ * a fleet view, balances and a CSV export. It is the planner's Manning tab
+ * fallback while 20261124060900 is not applied (D-01), and the Manning tab
+ * of /crew/leave for users without a vessel (D-27, D-45). Once 060900 is
+ * applied the period store writes the day codes and the vessel planner's
+ * Manning tab paints periods instead.
+ */
+export function LegacyLeavePlanner({ embedded = false }: { embedded?: boolean } = {}) {
   const currentDate = new Date();
   const [year, setYear] = useState(currentDate.getFullYear());
   const [month, setMonth] = useState(currentDate.getMonth() + 1);
@@ -236,11 +246,11 @@ export default function LeavePlannerPage() {
 
   if (loading) {
     return (
-      <DashboardLayout>
+      <>
         <div className="flex items-center justify-center min-h-[400px]">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
-      </DashboardLayout>
+      </>
     );
   }
 
@@ -272,15 +282,17 @@ export default function LeavePlannerPage() {
           : 'No vessel selected';
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-3">
         {/* Header */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <CalendarDays className="w-6 h-6" />
-              Leave Planner
-            </h1>
+            {embedded ? null : (
+              <h1 className="text-2xl font-bold flex items-center gap-2">
+                <CalendarDays className="w-6 h-6" />
+                Leave Planner
+              </h1>
+            )}
             <p className="text-sm text-muted-foreground">
               {scopeLabel} — {year} • {filteredCrew.length} crew shown
             </p>
@@ -304,9 +316,11 @@ export default function LeavePlannerPage() {
             <Button variant="outline" size="sm" onClick={() => navigate('/crew/leave/calculator')}>
               <Calculator className="w-4 h-4 mr-1" /> Calculator
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/crew/leave/requests')}>
-              Requests →
-            </Button>
+            {embedded ? null : (
+              <Button variant="outline" size="sm" onClick={() => navigate('/crew/leave/requests')}>
+                Requests →
+              </Button>
+            )}
           </div>
         </div>
 
@@ -677,6 +691,21 @@ export default function LeavePlannerPage() {
           </div>
         )}
       </div>
+    </>
+  );
+}
+
+/**
+ * The legacy URL /crew/leave (HRIS cross-link, D-45): a thin wrapper over the
+ * planner's Manning tab. LegacyRoute sends users with a vessel on to
+ * /v/:vesselCode/crew/planner/manning, so this renders for users without one
+ * (D-27), with the legacy grid as the tab. The legacy route renders the page
+ * without the shell, so it brings DashboardLayout (idempotent, D-13).
+ */
+export default function LeavePlannerPage() {
+  return (
+    <DashboardLayout>
+      <PlannerPage tab="manning" />
     </DashboardLayout>
   );
 }

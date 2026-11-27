@@ -7,6 +7,9 @@ export const MY_DOCUMENTS_PATH = 'documents';
 /** The vessel's hours-of-rest report (X1-08B), relative to `/v/:vesselCode`; under the Hours of Rest leaf. */
 export const HOR_REPORT_PATH = `${CREW_PATHS.hoursOfRest}/report`;
 
+/** The planner's tabs (X1-09B), relative to `/v/:vesselCode`: timeline | manning | requests | configuration. */
+export const PLANNER_TAB_PATH = `${CREW_PATHS.planner}/:tab`;
+
 /**
  * Crew routes, as data (BUILD-PLAN B8). The module manifest (./module.ts)
  * registers them, and the router mounts them inside their scope's layout
@@ -53,6 +56,14 @@ export const HOR_REPORT_PATH = `${CREW_PATHS.hoursOfRest}/report`;
  * breaches, breach reports sent (and creating one, final approvers) and
  * the reminder log. It sits under the Hours of Rest leaf, so the crew_hor
  * setting closes it with the board.
+ * X1-09B serves the planner at crew/planner/:tab (PlannerPage: Timeline,
+ * Manning, Requests, Configuration) behind vessel.crew.crew_scheduling.view,
+ * in place of the three legacy pages (the lane planner, the day-code leave
+ * grid and the requests page), which stay the page's D-01 fallback and the
+ * pages of their legacy URLs (/crew/rotation-planner, /crew/leave,
+ * /crew/leave/requests; D-45) as thin wrappers over the tabs. crew/planner
+ * still redirects to timeline. The fleet planner (/fleet/planner?tab=crew)
+ * is the same page in fleet scope.
  * X1-04B adds the person's own documents at /me/documents (scope personal,
  * path `documents`, guard vessel.crew.crew_certificates.view_own; the page
  * asks again and the server answers only for the caller's own profile). The
@@ -104,10 +115,10 @@ export const CREW_ROUTES: readonly RouteDef[] = [
   vesselCapabilityPage(CREW_PATHS.hoursOfRest, CREW_CAPS.horApprove, () => import('@/modules/work-rest/pages/HoursOfRestBoardPage')),
   // The vessel's hours-of-rest report (X1-08B; gap/04 C44, C41, C42): for anyone who sees the vessel's hours of rest.
   vesselCapabilityPage(HOR_REPORT_PATH, CREW_CAPS.horView, () => import('@/modules/work-rest/pages/HoursOfRestReportPage')),
+  // The planner (X1-09B; gap/04 C47-C50, C52, W7): Timeline, Manning, Requests and Configuration tabs on one
+  // page; an unknown tab lands on the timeline in the page. The legacy pages stay the D-01 fallback inside it.
   vesselRedirect(CREW_PATHS.planner, 'timeline'),
-  vesselPage(CREW_PATHS.plannerTimeline, () => import('@/modules/rotation-planner/pages/RotationPlannerPage')),
-  vesselPage(CREW_PATHS.plannerManning, () => import('@/modules/crew/pages/LeavePlannerPage')),
-  vesselPage(CREW_PATHS.plannerRequests, () => import('@/modules/crew/pages/LeaveRequestsPage')),
+  vesselCapabilityPage(PLANNER_TAB_PATH, CREW_CAPS.schedulingView, () => import('@/modules/rotation-planner/pages/PlannerPage')),
   vesselPage(CREW_PATHS.familiarisation, () => import('@/modules/training/pages/Training')),
   // The person's own documents (X1-04B; gap/04 C24-C26; X1 spec §4 personal row).
   {
@@ -116,12 +127,14 @@ export const CREW_ROUTES: readonly RouteDef[] = [
     page: () => import('@/modules/crew/pages/MyDocumentsPage'),
     guard: { kind: 'capability', capability: CREW_CAPS.documentsViewOwn },
   },
-  // Crew rotation and season planning across the fleet (gap/04, gap/07). Its
-  // nav leaf stays a platform node of Fleet › Overview (src/config/sitemap.ts).
+  // Crew rotation and season planning across the fleet (DECISIONS R2; gap/04, gap/07): ?tab=crew is the
+  // reachable vessels' planners stacked (X1-09B); the Season tab is X4's. Behind crew scheduling view on
+  // any vessel; each vessel lane asks again. Its nav leaf stays a platform node of Fleet › Overview
+  // (src/config/sitemap.ts).
   {
     scope: 'fleet',
     path: CREW_FLEET_PATHS.planner,
-    page: () => import('@/modules/rotation-planner/pages/RotationPlannerPage'),
-    guard: { kind: 'login' },
+    page: () => import('@/modules/rotation-planner/pages/PlannerPage'),
+    guard: { kind: 'capability', capability: CREW_CAPS.schedulingView },
   },
 ];

@@ -1,5 +1,8 @@
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
+import { cn } from '@/lib/utils';
+import { errorMessage } from '@/shared/lib/notify';
+import PlannerPage from './PlannerPage';
 import { addDays as addDaysFns, startOfMonth, endOfMonth } from 'date-fns';
 import Toolbar from '../components/Toolbar';
 import TimelineHeader from '../components/TimelineHeader';
@@ -32,12 +35,45 @@ const newId = () =>
   (globalThis.crypto?.randomUUID?.() ??
     `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`);
 
-const RotationPlannerPage: React.FC = () => {
+/** The fields a block edit may change (BlockDetailDrawer's form). */
+const EDITABLE_FIELDS = ['label', 'start_date', 'end_date', 'rotation_type', 'status', 'vessel_id', 'lane_id', 'crew_user_id', 'colour', 'notes'] as const;
+type EditableField = (typeof EDITABLE_FIELDS)[number];
+type BlockPatch = Partial<Pick<RotationAssignment, EditableField>> & { id: string };
+
+/** The values `keys` had on `cur` (null when unset): the inverse of a patch, for Undo. */
+function snapshotOf(cur: RotationAssignment | undefined, update: Partial<RotationAssignment> & { id: string }): Partial<RotationAssignment> & { id: string } {
+  const prev: Record<string, unknown> = { id: update.id };
+  const source = (cur ?? {}) as Partial<Record<keyof RotationAssignment, unknown>>;
+  for (const k of Object.keys(update) as Array<keyof RotationAssignment>) {
+    if (k === 'id') continue;
+    prev[k] = source[k] ?? null;
+  }
+  return prev as Partial<RotationAssignment> & { id: string };
+}
+
+export interface LegacyRotationPlannerProps {
+  /**
+   * The vessel the planner is locked to (the vessel Planner's D-01 fallback):
+   * only its lanes and bars, no vessel filter, a height that fits the page.
+   */
+  lockedVesselId?: string | null;
+}
+
+/**
+ * The legacy lane planner (before X1-09B): lanes per vessel, department and
+ * role, bars written straight to frp_rotation_assignments under the legacy
+ * frp_can_edit policies, undo / redo, copy / paste, XLSX import and export.
+ * It is the planner's D-01 fallback while 20261124060900 is not applied, and
+ * the page of /crew/rotation-planner for users without a vessel or fleet
+ * reach (D-27). Once 060900 is applied its guards refuse direct status
+ * writes, and the vessel planner's timeline takes over.
+ */
+export const LegacyRotationPlanner: React.FC<LegacyRotationPlannerProps> = ({ lockedVesselId = null }) => {
   const { user } = useAuth();
   const { canEdit } = usePlannerPermissions();
   const [zoom, setZoom] = useState<ZoomLevel>('week');
   const [anchor, setAnchor] = useState<Date>(new Date());
-  const [filters, setFilters] = useState<PlannerFilters>(defaultFilters);
+  const [filters, setFilters] = useState<PlannerFilters>(() => (lockedVesselId ? { ...defaultFilters, vesselIds: [lockedVesselId] } : defaultFilters));
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [detailId, setDetailId] = useState<string | undefined>();
   const [importOpen, setImportOpen] = useState(false);
@@ -51,8 +87,8 @@ const RotationPlannerPage: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
-    supabase.from('profiles').select('company_id').eq('user_id', user.id).single()
-      .then(({ data }) => setCompanyId((data as any)?.company_id ?? null));
+    supabase.from('profiles').select('company_id').eq('user_id', user.id).maybeSingle()
+      .then(({ data }) => setCompanyId(data?.company_id ?? null));
   }, [user]);
 
   const { viewStart, viewEnd } = useMemo(() => {
@@ -132,23 +168,15 @@ const RotationPlannerPage: React.FC = () => {
     label: string,
   ) => {
     if (!requireEdit() || !updates.length) return;
-    const before = updates.map((u) => {
-      const cur = assignmentsById.get(u.id);
-      const prev: any = { id: u.id };
-      for (const k of Object.keys(u)) {
-        if (k === 'id') continue;
-        prev[k] = (cur as any)?.[k] ?? null;
-      }
-      return prev as Partial<RotationAssignment> & { id: string };
-    });
+    const before = updates.map((u) => snapshotOf(assignmentsById.get(u.id), u));
     try {
       await history.run({
         label,
         apply: async () => { await planner.updateManyAssignments.mutateAsync(updates); },
         revert: async () => { await planner.updateManyAssignments.mutateAsync(before); },
       });
-    } catch (e: any) {
-      toast({ title: 'Save failed', description: e?.message, variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Save failed', description: errorMessage(e), variant: 'destructive' });
     }
   }, [requireEdit, assignmentsById, history, planner]);
 
@@ -163,8 +191,8 @@ const RotationPlannerPage: React.FC = () => {
         revert: async () => { await planner.deleteManyAssignments.mutateAsync(ids); },
       });
       setSelectedIds(new Set(ids));
-    } catch (e: any) {
-      toast({ title: 'Could not add blocks', description: e?.message, variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Could not add blocks', description: errorMessage(e), variant: 'destructive' });
     }
   }, [requireEdit, history, planner]);
 
@@ -179,8 +207,8 @@ const RotationPlannerPage: React.FC = () => {
       });
       setSelectedIds(new Set());
       setDetailId(undefined);
-    } catch (e: any) {
-      toast({ title: 'Delete failed', description: e?.message, variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Delete failed', description: errorMessage(e), variant: 'destructive' });
     }
   }, [requireEdit, assignmentsById, history, planner]);
 
@@ -188,8 +216,8 @@ const RotationPlannerPage: React.FC = () => {
     try {
       const label = await history.undo();
       if (label) toast({ title: 'Undone', description: label });
-    } catch (e: any) {
-      toast({ title: 'Undo failed', description: e?.message, variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Undo failed', description: errorMessage(e), variant: 'destructive' });
     }
   }, [history]);
 
@@ -197,8 +225,8 @@ const RotationPlannerPage: React.FC = () => {
     try {
       const label = await history.redo();
       if (label) toast({ title: 'Redone', description: label });
-    } catch (e: any) {
-      toast({ title: 'Redo failed', description: e?.message, variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'Redo failed', description: errorMessage(e), variant: 'destructive' });
     }
   }, [history]);
 
@@ -408,15 +436,15 @@ const RotationPlannerPage: React.FC = () => {
         filterSummary,
       });
       toast({ title: 'PDF exported', description: 'The timeline view was saved to your downloads.' });
-    } catch (e: any) {
-      toast({ title: 'PDF export failed', description: e?.message ?? 'Unknown error', variant: 'destructive' });
+    } catch (e) {
+      toast({ title: 'PDF export failed', description: errorMessage(e, 'Unknown error'), variant: 'destructive' });
     }
   }, [visibleAssignments, planner.locations, planner.lanes, viewStart, viewEnd, zoom, vesselName, crewName, filterSummary]);
 
   return (
-    <DashboardLayout>
-      <div className="flex flex-col h-[calc(100vh-6.75rem)]">
+      <div className={cn('flex flex-col', lockedVesselId ? 'h-[70vh] min-h-[28rem] overflow-hidden rounded-lg border border-border' : 'h-[calc(100vh-6.75rem)]')}>
         <Toolbar
+          lockedVessel={lockedVesselId !== null}
           zoom={zoom} setZoom={setZoom}
           viewStart={viewStart} viewEnd={viewEnd}
           onToday={() => setAnchor(new Date())}
@@ -513,12 +541,10 @@ const RotationPlannerPage: React.FC = () => {
           open={!!detail}
           onClose={() => setDetailId(undefined)}
           onSave={(a) => {
-            const src = a as any;
-            if (!src.id) return;
-            const fields = ['label', 'start_date', 'end_date', 'rotation_type', 'status', 'vessel_id', 'lane_id', 'crew_user_id', 'colour', 'notes'];
-            const patch: any = { id: src.id };
-            for (const f of fields) if (f in src) patch[f] = src[f] ?? null;
-            void applyUpdates([patch], 'Edit block');
+            if (!a.id) return;
+            const patch: Record<string, unknown> = { id: a.id };
+            for (const f of EDITABLE_FIELDS) if (f in a) patch[f] = a[f] ?? null;
+            void applyUpdates([patch as BlockPatch], 'Edit block');
           }}
           onDelete={(id) => void applyDeletes([id], 'Delete block')}
           onDuplicate={onDuplicate}
@@ -539,8 +565,21 @@ const RotationPlannerPage: React.FC = () => {
           onComplete={() => { history.clear(); }}
         />
       </div>
-    </DashboardLayout>
   );
 };
+
+/**
+ * The legacy URL /crew/rotation-planner (D-45): a thin wrapper over the
+ * planner's Timeline tab. LegacyRoute sends users with a vessel or fleet
+ * reach on to the scoped planner, so this renders for users without one
+ * (D-27), with the legacy lane planner as the tab. The legacy route renders
+ * the page without the shell, so it brings DashboardLayout (idempotent,
+ * D-13) until the route passes the shell itself.
+ */
+const RotationPlannerPage: React.FC = () => (
+  <DashboardLayout>
+    <PlannerPage tab="timeline" />
+  </DashboardLayout>
+);
 
 export default RotationPlannerPage;

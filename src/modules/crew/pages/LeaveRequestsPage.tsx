@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import DashboardLayout from '@/shared/components/layout/DashboardLayout';
+import PlannerPage from '@/modules/rotation-planner/pages/PlannerPage';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/modules/auth/contexts/AuthContext';
 import { useCrewEditAccess } from '@/shared/hooks/useCrewEditAccess';
@@ -54,7 +55,16 @@ const csvEscape = (v: any): string => {
   return s;
 };
 
-export default function LeaveRequestsPage() {
+/**
+ * The legacy leave requests page (before X1-09B): one-period requests,
+ * approve / decline / cancel with day codes written by the browser. It is
+ * the planner's Requests tab fallback while 20261124060900 is not applied
+ * (D-01), and the Requests tab of /crew/leave/requests for users without a
+ * vessel (D-27, D-45). Once 060900 is applied its guards refuse these
+ * direct status writes, and the vessel planner's Requests tab decides
+ * through crew_leave_request_decide.
+ */
+export function LegacyLeaveRequests({ embedded = false }: { embedded?: boolean } = {}) {
   const { profile, user } = useAuth();
   const { selectedVessel, isAllVessels } = useVessel();
   const companyId = profile?.company_id;
@@ -473,18 +483,22 @@ export default function LeaveRequestsPage() {
   };
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate('/crew/leave')}>
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
+            {embedded ? null : (
+              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Back to the leave planner" onClick={() => navigate('/crew/leave')}>
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+            )}
             <div>
-              <h1 className="text-2xl font-bold flex items-center gap-2">
-                <CalendarDays className="w-6 h-6" />
-                Leave Requests
-              </h1>
+              {embedded ? null : (
+                <h1 className="text-2xl font-bold flex items-center gap-2">
+                  <CalendarDays className="w-6 h-6" />
+                  Leave Requests
+                </h1>
+              )}
               <p className="text-sm text-muted-foreground">
                 Submit & review leave requests
                 {selectedVessel && !isAllVessels && ` — ${selectedVessel.name}`}
@@ -724,6 +738,22 @@ export default function LeaveRequestsPage() {
           </DialogContent>
         </Dialog>
       </div>
+    </>
+  );
+}
+
+/**
+ * The legacy URL /crew/leave/requests (HRIS cross-link, D-45): a thin
+ * wrapper over the planner's Requests tab. LegacyRoute sends users with a
+ * vessel on to /v/:vesselCode/crew/planner/requests, so this renders for
+ * users without one (D-27), with the legacy list as the tab. The legacy
+ * route renders the page without the shell, so it brings DashboardLayout
+ * (idempotent, D-13).
+ */
+export default function LeaveRequestsPage() {
+  return (
+    <DashboardLayout>
+      <PlannerPage tab="requests" />
     </DashboardLayout>
   );
 }
