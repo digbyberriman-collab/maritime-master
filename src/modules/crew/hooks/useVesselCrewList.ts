@@ -19,6 +19,7 @@ import { pendingClient, type NoPending } from '@/integrations/supabase/pending';
 import type { CrewPendingFunctions, CrewPendingTables } from '../types/db.pending';
 import { fromRpcRow, isMissingRpc, type CrewListRow } from '../lib/crewListModel';
 import { crewKeys } from './crewKeys';
+import { isMissingRelationError } from '@/shared/lib/notify';
 import { accountStateOf, invitationCell, type InvitationCell } from '@/modules/users-access/lib/invitationStatus';
 import {
   CREW_MEMBER_ASSIGNMENT_COLUMNS,
@@ -123,6 +124,59 @@ export function useFallbackLeaveCodes(
   if (query.error) return { status: 'error', error: query.error, retry: () => void query.refetch() };
   if (!query.data) return { status: 'loading' };
   return { status: 'ready', byUserId: query.data };
+}
+
+// ---------------------------------------------------------------- crew numbers (D-272)
+
+export type CrewNumbersState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  /** crew_personal_details is not applied yet (D-01): no numbers, nothing to say. */
+  | { status: 'missing' }
+  /** Any other failure: no numbers; the list still shows, with a quiet notice. */
+  | { status: 'error'; error: unknown; retry: () => void }
+  | { status: 'ready'; byProfileId: ReadonlyMap<string, string | null> };
+
+export const crewNumbersKey = (companyId: string | null | undefined, vesselId: string | null | undefined, profileIds: readonly string[]) =>
+  [...crewKeys.vessel(companyId, vesselId), 'crew-numbers', [...new Set(profileIds)].sort().join(',')] as const;
+
+const MISSING = Symbol('crew_personal_details missing');
+
+/**
+ * The crew numbers of the people on a list (gap/04 C3; D-272): one batched
+ * read of crew_personal_details for all of them (no N+1), merged into the
+ * rows by profile id (crewListModel.withCrewNumbers). RLS decides which
+ * rows come back (crew_personal_details_select_visible). Never breaks the
+ * list: the table missing (D-01) leaves the numbers out silently; any other
+ * error leaves them out with a notice and a retry.
+ */
+export function useCrewNumbers(
+  companyId: string | null | undefined,
+  vesselId: string | null | undefined,
+  profileIds: readonly string[],
+  options: { enabled?: boolean } = {},
+): CrewNumbersState {
+  const ids = [...new Set(profileIds)].sort();
+  const enabled = (options.enabled ?? true) && Boolean(companyId && vesselId) && ids.length > 0;
+  const query = useQuery({
+    queryKey: crewNumbersKey(companyId, vesselId, ids),
+    queryFn: async (): Promise<ReadonlyMap<string, string | null> | typeof MISSING> => {
+      const { data, error } = await crewDb.from('crew_personal_details').select('profile_id, crew_number').in('profile_id', ids);
+      if (error) {
+        if (isMissingRelationError(error)) return MISSING;
+        throw error;
+      }
+      return new Map((data ?? []).map((row) => [row.profile_id, row.crew_number] as const));
+    },
+    enabled,
+    retry: (failureCount) => failureCount < 1,
+    staleTime: 60_000,
+  });
+  if (!enabled) return { status: 'idle' };
+  if (query.error) return { status: 'error', error: query.error, retry: () => void query.refetch() };
+  if (query.data === undefined) return { status: 'loading' };
+  if (query.data === MISSING) return { status: 'missing' };
+  return { status: 'ready', byProfileId: query.data };
 }
 
 // ---------------------------------------------------------------- one person, for the legacy dialogs

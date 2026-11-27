@@ -113,8 +113,8 @@ export default function MyDevelopment() {
         ) : (
           <>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <KpiTile label="Active applications" icon={ClipboardList} value={stats.data?.activeApps ?? 0} zeroLabel="None in progress" />
-              <KpiTile label="Completed courses" icon={CheckCircle} value={stats.data?.completedCourses ?? 0} zeroLabel="None yet" />
+              <KpiTile label="Active applications" icon={ClipboardList} value={stats.data?.activeApps ?? 0} zeroTone="neutral" zeroLabel="None in progress" />
+              <KpiTile label="Completed courses" icon={CheckCircle} value={stats.data?.completedCourses ?? 0} zeroTone="neutral" zeroLabel="None yet" />
               <KpiTile label="Reimbursed" icon={DollarSign} textValue value={`$${(stats.data?.totalReimbursed ?? 0).toLocaleString('en-GB')}`} />
               <KpiTile
                 label="Outstanding obligations"

@@ -167,7 +167,7 @@ function VesselChecklists({ vesselId, vesselName }: { vesselId: string; vesselNa
       ) : null}
 
       <KpiGrid className="lg:grid-cols-4 min-[1440px]:grid-cols-4">
-        <KpiTile label="Checklists available" icon={ListChecks} value={templates.length} zeroLabel="None offered yet" />
+        <KpiTile label="Checklists available" icon={ListChecks} value={templates.length} zeroTone="neutral" zeroLabel="None offered yet" />
         <KpiTile label="Run today" icon={CheckCircle2} value={tally.ranToday} sub={`of ${templates.length.toLocaleString('en-GB')}`} state={run.state} notEnabledReason={run.reason} onRetry={retry} errorMessage="Run history could not be loaded" />
         <KpiTile label="Due in the next 7 days" icon={CalendarClock} value={tally.dueSoon} state={run.state} notEnabledReason={run.reason} onRetry={retry} errorMessage="Run history could not be loaded" />
         <KpiTile

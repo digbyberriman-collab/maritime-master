@@ -133,6 +133,12 @@ export const CrewTable: React.FC<CrewTableProps> = ({
           <div className="flex min-w-0 flex-col items-start gap-1">
             <span className="max-w-[16rem] truncate font-medium text-foreground">{row.displayName}</span>
             {row.preferredName ? <span className="type-caption text-muted-foreground">Known as {row.preferredName}</span> : null}
+            {row.crewNumber ? (
+              <span className="type-mono text-muted-foreground" data-crew-number="">
+                <span className="sr-only">Crew number </span>
+                {row.crewNumber}
+              </span>
+            ) : null}
             {row.loginState === 'pending_login' || row.travelToday ? (
               <div className="flex flex-wrap items-center gap-1.5">
                 {row.loginState === 'pending_login' ? <PendingLoginChip /> : null}
@@ -257,7 +263,7 @@ export const CrewTable: React.FC<CrewTableProps> = ({
       error={error}
       onRetry={onRetry}
       empty={{ title: empty.title, body: empty.body, icon: Users, action: empty.action }}
-      searchPlaceholder="Search name or position"
+      searchPlaceholder="Search name, position or crew number"
       searchText={crewSearchText}
       search={search}
       onSearchChange={onSearchChange}

@@ -69,7 +69,7 @@ vi.mock('@/lib/export', async (importOriginal) => {
   return { ...actual, runExport: (...args: unknown[]) => h.runExport(...args), notifyExportResult: vi.fn() };
 });
 
-import CrewListPage, { BASIC_LIST_NOTICE } from '@/modules/crew/pages/CrewListPage';
+import CrewListPage, { BASIC_LIST_NOTICE, CREW_NUMBERS_NOTICE } from '@/modules/crew/pages/CrewListPage';
 import { PENDING_LOGIN_HELP } from '@/modules/crew/components/crew-list/CrewStatusPill';
 import { crewStatusDetailText, fromRpcRow } from '@/modules/crew/lib/crewListModel';
 import { PENDING_TRANSFER_REASON } from '@/modules/crew/components/crew-list/CrewRowActions';
@@ -284,6 +284,43 @@ describe('the server list', () => {
     expect(body.map((r) => r.textContent)).toEqual([expect.stringMatching(/Joiner/), expect.stringMatching(/Pending/)]);
   });
 
+  it('crew numbers come from their own read (D-272): shown in the name cell, and the search finds them', async () => {
+    h.tables.crew_personal_details = { data: [{ profile_id: 'p-stew', crew_number: 'DRA-0015' }, { profile_id: 'p-master', crew_number: null }], error: null };
+    renderPage();
+    await loaded();
+    await waitFor(() => expect(within(rowOf(/^Stew, Demo$/)).getByText('DRA-0015')).toBeInTheDocument());
+    expect(h.fromCalls.filter((t) => t === 'crew_personal_details')).toHaveLength(1);
+    expect(rowOf(/^Master, Demo$/).querySelector('[data-crew-number]')).toBeNull();
+    const search = screen.getByPlaceholderText('Search name, position or crew number');
+    fireEvent.change(search, { target: { value: 'DRA-0015' } });
+    await waitFor(() => expect(within(table()).getAllByRole('row')).toHaveLength(2));
+    expect(within(table()).getByText('Stew, Demo')).toBeInTheDocument();
+    expect(screen.queryByText(CREW_NUMBERS_NOTICE)).toBeNull();
+  });
+
+  it('crew_personal_details missing (D-01): the list stands, with no numbers and nothing said', async () => {
+    h.tables.crew_personal_details = { data: null, error: { code: 'PGRST205', message: "Could not find the table 'public.crew_personal_details' in the schema cache" } };
+    renderPage();
+    await loaded();
+    await waitFor(() => expect(h.fromCalls).toContain('crew_personal_details'));
+    expect(within(table()).getAllByRole('row')).toHaveLength(ROWS.length + 1);
+    expect(table().querySelector('[data-crew-number]')).toBeNull();
+    expect(screen.queryByText(CREW_NUMBERS_NOTICE)).toBeNull();
+    expect(screen.queryByText('The crew list could not load')).toBeNull();
+    fireEvent.change(screen.getByPlaceholderText('Search name, position or crew number'), { target: { value: 'Stew' } });
+    await waitFor(() => expect(within(table()).getAllByRole('row')).toHaveLength(2));
+  });
+
+  it('any other crew-number error leaves the numbers out with a quiet notice; the list still shows', async () => {
+    h.tables.crew_personal_details = { data: null, error: { code: '57014', message: 'canceling statement due to statement timeout' } };
+    renderPage();
+    await loaded();
+    expect(await screen.findByText(CREW_NUMBERS_NOTICE)).toBeInTheDocument();
+    expect(within(table()).getAllByRole('row')).toHaveLength(ROWS.length + 1);
+    expect(screen.queryByText('The crew list could not load')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
   it('Transfer is refused for a pending placement, with the reason, and offered otherwise', async () => {
     renderPage();
     await loaded();
@@ -428,6 +465,15 @@ describe('empty, error and the D-01 fallback', () => {
       expect(within(table()).queryByText(/Elsewhere/)).toBeNull();
       // The invitation column waits for the server list.
       expect(within(table()).queryByRole('columnheader', { name: /Invitation/ })).toBeNull();
+    });
+
+    it('the basic list merges crew numbers too, once crew_personal_details answers', async () => {
+      h.tables.crew_personal_details = { data: [{ profile_id: 'p-bosun', crew_number: 'DRA-0007' }], error: null };
+      renderPage();
+      await loaded('Bosun, Demo');
+      await waitFor(() => expect(within(rowOf(/^Bosun, Demo$/)).getByText('DRA-0007')).toBeInTheDocument());
+      fireEvent.change(screen.getByPlaceholderText('Search name, position or crew number'), { target: { value: 'DRA-0007' } });
+      await waitFor(() => expect(within(table()).getAllByRole('row')).toHaveLength(2));
     });
 
     it('the Movements tab says the movements are not set up yet', async () => {

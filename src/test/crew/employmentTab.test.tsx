@@ -119,7 +119,7 @@ import SignOffDialog from '@/modules/crew/components/SignOffDialog';
 import type { CrewMember } from '@/modules/crew/hooks/useCrew';
 import { END_EMPLOYMENT_UNAVAILABLE, UNREADABLE_ANSWER } from '@/modules/crew/hooks/useEmployment';
 import { CREW_CAPS } from '@/modules/crew/paths';
-import { END_EMPLOYMENT_PENDING_MESSAGE, END_EMPLOYMENT_SENTENCES } from '@/modules/crew/lib/employment';
+import { END_EMPLOYMENT_PENDING_MESSAGE, END_EMPLOYMENT_SENTENCES, addDaysTo } from '@/modules/crew/lib/employment';
 import { todayDateOnly } from '@/shared/lib/form';
 import type { CrewProfileSummary } from '@/modules/crew/hooks/useCrewProfile';
 
@@ -384,7 +384,8 @@ const renderEnd = (renderFallback = (notice: string) => <div data-testid="legacy
           open
           onOpenChange={() => undefined}
           vessel={VESSEL}
-          person={{ profileId: PROFILE, displayName: 'Demo Chief Stew', joinDate: '2026-03-05' }}
+          // Relative to today: the form checks the end date against a ±365-day window from the real today.
+          person={{ profileId: PROFILE, displayName: 'Demo Chief Stew', joinDate: addDaysTo(TODAY, -30) }}
           renderFallback={renderFallback}
         />
       </MemoryRouter>
@@ -441,7 +442,7 @@ describe('End employment', () => {
     await chooseReason('Other');
     submit();
     expect(await screen.findByText(END_EMPLOYMENT_SENTENCES.notesRequired)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Last day of employment'), { target: { value: '2026-03-01' } });
+    fireEvent.change(screen.getByLabelText('Last day of employment'), { target: { value: addDaysTo(TODAY, -31) } });
     submit();
     expect(await screen.findByText(END_EMPLOYMENT_SENTENCES.beforeJoin)).toBeInTheDocument();
     expect(h.rpc).not.toHaveBeenCalled();

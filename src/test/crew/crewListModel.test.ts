@@ -33,6 +33,7 @@ import {
   STATUS_CHIP_ORDER,
   statusCounts,
   withCrewListParams,
+  withCrewNumbers,
   withMovementRange,
   type CrewListRow,
 } from '@/modules/crew/lib/crewListModel';
@@ -221,6 +222,18 @@ describe('search, departments, counts', () => {
     expect(crewSearchText({ ...rows[0], crewNumber: 'C-042' })).toContain('C-042');
   });
 
+  it('merges the crew numbers by profile id (D-272): server rows, unknown ids left alone, blanks as null', () => {
+    const merged = withCrewNumbers(rows, new Map([['p-1', 'DRA-0015'], ['p-2', '  '], ['p-9', 'DRA-0099']]));
+    expect(merged.map((r) => r.crewNumber)).toEqual(['DRA-0015', null, null, null]);
+    expect(merged[0].source).toBe('server');
+    expect(crewSearchText(merged[0])).toContain('DRA-0015');
+    expect(crewSearchText(rows[0])).not.toContain('DRA-0015');
+    // An empty map (the read missing or failed) changes nothing.
+    expect(withCrewNumbers(rows, new Map())).toBe(rows);
+    // Untouched rows keep their identity (no needless re-render).
+    expect(merged[2]).toBe(rows[2]);
+  });
+
   it('lists the departments present, in label order, and filters by one', () => {
     expect(departmentOptions(rows)).toEqual([{ key: 'deck', label: 'Deck' }, { key: 'interior', label: 'Interior' }]);
     expect(filterByDepartment(rows, 'deck').map((r) => r.profileId)).toEqual(['p-1', 'p-3']);
@@ -283,6 +296,14 @@ describe('the D-01 fallback: legacy rows', () => {
     leaveCodeByUserId: new Map<string, string>(),
     includeEmail: true,
     ...over,
+  });
+
+  it('crew numbers merge into basic rows too (D-272), and searching by number then finds them', () => {
+    const basic = fromLegacyCrew(member(), ctx()) as CrewListRow;
+    expect(basic.crewNumber).toBeNull();
+    const [merged] = withCrewNumbers([basic], new Map([['p-1', 'DRA-0015']]));
+    expect(merged).toMatchObject({ source: 'basic', crewNumber: 'DRA-0015' });
+    expect(crewSearchText(merged)).toContain('DRA-0015');
   });
 
   it('a current assignment reads On board, or On leave from the day code of today', () => {

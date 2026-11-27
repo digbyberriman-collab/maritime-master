@@ -62,6 +62,7 @@ vi.mock('@/modules/crew/lib/documentUpload', async (importOriginal) => {
 });
 
 import { DocumentsTab, UNCLASSIFIED_GROUP_KEY, UNCLASSIFIED_GROUP_LABEL } from '@/modules/crew/components/documents/DocumentsTab';
+import { ScopeContext, type ScopeValue } from '@/app/router/scopeContext';
 import { CATALOGUE_MISSING_NOTICE } from '@/modules/crew/lib/crewDocumentSchema';
 import { UPLOADS_UNAVAILABLE_NOTICE } from '@/modules/crew/lib/documentUpload';
 import { DOCUMENT_LEGEND_KEYS } from '@/modules/crew/lib/documentState';
@@ -443,6 +444,98 @@ describe('states', () => {
     expect(within(legacy).queryByRole('button', { name: /Edit/ })).toBeNull();
     expect(within(legacy).queryByText('Not yet verified')).toBeNull();
     expect(within(legacy).getByRole('button', { name: 'View Passport' })).toBeInTheDocument();
+  });
+
+  describe('documents STORM could not file by type (x1-stcw-fallback-empty-state)', () => {
+    const legacyCert = (over: Record<string, unknown>) => ({
+      id: 'l-mfa', user_id: USER, certificate_type: 'Medical_Care', certificate_name: 'Medical First Aid', certificate_number: 'STCW-4104', issuing_authority: null,
+      issue_date: '2022-01-31', expiry_date: '2027-01-31', file_url: null, file_name: null, file_size: null, notes: null,
+      created_at: '2026-01-01T00:00:00Z', updated_at: '2026-01-01T00:00:00Z',
+      ...over,
+    });
+    const fallbackWith = (rows: Array<Record<string, unknown>>) => {
+      delete h.rpc.crew_documents_for_profile;
+      delete h.rpc.crew_document_rights;
+      h.tables.crew_certificates = { data: rows, error: null };
+    };
+    const renderInScope = (tab: 'documents' | 'stcw' | 'qualifications') => {
+      const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+      const scope = { scope: 'vessel', vesselCode: 'DRA', vessel: { id: 'v-dra', name: 'DRAAK' } } as unknown as ScopeValue;
+      return render(
+        <QueryClientProvider client={client}>
+          <MemoryRouter>
+            <ScopeContext.Provider value={scope}>
+              <DocumentsTab tab={tab} profile={summary} vessel={VESSEL} />
+            </ScopeContext.Provider>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
+    };
+
+    it('a fallback row that maps to nothing: STCW does not claim nothing is recorded, and points to Qualifications', async () => {
+      fallbackWith([legacyCert({})]);
+      renderInScope('stcw');
+      const panel = await ready();
+      expect(panel).toHaveAttribute('data-documents-source', 'fallback');
+      expect(panel.querySelector('[data-document-row]')).toBeNull();
+      expect(within(panel).queryByText(/recorded yet/)).toBeNull();
+      expect(within(panel).queryByText('None are recorded for this person on this tab.')).toBeNull();
+      expect(within(panel).getByRole('heading', { name: 'No STCW certificates filed here' })).toBeInTheDocument();
+      const pointer = panel.querySelector('[data-unclassified-pointer]') as HTMLElement;
+      expect(pointer).toHaveTextContent('1 document STORM could not file by type is listed under Qualifications, Not classified yet.');
+      expect(within(pointer).getByRole('link', { name: `Qualifications, ${UNCLASSIFIED_GROUP_LABEL}` })).toHaveAttribute(
+        'href',
+        `/v/dra/crew/people/${PROFILE}/qualifications`,
+      );
+    });
+
+    it('the row itself is on Qualifications, Not classified yet, with no pointer there', async () => {
+      fallbackWith([legacyCert({})]);
+      renderInScope('qualifications');
+      const panel = await ready();
+      expect(panel.querySelector(`[data-document-group="${UNCLASSIFIED_GROUP_KEY}"]`)).not.toBeNull();
+      expect(panel.querySelector('[data-unclassified-pointer]')).toBeNull();
+    });
+
+    it('a tab with rows of its own still says where the unfiled ones are (plural)', async () => {
+      fallbackWith([
+        legacyCert({}),
+        legacyCert({ id: 'l-x', certificate_type: 'Other_Thing', certificate_name: 'Something else' }),
+        legacyCert({ id: 'l-pp', certificate_type: 'Passport', certificate_name: 'Passport', certificate_number: 'P-9' }),
+      ]);
+      renderInScope('documents');
+      const panel = await ready();
+      expect(docRow('l-pp')).not.toBeNull();
+      expect(panel.querySelector('[data-unclassified-pointer]')).toHaveTextContent('2 documents STORM could not file by type are listed under Qualifications, Not classified yet.');
+    });
+
+    it('server mode too: a row with no category and no type is pointed to from the other tabs', async () => {
+      h.rpc.crew_documents_for_profile = () => ({
+        data: [row({ id: 'd-unc', document_type_id: null, type_key: null, type_name: null, category_key: null, category_label: null, tab: 'qualifications', legacy_type: 'Medical_Care', legacy_name: 'Medical First Aid' })],
+        error: null,
+      });
+      renderInScope('stcw');
+      const panel = await ready();
+      expect(panel).toHaveAttribute('data-documents-source', 'server');
+      expect(within(panel).getByRole('heading', { name: 'No STCW certificates filed here' })).toBeInTheDocument();
+      expect(panel.querySelector('[data-unclassified-pointer="1"]')).not.toBeNull();
+    });
+
+    it('a mapped STCW row files on STCW; no pointer anywhere, Qualifications keeps its own empty state', async () => {
+      fallbackWith([legacyCert({ certificate_type: 'STCW Medical First Aid (VI/4)' })]);
+      renderInScope('stcw');
+      const panel = await ready();
+      expect(docRow('l-mfa')).not.toBeNull();
+      expect(panel.querySelector('[data-unclassified-pointer]')).toBeNull();
+    });
+
+    it('a mapped STCW row: the Qualifications tab shows no pointer and its usual empty state', async () => {
+      fallbackWith([legacyCert({ certificate_type: 'STCW Medical First Aid (VI/4)' })]);
+      renderInScope('qualifications');
+      const panel = await ready();
+      expect(panel.querySelector('[data-unclassified-pointer]')).toBeNull();
+      expect(within(panel).getByRole('heading', { name: 'No qualifications recorded yet' })).toBeInTheDocument();
+    });
   });
 
   it('D-01: the storage helper missing keeps Add off with its sentence', async () => {

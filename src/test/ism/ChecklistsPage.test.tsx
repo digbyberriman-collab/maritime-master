@@ -132,6 +132,21 @@ describe('the tiles', () => {
     expect(call?.args).toEqual({ p_vessel_ids: [V.dra], p_area: 'safety', p_today: today });
   });
 
+  it('no checklists offered is a neutral zero, not "All clear" (a good count); Overdue keeps its check', async () => {
+    h.state.rows.form_templates = [];
+    h.state.rows.form_template_vessel_settings = [];
+    h.state.rpc.form_template_run_stats = { data: [], error: null };
+    renderPage();
+    await screen.findByText('No checklists on this vessel yet');
+    const available = tile('Checklists available');
+    expect(available).toHaveAttribute('data-state', 'zero');
+    const label = within(available).getByText('None offered yet');
+    expect(label).toHaveClass('text-muted-foreground');
+    expect(available.querySelector('.text-success')).toBeNull();
+    await waitFor(() => expect(tile('Overdue')).toHaveAttribute('data-state', 'zero'));
+    expect(within(tile('Overdue')).getByText('Nothing overdue')).toHaveClass('text-success');
+  });
+
   it('while run tracking is not set up the run tiles say so, with no number', async () => {
     seed();
     delete h.state.rpc.form_template_run_stats;

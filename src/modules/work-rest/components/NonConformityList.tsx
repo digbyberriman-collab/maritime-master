@@ -23,6 +23,14 @@ interface Props {
   canReview: boolean;
   actorId: string;
   actorRole?: string | null;
+  /**
+   * Expected days of the month with no entry, and days entered. When given,
+   * "All clear" shows only for a fully entered month (none missing, some
+   * entered); otherwise the empty list says how far it goes. Omitted: the
+   * old "All clear" for callers that do not know the coverage.
+   */
+  missingDays?: number;
+  enteredDays?: number;
 }
 
 const SEVERITY_STYLES: Record<string, string> = {
@@ -47,6 +55,8 @@ export const NonConformityList: React.FC<Props> = ({
   canReview,
   actorId,
   actorRole,
+  missingDays,
+  enteredDays,
 }) => {
   const { toast } = useToast();
   const [editing, setEditing] = useState<Record<string, { status?: string; justification?: string }>>({});
@@ -82,8 +92,19 @@ export const NonConformityList: React.FC<Props> = ({
   };
 
   if (!ncs.length) {
+    const coverageKnown = missingDays !== undefined || enteredDays !== undefined;
+    const fullyEntered = (missingDays ?? 0) === 0 && (enteredDays ?? 0) > 0;
+    if (coverageKnown && !fullyEntered) {
+      return (
+        <Card data-nc-empty="partial">
+          <CardContent className="py-6 text-sm text-muted-foreground">
+            {(enteredDays ?? 0) > 0 ? 'No non-conformities in the days entered' : 'No days entered yet'}
+          </CardContent>
+        </Card>
+      );
+    }
     return (
-      <Card>
+      <Card data-nc-empty="clear">
         <CardContent className="py-6 text-sm text-muted-foreground flex items-center gap-2">
           <Badge className="bg-success/15 text-success border-success/40">All clear</Badge>
           No non-conformities for this period.

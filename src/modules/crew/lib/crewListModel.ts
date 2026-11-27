@@ -391,6 +391,24 @@ export function toCrewMemberStub(row: CrewListRow, vessel: { id: string; name: s
   };
 }
 
+// ---------------------------------------------------------------- crew numbers (D-272)
+
+/**
+ * The rows with their crew numbers merged in by profile id (D-272: the
+ * numbers come from their own read of crew_personal_details, since
+ * crew_vessel_list cannot return them). Works for both sources ('server'
+ * and 'basic'). A profile not in the map keeps the number it has (null);
+ * an empty map returns the rows unchanged.
+ */
+export function withCrewNumbers(rows: readonly CrewListRow[], numbers: ReadonlyMap<string, string | null>): CrewListRow[] {
+  if (numbers.size === 0) return rows as CrewListRow[];
+  return rows.map((row) => {
+    if (!numbers.has(row.profileId)) return row;
+    const crewNumber = text(numbers.get(row.profileId) ?? null);
+    return crewNumber === row.crewNumber ? row : { ...row, crewNumber };
+  });
+}
+
 // ---------------------------------------------------------------- search, filters, counts, sort
 
 /** What a row is searched by: names, position (catalogue and free text) and crew number. */

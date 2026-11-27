@@ -48,6 +48,21 @@ describe('ready', () => {
     const { container } = render(<KpiTile label="Crew on board" value={null} />);
     expect(valueOf(container)).toHaveTextContent('—');
   });
+
+  it('a placeholder dash carries no unit and reads muted', () => {
+    const { container } = render(<KpiTile label="Rest this month" value={null} unit="h" />);
+    expect(valueOf(container)).toHaveTextContent('—');
+    expect(valueOf(container)).toHaveClass('text-muted-foreground');
+    expect(screen.queryByText('h')).toBeNull();
+    expect(tileOf(container).textContent).toBe('Rest this month—');
+  });
+
+  it('a value keeps its unit', () => {
+    const { container } = render(<KpiTile label="Rest this month" value={12} unit="h" />);
+    expect(valueOf(container)).toHaveTextContent('12');
+    expect(valueOf(container)).toHaveClass('text-foreground');
+    expect(screen.getByText('h')).toBeInTheDocument();
+  });
 });
 
 describe('text values', () => {
@@ -73,6 +88,28 @@ describe('states', () => {
     expect(valueOf(container)).toHaveTextContent('0');
     expect(screen.getByText('All clear')).toHaveClass('text-success');
     expect(tileOf(container).className).not.toContain('border-l-critical');
+  });
+
+  it('zero with zeroTone neutral: a muted label, no success colour, no check (good counts)', () => {
+    const { container } = render(
+      <KpiTile label="Compliant" value={0} tone="ok" zeroTone="neutral" zeroLabel="No one compliant yet" />,
+    );
+    expect(tileOf(container)).toHaveAttribute('data-state', 'zero');
+    expect(valueOf(container)).toHaveTextContent('0');
+    const label = screen.getByText('No one compliant yet');
+    expect(label).toHaveClass('text-muted-foreground');
+    expect(label).not.toHaveClass('text-success');
+    expect(container.querySelector('.text-success')).toBeNull();
+    expect(container.querySelector('svg')).toBeNull();
+    expect(screen.queryByText('All clear')).toBeNull();
+  });
+
+  it('zero by default keeps the check icon', () => {
+    const { container } = render(<KpiTile label="Overdue" value={0} />);
+    const label = screen.getByText('All clear');
+    expect(label).toHaveClass('text-success');
+    expect(label.querySelector('svg')).not.toBeNull();
+    expect(tileOf(container)).toHaveAttribute('data-state', 'zero');
   });
 
   it('loading: skeletons, busy, labelled, never a link', () => {

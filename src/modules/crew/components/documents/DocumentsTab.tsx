@@ -1,4 +1,5 @@
 import React, { Suspense } from 'react';
+import { Link } from 'react-router-dom';
 import { FileText, History, Info, ListPlus, Plus, RefreshCw, RotateCw, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCan } from '@/lib/permissions/useCan';
@@ -26,7 +27,10 @@ import {
 import type { CrewDocumentTab } from '@/modules/crew/types/db.pending';
 import type { ProfileTabProps } from '@/modules/crew/lib/profileTabs';
 import { countDocumentLegend } from '@/modules/crew/lib/documentState';
-import { SYSTEM_CATEGORY_TAB } from '@/modules/crew/lib/documentTabs';
+import { CREW_DOCUMENT_TAB_LABEL, SYSTEM_CATEGORY_TAB, UNCLASSIFIED_TAB } from '@/modules/crew/lib/documentTabs';
+import { profilePath } from '@/modules/crew/lib/profileTabs';
+import { useVesselScope } from '@/app/router/scopes';
+import { vesselPath } from '@/modules/vessels/lib/vesselCode';
 import { CATALOGUE_MISSING_NOTICE } from '@/modules/crew/lib/crewDocumentSchema';
 import { UPLOADS_UNAVAILABLE_NOTICE, crewDocumentUploadsReady } from '@/modules/crew/lib/documentUpload';
 import { CREW_CAPS } from '@/modules/crew/paths';
@@ -275,6 +279,11 @@ export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({
   );
 
   const copy = DOCUMENT_TAB_COPY[tab];
+  // Where the documents STORM could not file by type are listed (the Qualifications tab, "Not classified
+  // yet"): the profile's tab in this vessel scope, or the page's own ?tab= on /me/documents.
+  const vesselScope = useVesselScope();
+  const unclassifiedHref =
+    context === 'own' ? `?tab=${UNCLASSIFIED_TAB}` : vesselScope ? vesselPath(vesselScope.code, profilePath(profileId, UNCLASSIFIED_TAB)) : null;
   const add = addAvailability({ documents, catalogue, rights, uploadsReady });
   const catalogueReady = catalogue.status === 'ready' ? catalogue.catalogue : null;
   const canOpenDialog = !add.hidden && !add.block && catalogueReady !== null;
@@ -371,6 +380,26 @@ export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({
   }
 
   const onTab = documents.documents.filter((d) => d.tab === tab);
+  // Rows on the Qualifications tab only because they map to nothing (no category, no type): another tab
+  // must not claim nothing is recorded while one of them may belong there (x1-stcw-fallback-empty-state).
+  const unclassified = tab === UNCLASSIFIED_TAB ? [] : documents.documents.filter((d) => d.categoryKey === null && d.typeId === null);
+  const unclassifiedPointer =
+    unclassified.length > 0 ? (
+      <>
+        {unclassified.length} {unclassified.length === 1 ? 'document' : 'documents'} STORM could not file by type{' '}
+        {unclassified.length === 1 ? 'is' : 'are'} listed under{' '}
+        {unclassifiedHref ? (
+          <Link to={unclassifiedHref} className="focus-ring rounded-sm font-medium text-primary underline-offset-4 hover:underline">
+            {CREW_DOCUMENT_TAB_LABEL[UNCLASSIFIED_TAB]}, {UNCLASSIFIED_GROUP_LABEL}
+          </Link>
+        ) : (
+          <span className="font-medium text-foreground">
+            {CREW_DOCUMENT_TAB_LABEL[UNCLASSIFIED_TAB]}, {UNCLASSIFIED_GROUP_LABEL}
+          </span>
+        )}
+        .
+      </>
+    ) : null;
   const reviewLive = review.status === 'ready';
   const reviewCount = onTab.filter(needsReview).length;
   const filtering = reviewOnly && reviewLive && reviewCount > 0;
@@ -533,15 +562,29 @@ export const DocumentsPanel: React.FC<DocumentsPanelProps> = ({
         </Button>
       ) : null}
       {missingBlock}
+      {unclassifiedPointer && onTab.length > 0 ? (
+        <p className="flex items-start gap-2 type-caption text-muted-foreground" data-unclassified-pointer={unclassified.length}>
+          <Info aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+          <span>{unclassifiedPointer}</span>
+        </p>
+      ) : null}
       {onTab.length === 0 ? (
         <EmptyState
           kind="first-use"
           icon={FileText}
-          title={`No ${copy.title === 'STCW' ? 'STCW certificates' : copy.title.toLowerCase()} recorded yet`}
+          title={
+            unclassifiedPointer
+              ? `No ${copy.title === 'STCW' ? 'STCW certificates' : copy.title.toLowerCase()} filed here`
+              : `No ${copy.title === 'STCW' ? 'STCW certificates' : copy.title.toLowerCase()} recorded yet`
+          }
           body={
-            canOpenDialog
-              ? 'Add the first one. Choose its type and STORM files it on the right tab.'
-              : 'None are recorded for this person on this tab.'
+            unclassifiedPointer ? (
+              <span data-unclassified-pointer={unclassified.length}>{unclassifiedPointer}</span>
+            ) : canOpenDialog ? (
+              'Add the first one. Choose its type and STORM files it on the right tab.'
+            ) : (
+              'None are recorded for this person on this tab.'
+            )
           }
           action={
             canOpenDialog ? (

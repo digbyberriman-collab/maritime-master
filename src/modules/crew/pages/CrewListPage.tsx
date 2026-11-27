@@ -27,7 +27,7 @@ import { CREW_CAPS, CREW_ROOT } from '@/modules/crew/paths';
 import { useCrew, type CrewMember } from '@/modules/crew/hooks/useCrew';
 import { crewKeys } from '@/modules/crew/hooks/crewKeys';
 import {
-  crewInvitationCell, useCrewMemberForEdit, useFallbackLeaveCodes, useVesselCrewList, type CrewListVessel,
+  crewInvitationCell, useCrewMemberForEdit, useCrewNumbers, useFallbackLeaveCodes, useVesselCrewList, type CrewListVessel,
 } from '@/modules/crew/hooks/useVesselCrewList';
 import {
   crewStatusDetailText,
@@ -41,6 +41,7 @@ import {
   sortCrewRows,
   toCrewMemberStub,
   withCrewListParams,
+  withCrewNumbers,
   withMovementRange,
   type CrewListParams,
   type CrewListRow,
@@ -69,6 +70,9 @@ const EMPTY_ROWS: CrewListRow[] = [];
 
 /** The D-01 notice while crew_vessel_list is not applied (X1 spec X1-02 §5). */
 export const BASIC_LIST_NOTICE = 'Showing the basic crew list. Movements and invitation status appear once the crew update is applied.';
+
+/** A failed crew-number read (not a missing table): the list stands, the numbers are left out. */
+export const CREW_NUMBERS_NOTICE = 'Crew numbers could not be loaded, so they are not shown or searched.';
 
 const LOGIN_LABEL: Record<CrewListRow['loginState'], string> = { active: 'Active', pending_login: 'Pending login', disabled: 'Disabled' };
 
@@ -174,7 +178,7 @@ const CrewListBody: React.FC<{ vessel: RouteVessel }> = ({ vessel }) => {
 
   const serverRows = list.status === 'ready' ? list.rows : null;
   const leaveCodeMap = leaveCodes.status === 'ready' ? leaveCodes.byUserId : null;
-  const rows = useMemo<CrewListRow[]>(() => {
+  const listRows = useMemo<CrewListRow[]>(() => {
     if (serverRows) return serverRows;
     if (!basic || crew.isLoading || !leaveCodeMap) return EMPTY_ROWS;
     const mapped = crew.crew
@@ -182,6 +186,11 @@ const CrewListBody: React.FC<{ vessel: RouteVessel }> = ({ vessel }) => {
       .filter((r): r is CrewListRow => r !== null);
     return sortCrewRows(mapped, 'rank', 'asc');
   }, [serverRows, basic, crew.isLoading, crew.crew, leaveCodeMap, vessel.id, today, canViewProfiles]);
+  // Crew numbers come from their own read (D-272), for both sources; the list never waits for them.
+  const profileIds = useMemo(() => listRows.map((r) => r.profileId), [listRows]);
+  const crewNumbers = useCrewNumbers(vessel.companyId, vessel.id, profileIds);
+  const numberMap = crewNumbers.status === 'ready' ? crewNumbers.byProfileId : null;
+  const rows = useMemo<CrewListRow[]>(() => (numberMap ? withCrewNumbers(listRows, numberMap) : listRows), [listRows, numberMap]);
 
   const isLoading =
     list.status === 'loading' || list.status === 'idle' || (basic && (crew.isLoading || leaveCodes.status === 'loading' || leaveCodes.status === 'idle'));
@@ -410,6 +419,14 @@ const CrewListBody: React.FC<{ vessel: RouteVessel }> = ({ vessel }) => {
         <Alert variant="info" data-crew-list-notice="basic">
           <AlertDescription>{BASIC_LIST_NOTICE}</AlertDescription>
         </Alert>
+      ) : null}
+      {crewNumbers.status === 'error' && params.tab === 'crew' ? (
+        <p role="status" className="flex flex-wrap items-center gap-x-2 gap-y-1 type-body-sm text-muted-foreground" data-crew-list-notice="crew-numbers">
+          {CREW_NUMBERS_NOTICE}
+          <Button type="button" variant="link" size="sm" className="h-auto p-0" onClick={crewNumbers.retry}>
+            Try again
+          </Button>
+        </p>
       ) : null}
 
       <Tabs value={params.tab} onValueChange={(value) => setParams({ tab: value === 'movements' ? 'movements' : 'crew' })}>

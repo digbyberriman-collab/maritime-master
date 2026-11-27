@@ -272,7 +272,15 @@ export default function CrewQualificationsReport({ definition }: ReportComponent
             zeroLabel="Nothing expiring"
             href={statusHref('expiring')}
           />
-          <KpiTile label="Complete" icon={CheckCircle2} value={tally.complete} state={loading ? 'loading' : undefined} zeroLabel="None complete yet" href={statusHref('complete')} />
+          <KpiTile
+            label="Complete"
+            icon={CheckCircle2}
+            value={tally.complete}
+            state={loading ? 'loading' : undefined}
+            zeroTone="neutral"
+            zeroLabel="None complete yet"
+            href={statusHref('complete')}
+          />
         </KpiGrid>
         {data ? <CoverageNote vessels={vessels} moduleName="the crew module" /> : null}
         {unset.length > 0 ? (

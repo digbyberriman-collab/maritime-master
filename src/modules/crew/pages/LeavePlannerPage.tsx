@@ -8,7 +8,7 @@ import { useVessel } from '@/modules/vessels/contexts/VesselContext';
 import { getDaysInMonth, format, isWeekend, isToday, getDay } from 'date-fns';
 import {
   ChevronLeft, ChevronRight, Lock, Unlock, Search, Paintbrush,
-  Undo2, Loader2, Info, CalendarDays, Download, Calculator, AlertTriangle,
+  Undo2, Loader2, Info, CalendarDays, Download, Calculator, AlertTriangle, ArrowUpRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -286,7 +286,7 @@ export function LegacyLeavePlanner({ embedded = false }: { embedded?: boolean } 
       <div className="space-y-3">
         {/* Header */}
         <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
+          <div className="min-w-0">
             {embedded ? null : (
               <h1 className="text-2xl font-bold flex items-center gap-2">
                 <CalendarDays className="w-6 h-6" />
@@ -297,7 +297,8 @@ export function LegacyLeavePlanner({ embedded = false }: { embedded?: boolean } 
               {scopeLabel} — {year} • {filteredCrew.length} crew shown
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          {/* Wraps at 390 px instead of running off the edge (embedded as the Manning fallback). */}
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             {canAccessAllVessels && (
               <Button
                 variant={fleetView ? 'default' : 'outline'}
@@ -313,8 +314,16 @@ export function LegacyLeavePlanner({ embedded = false }: { embedded?: boolean } 
             <Button variant="outline" size="sm" onClick={exportCsv}>
               <Download className="w-4 h-4 mr-1" /> Export CSV
             </Button>
-            <Button variant="outline" size="sm" onClick={() => navigate('/crew/leave/calculator')}>
+            {/* The calculator has one route, outside the vessel scope (legacyRedirects keeps it): a cross-scope exit. */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/crew/leave/calculator')}
+              title="Opens the leave calculator in the workspace, outside this vessel"
+            >
               <Calculator className="w-4 h-4 mr-1" /> Calculator
+              <ArrowUpRight aria-hidden="true" className="w-3.5 h-3.5 text-muted-foreground" />
+              <span className="sr-only">(opens in the workspace)</span>
             </Button>
             {embedded ? null : (
               <Button variant="outline" size="sm" onClick={() => navigate('/crew/leave/requests')}>

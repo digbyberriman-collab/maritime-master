@@ -485,6 +485,30 @@ describe('fallback and errors', () => {
     expect(screen.queryByRole('button', { name: /Summary PDF|Summary Excel|Export All Crew/ })).toBeNull();
   });
 
+  it('the fallback: zero compliant is not "All clear"; the day matrix scrolls inside its own box (no page overflow at 390)', async () => {
+    delete h.answers.work_rest_vessel_board;
+    h.tables = {
+      crew_assignments: { data: [{ user_id: 'u-deck', position: 'Deckhand', join_date: '2026-01-01', start_date: null, leave_date: null, end_date: null, is_current: true }], error: null },
+      profiles: { data: [{ user_id: 'u-deck', first_name: 'Deckhand', last_name: 'Example', rank: 'Deckhand', department: 'Deck' }], error: null },
+      work_rest_records: { data: [{ crew_id: 'u-deck', record_date: '2026-11-20', total_rest_minutes: 420, is_compliant: false }], error: null },
+    };
+    renderPage();
+    await screen.findByRole('link', { name: /Deckhand Example/ });
+    const overview = document.querySelector('[data-hor-overview]') as HTMLElement;
+    const compliant = Array.from(overview.querySelectorAll('[data-state]')).find((t) => t.textContent?.startsWith('Compliant')) as HTMLElement;
+    expect(compliant).toHaveAttribute('data-state', 'zero');
+    expect(compliant).toHaveTextContent('No one compliant yet');
+    expect(compliant).not.toHaveTextContent('All clear');
+    expect(compliant.querySelector('.text-success')).toBeNull();
+    expect(compliant).not.toHaveAttribute('data-tone');
+    // The breach cell's sr-only text is positioned against the scroller, not the page (x1-hor-board-sronly-overflow).
+    const breach = overview.querySelector('[title="Breach"]') as HTMLElement;
+    expect(breach).not.toBeNull();
+    const scroller = breach.closest('.overflow-x-auto') as HTMLElement;
+    expect(scroller).not.toBeNull();
+    expect(scroller.className).toContain('relative');
+  });
+
   it('a 42501 from the server reads as no access', async () => {
     h.answers.work_rest_vessel_board = () => ({ data: null, error: { code: '42501', message: 'not_permitted', details: 'You do not approve hours of rest on this vessel.' } });
     renderPage();

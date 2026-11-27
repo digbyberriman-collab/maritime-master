@@ -102,18 +102,22 @@ export const WorkRestOverviewBody: React.FC<WorkRestOverviewBodyProps> = ({ vess
     <div className="min-w-0 space-y-4" data-hor-overview="">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiTile label="Crew" icon={Users} value={stats.total} />
+        {/* A good count: none compliant is not a clean bill, so zero reads neutral. */}
         <KpiTile
           label="Compliant"
           icon={CheckCircle2}
           value={stats.compliant}
-          tone="ok"
-          sub={stats.total ? `${Math.round((stats.compliant / stats.total) * 100)}% of crew` : undefined}
+          tone={stats.compliant > 0 ? 'ok' : undefined}
+          sub={stats.compliant > 0 && stats.total ? `${Math.round((stats.compliant / stats.total) * 100)}% of crew` : undefined}
+          zeroTone="neutral"
+          zeroLabel="No one compliant yet"
         />
         <KpiTile label="Needs review" icon={AlertTriangle} value={stats.review} tone="warn" />
         <KpiTile label="Non-compliant" icon={XCircle} value={stats.nonCompliant} tone="danger" />
       </div>
       <p className="type-caption text-muted-foreground">Open a crew member to see their month.</p>
-      <div className="overflow-x-auto rounded-lg border border-border bg-card">
+      {/* `relative`: the scroller is the containing block of the breach cells' sr-only spans, so they scroll inside it, not the page. */}
+      <div className="relative overflow-x-auto rounded-lg border border-border bg-card">
         <table className="w-full border-collapse type-caption">
           <caption className="sr-only">Rest hours by day, {monthLabel({ year, month })}</caption>
           <thead>

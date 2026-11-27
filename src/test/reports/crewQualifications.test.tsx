@@ -290,6 +290,19 @@ describe('Crew qualifications page', () => {
     expect(within(summary).getByText('Missing or expired').closest('a')).toHaveAttribute('href', '/fleet/reports/crew-qualifications?status=needs-action');
   });
 
+  it('no one complete is a neutral zero (a good count); a problem count at zero keeps its check', async () => {
+    state.shown = shownReady();
+    const notComplete = ROWS.filter((r) => r.status !== 'complete' && r.status !== 'missing' && r.status !== 'expired');
+    state.answers = { fleet_report_crew_qualifications: { data: answer({ rows: notComplete }), error: null } };
+    renderReport();
+    const summary = await screen.findByRole('region', { name: 'Crew qualifications summary' });
+    const complete = (await within(summary).findByText('None complete yet')).closest('[data-state]') as HTMLElement;
+    expect(complete).toHaveAttribute('data-state', 'zero');
+    expect(within(complete).getByText('None complete yet')).toHaveClass('text-muted-foreground');
+    expect(complete.querySelector('.text-success')).toBeNull();
+    expect(within(summary).getByText('Nothing missing or expired')).toHaveClass('text-success');
+  });
+
   it('applies Show and Status from the URL, and Reset clears them', async () => {
     state.shown = shownReady();
     state.answers = { fleet_report_crew_qualifications: { data: answer(), error: null } };

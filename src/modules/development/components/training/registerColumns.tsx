@@ -68,6 +68,9 @@ export function registerColumns(ctx: RegisterContext): DataTableColumn<FleetAppl
         </div>
       ),
     },
+    // The reference sits next to the person so it is never the column that scrolls out of view at narrow
+    // desktop widths; lower-priority columns (Vessel, Estimated cost) are the ones that clip.
+    { id: 'number', header: 'Number', kind: 'reference', value: (r) => r.application_number, sortable: false, className: 'whitespace-nowrap' },
   ];
   if (ctx.showVessel) {
     columns.push({ id: 'vessel', header: 'Vessel', value: (r) => ctx.vesselName(r.vessel_id), emptyReason: 'A vessel outside your list', className: 'whitespace-nowrap' });
@@ -113,7 +116,6 @@ export function registerColumns(ctx: RegisterContext): DataTableColumn<FleetAppl
       minWidth: 180,
       cell: (r) => statusCell(r, ctx),
     },
-    { id: 'number', header: 'Number', kind: 'reference', value: (r) => r.application_number, sortable: false, className: 'whitespace-nowrap' },
   );
   return columns;
 }

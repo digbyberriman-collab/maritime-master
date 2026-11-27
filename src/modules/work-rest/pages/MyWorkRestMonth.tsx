@@ -558,6 +558,11 @@ const HorMonthBody: React.FC<HorMonthViewProps & { onDiscard: () => void }> = ({
   const breaches = wr.compliance.non_conformities;
   const serious = breaches.filter((b) => b.is_serious).length;
   const nearLimit = model.days.filter((d) => d.day.warning).length;
+  // How far a zero goes: nothing entered certifies nothing (even a month with nothing expected yet,
+  // e.g. all leave); a partial month only the days entered. The green check is for a fully entered month.
+  const noneEntered = entered === 0;
+  const partial = missing > 0 && entered > 0;
+  const coverageSub = noneEntered ? 'No days entered yet' : partial ? `None in the ${entered} ${entered === 1 ? 'day' : 'days'} entered` : undefined;
   const todayInMonth = today.startsWith(monthKey(year, month));
   const restRecords: DailyRecord[] = [...(monthData.data?.context ?? []), ...records];
 
@@ -664,14 +669,23 @@ const HorMonthBody: React.FC<HorMonthViewProps & { onDiscard: () => void }> = ({
           tone={missing > 0 ? 'warn' : undefined}
           sub={missing > 0 ? `${missing} expected ${missing === 1 ? 'day has' : 'days have'} no entry` : 'Every expected day so far'}
         />
+        {/* A zero certifies only a fully entered month (MLC): with days missing it says how far the figure goes. */}
         <KpiTile
           label="Breaches"
-          value={breaches.length}
+          value={noneEntered ? null : breaches.length}
+          state={breaches.length === 0 && (noneEntered || partial) ? 'ready' : undefined}
           tone={serious > 0 ? 'danger' : breaches.length ? 'orange' : undefined}
-          sub={breaches.length ? `${serious} serious` : undefined}
+          sub={breaches.length ? `${serious} serious` : coverageSub}
           zeroLabel="No breaches"
         />
-        <KpiTile label="Near the limit" value={nearLimit} tone={nearLimit ? 'warn' : undefined} sub={nearLimit ? 'Days within the warning margin' : undefined} zeroLabel="No days near the limit" />
+        <KpiTile
+          label="Near the limit"
+          value={noneEntered ? null : nearLimit}
+          state={nearLimit === 0 && (noneEntered || partial) ? 'ready' : undefined}
+          tone={nearLimit ? 'warn' : undefined}
+          sub={nearLimit ? 'Days within the warning margin' : coverageSub}
+          zeroLabel="No days near the limit"
+        />
       </div>
 
       <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-3">
@@ -758,6 +772,8 @@ const HorMonthBody: React.FC<HorMonthViewProps & { onDiscard: () => void }> = ({
           />
           <NonConformityList
             ncs={wr.nonConformities}
+            missingDays={missing}
+            enteredDays={entered}
             onRefresh={() => void wr.refresh()}
             canReview={!isOwn && (canFinalApprove || (canApprove && model.sameDepartment))}
             actorId={actorId}

@@ -222,7 +222,7 @@ const VesselLane: React.FC<{
       <div className="sticky left-0 z-10 flex shrink-0 items-center gap-2 bg-muted px-3" style={{ width: labelWidth }}>
         <span className="truncate type-body-sm font-semibold text-foreground">{vessel.name}</span>
         {link && gate.allowed ? (
-          <Link to={link} className="focus-ring ml-auto inline-flex size-8 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground [@media(pointer:coarse)]:size-11" aria-label={`Open the planner of ${vessel.name}`}>
+          <Link to={link} className="focus-ring ml-auto inline-flex size-8 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground [@media(pointer:coarse)]:size-11" aria-label={`Open the planner of ${vessel.name}`}>
             <ExternalLink aria-hidden="true" className="size-4" />
           </Link>
         ) : null}

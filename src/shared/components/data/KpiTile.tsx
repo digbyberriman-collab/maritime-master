@@ -36,7 +36,17 @@ export interface KpiTileProps {
   href?: string;
   /** Defaults to `zero` when `value` is 0, else `ready`. `no-access` renders nothing. */
   state?: KpiTileState;
+  /** The sub-line at zero (default "All clear"). */
   zeroLabel?: React.ReactNode;
+  /**
+   * How the zero sub-line reads. `ok` (the default) is the green check: only
+   * problem and queue counts (overdue, breaches, waiting for review) may read
+   * "All clear" at zero. A good count (compliant crew, completed courses,
+   * checklists offered) passes `neutral` with a neutral `zeroLabel`: the
+   * label is muted and has no check, because none compliant is not a clean
+   * bill. `data-state` stays `zero` either way.
+   */
+  zeroTone?: 'ok' | 'neutral';
   notEnabledReason?: React.ReactNode;
   /** For admins: where to switch the source on. */
   enableHref?: string;
@@ -84,7 +94,7 @@ function DeltaChip({ change, label, goodWhen, format }: KpiDelta) {
  * an optional delta. It always says why a number is missing:
  *
  *   loading      skeleton bars where the value and breakdown will be
- *   zero         "0" and "All clear"
+ *   zero         "0" and "All clear" (or a muted label with zeroTone="neutral")
  *   not-enabled  "—" and the reason ("Hours of Rest is off on 3 vessels")
  *   error        "—" and "Could not load", with retry
  *   no-access    nothing (the tile is hidden)
@@ -101,6 +111,7 @@ export function KpiTile({
   href,
   state,
   zeroLabel = 'All clear',
+  zeroTone = 'ok',
   notEnabledReason = 'Not switched on',
   enableHref,
   enableLabel = 'Switch on',
@@ -114,6 +125,9 @@ export function KpiTile({
   const isLoading = resolved === 'loading';
   const hasAlert = resolved === 'ready' && tone !== undefined && tone !== 'neutral';
   const showValue = resolved === 'ready' || resolved === 'zero';
+  const display = showValue ? formatValue(resolved === 'zero' && (value === undefined || value === null) ? 0 : value) : '—';
+  // A placeholder dash never carries a unit ("— h") and reads muted.
+  const hasDisplayValue = display !== '—';
   // Interactive children (enable link, retry) must not sit inside the tile link.
   const asLink = Boolean(href) && (resolved === 'ready' || resolved === 'zero');
 
@@ -121,12 +135,15 @@ export function KpiTile({
   if (isLoading) {
     subline = <Skeleton aria-hidden="true" className="h-3 w-32" />;
   } else if (resolved === 'zero') {
-    subline = (
-      <span className="inline-flex items-center gap-1 text-sm font-medium text-success">
-        <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" />
-        {zeroLabel}
-      </span>
-    );
+    subline =
+      zeroTone === 'neutral' ? (
+        <span className="text-sm text-muted-foreground">{zeroLabel}</span>
+      ) : (
+        <span className="inline-flex items-center gap-1 text-sm font-medium text-success">
+          <CheckCircle2 aria-hidden="true" className="h-3.5 w-3.5" />
+          {zeroLabel}
+        </span>
+      );
   } else if (resolved === 'not-enabled') {
     subline = (
       <span className="text-sm text-muted-foreground">
@@ -180,13 +197,17 @@ export function KpiTile({
               data-kpi-value=""
               className={cn(
                 textValue ? 'type-display min-w-0 truncate' : 'type-kpi',
-                hasAlert && tone ? TONE_TEXT[tone] : showValue ? 'text-foreground' : 'text-muted-foreground',
+                !hasDisplayValue
+                  ? 'text-muted-foreground'
+                  : hasAlert && tone
+                    ? TONE_TEXT[tone]
+                    : 'text-foreground',
               )}
               title={textValue && typeof value === 'string' ? value : undefined}
             >
-              {showValue ? formatValue(resolved === 'zero' && (value === undefined || value === null) ? 0 : value) : '—'}
+              {display}
             </span>
-            {showValue && unit ? <span className="text-sm text-muted-foreground">{unit}</span> : null}
+            {hasDisplayValue && unit ? <span className="text-sm text-muted-foreground">{unit}</span> : null}
           </>
         )}
       </div>

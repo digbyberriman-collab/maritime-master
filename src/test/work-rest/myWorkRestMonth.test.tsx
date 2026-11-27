@@ -170,7 +170,7 @@ vi.mock('@/modules/work-rest/components/SignOffPanel', () => ({
     return <section aria-label="Sign-off stub" />;
   },
 }));
-vi.mock('@/modules/work-rest/components/NonConformityList', () => ({ NonConformityList: () => null }));
+// NonConformityList renders for real: its empty state is part of what the month certifies.
 vi.mock('@/modules/work-rest/components/AuditLogPanel', () => ({ AuditLogPanel: () => null }));
 
 import MyWorkRestMonth from '@/modules/work-rest/pages/MyWorkRestMonth';
@@ -509,6 +509,58 @@ describe('MyWorkRestMonth (/me/hours-of-rest)', () => {
     expect(screen.getByText('16 of 18')).toBeInTheDocument();
     expect(screen.getByText('2 expected days have no entry')).toBeInTheDocument();
     expect(h.monthOpened.at(-1)).toEqual({ vesselId: 'v-dra', year: 2026, month: 11 });
+  });
+
+  // A zero certifies only a fully entered month (MLC figures): no green check, no "All clear" with days missing.
+  const kpi = (label: string) => {
+    const tiles = Array.from(document.querySelectorAll('[data-hor-kpis] [data-state]')) as HTMLElement[];
+    return tiles.find((t) => t.textContent?.startsWith(label)) as HTMLElement;
+  };
+
+  it('a month with no days entered certifies nothing: no check, no "All clear", no "No breaches"', async () => {
+    h.records = [];
+    renderPage();
+    await findEl('[data-hor-kpis]');
+    expect(screen.getByText('0 of 18')).toBeInTheDocument();
+    const kpis = document.querySelector('[data-hor-kpis]') as HTMLElement;
+    expect(kpis.querySelector('.text-success')).toBeNull();
+    expect(within(kpis).queryByText('No breaches')).toBeNull();
+    expect(within(kpis).queryByText('No days near the limit')).toBeNull();
+    expect(kpi('Breaches')).toHaveAttribute('data-state', 'ready');
+    expect(within(kpi('Breaches')).getByText('—')).toBeInTheDocument();
+    expect(within(kpi('Breaches')).getByText('No days entered yet')).toBeInTheDocument();
+    expect(within(kpi('Near the limit')).getByText('No days entered yet')).toBeInTheDocument();
+    // Rest this month: a dash, and no orphan unit.
+    expect(kpi('Rest this month').querySelector('[data-kpi-value]')?.textContent).toBe('—');
+    expect(within(kpi('Rest this month')).queryByText('h')).toBeNull();
+    expect(await screen.findByText('No days entered yet', { selector: '[data-nc-empty] *' })).toBeInTheDocument();
+    expect(screen.queryByText('All clear')).toBeNull();
+  });
+
+  it('a partial month says how far its zero goes: "None in the N days entered"', async () => {
+    h.records = h.records.filter((r) => r.record_date !== '2026-11-15');
+    renderPage();
+    await findEl('[data-hor-kpis]');
+    expect(screen.getByText('15 of 18')).toBeInTheDocument();
+    expect(kpi('Breaches')).toHaveAttribute('data-state', 'ready');
+    expect(within(kpi('Breaches')).getByText('0')).toBeInTheDocument();
+    expect(within(kpi('Breaches')).getByText('None in the 15 days entered')).toBeInTheDocument();
+    expect(within(kpi('Near the limit')).getByText('None in the 15 days entered')).toBeInTheDocument();
+    expect(document.querySelector('[data-hor-kpis] .text-success')).toBeNull();
+    expect(screen.getByText('No non-conformities in the days entered')).toBeInTheDocument();
+    expect(screen.queryByText('All clear')).toBeNull();
+  });
+
+  it('a fully entered clean month keeps the checks and "All clear"', async () => {
+    h.records = [];
+    for (let d = 1; d <= 20; d++) if (d !== 10 && d !== 11) h.records.push(day(`2026-11-${String(d).padStart(2, '0')}`));
+    renderPage();
+    await findEl('[data-hor-kpis]');
+    expect(screen.getByText('18 of 18')).toBeInTheDocument();
+    expect(kpi('Breaches')).toHaveAttribute('data-state', 'zero');
+    expect(within(kpi('Breaches')).getByText('No breaches')).toHaveClass('text-success');
+    expect(within(kpi('Near the limit')).getByText('No days near the limit')).toHaveClass('text-success');
+    expect(screen.getByText('All clear')).toBeInTheDocument();
   });
 
   it('a day opens the day editor, the URL keeps it, and Week shows that week', async () => {

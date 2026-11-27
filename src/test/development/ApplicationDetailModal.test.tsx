@@ -11,7 +11,7 @@
  * missing, leaves only the applicant's submit and cancel of a draft
  * working: every other step reads "Not set up yet".
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 const h = vi.hoisted(() => ({
@@ -78,7 +78,12 @@ const buttonNames = () => {
   return region ? within(region).getAllByRole('button').map((b) => b.textContent?.split(':')[0].trim()) : [];
 };
 
+// The fixtures carry fixed updated_at stamps; the "waiting more than 7 days" suffix reads the clock.
+// Only Date is faked (timers stay real, so waitFor keeps working).
+const NOW = new Date('2026-11-27T10:00:00Z');
+
 beforeEach(() => {
+  vi.useFakeTimers({ now: NOW, toFake: ['Date'] });
   h.userId = APPLICANT;
   h.support = 'unknown';
   h.mode = 'both';
@@ -87,6 +92,10 @@ beforeEach(() => {
   h.events = { status: 'not_set_up' };
   h.mutateAsync.mockReset();
   h.mutateAsync.mockResolvedValue({ mode: 'rpc' });
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('the applicant', () => {
@@ -229,6 +238,11 @@ describe('the final approvers', () => {
     expect(screen.getByText('Waiting for the Purser')).toBeInTheDocument();
     expect(buttonNames()).not.toContain('Approve');
     expect(buttonNames()).toContain('Return for changes');
+  });
+
+  it('marks a stage waiting more than 7 days', () => {
+    renderModal({ application: application({ status: 'captain_purser_review', updated_at: '2026-11-01T09:00:00Z' }), canReview: true, reviewStage: 'captain' });
+    expect(screen.getByText(/waiting more than 7 days/)).toBeInTheDocument();
   });
 
   it('voids an application in its own dialog, with a reason', async () => {

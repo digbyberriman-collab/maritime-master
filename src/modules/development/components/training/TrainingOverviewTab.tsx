@@ -92,7 +92,16 @@ export function TrainingOverviewTab({ register, expenses, mode, vessels, categor
           Training at a glance
         </h2>
         <KpiGrid className="min-[1440px]:grid-cols-4">
-          <KpiTile label="Applications" icon={ClipboardList} value={counts.total} sub="Submitted, not voided" href={toRegister({})} />
+          {/* Good and programme counts read neutral at zero: an empty programme is not "All clear". */}
+          <KpiTile
+            label="Applications"
+            icon={ClipboardList}
+            value={counts.total}
+            sub="Submitted, not voided"
+            zeroTone="neutral"
+            zeroLabel="None submitted yet"
+            href={toRegister({})}
+          />
           <KpiTile
             label="Awaiting approval"
             icon={Clock}
@@ -107,9 +116,32 @@ export function TrainingOverviewTab({ register, expenses, mode, vessels, categor
             tone={stale.length > 0 ? 'danger' : undefined}
             sub="At one approval stage"
           />
-          <KpiTile label="Approved, not completed" icon={GraduationCap} value={counts.approved} href={toRegister({ status: 'approved' })} />
-          <KpiTile label="Completed" icon={CheckCircle2} value={counts.completed} tone={counts.completed > 0 ? 'ok' : undefined} href={toRegister({ status: 'completed' })} />
-          <KpiTile label="Clawback active" icon={Undo2} value={counts.clawbackActive} sub="Reimbursed, inside the window" href={toRegister({ clawback: 'active' })} />
+          <KpiTile
+            label="Approved, not completed"
+            icon={GraduationCap}
+            value={counts.approved}
+            zeroTone="neutral"
+            zeroLabel="None waiting to complete"
+            href={toRegister({ status: 'approved' })}
+          />
+          <KpiTile
+            label="Completed"
+            icon={CheckCircle2}
+            value={counts.completed}
+            tone={counts.completed > 0 ? 'ok' : undefined}
+            zeroTone="neutral"
+            zeroLabel="None completed yet"
+            href={toRegister({ status: 'completed' })}
+          />
+          <KpiTile
+            label="Clawback active"
+            icon={Undo2}
+            value={counts.clawbackActive}
+            sub="Reimbursed, inside the window"
+            zeroTone="neutral"
+            zeroLabel="None in a clawback window"
+            href={toRegister({ clawback: 'active' })}
+          />
           {expenseTile('Reimbursed', Receipt, (t) => `USD ${Math.round(t.reimbursedUsd).toLocaleString('en-GB')}`, { textValue: true, sub: 'Approved and paid expense claims' })}
           {expenseTile('Expense claims to review', Hourglass, (t) => t.pendingClaims)}
         </KpiGrid>
