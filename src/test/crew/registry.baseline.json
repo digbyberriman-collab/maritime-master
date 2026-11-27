@@ -10,6 +10,7 @@
     "/v/:vesselCode/crew/employment-history :: <PlaceholderWrapper{title=\"Employment History\"}>",
     "/v/:vesselCode/crew/familiarisation :: page(/src/modules/training/pages/Training.tsx) guard=ProtectedRoute layout=-",
     "/v/:vesselCode/crew/hours-of-rest :: <ModuleRoute{capability=\"vessel.crew.hours_of_rest.approve\"}> > page(/src/modules/work-rest/pages/HoursOfRestBoardPage.tsx) guard=- layout=-",
+    "/v/:vesselCode/crew/hours-of-rest/report :: <ModuleRoute{capability=\"vessel.crew.hours_of_rest.view\"}> > page(/src/modules/work-rest/pages/HoursOfRestReportPage.tsx) guard=- layout=-",
     "/v/:vesselCode/crew/list :: <ModuleRoute{capability=\"vessel.crew.crew_list.view\"}> > page(/src/modules/crew/pages/CrewListPage.tsx) guard=- layout=-",
     "/v/:vesselCode/crew/new :: <ModuleRoute{capability=\"vessel.crew.crew_profiles.create\"}> > page(/src/modules/crew/pages/AddCrewPage.tsx) guard=- layout=-",
     "/v/:vesselCode/crew/people/:profileId :: redirect(personal)",

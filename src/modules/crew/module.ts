@@ -18,7 +18,9 @@
  *     leaf is gone. X1-06B rebuilt Crew Compliance (beta, behind
  *     vessel.crew.crew_compliance.view; crew/compliance/:tab). X1-08
  *     rebuilt Hours of Rest as the vessel board (beta, behind
- *     vessel.crew.hours_of_rest.approve).
+ *     vessel.crew.hours_of_rest.approve); X1-08B added its report at
+ *     crew/hours-of-rest/report (behind vessel.crew.hours_of_rest.view),
+ *     a page under the same leaf, with no leaf of its own.
  *     There is no Dashboard leaf yet: a planned leaf at the module root
  *     would turn today's crew -> crew/list redirect into a Coming Soon page
  *     (X1-10B adds it as beta with its page).
@@ -34,7 +36,8 @@
  *   (platform-prep PP4; deferred until each emitter lands, D-238). The three
  *   crew document types are live from X1-05 (review needed, decided,
  *   expiring), the four hours-of-rest types from X1-08 (reminder, serious
- *   breach, breach report, correction requested).
+ *   breach, breach report, correction requested). hor_breach_report links
+ *   to the report page X1-08B serves (`crew/hours-of-rest/report?year=&report=`).
  *
  * Platform-prep PP3 moved the routes and leaves here from
  * src/config/sitemap.ts and src/routes/index.tsx unchanged; X1-01 set the

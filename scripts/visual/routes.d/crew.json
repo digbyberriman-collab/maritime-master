@@ -571,5 +571,43 @@
     "slug": "crew-hor-board-denied",
     "persona": "vessel-crew",
     "note": "X1-08: crew without hours-of-rest approval: the approvers-only notice with a link to their own month."
+  },
+  {
+    "path": "/v/dra/crew/hours-of-rest/report?year=2026",
+    "slug": "crew-hor-report",
+    "persona": "vessel-master",
+    "waitFor": "[data-hor-report=\"ready\"] [data-hor-kpis=\"ready\"]",
+    "note": "X1-08B: the vessel's hours-of-rest report for 2026 as the Master: Unreviewed breaches, Serious open, Not submitted and Awaiting approval, By month (newest first, the month's submissions), Open breaches, Breach reports sent and the Reminders log with the 'Automatic reminders are not scheduled yet' notice. Until PR-X1-G gives the base vessel-master persona hours-of-rest final approval (crew_roster admin) and adds rpc/work_rest_breach_report_recipients.json, capture it with a scratch --fixtures copy; without them the Master sees the report as a viewer (no board links, no Create breach report)."
+  },
+  {
+    "path": "/v/dra/crew/hours-of-rest/report?year=2026",
+    "slug": "crew-hor-report-dialog",
+    "persona": "vessel-master",
+    "waitFor": "[data-hor-report=\"ready\"] [data-hor-kpis=\"ready\"]",
+    "actions": [
+      {
+        "click": "[data-open-breach-report]"
+      },
+      {
+        "waitFor": "[data-breach-report-dialog] [data-breach-choices]"
+      },
+      {
+        "wait": 400
+      }
+    ],
+    "note": "X1-08B: Create breach report open: the period with quick periods, the reviewed breaches in no report yet, the DPA and fleet HR to share with, notes; the copy says it is shared in STORM (D-249). Until PR-X1-G gives the base vessel-master persona hours-of-rest final approval (crew_roster admin) and adds rpc/work_rest_breach_report_recipients.json, capture it with a scratch --fixtures copy; without them the Master sees the report as a viewer (no board links, no Create breach report)."
+  },
+  {
+    "path": "/v/dra/crew/hours-of-rest/report?year=2026",
+    "slug": "crew-hor-report-hod",
+    "persona": "vessel-hod",
+    "waitFor": "[data-hor-report=\"ready\"] [data-hor-kpis=\"ready\"]",
+    "note": "X1-08B: the report as the Chief Officer, a head of department: the board links, open breaches and reminders, but no Create breach report (final approvers only)."
+  },
+  {
+    "path": "/v/dra/crew/hours-of-rest/report?year=2026",
+    "slug": "crew-hor-report-denied",
+    "persona": "vessel-crew",
+    "note": "X1-08B: crew without hours-of-rest access on DRAAK: the route guard keeps the report closed (no access page); nothing of the report is read."
   }
 ]

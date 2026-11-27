@@ -4,6 +4,9 @@ import { CREW_CAPS, CREW_FLEET_PATHS, CREW_PATHS, CREW_ROOT } from './paths';
 /** The person's own documents, relative to `/me` (X1-04B; the crew manifest's personal.my_work leaf). */
 export const MY_DOCUMENTS_PATH = 'documents';
 
+/** The vessel's hours-of-rest report (X1-08B), relative to `/v/:vesselCode`; under the Hours of Rest leaf. */
+export const HOR_REPORT_PATH = `${CREW_PATHS.hoursOfRest}/report`;
+
 /**
  * Crew routes, as data (BUILD-PLAN B8). The module manifest (./module.ts)
  * registers them, and the router mounts them inside their scope's layout
@@ -44,6 +47,12 @@ export const MY_DOCUMENTS_PATH = 'documents';
  * vessel and sends everyone else to their own month, /me/hours-of-rest;
  * the legacy overview is the board's D-01 fallback and still the page of
  * the legacy /crew/work-rest/overview).
+ * X1-08B serves the vessel's hours-of-rest report at
+ * crew/hours-of-rest/report?year= (HoursOfRestReportPage) behind
+ * vessel.crew.hours_of_rest.view: the year's KPIs and months, open
+ * breaches, breach reports sent (and creating one, final approvers) and
+ * the reminder log. It sits under the Hours of Rest leaf, so the crew_hor
+ * setting closes it with the board.
  * X1-04B adds the person's own documents at /me/documents (scope personal,
  * path `documents`, guard vessel.crew.crew_certificates.view_own; the page
  * asks again and the server answers only for the caller's own profile). The
@@ -93,6 +102,8 @@ export const CREW_ROUTES: readonly RouteDef[] = [
   vesselCapabilityPage(`${CREW_PATHS.compliance}/:tab`, CREW_CAPS.complianceView, () => import('@/modules/crew/pages/CrewCompliancePage')),
   // The vessel hours-of-rest board (X1-08; gap/04 C40-C43): for approvers; the page asks again for the route vessel.
   vesselCapabilityPage(CREW_PATHS.hoursOfRest, CREW_CAPS.horApprove, () => import('@/modules/work-rest/pages/HoursOfRestBoardPage')),
+  // The vessel's hours-of-rest report (X1-08B; gap/04 C44, C41, C42): for anyone who sees the vessel's hours of rest.
+  vesselCapabilityPage(HOR_REPORT_PATH, CREW_CAPS.horView, () => import('@/modules/work-rest/pages/HoursOfRestReportPage')),
   vesselRedirect(CREW_PATHS.planner, 'timeline'),
   vesselPage(CREW_PATHS.plannerTimeline, () => import('@/modules/rotation-planner/pages/RotationPlannerPage')),
   vesselPage(CREW_PATHS.plannerManning, () => import('@/modules/crew/pages/LeavePlannerPage')),

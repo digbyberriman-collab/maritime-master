@@ -26,7 +26,7 @@ import KeepSearchNavigate from '@/app/router/KeepSearchNavigate';
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 
 import manifest from '@/modules/crew/module';
-import { CREW_ROUTES, MY_DOCUMENTS_PATH } from '@/modules/crew/routes';
+import { CREW_ROUTES, HOR_REPORT_PATH, MY_DOCUMENTS_PATH } from '@/modules/crew/routes';
 import { ADD_CREW_PATH } from '@/modules/crew/lib/addCrewSchema';
 import { CREW_CAPABILITIES, CREW_CAPS, CREW_FLEET_PATHS, CREW_PATHS } from '@/modules/crew/paths';
 import { MODULE_REGISTRY } from '@/app/registry/modules';
@@ -50,6 +50,8 @@ const TODAY: Record<string, string> = {
   [`vessel ${COMPLIANCE_TAB_PATH}`]: '/src/modules/crew/pages/CrewCompliancePage.tsx',
   // X1-08: the vessel hours-of-rest board replaces the legacy overview (its D-01 fallback).
   [`vessel ${CREW_PATHS.hoursOfRest}`]: '/src/modules/work-rest/pages/HoursOfRestBoardPage.tsx',
+  // X1-08B: the vessel's hours-of-rest report (new; behind hours_of_rest.view).
+  [`vessel ${HOR_REPORT_PATH}`]: '/src/modules/work-rest/pages/HoursOfRestReportPage.tsx',
   // X1-07B: one crew member's month is the profile's Hours of rest tab (crew/people/:profileId/:tab); no route of its own.
   [`vessel ${CREW_PATHS.plannerTimeline}`]: '/src/modules/rotation-planner/pages/RotationPlannerPage.tsx',
   [`vessel ${CREW_PATHS.plannerManning}`]: '/src/modules/crew/pages/LeavePlannerPage.tsx',
@@ -86,6 +88,7 @@ describe('crew routes', () => {
       else if (r.path === ADD_CREW_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.profilesCreate });
       else if (r.path === COMPLIANCE_TAB_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.complianceView });
       else if (r.path === CREW_PATHS.hoursOfRest) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.horApprove });
+      else if (r.path === HOR_REPORT_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.horView });
       else if (r.scope === 'personal' && r.path === MY_DOCUMENTS_PATH) expect(r.guard, r.path).toEqual({ kind: 'capability', capability: CREW_CAPS.documentsViewOwn });
       else expect(r.guard, r.path).toEqual({ kind: 'login' });
     }
