@@ -147,18 +147,30 @@ describe('documents manifest', () => {
     expect(leaf).toMatchObject({ label: 'Documents', status: 'beta', capability: 'fleet.operations.fleet_documents.view' });
   });
 
-  it('the published and reminder types are live (their emitters are in 040400); the sweep\'s stay deferred (D-238)', () => {
+  it('every fleet document type is live, each named by its emitter\'s file: publish and remind in 040400, the daily sweep\'s in 040800 (D-238)', () => {
     const status = Object.fromEntries((manifest.notificationTypes ?? []).map((t) => [t.key, t.status]));
     expect(status).toEqual({
       fleet_document_published: 'live',
       fleet_document_ack_reminder: 'live',
-      fleet_document_ack_due_soon: 'deferred',
-      fleet_document_ack_overdue: 'deferred',
-      fleet_document_ack_digest: 'deferred',
+      fleet_document_ack_due_soon: 'live',
+      fleet_document_ack_overdue: 'live',
+      fleet_document_ack_digest: 'live',
     });
     const acks = read('supabase/migrations/20261124040400_fleet_documents_acknowledgements.sql');
+    const sweep = read('supabase/migrations/20261124040800_fleet_daily_sweep.sql');
+    const emittedBy: Record<string, string> = {
+      fleet_document_published: acks,
+      fleet_document_ack_reminder: acks,
+      fleet_document_ack_due_soon: sweep,
+      fleet_document_ack_overdue: sweep,
+      fleet_document_ack_digest: sweep,
+    };
     for (const key of Object.keys(status)) {
-      expect(acks.includes(`'${key}'`), key).toBe(status[key] === 'live');
+      expect(emittedBy[key].includes(`p_type_key => '${key}'`) || emittedBy[key].includes(`'${key}', `), key).toBe(true);
+    }
+    // The sweep's types are not emitted by the acknowledgements file (one emitter each).
+    for (const key of ['fleet_document_ack_due_soon', 'fleet_document_ack_overdue', 'fleet_document_ack_digest']) {
+      expect(acks.includes(`'${key}'`), key).toBe(false);
     }
   });
 });

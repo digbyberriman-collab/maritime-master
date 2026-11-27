@@ -32,11 +32,14 @@
  *   vessel, X5-05B) and the vessel page's (./paths.ts DOCUMENTS_CAPS,
  *   VESSEL_FLEET_DOCUMENTS_CAPS).
  * - notificationTypes: the fleet document notification types and their
- *   emitters (platform-prep PP4; D-238): fleet_document_published and
- *   fleet_document_ack_reminder are live (their emitters are in
- *   20261124040400, proved by fleet/documents_acks.test.sql; the manual
- *   reminder is sent from the Remind dialogs of X5-05B); the sweep's types
- *   stay deferred until X5-09.
+ *   emitters (platform-prep PP4; D-238), all live:
+ *   - fleet_document_published and fleet_document_ack_reminder: emitted in
+ *     20261124040400, proved by fleet/documents_acks.test.sql (the manual
+ *     reminder is sent from the Remind dialogs of X5-05B);
+ *   - fleet_document_ack_due_soon, fleet_document_ack_overdue and (Mondays)
+ *     fleet_document_ack_digest: emitted by fleet_ops_daily_sweep() in
+ *     20261124040800 (X5-09), run daily by hr-daily-sweeper, proved by
+ *     fleet/daily_sweep.test.sql.
  *
  * Platform-prep PP3 moved the routes from src/routes/index.tsx and the
  * leaves from src/config/sitemap.ts; X5-04A swapped in the library.
@@ -99,9 +102,9 @@ const manifest: ModuleManifest = {
   notificationTypes: [
     { key: 'fleet_document_published', status: 'live', emitter: 'fleet_documents_after_publish() on fleet_document_publish() (X5-05A)' },
     { key: 'fleet_document_ack_reminder', status: 'live', emitter: 'fleet_document_remind() from the Remind dialogs of the Acknowledgements tab and the vessel crew view (X5-05B)' },
-    { key: 'fleet_document_ack_due_soon', status: 'deferred', emitter: 'fleet_ops_daily_sweep() through hr-daily-sweeper (X5-09)' },
-    { key: 'fleet_document_ack_overdue', status: 'deferred', emitter: 'fleet_ops_daily_sweep() through hr-daily-sweeper (X5-09)' },
-    { key: 'fleet_document_ack_digest', status: 'deferred', emitter: 'fleet_ops_daily_sweep() on Mondays (X5-09)' },
+    { key: 'fleet_document_ack_due_soon', status: 'live', emitter: 'fleet_ops_daily_sweep() through hr-daily-sweeper: due in three days (X5-09)' },
+    { key: 'fleet_document_ack_overdue', status: 'live', emitter: 'fleet_ops_daily_sweep() through hr-daily-sweeper: to the person and their Master / HoD (X5-09)' },
+    { key: 'fleet_document_ack_digest', status: 'live', emitter: 'fleet_ops_daily_sweep() on Mondays, to the documents editors (X5-09)' },
   ],
 };
 

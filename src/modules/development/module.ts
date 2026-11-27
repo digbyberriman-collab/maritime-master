@@ -25,8 +25,10 @@
  *     closed per vessel by the `crew_training` module setting.
  * - capabilities: ./paths.ts DEVELOPMENT_CAPABILITIES.
  * - notificationTypes: the training application notification types and
- *   their emitters (platform-prep PP4; D-238): the two transition types are
- *   live from X5-07A, the stale digest waits for X5-09.
+ *   their emitters (platform-prep PP4; D-238), all live: the two transition
+ *   types from development_transition() (X5-07A), the Monday stale digest
+ *   from fleet_ops_daily_sweep() (20261124040800, X5-09, proved by
+ *   fleet/daily_sweep.test.sql).
  *
  * Platform-prep PP3 moved the routes from src/routes/index.tsx and the leaves
  * from src/config/sitemap.ts; X5-07B swapped in the fleet page, the guards
@@ -95,7 +97,7 @@ const manifest: ModuleManifest = {
   notificationTypes: [
     { key: 'training_application_action_needed', status: 'live', emitter: 'development_transition() (X5-07A)' },
     { key: 'training_application_updated', status: 'live', emitter: 'development_transition() (X5-07A)' },
-    { key: 'training_applications_stale', status: 'deferred', emitter: 'fleet_ops_daily_sweep() on Mondays (X5-09)' },
+    { key: 'training_applications_stale', status: 'live', emitter: 'fleet_ops_daily_sweep() on Mondays, to the training admins (X5-09)' },
   ],
 };
 
