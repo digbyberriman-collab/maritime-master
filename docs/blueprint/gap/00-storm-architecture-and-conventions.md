@@ -361,8 +361,12 @@ Platform-level entities only; domain entities are in docs 01–10.
 | `nb_` | New Build | live; company-scope fix pending verification |
 | `rf_` | Refit | **no schema anywhere**; import decided 19 Sep |
 | `frp_` | Rotation planner | live |
-| `work_rest_`, `vessel_work_rest_settings` | Hours of work and rest | in `types.ts` |
-| `form_` | ISM forms engine | live |
+| `work_rest_`, `vessel_work_rest_settings` | Hours of work and rest | in `types.ts`; Phase 3 wave 1 adds `work_rest_breach_reports`, `work_rest_reminders` (written, not applied, D-01) |
+| `form_` | ISM forms engine | live; `form_template_*` (`form_template_events`, `form_template_vessel_settings`) written in Phase 3 wave 1 (D-302) |
+| `crew_`, `positions`, `position_*`, `departments`, `contract_types`, `leave_types`, `vessel_crew_settings`, `ref_` (countries, languages), `familiarization_` (legacy, kept) | Crew (X1) | `crew_assignments`, `crew_certificates` and the legacy `familiarization_` tables live; the rest written in Phase 3 wave 1, not applied (D-01) |
+| `expiry_` | Expiry engine (X5) | written in Phase 3 wave 1, not applied (D-302) |
+| `fleet_` (shared with the live `fleet_groups`, `fleet_training_participants`): `fleet_document_*`, `fleet_documents`, `fleet_medical_settings` | Fleet operations (X5) | written in Phase 3 wave 1, not applied (D-302) |
+| `development_` | Development and training | live; `development_application_events` written in Phase 3 wave 1 (D-302) |
 | `sms_` | dead parallel forms schema | do not reuse; drop is a separate decision |
 | New domains | pick before writing SQL, record here: e.g. `safety_` (doc 05), `vcert_` or extend `certificates` (doc 06), `voyage_`, `charter_` (doc 07), `record_` (doc 08), `support_` (doc 09) | proposed |
 
